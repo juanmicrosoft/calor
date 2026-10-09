@@ -1091,7 +1091,7 @@ public class EvidenceContractTests
     public void CommittedContractRegistersTheS1ReRunAndTheC2Charge()
     {
         // Decision A raises one ceiling for one gate to one value; decision B moves one charge.
-        // Neither changes a ceiling's own value.
+        // Neither changes a ceiling's own value (amendment 1.5.0 later raised determinism-compute itself).
         var contract = Contract();
         var capacity = contract["authorityCapacity"]!["capacity"]!;
         var s1 = S1Exception(contract);
@@ -1101,7 +1101,7 @@ public class EvidenceContractTests
         Assert.Null(s1["pr"]);
         var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
         Assert.Equal(1500, ceilings["s1-generated-cases"]);
-        Assert.Equal(2000, ceilings["determinism-compute"]);
+        Assert.Equal(3200, ceilings["determinism-compute"]);  // amendment 1.5.0 (was 2,000)
         Assert.Equal(1500, ceilings["regeneration-compute"]);
         Assert.Equal(2, ceilings["regenerations"]);
         Assert.Equal(10, ceilings["s1-timebox"]);
@@ -1711,6 +1711,55 @@ public class EvidenceContractTests
     // ------------------------------------------------------------------
     // Amendment 1.4.0: the stale artifacts are reclassified by named repairs (reclassificationRule)
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Amendment 1.5.0: determinism-compute 3,200; a third C1 PR and a third C2 regeneration (C011)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Amendment150RaisesDeterminismComputeAndAddsOneFreezeAndOneRegeneration()
+    {
+        // Maintainer decisions 2026-10-08 ("Amend + 3rd freeze"; the 3,200 ceiling).
+        var contract = Contract();
+        var capacity = contract["authorityCapacity"]!["capacity"]!;
+        var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
+        Assert.Equal(3200, ceilings["determinism-compute"]);
+        Assert.Equal(2, ceilings["agent-prs-per-gate"]);
+        Assert.Equal(2, ceilings["regenerations"]);
+        Assert.Equal(1500, ceilings["regeneration-compute"]);
+        Assert.Equal(0, ceilings["paid-spend"]);
+        var added = capacity["exceptions"]!.AsArray().Where(e => e!["amendment"]!.GetValue<string>() == "1.5.0").ToList();
+        Assert.Equal(["agent-prs-per-gate #1423 3 addedPrs", "regenerations #1424 3 addedRegenerations"],
+            added.Select(e => $"{e!["ceiling"]} #{e["issue"]} {e["value"]} {(e["addedPrs"] is null ? "addedRegenerations" : "addedPrs")}"));
+        foreach (var e in added)
+        {
+            Assert.Null(e!["pr"]);
+            Assert.Contains(e["conditions"]!.AsArray(), c => c!.GetValue<string>().StartsWith("A further failure is terminal.", StringComparison.Ordinal)
+                && c.GetValue<string>().Contains("MILESTONE-FAILED", StringComparison.Ordinal));
+        }
+        var entry = contract["amendmentLog"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.5.0")!;
+        Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.Empty(entry["removedRows"]!.AsArray());
+        var change = Assert.Single(entry["ceilingChanges"]!.AsArray())!;
+        Assert.Equal(("determinism-compute", 2000, 3200), (change["ceiling"]!.GetValue<string>(), change["from"]!.GetValue<int>(), change["to"]!.GetValue<int>()));
+        Assert.Contains("4 x 795 = 3,180", entry["justification"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Empty(EvidenceContractValidator.ValidateContract(contract));
+
+        // Each new exception is bound to its registered text, value, and added amount.
+        foreach (var (ceiling, mutate) in new (string, Action<JsonNode>)[]
+        {
+            ("agent-prs-per-gate", e => e["value"] = 4),
+            ("agent-prs-per-gate", e => e["addedPrs"] = 2),
+            ("regenerations", e => e["conditions"]!.AsArray().RemoveAt(3)),
+            ("regenerations", e => e["addedPrs"] = 1),
+        })
+        {
+            var tampered = Contract();
+            mutate(tampered["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
+                .Single(e => e!["ceiling"]!.GetValue<string>() == ceiling && e["amendment"]!.GetValue<string>() == "1.5.0")!);
+            AssertViolation(EvidenceContractValidator.ValidateContract(tampered), "C011");
+        }
+    }
 
     [Fact]
     public void Amendment140ReclassifiesEveryStaleArtifactByANamedRepair()

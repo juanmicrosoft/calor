@@ -117,7 +117,7 @@ class RegistrationTests(unittest.TestCase):
             self.assertTrue(any(n.startswith(f"Calor.Compiler.Tests.{s2}.") for n in compiler), s2)
 
     def test_worst_case_fits_the_accepted_ceiling(self) -> None:
-        self.assertEqual((655, 115, 1965), dp.worst_case(PROTOCOL))  # amendment 1.3.0: Windows 75 min, no control run
+        self.assertEqual((795, 115, 3180), dp.worst_case(PROTOCOL))  # amendment 1.5.0: Windows 110 min, 4 executions, ceiling 3,200
 
 
 class NegativeRegistrationControls(unittest.TestCase):
@@ -155,7 +155,7 @@ class NegativeRegistrationControls(unittest.TestCase):
             self.only("D007", protocol=mutate(edit))
 
     def test_d008_budget_over_ceiling(self) -> None:
-        self.only("D008", protocol=mutate(lambda p: p["budget"].update(maxExecutions=4)))
+        self.only("D008", protocol=mutate(lambda p: p["budget"].update(maxExecutions=5)))  # 5 x 795 > 3,200 (amendment 1.5.0)
 
     def test_d009_line_ending_normalization(self) -> None:
         self.only("D009", protocol=mutate(lambda p: p["agreement"].update(normalizationRules=["CRLF -> LF"])))
@@ -327,6 +327,88 @@ class DecisionControls(unittest.TestCase):
         self.assertEqual(("INCOMPLETE", False), (result["verdict"], result["complete"]))
         self.assertEqual({"OPEN"}, {r["status"] for r in result["determinismRows"] if r["id"] == "identical-tree-CommittedReportsMatchGeneratedOracle"})
 
+    # Amendment 1.5.0: the harness-cut rule (runPlan.harnessCutRule).
+    def cut(self, records, env="win-x64", keep=0) -> dict:
+        """Make the last attempt of env one that the harness's job deadline cut in profile number keep."""
+        r = find(records, env, self.protocol["runPlan"]["attemptsPerJob"])
+        r["profiles"] = r["profiles"][:keep + 1]
+        p = r["profiles"][keep]
+        r.update(status="invalid", reason=dp.HARNESS_CUT_REASON)
+        p.update(status="invalid", invocation="timeout|Missing", exitCode=-9, seconds=60.0)
+        p["tests"] = {n: ",".join(["Timeout"] * len(v.split(","))) for n, v in p["tests"].items()}
+        p["cells"] = None if p["cells"] is None else {k: "Timeout" for k in p["cells"]}
+        p["artifacts"] = {k: "Timeout" for k in p["artifacts"]}
+        return r
+
+    def test_harness_cut_attempt_is_incomplete_never_disagreement(self) -> None:
+        records = passing_records(self.protocol)
+        self.cut(records)
+        result = self.decide(records)
+        self.assertEqual(("INCOMPLETE", False, 0), (result["verdict"], result["complete"], result["classCounts"]["DISAGREE"]))
+        self.assertEqual([{"environment": "win-x64", "job": 1, "attempt": self.protocol["runPlan"]["attemptsPerJob"],
+                           "profile": "verification-full"}], result["harnessCut"])
+        row = self.klass(result, f"test:verification:{ORACLE}")
+        self.assertEqual("INCOMPLETE", row["class"])
+        self.assertNotIn("Timeout", row["valuesByEnvironment"]["win-x64"])
+        self.assertEqual("INCOMPLETE", self.klass(result, "invocation:verification-full")["class"])
+        # Without the rule (1.4.0 and earlier) the same records read NON-DETERMINISTIC.
+        records = passing_records(self.protocol)
+        self.cut(records).pop("reason")
+        self.assertEqual("NON-DETERMINISTIC", self.decide(records)["verdict"])
+
+    def test_harness_cut_never_hides_an_observed_disagreement(self) -> None:
+        records = passing_records(self.protocol)
+        self.cut(records)
+        prof(find(records, "linux-x64", 1), "verification-full")["tests"][ORACLE] = "Failed"
+        result = self.decide(records)
+        self.assertEqual(("NON-DETERMINISTIC", "DISAGREE"), (result["verdict"], self.klass(result, f"test:verification:{ORACLE}")["class"]))
+        # A profile that completed earlier in the cut attempt is still compared.
+        records = passing_records(self.protocol)
+        r = self.cut(records, keep=1)
+        r["profiles"][0]["tests"][ORACLE] = "Failed"
+        r["profiles"][0].update(exitCode=1, invocation="1|Completed")
+        result = self.decide(records)
+        self.assertEqual("DISAGREE", self.klass(result, f"test:verification:{ORACLE}")["class"])
+        self.assertEqual("oracle-isolated", result["harnessCut"][0]["profile"])
+
+    def test_harness_cut_keeps_every_value_it_observed(self) -> None:
+        # Round 1 of #1537: only filled values are left out. An observed test outcome, cell, or artifact of the cut
+        # invocation that differs from the others is still DISAGREE.
+        observed = [
+            (lambda p: p["tests"].update({ORACLE: "Failed"}), f"test:verification:{ORACLE}"),
+            (lambda p: p["cells"].update({"case-000007": "0" * 32 + "|1"}), "cell:case-000007"),
+            (lambda p: p["artifacts"].update({"translator-fixture": "c" * 64}), "artifact:translator-fixture"),
+        ]
+        for change, key in observed:
+            records = passing_records(self.protocol)
+            change(self.cut(records)["profiles"][0])
+            result = self.decide(records)
+            self.assertEqual(("NON-DETERMINISTIC", "DISAGREE"), (result["verdict"], self.klass(result, key)["class"]), key)
+        # An observed value equal to the others is kept, but it never establishes (the attempt is invalid).
+        records = passing_records(self.protocol)
+        self.cut(records)["profiles"][0]["tests"][ORACLE] = "Passed"
+        result = self.decide(records)
+        self.assertEqual(("INCOMPLETE", "INCOMPLETE"), (result["verdict"], self.klass(result, f"test:verification:{ORACLE}")["class"]))
+
+    def test_a_partly_observed_theory_row_is_checked_as_part_of_the_full_value(self) -> None:
+        name, multiplicity = next((n, m) for n, m in dp.selection(dp.profile_by_id(self.protocol)["verification-full"], CASES).items() if m > 1)
+        for observed, expected in (("Passed", "INCOMPLETE"), ("Failed", "DISAGREE")):
+            records = passing_records(self.protocol)
+            self.cut(records)["profiles"][0]["tests"][name] = ",".join([observed] + ["Timeout"] * (multiplicity - 1))
+            row = self.klass(self.decide(records), f"test:verification:{name}")
+            self.assertEqual(expected, row["class"], observed)
+            if expected == "DISAGREE":
+                self.assertEqual({"win-x64": [observed]}, row["partialValuesByEnvironment"])
+
+    def test_only_a_genuine_harness_cut_is_excluded(self) -> None:
+        for change in (lambda r: r.update(reason="the harness stopped before this attempt"),
+                       lambda r: r.update(reason="the job deadline was reached before this invocation"),
+                       lambda r: r["profiles"][-1].update(invocation="-9|Missing")):
+            records = passing_records(self.protocol)
+            change(self.cut(records))
+            result = self.decide(records)
+            self.assertEqual(([], "NON-DETERMINISTIC"), (result["harnessCut"], result["verdict"]))
+
     def test_malformed_foreign_or_rerun_records_are_invalid(self) -> None:
         def theory_short(rs):
             prof(find(rs, "linux-x64"), "verification-full")["tests"][THEORY] = "Passed"
@@ -430,10 +512,11 @@ class PlanGuards(unittest.TestCase):
     """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
 
     def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",), ledger=None,
-             current=True) -> list[str]:
+             current=True, merge=None) -> list[str]:
         runs = list(inventory) + ([this_run(mode, execution_id)] if current else [])
         return dr.plan_problems(PROTOCOL, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
-                                ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths))
+                                ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths),
+                                pr_merge_commit=lambda pr: merge)
 
     def refused(self, needle: str, **kwargs) -> None:
         problems = self.plan(**kwargs)
@@ -450,6 +533,25 @@ class PlanGuards(unittest.TestCase):
             env = envs[cell["env"]]
             self.assertEqual((env["runner"], env["jobTimeoutMinutes"]), (cell["runner"], cell["timeout"]))
         self.assertEqual({20}, {c["timeout"] for c in dr.matrix(PROTOCOL, "control")["include"]})
+
+    def test_fourth_execution_runs_only_on_the_amendment_merge(self) -> None:
+        # Amendment 1.5.0 (budget.extraExecution): after 3 executions, one more, only on the merge commit GitHub recorded
+        # for the amendment's PR. A commit whose subject merely names that PR does not qualify.
+        three = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=400) for i in (1, 2, 3)]
+        self.assertEqual([], self.plan(inventory=three, merge=NEW))
+        for merge in (None, OLD, NEW[:12], "not a sha"):
+            self.refused("may run only on the merge commit", inventory=three, merge=merge)
+        self.assertEqual([], self.plan(inventory=three[:2], merge=None))  # the first three executions are not bound
+
+    def test_the_merge_commit_comes_from_githubs_record_of_a_merged_pr(self) -> None:
+        good = {"merged": True, "base": {"ref": "main"}, "merge_commit_sha": NEW}
+        self.assertEqual(NEW, dr.pr_merge_commit(REPO, "t", 1537, get=lambda path, token: good))
+        for data in (dict(good, merged=False), dict(good, base={"ref": "release"}), {}):
+            self.assertIsNone(dr.pr_merge_commit(REPO, "t", 1537, get=lambda path, token, d=data: d))
+
+        def boom(path, token):
+            raise OSError("network")
+        self.assertIsNone(dr.pr_merge_commit(REPO, "t", 1537, get=boom))
 
     def test_second_execution_of_a_commit_is_refused(self) -> None:
         self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW)])
@@ -483,16 +585,17 @@ class PlanGuards(unittest.TestCase):
         self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1")], paths=["docs/x.md"]))
 
     def test_budget_exceeded_is_refused(self) -> None:
-        spent = [past(i, f"determinism control C{i}", minutes=720, started=False) for i in (1, 2)]  # 13 + 1,440 + 555 > 2,000
-        self.refused("exceeds the 2000", inventory=spent)
-        self.refused("exceeds the 2000", inventory=[past(i, "unreadable", status="in_progress", minutes=0) for i in (1, 2, 3)])
-        busy = [past(1, "determinism execution E1", status="in_progress", minutes=1800)]  # measured minutes plus the worst case
-        self.refused("exceeds the 2000", inventory=busy, mode="control", execution_id="C1")
+        # Amendment 1.5.0: ceiling 3,200, worst case 795 per execution.
+        spent = [past(i, f"determinism control C{i}", minutes=1200, started=False) for i in (1, 2)]  # 13 + 2,400 + 795 > 3,200
+        self.refused("exceeds the 3200", inventory=spent)
+        self.refused("exceeds the 3200", inventory=[past(i, "unreadable", status="in_progress", minutes=0) for i in (1, 2, 3, 4)])
+        busy = [past(1, "determinism execution E1", status="in_progress", minutes=2500)]  # measured minutes plus the worst case
+        self.refused("exceeds the 3200", inventory=busy, mode="control", execution_id="C1")
         self.refused("missing from the API inventory", ledger={"entries": [{"runId": 3, "runnerMinutes": 1}]})
-        bigger = {"entries": [{"runId": 1, "mode": "control", "runnerMinutes": 1500}]}
-        self.refused("exceeds the 2000", inventory=[past(1, "determinism control C1", minutes=1)], ledger=bigger)
-        executions = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=1) for i in (1, 2, 3)]
-        self.refused("limit of 3 execution", inventory=executions)
+        bigger = {"entries": [{"runId": 1, "mode": "control", "runnerMinutes": 2500}]}
+        self.refused("exceeds the 3200", inventory=[past(1, "determinism control C1", minutes=1)], ledger=bigger)
+        executions = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=1) for i in (1, 2, 3, 4)]
+        self.refused("limit of 4 execution", inventory=executions)
         cancelled = [past(i, f"determinism control C{i}", minutes=0, started=False, conclusion="cancelled") for i in (1, 2)]
         self.refused("limit of 0 control", inventory=cancelled, mode="control", execution_id="C3")  # every dispatch counts
         refusals = [past(i, f"determinism execution E{i}", minutes=1, started=False, conclusion="failure") for i in (1, 2, 3)]
@@ -766,6 +869,51 @@ class AttemptRunnerControls(unittest.TestCase):
         self.assertEqual(["environment-violation"] * 2, [r["status"] for r in self.records()])
         self.assertEqual([None, None], [self.problem(r) for r in self.records()])
         self.assertEqual([], self.lines())
+
+    def test_a_cut_is_decided_by_the_bound_that_ended_the_invocation(self) -> None:
+        # Rounds 1-2 of #1537: the cause of a timeout is the bound the invocation was given (job deadline or process
+        # timeout), never its measured duration, so a deadline just under the process timeout, a delayed kill, or slow
+        # result processing cannot turn a cut into a compared Timeout value, nor a process timeout into a cut.
+        from unittest import mock
+        profile = PROTOCOL["control"]["profile"]
+        limit = profile["processTimeoutMinutes"] * 60
+        for left, killed_after, expect in ((limit - 0.5, limit + 2.0, ("invalid", True)),   # deadline 0.5 s short; late kill
+                                           (limit - 120, limit - 119, ("invalid", True)),   # an ordinary cut
+                                           (limit + 600, limit + 0.1, ("timeout", False)),  # the process timeout bound
+                                           (limit + 600, limit - 300, ("timeout", False))):  # even if it ends early
+            clock = [1000.0]
+
+            def run(cmd, env, seconds, log, gone=killed_after):
+                Path(log).write_text("", encoding="utf-8")
+                clock[0] += gone
+                return None, True
+
+            def slow_values(*args, **kwargs):
+                clock[0] += 0.9  # result processing after the kill
+                return original(*args, **kwargs)
+            original = dp.profile_values
+            directory = self.out / f"inv-{left}-{killed_after}"
+            with mock.patch.object(dr, "run_with_timeout", run), mock.patch.object(dp, "profile_values", slow_values), \
+                    mock.patch.object(dr.time, "monotonic", lambda: clock[0]):
+                result = dr.run_profile(PROTOCOL, CASES, profile, dp.env_by_id(PROTOCOL)["linux-x64"], directory, self.base,
+                                        self.base["NUGET_PACKAGES"], time.time() + left)
+            self.assertEqual(expect, (result["status"], result["_cut"]), left)
+            self.assertEqual(round(killed_after, 1), result["seconds"])  # recorded before the results were read
+
+    def test_a_deadline_cut_is_recorded_with_the_harness_cut_reason(self) -> None:
+        from unittest import mock
+        real = dr.run_profile
+
+        def cut_profile(*args, **kwargs):
+            result = real(*args, **kwargs)
+            result.update(_cut=True, status="invalid", invocation="timeout|Missing")
+            return result
+        with mock.patch.object(dr, "run_profile", cut_profile):
+            self.assertEqual(1, self.run_job())
+        records = self.records()
+        self.assertEqual([(dp.HARNESS_CUT_REASON, 1), (dp.HARNESS_CUT_REASON, 0)],
+                         [(r["reason"], len(r["profiles"])) for r in records])
+        self.assertNotIn("_cut", records[0]["profiles"][0])  # the cause is never written to the record
 
     def test_the_job_deadline_stops_starting_invocations(self) -> None:
         self.assertEqual(1, self.run_job(JOB_STARTED=str(time.time() - 16 * 60)))
