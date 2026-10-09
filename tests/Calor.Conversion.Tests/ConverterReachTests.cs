@@ -258,7 +258,11 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1Initializer");
 
         AssertParsesClean(rt);
-        Assert.Contains("§NEW{TestValidator}", rt.Calor);
+        // #1524: these are collection-initializer Add calls, not member assignments.
+        // §NEW used to render them as `_item0 = ...`, which names no member of
+        // TestValidator; they are now kept as C# with a reported loss.
+        Assert.Contains("§CS{new TestValidator", rt.Calor);
+        Assert.DoesNotContain("_item0", rt.Calor);
     }
 
     /// <summary>

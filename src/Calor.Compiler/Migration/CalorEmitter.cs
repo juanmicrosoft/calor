@@ -2945,9 +2945,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // emitter re-emits `f` instead of widening to double.
         if (node.IsSingle)
             return $"SINGLE:{((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-        return node.IsDecimal
-            ? $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
-            : node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (node.IsDecimal)
+            return $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        // #1528: the lexer reads a bare literal as a double only when it has a
+        // fraction or an exponent. A whole-number double such as 2.0 prints as "2",
+        // which would re-parse as an int and turn x / 2.0 into integer division.
+        var text = node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return double.IsFinite(node.Value) && text.IndexOfAny(['.', 'E', 'e']) < 0
+            ? text + ".0"
+            : text;
     }
 
     public string Visit(DecimalLiteralNode node)

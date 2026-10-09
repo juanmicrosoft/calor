@@ -226,7 +226,7 @@ public static class FeatureSupport
         {
             Name = "object-initializer",
             Support = SupportLevel.Full,
-            Description = "Object initializers are converted to Calor §NEW with property assignments"
+            Description = "Name = value object initializers are converted to Calor §NEW with member assignments. Collection-initializer elements, nested initializers, untyped target-typed new, initializers inside interpolation holes and non-constant collection values that would be hoisted are preserved as inline C# interop with a reported loss."
         },
         ["dictionary-initializer"] = new FeatureInfo
         {
