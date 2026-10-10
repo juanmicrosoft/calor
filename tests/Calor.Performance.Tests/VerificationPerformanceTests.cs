@@ -213,6 +213,10 @@ public class VerificationPerformanceTests
             $"Medium module binding took {sw.ElapsedMilliseconds}ms, expected < 500ms");
     }
 
+    private const int StatementsPerFunction = 100;
+    private const int SmallFunctionCount = 20;
+    private const int LargeFunctionCount = 160;
+
     /// <summary>
     /// Binding cost must grow linearly with the number of functions. The 0.22
     /// regression (loop discovery copying the module-wide symbol table at every
@@ -224,18 +228,20 @@ public class VerificationPerformanceTests
     [Fact]
     public void Binding_ScalesLinearlyWithFunctionCount()
     {
+        // Sized to keep this test cheap inside the timed suite (#1536): the module is
+        // parsed once per size and only binding is repeated.
         static double BestBindMs(int functions)
         {
-            var source = SyntheticCodeGenerator.Generate(functions: functions, statementsPerFunction: 100);
+            var source = SyntheticCodeGenerator.Generate(functions: functions, statementsPerFunction: StatementsPerFunction);
+            var parseDiagnostics = new DiagnosticBag();
+            var tokens = new Lexer(source, parseDiagnostics).TokenizeAllForParser();
+            var ast = new Parser(tokens, parseDiagnostics).Parse();
+            Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
             var best = double.MaxValue;
             for (var run = 0; run < 3; run++)
             {
-                var diagnostics = new DiagnosticBag();
-                var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
-                var ast = new Parser(tokens, diagnostics).Parse();
-                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
                 var sw = Stopwatch.StartNew();
-                new Binder(diagnostics).Bind(ast);
+                new Binder(new DiagnosticBag()).Bind(ast);
                 sw.Stop();
                 best = Math.Min(best, sw.Elapsed.TotalMilliseconds);
             }
@@ -243,10 +249,10 @@ public class VerificationPerformanceTests
         }
 
         BestBindMs(10); // JIT warmup
-        var small = BestBindMs(40);
-        var large = BestBindMs(320);
+        var small = BestBindMs(SmallFunctionCount);
+        var large = BestBindMs(LargeFunctionCount);
         var ratio = large / Math.Max(small, 1.0);
-        _output.WriteLine($"Binding 40 functions: {small:F1}ms, 320 functions: {large:F1}ms, ratio {ratio:F2}x");
+        _output.WriteLine($"Binding {SmallFunctionCount} functions: {small:F1}ms, {LargeFunctionCount} functions: {large:F1}ms, ratio {ratio:F2}x");
 
         Assert.True(ratio < 24,
             $"Binding scaling is superlinear: 8x the functions took {ratio:F2}x the time (linear is ~8x, quadratic ~64x)");
