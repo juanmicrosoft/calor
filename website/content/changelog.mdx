@@ -132,8 +132,10 @@ give the details.
   `main` after the release commit refuses; an unrelated change does not. The headline bytes
   depend only on the release commit, so two runs write identical files.
 - **The NuGet packages and the website build byte-for-byte the same from the same commit.**
-  The release gate (#1410) rebuilds both at publication and compares their SHA-256 hashes with
-  the adjudicated ones, so the builds must be reproducible. Two builds of one commit, in fresh
+  On the gated path, the release gate (#1410) rebuilds both at publication and compares their
+  SHA-256 hashes with the adjudicated ones, so the builds must be reproducible. The 0.24.0
+  override release skips that comparison, because no adjudication succeeded. It checks only that
+  the packages, release metadata, and notes match the release commit. Two builds of one commit, in fresh
   clones at different paths, give identical hashes for both packages, every package entry, the
   release metadata, and every website file. One macOS and one Linux build also matched. This
   holds when both builds use the same .NET SDK build: Homebrew's source-built SDK 10.0.401 gives

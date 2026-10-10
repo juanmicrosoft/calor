@@ -35,6 +35,7 @@ import re
 import sys
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verify_release_adjudication as r2  # noqa: E402  (the #1410 gate; reused, not changed)
@@ -172,6 +173,52 @@ def check_notes(gate: r2.Gate, label: str, text: str, expected: str, override: d
     r2.scan_text(gate, label, text)
 
 
+def nuspec_metadata(data: bytes) -> dict[str, str]:
+    """id and version from <package><metadata>, ignoring the XML namespace and comments."""
+    try:
+        root = ElementTree.fromstring(data)
+    except ElementTree.ParseError:
+        return {}
+    local = lambda tag: tag.rsplit("}", 1)[-1]  # noqa: E731
+    metadata = [child for child in root if local(child.tag) == "metadata"]
+    if local(root.tag) != "package" or len(metadata) != 1:
+        return {}
+    found: dict[str, str] = {}
+    for child in metadata[0]:
+        if local(child.tag) in ("id", "version"):
+            found[local(child.tag)] = "<duplicate>" if local(child.tag) in found else (child.text or "").strip()
+    return found
+
+
+def check_metadata(gate: r2.Gate, root: Path, cand: str, hashes: dict[str, str]) -> None:
+    """scripts/generate-release-metadata.py output: one SBOM and one provenance statement, each
+    naming exactly the packages about to be pushed (name -> sha256) and the candidate commit."""
+    files = {p.name: p for p in root.glob("*.json")}
+    sboms = [n for n in files if n.endswith(".sbom.spdx.json")]
+    provs = [n for n in files if n.endswith(".provenance.json")]
+    if not hashes or len(files) != 2 or len(sboms) != 1 or len(provs) != 1:
+        gate.fail("O012", f"metadata must be one .sbom.spdx.json and one .provenance.json for --nuget-dir, found {sorted(files)}")
+        return
+    try:
+        sbom = json.loads(files[sboms[0]].read_text(encoding="utf-8"))
+        prov = json.loads(files[provs[0]].read_text(encoding="utf-8"))
+        sbom_files = {f["fileName"]: f["checksums"][0]["checksumValue"] for f in sbom["files"]}
+        subjects = {s["name"]: s["digest"]["sha256"] for s in prov["subject"]}
+        commit = prov["predicate"]["buildDefinition"]["externalParameters"]["commit"]
+        namespace = sbom["documentNamespace"]
+    except (ValueError, KeyError, IndexError, TypeError) as error:
+        gate.fail("O012", f"release metadata does not have the generated shape: {error!r}")
+        return
+    if sbom_files != hashes:
+        gate.fail("O012", f"{sboms[0]} does not list exactly the packages and their sha256")
+    if subjects != hashes:
+        gate.fail("O012", f"{provs[0]} subjects are not exactly the packages and their sha256")
+    if commit != cand or f"/sbom/{cand}/" not in namespace:
+        gate.fail("O012", f"release metadata does not name the candidate {cand}")
+    for name, path in sorted(files.items()):
+        r2.scan_text(gate, name, path.read_text(encoding="utf-8"))
+
+
 def check_surfaces(gate: r2.Gate, args: argparse.Namespace, cand: str, version: str,
                    override: dict, override_sha: str) -> None:
     tag = f"v{version}"
@@ -193,22 +240,24 @@ def check_surfaces(gate: r2.Gate, args: argparse.Namespace, cand: str, version: 
 
     hashes: dict[str, str] = {}
     if args.nuget_dir:
+        # The packages carry no source commit (the nuspec repository element has none), so the
+        # binding to the candidate is --expect-head in the job that packs, plus the metadata check.
         local = {p.name: p for p in Path(args.nuget_dir).glob("*.nupkg")}
-        wanted = {f"calor.{version}.nupkg", f"calor.sdk.{version}.nupkg"}
-        if {name.lower() for name in local} != wanted or len(local) != 2:
+        wanted = {f"calor.{version}.nupkg": "calor", f"calor.sdk.{version}.nupkg": "calor.sdk"}
+        if {name.lower() for name in local} != set(wanted) or len(local) != 2:
             gate.fail("O011", f"package directory must hold exactly {sorted(wanted)}, found {sorted(local)}")
         for name, path in sorted(local.items()):
             hashes[name] = r2.sha256(path.read_bytes())
             with zipfile.ZipFile(path) as archive:
+                specs = [e for e in archive.namelist() if e.endswith(".nuspec") and "/" not in e]
+                if len(specs) != 1:
+                    gate.fail("O011", f"{name}: expected exactly one root .nuspec, found {len(specs)}")
+                else:
+                    meta = nuspec_metadata(archive.read(specs[0]))
+                    if meta.get("id", "").lower() != wanted.get(name.lower()) or meta.get("version") != version:
+                        gate.fail("O011", f"{name}: nuspec id/version {meta.get('id')!r}/{meta.get('version')!r} "
+                                          f"is not {wanted.get(name.lower())!r}/{version!r}")
                 for entry in archive.namelist():
-                    if entry.endswith(".nuspec"):
-                        nuspec = archive.read(entry).decode("utf-8", "replace")
-                        found = re.search(r"<version>([^<]+)</version>", nuspec)
-                        if not found or found.group(1) != version:
-                            gate.fail("O011", f"{name}: nuspec version is not {version}")
-                        commit = re.search(r'<repository\b[^>]*\bcommit="([^"]*)"', nuspec)
-                        if commit and commit.group(1) != cand:
-                            gate.fail("O011", f"{name}: built from {commit.group(1)}, not the candidate {cand}")
                     if entry.endswith(".nuspec") or Path(entry).suffix.lower() in r2.TEXT_SUFFIXES:
                         r2.scan_text(gate, f"{name}/{entry}", archive.read(entry).decode("utf-8", "replace"))
         if args.registry_dir:
@@ -221,18 +270,7 @@ def check_surfaces(gate: r2.Gate, args: argparse.Namespace, cand: str, version: 
                 if mine is None or r2.zip_entries(mine) != theirs:
                     gate.fail("O011", f"nuget.org already serves {existing.name} with content other than this package")
     if args.metadata_dir:
-        files = sorted(Path(args.metadata_dir).glob("*.json"))
-        if not files or not hashes:
-            gate.fail("O012", "metadata needs a non-empty directory and --nuget-dir")
-        for path in files:
-            text = path.read_text(encoding="utf-8")
-            try:
-                json.loads(text)
-            except ValueError:
-                gate.fail("O012", f"{path.name} is not valid JSON")
-            missing = [n for n, h in hashes.items() if h not in text] + ([cand] if cand not in text else [])
-            if missing:
-                gate.fail("O012", f"{path.name} does not name {', '.join(missing)}")
+        check_metadata(gate, Path(args.metadata_dir), cand, hashes)
     if args.website_dir:
         root = Path(args.website_dir)
         pages = [p for p in sorted(root.rglob("*")) if p.is_file()] if root.is_dir() else []

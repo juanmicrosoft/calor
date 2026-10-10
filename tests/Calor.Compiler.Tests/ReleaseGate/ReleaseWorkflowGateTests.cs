@@ -105,6 +105,36 @@ public class ReleaseWorkflowGateTests
     }
 
     [Fact]
+    public void GateCheckerRejectsModeSelectionAloneAsAGate()
+    {
+        var lines = ("jobs:\n  publish:\n    steps:\n      - run: python3 scripts/verify_maintainer_override.py --select-mode --identity x --override y\n"
+            + "      - run: dotnet nuget push x.nupkg\n").Split('\n');
+        var violations = new List<string>();
+        GateViolations("mutant.yml", lines, violations);
+        Assert.NotEmpty(violations);
+    }
+
+    [Theory]
+    [MemberData(nameof(GatedWorkflows))]
+    public void EveryModeSwitchRunsTheMatchingVerifierInEachBranch(string workflow)
+    {
+        // A switch that verifies in one mode verifies in the other: the identity branch runs the
+        // #1410 gate (and never the override check), the override branch runs the override check.
+        var text = Read(workflow).Replace("\r\n", "\n");
+        foreach (Match block in Regex.Matches(text, @"case ""\$(?:RELEASE_)?MODE"" in\n(.*?)\n\s*esac", RegexOptions.Singleline))
+        {
+            string Branch(string mode) => Regex.Match(block.Groups[1].Value, $@"(?s)(?:^|\n)\s*{mode}\)(.*?);;").Groups[1].Value;
+            var identity = Branch("identity");
+            var overrideBranch = Branch("override");
+            if (!identity.Contains(Verifier) && !overrideBranch.Contains(OverrideVerifier)) continue;
+            Assert.Contains(Verifier, identity);
+            Assert.DoesNotContain(OverrideVerifier, identity);
+            Assert.Contains(OverrideVerifier, overrideBranch);
+            Assert.DoesNotContain(Verifier, overrideBranch);
+        }
+    }
+
+    [Fact]
     public void GateCheckerRejectsContinueOnErrorOnTheGateStep()
     {
         var lines = ("jobs:\n  publish:\n    steps:\n      - continue-on-error: true\n        run: python3 scripts/verify_release_adjudication.py --identity x\n"
@@ -148,7 +178,8 @@ public class ReleaseWorkflowGateTests
             {
                 var code = line.TrimStart();
                 if (code.StartsWith('#')) continue;
-                var isGate = code.Contains(Verifier) || code.Contains(OverrideVerifier);
+                // Mode selection only reads the inputs; it verifies nothing and is never a gate.
+                var isGate = code.Contains(Verifier) || (code.Contains(OverrideVerifier) && !code.Contains("--select-mode"));
                 if (isGate || inGate)
                 {
                     if (Regex.IsMatch(code, @"\|\|\s*(?:true\b|:(?=\s|;|$)|echo\b|exit\s+0\b)|;\s*true\b"))

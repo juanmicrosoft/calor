@@ -1,0 +1,22 @@
+Found five issues:
+
+1. **MAJOR — Package identity and version checks can falsely pass.** [verify_maintainer_override.py:204](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/scripts/verify_maintainer_override.py:204)  
+   The verifier searches nuspec XML with regex and never checks the package ID. An in-memory control with `<!-- <version>0.24.0</version> -->` followed by actual metadata version `0.25.0` passed without errors. Renamed packages containing other IDs also passed. NuGet uses the metadata values. **Fix:** parse XML, require exactly one nuspec, and validate its metadata ID and version against the expected package.
+
+2. **MAJOR — Missing package provenance is accepted.** [verify_maintainer_override.py:210](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/scripts/verify_maintainer_override.py:210)  
+   `if commit and ...` rejects a different commit but accepts no repository commit at all. Removing both packages’ repository elements passed the in-memory control, defeating the promised candidate consistency check. **Fix:** require a repository commit equal to the candidate; configure override packing to supply it and add a missing-commit negative test.
+
+3. **MAJOR — Metadata consistency is only substring matching.** [verify_maintainer_override.py:230](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/scripts/verify_maintainer_override.py:230)  
+   JSON describing the wrong package, hash, and commit passed when the expected hashes and candidate appeared in an unrelated field. Package names and required metadata schemas are never validated; metadata also receives no G012 wording scan. **Fix:** validate provenance subject name/hash mappings, source commit, SBOM file/checksum mappings, and required files structurally; scan their text.
+
+4. **MAJOR — Structural tests weaken protection of the identity path.** [ReleaseWorkflowGateTests.cs:151](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/tests/Calor.Compiler.Tests/ReleaseGate/ReleaseWorkflowGateTests.cs:151)  
+   Any override-script mention now establishes `gateSeen`, including `--select-mode`, which validates neither record nor candidate. Removing identity verifier calls from publishing jobs leaves override calls sufficient for this check. **Fix:** exclude mode selection from gate detection and require the appropriate verifier in each publishing branch. Add mutations removing the identity verifier and replacing verification with selection alone.
+
+5. **MAJOR — The 0.24.0 notes still overclaim publication verification.** [CHANGELOG.md:129](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/CHANGELOG.md:129), mirrored at [changelog.mdx:135](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/website/content/changelog.mdx:135)  
+   They say publication rebuilds packages/site and compares hashes against adjudicated hashes. Override publication explicitly skips those comparisons. **Fix:** qualify this as behavior of the identity path and state that 0.24.0 override publication performs consistency and wording checks without adjudicated hash comparisons.
+
+Otherwise, I found no empty-mode, skipped-step, or shell bypass in the committed publishing workflows. Override publication requires both the explicit input and committed record, main ancestry, matching version, and FAILED outcome. Identity verifier calls retain their arguments and publishing order. All three release test gates retain candidate checkouts and block publication; override dispatch excludes benchmarks.
+
+The recorded terminal hash matches the referenced branch. The review-overrun, two-path, claim 4, and claim 13 corrections agree with its README. Neither forbidden independence phrase appears unnegated in the 0.24.0 sections. Validation was read-only; I did not run the filesystem-writing xUnit suite.
+
+REQUEST-CHANGES

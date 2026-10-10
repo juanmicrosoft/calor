@@ -154,16 +154,33 @@ public class MaintainerOverrideTests
     public void DifferentPackageAlreadyOnNugetFails()
     {
         using var repo = OverrideRepo.Build();
-        OverrideRepo.WritePackage(Path.Combine(repo.RegistryDir, "calor.0.24.0.nupkg"), "calor", "0.24.0", repo.Candidate, "other");
+        OverrideRepo.WritePackage(Path.Combine(repo.RegistryDir, "calor.0.24.0.nupkg"), "calor", "<version>0.24.0</version>", "other");
         AssertCodes(repo.Run(repo.Basic("--nuget-dir", repo.NugetDir, "--registry-dir", repo.RegistryDir)), "O011");
     }
 
-    [Fact]
-    public void PackageBuiltFromAnotherCommitFails()
+    [Theory]
+    [InlineData("Calor.Sdk", "<!-- <version>0.24.0</version> --><version>0.25.0</version>")]
+    [InlineData("Other.Package", "<version>0.24.0</version>")]
+    [InlineData("Calor.Sdk", "<version>0.24.0</version><version>0.24.0</version>")]
+    public void PackageWithAnotherIdOrVersionFails(string id, string version)
     {
         using var repo = OverrideRepo.Build();
-        OverrideRepo.WritePackage(Path.Combine(repo.NugetDir, "Calor.Sdk.0.24.0.nupkg"), "Calor.Sdk", "0.24.0", repo.Base);
+        OverrideRepo.WritePackage(Path.Combine(repo.NugetDir, "Calor.Sdk.0.24.0.nupkg"), id, version);
         AssertCodes(repo.Run(repo.Basic("--nuget-dir", repo.NugetDir)), "O011");
+    }
+
+    [Fact]
+    public void MetadataForAnotherCommitOrPackageFails()
+    {
+        using var repo = OverrideRepo.Build();
+        var nugetAndMetadata = repo.Basic("--nuget-dir", repo.NugetDir, "--metadata-dir", repo.MetadataDir);
+        repo.WriteMetadata(repo.Base);
+        AssertCodes(repo.Run(nugetAndMetadata), "O012");
+        repo.WriteMetadata(repo.Candidate, extraSubject: "decoy.nupkg");
+        AssertCodes(repo.Run(nugetAndMetadata), "O012");
+        repo.WriteMetadata(repo.Candidate);
+        File.WriteAllText(Path.Combine(repo.MetadataDir, "extra.json"), "{}");
+        AssertCodes(repo.Run(nugetAndMetadata), "O012");
     }
 
     [Fact]
@@ -297,12 +314,41 @@ public class MaintainerOverrideTests
 
             File.WriteAllText(repo.NotesPath, notes);
             File.WriteAllText(repo.BodyPath, notes + $"\n<!-- calor-maintainer-override: v1:{repo.Candidate}:{repo.OverrideSha} -->\n");
-            WritePackage(Path.Combine(repo.NugetDir, $"calor.{ReleaseVersion}.nupkg"), "calor", ReleaseVersion, repo.Candidate);
-            WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", ReleaseVersion, repo.Candidate);
-            var hashes = Directory.GetFiles(repo.NugetDir).Select(f => Sha(File.ReadAllBytes(f)));
-            File.WriteAllText(Path.Combine(repo.MetadataDir, "x.provenance.json"),
-                new JsonObject { ["commit"] = repo.Candidate, ["subjects"] = new JsonArray(hashes.Select(h => (JsonNode)h!).ToArray()) }.ToJsonString());
+            WritePackage(Path.Combine(repo.NugetDir, $"calor.{ReleaseVersion}.nupkg"), "calor", $"<version>{ReleaseVersion}</version>");
+            WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", $"<version>{ReleaseVersion}</version>");
+            repo.WriteMetadata(repo.Candidate);
             return repo;
+        }
+
+        /// <summary>The shape scripts/generate-release-metadata.py writes: one SBOM, one provenance.</summary>
+        public void WriteMetadata(string commit, string? extraSubject = null)
+        {
+            foreach (var old in Directory.GetFiles(MetadataDir)) File.Delete(old);
+            var packages = Directory.GetFiles(NugetDir).OrderBy(f => f, StringComparer.Ordinal)
+                .Select(f => (Name: Path.GetFileName(f), Sha: Sha(File.ReadAllBytes(f)))).ToList();
+            if (extraSubject is not null) packages.Add((extraSubject, new string('1', 64)));
+            var sbom = new JsonObject
+            {
+                ["documentNamespace"] = $"https://github.com/juanmicrosoft/calor/sbom/{commit}/x",
+                ["files"] = new JsonArray(packages.Select(p => (JsonNode)new JsonObject
+                {
+                    ["fileName"] = p.Name,
+                    ["checksums"] = new JsonArray(new JsonObject { ["algorithm"] = "SHA256", ["checksumValue"] = p.Sha }),
+                }).ToArray()),
+            };
+            var provenance = new JsonObject
+            {
+                ["subject"] = new JsonArray(packages.Select(p => (JsonNode)new JsonObject
+                {
+                    ["name"] = p.Name, ["digest"] = new JsonObject { ["sha256"] = p.Sha },
+                }).ToArray()),
+                ["predicate"] = new JsonObject
+                {
+                    ["buildDefinition"] = new JsonObject { ["externalParameters"] = new JsonObject { ["commit"] = commit } },
+                },
+            };
+            File.WriteAllText(Path.Combine(MetadataDir, "calor-nuget.sbom.spdx.json"), sbom.ToJsonString());
+            File.WriteAllText(Path.Combine(MetadataDir, "calor-nuget.provenance.json"), provenance.ToJsonString());
         }
 
         public string[] Basic(params string[] extra) =>
@@ -317,13 +363,13 @@ public class MaintainerOverrideTests
 
         public void Git(params string[] args) => GateRepo.RunGit(Root, args);
 
-        public static void WritePackage(string path, string id, string version, string commit, string payload = "")
+        public static void WritePackage(string path, string id, string versionXml, string payload = "")
         {
             if (File.Exists(path)) File.Delete(path);
             using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
             using (var writer = new StreamWriter(archive.CreateEntry($"{id}.nuspec").Open()))
-                writer.Write($"<package><metadata><id>{id}</id><version>{version}</version>"
-                    + $"<repository type=\"git\" commit=\"{commit}\" /></metadata></package>");
+                writer.Write("\uFEFF<?xml version=\"1.0\" encoding=\"utf-8\"?><package xmlns=\"http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd\">"
+                    + $"<metadata><id>{id}</id>{versionXml}<repository type=\"git\" /></metadata></package>");
             using (var writer = new StreamWriter(archive.CreateEntry("lib/net10.0/_._").Open()))
                 writer.Write(id + payload);
         }
