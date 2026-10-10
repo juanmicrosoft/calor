@@ -1,0 +1,10 @@
+C1 invalidation classifier (#1423), run by A1 (#1408).
+Command (from the C1 landing b04e963f69a5a1016159cfcf8c5199eeea329fdb checkout, the trust anchor; isolated HOME and CALOR_HOME):
+  CALOR_C1_CLASSIFY_TARGET=05e3545e8a6947f68d09e759ffa5dcc1f99b74cb dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj -c Release --filter FullyQualifiedName~CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated
+Target: the A1 branch at its second commit. This file is added by the next commit, a new data file under adjudication-1408/ only.
+
+anchor HEAD b04e963f69a5a1016159cfcf8c5199eeea329fdb; target 05e3545e8a6947f68d09e759ffa5dcc1f99b74cb; origin/main 12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e
+  Passed Calor.Compiler.Tests.EvidenceContract.CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated [14 s]
+ NOT-INVALIDATED; landing b04e963f69a5a1016159cfcf8c5199eeea329fdb; 15 commit diffs
+     Passed: 1
+CLASSIFIER-EXIT=0

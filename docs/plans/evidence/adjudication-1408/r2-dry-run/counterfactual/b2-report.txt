@@ -1,0 +1,12 @@
+0.24 B2 (#1422) benchmark publication gate
+OK: comparabilityKeySha256 35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e
+provenance: 04e61f188e85a710a91242e1ddbf35fcd50e329e (refs/remotes/origin/main)
+denominator: 226 registered, 9 excluded before registration, 217 sent to the oracle, 17 included (EQUIVALENT); by disposition {'EQUIVALENT': 17, 'EXCLUDED-PRE-REGISTERED': 9, 'NOT-EQUIVALENT': 192, 'UNCLASSIFIED': 8}
+TokenEconomics/CompositeTokenEconomics: geometric mean r 1.2349617720447104 over 17 pairs, corpus-resampling interval ['1.114699569538594', '1.3565810319607556']; r = csharpSize / calorSize (r > 1: the C# file is larger; r < 1: the Calor file is larger)
+no headline is published yet; nothing is compared
+limitations:
+  - Corpus only: the corpus is fixed and author-built. It is not a sample of real-world code, tasks, or developers, and no figure here generalizes beyond these files.
+  - EQUIVALENT means the two arms showed no observable difference on the registered finite inputs under the registered oracle. It is not a proof of equivalence and not a claim that either arm is correct with respect to its task statement.
+  - 17 pairs are included of the 217 pairs sent to the oracle (226 registered, 9 excluded before registration). The figure describes those 17 pairs, not the corpus.
+  - r is a static source-size ratio of two committed files. It is not a coding-agent outcome and not a measured language, productivity, correctness, or safety advantage.
+  - The interval is a corpus-resampling interval for this fixed corpus, not a confidence interval for any population.

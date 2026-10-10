@@ -1,0 +1,15 @@
+identity calor-adjudication:v1:6aae20cf50d5374d4f3da2d3b070a95ec828e0a3:2b6f174356ec0bb56f2d476dcf1295b9a555e915817b27ee2579f8eb3d311968
+real origin/main 12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e; simulated main 6aae20cf50d5374d4f3da2d3b070a95ec828e0a3; HEAD 04e61f188e85a710a91242e1ddbf35fcd50e329e
+RELEASE GATE: PASS calor-adjudication:v1:6aae20cf50d5374d4f3da2d3b070a95ec828e0a3:2b6f174356ec0bb56f2d476dcf1295b9a555e915817b27ee2579f8eb3d311968
+candidate=04e61f188e85a710a91242e1ddbf35fcd50e329e
+version=0.24.0
+tag=v0.24.0
+prerelease=true
+SURFACES-EXIT=0
+B2-EXIT=0
+RELEASE GATE: PASS calor-adjudication:v1:6aae20cf50d5374d4f3da2d3b070a95ec828e0a3:2b6f174356ec0bb56f2d476dcf1295b9a555e915817b27ee2579f8eb3d311968
+candidate=04e61f188e85a710a91242e1ddbf35fcd50e329e
+version=0.24.0
+tag=v0.24.0
+prerelease=true
+BENCHMARK-WORKTREE-EXIT=0

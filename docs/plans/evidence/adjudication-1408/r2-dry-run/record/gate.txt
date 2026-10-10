@@ -1,0 +1,27 @@
+identity calor-adjudication:v1:42a0d226a2bd5164d4663b08b0cb3a877808d2c5:adc24ef5a38aecc8a5e2d5b58f861fb68d7db5fd36100ab8a13a5b2f4dfaddbd
+real origin/main 12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e; simulated main 42a0d226a2bd5164d4663b08b0cb3a877808d2c5; HEAD 04e61f188e85a710a91242e1ddbf35fcd50e329e
+::error::release gate (#1410) G006: terminal outcome is 'MILESTONE-FAILED', not MILESTONE-SUCCEEDED
+::error::release gate (#1410) G008: gate:#1311: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1413: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1421: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1276: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1422: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1410: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1423: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: claim:no-benchmark-results-published: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: claim:reproducible-release-evidence-and-gate: BLOCKED; a blocked release-critical row cannot be released
+RELEASE GATE: FAIL (10 violation(s)); nothing may be published.
+SURFACES-EXIT=1
+B2-EXIT=0
+::error::release gate (#1410) G006: terminal outcome is 'MILESTONE-FAILED', not MILESTONE-SUCCEEDED
+::error::release gate (#1410) G008: gate:#1311: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1413: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1421: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1276: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1422: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1410: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1423: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: claim:no-benchmark-results-published: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: claim:reproducible-release-evidence-and-gate: BLOCKED; a blocked release-critical row cannot be released
+RELEASE GATE: FAIL (10 violation(s)); nothing may be published.
+BENCHMARK-WORKTREE-EXIT=1

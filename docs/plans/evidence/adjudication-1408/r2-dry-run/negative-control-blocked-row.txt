@@ -1,0 +1,6 @@
+     Failed: 1
+   T001 [verifier-runtime-differential] a BLOCKED adjudication makes the milestone fail; every subject is release-critical
+  Failed Calor.Compiler.Tests.EvidenceContract.A1TerminalRecordScratchCheck.A1RecordIsAValidTerminalRecord [6 ms]
+[xUnit.net 00:00:00.63]       T001 [verifier-runtime-differential] a BLOCKED adjudication makes the milestone fail; every subject is release-critical
+Test Run Failed.
+TVAL-EXIT=1

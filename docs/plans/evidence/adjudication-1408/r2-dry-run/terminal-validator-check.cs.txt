@@ -1,0 +1,28 @@
+// SCRATCH ONLY (A1 preparation; never committed): runs the contract's T001-T003 validator on a
+// terminal record named by A1_RECORD, with the committed contract, inventory, and claim registry.
+using System.IO;
+using System.Linq;
+using System.Text.Json.Nodes;
+using Xunit;
+
+namespace Calor.Compiler.Tests.EvidenceContract;
+
+public class A1TerminalRecordScratchCheck
+{
+    [Fact]
+    public void A1RecordIsAValidTerminalRecord()
+    {
+        var recordPath = System.Environment.GetEnvironmentVariable("A1_RECORD");
+        Assert.False(string.IsNullOrEmpty(recordPath), "A1_RECORD not set");
+        var root = System.Environment.GetEnvironmentVariable("A1_REPO")!;
+        JsonNode Load(string p) => JsonNode.Parse(File.ReadAllText(Path.Combine(root, p)))!;
+        var contract = Load("docs/plans/evidence/evidence-contract-1407/contract.json");
+        var inventory = Load("docs/plans/evidence/evidence-contract-1407/artifact-inventory.json");
+        var registry = Load("docs/plans/evidence/c2-1424/regeneration-3/claim-registry.json");
+        var claims = registry["claims"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+        var record = JsonNode.Parse(File.ReadAllText(recordPath!))!;
+        var violations = EvidenceContractValidator.ValidateTerminalRecord(contract, inventory, claims, record);
+        Assert.True(violations.Count == 0, string.Join("\n", violations));
+        Assert.Equal(75, record["adjudications"]!.AsArray().Count);
+    }
+}
