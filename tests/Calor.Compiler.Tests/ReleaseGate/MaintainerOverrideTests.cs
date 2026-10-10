@@ -183,6 +183,41 @@ public class MaintainerOverrideTests
         AssertCodes(repo.Run(nugetAndMetadata), "O012");
     }
 
+    [Theory]
+    [InlineData("duplicate-sbom")]
+    [InlineData("duplicate-subject")]
+    [InlineData("sha1")]
+    [InlineData("namespace-decoy")]
+    public void ContradictoryMetadataFails(string mutation)
+    {
+        using var repo = OverrideRepo.Build();
+        repo.WriteMetadata(repo.Candidate, mutate: (sbom, provenance) =>
+        {
+            var files = sbom["files"]!.AsArray();
+            var subjects = provenance["subject"]!.AsArray();
+            switch (mutation)
+            {
+                case "duplicate-sbom":
+                    var wrong = files[0]!.DeepClone();
+                    wrong["checksums"]![0]!["checksumValue"] = new string('2', 64);
+                    files.Insert(0, wrong);
+                    break;
+                case "duplicate-subject":
+                    var decoy = subjects[0]!.DeepClone();
+                    decoy["digest"]!["sha256"] = new string('2', 64);
+                    subjects.Insert(0, decoy);
+                    break;
+                case "sha1":
+                    files[0]!["checksums"]![0]!["algorithm"] = "SHA1";
+                    break;
+                default:
+                    sbom["documentNamespace"] = $"https://github.com/juanmicrosoft/calor/sbom/{repo.Base}/x?/sbom/{repo.Candidate}/";
+                    break;
+            }
+        });
+        AssertCodes(repo.Run(repo.Basic("--nuget-dir", repo.NugetDir, "--metadata-dir", repo.MetadataDir)), "O012");
+    }
+
     [Fact]
     public void HeadOtherThanTheCandidateFails()
     {
@@ -321,7 +356,7 @@ public class MaintainerOverrideTests
         }
 
         /// <summary>The shape scripts/generate-release-metadata.py writes: one SBOM, one provenance.</summary>
-        public void WriteMetadata(string commit, string? extraSubject = null)
+        public void WriteMetadata(string commit, string? extraSubject = null, Action<JsonObject, JsonObject>? mutate = null)
         {
             foreach (var old in Directory.GetFiles(MetadataDir)) File.Delete(old);
             var packages = Directory.GetFiles(NugetDir).OrderBy(f => f, StringComparer.Ordinal)
@@ -329,7 +364,7 @@ public class MaintainerOverrideTests
             if (extraSubject is not null) packages.Add((extraSubject, new string('1', 64)));
             var sbom = new JsonObject
             {
-                ["documentNamespace"] = $"https://github.com/juanmicrosoft/calor/sbom/{commit}/x",
+                ["documentNamespace"] = $"https://github.com/juanmicrosoft/calor/sbom/{commit}/calor-nuget-{commit}",
                 ["files"] = new JsonArray(packages.Select(p => (JsonNode)new JsonObject
                 {
                     ["fileName"] = p.Name,
@@ -347,6 +382,7 @@ public class MaintainerOverrideTests
                     ["buildDefinition"] = new JsonObject { ["externalParameters"] = new JsonObject { ["commit"] = commit } },
                 },
             };
+            mutate?.Invoke(sbom, provenance);
             File.WriteAllText(Path.Combine(MetadataDir, "calor-nuget.sbom.spdx.json"), sbom.ToJsonString());
             File.WriteAllText(Path.Combine(MetadataDir, "calor-nuget.provenance.json"), provenance.ToJsonString());
         }

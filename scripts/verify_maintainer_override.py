@@ -202,18 +202,21 @@ def check_metadata(gate: r2.Gate, root: Path, cand: str, hashes: dict[str, str])
     try:
         sbom = json.loads(files[sboms[0]].read_text(encoding="utf-8"))
         prov = json.loads(files[provs[0]].read_text(encoding="utf-8"))
-        sbom_files = {f["fileName"]: f["checksums"][0]["checksumValue"] for f in sbom["files"]}
-        subjects = {s["name"]: s["digest"]["sha256"] for s in prov["subject"]}
+        # Lists, not dicts: a duplicate name (a wrong entry beside the right one) must fail.
+        sbom_files = sorted((f["fileName"], c["algorithm"], c["checksumValue"])
+                            for f in sbom["files"] for c in f["checksums"])
+        subjects = sorted((s["name"], s["digest"]["sha256"], len(s["digest"])) for s in prov["subject"])
         commit = prov["predicate"]["buildDefinition"]["externalParameters"]["commit"]
-        namespace = sbom["documentNamespace"]
+        namespace = re.fullmatch(r"https://github\.com/juanmicrosoft/calor/sbom/([0-9a-f]{40})/[A-Za-z0-9._%-]+",
+                                 str(sbom["documentNamespace"]))
     except (ValueError, KeyError, IndexError, TypeError) as error:
         gate.fail("O012", f"release metadata does not have the generated shape: {error!r}")
         return
-    if sbom_files != hashes:
-        gate.fail("O012", f"{sboms[0]} does not list exactly the packages and their sha256")
-    if subjects != hashes:
+    if sbom_files != sorted((n, "SHA256", h) for n, h in hashes.items()):
+        gate.fail("O012", f"{sboms[0]} does not list exactly the packages, each with one SHA256")
+    if subjects != sorted((n, h, 1) for n, h in hashes.items()):
         gate.fail("O012", f"{provs[0]} subjects are not exactly the packages and their sha256")
-    if commit != cand or f"/sbom/{cand}/" not in namespace:
+    if commit != cand or not namespace or namespace.group(1) != cand:
         gate.fail("O012", f"release metadata does not name the candidate {cand}")
     for name, path in sorted(files.items()):
         r2.scan_text(gate, name, path.read_text(encoding="utf-8"))

@@ -115,23 +115,50 @@ public class ReleaseWorkflowGateTests
     }
 
     [Theory]
-    [MemberData(nameof(GatedWorkflows))]
-    public void EveryModeSwitchRunsTheMatchingVerifierInEachBranch(string workflow)
+    [InlineData("publish-nuget.yml", 4)]
+    [InlineData("nextjs-gh-pages.yml", 4)]
+    [InlineData("verify-release.yml", 1)]
+    [InlineData("benchmark.yml", 0)]
+    public void EveryModeSwitchRunsTheMatchingVerifierInEachBranch(string workflow, int verifyingSwitches)
     {
-        // A switch that verifies in one mode verifies in the other: the identity branch runs the
-        // #1410 gate (and never the override check), the override branch runs the override check.
-        var text = Read(workflow).Replace("\r\n", "\n");
-        foreach (Match block in Regex.Matches(text, @"case ""\$(?:RELEASE_)?MODE"" in\n(.*?)\n\s*esac", RegexOptions.Singleline))
+        var (count, violations) = ModeSwitchViolations(Read(workflow));
+        Assert.True(violations.Count == 0, string.Join("\n", violations));
+        Assert.Equal(verifyingSwitches, count);
+    }
+
+    [Theory]
+    [InlineData(": python3 ")]
+    [InlineData("# python3 ")]
+    [InlineData("echo python3 ")]
+    public void ModeSwitchCheckRejectsADisabledIdentityVerifier(string disabled)
+    {
+        // Mutation control: commenting out or no-op'ing every identity check must not pass.
+        var mutant = Read("publish-nuget.yml").Replace("python3 " + Verifier, disabled + Verifier);
+        Assert.NotEmpty(ModeSwitchViolations(mutant).Violations);
+    }
+
+    /// <summary>
+    /// In every release-mode switch that mentions a verifier, the <c>identity)</c> branch runs the
+    /// #1410 gate as an executable command (not a comment or no-op) and never the override check,
+    /// and the <c>override)</c> branch runs the override check and never the gate.
+    /// </summary>
+    private static (int Count, List<string> Violations) ModeSwitchViolations(string text)
+    {
+        var violations = new List<string>();
+        var count = 0;
+        foreach (Match block in Regex.Matches(text.Replace("\r\n", "\n"), @"case ""\$(?:RELEASE_)?MODE"" in\n(.*?)\n\s*esac", RegexOptions.Singleline))
         {
-            string Branch(string mode) => Regex.Match(block.Groups[1].Value, $@"(?s)(?:^|\n)\s*{mode}\)(.*?);;").Groups[1].Value;
-            var identity = Branch("identity");
-            var overrideBranch = Branch("override");
-            if (!identity.Contains(Verifier) && !overrideBranch.Contains(OverrideVerifier)) continue;
-            Assert.Contains(Verifier, identity);
-            Assert.DoesNotContain(OverrideVerifier, identity);
-            Assert.Contains(OverrideVerifier, overrideBranch);
-            Assert.DoesNotContain(Verifier, overrideBranch);
+            if (!block.Value.Contains(Verifier) && !block.Value.Contains(OverrideVerifier)) continue;
+            count++;
+            foreach (var (mode, mine, other) in new[] { ("identity", Verifier, OverrideVerifier), ("override", OverrideVerifier, Verifier) })
+            {
+                var branch = Regex.Match(block.Groups[1].Value, $@"(?s)(?:^|\n)\s*{mode}\)(.*?);;").Groups[1].Value;
+                var runs = branch.Split('\n').Select(l => l.Trim()).Any(l => l.StartsWith("python3 " + mine, StringComparison.Ordinal));
+                if (!runs || branch.Contains(other))
+                    violations.Add($"switch {count}: the {mode} branch must run {mine} and not {other}: '{branch.Trim()}'");
+            }
         }
+        return (count, violations);
     }
 
     [Fact]
