@@ -7,12 +7,24 @@ name: Publish to NuGet
 # website and benchmark dispatch. The publishing job re-runs
 # scripts/verify_release_adjudication.py against the bytes it is about to publish.
 # Design: docs/plans/evidence/r2-1410/release-gate.md.
+#
+# Maintainer override (0.24.0 only, authorized 2026-10-10): a dispatch may instead pass
+# `maintainer_override: <version>`. Exactly one of the two inputs is accepted. Override mode is
+# UNGATED: it runs scripts/verify_maintainer_override.py, which needs the committed
+# docs/plans/evidence/adjudication-1408/maintainer-override.json and the MILESTONE-FAILED
+# terminal record it names, and publishes the dispatch commit on main. The release test gates
+# below run unchanged in both modes. Override mode skips the record-hash comparisons (no
+# successful record exists) and never dispatches benchmark publication.
 on:
   workflow_dispatch:
     inputs:
       adjudication_identity:
-        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
-        required: true
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410). Exactly one of this and maintainer_override.'
+        required: false
+        type: string
+      maintainer_override:
+        description: 'UNGATED maintainer override: the version named in docs/plans/evidence/adjudication-1408/maintainer-override.json. Leave empty for the gated path.'
+        required: false
         type: string
 
 permissions:
@@ -24,6 +36,7 @@ concurrency:
 
 env:
   ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+  MAINTAINER_OVERRIDE: ${{ inputs.maintainer_override }}
 
 jobs:
   adjudication-gate:
@@ -33,6 +46,8 @@ jobs:
       version: ${{ steps.gate.outputs.version }}
       tag: ${{ steps.gate.outputs.tag }}
       prerelease: ${{ steps.gate.outputs.prerelease }}
+      mode: ${{ steps.mode.outputs.mode }}
+      override_sha256: ${{ steps.gate.outputs.override_sha256 }}
     steps:
       - name: Refuse a dispatch from any ref but main
         if: github.ref != 'refs/heads/main'
@@ -46,9 +61,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify the adjudication identity (#1410)
+      - name: Choose the release mode (exactly one input)
+        id: mode
+        run: python3 scripts/verify_maintainer_override.py --select-mode --identity "$ADJUDICATION_IDENTITY" --override "$MAINTAINER_OVERRIDE"
+
+      - name: Verify the adjudication identity (#1410) or the maintainer override
         id: gate
-        run: python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+        env:
+          RELEASE_MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_MODE" in
+            identity) python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" ;;
+            override) python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
+                        --identity "$ADJUDICATION_IDENTITY" --candidate "$GITHUB_SHA" --expect-head ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
   # Truthful release gates (#790, W1 Slice 4): publishing is impossible unless
   # the full test suite and the M-A1 packaged-SDK consumer check pass on the
@@ -395,6 +423,9 @@ jobs:
       id-token: write
       attestations: write
       actions: write
+    env:
+      RELEASE_MODE: ${{ needs.adjudication-gate.outputs.mode }}
+      OVERRIDE_SHA256: ${{ needs.adjudication-gate.outputs.override_sha256 }}
 
     steps:
       - name: Checkout the adjudicated candidate with full history
@@ -466,13 +497,27 @@ jobs:
             CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           test -s "$RUNNER_TEMP/notes.md"
 
-      - name: Verify packages, metadata, and notes against the adjudication (#1410)
+      # Override mode cannot compare hashes with an adjudication (none succeeded). It re-checks
+      # the override record and terminal record at HEAD, that the notes are HEAD's CHANGELOG
+      # section and say the release is an ungated override, that the packages are exactly the two
+      # VERSION packages built from HEAD, that the metadata names them, and the G012 wording scan.
+      - name: Verify packages, metadata, and notes against the adjudication (#1410) or the override
         env:
           VER: ${{ needs.adjudication-gate.outputs.version }}
+          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
         run: |
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --version "$VER" --nuget-dir ./nupkg --metadata-dir ./release-metadata \
-            --release-notes "$RUNNER_TEMP/notes.md"
+          set -euo pipefail
+          case "$RELEASE_MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --version "$VER" --nuget-dir ./nupkg --metadata-dir ./release-metadata \
+                --release-notes "$RUNNER_TEMP/notes.md" ;;
+            override)
+              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
+                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
+                --nuget-dir ./nupkg --metadata-dir ./release-metadata --release-notes "$RUNNER_TEMP/notes.md" ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Attest NuGet packages
         uses: actions/attest-build-provenance@v2
@@ -487,6 +532,7 @@ jobs:
       - name: Compare any version already on nuget.org (#1410)
         env:
           VER: ${{ needs.adjudication-gate.outputs.version }}
+          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/registry"
@@ -499,8 +545,16 @@ jobs:
               *) echo "::error::cannot tell whether nuget.org has $id $VER (HTTP $code)"; exit 1 ;;
             esac
           done
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/registry"
+          case "$RELEASE_MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/registry" ;;
+            override)
+              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
+                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
+                --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/registry" ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Push to NuGet
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
@@ -511,6 +565,7 @@ jobs:
       - name: Verify the packages nuget.org serves (#1410)
         env:
           VER: ${{ needs.adjudication-gate.outputs.version }}
+          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
         run: |
           set -euo pipefail
           rm -rf "$RUNNER_TEMP/served" && mkdir -p "$RUNNER_TEMP/served"
@@ -524,8 +579,16 @@ jobs:
             done
             test -s "$RUNNER_TEMP/served/$id.$VER.nupkg" || { echo "::error::nuget.org does not serve $id $VER after 30 minutes"; exit 1; }
           done
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served"
+          case "$RELEASE_MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served" ;;
+            override)
+              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
+                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
+                --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served" ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -560,12 +623,23 @@ jobs:
           if [ -n "$existing" ] && [ "$existing" != "$CANDIDATE" ]; then
             echo "::error::tag $TAG already points at $existing, not the candidate $CANDIDATE"; exit 1
           fi
+          case "$RELEASE_MODE" in
+            identity) TRAILER="<!-- calor-adjudication: $ADJUDICATION_IDENTITY -->" ;;
+            override) TRAILER="<!-- calor-maintainer-override: v1:$CANDIDATE:$OVERRIDE_SHA256 -->" ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
           if gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/existing.md" 2>/dev/null; then
             TITLE="$(gh release view "$TAG" --json name --jq .name)"
-            python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-              --expect-head --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
+            if [ "$RELEASE_MODE" = identity ]; then
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
+            else
+              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
+                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
+                --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
+            fi
           else
-            { cat "$RUNNER_TEMP/notes.md"; printf '\n<!-- calor-adjudication: %s -->\n' "$ADJUDICATION_IDENTITY"; } > "$RUNNER_TEMP/body.md"
+            { cat "$RUNNER_TEMP/notes.md"; printf '\n%s\n' "$TRAILER"; } > "$RUNNER_TEMP/body.md"
             FLAG=""
             if [ "$PRERELEASE" = "true" ]; then FLAG="--prerelease"; fi
             gh release create "$TAG" --target "$CANDIDATE" --title "$TAG" --notes-file "$RUNNER_TEMP/body.md" $FLAG
@@ -595,10 +669,19 @@ jobs:
       # Releases created with GITHUB_TOKEN raise no `release` events, so the downstream
       # surfaces are dispatched explicitly, from main, with the same identity. Each one
       # re-runs the gate, checks out the candidate, and checks this release's body.
+      # Override mode dispatches only the website, which re-runs the override check against the
+      # tag. It never dispatches benchmark publication.
       - name: Dispatch website and benchmark publication
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY"
-          gh workflow run benchmark.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY"
+          case "$RELEASE_MODE" in
+            identity)
+              gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY"
+              gh workflow run benchmark.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY" ;;
+            override)
+              gh workflow run nextjs-gh-pages.yml --ref main -f maintainer_override="$MAINTAINER_OVERRIDE"
+              echo "Maintainer override: benchmark publication is not dispatched." ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac

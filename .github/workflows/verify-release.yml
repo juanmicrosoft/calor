@@ -22,8 +22,12 @@ on:
         required: true
         type: string
       adjudication_identity:
-        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
-        required: true
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410). Exactly one of this and maintainer_override.'
+        required: false
+        type: string
+      maintainer_override:
+        description: 'For the UNGATED 0.24.0 maintainer-override release only: the same version as above'
+        required: false
         type: string
 
 permissions:
@@ -32,7 +36,8 @@ permissions:
 jobs:
   # #1410 (0.24 R2): the installed-tool check is a release-path surface, so it also
   # consumes the one adjudication identity. It verifies only the adjudicated version,
-  # and only after the GitHub release carrying that identity exists.
+  # and only after the GitHub release carrying that identity exists. A maintainer-override
+  # release (0.24.0) carries no identity; it is checked against its override record instead.
   adjudication-gate:
     runs-on: ubuntu-latest
     outputs:
@@ -49,15 +54,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+          MAINTAINER_OVERRIDE: ${{ inputs.maintainer_override }}
           VER: ${{ inputs.version }}
         run: |
           set -euo pipefail
           if [ "$GITHUB_REF" != refs/heads/main ]; then echo "::error::dispatch from main only (got $GITHUB_REF)"; exit 1; fi
           gh release view "v$VER" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
           TITLE="$(gh release view "v$VER" --json name --jq .name)"
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --version "$VER" --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
-            --release-tag "v$VER" --release-title "$TITLE"
+          MODE="$(python3 scripts/verify_maintainer_override.py --select-mode --github-output '' \
+            --identity "$ADJUDICATION_IDENTITY" --override "$MAINTAINER_OVERRIDE" | sed -n 's/^mode=//p')"
+          case "$MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --version "$VER" --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
+                --release-tag "v$VER" --release-title "$TITLE" ;;
+            override)
+              if [ "$MAINTAINER_OVERRIDE" != "$VER" ]; then echo "::error::maintainer_override must equal version"; exit 1; fi
+              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
+                --identity "$ADJUDICATION_IDENTITY" --candidate-tag --require-tag \
+                --release-body "$RUNNER_TEMP/release-body.md" --release-tag "v$VER" --release-title "$TITLE" ;;
+            *) echo "::error::release mode could not be chosen"; exit 1 ;;
+          esac
 
   install-and-verify:
     needs: adjudication-gate

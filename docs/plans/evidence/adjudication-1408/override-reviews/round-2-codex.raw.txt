@@ -1,0 +1,9 @@
+1. **MAJOR — Metadata validation still accepts contradictory evidence.** `scripts/verify_maintainer_override.py:205`  
+   Dictionary construction silently discards duplicate package names. In-memory controls containing a wrong hash followed by the correct hash passed for both SBOM files and provenance subjects. SBOM checksums labeled `SHA1` also passed because the algorithm is ignored. At line 216, a namespace naming another commit passed when the candidate appeared only in a query-string decoy. Round-1 finding 3 remains incompletely resolved.  
+   **Fix:** reject duplicate names, require SHA256 checksums, validate the canonical namespace structure, and add negative controls for these cases.
+
+2. **MAJOR — Comments can satisfy the new identity-branch protection.** `tests/Calor.Compiler.Tests/ReleaseGate/ReleaseWorkflowGateTests.cs:129`  
+   Branch assertions search raw text, including comments. An in-memory mutation replaced all four executable identity-verifier calls in `publish` with comments and `:` commands. The branch-pairing check accepted it; `GateViolations` also accepted it because executable override calls established `gateSeen`. The previous checker rejected a publishing job containing only commented identity checks. This leaves round-1 finding 4 incompletely resolved and weakens identity-path protection.  
+   **Fix:** require executable, unsuppressed verifier calls in each branch, exclude comments, and add a mutation replacing every publishing-job identity check with commented text.
+
+REQUEST-CHANGES

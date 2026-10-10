@@ -7,6 +7,8 @@ name: Release audit (adjudication identity)
 # nothing else. This audit makes such a release visible: it fails, red, unless the
 # release body ends with an adjudication identity that verifies against the release's
 # own tag and notes. It changes nothing; correcting the release is a maintainer action.
+# The 0.24.0 maintainer-override release carries a calor-maintainer-override trailer instead.
+# The audit checks it against the committed override record and reports it as UNGATED.
 # Design: docs/plans/evidence/r2-1410/release-gate.md.
 on:
   release:
@@ -34,6 +36,12 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$BODY" | tr -d '\r' > "$RUNNER_TEMP/release-body.md"
           IDENTITY="$(sed -n 's/^<!-- calor-adjudication: \([^ ]*\) -->$/\1/p' "$RUNNER_TEMP/release-body.md" | tail -1)"
+          if [ -z "$IDENTITY" ] && grep -q '^<!-- calor-maintainer-override: ' "$RUNNER_TEMP/release-body.md"; then
+            echo "::warning::release $TAG is an UNGATED maintainer-override release, outside the #1410 gate"
+            python3 scripts/verify_maintainer_override.py --override "${TAG#v}" --candidate-tag --require-tag \
+              --release-body "$RUNNER_TEMP/release-body.md" --release-tag "$TAG" --release-title "$TITLE"
+            exit 0
+          fi
           if [ -z "$IDENTITY" ]; then
             echo "::error::release $TAG carries no adjudication identity; it did not come through the gated release path (#1410)"
             exit 1

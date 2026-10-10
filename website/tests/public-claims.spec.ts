@@ -223,7 +223,9 @@ for (const width of [1366, 390]) {
       'not a proof that the verifier is sound',
       'Whole-compiler soundness is not established',
       'No independent party adjudicated or verified it',
-      'No benchmark results are published with this release',
+      'This release publishes no new benchmark results',
+      'recorded maintainer override, not a gated release',
+      'MILESTONE-FAILED',
       'never reached NuGet']) {
       await expect(article).toContainText(text);
     }
@@ -403,7 +405,7 @@ test('research milestones stay distinct from software releases', async () => {
   expect(rootChangelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
   expect(rootChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
   expect(rootCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
-  expect(normalizedRootCurrentSection).toContain('No benchmark results are published with this release');
+  expect(normalizedRootCurrentSection).toContain('This release publishes no new benchmark results');
   expect(normalizedRootCurrentSection).toContain('7 false proofs in 4 areas');
   expect(rootBenchmarkSection).toContain('Benchmark Results (Statistical: 30 runs)');
   expect(rootBenchmarkSection).toContain('Programs Tested');

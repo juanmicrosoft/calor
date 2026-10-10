@@ -8,12 +8,21 @@ name: Deploy Next.js to GitHub Pages
 # deploy job checks the uploaded artifact again before deploying it. There is no
 # `release: created` trigger and no ungated dispatch.
 # Design: docs/plans/evidence/r2-1410/release-gate.md.
+# Maintainer override (0.24.0 only): publish-nuget's override mode dispatches this with
+# `maintainer_override: <version>` instead. That mode is UNGATED: it builds the commit the
+# v<version> tag names, after scripts/verify_maintainer_override.py checks the committed override
+# record and the GitHub release, and scans the built site for forbidden wording. It cannot
+# compare the site with an adjudicated tree hash, because no successful adjudication exists.
 on:
   workflow_dispatch:
     inputs:
       adjudication_identity:
-        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
-        required: true
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410). Exactly one of this and maintainer_override.'
+        required: false
+        type: string
+      maintainer_override:
+        description: 'UNGATED maintainer override: the version named in docs/plans/evidence/adjudication-1408/maintainer-override.json'
+        required: false
         type: string
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -30,6 +39,7 @@ concurrency:
 
 env:
   ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+  MAINTAINER_OVERRIDE: ${{ inputs.maintainer_override }}
 
 jobs:
   # Build job
@@ -38,6 +48,7 @@ jobs:
     outputs:
       candidate: ${{ steps.gate.outputs.candidate }}
       version: ${{ steps.gate.outputs.version }}
+      mode: ${{ steps.mode.outputs.mode }}
     steps:
       - name: Refuse a dispatch from any ref but main
         if: github.ref != 'refs/heads/main'
@@ -51,9 +62,21 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify the adjudication identity (#1410)
+      - name: Choose the release mode (exactly one input)
+        id: mode
+        run: python3 scripts/verify_maintainer_override.py --select-mode --identity "$ADJUDICATION_IDENTITY" --override "$MAINTAINER_OVERRIDE"
+
+      - name: Verify the adjudication identity (#1410) or the maintainer override
         id: gate
-        run: python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+        env:
+          RELEASE_MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_MODE" in
+            identity) python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" ;;
+            override) python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" --identity "$ADJUDICATION_IDENTITY" --candidate-tag --require-tag ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Check out the candidate and verify the GitHub release (#1410)
         env:
@@ -61,14 +84,23 @@ jobs:
           CANDIDATE: ${{ steps.gate.outputs.candidate }}
           TAG: ${{ steps.gate.outputs.tag }}
           VER: ${{ steps.gate.outputs.version }}
+          RELEASE_MODE: ${{ steps.mode.outputs.mode }}
         run: |
           set -euo pipefail
           git checkout -q --detach "$CANDIDATE"
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
           TITLE="$(gh release view "$TAG" --json name --jq .name)"
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md" \
-            --release-tag "$TAG" --release-title "$TITLE"
+          case "$RELEASE_MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md" \
+                --release-tag "$TAG" --release-title "$TITLE" ;;
+            override)
+              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" --identity "$ADJUDICATION_IDENTITY" \
+                --candidate-tag --expect-head --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
+                --release-tag "$TAG" --release-title "$TITLE" ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -88,12 +120,19 @@ jobs:
         working-directory: website
         run: npm run build
 
-      - name: Verify the built site against the adjudication (#1410)
+      - name: Verify the built site against the adjudication (#1410) or the override
         env:
           VER: ${{ steps.gate.outputs.version }}
+          RELEASE_MODE: ${{ steps.mode.outputs.mode }}
         run: |
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --version "$VER" --website-dir website/out
+          set -euo pipefail
+          case "$RELEASE_MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --version "$VER" --website-dir website/out ;;
+            override) python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" --identity "$ADJUDICATION_IDENTITY" --candidate-tag --expect-head --website-dir website/out ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -126,12 +165,18 @@ jobs:
       - name: Verify the artifact about to be deployed (#1410)
         env:
           VER: ${{ needs.build.outputs.version }}
+          RELEASE_MODE: ${{ needs.build.outputs.mode }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/site"
           tar -xf "$RUNNER_TEMP/pages/artifact.tar" -C "$RUNNER_TEMP/site"
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --require-tag --version "$VER" --website-dir "$RUNNER_TEMP/site"
+          case "$RELEASE_MODE" in
+            identity)
+              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+                --expect-head --require-tag --version "$VER" --website-dir "$RUNNER_TEMP/site" ;;
+            override) python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" --identity "$ADJUDICATION_IDENTITY" --candidate-tag --expect-head --require-tag --website-dir "$RUNNER_TEMP/site" ;;
+            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
+          esac
 
       - name: Deploy to GitHub Pages
         id: deployment
