@@ -14,6 +14,8 @@ namespace Calor.Compiler.Tests.ReleaseGate;
 public class ReleaseWorkflowGateTests
 {
     private const string Verifier = "scripts/verify_release_adjudication.py";
+    // The 0.24.0 maintainer override (ungated, recorded) is the only other accepted check.
+    private const string OverrideVerifier = "scripts/verify_maintainer_override.py";
 
     // Pinned inputs are re-materialized, never republished by a release (#1407 section 7); the
     // z3-binaries release is that pinned input, not a Calor release surface.
@@ -28,6 +30,9 @@ public class ReleaseWorkflowGateTests
         "publish-nuget.yml", "nextjs-gh-pages.yml", "benchmark.yml", "verify-release.yml",
     };
 
+    // Workflows that also accept the maintainer override. benchmark.yml is deliberately absent.
+    private static readonly string[] OverrideWorkflows = { "publish-nuget.yml", "nextjs-gh-pages.yml", "verify-release.yml" };
+
     [Theory]
     [MemberData(nameof(GatedWorkflows))]
     public void SurfaceIsNotTriggeredByReleaseEvents(string workflow)
@@ -41,8 +46,33 @@ public class ReleaseWorkflowGateTests
     public void SurfaceRequiresTheAdjudicationIdentity(string workflow)
     {
         var text = Read(workflow);
-        Assert.Matches(new Regex(@"\n      adjudication_identity:\n(?:        .*\n)*?        required: true\n"), text);
         Assert.Contains(Verifier, text);
+        if (!OverrideWorkflows.Contains(workflow))
+        {
+            Assert.Matches(new Regex(@"\n      adjudication_identity:\n(?:        .*\n)*?        required: true\n"), text);
+            Assert.DoesNotContain("maintainer_override", text);
+            Assert.DoesNotContain(OverrideVerifier, text);
+            return;
+        }
+        // The identity is optional only because the override can replace it; the mode step
+        // refuses a dispatch with both inputs or neither, and every mode switch fails closed.
+        Assert.Matches(new Regex(@"\n      adjudication_identity:\n(?:        .*\n)*?        required: false\n"), text);
+        Assert.Matches(new Regex(@"\n      maintainer_override:\n(?:        .*\n)*?        required: false\n"), text);
+        Assert.Contains(OverrideVerifier + " --select-mode", text);
+        var switches = Regex.Matches(text, @"case ""\$(?:RELEASE_)?MODE"" in").Count;
+        Assert.True(switches > 0, "no release-mode switch");
+        Assert.Equal(switches, Regex.Matches(text, @"\n\s*\*\) echo ""::error::[^""]*mode[^""]*""; exit 1 ;;").Count);
+    }
+
+    [Fact]
+    public void OverrideModeKeepsTheReleaseTestGatesAndNeverPublishesBenchmarks()
+    {
+        var text = Read("publish-nuget.yml");
+        Assert.Contains("needs: [adjudication-gate, test, sdk-consumer, release-quality]", text);
+        var dispatch = Regex.Match(text, @"(?s)- name: Dispatch website and benchmark publication.*").Value;
+        var overrideBranch = Regex.Match(dispatch, @"(?s)\n\s*override\)(.*?);;").Groups[1].Value;
+        Assert.Contains("nextjs-gh-pages.yml", overrideBranch);
+        Assert.DoesNotContain("benchmark.yml", overrideBranch);
     }
 
     [Fact]
@@ -118,11 +148,12 @@ public class ReleaseWorkflowGateTests
             {
                 var code = line.TrimStart();
                 if (code.StartsWith('#')) continue;
-                if (code.Contains(Verifier) || inGate)
+                var isGate = code.Contains(Verifier) || code.Contains(OverrideVerifier);
+                if (isGate || inGate)
                 {
                     if (Regex.IsMatch(code, @"\|\|\s*(?:true\b|:(?=\s|;|$)|echo\b|exit\s+0\b)|;\s*true\b"))
                         violations.Add($"{name}:{job}: the gate's failure is suppressed: '{code}'");
-                    else if (code.Contains(Verifier))
+                    else if (isGate)
                         gateSeen = true;
                     inGate = code.EndsWith('\\');
                 }
@@ -140,7 +171,7 @@ public class ReleaseWorkflowGateTests
                 if (Regex.IsMatch(line, @"^\s{6}- ")) steps.Add(new List<string>());
                 if (steps.Count > 0) steps[^1].Add(line);
             }
-            if (jobPublishes && steps.Any(step => step.Any(l => l.Contains(Verifier))
+            if (jobPublishes && steps.Any(step => step.Any(l => l.Contains(Verifier) || l.Contains(OverrideVerifier))
                     && step.Any(l => Regex.IsMatch(l, @"^\s*-?\s*continue-on-error:\s*true"))))
                 violations.Add($"{name}:{job}: a gate step uses continue-on-error");
         }

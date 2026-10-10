@@ -9,6 +9,23 @@ All notable changes to this project will be documented in this file.
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
 sweep, and it adds machinery that makes the release evidence reproducible. It adds no new syntax.
 
+**This release is a recorded maintainer override, not a gated release.** The 0.24 evidence
+adjudication (#1408) recorded the outcome `MILESTONE-FAILED`. It failed for three reasons:
+
+- **Review rounds.** Several pull requests went past the limit of 3 review rounds, and no
+  contract amendment allowed it.
+- **Release paths.** Two release paths do not check the adjudication record. The release pull
+  request comes before the release candidate it would have to check. Older tags still hold a
+  publish workflow with no gate that can read the NuGet API key.
+- **False claims.** Two claims in an earlier version of these notes were not true. Both are
+  corrected in this entry.
+
+A failed record cannot pass the release gate (#1410). On 2026-10-10 the maintainer decided to
+release 0.24.0 anyway, as an explicit maintainer override outside the gate. The decision is
+recorded in `docs/plans/evidence/adjudication-1408/maintainer-override.json`. The failed
+[terminal record](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/evidence/adjudication-1408/terminal-record.json)
+stays unchanged.
+
 This is the first release on NuGet since 0.21.0. The v0.22.0 tag and GitHub pre-release exist,
 but the NuGet publish for 0.22.0 was skipped after its performance tests failed, so 0.22.0 never
 reached NuGet. Milestone 0.23 was planning-only and shipped no code. If you upgrade from 0.21.0,
@@ -16,7 +33,8 @@ read the 0.22.0 entry below as well: its changes are part of this release.
 
 The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs. No independent party
 adjudicated or verified it, so every 0.24 evidence claim is at most
-*bounded*. No benchmark results are published with this release.
+*bounded*. This release publishes no new benchmark results. The benchmark workflow can still
+push a benchmark headline to a public branch and open a pull request.
 
 ### Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)
 
@@ -84,8 +102,10 @@ give the details.
   array, or user-type value that may be null. See the interface entry under **Fixed**.
 - **Reproducible release evidence.** The repository now records, under `docs/plans/`, the 0.24
   evidence contract, the registered soundness sweep and its results (#1311), a disposition for
-  every finding (#1413), and a registered verifier determinism protocol (#1421). A release can
-  be published only through a gate that checks one adjudication record (#1410).
+  every finding (#1413), and a registered verifier determinism protocol (#1421). A release gate
+  (#1410) checks one adjudication record before anything is published. 0.24.0 did not pass
+  through it: it was released through the recorded maintainer override instead. The two release
+  paths described at the top of this entry still do not go through the gate.
 
 ### Changed
 
