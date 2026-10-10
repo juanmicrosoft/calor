@@ -203,8 +203,8 @@ def check_metadata(gate: r2.Gate, root: Path, cand: str, hashes: dict[str, str])
         sbom = json.loads(files[sboms[0]].read_text(encoding="utf-8"))
         prov = json.loads(files[provs[0]].read_text(encoding="utf-8"))
         # Lists, not dicts: a duplicate name (a wrong entry beside the right one) must fail.
-        sbom_files = sorted((f["fileName"], c["algorithm"], c["checksumValue"])
-                            for f in sbom["files"] for c in f["checksums"])
+        sbom_files = sorted((f["fileName"], tuple((c["algorithm"], c["checksumValue"]) for c in f["checksums"]))
+                            for f in sbom["files"])
         subjects = sorted((s["name"], s["digest"]["sha256"], len(s["digest"])) for s in prov["subject"])
         commit = prov["predicate"]["buildDefinition"]["externalParameters"]["commit"]
         namespace = re.fullmatch(r"https://github\.com/juanmicrosoft/calor/sbom/([0-9a-f]{40})/[A-Za-z0-9._%-]+",
@@ -212,7 +212,7 @@ def check_metadata(gate: r2.Gate, root: Path, cand: str, hashes: dict[str, str])
     except (ValueError, KeyError, IndexError, TypeError) as error:
         gate.fail("O012", f"release metadata does not have the generated shape: {error!r}")
         return
-    if sbom_files != sorted((n, "SHA256", h) for n, h in hashes.items()):
+    if sbom_files != sorted((n, (("SHA256", h),)) for n, h in hashes.items()):
         gate.fail("O012", f"{sboms[0]} does not list exactly the packages, each with one SHA256")
     if subjects != sorted((n, h, 1) for n, h in hashes.items()):
         gate.fail("O012", f"{provs[0]} subjects are not exactly the packages and their sha256")

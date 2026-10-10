@@ -187,6 +187,8 @@ public class MaintainerOverrideTests
     [InlineData("duplicate-sbom")]
     [InlineData("duplicate-subject")]
     [InlineData("sha1")]
+    [InlineData("checksumless-duplicate")]
+    [InlineData("checksumless-extra")]
     [InlineData("namespace-decoy")]
     public void ContradictoryMetadataFails(string mutation)
     {
@@ -209,6 +211,14 @@ public class MaintainerOverrideTests
                     break;
                 case "sha1":
                     files[0]!["checksums"]![0]!["algorithm"] = "SHA1";
+                    break;
+                case "checksumless-duplicate":
+                    var bare = files[0]!.DeepClone();
+                    bare["checksums"] = new JsonArray();
+                    files.Add(bare);
+                    break;
+                case "checksumless-extra":
+                    files.Add(new JsonObject { ["fileName"] = "wrong-package.nupkg", ["checksums"] = new JsonArray() });
                     break;
                 default:
                     sbom["documentNamespace"] = $"https://github.com/juanmicrosoft/calor/sbom/{repo.Base}/x?/sbom/{repo.Candidate}/";
