@@ -1,0 +1,190 @@
+{
+ "schema": "c2-1424/ledger/2",
+ "issue": 1424,
+ "candidate": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "contractVersion": "1.4.0",
+ "regeneration": {
+  "number": 2,
+  "of": 2,
+  "status": "COMPLETE WITH A FAILED ROW (determinism protocol; see results.json)",
+  "note": "The last regeneration allowed. Regeneration 1 (candidate 696ab824) is history in ../ledger.json; every one of its results is invalid for this candidate (stopping rule 4)."
+ },
+ "accounting": "runnerMinutes: each job's completed_at - started_at rounded up, no OS multiplier, over every job the API lists.",
+ "ci": [
+  {
+   "runId": 37826943308,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37826943308",
+   "lane": "ci-determinism",
+   "what": "determinism-protocol.yml execution c2-1424-regen-2 (protocol 1.4.0; the 3rd and last execution slot)",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-5e52d8ab",
+   "headSha": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-08T18:47:03Z",
+   "conclusion": "failure",
+   "outcome": "FAILURE: decider verdict NON-DETERMINISTIC, complete false. Classes: 660 AGREE-PASS, 470 DISAGREE, 1,174 INCOMPLETE, 0 AGREE-FAIL. Attempts: 149 completed, 1 invalid ('the job deadline cut an invocation': win-x64 job 1, attempt 15, verification-full). Every DISAGREE case is that one cut attempt's harness-filled Timeout values against Passed or 0|Completed in all 149 completed attempts; no two observed values differ. See determinism/.",
+   "runnerMinutes": 403,
+   "charge": "regeneration-compute (chargeRule c2-candidate-determinism-protocol: this is the one qualifying execution of regeneration 2)",
+   "jobCounts": {
+    "completed/success": 10,
+    "completed/failure": 2
+   },
+   "record": "ci/run-37826943308.json",
+   "imagesObserved": [
+    "macos-14-arm64 20260831.0302.1",
+    "ubuntu-24.04 20261004.327.1",
+    "ubuntu-24.04-arm 20261004.142.1",
+    "windows-11-vs2026-arm64 20261004.176.1",
+    "windows-2025-vs2026 20260925.250.1"
+   ],
+   "dotnetObserved": []
+  },
+  {
+   "runId": 37826947313,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37826947313",
+   "lane": "ci-test",
+   "what": "test.yml workflow_dispatch",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-5e52d8ab",
+   "headSha": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-08T18:47:05Z",
+   "conclusion": "success",
+   "outcome": "SUCCESS: every job succeeded; roundtrip-verification and snapshot-diff-heuristic skipped by their own conditions.",
+   "runnerMinutes": 159,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/success": 35,
+    "completed/skipped": 2
+   },
+   "record": "ci/run-37826947313.json",
+   "imagesObserved": [
+    "macos-14-arm64 20260831.0302.1",
+    "ubuntu-24.04 20261004.327.1",
+    "ubuntu-24.04-arm 20261004.142.1",
+    "windows-11-vs2026-arm64 20261004.176.1",
+    "windows-2025-vs2026 20260925.250.1"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  },
+  {
+   "runId": 37826951096,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37826951096",
+   "lane": "ci-tier2",
+   "what": "tier2.yml workflow_dispatch",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-5e52d8ab",
+   "headSha": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-08T18:47:07Z",
+   "conclusion": "failure",
+   "outcome": "FAILURE BY REGISTERED DESIGN: 428 passed / 51 expected-negative / 30 known-failure, all else 0; the job exits 1 because of the 30 known failures (inventory: 'The 30 registered known failures are not fixed; they stay failures in every result').",
+   "runnerMinutes": 7,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/failure": 1
+   },
+   "record": "ci/run-37826951096.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20261004.327.1"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  },
+  {
+   "runId": 37826955315,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37826955315",
+   "lane": "ci-reproducible-builds",
+   "what": "reproducible-builds.yml workflow_dispatch",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-5e52d8ab",
+   "headSha": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-08T18:47:09Z",
+   "conclusion": "success",
+   "outcome": "SUCCESS: two Linux builds (checkout and a clone at another path with varied HOME, caches, TZ, locale) identical for packages, metadata, and website.",
+   "runnerMinutes": 4,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/success": 2
+   },
+   "record": "ci/run-37826955315.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20261004.327.1"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  }
+ ],
+ "totals": {
+  "regenerationComputeRunnerMinutes": 573,
+  "ceiling": 1500,
+  "withinCeiling": true,
+  "determinismProtocolExecutionsQualifying": 1,
+  "determinismCompute": "G2's plan counts every dispatched run: dry run 13 + g3-exec-1 388 + g3-exec-2 401 + c2-1424-regen-1 2 + c2-1424-regen-2 403 = 1,207 of 2,000; executions 3 of maxExecutions 3 (no slot remains)."
+ },
+ "observedNotCharged": [
+  {
+   "runId": 37813486913,
+   "what": "test.yml push run of the candidate merge (C1's environment observation; not dispatched by C2)"
+  }
+ ],
+ "localEnvironment": {
+  "machine": "Apple M4 Max, 14 logical CPUs, 36 GiB, macOS 27.0.1 arm64",
+  "dotnet": "Microsoft SDK 10.0.401 (commit e34a38d2ae) from dotnet-install.sh into a private root, runtimes 10.0.12 and 8.0.31; dotnetSdkBuild sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053. Linux CI (reproducible-builds.yml) reported sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465 (same version, other OS build) and produced identical package, metadata, and website bytes.",
+  "dotnetCoverageAttempt2": "Homebrew dotnet host 10.0.401 / runtime 10.0.12 at /opt/homebrew, for the coverage step's second attempt only (see results.json release-quality-reports); same Release binaries (--no-build).",
+  "node": "v20.20.2, npm 10.8.2 (nodejs.org tarball)",
+  "python": "3.14.8 (Homebrew)",
+  "git": "2.54.0 (Apple Git-157)",
+  "isolation": "HOME, USERPROFILE, CALOR_HOME, DOTNET_CLI_HOME, NUGET_PACKAGES, NuGet HTTP and plugin caches, npm cache, XDG dirs, and TMPDIR all under the C2 scratch directory (r2/home etc.); core.autocrlf false. gh read a token passed as GH_TOKEN. No file under the real ~/.calor changed."
+ },
+ "local": [
+  {
+   "id": "L1",
+   "where": "fresh clone A (r2/cand) at the candidate",
+   "script": "local.sh",
+   "outcome": "every step exit 0 (see local/clone-a/steps.txt)"
+  },
+  {
+   "id": "L2",
+   "where": "fresh clone B (r2/second/nested/fresh) at the candidate",
+   "script": "local.sh",
+   "outcome": "every step exit 0 (local/clone-b/steps.txt); 0 differences against A (local/compare-a-b.md)"
+  },
+  {
+   "id": "L3",
+   "where": "clone A",
+   "script": "rq.sh: release-quality steps, Tier 2, Z3 mirror, submodules",
+   "outcome": "self-tests, test quality, mutation, performance (median 12.304 s, maximum 24.000 s), flake 100/100, round trip (5 of 5 Pass), scorecard, round-trip delta (no regressions) exit 0; coverage exit 1 (environment, attempt 2 passed); Tier 2 exit 1 by registered design; Z3 mirror download exit 1 (gh not logged in under the isolated HOME), redone with GH_TOKEN: 7 of 7 MATCH"
+  },
+  {
+   "id": "L4",
+   "where": "clone A",
+   "script": "rq-cov2.sh: coverage step attempt 2 with the Homebrew dotnet host",
+   "outcome": "exit 0; Compiler 7,360 + 5,676 (3 skipped), Conversion 476, Enforcement 695, Semantics 55, Verification 473, failed 0; coverage ratchets met"
+  }
+ ],
+ "deviations": [
+  "plan.json was written at 18:53Z, after the CI dispatches and the two local lanes.",
+  "The coverage step ran twice. Attempt 1 failed exactly one test, SoundnessRegistrationTests.EveryCaseOracleCompilesAgainstBclOnly, which rejects any BCL reference whose path contains 'Calor'; the private dotnet root sits under the C2 scratch path ('...-repos-juanmicrosoft-calor/...'). Attempt 2 used Homebrew's host (no 'calor' in its path) with the same binaries and passed; the same test passed in CI's tests (compiler). Both attempts are recorded.",
+  "The Z3 mirror download ran twice: the first had no GitHub login under the isolated HOME (exit 1, nothing downloaded); the second passed a token as GH_TOKEN. Both are recorded.",
+  "test.yml's roundtrip-verification job skipped itself (its change filter compares main with the dispatch branch, and the candidate is an ancestor of main); the round-trip evidence is local (5 of 5 Pass).",
+  "The first draft of these records (not pushed) copied regeneration 1's diagnostic headline hashes (db1a6fd2..., d4291447...) instead of this regeneration's. The R2 dry run failed G011 on them; the records were corrected to 6af1adef... and 91d63dcd... (clone A, clone B, and the dry run agree) before the PR was opened.",
+  "No CI workflow runs the release-quality job without reaching publish-nuget.yml's adjudication gate, so it ran locally on macOS."
+ ],
+ "archives": "Files over about 1 MB are on the orphan branch evidence/v0.24-archives; archives.json in this directory lists them.",
+ "temporaryBranch": {
+  "name": "c2-1424/candidate-5e52d8ab",
+  "pointsAt": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+  "purpose": "workflow_dispatch ref that resolves to the candidate (main is at the C1 landing 7eca4868). Delete after A1."
+ },
+ "published": "nothing: no package push, tag, release, release-asset upload, Pages deploy, or publication PR; publish-nuget.yml, nextjs-gh-pages.yml, benchmark.yml, verify-release.yml were never dispatched"
+}

@@ -1,0 +1,184 @@
+
+added 285 packages in 5s
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
+
+> calor-website@0.24.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+
+   Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 9 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ⚠ Compiled with warnings
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceCommit' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'transpilationChecks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'syntaxPatternScripts' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'contractVerificationTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'behavioralExecutionTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceCommit' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'transpilationChecks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'syntaxPatternScripts' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'contractVerificationTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'behavioralExecutionTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/105) ...
+   Generating static pages (26/105) 
+   Generating static pages (52/105) 
+   Generating static pages (78/105) 
+ ✓ Generating static pages (105/105)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size     First Load JS
+┌ ○ /                                       5.85 kB         128 kB
+├ ○ /_not-found                             872 B          88.3 kB
+├ ● /docs/[[...slug]]                       12.1 kB         128 kB
+├   ├ /docs
+├   ├ /docs/benchmarking/agent-tasks
+├   ├ /docs/benchmarking/effect-rows-study
+├   └ [+94 more paths]
+├ ○ /robots.txt                             0 B                0 B
+├ ○ /search-index.json                      0 B                0 B
+└ ○ /sitemap.xml                            0 B                0 B
++ First Load JS shared by all               87.4 kB
+  ├ chunks/117-531fcaea7756ac14.js          31.8 kB
+  ├ chunks/fd9d1056-8e5c1cc36a160d8c.js     53.6 kB
+  └ other shared chunks (total)             1.95 kB
+
+
+○  (Static)  prerendered as static content
+●  (SSG)     prerendered as static HTML (uses getStaticProps)
+

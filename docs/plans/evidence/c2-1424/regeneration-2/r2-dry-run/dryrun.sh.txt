@@ -1,0 +1,34 @@
+#!/bin/bash
+# R2 release-gate dry run against a SYNTHETIC terminal record, in a scratch clone only.
+# Usage: dryrun.sh <mode: success|with-blocked-determinism>
+# The record is committed only in this scratch clone, on top of the regeneration-2 commit, and
+# refs/remotes/origin/main is moved to it locally so the gate's "on protected main" check can run.
+# Nothing is pushed.
+source /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/common.sh
+MODE="$1"; D=$R/dryrun; O=$R/out/r2-dry-run/$MODE; A=$R/out/clone-a; mkdir -p $O
+cd $D
+git checkout -q --detach 1a306b52ff94488bca8a45ecb35e956a0d2de91f
+mkdir -p docs/plans/evidence/adjudication-1408
+python3 $R/make_terminal.py "$D" docs/plans/evidence/adjudication-1408/terminal-record.json "$MODE"
+git add docs/plans/evidence/adjudication-1408/terminal-record.json
+git -c user.name=c2-dry-run -c user.email=c2-dry-run@invalid -c commit.gpgsign=false commit -q -m "SYNTHETIC terminal record for the C2 R2 dry run ($MODE); never pushed"
+ADJ=$(git rev-parse HEAD)
+DIG=$(git show "$ADJ:docs/plans/evidence/adjudication-1408/terminal-record.json" | shasum -a 256 | cut -d' ' -f1)
+ID="calor-adjudication:v1:$ADJ:$DIG"
+git update-ref refs/remotes/origin/main "$ADJ"
+cp docs/plans/evidence/adjudication-1408/terminal-record.json $O/terminal-record.synthetic.json
+git checkout -q --detach 5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d
+echo "identity $ID" > $O/gate.txt
+python3 scripts/verify_release_adjudication.py --identity "$ID" --expect-head --version 0.24.0 \
+  --release-notes $A/release-notes.md --nuget-dir $A/build/nupkg --metadata-dir $A/build/release-metadata \
+  --website-dir $A/build/website >> $O/gate.txt 2>&1
+echo "SURFACES-EXIT=$?" >> $O/gate.txt
+# Benchmark surface: write the headline with B2's gate in this checkout, then R2's worktree check.
+mkdir -p $O/b1; cp -R $A/b1-regen/. $O/b1/
+python3 scripts/benchmark_publication_gate.py check --commit "$(git rev-parse HEAD)" --regenerated $O/b1 --report $O/b2-report.txt > $O/b2.txt 2>&1
+echo "B2-EXIT=$?" >> $O/gate.txt
+python3 scripts/verify_release_adjudication.py --identity "$ID" --expect-head --version 0.24.0 --benchmark-worktree >> $O/gate.txt 2>&1
+echo "BENCHMARK-WORKTREE-EXIT=$?" >> $O/gate.txt
+git checkout -q -- . ; git clean -qfd website/public/data
+git update-ref refs/remotes/origin/main 7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9
+cat $O/gate.txt

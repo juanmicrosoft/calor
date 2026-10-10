@@ -1,0 +1,2 @@
+start 2026-10-08T19:08:14Z dotnet /opt/homebrew/bin/dotnet 10.0.401
+STEP collect-and-enforce-coverage exit 0 at 2026-10-08T19:23:35Z

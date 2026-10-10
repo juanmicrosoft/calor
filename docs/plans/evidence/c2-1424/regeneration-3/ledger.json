@@ -1,0 +1,179 @@
+{
+ "schema": "c2-1424/ledger/3",
+ "issue": 1424,
+ "candidate": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+ "contractVersion": "1.5.0",
+ "regeneration": {
+  "number": 3,
+  "of": 3,
+  "status": "COMPLETE: no BLOCKED or FAILED row (Tier 2's FAIL verdict is the registered design)",
+  "note": "The last regeneration allowed (contract 1.5.0 exception). Regeneration 1 (696ab824) is history in ../ledger.json; regeneration 2 (5e52d8ab, PR #1535, never merged) is history in ../regeneration-2/. Under stopping rule 4 none of their results carry over."
+ },
+ "accounting": "runnerMinutes: each job's completed_at - started_at rounded up, no OS multiplier, over every job the API lists.",
+ "ci": [
+  {
+   "runId": 37965084091,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37965084091",
+   "lane": "ci-determinism",
+   "what": "determinism-protocol.yml execution c2-1424-regen-3 (protocol 1.5.0; the 4th and last execution slot)",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-04e61f18",
+   "headSha": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-09T17:16:22Z",
+   "conclusion": "success",
+   "outcome": "SUCCESS: decider verdict DETERMINISTIC, complete true; 2,304 AGREE-PASS, 0 DISAGREE, 0 INCOMPLETE, 0 AGREE-FAIL; 150 of 150 attempts completed (0 invalid, timeout, crash, missing, environment-violation, or infrastructure-failure); all four determinism rows RESOLVED. See determinism/.",
+   "runnerMinutes": 401,
+   "charge": "regeneration-compute (chargeRule c2-candidate-determinism-protocol: the one qualifying execution of regeneration 3)",
+   "jobCounts": {
+    "completed/success": 12
+   },
+   "record": "ci/run-37965084091.json",
+   "imagesObserved": [
+    "macos-14-arm64 20260831.0302.1",
+    "ubuntu-24.04 20261004.327.1",
+    "ubuntu-24.04-arm 20261004.142.1",
+    "windows-11-vs2026-arm64 20261004.176.1",
+    "windows-2025-vs2026 20260925.250.1"
+   ],
+   "dotnetObserved": []
+  },
+  {
+   "runId": 37965086841,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37965086841",
+   "lane": "ci-test",
+   "what": "test.yml workflow_dispatch",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-04e61f18",
+   "headSha": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-09T17:16:23Z",
+   "conclusion": "success",
+   "outcome": "SUCCESS: every job succeeded; roundtrip-verification and snapshot-diff-heuristic skipped by their own conditions.",
+   "runnerMinutes": 164,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/success": 35,
+    "completed/skipped": 2
+   },
+   "record": "ci/run-37965086841.json",
+   "imagesObserved": [
+    "macos-14-arm64 20260831.0302.1",
+    "ubuntu-24.04 20261004.327.1",
+    "ubuntu-24.04-arm 20261004.142.1",
+    "windows-11-vs2026-arm64 20261004.176.1",
+    "windows-2025-vs2026 20260925.250.1"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  },
+  {
+   "runId": 37965089769,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37965089769",
+   "lane": "ci-tier2",
+   "what": "tier2.yml workflow_dispatch",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-04e61f18",
+   "headSha": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-09T17:16:25Z",
+   "conclusion": "failure",
+   "outcome": "FAILURE BY REGISTERED DESIGN: 428 passed / 51 expected-negative / 30 known-failure, all else 0; the job exits 1 because of the 30 registered known failures.",
+   "runnerMinutes": 6,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/failure": 1
+   },
+   "record": "ci/run-37965089769.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20261004.327.1"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  },
+  {
+   "runId": 37965092627,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37965092627",
+   "lane": "ci-reproducible-builds",
+   "what": "reproducible-builds.yml workflow_dispatch",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-04e61f18",
+   "headSha": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-09T17:16:26Z",
+   "conclusion": "success",
+   "outcome": "SUCCESS: two Linux builds (checkout and a clone at another path with varied HOME, caches, TZ, locale) identical for packages, metadata, and website.",
+   "runnerMinutes": 12,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/success": 2
+   },
+   "record": "ci/run-37965092627.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20261004.327.1"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  }
+ ],
+ "totals": {
+  "regenerationComputeRunnerMinutes": 583,
+  "ceiling": 1500,
+  "withinCeiling": true,
+  "determinismProtocolExecutionsQualifying": 1,
+  "determinismCompute": "Every dispatched protocol run: dry run 13 + g3-exec-1 388 + g3-exec-2 401 + c2-1424-regen-1 2 + c2-1424-regen-2 403 + c2-1424-regen-3 401 = 1,608 of 3,200 (protocol 1.5.0 ceiling); executions 4 of maxExecutions 4."
+ },
+ "observedNotCharged": [
+  {
+   "what": "test.yml push run of the candidate merge (C1's environment observation; not dispatched by C2)"
+  }
+ ],
+ "localEnvironment": {
+  "machine": "Apple M4 Max, 14 logical CPUs, 36 GiB, macOS 27.0.1 arm64",
+  "dotnet": "Microsoft SDK 10.0.401 (commit e34a38d2ae) from dotnet-install.sh into a private root, runtimes 10.0.12 and 8.0.31; dotnetSdkBuild sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053. Linux CI (reproducible-builds.yml) reported sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465 and produced identical package, metadata, and website bytes.",
+  "dotnetCoverage": "The release-quality coverage step used Homebrew's dotnet host 10.0.401 / runtime 10.0.12 at /opt/homebrew (planned; see plan.json), with the same Release binaries (--no-build).",
+  "node": "v20.20.2, npm 10.8.2 (nodejs.org tarball)",
+  "python": "3.14.8 (Homebrew)",
+  "git": "2.54.0 (Apple Git-157)",
+  "isolation": "HOME, USERPROFILE, CALOR_HOME, DOTNET_CLI_HOME, NUGET_PACKAGES, NuGet HTTP and plugin caches, npm cache, XDG dirs, and TMPDIR under the C2 scratch directory (r3/home etc.); core.autocrlf false; gh received a token as GH_TOKEN. No file under the real ~/.calor changed."
+ },
+ "local": [
+  {
+   "id": "L1",
+   "where": "fresh clone A (r3/cand) at the candidate",
+   "script": "local.sh",
+   "outcome": "every step exit 0 (local/clone-a/steps.txt)"
+  },
+  {
+   "id": "L2",
+   "where": "fresh clone B (r3/second/nested/fresh) at the candidate",
+   "script": "local.sh",
+   "outcome": "every step exit 0; 0 differences against A (local/compare-a-b.md)"
+  },
+  {
+   "id": "L3",
+   "where": "clone A",
+   "script": "rq.sh: release-quality steps, round-trip delta, Tier 2, Z3 mirror, submodules",
+   "outcome": "every step exit 0 except Tier 2 (exit 1 by registered design): coverage met (Compiler 7,360 + 5,678 with 3 skipped, Conversion 476, Enforcement 695, Semantics 55, Verification 473; failed 0), mutation, performance (median 12.869 s, maximum 24.000 s), flake 100/100, round trip 5 of 5 Pass, scorecard, no round-trip regressions; Z3 mirror 7 of 7 MATCH"
+  }
+ ],
+ "deviations": [
+  "plan.json was written at 17:50Z, after the CI dispatches, the two local lanes, and release-quality.",
+  "test.yml's roundtrip-verification job skipped itself (its change filter compares main with the dispatch branch, and the candidate is an ancestor of main); the round-trip evidence is local (5 of 5 Pass).",
+  "No CI workflow runs the release-quality job without reaching publish-nuget.yml's adjudication gate, so it ran locally on macOS."
+ ],
+ "archives": "Files over about 1 MB are on the orphan branch evidence/v0.24-archives; archives.json in this directory lists them.",
+ "temporaryBranch": {
+  "name": "c2-1424/candidate-04e61f18",
+  "pointsAt": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+  "purpose": "workflow_dispatch ref that resolves to the candidate (main is at the C1 landing b04e963f). Delete after A1."
+ },
+ "published": "nothing: no package push, tag, release, release-asset upload, Pages deploy, or publication PR; publish-nuget.yml, nextjs-gh-pages.yml, benchmark.yml, verify-release.yml were never dispatched"
+}

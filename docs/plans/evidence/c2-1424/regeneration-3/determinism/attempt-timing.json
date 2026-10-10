@@ -1,0 +1,87 @@
+{
+ "note": "Per-job invocation durations ('seconds' of each attempt record), all profiles; job setup not included.",
+ "jobs": {
+  "linux-arm64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 20.2,
+    "verification-full": 55.5
+   },
+   "sumSecondsAllProfiles": 1138.9
+  },
+  "linux-arm64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 21.1,
+    "verification-full": 57.4
+   },
+   "sumSecondsAllProfiles": 1173.3
+  },
+  "linux-x64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "compiler-verifier": 83.1,
+    "oracle-isolated": 18.7,
+    "verification-full": 55.1
+   },
+   "sumSecondsAllProfiles": 2345.1
+  },
+  "linux-x64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "compiler-verifier": 80.0,
+    "oracle-isolated": 18.1,
+    "verification-full": 52.9
+   },
+   "sumSecondsAllProfiles": 2269.7
+  },
+  "osx-arm64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 22.4,
+    "verification-full": 108.3
+   },
+   "sumSecondsAllProfiles": 2120.6
+  },
+  "osx-arm64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 21.0,
+    "verification-full": 103.6
+   },
+   "sumSecondsAllProfiles": 1865.2
+  },
+  "win-arm64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 29.4,
+    "verification-full": 129.3
+   },
+   "sumSecondsAllProfiles": 2379.6
+  },
+  "win-arm64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 32.6,
+    "verification-full": 150.2
+   },
+   "sumSecondsAllProfiles": 2746.9
+  },
+  "win-x64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 26.7,
+    "verification-full": 135.2
+   },
+   "sumSecondsAllProfiles": 2454.9
+  },
+  "win-x64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 38.8,
+    "verification-full": 229.6
+   },
+   "sumSecondsAllProfiles": 4070.7
+  }
+ }
+}

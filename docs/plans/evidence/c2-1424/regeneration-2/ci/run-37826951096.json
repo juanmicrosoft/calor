@@ -1,0 +1,46 @@
+{
+ "runId": 37826951096,
+ "workflow": "Tier 2 verification",
+ "title": "Tier 2 verification",
+ "event": "workflow_dispatch",
+ "headBranch": "c2-1424/candidate-5e52d8ab",
+ "headSha": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "runAttempt": 1,
+ "status": "completed",
+ "conclusion": "failure",
+ "createdAt": "2026-10-08T18:47:07Z",
+ "updatedAt": "2026-10-08T18:56:00Z",
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/37826951096",
+ "runnerMinutes": 7,
+ "jobCounts": {
+  "completed/failure": 1
+ },
+ "jobs": [
+  {
+   "id": 113482142260,
+   "name": "verify-corpus",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-08T18:49:21Z",
+   "completedAt": "2026-10-08T18:55:59Z",
+   "runnerMinutes": 7,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000058716",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261004.327.1",
+    "runnerName": "GitHub Actions 1000058716",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37826951096/113482142260-verify-corpus.log.gz",
+    "runnerImageProvisionerVersion": "20261002.596"
+   }
+  }
+ ]
+}
