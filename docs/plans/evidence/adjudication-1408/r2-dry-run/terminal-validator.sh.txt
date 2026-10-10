@@ -1,0 +1,10 @@
+#!/bin/bash
+# Run EvidenceContractValidator.ValidateTerminalRecord (T001-T003) on a record, in the scratch clone.
+# Usage: tval.sh <record.json> <log>
+source /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/env.sh
+cd $A1/tval
+export A1_RECORD="$1" A1_REPO="$A1/tval"
+dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj -c Release \
+  --filter "FullyQualifiedName~A1TerminalRecordScratchCheck" --logger "console;verbosity=normal" > "$2" 2>&1
+echo "TVAL-EXIT=$?" >> "$2"
+tail -5 "$2"

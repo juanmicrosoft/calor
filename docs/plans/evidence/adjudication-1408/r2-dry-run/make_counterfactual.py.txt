@@ -1,0 +1,6 @@
+"""Counterfactual for the R2 dry run only: the draft record with outcome MILESTONE-SUCCEEDED."""
+import json, sys
+r = json.load(open(sys.argv[1]))
+r["outcome"] = "MILESTONE-SUCCEEDED"
+r["COUNTERFACTUAL"] = "R2 dry run only; condition 9 does not hold, so this is not a proposal."
+open(sys.argv[2], "w").write(json.dumps(r, indent=1, ensure_ascii=False) + "\n")
