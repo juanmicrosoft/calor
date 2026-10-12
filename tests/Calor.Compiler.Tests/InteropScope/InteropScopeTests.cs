@@ -152,8 +152,10 @@ public class InteropScopeTests
         ["IN_PROGRESS without PR"] = ("S008", scope => { Family(scope, "F2")["readiness"] = new JsonObject { ["status"] = "IN_PROGRESS" }; return null; }),
         ["MET while 1413 is open"] = ("S009", scope => { scope["gateStatus"] = "MET"; return null; }),
         ["MET without the gate amendment"] = ("S009", scope => { MetWithoutAmendment(scope); return null; }),
-        ["FROZEN without acceptance"] = ("S009", scope => { scope["status"] = "FROZEN"; scope["capacity"]!["status"] = "ACCEPTED"; return null; }),
-        ["ceiling accepted while proposed"] = ("S009", scope => { scope["capacity"]!["ceilings"]![0]!["status"] = "ACCEPTED"; return null; }),
+        ["FROZEN without acceptance"] = ("S009", scope => { Freeze(scope); scope["acceptance"] = null; return null; }),
+        ["ceiling accepted while proposed"] = ("S009", scope => { Unfreeze(scope); scope["capacity"]!["ceilings"]![0]!["status"] = "ACCEPTED"; return null; }),
+        ["ceiling still proposed while frozen"] = ("S009", scope => { Freeze(scope); scope["capacity"]!["ceilings"]![0]!["status"] = "PROPOSED"; return null; }),
+        ["acceptance without a full merge commit"] = ("S009", scope => { Freeze(scope); scope["acceptance"]!["mergeCommit"] = "16c1c5f8"; return null; }),
         ["1413 condition removed"] = ("S009", scope => { scope["gateConditions"]!.AsArray().RemoveAt(0); return null; }),
         ["capacity condition removed"] = ("S009", scope => { scope["gateConditions"]!.AsArray().RemoveAt(1); return null; }),
         ["ceiling without unit"] = ("S010", scope => { scope["capacity"]!["ceilings"]![0]!["unit"] = ""; return null; }),
@@ -303,6 +305,16 @@ public class InteropScopeTests
     private static string Bump(string v) { var p = v.Split('.'); return $"{p[0]}.{p[1]}.{int.Parse(p[2]) + 1}"; }
 
     private static string Requirement(JsonNode c) => InteropScopeValidator.RequirementDigest(c);
+
+    /// <summary>The PROPOSED state the packet merged in: no acceptance, NOT-MET, every ceiling PROPOSED.</summary>
+    private static void Unfreeze(JsonNode scope)
+    {
+        scope["status"] = "PROPOSED";
+        scope["gateStatus"] = "NOT-MET";
+        scope["acceptance"] = null;
+        scope["capacity"]!["status"] = "PROPOSED";
+        foreach (var c in scope["capacity"]!["ceilings"]!.AsArray()) c!["status"] = "PROPOSED";
+    }
 
     private static void Freeze(JsonNode scope)
     {

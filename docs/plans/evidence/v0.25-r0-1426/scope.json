@@ -1,7 +1,7 @@
 {
   "schema": "v0.25-interop-scope/1",
   "scopeVersion": "1.0.0",
-  "status": "PROPOSED",
+  "status": "FROZEN",
   "gateStatus": "NOT-MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
   "epic": 1425,
@@ -35,7 +35,11 @@
       "reason": "#1426 deliverable 2 also asks for cross-feature interaction rows and documentation-example rows. 1.0.0 registers single-family rows only; an amendment adds the #1428 shared controls and the #1429 example rows before MET."
     }
   ],
-  "acceptance": null,
+  "acceptance": {
+    "mergeCommit": "16c1c5f810b042683ef8d8b375f161884fa0b777",
+    "mergedAtUtc": "2026-10-04T00:05:35Z",
+    "pr": 1483
+  },
   "identities": {
     "measuredCommit": "bf584fb71db140ca19e5c956a241a0da7dd02f60",
     "srcTree": "ee3c9db987d844a9348b8d0bab75e603cc01797c",
@@ -235,109 +239,109 @@
     }
   ],
   "capacity": {
-    "status": "PROPOSED",
+    "status": "ACCEPTED",
     "ceilings": [
       {
         "id": "timebox",
         "value": 84,
         "unit": "calendar days from the R0 acceptance write-back",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "agent-prs-per-issue",
         "value": 2,
         "unit": "PRs (one primary, one follow-up)",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "pr-size",
         "value": 1500,
         "unit": "changed lines excluding committed evidence data and test fixtures",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "family-nontest-lines-F1",
         "value": 900,
         "unit": "changed non-test lines across the family's PRs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "family-nontest-lines-F2",
         "value": 900,
         "unit": "changed non-test lines across the family's PRs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "family-nontest-lines-F3",
         "value": 900,
         "unit": "changed non-test lines across the family's PRs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "family-nontest-lines-F4",
         "value": 400,
         "unit": "changed non-test lines across the family's PRs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "family-nontest-lines-F5",
         "value": 600,
         "unit": "changed non-test lines across the family's PRs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "family-nontest-lines-F6",
         "value": 700,
         "unit": "changed non-test lines across the family's PRs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "review-rounds",
         "value": 3,
         "unit": "Codex adversarial rounds per PR, plus one verification-only pass; then close and re-scope",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "maintainer-review-per-pr",
         "value": 2,
         "unit": "hours, all rounds",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "maintainer-review-total",
         "value": 40,
         "unit": "hours across the milestone",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "agent-execution",
         "value": 124,
         "unit": "agent-hours across the milestone (R0 6, D1 6, F1-F3 16 each, F4 6, F5 10, F6 10, W0 10, W1 10, T1 12, A1 6)",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "ci-minutes",
         "value": 12000,
         "unit": "CI runner-minutes across the milestone, including round-trip harness runs",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "roundtrip-harness-runs",
         "value": 10,
         "unit": "complete runs (about 30 minutes each), inside ci-minutes",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "local-compute",
         "value": 20,
         "unit": "local machine-hours",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       },
       {
         "id": "paid-spend",
         "value": 0,
         "unit": "USD; on usage limits, wait",
-        "status": "PROPOSED"
+        "status": "ACCEPTED"
       }
     ]
   },
