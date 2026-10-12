@@ -165,6 +165,20 @@ public class InteropScopeTests
             Exception(scope, "EXC-1520-EXTRA-VERIFICATION")["basis"] = "D-CAPACITY"; Reregister(scope, "EXC-1520-EXTRA-VERIFICATION"); return null; }),
         ["unconfirmed exception wider than its basis"] = ("S010", scope => {
             Exception(scope, "EXC-1520-EXTRA-VERIFICATION")["allowedExtraPasses"] = 2; Reregister(scope, "EXC-1520-EXTRA-VERIFICATION"); return null; }),
+        ["mapping cites a cropped copy of the S2 record"] = ("S012", scope => {
+            const string cropped = "docs/plans/evidence/v0.25-r0-1426/cropped-dispositions.json";
+            scope["mappedBlockers"]!["source"] = cropped; scope["mappedBlockers"]!["notApplicable"] = new JsonArray();
+            return p => {
+                if (p != cropped) return ReadRepo(p);
+                var s2 = JsonNode.Parse(Encoding.UTF8.GetString(ReadRepo(InteropScopeValidator.S2Record)!))!;
+                var keep = new[] { "R-OBL", "R-OBL-RESIDUALS", "R-TEXT" };
+                s2["repairs"] = new JsonArray(s2["repairs"]!.AsArray().Where(r => keep.Contains(r!["id"]!.GetValue<string>())).Select(r => r!.DeepClone()).ToArray());
+                return Encoding.UTF8.GetBytes(s2.ToJsonString()); }; }),
+        ["gate record without its mapping"] = ("S012", scope => {
+            return p => {
+                if (!p.EndsWith("/gate/blockers-mapped-after-1413.json", StringComparison.Ordinal)) return ReadRepo(p);
+                var g = JsonNode.Parse(Encoding.UTF8.GetString(ReadRepo(p)!))!.AsObject(); g.Remove("applicable");
+                return Encoding.UTF8.GetBytes(g.ToJsonString()); }; }),
         ["mapping removed while MET"] = ("S012", scope => { scope.AsObject().Remove("mappedBlockers"); return null; }),
         ["mapping emptied while MET"] = ("S012", scope => {
             scope["mappedBlockers"]!["applicable"] = new JsonArray(); scope["mappedBlockers"]!["notApplicable"] = new JsonArray(); return null; }),
@@ -376,14 +390,20 @@ public class InteropScopeTests
     }
 
     /// <summary>Serves gate/&lt;id&gt;.json records; issueState is what the #1413 record says.</summary>
+    /// <summary>
+    /// Serves gate/&lt;id&gt;.json records; issueState is what the #1413 record says. A committed record keeps its
+    /// substantive evidence (such as the blocker mapping), so a MET positive still exercises reconciliation.
+    /// </summary>
     private static Func<string, byte[]?> GateReader(string issueState) => p =>
-        p.StartsWith(Dir + "/gate/", StringComparison.Ordinal)
-            ? Encoding.UTF8.GetBytes(new JsonObject
-            {
-                ["condition"] = Path.GetFileNameWithoutExtension(p), ["state"] = "SATISFIED",
-                ["issueState"] = issueState, ["closedAtUtc"] = "2026-10-09T00:00:00Z",
-            }.ToJsonString())
-            : ReadRepo(p);
+    {
+        if (!p.StartsWith(Dir + "/gate/", StringComparison.Ordinal)) return ReadRepo(p);
+        var record = ReadRepo(p) is { } b ? JsonNode.Parse(Encoding.UTF8.GetString(b))!.AsObject() : new JsonObject();
+        record["condition"] = Path.GetFileNameWithoutExtension(p);
+        record["state"] = "SATISFIED";
+        record["issueState"] = issueState;
+        record["closedAtUtc"] = "2026-10-09T00:00:00Z";
+        return Encoding.UTF8.GetBytes(record.ToJsonString());
+    };
 
     private static JsonObject Change(string id, string field, string from, string to) =>
         new() { ["id"] = id, ["field"] = field, ["from"] = from, ["to"] = to };

@@ -16,6 +16,9 @@ internal static class InteropScopeValidator
 {
     public const string PacketDir = "docs/plans/evidence/v0.25-r0-1426";
 
+    /// <summary>The 0.24 S2 (#1413) dispositions record every mapped blocker is reconciled against.</summary>
+    public const string S2Record = "docs/plans/evidence/s2-1413/dispositions.json";
+
     /// <summary>The six families the epic (#1425) retains, keyed by family id.</summary>
     public static readonly IReadOnlyDictionary<string, int> RequiredFamilies = new Dictionary<string, int>
     {
@@ -109,11 +112,11 @@ internal static class InteropScopeValidator
             var applicable = Arr(mapping?["applicable"]).ToList();
             var notApplicable = Arr(mapping?["notApplicable"]).ToList();
             JsonNode? s2 = null;
-            try { s2 = Str(mapping?["source"]) is { } src && readRepoFile(src) is { } sb ? JsonNode.Parse(sb) : null; }
+            try { s2 = Str(mapping?["source"]) == S2Record && readRepoFile(S2Record) is { } sb ? JsonNode.Parse(sb) : null; }
             catch (JsonException) { }
             var repairs = Arr(s2?["repairs"]).ToList();
             if (repairs.Count == 0)
-                v.Add(new("S012", "mappedBlockers", "the mapping must cite the 0.24 S2 record and its repairs"));
+                v.Add(new("S012", "mappedBlockers", $"the mapping must cite {S2Record} and reconcile its repairs"));
             foreach (var rep in repairs)
             {
                 var rid = Str(rep["id"]);
@@ -137,8 +140,9 @@ internal static class InteropScopeValidator
             JsonNode? gateRecord = null;
             try { gateRecord = readRepoFile($"{PacketDir}/gate/blockers-mapped-after-1413.json") is { } gb ? JsonNode.Parse(gb) : null; }
             catch (JsonException) { }
-            if (Str(scope["gateStatus"]) == "MET" && gateRecord?["applicable"] is { } ga && !JsonNode.DeepEquals(ga, mapping?["applicable"]))
-                v.Add(new("S012", "mappedBlockers", "the gate record's applicable mapping differs from the packet's"));
+            if (Str(scope["gateStatus"]) == "MET" && (gateRecord?["applicable"] is not { } ga || !JsonNode.DeepEquals(ga, mapping?["applicable"])
+                || gateRecord["notApplicable"] is not { } gn || !JsonNode.DeepEquals(gn, mapping?["notApplicable"])))
+                v.Add(new("S012", "mappedBlockers", "the gate record must carry the packet's applicable and not-applicable mapping"));
         }
 
         // S002: case shape and the frozen vocabularies.
