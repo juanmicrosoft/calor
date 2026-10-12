@@ -80,6 +80,19 @@ internal static class InteropScopeValidator
                     v.Add(new("S012", fid, $"family blockers must include #{need}"));
         }
 
+        // S012 (1.1.0): each applicable 0.24 S2 repair mapped after #1413 is a native blocker of every family
+        // it names, and names its merge on main (a mapped blocker never stands for unmerged code).
+        foreach (var m in Arr(scope["mappedBlockers"]?["applicable"]))
+        {
+            var repair = Str(m["repair"]) ?? "?";
+            if (Int(m["pr"]) <= 0 || !IsFullSha(Str(m["mergeCommit"])) || !Arr(m["families"]).Any())
+                v.Add(new("S012", repair, "a mapped blocker needs its PR, its full merge commit and at least one family"));
+            // A family absent from the packet is S001's finding; it has no blocker list to check.
+            foreach (var fid in Arr(m["families"]).Select(Str))
+                if (families.FirstOrDefault(f => Str(f["id"]) == fid) is { } fam && !Arr(fam["blockers"]).Any(b => Int(b) == Int(m["pr"])))
+                    v.Add(new("S012", fid ?? "?", $"mapped blocker {repair} (#{Int(m["pr"])}) is missing from the family's blockers"));
+        }
+
         // S002: case shape and the frozen vocabularies.
         foreach (var (name, values) in Vocabularies)
             if (!Arr(scope["vocabularies"]?[name]).Select(Str).SequenceEqual(values))
@@ -270,6 +283,12 @@ internal static class InteropScopeValidator
                 v.Add(new("S010", Str(c["id"]) ?? "?", "ceiling needs a unique id, numeric value, unit and PROPOSED/ACCEPTED status"));
         if (!ceilings.Any(c => Str(c["id"]) == "paid-spend" && c["value"]?.ToJsonString() == "0"))
             v.Add(new("S010", "paid-spend", "the paid-spend ceiling must be registered at 0"));
+        // A capacity exception names a registered ceiling, one PR, the amendment that records it, and the decision.
+        var exceptionIds = new HashSet<string>();
+        foreach (var e in Arr(capacity?["exceptions"]))
+            if (!exceptionIds.Add(Str(e["id"]) ?? "") || !ceilingIds.Contains(Str(e["ceiling"]) ?? "") || Int(e["pr"]) <= 0
+                || !NonBlank(e["decision"]) || !amendments.Any(a => Str(a["version"]) == Str(e["amendment"])))
+                v.Add(new("S010", Str(e["id"]) ?? "?", "a capacity exception needs a unique id, a registered ceiling, a PR, a decision and its amendment"));
 
         // S013: the baseline evidence is sealed, and every recorded baseline is recomputed from it.
         var seal = scope["evidenceSeal"];

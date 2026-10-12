@@ -127,7 +127,7 @@ public class InteropScopeTests
             var w = Amendment(scope, removed: null); w["changes"] = new JsonArray(Change("F4-ITER-01", "expected", "native", "rejected"));
             scope["amendments"]!.AsArray().Add(w); scope["scopeVersion"] = Last(scope); return null; }),
         ["amendment without PR"] = ("S005", scope => { var a = Amendment(scope, removed: null); a["pr"] = 0; scope["amendments"]!.AsArray().Add(a); scope["scopeVersion"] = Last(scope); return null; }),
-        ["scope version ahead of amendments"] = ("S005", scope => { scope["scopeVersion"] = "1.1.0"; return null; }),
+        ["scope version ahead of amendments"] = ("S005", scope => { scope["scopeVersion"] = Bump(Last(scope)); return null; }),
         ["unknown readiness status"] = ("S006", scope => { Family(scope, "F2")["readiness"]!["status"] = "DONE"; return null; }),
         ["readiness vocabulary extended"] = ("S006", scope => { scope["vocabularies"]!["readiness"]!.AsArray().Add("REVIEWED"); return null; }),
         ["READY without commit"] = ("S007", scope => { Ready(scope)["candidate"]!["commit"] = "abc1234"; return null; }),
@@ -150,8 +150,13 @@ public class InteropScopeTests
             scope["amendments"]!.AsArray().Add(s); scope["scopeVersion"] = Last(scope); return null; }),
         ["BLOCKED without reason"] = ("S008", scope => { Family(scope, "F2")["readiness"] = new JsonObject { ["status"] = "BLOCKED" }; return null; }),
         ["IN_PROGRESS without PR"] = ("S008", scope => { Family(scope, "F2")["readiness"] = new JsonObject { ["status"] = "IN_PROGRESS" }; return null; }),
-        ["MET while 1413 is open"] = ("S009", scope => { scope["gateStatus"] = "MET"; return null; }),
-        ["MET without the gate amendment"] = ("S009", scope => { MetWithoutAmendment(scope); return null; }),
+        ["MET while 1413 is open"] = ("S009", scope => { scope["gateStatus"] = "MET"; scope["gateConditions"]![0]!["state"] = "OPEN"; return null; }),
+        ["MET without the gate amendment"] = ("S009", scope => { MetWithoutAmendment(scope);
+            foreach (var a in scope["amendments"]!.AsArray()) a!.AsObject().Remove("gateDecision"); return GateReader("CLOSED"); }),
+        ["MET with a gate record that names another condition"] = ("S009", scope => {
+            return p => p.EndsWith("/gate/capacity-accepted.json") ? Encoding.UTF8.GetBytes("{\"condition\":\"blocker-1413\",\"state\":\"SATISFIED\"}") : ReadRepo(p); }),
+        ["mapped blocker missing from a family"] = ("S012", scope => { Family(scope, "F2")["blockers"]!.AsArray().RemoveAt(2); return null; }),
+        ["capacity exception for an unknown ceiling"] = ("S010", scope => { scope["capacity"]!["exceptions"]![0]!["ceiling"] = "no-such-ceiling"; return null; }),
         ["FROZEN without acceptance"] = ("S009", scope => { Freeze(scope); scope["acceptance"] = null; return null; }),
         ["ceiling accepted while proposed"] = ("S009", scope => { Unfreeze(scope); scope["capacity"]!["ceilings"]![0]!["status"] = "ACCEPTED"; return null; }),
         ["ceiling still proposed while frozen"] = ("S009", scope => { Freeze(scope); scope["capacity"]!["ceilings"]![0]!["status"] = "PROPOSED"; return null; }),
@@ -194,8 +199,10 @@ public class InteropScopeTests
         ["READY example by path traversal"] = ("S007", scope => { Ready(scope)["websiteExamples"] = new JsonArray("website/content/../../README.md"); return null; }),
         ["READY review by path traversal"] = ("S007", scope => { Ready(scope)["reviews"]![0]!["record"] = $"{Dir}/reviews/../../../../../README.md"; return null; }),
         ["READY result by path traversal"] = ("S007", scope => { Ready(scope)["cases"]![0]!["evidence"] = "docs/plans/evidence/../../../README.md"; return null; }),
-        ["MET with a relabeled interaction row"] = ("S009", scope => { MetWithAmendment(scope); var x = Case(scope, "X-interaction"); x.AsObject().Remove("families");
-            scope["denominatorV1"]!.AsArray().Single(d => d!["id"]!.GetValue<string>() == "X-interaction")!["requirementSha256"] = Requirement(x); return GateReader("CLOSED"); }),
+        ["MET with a relabeled interaction row"] = ("S009", scope => { MetWithAmendment(scope);
+            foreach (var x in scope["cases"]!.AsArray().Where(c => c!["role"]!.GetValue<string>() == "interaction").ToList())
+            { x!.AsObject().Remove("families"); Rehash(scope, x); }
+            return GateReader("CLOSED"); }),
         ["MET with the planning doc as evidence"] = ("S009", scope => { MetWithAmendment(scope); scope["gateConditions"]![0]!["evidence"] = "docs/plans/v0.25-interop-scope-and-baseline.md"; return GateReader("CLOSED"); }),
         ["MET while the 1413 record is open"] = ("S009", scope => { MetWithAmendment(scope); return GateReader("OPEN"); }),
     };
@@ -246,6 +253,16 @@ public class InteropScopeTests
     private static JsonNode Family(JsonNode scope, string id) => scope["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!;
     private static JsonNode Case(JsonNode scope, string id) => scope["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == id)!;
     private static JsonNode Ceiling(JsonNode scope, string id) => scope["capacity"]!["ceilings"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;
+
+    /// <summary>Re-registers a case's requirement digest wherever it is registered (1.0.0 or an amendment), to isolate a control from S004.</summary>
+    private static void Rehash(JsonNode scope, JsonNode c)
+    {
+        var id = c["id"]!.GetValue<string>();
+        var entries = scope["denominatorV1"]!.AsArray()
+            .Concat(scope["amendments"]!.AsArray().SelectMany(a => a!["addedCases"]?.AsArray() ?? []))
+            .Where(d => d!["id"]!.GetValue<string>() == id);
+        foreach (var e in entries) e!["requirementSha256"] = Requirement(c);
+    }
 
     private static JsonNode Frozen(JsonNode scope, string id) =>
         scope["denominatorV1"]!.AsArray().Single(d => d!["id"]!.GetValue<string>() == id)!.DeepClone();

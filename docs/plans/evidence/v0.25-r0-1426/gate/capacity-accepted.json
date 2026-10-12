@@ -1,0 +1,106 @@
+{
+  "condition": "capacity-accepted",
+  "state": "SATISFIED",
+  "amendment": "1.1.0",
+  "recordedAtUtc": "2026-10-12T02:22:52Z",
+  "acceptance": {
+    "mergeCommit": "16c1c5f810b042683ef8d8b375f161884fa0b777",
+    "mergedAtUtc": "2026-10-04T00:05:35Z",
+    "pr": 1483
+  },
+  "writeBackPr": 1552,
+  "decision": "Accept the section 9 ceilings. Recorded by the merge of #1483 (16c1c5f8, 2026-10-04T00:05:35Z, merged by juanatjcx, the maintainer's authorized alternate login), which section 1 makes the acceptance, and written back by #1552. The maintainer's words 'Accept and merge' for the 0.25 capacity were relayed in the agent session; no repository or GitHub record of them exists.",
+  "ceilings": [
+    {
+      "id": "timebox",
+      "value": 84,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "agent-prs-per-issue",
+      "value": 2,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "pr-size",
+      "value": 1500,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "family-nontest-lines-F1",
+      "value": 900,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "family-nontest-lines-F2",
+      "value": 900,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "family-nontest-lines-F3",
+      "value": 900,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "family-nontest-lines-F4",
+      "value": 400,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "family-nontest-lines-F5",
+      "value": 600,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "family-nontest-lines-F6",
+      "value": 700,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "review-rounds",
+      "value": 3,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "maintainer-review-per-pr",
+      "value": 2,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "maintainer-review-total",
+      "value": 40,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "agent-execution",
+      "value": 124,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "ci-minutes",
+      "value": 12000,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "roundtrip-harness-runs",
+      "value": 10,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "local-compute",
+      "value": 20,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "paid-spend",
+      "value": 0,
+      "status": "ACCEPTED"
+    }
+  ],
+  "exceptions": [
+    "EXC-F5-NONTEST-LINES",
+    "EXC-F5-EXTRA-VERIFICATION",
+    "EXC-1520-EXTRA-VERIFICATION",
+    "EXC-1538-EXTRA-VERIFICATION"
+  ]
+}
