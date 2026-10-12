@@ -157,6 +157,9 @@ public class InteropScopeTests
             return p => p.EndsWith("/gate/capacity-accepted.json") ? Encoding.UTF8.GetBytes("{\"condition\":\"blocker-1413\",\"state\":\"SATISFIED\"}") : ReadRepo(p); }),
         ["mapped blocker missing from a family"] = ("S012", scope => { Family(scope, "F2")["blockers"]!.AsArray().RemoveAt(2); return null; }),
         ["capacity exception for an unknown ceiling"] = ("S010", scope => { scope["capacity"]!["exceptions"]![0]!["ceiling"] = "no-such-ceiling"; return null; }),
+        ["mapped blocker naming an unknown family"] = ("S012", scope => { scope["mappedBlockers"]!["applicable"]![0]!["families"] = new JsonArray("F7"); return null; }),
+        ["unconfirmed capacity exception without a basis"] = ("S010", scope => {
+            var e = scope["capacity"]!["exceptions"]!.AsArray().First(x => !x!["confirmed"]!.GetValue<bool>())!; e.AsObject().Remove("basis"); return null; }),
         ["FROZEN without acceptance"] = ("S009", scope => { Freeze(scope); scope["acceptance"] = null; return null; }),
         ["ceiling accepted while proposed"] = ("S009", scope => { Unfreeze(scope); scope["capacity"]!["ceilings"]![0]!["status"] = "ACCEPTED"; return null; }),
         ["ceiling still proposed while frozen"] = ("S009", scope => { Freeze(scope); scope["capacity"]!["ceilings"]![0]!["status"] = "PROPOSED"; return null; }),

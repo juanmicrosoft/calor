@@ -22,10 +22,11 @@
       ],
       "families": [
         "F1",
+        "F2",
         "F3",
         "F5"
       ],
-      "reason": "Entry facts are dropped when a body may write a name they read, including ref/out/in aliasing and element or field stores; raw C# makes a body opaque. F1 adds by-reference writes; F3 and F5 replace preserved raw C# (opaque today) with native bodies containing calls and element stores, so the fact-kill rule must cover them."
+      "reason": "Entry facts are dropped when a body may write a name they read, including ref/out/in aliasing and element or field stores; raw C# makes a body opaque. F1 adds by-reference writes. F2, F3 and F5 replace raw C# that is opaque today (inline `§CS{}` interpolation holes with calls, preserved local functions, preserved array expressions) with native calls and element stores, so the fact-kill rule must cover them."
     },
     {
       "repair": "R-OBL-RESIDUALS",
@@ -38,10 +39,11 @@
       ],
       "families": [
         "F1",
+        "F2",
         "F3",
         "F5"
       ],
-      "reason": "After a statement that may throw (calls, element reads, checked arithmetic) the obligation state is not exact. F1 adds calls that write `out` before throwing (F1-REFOUT-04); F3 adds native local-function calls; F5 adds native element initializers that may throw (F5-ARRAY-04)."
+      "reason": "After a statement that may throw (calls, element reads, checked arithmetic) the obligation state is not exact. F1 adds calls that write `out` before throwing (F1-REFOUT-04); F2 lifts interpolation-hole calls into native calls; F3 adds native local-function calls; F5 adds native element initializers that may throw (F5-ARRAY-04)."
     },
     {
       "repair": "R-TEXT",
@@ -97,7 +99,9 @@
     "F2": [
       1426,
       1423,
-      1497
+      1497,
+      1496,
+      1503
     ],
     "F3": [
       1426,

@@ -99,7 +99,9 @@
   ],
   "exceptions": [
     "EXC-F5-NONTEST-LINES",
-    "EXC-F5-EXTRA-VERIFICATION",
+    "EXC-F5-EXTRA-VERIFICATION"
+  ],
+  "pendingConfirmation": [
     "EXC-1520-EXTRA-VERIFICATION",
     "EXC-1538-EXTRA-VERIFICATION"
   ]

@@ -87,10 +87,14 @@ internal static class InteropScopeValidator
             var repair = Str(m["repair"]) ?? "?";
             if (Int(m["pr"]) <= 0 || !IsFullSha(Str(m["mergeCommit"])) || !Arr(m["families"]).Any())
                 v.Add(new("S012", repair, "a mapped blocker needs its PR, its full merge commit and at least one family"));
-            // A family absent from the packet is S001's finding; it has no blocker list to check.
+            // A mapped family must be one of the six; a family missing from the packet is S001's finding.
             foreach (var fid in Arr(m["families"]).Select(Str))
-                if (families.FirstOrDefault(f => Str(f["id"]) == fid) is { } fam && !Arr(fam["blockers"]).Any(b => Int(b) == Int(m["pr"])))
-                    v.Add(new("S012", fid ?? "?", $"mapped blocker {repair} (#{Int(m["pr"])}) is missing from the family's blockers"));
+            {
+                if (!RequiredFamilies.ContainsKey(fid ?? ""))
+                    v.Add(new("S012", fid ?? "?", $"mapped blocker {repair} names a family that is not one of the six"));
+                else if (families.FirstOrDefault(f => Str(f["id"]) == fid) is { } fam && !Arr(fam["blockers"]).Any(b => Int(b) == Int(m["pr"])))
+                    v.Add(new("S012", fid!, $"mapped blocker {repair} (#{Int(m["pr"])}) is missing from the family's blockers"));
+            }
         }
 
         // S002: case shape and the frozen vocabularies.
@@ -289,6 +293,12 @@ internal static class InteropScopeValidator
             if (!exceptionIds.Add(Str(e["id"]) ?? "") || !ceilingIds.Contains(Str(e["ceiling"]) ?? "") || Int(e["pr"]) <= 0
                 || !NonBlank(e["decision"]) || !amendments.Any(a => Str(a["version"]) == Str(e["amendment"])))
                 v.Add(new("S010", Str(e["id"]) ?? "?", "a capacity exception needs a unique id, a registered ceiling, a PR, a decision and its amendment"));
+        // An exception not confirmed by the maintainer must say so and name the recorded decision it extends.
+        var decisionIds = amendments.SelectMany(a => Arr(a["maintainerDecisions"])).Select(x => Str(x["id"])).ToHashSet();
+        foreach (var e in Arr(capacity?["exceptions"]))
+            if (e["confirmed"]?.GetValueKind() is not (JsonValueKind.True or JsonValueKind.False)
+                || (e["confirmed"]!.GetValueKind() == JsonValueKind.False && !decisionIds.Contains(Str(e["basis"]))))
+                v.Add(new("S010", Str(e["id"]) ?? "?", "a capacity exception must state whether the maintainer confirmed it; an unconfirmed one must name the recorded decision it extends"));
 
         // S013: the baseline evidence is sealed, and every recorded baseline is recomputed from it.
         var seal = scope["evidenceSeal"];

@@ -142,7 +142,9 @@
       "blockers": [
         1426,
         1423,
-        1497
+        1497,
+        1496,
+        1503
       ],
       "provisionalSize": "L",
       "readiness": {
@@ -394,7 +396,8 @@
         },
         "decision": "@juanmicrosoft, 2026-10-11: F5's non-test source is +596/-284 against the 600-line family ceiling, over when added and removed lines both count; recorded as an exception that allows it.",
         "scope": "PR #1521 only, at 880 changed non-test lines. Any further F5 non-test change, including one prompted by EXC-F5-EXTRA-VERIFICATION, needs a new exception.",
-        "amendment": "1.1.0"
+        "amendment": "1.1.0",
+        "confirmed": true
       },
       {
         "id": "EXC-F5-EXTRA-VERIFICATION",
@@ -405,7 +408,8 @@
         "covers": "The 4 fixes made after F5's verification pass (61267112d, witnesses in 0e27e0433): round-3 findings 1, 2 and 5 and round-2 finding 6, which that pass marked NOT-VERIFIED.",
         "decision": "@juanmicrosoft, 2026-10-11: allow one extra Codex verification-only pass on F5's 4 post-verification fixes, recorded before that pass runs.",
         "scope": "One verification-only pass; no further adversarial round.",
-        "amendment": "1.1.0"
+        "amendment": "1.1.0",
+        "confirmed": true
       },
       {
         "id": "EXC-1520-EXTRA-VERIFICATION",
@@ -414,10 +418,11 @@
         "ceilingValue": 3,
         "allowedExtraPasses": 1,
         "covers": "Changes made after #1520's Codex verification pass (commit e60773a08, 'Address #1515 verification pass') that Codex has not reviewed.",
-        "decision": "Recorded as maintainer-approved under the reasoning of the 2026-10-11 F5 decision (unreviewed post-verification fixes get one verification-only pass). This extension to #1520 is the agent's inference from that decision and awaits @juanmicrosoft's confirmation.",
+        "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1520, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
         "confirmed": false,
         "scope": "One verification-only pass; no further adversarial round.",
-        "amendment": "1.1.0"
+        "amendment": "1.1.0",
+        "basis": "D-F5-EXCEPTIONS"
       },
       {
         "id": "EXC-1538-EXTRA-VERIFICATION",
@@ -426,10 +431,11 @@
         "ceilingValue": 3,
         "allowedExtraPasses": 1,
         "covers": "Changes made after #1538's Codex verification pass, which reviewed 05124b455: commit 2be9b3b98 ('compare §PROOF local names without a CodeGen dependency').",
-        "decision": "Recorded as maintainer-approved under the reasoning of the 2026-10-11 F5 decision (unreviewed post-verification fixes get one verification-only pass). This extension to #1538 is the agent's inference from that decision and awaits @juanmicrosoft's confirmation.",
+        "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1538, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
         "confirmed": false,
         "scope": "One verification-only pass; no further adversarial round.",
-        "amendment": "1.1.0"
+        "amendment": "1.1.0",
+        "basis": "D-F5-EXCEPTIONS"
       }
     ]
   },
@@ -1526,13 +1532,13 @@
       "id": "X-INT-07",
       "family": "F5",
       "role": "interaction",
-      "expected": "native-or-preserved",
+      "expected": "native",
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
       "baseline": {},
       "observations": [],
-      "note": "#1428 shared control, F3 x F5. An expression-position array (a returned `new int[,] {{...}}` and an array argument) inside a native local function. Generated hoist and `§ARR2D` names do not collide with the local function's parameters or the enclosing member's locals, and element evaluation order matches C#. Not fixtured at 1.1.0.",
+      "note": "#1428 shared control, F3 x F5. An expression-position array (a returned `new int[,] {{...}}` and an array argument) inside a native local function: the intersection of F3's native slice and F5's native array forms. Expected native: generated hoist and `§ARR2D` names do not collide with the local function's parameters or the enclosing member's locals, and element evaluation order matches C#. Whole-member preservation does not satisfy this row; a shape outside either family's native slice needs its own registered row. Not fixtured at 1.1.0.",
       "cells": [
         "cli-default",
         "mcp-default",
@@ -1743,9 +1749,23 @@
           "surface": "mcp-passthroughOnError",
           "path": "isError",
           "equals": false
+        },
+        {
+          "case": "F5-ARRAY-02",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": false
+        },
+        {
+          "case": "F5-ARRAY-02",
+          "surface": "mcp-default",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
         }
       ],
-      "note": "#1429 row. The MCP page lists `calor_convert` without saying that it rescues members only with `passthroughOnError`. At the baseline MCP with default arguments returns isError on F4-ITER-01 and rescues with `passthroughOnError`. Expected: the page states the per-surface default and the report names it.",
+      "note": "#1429 row. The MCP page lists `calor_convert` without describing when it rescues a member. At the baseline MCP with default arguments rescues some members and not others: it rescues F5-ARRAY-02 (whose native output does not parse; `post-validation-fallback`), but returns isError on F4-ITER-01 (whose native output parses and the compiler rejects with Calor0209), which it rescues only with `passthroughOnError`. Expected: the page states the per-surface default for each trigger and the report names it.",
       "cells": [
         "example-compiles-default",
         "example-matches-page-claim"
@@ -2509,13 +2529,13 @@
           "id": "X-INT-07",
           "family": "F5",
           "role": "interaction",
-          "expected": "native-or-preserved",
+          "expected": "native",
           "baselineStatus": "not-measured",
           "fixture": null,
           "fixtureSha256": null,
           "baseline": {},
           "observations": [],
-          "note": "#1428 shared control, F3 x F5. An expression-position array (a returned `new int[,] {{...}}` and an array argument) inside a native local function. Generated hoist and `§ARR2D` names do not collide with the local function's parameters or the enclosing member's locals, and element evaluation order matches C#. Not fixtured at 1.1.0.",
+          "note": "#1428 shared control, F3 x F5. An expression-position array (a returned `new int[,] {{...}}` and an array argument) inside a native local function: the intersection of F3's native slice and F5's native array forms. Expected native: generated hoist and `§ARR2D` names do not collide with the local function's parameters or the enclosing member's locals, and element evaluation order matches C#. Whole-member preservation does not satisfy this row; a shape outside either family's native slice needs its own registered row. Not fixtured at 1.1.0.",
           "cells": [
             "cli-default",
             "mcp-default",
@@ -2526,7 +2546,7 @@
             "F3",
             "F5"
           ],
-          "requirementSha256": "98a1bf4593d031f24e9dfb6215b5482e3321de489e7951a8727a42b5df5fc425"
+          "requirementSha256": "a46dfae3f07ce754b3981aa71842070a63c3f2f1ea90302c0e1788f228c91ed7"
         },
         {
           "id": "X-INT-08",
@@ -2735,15 +2755,29 @@
               "surface": "mcp-passthroughOnError",
               "path": "isError",
               "equals": false
+            },
+            {
+              "case": "F5-ARRAY-02",
+              "surface": "mcp-default",
+              "path": "isError",
+              "equals": false
+            },
+            {
+              "case": "F5-ARRAY-02",
+              "surface": "mcp-default",
+              "path": "lossFeatures",
+              "equals": [
+                "post-validation-fallback"
+              ]
             }
           ],
-          "note": "#1429 row. The MCP page lists `calor_convert` without saying that it rescues members only with `passthroughOnError`. At the baseline MCP with default arguments returns isError on F4-ITER-01 and rescues with `passthroughOnError`. Expected: the page states the per-surface default and the report names it.",
+          "note": "#1429 row. The MCP page lists `calor_convert` without describing when it rescues a member. At the baseline MCP with default arguments rescues some members and not others: it rescues F5-ARRAY-02 (whose native output does not parse; `post-validation-fallback`), but returns isError on F4-ITER-01 (whose native output parses and the compiler rejects with Calor0209), which it rescues only with `passthroughOnError`. Expected: the page states the per-surface default for each trigger and the report names it.",
           "cells": [
             "example-compiles-default",
             "example-matches-page-claim"
           ],
           "websiteExample": "website/content/cli/mcp.mdx",
-          "requirementSha256": "22a55f65beeb8a3aaa95cc065bf07480fd7059b48f30552c3a813485a1865302"
+          "requirementSha256": "06116008c349e4a6f1c2222dd6358bcc2db4af05f4801fe40cbf6655fd216bbf"
         }
       ],
       "changes": [],
@@ -2777,11 +2811,13 @@
       "mappedBlockers": {
         "R-OBL": [
           "F1",
+          "F2",
           "F3",
           "F5"
         ],
         "R-OBL-RESIDUALS": [
           "F1",
+          "F2",
           "F3",
           "F5"
         ],
@@ -2871,10 +2907,11 @@
         ],
         "families": [
           "F1",
+          "F2",
           "F3",
           "F5"
         ],
-        "reason": "Entry facts are dropped when a body may write a name they read, including ref/out/in aliasing and element or field stores; raw C# makes a body opaque. F1 adds by-reference writes; F3 and F5 replace preserved raw C# (opaque today) with native bodies containing calls and element stores, so the fact-kill rule must cover them."
+        "reason": "Entry facts are dropped when a body may write a name they read, including ref/out/in aliasing and element or field stores; raw C# makes a body opaque. F1 adds by-reference writes. F2, F3 and F5 replace raw C# that is opaque today (inline `§CS{}` interpolation holes with calls, preserved local functions, preserved array expressions) with native calls and element stores, so the fact-kill rule must cover them."
       },
       {
         "repair": "R-OBL-RESIDUALS",
@@ -2887,10 +2924,11 @@
         ],
         "families": [
           "F1",
+          "F2",
           "F3",
           "F5"
         ],
-        "reason": "After a statement that may throw (calls, element reads, checked arithmetic) the obligation state is not exact. F1 adds calls that write `out` before throwing (F1-REFOUT-04); F3 adds native local-function calls; F5 adds native element initializers that may throw (F5-ARRAY-04)."
+        "reason": "After a statement that may throw (calls, element reads, checked arithmetic) the obligation state is not exact. F1 adds calls that write `out` before throwing (F1-REFOUT-04); F2 lifts interpolation-hole calls into native calls; F3 adds native local-function calls; F5 adds native element initializers that may throw (F5-ARRAY-04)."
       },
       {
         "repair": "R-TEXT",
