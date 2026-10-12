@@ -2799,14 +2799,70 @@
           "id": "D-F5-EXCEPTIONS",
           "date": "2026-10-11",
           "by": "@juanmicrosoft",
-          "decision": "EXC-F5-NONTEST-LINES and EXC-F5-EXTRA-VERIFICATION (capacity.exceptions)."
+          "decision": "EXC-F5-NONTEST-LINES and EXC-F5-EXTRA-VERIFICATION (capacity.exceptions).",
+          "exceptions": [
+            "EXC-F5-NONTEST-LINES",
+            "EXC-F5-EXTRA-VERIFICATION"
+          ]
         }
       ],
       "capacityExceptions": [
-        "EXC-F5-NONTEST-LINES",
-        "EXC-F5-EXTRA-VERIFICATION",
-        "EXC-1520-EXTRA-VERIFICATION",
-        "EXC-1538-EXTRA-VERIFICATION"
+        {
+          "id": "EXC-F5-NONTEST-LINES",
+          "ceiling": "family-nontest-lines-F5",
+          "pr": 1521,
+          "ceilingValue": 600,
+          "allowed": 880,
+          "measured": {
+            "added": 596,
+            "removed": 284,
+            "changed": 880,
+            "at": "073ee4f1f",
+            "command": "git diff --numstat origin/main...origin/milestone-0.25/f5-1132-array-expressions -- src"
+          },
+          "decision": "@juanmicrosoft, 2026-10-11: F5's non-test source is +596/-284 against the 600-line family ceiling, over when added and removed lines both count; recorded as an exception that allows it.",
+          "scope": "PR #1521 only, at 880 changed non-test lines. Any further F5 non-test change, including one prompted by EXC-F5-EXTRA-VERIFICATION, needs a new exception.",
+          "amendment": "1.1.0",
+          "confirmed": true
+        },
+        {
+          "id": "EXC-F5-EXTRA-VERIFICATION",
+          "ceiling": "review-rounds",
+          "pr": 1521,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "The 4 fixes made after F5's verification pass (61267112d, witnesses in 0e27e0433): round-3 findings 1, 2 and 5 and round-2 finding 6, which that pass marked NOT-VERIFIED.",
+          "decision": "@juanmicrosoft, 2026-10-11: allow one extra Codex verification-only pass on F5's 4 post-verification fixes, recorded before that pass runs.",
+          "scope": "One verification-only pass; no further adversarial round.",
+          "amendment": "1.1.0",
+          "confirmed": true
+        },
+        {
+          "id": "EXC-1520-EXTRA-VERIFICATION",
+          "ceiling": "review-rounds",
+          "pr": 1520,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "Changes made after #1520's Codex verification pass (commit e60773a08, 'Address #1515 verification pass') that Codex has not reviewed.",
+          "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1520, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
+          "confirmed": false,
+          "scope": "One verification-only pass; no further adversarial round.",
+          "amendment": "1.1.0",
+          "basis": "D-F5-EXCEPTIONS"
+        },
+        {
+          "id": "EXC-1538-EXTRA-VERIFICATION",
+          "ceiling": "review-rounds",
+          "pr": 1538,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "Changes made after #1538's Codex verification pass, which reviewed 05124b455: commit 2be9b3b98 ('compare §PROOF local names without a CodeGen dependency').",
+          "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1538, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
+          "confirmed": false,
+          "scope": "One verification-only pass; no further adversarial round.",
+          "amendment": "1.1.0",
+          "basis": "D-F5-EXCEPTIONS"
+        }
       ],
       "mappedBlockers": {
         "R-OBL": [
@@ -2888,7 +2944,7 @@
   ],
   "mappedBlockers": {
     "source": "docs/plans/evidence/s2-1413/dispositions.json",
-    "rule": "A 0.24 S2 repair or demotion applies to a family when the family's native 0.25 work creates a construct the repair's change governs. Every applicable repair is merged on main; it blocks the family's READY until that record cites the repair's merge commit and a passing run of its regression witness on the family's candidate. A disposition is not a 0.25 repair, and 0.24 false proofs stay owned by 0.24.",
+    "rule": "A 0.24 S2 repair or demotion applies to a family when the family's native 0.25 work creates a construct the repair's change governs. Every repair in the S2 record has exactly one disposition here: applicable (with its PR, merge commit and regression witnesses) or not applicable (with a reason). Every applicable repair is merged on main; it blocks the family's READY until that record's blockersResolved entry cites the repair's merge commit and a retained witnessRun record under docs/plans/evidence/ showing its regression witnesses passed on the READY candidate (S007). A disposition is not a 0.25 repair, and 0.24 false proofs stay owned by 0.24.",
     "applicable": [
       {
         "repair": "R-OBL",

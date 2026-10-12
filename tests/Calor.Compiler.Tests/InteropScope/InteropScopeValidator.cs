@@ -97,6 +97,50 @@ internal static class InteropScopeValidator
             }
         }
 
+        // S012 (1.1.0): once the mapping condition is claimed (SATISFIED, or the gate MET), the mapping must
+        // cover every repair in the cited 0.24 S2 record exactly once, as applicable (with that repair's PR,
+        // merge commit and regression witnesses) or not applicable (with a reason), and the amendment and
+        // the gate record must carry the same applicable mapping.
+        var mappingClaimed = Str(scope["gateStatus"]) == "MET" || Arr(scope["gateConditions"])
+            .Any(g => Str(g["id"]) == "blockers-mapped-after-1413" && Str(g["state"]) == "SATISFIED");
+        if (mappingClaimed)
+        {
+            var mapping = scope["mappedBlockers"];
+            var applicable = Arr(mapping?["applicable"]).ToList();
+            var notApplicable = Arr(mapping?["notApplicable"]).ToList();
+            JsonNode? s2 = null;
+            try { s2 = Str(mapping?["source"]) is { } src && readRepoFile(src) is { } sb ? JsonNode.Parse(sb) : null; }
+            catch (JsonException) { }
+            var repairs = Arr(s2?["repairs"]).ToList();
+            if (repairs.Count == 0)
+                v.Add(new("S012", "mappedBlockers", "the mapping must cite the 0.24 S2 record and its repairs"));
+            foreach (var rep in repairs)
+            {
+                var rid = Str(rep["id"]);
+                var app = applicable.Where(a => Str(a["repair"]) == rid).ToList();
+                var na = notApplicable.Where(a => Str(a["repair"]) == rid).ToList();
+                if (app.Count + na.Count != 1)
+                    v.Add(new("S012", rid ?? "?", "every 0.24 S2 repair needs exactly one applicable or not-applicable disposition"));
+                else if (app.Count == 1 && (Int(app[0]["pr"]) != Int(rep["pr"]) || Str(app[0]["mergeCommit"]) != Str(rep["mergeCommit"])
+                    || !Arr(app[0]["regressionWitness"]).Select(Str).SequenceEqual(Arr(rep["regressionWitness"]).Select(Str))))
+                    v.Add(new("S012", rid!, "an applicable repair must carry the S2 record's PR, merge commit and regression witnesses"));
+                else if (na.Count == 1 && !NonBlank(na[0]["reason"]))
+                    v.Add(new("S012", rid!, "a not-applicable repair needs a reason"));
+            }
+            foreach (var extra in applicable.Concat(notApplicable).Where(a => !repairs.Any(r => Str(r["id"]) == Str(a["repair"]))))
+                v.Add(new("S012", Str(extra["repair"]) ?? "?", "a mapped repair is not in the cited 0.24 S2 record"));
+            var expected = applicable.ToDictionary(a => Str(a["repair"]) ?? "", a => string.Join(",", Arr(a["families"]).Select(Str)));
+            var recorded = amendments.LastOrDefault(a => a["mappedBlockers"] is JsonObject)?["mappedBlockers"] as JsonObject;
+            if (recorded is null || recorded.Count != expected.Count
+                || recorded.Any(kv => !expected.TryGetValue(kv.Key, out var fams) || fams != string.Join(",", Arr(kv.Value).Select(Str))))
+                v.Add(new("S012", "mappedBlockers", "the amendment's mapping differs from the packet's applicable mapping"));
+            JsonNode? gateRecord = null;
+            try { gateRecord = readRepoFile($"{PacketDir}/gate/blockers-mapped-after-1413.json") is { } gb ? JsonNode.Parse(gb) : null; }
+            catch (JsonException) { }
+            if (Str(scope["gateStatus"]) == "MET" && gateRecord?["applicable"] is { } ga && !JsonNode.DeepEquals(ga, mapping?["applicable"]))
+                v.Add(new("S012", "mappedBlockers", "the gate record's applicable mapping differs from the packet's"));
+        }
+
         // S002: case shape and the frozen vocabularies.
         foreach (var (name, values) in Vocabularies)
             if (!Arr(scope["vocabularies"]?[name]).Select(Str).SequenceEqual(values))
@@ -222,7 +266,8 @@ internal static class InteropScopeValidator
             if (status == "READY")
             {
                 var familyCases = cases.Where(c => Str(c["family"]) == fid).ToList();
-                ValidateReady(v, fid, r!, f, familyCases, Exists, readRepoFile, recordValue, deviation);
+                ValidateReady(v, fid, r!, f, familyCases, Exists, readRepoFile, recordValue, deviation,
+                    Arr(scope["mappedBlockers"]?["applicable"]).ToList());
                 var assessed = Version(Str(r!["scopeVersion"]));
                 var stale = familyTouched.Where(x => x.Family == fid && assessed is not null && Version(x.Version)!.Value.CompareTo(assessed.Value) > 0)
                     .Select(x => x.Version).Distinct();
@@ -293,12 +338,32 @@ internal static class InteropScopeValidator
             if (!exceptionIds.Add(Str(e["id"]) ?? "") || !ceilingIds.Contains(Str(e["ceiling"]) ?? "") || Int(e["pr"]) <= 0
                 || !NonBlank(e["decision"]) || !amendments.Any(a => Str(a["version"]) == Str(e["amendment"])))
                 v.Add(new("S010", Str(e["id"]) ?? "?", "a capacity exception needs a unique id, a registered ceiling, a PR, a decision and its amendment"));
-        // An exception not confirmed by the maintainer must say so and name the recorded decision it extends.
-        var decisionIds = amendments.SelectMany(a => Arr(a["maintainerDecisions"])).Select(x => Str(x["id"])).ToHashSet();
-        foreach (var e in Arr(capacity?["exceptions"]))
-            if (e["confirmed"]?.GetValueKind() is not (JsonValueKind.True or JsonValueKind.False)
-                || (e["confirmed"]!.GetValueKind() == JsonValueKind.False && !decisionIds.Contains(Str(e["basis"]))))
-                v.Add(new("S010", Str(e["id"]) ?? "?", "a capacity exception must state whether the maintainer confirmed it; an unconfirmed one must name the recorded decision it extends"));
+        // Each exception is exactly the copy its amendment registered (no widening or retargeting afterwards).
+        // An unconfirmed one says so and extends a recorded maintainer decision that itself grants a confirmed
+        // exception of the same kind: same ceiling, the same single extra verification-only pass.
+        var decisions = amendments.SelectMany(a => Arr(a["maintainerDecisions"])).ToList();
+        var allExceptions = Arr(capacity?["exceptions"]).ToList();
+        foreach (var e in allExceptions)
+        {
+            var eid = Str(e["id"]) ?? "?";
+            var registeredCopy = amendments.Where(a => Str(a["version"]) == Str(e["amendment"]))
+                .SelectMany(a => Arr(a["capacityExceptions"])).FirstOrDefault(x => Str(x["id"]) == eid);
+            if (registeredCopy is null || !JsonNode.DeepEquals(registeredCopy, e))
+                v.Add(new("S010", eid, "a capacity exception differs from the copy its amendment registered"));
+            var kind = e["confirmed"]?.GetValueKind();
+            if (kind is not (JsonValueKind.True or JsonValueKind.False))
+                v.Add(new("S010", eid, "a capacity exception must state whether the maintainer confirmed it"));
+            else if (kind == JsonValueKind.False)
+            {
+                var basis = decisions.FirstOrDefault(d => Str(d["id"]) == Str(e["basis"]));
+                var granted = Arr(basis?["exceptions"]).Select(Str)
+                    .Select(id => allExceptions.FirstOrDefault(x => Str(x["id"]) == id)).OfType<JsonNode>()
+                    .Where(x => x["confirmed"]?.GetValueKind() == JsonValueKind.True);
+                if (Str(e["ceiling"]) != "review-rounds" || !IsInt(e["allowedExtraPasses"]) || Int(e["allowedExtraPasses"]) != 1
+                    || !granted.Any(x => Str(x["ceiling"]) == Str(e["ceiling"]) && Int(x["allowedExtraPasses"]) == Int(e["allowedExtraPasses"])))
+                    v.Add(new("S010", eid, "an unconfirmed exception may only extend a recorded decision's confirmed single extra verification pass to another PR"));
+            }
+        }
 
         // S013: the baseline evidence is sealed, and every recorded baseline is recomputed from it.
         var seal = scope["evidenceSeal"];
@@ -345,7 +410,8 @@ internal static class InteropScopeValidator
     }
 
     private static void ValidateReady(List<ContractViolation> v, string fid, JsonNode r, JsonNode family,
-        List<JsonNode> familyCases, Func<string?, bool> exists, Func<string, byte[]?> read, string? recordValue, bool deviation)
+        List<JsonNode> familyCases, Func<string?, bool> exists, Func<string, byte[]?> read, string? recordValue, bool deviation,
+        List<JsonNode> mapped)
     {
         void Fail(string what) => v.Add(new("S007", fid, $"READY record: {what}"));
         if (!IsFullSha(Str(r["candidate"]?["commit"])))
@@ -390,6 +456,21 @@ internal static class InteropScopeValidator
         foreach (var b in Arr(family["blockers"]))
             if (!Arr(r["blockersResolved"]).Any(x => Int(x["issue"]) == Int(b) && NonBlank(x["reference"])))
                 Fail($"blocker #{Int(b)} has no recorded resolution");
+        // A mapped 0.24 S2 repair is resolved only by its merge commit and a retained, passing run of its
+        // regression witnesses on this READY candidate.
+        foreach (var m in mapped.Where(m => Arr(m["families"]).Select(Str).Contains(fid)))
+        {
+            var res = Arr(r["blockersResolved"]).FirstOrDefault(x => Int(x["issue"]) == Int(m["pr"]));
+            var ev = Str(res?["witnessRun"]);
+            JsonNode? run = null;
+            try { run = ev is not null && ev.StartsWith("docs/plans/evidence/", StringComparison.Ordinal) && exists(ev) ? JsonNode.Parse(read(ev)!) : null; }
+            catch (JsonException) { }
+            if (res is null || Str(res["mergeCommit"]) != Str(m["mergeCommit"]) || run is null
+                || Str(run["candidate"]) != Str(r["candidate"]?["commit"]) || Str(run["repair"]) != Str(m["repair"])
+                || !Arr(run["witnesses"]).Select(Str).SequenceEqual(Arr(m["regressionWitness"]).Select(Str))
+                || Str(run["result"]) != "passed")
+                Fail($"mapped blocker {Str(m["repair"])} (#{Int(m["pr"])}) needs its merge commit and a retained passing run of its regression witnesses on this candidate");
+        }
     }
 
     /// <summary>One surface's outcome. Behavioral equality is recomputed from the original run.</summary>

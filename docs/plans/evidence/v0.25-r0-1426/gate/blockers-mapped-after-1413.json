@@ -3,7 +3,7 @@
   "state": "SATISFIED",
   "amendment": "1.1.0",
   "recordedAtUtc": "2026-10-12T02:22:52Z",
-  "rule": "A 0.24 S2 repair or demotion applies to a family when the family's native 0.25 work creates a construct the repair's change governs. Every applicable repair is merged on main; it blocks the family's READY until that record cites the repair's merge commit and a passing run of its regression witness on the family's candidate. A disposition is not a 0.25 repair, and 0.24 false proofs stay owned by 0.24.",
+  "rule": "A 0.24 S2 repair or demotion applies to a family when the family's native 0.25 work creates a construct the repair's change governs. Every repair in the S2 record has exactly one disposition here: applicable (with its PR, merge commit and regression witnesses) or not applicable (with a reason). Every applicable repair is merged on main; it blocks the family's READY until that record's blockersResolved entry cites the repair's merge commit and a retained witnessRun record under docs/plans/evidence/ showing its regression witnesses passed on the READY candidate (S007). A disposition is not a 0.25 repair, and 0.24 false proofs stay owned by 0.24.",
   "applicable": [
     {
       "repair": "R-OBL",
