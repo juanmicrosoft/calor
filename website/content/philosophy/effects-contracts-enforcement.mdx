@@ -207,7 +207,7 @@ public static int Divide(int a, int b)
 
 Calor doesn't just check individual functions. It analyzes the entire call graph:
 
-```
+```text illustrative
 error Calor0410: Function 'ProcessOrder' uses effect 'network'
                  but does not declare it
   Call chain: ProcessOrder → NotifyCustomer → SendEmail → HttpClient.PostAsync

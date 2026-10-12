@@ -173,6 +173,9 @@ pipeline) so they can flow through the structured formats:
 | `Calor1329` | Docs drift: a generated mirror doc (AGENTS.md) is out of sync with its single source (CLAUDE.md) |
 | `Calor1330` | Docs drift: a complete `§M` program in the agent syntax exemplar no longer compiles to C# (Roslyn-semantic-checked, so type errors are caught) |
 | `Calor1331` | Docs drift: the exemplar binds an array-returning BCL call (e.g. `File.ReadAllLines`) to a generic collection type instead of the array form `[T]` |
+| `Calor1332` | Docs drift: a complete website example does not compile, or a negative example (`expect=`) reports a different set of codes |
+| `Calor1333` | Docs drift: a website `output` fence does not match the example's actual diagnostics, or an output-shaped fence is labelled neither `output` nor `illustrative` |
+| `Calor1334` | Docs drift: a malformed or misplaced website fence annotation, or a negative example whose code or location is not what its prose states |
 | `Calor1340` | Format: input file not found |
 | `Calor1341` | Format: input file is not a `.calr` file (skipped) |
 | `Calor1342` | Format: unexpected error while processing a file |
@@ -209,7 +212,7 @@ pipeline) so they can flow through the structured formats:
   for one release), optional `reason`, and a structured `counterexample`.
   The legacy flat `errors`/`warnings` string arrays are gone.
 - **`calor self-check docs --format json`** emits the unified schema on stdout
-  with docs-drift findings (`Calor1320`–`Calor1331`) and exits 1 when drift is
+  with docs-drift findings (`Calor1320`–`Calor1334`) and exits 1 when drift is
   found (text mode reports the same findings on stderr).
 - **`calor format --format json`** and **`calor convert --format json`** emit
   the full envelope document (`version`/`command`/`diagnostics`/`summary`/`data`)
