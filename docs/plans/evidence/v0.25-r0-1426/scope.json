@@ -1,8 +1,8 @@
 {
   "schema": "v0.25-interop-scope/1",
-  "scopeVersion": "1.0.0",
+  "scopeVersion": "1.1.0",
   "status": "FROZEN",
-  "gateStatus": "NOT-MET",
+  "gateStatus": "MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
   "epic": 1425,
   "gate": 1426,
@@ -11,28 +11,38 @@
     {
       "id": "blocker-1413",
       "issue": 1413,
-      "state": "OPEN",
-      "reason": "#1426 closure is blocked by 0.24 S2. No #1413 disposition exists at recording; the S1 results PR #1480 is open and undispositioned."
+      "state": "SATISFIED",
+      "reason": "#1426 closure is blocked by 0.24 S2. No #1413 disposition exists at recording; the S1 results PR #1480 is open and undispositioned.",
+      "evidence": "docs/plans/evidence/v0.25-r0-1426/gate/blocker-1413.json",
+      "satisfiedIn": "1.1.0"
     },
     {
       "id": "capacity-accepted",
-      "state": "OPEN",
-      "reason": "Every ceiling below is PROPOSED until the maintainer accepts it (by merge, then an acceptance write-back)."
+      "state": "SATISFIED",
+      "reason": "Every ceiling below is PROPOSED until the maintainer accepts it (by merge, then an acceptance write-back).",
+      "evidence": "docs/plans/evidence/v0.25-r0-1426/gate/capacity-accepted.json",
+      "satisfiedIn": "1.1.0"
     },
     {
       "id": "independence-deviation-accepted",
-      "state": "OPEN",
-      "reason": "#1426 deliverable 4 says missing independent review blocks R0. No reviewer independent of the maintainer and the AI reviewers is available, so R0 needs the maintainer's explicit acceptance of the reduced-independence deviation."
+      "state": "SATISFIED",
+      "reason": "#1426 deliverable 4 says missing independent review blocks R0. No reviewer independent of the maintainer and the AI reviewers is available, so R0 needs the maintainer's explicit acceptance of the reduced-independence deviation.",
+      "evidence": "docs/plans/evidence/v0.25-r0-1426/gate/independence-deviation-accepted.json",
+      "satisfiedIn": "1.1.0"
     },
     {
       "id": "blockers-mapped-after-1413",
-      "state": "OPEN",
-      "reason": "#1426 deliverable 3: after #1413 dispositions exist, map each applicable 0.24 repair or demotion as a native blocker of the affected family issues."
+      "state": "SATISFIED",
+      "reason": "#1426 deliverable 3: after #1413 dispositions exist, map each applicable 0.24 repair or demotion as a native blocker of the affected family issues.",
+      "evidence": "docs/plans/evidence/v0.25-r0-1426/gate/blockers-mapped-after-1413.json",
+      "satisfiedIn": "1.1.0"
     },
     {
       "id": "interaction-and-doc-rows-registered",
-      "state": "OPEN",
-      "reason": "#1426 deliverable 2 also asks for cross-feature interaction rows and documentation-example rows. 1.0.0 registers single-family rows only; an amendment adds the #1428 shared controls and the #1429 example rows before MET."
+      "state": "SATISFIED",
+      "reason": "#1426 deliverable 2 also asks for cross-feature interaction rows and documentation-example rows. 1.0.0 registers single-family rows only; an amendment adds the #1428 shared controls and the #1429 example rows before MET.",
+      "evidence": "docs/plans/evidence/v0.25-r0-1426/gate/interaction-and-doc-rows-registered.json",
+      "satisfiedIn": "1.1.0"
     }
   ],
   "acceptance": {
@@ -116,7 +126,9 @@
       "title": "ref/out call semantics",
       "blockers": [
         1427,
-        1423
+        1423,
+        1496,
+        1503
       ],
       "provisionalSize": "L",
       "readiness": {
@@ -129,11 +141,18 @@
       "title": "interpolation target typing",
       "blockers": [
         1426,
-        1423
+        1423,
+        1497,
+        1496,
+        1503
       ],
       "provisionalSize": "L",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f2-906-interpolation",
+        "evidence": "docs/plans/evidence/v0.25-f2-906/rows.json",
+        "tests": "tests/Calor.Compiler.Tests/Interpolation/InterpolationTargetTypingTests.cs",
+        "note": "Implementation evidence only. Not READY: needs a #1423 candidate, approver review, F2-INTERP-09 corpus counts on that candidate, and passed evidence per registered F2 case."
       }
     },
     {
@@ -142,11 +161,16 @@
       "title": "native non-capturing local functions",
       "blockers": [
         1426,
-        1423
+        1423,
+        1496,
+        1503
       ],
       "provisionalSize": "L",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f3-847-local-functions",
+        "evidence": "docs/plans/evidence/v0.25-f3-847/README.md",
+        "note": "Two stacked draft PRs: #1519 (branch above) adds the local-function construct, binding, effects, verification refusal and Calor0211; a stacked PR on milestone-0.25/f3-847-converter adds C# conversion and the per-row evidence. With both, F3-LOCAL-01/02/03 are native and source-equivalent with a default compile on every CLI, MCP and migrate surface; F3-LOCAL-04/05 stay preserved. F3-LOCAL-A1 is covered by executable tests, not by a per-case evidence record. READY is left to the maintainer: candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references."
       }
     },
     {
@@ -159,7 +183,10 @@
       ],
       "provisionalSize": "S-M",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f4-1139-iterator-accessors",
+        "evidence": "docs/plans/evidence/v0.25-f4-1139/README.md",
+        "note": "Converter preserves iterator accessors as §CSHARP on every surface without rescue. READY is left to the maintainer (A1 era): needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references. F4-ITER-04 stays not-measured."
       }
     },
     {
@@ -168,11 +195,16 @@
       "title": "array-expression evaluation",
       "blockers": [
         1426,
-        1423
+        1423,
+        1496,
+        1503
       ],
       "provisionalSize": "M",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f5-1132-array-expressions",
+        "evidence": "docs/plans/evidence/v0.25-f5-1132/README.md",
+        "note": "F5-ARRAY-01..05 convert natively (no §CSHARP, no §CS, no loss) on CLI, migrate and MCP surfaces, compile with default options and run like the original; F5-ARRAY-03 output unchanged; F5-ARRAY-06 boundary declared in the evidence README. READY is left to the maintainer (A1 era): needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references."
       }
     },
     {
@@ -185,7 +217,11 @@
       ],
       "provisionalSize": "M",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f6-1144-conversion-reporting",
+        "evidence": "docs/plans/evidence/v0.25-f6-1144/surface-matrix.json",
+        "tests": "tests/Calor.Compiler.Tests/ConversionReporting/ConversionPathReportingTests.cs",
+        "note": "Implementation evidence only. Not READY: needs a #1423 candidate, approver review, and passed evidence per registered F6 case."
       }
     }
   ],
@@ -342,6 +378,64 @@
         "value": 0,
         "unit": "USD; on usage limits, wait",
         "status": "ACCEPTED"
+      }
+    ],
+    "exceptions": [
+      {
+        "id": "EXC-F5-NONTEST-LINES",
+        "ceiling": "family-nontest-lines-F5",
+        "pr": 1521,
+        "ceilingValue": 600,
+        "allowed": 880,
+        "measured": {
+          "added": 596,
+          "removed": 284,
+          "changed": 880,
+          "at": "073ee4f1f",
+          "command": "git diff --numstat origin/main...origin/milestone-0.25/f5-1132-array-expressions -- src"
+        },
+        "decision": "@juanmicrosoft, 2026-10-11: F5's non-test source is +596/-284 against the 600-line family ceiling, over when added and removed lines both count; recorded as an exception that allows it.",
+        "scope": "PR #1521 only, at 880 changed non-test lines. Any further F5 non-test change, including one prompted by EXC-F5-EXTRA-VERIFICATION, needs a new exception.",
+        "amendment": "1.1.0",
+        "confirmed": true
+      },
+      {
+        "id": "EXC-F5-EXTRA-VERIFICATION",
+        "ceiling": "review-rounds",
+        "pr": 1521,
+        "ceilingValue": 3,
+        "allowedExtraPasses": 1,
+        "covers": "The 4 fixes made after F5's verification pass (61267112d, witnesses in 0e27e0433): round-3 findings 1, 2 and 5 and round-2 finding 6, which that pass marked NOT-VERIFIED.",
+        "decision": "@juanmicrosoft, 2026-10-11: allow one extra Codex verification-only pass on F5's 4 post-verification fixes, recorded before that pass runs.",
+        "scope": "One verification-only pass; no further adversarial round.",
+        "amendment": "1.1.0",
+        "confirmed": true
+      },
+      {
+        "id": "EXC-1520-EXTRA-VERIFICATION",
+        "ceiling": "review-rounds",
+        "pr": 1520,
+        "ceilingValue": 3,
+        "allowedExtraPasses": 1,
+        "covers": "Changes made after #1520's Codex verification pass (commit e60773a08, 'Address #1515 verification pass') that Codex has not reviewed.",
+        "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1520, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
+        "confirmed": false,
+        "scope": "One verification-only pass; no further adversarial round.",
+        "amendment": "1.1.0",
+        "basis": "D-F5-EXCEPTIONS"
+      },
+      {
+        "id": "EXC-1538-EXTRA-VERIFICATION",
+        "ceiling": "review-rounds",
+        "pr": 1538,
+        "ceilingValue": 3,
+        "allowedExtraPasses": 1,
+        "covers": "Changes made after #1538's Codex verification pass, which reviewed 05124b455: commit 2be9b3b98 ('compare §PROOF local names without a CodeGen dependency').",
+        "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1538, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
+        "confirmed": false,
+        "scope": "One verification-only pass; no further adversarial round.",
+        "amendment": "1.1.0",
+        "basis": "D-F5-EXCEPTIONS"
       }
     ]
   },
@@ -1203,6 +1297,480 @@
         "library-sdk-provenance",
         "wire-compatibility"
       ]
+    },
+    {
+      "id": "X-INT-01",
+      "family": "F1",
+      "role": "interaction",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F1-REFOUT-08",
+          "surface": "cli-default",
+          "path": "lossFeatures",
+          "equals": []
+        },
+        {
+          "case": "F1-REFOUT-08",
+          "surface": "cli-default",
+          "path": "execution",
+          "equals": {
+            "compiled": true,
+            "result": "1",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": false
+          }
+        },
+        {
+          "case": "F1-REFOUT-08",
+          "surface": "mcp-default",
+          "path": "execution",
+          "equals": {
+            "compiled": true,
+            "result": "1",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": false
+          }
+        }
+      ],
+      "note": "#1428 shared control, F1 x F5. `Bump(ref pts[0].X)` passes a struct array element by reference. The converter hoists `pts[0]` into a local copy, passes `ref _hoist001.X`, and reports a native conversion with no losses on all four surfaces; with --permissive-effects the program returns 1 where C# returns 2. Expected: the element is passed by reference (result 2) on every surface, or the call is refused explicitly; never a silent copy. Owned by F1; re-run whenever F5 changes array-element hoisting.",
+      "cells": [
+        "cli-default",
+        "cli-passthrough",
+        "mcp-default",
+        "mcp-passthroughOnError"
+      ],
+      "families": [
+        "F1",
+        "F5"
+      ]
+    },
+    {
+      "id": "X-INT-02",
+      "family": "F5",
+      "role": "interaction",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
+        },
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "humanAttribution",
+          "equals": "(2 via --passthrough fallback)"
+        },
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": true
+        }
+      ],
+      "note": "#1428 shared control, F5 x F6. The F5-ARRAY-01 expression-position 2-D array: today the no-flag CLI rescues the member as `§CSHARP` and labels it '(2 via --passthrough fallback)', and MCP with default arguments fails (isError). Expected once both families land: native on all four surfaces, with no fallback loss feature and no rescue attribution; a shape F5 still refuses is reported with its actual trigger.",
+      "cells": [
+        "cli-default",
+        "cli-passthrough",
+        "mcp-default",
+        "mcp-passthroughOnError"
+      ],
+      "families": [
+        "F5",
+        "F6"
+      ]
+    },
+    {
+      "id": "X-INT-03",
+      "family": "F4",
+      "role": "interaction",
+      "expected": "preserved",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F4-ITER-01",
+          "surface": "cli-default",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": true
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-default",
+          "path": "compile",
+          "equals": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0209"
+            ],
+            "warningCodes": [],
+            "firstError": "'§YIELD' is illegal inside a property/indexer accessor.",
+            "firstErrorLine": 12
+          }
+        }
+      ],
+      "note": "#1428 shared control, F4 x F6. The F4-ITER-01 iterator property and indexer: the native output carries `§YIELD` in an accessor and fails the compile with Calor0209; the CLI rescues it as a post-validation fallback, and MCP with default arguments returns isError. Expected: converter-level preservation on all four surfaces without rescue, reported by F6 as converter preservation, not as a post-validation fallback.",
+      "cells": [
+        "cli-default",
+        "cli-passthrough",
+        "mcp-default",
+        "mcp-passthroughOnError"
+      ],
+      "families": [
+        "F4",
+        "F6"
+      ]
+    },
+    {
+      "id": "X-INT-04",
+      "family": "F2",
+      "role": "interaction",
+      "expected": "preserved",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F2-INTERP-03",
+          "surface": "cli-default",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback",
+            "ref-struct"
+          ]
+        },
+        {
+          "case": "F2-INTERP-03",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": true
+        }
+      ],
+      "note": "#1428 shared control, F2 x F6. The F2-INTERP-03 custom `[InterpolatedStringHandler]` call: the CLI rescues it as a post-validation fallback; MCP with default arguments returns isError. Expected: F2 refuses the handler at conversion time, so every surface preserves the member without rescue, and F6 reports that refusal as its trigger.",
+      "cells": [
+        "cli-default",
+        "cli-passthrough",
+        "mcp-default",
+        "mcp-passthroughOnError"
+      ],
+      "families": [
+        "F2",
+        "F6"
+      ]
+    },
+    {
+      "id": "X-INT-05",
+      "family": "F1",
+      "role": "interaction",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1428 shared control, F1 x F3. A native local function with a `ref` or `out` parameter, called with `ref`/`out` arguments from its enclosing member, including one that assigns its `out` before throwing. Native output keeps by-reference identity and C# definite assignment, and analysis drops facts over the written argument (R-OBL, #1496); otherwise the enclosing member stays preserved. Not fixtured at 1.1.0.",
+      "cells": [
+        "cli-default",
+        "mcp-default",
+        "analysis-fact-kill"
+      ],
+      "families": [
+        "F1",
+        "F3"
+      ]
+    },
+    {
+      "id": "X-INT-06",
+      "family": "F2",
+      "role": "interaction",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1428 shared control, F2 x F3. An interpolated string whose hole calls a native local function (`$\"{Fmt(x)}\"` with a local `string Fmt(int v)`). The hole binds to the local function, never to a same-named class member (F3-LOCAL-02), and its effects are charged to the enclosing member; a hole that cannot be bound keeps the member preserved. Not fixtured at 1.1.0.",
+      "cells": [
+        "cli-default",
+        "mcp-default",
+        "hole-binding",
+        "hole-effects"
+      ],
+      "families": [
+        "F2",
+        "F3"
+      ]
+    },
+    {
+      "id": "X-INT-07",
+      "family": "F5",
+      "role": "interaction",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1428 shared control, F3 x F5. An expression-position array (a returned `new int[,] {{...}}` and an array argument) inside a native local function: the intersection of F3's native slice and F5's native array forms. Expected native: generated hoist and `§ARR2D` names do not collide with the local function's parameters or the enclosing member's locals, and element evaluation order matches C#. Whole-member preservation does not satisfy this row; a shape outside either family's native slice needs its own registered row. Not fixtured at 1.1.0.",
+      "cells": [
+        "cli-default",
+        "mcp-default",
+        "name-collision",
+        "evaluation-order"
+      ],
+      "families": [
+        "F3",
+        "F5"
+      ]
+    },
+    {
+      "id": "X-INT-08",
+      "family": "F1",
+      "role": "interaction",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1428 shared control, F1 x F2. An `out var` declared inside an interpolation hole (`$\"{(int.TryParse(s, out var n) ? n : -1)}\"`). Inside the #1427 RO-DECL-1 bound the declaration lowers natively with C# scope and definite assignment; outside it the member stays preserved. Never inline `§CS{}` with assumed effects (the F1-REFOUT-02 shape). Not fixtured at 1.1.0.",
+      "cells": [
+        "cli-default",
+        "mcp-default"
+      ],
+      "families": [
+        "F1",
+        "F2"
+      ]
+    },
+    {
+      "id": "DOC-F1-01",
+      "family": "F1",
+      "role": "doc-example",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1429 row. The calls reference documents the ref/out/in call forms #1427 admits (`§A{out}`, `§A{ref}`, `§A{in}`, the `out _` discard, and the bounded `out var` lowering) with a complete program that compiles by default and whose generated C# keeps by-reference identity. The page has no such example at 1.1.0.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/syntax-reference/calls.mdx"
+    },
+    {
+      "id": "DOC-F2-01",
+      "family": "F2",
+      "role": "doc-example",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1429 row. The string-operations reference documents interpolated strings: an undefined name in a hole is reported at the hole, and a converted C# interpolation keeps its target typing. Complete programs compile by default; a negative example is labeled as one.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/syntax-reference/string-operations.mdx"
+    },
+    {
+      "id": "DOC-F3-01",
+      "family": "F3",
+      "role": "doc-example",
+      "expected": "native-or-preserved",
+      "baselineStatus": "control-passes",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F3-LOCAL-02",
+          "surface": "cli-default",
+          "path": "csharpInteropBlocks",
+          "equals": 1
+        },
+        {
+          "case": "F3-LOCAL-02",
+          "surface": "cli-default",
+          "path": "execution",
+          "equals": {
+            "compiled": true,
+            "result": "3|1002",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        }
+      ],
+      "note": "#1429 row. The convert page says local functions no longer silently substitute a different construct. At the baseline F3-LOCAL-02 (a local `Add` shadowing a class method `Add`) is preserved as `§CSHARP` and returns the C# result, so the claim holds. It must keep holding when F3 converts local functions natively: native with the same result, or preserved; never rebound.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/cli/convert.mdx"
+    },
+    {
+      "id": "DOC-F3-02",
+      "family": "F3",
+      "role": "doc-example",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1429 row. The structure-tags reference documents native local-function syntax with a complete program that compiles by default, including the shadowing rule (the local function wins over a same-named member).",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/syntax-reference/structure-tags.mdx"
+    },
+    {
+      "id": "DOC-F4-01",
+      "family": "F4",
+      "role": "doc-example",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1429 row. The convert page documents that iterator properties and indexers are preserved at conversion time on every surface, with laziness, `finally` and exception timing kept, and that native `§YIELD` in an accessor stays Calor0209.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/cli/convert.mdx"
+    },
+    {
+      "id": "DOC-F5-01",
+      "family": "F5",
+      "role": "doc-example",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "#1429 row. The convert page documents expression-position array conversion: supported ranks and initializers, the declared unsupported boundary (F5-ARRAY-06), and C# element evaluation order, with an example whose output compiles by default.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/cli/convert.mdx"
+    },
+    {
+      "id": "DOC-F6-01",
+      "family": "F6",
+      "role": "doc-example",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "success",
+          "equals": true
+        },
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "csharpInteropBlocks",
+          "equals": 2
+        },
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "humanAttribution",
+          "equals": "(2 via --passthrough fallback)"
+        }
+      ],
+      "note": "#1429 row. The convert page's Supported Constructs section says the command line preserves an unconvertible member as `§CSHARP` by default, without `--passthrough`. At the baseline the no-flag run does preserve F5-ARRAY-01's members, but labels them '(2 via --passthrough fallback)'. Expected: the page and the report name the same path.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/cli/convert.mdx"
+    },
+    {
+      "id": "DOC-F6-02",
+      "family": "F6",
+      "role": "doc-example",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": true
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError",
+          "path": "isError",
+          "equals": false
+        },
+        {
+          "case": "F5-ARRAY-02",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": false
+        },
+        {
+          "case": "F5-ARRAY-02",
+          "surface": "mcp-default",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
+        }
+      ],
+      "note": "#1429 row. The MCP page lists `calor_convert` without describing when it rescues a member. At the baseline MCP with default arguments rescues some members and not others: it rescues F5-ARRAY-02 (whose native output does not parse; `post-validation-fallback`), but returns isError on F4-ITER-01 (whose native output parses and the compiler rejects with Calor0209), which it rescues only with `passthroughOnError`. Expected: the page states the per-surface default for each trigger and the report names it.",
+      "cells": [
+        "example-compiles-default",
+        "example-matches-page-claim"
+      ],
+      "websiteExample": "website/content/cli/mcp.mdx"
     }
   ],
   "discovered": [
@@ -1711,5 +2279,756 @@
       "requirementSha256": "961bdde5ba9a2763be36a6907ef93392ddc17db733a6d5c53354f2ea46baca22"
     }
   ],
-  "amendments": []
+  "amendments": [
+    {
+      "version": "1.1.0",
+      "dateUtc": "2026-10-12T02:22:52Z",
+      "pr": 1553,
+      "gateDecision": "R0-MET",
+      "afterInspection": true,
+      "inspectionStatement": "The interaction and documentation rows were chosen after reading the 1.0.0 baseline results and the open family draft PRs (#1510, #1512, #1513, #1519/#1531, #1521, #1522). Their expected outcomes follow the section 8 scope rules, not any draft result. No case is removed, reclassified or relaxed; the four measured interaction rows and three measured documentation rows cite only the sealed 1.0.0 results.",
+      "justification": "R0 gate decision. All five gate conditions are SATISFIED, each with its own record under gate/: #1413 closed 2026-10-10T22:32:09Z; the capacity ceilings accepted by the #1483 merge (written back by #1552); the reduced-independence deviation accepted on 2026-10-11; the applicable 0.24 S2 repairs mapped as native family blockers (all merged); 8 #1428 interaction rows and 8 #1429 documentation rows registered. Also records the F5 capacity exceptions, verification-pass exceptions for #1520 and #1538 (pending maintainer confirmation), and the families' IN_PROGRESS readiness.",
+      "addedCases": [
+        {
+          "id": "X-INT-01",
+          "family": "F1",
+          "role": "interaction",
+          "expected": "native",
+          "baselineStatus": "reproduces",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F1-REFOUT-08",
+              "surface": "cli-default",
+              "path": "lossFeatures",
+              "equals": []
+            },
+            {
+              "case": "F1-REFOUT-08",
+              "surface": "cli-default",
+              "path": "execution",
+              "equals": {
+                "compiled": true,
+                "result": "1",
+                "exception": null,
+                "compileMode": "permissive-effects",
+                "errors": [],
+                "matchesOriginal": false
+              }
+            },
+            {
+              "case": "F1-REFOUT-08",
+              "surface": "mcp-default",
+              "path": "execution",
+              "equals": {
+                "compiled": true,
+                "result": "1",
+                "exception": null,
+                "compileMode": "permissive-effects",
+                "errors": [],
+                "matchesOriginal": false
+              }
+            }
+          ],
+          "note": "#1428 shared control, F1 x F5. `Bump(ref pts[0].X)` passes a struct array element by reference. The converter hoists `pts[0]` into a local copy, passes `ref _hoist001.X`, and reports a native conversion with no losses on all four surfaces; with --permissive-effects the program returns 1 where C# returns 2. Expected: the element is passed by reference (result 2) on every surface, or the call is refused explicitly; never a silent copy. Owned by F1; re-run whenever F5 changes array-element hoisting.",
+          "cells": [
+            "cli-default",
+            "cli-passthrough",
+            "mcp-default",
+            "mcp-passthroughOnError"
+          ],
+          "families": [
+            "F1",
+            "F5"
+          ],
+          "requirementSha256": "4e475477263cf1b22f15ff46a6f621aa5bcf4ef5ca2b82862043c08ad8b09bda"
+        },
+        {
+          "id": "X-INT-02",
+          "family": "F5",
+          "role": "interaction",
+          "expected": "native",
+          "baselineStatus": "reproduces",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F5-ARRAY-01",
+              "surface": "cli-default",
+              "path": "lossFeatures",
+              "equals": [
+                "post-validation-fallback"
+              ]
+            },
+            {
+              "case": "F5-ARRAY-01",
+              "surface": "cli-default",
+              "path": "humanAttribution",
+              "equals": "(2 via --passthrough fallback)"
+            },
+            {
+              "case": "F5-ARRAY-01",
+              "surface": "mcp-default",
+              "path": "isError",
+              "equals": true
+            }
+          ],
+          "note": "#1428 shared control, F5 x F6. The F5-ARRAY-01 expression-position 2-D array: today the no-flag CLI rescues the member as `§CSHARP` and labels it '(2 via --passthrough fallback)', and MCP with default arguments fails (isError). Expected once both families land: native on all four surfaces, with no fallback loss feature and no rescue attribution; a shape F5 still refuses is reported with its actual trigger.",
+          "cells": [
+            "cli-default",
+            "cli-passthrough",
+            "mcp-default",
+            "mcp-passthroughOnError"
+          ],
+          "families": [
+            "F5",
+            "F6"
+          ],
+          "requirementSha256": "4d6e50fe0db856b310441ddf6e3d97605426198755ad9a9e700aec5f05dac9a8"
+        },
+        {
+          "id": "X-INT-03",
+          "family": "F4",
+          "role": "interaction",
+          "expected": "preserved",
+          "baselineStatus": "reproduces",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F4-ITER-01",
+              "surface": "cli-default",
+              "path": "lossFeatures",
+              "equals": [
+                "post-validation-fallback"
+              ]
+            },
+            {
+              "case": "F4-ITER-01",
+              "surface": "mcp-default",
+              "path": "isError",
+              "equals": true
+            },
+            {
+              "case": "F4-ITER-01",
+              "surface": "mcp-default",
+              "path": "compile",
+              "equals": {
+                "exit": 1,
+                "errorCodes": [
+                  "Calor0209"
+                ],
+                "warningCodes": [],
+                "firstError": "'§YIELD' is illegal inside a property/indexer accessor.",
+                "firstErrorLine": 12
+              }
+            }
+          ],
+          "note": "#1428 shared control, F4 x F6. The F4-ITER-01 iterator property and indexer: the native output carries `§YIELD` in an accessor and fails the compile with Calor0209; the CLI rescues it as a post-validation fallback, and MCP with default arguments returns isError. Expected: converter-level preservation on all four surfaces without rescue, reported by F6 as converter preservation, not as a post-validation fallback.",
+          "cells": [
+            "cli-default",
+            "cli-passthrough",
+            "mcp-default",
+            "mcp-passthroughOnError"
+          ],
+          "families": [
+            "F4",
+            "F6"
+          ],
+          "requirementSha256": "9d08c9273d26e31f40252dfea1ce829fd659c0b123e4374379d2d607f1c1bf80"
+        },
+        {
+          "id": "X-INT-04",
+          "family": "F2",
+          "role": "interaction",
+          "expected": "preserved",
+          "baselineStatus": "reproduces",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F2-INTERP-03",
+              "surface": "cli-default",
+              "path": "lossFeatures",
+              "equals": [
+                "post-validation-fallback",
+                "ref-struct"
+              ]
+            },
+            {
+              "case": "F2-INTERP-03",
+              "surface": "mcp-default",
+              "path": "isError",
+              "equals": true
+            }
+          ],
+          "note": "#1428 shared control, F2 x F6. The F2-INTERP-03 custom `[InterpolatedStringHandler]` call: the CLI rescues it as a post-validation fallback; MCP with default arguments returns isError. Expected: F2 refuses the handler at conversion time, so every surface preserves the member without rescue, and F6 reports that refusal as its trigger.",
+          "cells": [
+            "cli-default",
+            "cli-passthrough",
+            "mcp-default",
+            "mcp-passthroughOnError"
+          ],
+          "families": [
+            "F2",
+            "F6"
+          ],
+          "requirementSha256": "b77bfbc501f60c66025287c2e46d0aa03a0ea0931371a9ca594e1e61a1f96820"
+        },
+        {
+          "id": "X-INT-05",
+          "family": "F1",
+          "role": "interaction",
+          "expected": "native-or-preserved",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1428 shared control, F1 x F3. A native local function with a `ref` or `out` parameter, called with `ref`/`out` arguments from its enclosing member, including one that assigns its `out` before throwing. Native output keeps by-reference identity and C# definite assignment, and analysis drops facts over the written argument (R-OBL, #1496); otherwise the enclosing member stays preserved. Not fixtured at 1.1.0.",
+          "cells": [
+            "cli-default",
+            "mcp-default",
+            "analysis-fact-kill"
+          ],
+          "families": [
+            "F1",
+            "F3"
+          ],
+          "requirementSha256": "003d5aaead30b9e8767ac1c763e86a6515db81a31e955041a2e3c4f30e780733"
+        },
+        {
+          "id": "X-INT-06",
+          "family": "F2",
+          "role": "interaction",
+          "expected": "native-or-preserved",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1428 shared control, F2 x F3. An interpolated string whose hole calls a native local function (`$\"{Fmt(x)}\"` with a local `string Fmt(int v)`). The hole binds to the local function, never to a same-named class member (F3-LOCAL-02), and its effects are charged to the enclosing member; a hole that cannot be bound keeps the member preserved. Not fixtured at 1.1.0.",
+          "cells": [
+            "cli-default",
+            "mcp-default",
+            "hole-binding",
+            "hole-effects"
+          ],
+          "families": [
+            "F2",
+            "F3"
+          ],
+          "requirementSha256": "d1a60d46e47ed9c2b333f6f298f17f25654519bed618b7a9e32cdebb7e807502"
+        },
+        {
+          "id": "X-INT-07",
+          "family": "F5",
+          "role": "interaction",
+          "expected": "native",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1428 shared control, F3 x F5. An expression-position array (a returned `new int[,] {{...}}` and an array argument) inside a native local function: the intersection of F3's native slice and F5's native array forms. Expected native: generated hoist and `§ARR2D` names do not collide with the local function's parameters or the enclosing member's locals, and element evaluation order matches C#. Whole-member preservation does not satisfy this row; a shape outside either family's native slice needs its own registered row. Not fixtured at 1.1.0.",
+          "cells": [
+            "cli-default",
+            "mcp-default",
+            "name-collision",
+            "evaluation-order"
+          ],
+          "families": [
+            "F3",
+            "F5"
+          ],
+          "requirementSha256": "a46dfae3f07ce754b3981aa71842070a63c3f2f1ea90302c0e1788f228c91ed7"
+        },
+        {
+          "id": "X-INT-08",
+          "family": "F1",
+          "role": "interaction",
+          "expected": "native-or-preserved",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1428 shared control, F1 x F2. An `out var` declared inside an interpolation hole (`$\"{(int.TryParse(s, out var n) ? n : -1)}\"`). Inside the #1427 RO-DECL-1 bound the declaration lowers natively with C# scope and definite assignment; outside it the member stays preserved. Never inline `§CS{}` with assumed effects (the F1-REFOUT-02 shape). Not fixtured at 1.1.0.",
+          "cells": [
+            "cli-default",
+            "mcp-default"
+          ],
+          "families": [
+            "F1",
+            "F2"
+          ],
+          "requirementSha256": "de56376cddef951b9e55d58fbdef1eb42e25893aa190813896f78ec1cdcfcd69"
+        },
+        {
+          "id": "DOC-F1-01",
+          "family": "F1",
+          "role": "doc-example",
+          "expected": "native",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1429 row. The calls reference documents the ref/out/in call forms #1427 admits (`§A{out}`, `§A{ref}`, `§A{in}`, the `out _` discard, and the bounded `out var` lowering) with a complete program that compiles by default and whose generated C# keeps by-reference identity. The page has no such example at 1.1.0.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/syntax-reference/calls.mdx",
+          "requirementSha256": "4c4cefbd801788173eed03e3a67d4f5377fd53b9b0e8764e791a457393e548db"
+        },
+        {
+          "id": "DOC-F2-01",
+          "family": "F2",
+          "role": "doc-example",
+          "expected": "native",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1429 row. The string-operations reference documents interpolated strings: an undefined name in a hole is reported at the hole, and a converted C# interpolation keeps its target typing. Complete programs compile by default; a negative example is labeled as one.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/syntax-reference/string-operations.mdx",
+          "requirementSha256": "102b5b04bfe1915a16ea84fd403a2c78fc4527575240cb1236687a7166c872bf"
+        },
+        {
+          "id": "DOC-F3-01",
+          "family": "F3",
+          "role": "doc-example",
+          "expected": "native-or-preserved",
+          "baselineStatus": "control-passes",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F3-LOCAL-02",
+              "surface": "cli-default",
+              "path": "csharpInteropBlocks",
+              "equals": 1
+            },
+            {
+              "case": "F3-LOCAL-02",
+              "surface": "cli-default",
+              "path": "execution",
+              "equals": {
+                "compiled": true,
+                "result": "3|1002",
+                "exception": null,
+                "compileMode": "permissive-effects",
+                "errors": [],
+                "matchesOriginal": true
+              }
+            }
+          ],
+          "note": "#1429 row. The convert page says local functions no longer silently substitute a different construct. At the baseline F3-LOCAL-02 (a local `Add` shadowing a class method `Add`) is preserved as `§CSHARP` and returns the C# result, so the claim holds. It must keep holding when F3 converts local functions natively: native with the same result, or preserved; never rebound.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/cli/convert.mdx",
+          "requirementSha256": "580188760fbc4be03c9e5d36784a510e6b63b2f94780338925e3dc6b0e5c8a52"
+        },
+        {
+          "id": "DOC-F3-02",
+          "family": "F3",
+          "role": "doc-example",
+          "expected": "native",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1429 row. The structure-tags reference documents native local-function syntax with a complete program that compiles by default, including the shadowing rule (the local function wins over a same-named member).",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/syntax-reference/structure-tags.mdx",
+          "requirementSha256": "6bd6d815921262183bc99b50c0caa347cd719faa42f260bac46efc37c8808c6c"
+        },
+        {
+          "id": "DOC-F4-01",
+          "family": "F4",
+          "role": "doc-example",
+          "expected": "preserved",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1429 row. The convert page documents that iterator properties and indexers are preserved at conversion time on every surface, with laziness, `finally` and exception timing kept, and that native `§YIELD` in an accessor stays Calor0209.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/cli/convert.mdx",
+          "requirementSha256": "bc86fc1cd8d23fe2caa92b36cdcea14cd43d9f137d638f1e9647e18e47f3e9a5"
+        },
+        {
+          "id": "DOC-F5-01",
+          "family": "F5",
+          "role": "doc-example",
+          "expected": "native",
+          "baselineStatus": "not-measured",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [],
+          "note": "#1429 row. The convert page documents expression-position array conversion: supported ranks and initializers, the declared unsupported boundary (F5-ARRAY-06), and C# element evaluation order, with an example whose output compiles by default.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/cli/convert.mdx",
+          "requirementSha256": "e5b91a87a342f323114731a85a5a734d4cf7a2f961e3cd351324adc3958d1a08"
+        },
+        {
+          "id": "DOC-F6-01",
+          "family": "F6",
+          "role": "doc-example",
+          "expected": "native",
+          "baselineStatus": "reproduces",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F5-ARRAY-01",
+              "surface": "cli-default",
+              "path": "success",
+              "equals": true
+            },
+            {
+              "case": "F5-ARRAY-01",
+              "surface": "cli-default",
+              "path": "csharpInteropBlocks",
+              "equals": 2
+            },
+            {
+              "case": "F5-ARRAY-01",
+              "surface": "cli-default",
+              "path": "humanAttribution",
+              "equals": "(2 via --passthrough fallback)"
+            }
+          ],
+          "note": "#1429 row. The convert page's Supported Constructs section says the command line preserves an unconvertible member as `§CSHARP` by default, without `--passthrough`. At the baseline the no-flag run does preserve F5-ARRAY-01's members, but labels them '(2 via --passthrough fallback)'. Expected: the page and the report name the same path.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/cli/convert.mdx",
+          "requirementSha256": "b7ea9a01d5fbf9243345b8ff1acd2bf6031334917a9a18906e8acb16000eb34b"
+        },
+        {
+          "id": "DOC-F6-02",
+          "family": "F6",
+          "role": "doc-example",
+          "expected": "native",
+          "baselineStatus": "reproduces",
+          "fixture": null,
+          "fixtureSha256": null,
+          "baseline": {},
+          "observations": [
+            {
+              "case": "F4-ITER-01",
+              "surface": "mcp-default",
+              "path": "isError",
+              "equals": true
+            },
+            {
+              "case": "F4-ITER-01",
+              "surface": "mcp-passthroughOnError",
+              "path": "isError",
+              "equals": false
+            },
+            {
+              "case": "F5-ARRAY-02",
+              "surface": "mcp-default",
+              "path": "isError",
+              "equals": false
+            },
+            {
+              "case": "F5-ARRAY-02",
+              "surface": "mcp-default",
+              "path": "lossFeatures",
+              "equals": [
+                "post-validation-fallback"
+              ]
+            }
+          ],
+          "note": "#1429 row. The MCP page lists `calor_convert` without describing when it rescues a member. At the baseline MCP with default arguments rescues some members and not others: it rescues F5-ARRAY-02 (whose native output does not parse; `post-validation-fallback`), but returns isError on F4-ITER-01 (whose native output parses and the compiler rejects with Calor0209), which it rescues only with `passthroughOnError`. Expected: the page states the per-surface default for each trigger and the report names it.",
+          "cells": [
+            "example-compiles-default",
+            "example-matches-page-claim"
+          ],
+          "websiteExample": "website/content/cli/mcp.mdx",
+          "requirementSha256": "06116008c349e4a6f1c2222dd6358bcc2db4af05f4801fe40cbf6655fd216bbf"
+        }
+      ],
+      "changes": [],
+      "removedCases": [],
+      "maintainerDecisions": [
+        {
+          "id": "D-CAPACITY",
+          "date": "2026-10-04",
+          "by": "@juanmicrosoft",
+          "decision": "Accept the section 9 ceilings. Recorded by the merge of #1483 (16c1c5f8, 2026-10-04T00:05:35Z, merged by juanatjcx, the maintainer's authorized alternate login), which section 1 makes the acceptance, and written back by #1552. The maintainer's words 'Accept and merge' for the 0.25 capacity were relayed in the agent session; no repository or GitHub record of them exists."
+        },
+        {
+          "id": "D-INDEPENDENCE",
+          "date": "2026-10-11",
+          "by": "@juanmicrosoft",
+          "decision": "'Accept': the reduced-independence deviation in section 9, with the same arrangement as 0.24 (Codex cross-family review, @juanmicrosoft as approver, independence recorded as 'reduced'). Relayed in the agent session; no GitHub record."
+        },
+        {
+          "id": "D-F5-EXCEPTIONS",
+          "date": "2026-10-11",
+          "by": "@juanmicrosoft",
+          "decision": "EXC-F5-NONTEST-LINES and EXC-F5-EXTRA-VERIFICATION (capacity.exceptions).",
+          "exceptions": [
+            "EXC-F5-NONTEST-LINES",
+            "EXC-F5-EXTRA-VERIFICATION"
+          ]
+        }
+      ],
+      "capacityExceptions": [
+        {
+          "id": "EXC-F5-NONTEST-LINES",
+          "ceiling": "family-nontest-lines-F5",
+          "pr": 1521,
+          "ceilingValue": 600,
+          "allowed": 880,
+          "measured": {
+            "added": 596,
+            "removed": 284,
+            "changed": 880,
+            "at": "073ee4f1f",
+            "command": "git diff --numstat origin/main...origin/milestone-0.25/f5-1132-array-expressions -- src"
+          },
+          "decision": "@juanmicrosoft, 2026-10-11: F5's non-test source is +596/-284 against the 600-line family ceiling, over when added and removed lines both count; recorded as an exception that allows it.",
+          "scope": "PR #1521 only, at 880 changed non-test lines. Any further F5 non-test change, including one prompted by EXC-F5-EXTRA-VERIFICATION, needs a new exception.",
+          "amendment": "1.1.0",
+          "confirmed": true
+        },
+        {
+          "id": "EXC-F5-EXTRA-VERIFICATION",
+          "ceiling": "review-rounds",
+          "pr": 1521,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "The 4 fixes made after F5's verification pass (61267112d, witnesses in 0e27e0433): round-3 findings 1, 2 and 5 and round-2 finding 6, which that pass marked NOT-VERIFIED.",
+          "decision": "@juanmicrosoft, 2026-10-11: allow one extra Codex verification-only pass on F5's 4 post-verification fixes, recorded before that pass runs.",
+          "scope": "One verification-only pass; no further adversarial round.",
+          "amendment": "1.1.0",
+          "confirmed": true
+        },
+        {
+          "id": "EXC-1520-EXTRA-VERIFICATION",
+          "ceiling": "review-rounds",
+          "pr": 1520,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "Changes made after #1520's Codex verification pass (commit e60773a08, 'Address #1515 verification pass') that Codex has not reviewed.",
+          "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1520, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
+          "confirmed": false,
+          "scope": "One verification-only pass; no further adversarial round.",
+          "amendment": "1.1.0",
+          "basis": "D-F5-EXCEPTIONS"
+        },
+        {
+          "id": "EXC-1538-EXTRA-VERIFICATION",
+          "ceiling": "review-rounds",
+          "pr": 1538,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "Changes made after #1538's Codex verification pass, which reviewed 05124b455: commit 2be9b3b98 ('compare §PROOF local names without a CodeGen dependency').",
+          "decision": "Extension of the 2026-10-11 F5 decision (one verification-only pass for fixes made after a verification pass that Codex never reviewed) to #1538, recorded at the coordinating session's direction. The extension is the agent's inference, not a maintainer statement; it awaits @juanmicrosoft's confirmation.",
+          "confirmed": false,
+          "scope": "One verification-only pass; no further adversarial round.",
+          "amendment": "1.1.0",
+          "basis": "D-F5-EXCEPTIONS"
+        }
+      ],
+      "mappedBlockers": {
+        "R-OBL": [
+          "F1",
+          "F2",
+          "F3",
+          "F5"
+        ],
+        "R-OBL-RESIDUALS": [
+          "F1",
+          "F2",
+          "F3",
+          "F5"
+        ],
+        "R-TEXT": [
+          "F2"
+        ]
+      },
+      "readiness": [
+        {
+          "family": "F2",
+          "from": "NOT_STARTED",
+          "to": "IN_PROGRESS",
+          "branch": "milestone-0.25/f2-906-interpolation",
+          "prs": [
+            1522
+          ],
+          "source": "origin/milestone-0.25/f2-906-interpolation"
+        },
+        {
+          "family": "F3",
+          "from": "NOT_STARTED",
+          "to": "IN_PROGRESS",
+          "branch": "milestone-0.25/f3-847-local-functions",
+          "prs": [
+            1519,
+            1531
+          ],
+          "source": "origin/milestone-0.25/f3-847-local-functions"
+        },
+        {
+          "family": "F4",
+          "from": "NOT_STARTED",
+          "to": "IN_PROGRESS",
+          "branch": "milestone-0.25/f4-1139-iterator-accessors",
+          "prs": [
+            1510
+          ],
+          "source": "origin/milestone-0.25/f4-1139-iterator-accessors"
+        },
+        {
+          "family": "F5",
+          "from": "NOT_STARTED",
+          "to": "IN_PROGRESS",
+          "branch": "milestone-0.25/f5-1132-array-expressions",
+          "prs": [
+            1521
+          ],
+          "source": "origin/milestone-0.25/f5-1132-array-expressions"
+        },
+        {
+          "family": "F6",
+          "from": "NOT_STARTED",
+          "to": "IN_PROGRESS",
+          "branch": "milestone-0.25/f6-1144-conversion-reporting",
+          "prs": [
+            1513
+          ],
+          "source": "origin/milestone-0.25/f6-1144-conversion-reporting"
+        },
+        {
+          "family": "F1",
+          "from": "NOT_STARTED",
+          "to": "NOT_STARTED",
+          "reason": "No F1 (#943) branch or PR exists; F1 waits on D1 #1427 (draft PR #1518)."
+        }
+      ]
+    }
+  ],
+  "mappedBlockers": {
+    "source": "docs/plans/evidence/s2-1413/dispositions.json",
+    "rule": "A 0.24 S2 repair or demotion applies to a family when the family's native 0.25 work creates a construct the repair's change governs. Every repair in the S2 record has exactly one disposition here: applicable (with its PR, merge commit and regression witnesses) or not applicable (with a reason). Every applicable repair is merged on main; it blocks the family's READY until that record's blockersResolved entry cites the repair's merge commit and a retained witnessRun record under docs/plans/evidence/ showing its regression witnesses passed on the READY candidate (S007). A disposition is not a 0.25 repair, and 0.24 false proofs stay owned by 0.24.",
+    "applicable": [
+      {
+        "repair": "R-OBL",
+        "pr": 1496,
+        "kind": "DEMOTE-IN-0.24",
+        "rows": [
+          "OBL-MUTATION-KILL",
+          "OBL-BRANCH-FACTS",
+          "OBL-REFINEMENT-RETURN",
+          "OBL-SUBTYPE",
+          "OBL-SELFREF"
+        ],
+        "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+        "regressionWitness": [
+          "tests/Calor.Compiler.Tests/S2ObligationStateTests.cs"
+        ],
+        "families": [
+          "F1",
+          "F2",
+          "F3",
+          "F5"
+        ],
+        "reason": "Entry facts are dropped when a body may write a name they read, including ref/out/in aliasing and element or field stores; raw C# makes a body opaque. F1 adds by-reference writes. F2, F3 and F5 replace raw C# that is opaque today (inline `§CS{}` interpolation holes with calls, preserved local functions, preserved array expressions) with native calls and element stores, so the fact-kill rule must cover them."
+      },
+      {
+        "repair": "R-OBL-RESIDUALS",
+        "pr": 1503,
+        "kind": "DEMOTE-IN-0.24",
+        "rows": [],
+        "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+        "regressionWitness": [
+          "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
+        ],
+        "families": [
+          "F1",
+          "F2",
+          "F3",
+          "F5"
+        ],
+        "reason": "After a statement that may throw (calls, element reads, checked arithmetic) the obligation state is not exact. F1 adds calls that write `out` before throwing (F1-REFOUT-04); F2 lifts interpolation-hole calls into native calls; F3 adds native local-function calls; F5 adds native element initializers that may throw (F5-ARRAY-04)."
+      },
+      {
+        "repair": "R-TEXT",
+        "pr": 1497,
+        "kind": "FIX-IN-0.24",
+        "rows": [
+          "STR-NULL-NONASCII",
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+        "regressionWitness": [
+          "tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs"
+        ],
+        "families": [
+          "F2"
+        ],
+        "reason": "String literals reach Z3 per UTF-16 code unit and null-tolerant string forms are refused when unsound. F2 changes what a string literal with `${...}` holes means (bound holes), so contract translation of interpolated strings must model the holes or refuse; it must not treat them as literal text."
+      }
+    ],
+    "notApplicable": [
+      {
+        "repair": "R-CACHE",
+        "pr": 1494,
+        "kind": "FIX-IN-0.24",
+        "reason": "Literal cache keys. No family changes literal hashing; a node kind the hasher does not know is never cached (the SawUnhashedKind rule), so new F2-F5 expression forms cannot share a cache entry."
+      },
+      {
+        "repair": "R-IMPL",
+        "pr": 1495,
+        "kind": "DEMOTE-IN-0.24",
+        "reason": "Interface/implementer implication prover. No family changes that channel. R-IMPL makes any string-, array- or user-type-sorted implication Assumed regardless of how the value was produced, so the 1.0.0 'uncertain' IMPL-ASSUMPTION-FORMS link for F1 and F2 resolves to not applicable."
+      },
+      {
+        "repair": "R-QNT",
+        "pr": 1498,
+        "kind": "DEMOTE-IN-0.24",
+        "reason": "Nested quantifiers. No family introduces quantifiers."
+      },
+      {
+        "repair": "R-NUM",
+        "pr": 1502,
+        "kind": "DEMOTE-IN-0.24",
+        "reason": "Sub-32-bit and oversize-literal arithmetic. No family changes numeric modeling."
+      }
+    ]
+  }
 }
