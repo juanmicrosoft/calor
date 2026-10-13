@@ -1,6 +1,6 @@
 # 0.25 F5 (#1132) evidence: array expressions
 
-**Status:** IN_PROGRESS on PR 2 (branch `milestone-0.25/f5-1132-narrowed`). Not a READY record:
+**Status:** IN_PROGRESS on PR 2 (branch `milestone-0.25/f5-1132-narrowed`; review budget spent with 1 open MAJOR, see `reviews/pr2-verification.md`; no PR opened). Not a READY record:
 READY needs a candidate commit, per-case evidence carrying `requirementSha256`, the blocker
 references below and the maintainer's approval (`docs/plans/v0.25-interop-scope-and-baseline.md` §10).
 Reduced independence: Codex records only; not independently reviewed.
@@ -208,6 +208,7 @@ Fresh budget: 3 Codex rounds plus 1 verification-only pass. Records: `reviews/pr
 | 1 (round 1) | `reviews/pr2-round-1.md` | REQUEST CHANGES: 3 MAJOR, 1 MINOR; all fixed |
 | 2 (round 2) | `reviews/pr2-round-2.md` | REQUEST CHANGES: 1 BLOCKING, 1 MAJOR, 1 MINOR; all fixed |
 | 3 (round 3) | `reviews/pr2-round-3.md` | REQUEST CHANGES: 1 BLOCKING (contested, not changed), 3 MAJOR (fixed) |
+| 4 (verification) | `reviews/pr2-verification.md` | REQUEST CHANGES: round-3 items 2-4 VERIFIED, item 1 ACCEPTED; 1 new MAJOR introduced by the round-3 constant exemption (a constant with a user-defined conversion runs it after a hoisted argument). **Open; budget spent; PR not opened** |
 
 ---
 
