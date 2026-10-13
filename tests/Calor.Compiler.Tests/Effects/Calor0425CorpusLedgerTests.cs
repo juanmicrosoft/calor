@@ -264,7 +264,9 @@ public class Calor0425CorpusLedgerTests
     /// <c>StoppedInCliOnlyPass</c> so the outcome buckets still add up. This is
     /// the roadmap's documented CLI-only-pass divergence (§5 gate 9's
     /// NOT-ADJUDICATED route names <c>ReturnValidationPass</c> explicitly),
-    /// recorded rather than smoothed away.</para>
+    /// recorded rather than smoothed away. Since #1139 (0.25 F4) the converter
+    /// preserves those modules' iterator accessors as member interop, so the
+    /// bucket is empty again; the bucket and its sum rule stay.</para>
     /// </summary>
 
     /// <summary>
@@ -1813,7 +1815,9 @@ public class Calor0425CorpusLedgerTests
         /// one of the four. Zero at K1's registration; three after W3(a), all of
         /// them newly-parsing FluentValidation modules stopping at Calor0209
         /// (IllegalYield, ReturnValidationPass): EmptyTester, NotEmptyTester and
-        /// ITestValidationContinuation.
+        /// ITestValidationContinuation. Zero again after #1139 (0.25 F4): their
+        /// iterator accessors are now preserved as member interop, so the three
+        /// reach the effect pass in the CLI too and stop at Calor0410 (104 -> 107).
         /// </summary>
         int StoppedInCliOnlyPass,
         int Calor0425Modules,

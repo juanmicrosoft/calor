@@ -99,7 +99,16 @@ public class BinderIncompleteRatchetTests
         + "than treated as a coverage improvement. #1386 preserves C# null-forgiving expressions "
         + "as explicit interop and keeps calls opaque when a same-name overload is preserved in a "
         + "member interop block. This moves 35163 -> 35153 visits and 114 -> 129 opaque boundaries; "
-        + "binder-source-coverage.json records every changed source identity";
+        + "binder-source-coverage.json records every changed source identity. "
+        + "#1139 (0.25 F4) preserves iterator accessors (a get body that yields) as member "
+        + "interop instead of emitting a native getter that holds yield (Calor0209). The corpus has "
+        + "three: FluentValidation/TestHelper/ITestValidationContinuation.cs UnmatchedFailures moves "
+        + "24 -> 17 visits (exact source spans 24 -> 18, unmapped 74 -> 69, opaque source "
+        + "expressions 0 -> 11: the 11 getter-body expressions are now inside one boundary; the 7th "
+        + "visit had no source span), and FluentValidation.Tests/EmptyTester.cs and NotEmptyTester.cs "
+        + "TestModel.Strings (get { yield break; }) keep their visit counts while 2 unmapped source "
+        + "expressions each become opaque. Net 35159 -> 35152 visits, 129 -> 132 opaque boundaries "
+        + "and 6944 -> 6959 opaque expressions, with incomplete diagnostics still zero";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
