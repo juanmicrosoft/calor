@@ -173,10 +173,12 @@ responses captured from the MCP server. The refinement-type pages now say that a
     `{ new List<int> { 1 }, 2 }`, which before lost the list and produced a one-element array.
     It also covers a multi-line element such as an anonymous object in a rectangular array row.
   - Effect checking: the elements of `§ARR2D` rows are now charged. Before, they were not
-    inferred, so a row could hide an effect its function did not declare. Array members such as
-    `GetLength` and `Rank` are unchanged: they are still unknown calls, so a function that calls
-    one reports `Calor0410` (an effect used but not declared) unless it declares that effect or
-    is compiled with `--permissive-effects`.
+    inferred, so a row could hide an effect its function did not declare. Effects of array
+    members such as `GetLength` and `Rank` are unchanged. On a receiver typed as an array
+    (`i32[]`, `i32[,]`) they are still unknown calls, so a function that calls one reports
+    `Calor0410` (an effect used but not declared) unless it declares that effect or is compiled
+    with `--permissive-effects`. A receiver declared as `System.Array` still resolves through
+    its effect manifest, as before.
 
 ## [0.24.0] - 2026-10-07
 

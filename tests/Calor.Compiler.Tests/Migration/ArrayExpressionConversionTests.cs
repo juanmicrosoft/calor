@@ -523,6 +523,41 @@ public class ArrayExpressionConversionTests
 
     // The last value: whether the row calls an array member (or sets a field through an
     // object initializer), which is an unknown effect with default options.
+    // PR 2 Codex round 1: a local read before an array argument that writes the local
+    // (by ref), when a later argument is hoisted. The read was left in place and ran
+    // after the hoisted array (11, not 1).
+    private const string Pr2Arguments = """
+        public class Cell
+        {
+        }
+
+        public static class L
+        {
+            public static int Bump(ref int x)
+            {
+                x = x + 1;
+                return x;
+            }
+
+            public static int Use(int first, int[] xs, Cell c)
+            {
+                return first * 10 + xs[0];
+            }
+        }
+
+        public static class Probe
+        {
+            public static string Run()
+            {
+                int x = 0;
+                int r = L.Use(x, new int[] { L.Bump(ref x) }, new Cell());
+                int y = 1;
+                int q = L.Use(y, new int[] { y }, new Cell());
+                return r + "," + x + "|" + (q - 10);
+            }
+        }
+        """;
+
     public static TheoryData<string, string, Surface, bool> Rows()
     {
         var data = new TheoryData<string, string, Surface, bool>();
@@ -538,6 +573,7 @@ public class ArrayExpressionConversionTests
             data.Add("shapes", "3|001|1236|1|33|True|27|False02|12346", surface, true);
             data.Add("round2", "2,0,42|112|True|1002,3", surface, true);
             data.Add("round3", "3,10,123,1118|scsc|sctc", surface, true);
+            data.Add("pr2-args", "1,1|1", surface, false);
         }
         return data;
     }
@@ -770,8 +806,18 @@ public class ArrayExpressionConversionTests
     private const string BlockElements = """
         using System.Collections.Generic;
 
+        public delegate int D(int x);
+
         public static class W
         {
+            // PR 2 Codex round 1: a block lambda element was bound to an untyped temp
+            // ahead of the array, which loses its delegate type (Func<int, int> is not D).
+            public static string Lambda()
+            {
+                D[] ds = new D[] { (int x) => { int y = x; y = y + 1; return y; } };
+                return "" + ds.Length;
+            }
+
             public static string Witness()
             {
                 object[,] a = { { new { A = 1 } } };
@@ -794,7 +840,7 @@ public class ArrayExpressionConversionTests
         {
             public static string Run()
             {
-                return W.Witness() + "|" + W.List1D() + "|" + W.ListRect();
+                return W.Witness() + "|" + W.List1D() + "|" + W.ListRect() + "|" + W.Lambda();
             }
         }
         """;
@@ -803,7 +849,7 @@ public class ArrayExpressionConversionTests
     [MemberData(nameof(SurfacesOnly))]
     public async Task BlockElements_ArePreservedWithAReport_AndRunLikeTheOriginal(Surface surface)
     {
-        Assert.Equal("1,{ A = 1 }|2|2", Run(BlockElements));
+        Assert.Equal("1,{ A = 1 }|2|2|1", Run(BlockElements));
         var (calor, losses) = await ConvertAsync(BlockElements, surface);
         // Each statement is preserved as C# (or its member, where statements are not),
         // and reported; none is written natively with a lost or misplaced element.
@@ -832,6 +878,7 @@ public class ArrayExpressionConversionTests
         "shapes" => Shapes,
         "round2" => Round2,
         "round3" => Round3,
+        "pr2-args" => Pr2Arguments,
         _ => R0Fixture(row)
     };
 

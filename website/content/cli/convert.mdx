@@ -398,11 +398,12 @@ a declared array, and sized arrays without an initializer. They work as a return
 value, argument, binding, field or property initializer, member-access target, and
 `?:` branch. Elements can be calls, object initializers, `x++`, and other arrays.
 
-**Effects of array members are not modeled.** A call to an array member, such as
-`g.GetLength(0)`, `g.Rank` or `g.Clone()`, is an unknown external call (`Calor0411`).
-A function that makes one and declares no matching effect reports `Calor0410` (an
-effect is used but not declared). Declare the effect, or compile converted code with
-`--permissive-effects`.
+**Effects of array members are not modeled.** When the receiver is typed as an array
+(`i32[]`, `i32[,]`), a call to an array member, such as `g.GetLength(0)`, `g.Rank` or
+`g.Clone()`, is an unknown external call (`Calor0411`). A function that makes one and
+declares no matching effect reports `Calor0410` (an effect is used but not declared).
+Declare the effect, or compile converted code with `--permissive-effects`. A receiver
+declared as `System.Array` resolves through its effect manifest instead, as before.
 
 **Limits.** These shapes are kept as C# and reported as a conversion loss, never
 moved:

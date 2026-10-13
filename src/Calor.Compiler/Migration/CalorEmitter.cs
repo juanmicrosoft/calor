@@ -2302,14 +2302,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     /// <summary>
     /// #1132: whether <paramref name="element"/> is written in place as an array element:
-    /// no statement emitted ahead of the array (a collection block, whose element was lost)
-    /// and, unless <paramref name="allowMultiline"/>, one line (a §ROW holds no block).
+    /// nothing emitted or bound ahead of the array (a collection block, whose element was
+    /// lost; a block lambda bound to an untyped temp, which loses its delegate type) and,
+    /// unless <paramref name="allowMultiline"/>, one line (a §ROW holds no block).
     /// </summary>
     internal static bool WritesInPlace(ExpressionNode element, bool allowMultiline)
     {
         var probe = new CalorEmitter { _memberBodyDepth = 1 };
         var value = probe.RenderInPlace([element])[0];
-        return probe._builder.Length == 0 && (allowMultiline || !value.Contains('\n'));
+        return probe._builder.Length == 0 && probe._pendingHoistedLines.Count == 0
+            && (allowMultiline || !value.Contains('\n'));
     }
 
     public string Visit(AssignmentStatementNode node)

@@ -11116,6 +11116,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private void HoistComplexArguments(List<ExpressionNode> args, SeparatedSyntaxList<ArgumentSyntax>? syntax = null)
     {
+        int last;
         // An earlier argument stays in place when it evaluates nothing (a literal, a
         // lambda) or nothing a later argument can change: a local or parameter read.
         // A ref/out/in argument must stay storage. Without syntax, storage shapes stay.
@@ -11131,8 +11132,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return !list[i].RefKindKeyword.IsKind(SyntaxKind.None)
                 || list[i].Expression is LiteralExpressionSyntax or DefaultExpressionSyntax
                 || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
-                    && _semanticModel.GetSymbolInfo(list[i].Expression).Symbol is ILocalSymbol or IParameterSymbol;
+                    && _semanticModel.GetSymbolInfo(list[i].Expression).Symbol is ILocalSymbol or IParameterSymbol
+                    // #1132: unless a later argument runs code first (`Use(x, new[] { Bump(ref x) }, c)`).
+                    && !list.Skip(i + 1).Take(last - i).Any(later => later.RefKindKeyword.IsKind(SyntaxKind.None)
+                        && later.Expression.DescendantNodesAndSelf().Any(RunsCode));
         }
+
+        static bool RunsCode(SyntaxNode node) => node is InvocationExpressionSyntax or AssignmentExpressionSyntax
+            or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax or BaseObjectCreationExpressionSyntax
+            or ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None };
 
         bool Complex(ExpressionNode arg) =>
             !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
@@ -11143,7 +11151,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // #1132: a hoisted argument runs before the call's earlier arguments, so every
         // earlier argument that is not InPlace is bound first, in order.
-        var last = -1;
+        last = -1;
         for (var i = 0; i < args.Count; i++)
         {
             if (Complex(args[i]) && args[i] is not LambdaExpressionNode)

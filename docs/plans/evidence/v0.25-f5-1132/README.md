@@ -72,8 +72,10 @@ expression form parses), as #1521 verified.
 (scalar and `int[]` overloads), `SetValue`, `Clone`, `GetEnumerator`, `ToString`, `GetHashCode`,
 `Equals`, `Initialize`, `CopyTo` on `i32[,]` and `i32[]`, a user extension
 `GetLength(this int[], long)` called with a `long`, a second user extension, and `System.Array` /
-`ValueTask[]` receivers. Every array receiver gives `Calor0411` (unknown external call) then
-`Calor0410` (effect `unknown` undeclared).
+`ValueTask[]` receivers. Every receiver typed as a Calor array (`i32[]`, `i32[,]`) gives
+`Calor0411` (unknown external call) then `Calor0410` (effect `unknown` undeclared). Receivers
+declared `System.Array` or `System.Threading.Tasks.ValueTask[]` give no diagnostic (rows 21-23),
+which is main's behavior, pinned as such (see the residual below).
 
 Proof of parity: the same file, unchanged, was run against `origin/main` at `043a2ed38` (an
 exported tree with the same Z3 assets and an isolated HOME): 23 of 23 pass. A message-level dump of
