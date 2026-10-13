@@ -429,6 +429,50 @@ public sealed class ContractTranslator
     }
 
     /// <summary>
+    /// #1516: declares an immutable local bound to <paramref name="definition"/> and returns the equation
+    /// `name == definition`, or null with <paramref name="refusal"/>. Only integer and bool locals are
+    /// declared, and only when the definition's modeled type (width and signedness) is exactly the
+    /// declared type: an implicit conversion at the binding is not modeled.
+    /// </summary>
+    internal BoolExpr? DeclareBoundLocal(string name, string? typeName, ExpressionNode definition, out string? refusal)
+    {
+        refusal = null;
+        var value = Translate(definition);
+        string? modeledType = value switch
+        {
+            BoolExpr => "bool",
+            BitVecExpr bits when _exprInfo.TryGetValue(bits, out var info) && info.Width == bits.SortSize
+                && bits.SortSize is 8 or 16 or 32 or 64
+                => (info.IsSigned ? "i" : "u") + bits.SortSize,
+            _ => null
+        };
+        if (value == null)
+            refusal = "has a defining expression the verifier cannot model ("
+                + (DiagnoseTranslationFailure(definition) ?? "unsupported form") + ")";
+        else if (modeledType == null)
+            refusal = "has a type the verifier does not model for locals (only integers and bool)";
+        else if (typeName != null && CanonicalScalarType(typeName) != modeledType)
+            refusal = $"is declared '{typeName}' but defined by a '{modeledType}' expression; the conversion is not modeled";
+        else if (_variables.ContainsKey(name) || !DeclareVariable(name, modeledType))
+            refusal = "cannot be declared in the solver (its name is taken or reserved)";
+        return refusal == null ? _ctx.MkEq(_variables[name].Expr, value!) : null;
+    }
+
+    private static string? CanonicalScalarType(string typeName) => NormalizeTypeName(typeName) switch
+    {
+        "i8" or "sbyte" => "i8",
+        "i16" or "short" => "i16",
+        "i32" or "int" => "i32",
+        "i64" or "long" => "i64",
+        "u8" or "byte" => "u8",
+        "u16" or "ushort" => "u16",
+        "u32" or "uint" => "u32",
+        "u64" or "ulong" => "u64",
+        "bool" => "bool",
+        _ => null
+    };
+
+    /// <summary>
     /// Gets all declared variables.
     /// </summary>
     public IReadOnlyDictionary<string, (Expr Expr, string Type)> Variables => _variables;

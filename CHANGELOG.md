@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `§PROOF` can now refer to a `§B` local** (#1516). `§PROOF` states a fact the compiler
+  tries to prove; when it succeeds, the obligation is *discharged* and the runtime check is
+  removed. Before this fix, any `§PROOF` that named a local, such as
+  `§B{newBalance:i32} (- balance amount)` then `§PROOF{p1} (>= newBalance INT:0)`, was reported
+  `Unsupported` with "Unknown variable", even when it was easy to prove. The solver now uses the
+  local's defining expression, but only when that is exactly the local's value at the proof:
+  - the local is immutable (`§B`, not `§B{~...}`), bound once, and never reassigned or passed by `ref`;
+  - its binding runs on every path to the proof (it comes earlier in the same block, or in a block
+    that encloses the proof);
+  - its definition uses only literals, operators, parameters the function never changes, and
+    other locals that meet these rules.
+
+  The solver also refuses a local whose C# name collides with another variable (`a-b` and `ab`
+  both become `ab`). It refuses all locals in a function when a refinement predicate (a
+  `§RTYPE` or parameter refinement) does more than compare names and literals, or when the
+  module declares operator overloads. In these cases, code the solver cannot see could change
+  the local.
+
+  Any other local still makes the proof `Unsupported`, and the runtime check stays. The message
+  now says which local and why, for example "local 'm' is mutable". If the proof needs the
+  local's definition to finish without integer overflow, it is reported `Assumed`, not
+  discharged, and the runtime check stays.
+
 ### Website examples are now checked in CI (#1143)
 
 `calor self-check docs` now reads `website/content/**/*.mdx`, not only `docs/`. It already runs
