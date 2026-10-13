@@ -1,0 +1,869 @@
+{
+  "schema": "v0.25-f5-1132-evidence/1",
+  "measuredCommit": "0e27e0433bd7f1332404e4748ac7e2ff5776df8e",
+  "srcTree": "c631e8b66382fc63af0fdee1deb818f9f68810c2",
+  "dotnetSdk": "10.0.401",
+  "platform": "Darwin arm64",
+  "cases": [
+    {
+      "case": "F5-ARRAY-01",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-01.cs.txt",
+      "fixtureSha256": "984f6a6bf85c56b9120f7053d207e98c254fd486d65b9f27a938ca3ed4dac5ae",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [],
+          "issueFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "unsupportedFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "2x2|2|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "2x2|2|3",
+        "exception": null
+      }
+    },
+    {
+      "case": "F5-ARRAY-02",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-02.cs.txt",
+      "fixtureSha256": "e235ce21ba8e2abca01e9c93d89f4beff240e384410307ee2fe0b9e5247bc674",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 19,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 19,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 19,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [],
+          "issueFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "unsupportedFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "13|2|5|67125",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "13|2|5|67125",
+        "exception": null
+      }
+    },
+    {
+      "case": "F5-ARRAY-03",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs.txt",
+      "fixtureSha256": "e90768eca604330a7e503944136d3a3309bc87730bf4a424527935b5da5d36f0",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 5,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 5,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 5,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [],
+          "issueFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "unsupportedFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|3|3|4",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "3|3|3|4",
+        "exception": null
+      }
+    },
+    {
+      "case": "F5-ARRAY-04",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
+      "fixtureSha256": "2e7526e66a9977db37cb33f112e4c56da82517c424ba1520085c46d0023cbe51",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 18,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 18,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 18,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [],
+          "issueFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "unsupportedFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "1|2|50|boom|123",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "1|2|50|boom|123",
+        "exception": null
+      }
+    },
+    {
+      "case": "F5-ARRAY-05",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-05.cs.txt",
+      "fixtureSha256": "c7ed707f207831d97c47b0be757348365753a43978b233c226954d67dda3f806",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [],
+          "issueFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "unsupportedFeatures": [
+            "nullable-oblivious-nested-shape"
+          ],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "3|4|3|9|b|6",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "3|4|3|9|b|6",
+        "exception": null
+      }
+    }
+  ]
+}
