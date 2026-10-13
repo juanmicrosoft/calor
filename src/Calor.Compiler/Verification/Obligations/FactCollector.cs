@@ -77,8 +77,10 @@ public sealed class FactCollector
 
     /// <summary>For a §PROOF counterexample only: whether a fact may be stale at <paramref name="span"/>
     /// through code outside that span (the proof condition's own reads are its evaluation).</summary>
-    public bool IsStaleBefore(ExpressionNode fact, TextSpan span)
-        => HasOpaqueCode || ReferencedNames(fact).Overlaps(_assignedNames) || ReadsHeap(fact)
+    public bool IsStaleBefore(ExpressionNode fact, TextSpan span, IReadOnlySet<string>? resolvedLocals = null)
+        => HasOpaqueCode
+           || ReferencedNames(fact).Any(name => resolvedLocals?.Contains(name) != true && _assignedNames.Contains(name))
+           || ReadsHeap(fact)
             && (_heapWritten || _heapReads.Any(read => read.Start < span.Start || read.End > span.End));
 
     private static bool IsHeapMutation(AstNode node)
@@ -102,6 +104,8 @@ public sealed class FactCollector
             || node is ReferenceNode reference && reference.Name.Contains('.');
 
     private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
+    private IReadOnlyList<StatementNode> _body = [];
+    private bool _refinementChangesState;
     private bool _heapWritten;
     private List<TextSpan> _heapReads = new();
     private readonly HashSet<string> _aliasWritten = new(StringComparer.Ordinal);
@@ -154,6 +158,13 @@ public sealed class FactCollector
         // #1413 (D-OBL-THROWING-PREDECESSOR): a binding or assignment to a refined name runs a
         // compiler-inserted refinement guard, which throws.
         _refinedTypes.UnionWith(refinementPredicates?.Keys ?? []);
+        // #1516 review rounds 2-3: a refinement guard runs its predicate after a binding or assignment
+        // (and on entry), outside the body this collector scans. Unless every predicate is plain
+        // (literals, operators, `#`, simple names), it may change state: an increment, a call, or a
+        // member read that runs a getter.
+        _refinementChangesState = (refinementPredicates?.Values ?? [])
+            .Concat(parameters.Select(p => p.InlineRefinement?.Predicate).OfType<ExpressionNode>())
+            .Any(predicate => !DescendantsAndSelf(predicate).All(node => node is SelfRefNode || IsPlainDefinitionNode(node)));
         _parameterNames.UnionWith(parameters.Select(p => p.Name));
         _refinedNames.UnionWith(parameters
             .Where(p => p.InlineRefinement != null || _refinedTypes.Contains(p.TypeName))
@@ -214,6 +225,7 @@ public sealed class FactCollector
         if (_bodyInitialized)
             return;
         _bodyInitialized = true;
+        _body = body;
         _assignedNames = CollectAssignedNames(body);
         var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
         HasOpaqueCode = nodes.Any(node => IsOpaque(node));
@@ -367,6 +379,178 @@ public sealed class FactCollector
                && (anyMember || reference.Name.Split('.').Skip(1).Any(propertyNames.Contains))
             // §LEN emits `.Length`, which a declared (or raw) Length property may implement.
             || n is ArrayLengthNode && (anyMember || propertyNames.Contains("Length")));
+
+    /// <summary>
+    /// #1516: resolves the §B locals a §PROOF condition reads to their defining expressions, appending
+    /// them to <paramref name="locals"/> (dependencies first). A local resolves only when its value at the
+    /// proof is exactly its definition evaluated there: it is bound once, immutably, never rebound, by a
+    /// binding that precedes the proof in an enclosing statement list (so every path to the proof runs
+    /// it), and its definition is literals, operators, unchanged parameters, and other such locals.
+    /// Names with no binding are left to the translator. Returns why a local cannot be resolved, or null.
+    /// </summary>
+    public string? ResolveProofLocals(
+        ExpressionNode condition,
+        IReadOnlySet<string> declared,
+        List<(string Name, string? TypeName, ExpressionNode Definition)> locals)
+    {
+        var proof = _body.SelectMany(DescendantsAndSelf).OfType<ProofObligationNode>()
+            .FirstOrDefault(node => ReferenceEquals(node.Condition, condition));
+        if (proof == null)
+            return null;
+        var binds = _body.SelectMany(DescendantsAndSelf).OfType<BindStatementNode>()
+            .GroupBy(bind => bind.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+        var rebound = CollectAssignedNames(_body, includeBinds: false);
+        // #1516 review round 3: a variable passed by reference with any modifier, `in` included,
+        // exposes its storage to the callee (an `in` reference can be written through unsafe code).
+        foreach (var node in _body.SelectMany(DescendantsAndSelf))
+        {
+            if (node.GetType().GetProperty("ArgumentModifiers")?.GetValue(node) is IReadOnlyList<string?> modifiers
+                && node.GetType().GetProperty("Arguments")?.GetValue(node) is IReadOnlyList<ExpressionNode> arguments)
+            {
+                for (var index = 0; index < arguments.Count && index < modifiers.Count; index++)
+                    if (modifiers[index] != null && RootName(arguments[index]) is { } root)
+                        rebound.Add(root);
+            }
+        }
+        var resolved = new Dictionary<string, BindStatementNode>(StringComparer.Ordinal);
+        var resolving = new HashSet<string>(StringComparer.Ordinal);
+        // The emitter sanitizes names (`a-b` and `ab` both become `ab`), so two Calor names can be
+        // one C# variable; a name sharing its C# identifier with another is never resolved. The
+        // emitter only drops characters and adds `_` or `@`, so names whose letters and digits
+        // differ never collide: comparing letters and digits over-approximates its collisions.
+        var emittedNames = _body.SelectMany(DescendantsAndSelf).OfType<ReferenceNode>()
+            .Select(reference => reference.Name.Split('.')[0])
+            .Concat(binds.Keys).Concat(rebound).Concat(_assignedNames).Concat(_parameterNames).Concat(declared)
+            .Distinct(StringComparer.Ordinal)
+            .GroupBy(LettersAndDigits, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        bool SharesEmittedName(string name)
+            => emittedNames.GetValueOrDefault(LettersAndDigits(name)) > 1;
+        static string LettersAndDigits(string name) => string.Concat(name.Where(char.IsLetterOrDigit));
+        return Resolve(condition, proof);
+
+        string? Resolve(ExpressionNode expression, AstNode site)
+        {
+            foreach (var name in ReferencedNames(expression))
+            {
+                if (!binds.TryGetValue(name, out var candidates))
+                    continue;
+                // The solver already holds this name for a parameter or size variable, which the
+                // local shadows; the proof would read the wrong variable.
+                if (declared.Contains(name))
+                    return $"local '{name}' shares its name with a parameter or solver variable, so the proof's reference is ambiguous";
+                var reason = ResolveLocal(name, candidates, site);
+                if (reason != null)
+                    return $"local '{name}' {reason}";
+            }
+            return null;
+        }
+
+        string? ResolveLocal(string name, List<BindStatementNode> candidates, AstNode site)
+        {
+            if (HasOpaqueCode)
+                return "is in a body with raw C#, unsafe code, or a lambda, which the verifier cannot see and which may change it";
+            // An operator in a definition or refinement predicate may run a user-defined overload.
+            if (OperatorsMayBeOverloaded)
+                return "is in a module that declares operator overloads or raw C# members, whose effects are not modeled";
+            if (_refinementChangesState)
+                return "is in a function whose refinement guards may change state (a refinement predicate is not plain), which the verifier does not model";
+            if (_hasJumps)
+                return "may be skipped by a goto, so its binding is not known to run before the proof";
+            if (candidates.Count > 1)
+                return "is bound more than once, so its value at the proof is not known";
+            var bind = candidates[0];
+            // The emitter writes these references as C# keywords or literals, not as the local.
+            if (name is "null" or "true" or "false" or "default" or "this" or "base"
+                || SharesEmittedName(name))
+                return "shares its C# name with another variable, so its value at the proof is not known";
+            if (bind.IsMutable)
+                return "is mutable (§B{~...}), so its value at the proof is not modeled";
+            if (rebound.Contains(name) || _parameterNames.Contains(name))
+                return "is reassigned, passed by reference, or shadows another variable, so its value at the proof is not modeled";
+            if (bind.Initializer is not { } definition)
+                return "has no initializer";
+            if (!Dominates(bind, site))
+                return "is not bound on every path to the proof (it is bound in a branch or loop body that does not enclose the proof, or after it)";
+            if (resolved.TryGetValue(name, out _))
+                return null;
+            if (!resolving.Add(name))
+                return "is defined in terms of itself";
+            if (!DescendantsAndSelf(definition).All(IsPlainDefinitionNode))
+                return "has a defining expression the verifier does not model for locals (only literals, operators, parameters, and other immutable locals)";
+            foreach (var read in ReferencedNames(definition))
+            {
+                if (binds.ContainsKey(read))
+                {
+                    var reason = ResolveLocal(read, binds[read], bind);
+                    if (reason != null)
+                        return $"is defined from local '{read}', which {reason}";
+                }
+                else if (!_parameterNames.Contains(read) || _assignedNames.Contains(read) || rebound.Contains(read) || !declared.Contains(read)
+                         || SharesEmittedName(read))
+                {
+                    return $"is defined from '{read}', whose value at the proof is not modeled";
+                }
+            }
+            resolving.Remove(name);
+            resolved[name] = bind;
+            locals.Add((name, bind.TypeName, definition));
+            return null;
+        }
+    }
+
+    // #1516: the forms a resolvable local's definition may use: never a call, member or element read,
+    // increment, or anything else that reads or changes state outside the function's parameters.
+    private static bool IsPlainDefinitionNode(AstNode node)
+        => node is IntLiteralNode or BoolLiteralNode or BinaryOperationNode or ConditionalExpressionNode
+            || node is ReferenceNode reference && !reference.Name.Contains('.')
+            || node is UnaryOperationNode unary && !IsIncrement(unary);
+
+    /// <summary>#1516: whether <paramref name="bind"/> runs on every path to <paramref name="site"/>: it
+    /// precedes, in one sequential statement list, the statement that contains the site.</summary>
+    private bool Dominates(StatementNode bind, AstNode site)
+    {
+        foreach (var list in StatementLists())
+        {
+            var index = -1;
+            for (var i = 0; i < list.Count && index < 0; i++)
+                if (ReferenceEquals(list[i], bind))
+                    index = i;
+            if (index >= 0)
+                return list.Skip(index + 1).Any(statement =>
+                    DescendantsAndSelf(statement).Any(node => ReferenceEquals(node, site)));
+        }
+        return false;
+    }
+
+    // Sequential statement lists only; a binding in any other container never resolves.
+    private IEnumerable<IReadOnlyList<StatementNode>> StatementLists()
+    {
+        yield return _body;
+        foreach (var node in _body.SelectMany(DescendantsAndSelf))
+        {
+            IReadOnlyList<StatementNode>?[] lists = node switch
+            {
+                IfStatementNode n => [n.ThenBody, n.ElseBody],
+                ElseIfClauseNode n => [n.Body],
+                ForStatementNode n => [n.Body],
+                WhileStatementNode n => [n.Body],
+                DoWhileStatementNode n => [n.Body],
+                ForeachStatementNode n => [n.Body],
+                DictionaryForeachNode n => [n.Body],
+                TryStatementNode n => [n.TryBody, n.FinallyBody],
+                CatchClauseNode n => [n.Body],
+                MatchCaseNode n => [n.Body],
+                UsingStatementNode n => [n.Body],
+                SyncBlockNode n => [n.Body],
+                _ => []
+            };
+            foreach (var list in lists)
+                if (list != null)
+                    yield return list;
+        }
+    }
 
     /// <summary>Each condition is a fact only within the body it guards; #1413 (S1 OBL-BRANCH-FACTS):
     /// elseif and else bodies also get the negations of the earlier conditions.</summary>
@@ -573,7 +757,7 @@ public sealed class FactCollector
         }
     }
 
-    private static HashSet<string> CollectAssignedNames(IReadOnlyList<StatementNode> statements)
+    private static HashSet<string> CollectAssignedNames(IReadOnlyList<StatementNode> statements, bool includeBinds = true)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in statements.SelectMany(DescendantsAndSelf))
@@ -581,7 +765,8 @@ public sealed class FactCollector
             switch (node)
             {
                 case BindStatementNode bind:
-                    names.Add(bind.Name);
+                    if (includeBinds)
+                        names.Add(bind.Name);
                     break;
                 case AssignmentStatementNode { Target: ReferenceNode target }:
                     names.Add(target.Name);
