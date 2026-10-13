@@ -145,6 +145,39 @@ responses captured from the MCP server. The refinement-type pages now say that a
 `calor` compile does not run the obligation solver (the `calor_refine` MCP tool does). New findings use
 `Calor1332`–`Calor1334`.
 
+- **C# array expressions now convert to native Calor and keep C# evaluation order** (#1132).
+  An array created inside an expression (a `return`, a call argument, a `?:` branch, or a field
+  or property initializer) now converts to Calor instead of being kept as C#. Before, the
+  converter wrote `return new T[,] { … }` as a block bound to a name that the generated C# never
+  declared, so the C# failed to compile (`CS0103`, `CS0201`). Arrays in a `?:` branch did not
+  parse. In both cases, the only thing that saved the conversion was the post-conversion rescue
+  (`§CSHARP`, which keeps the original C# verbatim).
+  - Elements are evaluated once, left to right, where the C# had them. The unselected `?:` branch
+    and the right operand of `&&`/`||` are still skipped. Before, elements, sizes and arguments
+    could be moved into temporaries that ran before earlier parts of the same statement. For
+    example, `int[] a = { x, SetX(), x }` read the new `x` in slot 0, and `new int[n, Next()]`
+    read `n` after `Next()` ran.
+  - New Calor forms: an inline `§ARR2D{id:id:T} §ROW … §/ARR2D{id}`, a sized `§ARR2D` with
+    `§ROW` lines for rank 3 and up (`§ARR2D{id:id:i32:2:1:2}`), and `(§IDX2D g i j).Member` for
+    a member of an element. Jagged arrays keep their element type and rank order
+    (`new int[2][]`, `new int[,][]`). A bare `T[,] g = { … }` initializer is a rectangular array.
+    `new[] { F(), G() }` keeps its element type instead of becoming `object[]`. `new T[0]` and
+    `{ }` create fresh arrays instead of sharing `Array.Empty<T>()`.
+  - Names the converter generates (`_hoist000`, `arr2d004`) skip every identifier in the source
+    and in the other files of a project migration. A user local named `_hoist000` is no longer
+    rebound (`Calor0260`).
+  - Some shapes cannot be written in place. They stay C# and are reported as a conversion loss.
+    An assignment used as an element, index or size is reported as
+    `conditional-expression-hoisting`; before, it ran twice. An element that Calor writes as a
+    block is reported as `array-element-block`. That covers a collection initializer such as
+    `{ new List<int> { 1 }, 2 }`, which before lost the list and produced a one-element array.
+    It also covers a multi-line element such as an anonymous object in a rectangular array row.
+  - Effect checking: the elements of `§ARR2D` rows are now charged. Before, they were not
+    inferred, so a row could hide an effect its function did not declare. Array members such as
+    `GetLength` and `Rank` are unchanged: they are still unknown calls, so a function that calls
+    one reports `Calor0410` (an effect used but not declared) unless it declares that effect or
+    is compiled with `--permissive-effects`.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

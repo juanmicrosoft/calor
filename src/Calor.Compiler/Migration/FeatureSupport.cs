@@ -204,6 +204,13 @@ public static class FeatureSupport
             Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
             Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
+        ["array-element-block"] = new FeatureInfo
+        {
+            Name = "array-element-block",
+            Support = SupportLevel.NotSupported,
+            Description = "An array element that Calor writes as a block (a collection initializer, or a multi-line element such as an anonymous object in a rectangular array row) preserves its statement as counted C# interop",
+            Workaround = "Bind the element to a local first, then use the local in the array"
+        },
         ["linq-method"] = new FeatureInfo
         {
             Name = "linq-method",

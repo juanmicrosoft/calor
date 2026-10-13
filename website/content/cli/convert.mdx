@@ -316,6 +316,116 @@ or fails to round-trip back to C#; output that parses but that Calor's own
 compiler then rejects still fails the conversion, with nothing written and exit
 `1`. `--passthrough` does not change that outcome.
 
+### Array Expressions
+
+An array created inside an expression, such as a `return`, a call argument, or a
+branch of `?:`, converts to native Calor. The C# evaluation order is kept: each
+element is evaluated once, left to right, in place. The unselected branch of `?:`,
+and the right operand of `&&` or `||`, are still not evaluated. Before 0.25, a
+`return new T[,] { … }` produced Calor whose C# did not compile, and arrays in a
+`?:` branch did not parse. Only the post-conversion rescue (`§CSHARP`) hid that.
+
+This C#:
+
+```csharp
+public static class Grid
+{
+    public static int[,] Pick(bool wide, int v)
+    {
+        return wide
+            ? new int[,] { { v, v + 1 } }
+            : new int[,] { { v } };
+    }
+
+    public static int Sum(int[] xs, int start)
+    {
+        int s = start;
+        foreach (var x in xs)
+        {
+            s = s + x;
+        }
+        return s;
+    }
+
+    public static int Total(int v) => Sum(new int[] { v, v * 2 }, Pick(true, v)[0, 1]);
+}
+```
+
+converts to:
+
+```calor
+§M{m001:Grids}
+  §CL{c001:Grid:pub:stat}
+    §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]
+      §E{alloc}
+      §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}
+
+    §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32
+      §B{~s:i32} start
+      §EACH{each008:x:var} xs
+        §ASSIGN s (+ s x)
+      §R s
+
+    §MT{m009:Total:pub:stat} (i32:v) -> i32
+      §E{alloc}
+      §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+```
+
+Three forms make this work:
+
+- **Inline `§ARR2D`.** In expression position the array is written on one line and
+  ends with `§/ARR2D{id}`, the same way `§ARR` already did. An object initializer
+  used as an element stays on its `§ROW` line (`§NEW{Cell} V = v §/NEW`). The
+  converter no longer moves it into a temporary variable ahead of the statement.
+- **Rank 3 and up.** `§ARR2D{id:id:i32:2:1:2}` followed by `§ROW` lines gives the
+  shape. The rows are the innermost vectors in row-major order. A row count that
+  does not match the shape is a C# compile error, never padded or cut.
+- **Grouped element access.** `(§IDX2D g 0 1).V` reads a member of an element.
+  Written without the parentheses, `.V` attached to the last index.
+
+Names the converter generates (`_hoist000`, `arr2d004`) skip every identifier that
+appears in your C# file, and in the other files of a `calor migrate` project. A
+local you named `_hoist000` is never rebound.
+
+`new T[0]` and an empty `{ }` initializer convert to a fresh zero-length array.
+Before, they became the shared `Array.Empty<T>()`, so `new int[0] == new int[0]`
+changed from `false` to `true`.
+
+**Supported natively:** one-dimensional, implicitly typed (`new[]`, `new[,]`), jagged
+(also `new int[,][]` and `new int[][,]`), and rectangular arrays of rank 2 or more.
+This covers initializers with or without written sizes, bare `{ … }` initializers of
+a declared array, and sized arrays without an initializer. They work as a return
+value, argument, binding, field or property initializer, member-access target, and
+`?:` branch. Elements can be calls, object initializers, `x++`, and other arrays.
+
+**Effects of array members are not modeled.** A call to an array member, such as
+`g.GetLength(0)`, `g.Rank` or `g.Clone()`, is an unknown external call (`Calor0411`).
+A function that makes one and declares no matching effect reports `Calor0410` (an
+effect is used but not declared). Declare the effect, or compile converted code with
+`--permissive-effects`.
+
+**Limits.** These shapes are kept as C# and reported as a conversion loss, never
+moved:
+
+- An assignment used as an element, an index, or a size (`{ x = Next() }`,
+  `a[i = 0]`, `new int[n = 3]`). Inside a `?:`, `&&`, `||`, or `??` operand: a sized
+  array whose size is anything but a name or an integer literal
+  (`flag ? new int[n + 1] : …`). A `ref`/`out`/`in` argument whose address calls a
+  method (`F(in xs[I()], new Cell())`) when a later argument must be moved. These are
+  reported as `conditional-expression-hoisting`.
+- An element that Calor writes as a block: a collection initializer
+  (`{ new List<int> { 1 }, 2 }`), or a multi-line element, such as an anonymous
+  object, in a rectangular array row (`object[,] a = { { new { A = 1 } } };`). The
+  statement is kept as C# and reported as `array-element-block`.
+- If an array still produces Calor that does not parse, the member is kept as C# by
+  the rescue and reported as `post-validation-fallback`. A `switch` expression used
+  as an element of a one-dimensional array is one known case.
+- `stackalloc` arrays are unchanged by this work.
+
+Outside arrays, the converter can still move some subexpressions of a statement into
+temporaries (for example, steps of a method chain). Arrays no longer add to that, but
+this work does not change it.
+
 ---
 
 ## Benchmark Comparison
