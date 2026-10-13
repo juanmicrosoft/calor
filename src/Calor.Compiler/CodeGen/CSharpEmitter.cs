@@ -5141,7 +5141,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         else
         {
             // Empty array expression
-            return $"Array.Empty<{elementType}>()";
+            return $"Array.Empty<{elementType}{elementRanks}>()";
         }
     }
 

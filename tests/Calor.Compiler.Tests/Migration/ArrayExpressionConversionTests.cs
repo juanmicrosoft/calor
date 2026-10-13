@@ -807,6 +807,14 @@ public class ArrayExpressionConversionTests
             {
                 return f(xs[0]);
             }
+
+            // PR 2 Codex round 3: a constant stays in place (its constant conversion to
+            // byte? picks this overload; a temp is a non-constant int and picks long?).
+            public const int C = 1;
+
+            public static int UseB(byte? x, int[] xs, Cell c) => 1;
+
+            public static int UseB(long? x, int[] xs, Cell c) => 2;
         }
 
         public static class Probe
@@ -820,7 +828,8 @@ public class ArrayExpressionConversionTests
             {
                 int a = L.Use(v, new int[] { L.S() }, new Cell());
                 int b = L.Use2(L.Id, new int[] { 4 }, new Cell());
-                return a + "," + b + "|" + L.Log;
+                int k = L.UseB(L.C, new int[] { 1 }, new Cell());
+                return a + "," + b + "," + k + "|" + L.Log;
             }
         }
         """;
@@ -834,7 +843,7 @@ public class ArrayExpressionConversionTests
         var compilation = Program.Compile(result.CalorSource!, "retyped.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
-        Assert.Equal("3,4|cs", Run(Pr2Retyped));
+        Assert.Equal("3,4,1|cs", Run(Pr2Retyped));
         Assert.Equal(Run(Pr2Retyped), Run(compilation.GeneratedCode));
     }
 
@@ -882,6 +891,38 @@ public class ArrayExpressionConversionTests
         var converted = new CSharpToCalorConverter().Convert(effect);
         Assert.True(converted.Success, string.Join("\n", converted.Issues));
         Assert.Contains("§B{any[]:xs}", converted.CalorSource);
+
+        // PR 2 Codex round 3: a nullable declared type (`object[]?`) is not the created
+        // string[] either; the block form (`§ARR{zs:str}`) would declare string[].
+        const string nullable = """
+            #nullable enable
+            public static class P
+            {
+                static string S() => "c";
+
+                public static int Run()
+                {
+                    object[]? zs = new[] { S() };
+                    object[][,] js = new[] { new string[,] { { "d" } } };
+                    return zs.Length + js.Length;
+                }
+            }
+            """;
+        // These bindings fail the round trip on main too (`object[]? zs = F();` alone does):
+        // loud, never a silently retyped local.
+        var annotated = new CSharpToCalorConverter().Convert(nullable);
+        Assert.DoesNotContain("§ARR{zs:", annotated.CalorSource ?? "");
+        Assert.DoesNotContain("§ARR{js:", annotated.CalorSource ?? "");
+    }
+
+    [Fact]
+    public void EmptyJaggedArray_KeepsItsElementRank()
+    {
+        // PR 2 Codex round 3: an empty §ARR of i32[] is Array.Empty<int[]>(), not Array.Empty<int>().
+        const string calor = "§M{m1:T}\n  §CL{c1:P:pub:stat}\n    §MT{f1:Make:pub:stat} () -> i32[][]\n      §E{alloc}\n      §R §ARR{a:i32[]} §/ARR{a}\n";
+        var compilation = Program.Compile(calor, "empty.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.Contains("Array.Empty<int[]>()", compilation.GeneratedCode);
     }
 
     [Fact]

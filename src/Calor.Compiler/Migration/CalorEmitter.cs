@@ -1911,8 +1911,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // #1132: `object[] xs = new[] { "a" }` creates a string[] but declares object[]; the
         // block form would declare string[] (overloads and effects follow the static type).
         if (node.Initializer is ArrayCreationNode arrNode
-            && (node.TypeName is not { } declared || !declared.EndsWith("[]", StringComparison.Ordinal)
-                || TypeMapper.CSharpToCalor(declared[..^2]) == TypeMapper.CSharpToCalor(arrNode.ElementType)))
+            && (node.TypeName is null or "var" || node.TypeName.StartsWith("ARRAY[", StringComparison.Ordinal)
+                || OneDimensional(node.TypeName) == OneDimensional(arrNode.ElementType + "[]")))
         {
             EmitArrayCreationWithName(arrNode, node.Name);
             return "";
@@ -2222,6 +2222,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
         }
+    }
+
+    /// <summary>#1132: a mapped array type with Calor's `[T]` spelled `T[]`, for comparison.</summary>
+    private static string OneDimensional(string type)
+    {
+        var mapped = TypeMapper.CSharpToCalor(type);
+        return mapped.Length > 2 && mapped[0] == '[' && mapped[^1] == ']' ? mapped[1..^1] + "[]" : mapped;
     }
 
     /// <summary>

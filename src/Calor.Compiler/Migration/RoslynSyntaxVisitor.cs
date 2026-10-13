@@ -11131,6 +11131,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // to an untyped temp (Codex round 2); they evaluate nothing either.
             return !list[i].RefKindKeyword.IsKind(SyntaxKind.None)
                 || list[i].Expression is LiteralExpressionSyntax or DefaultExpressionSyntax
+                // A constant evaluates nothing, and its constant conversions need it in place.
+                || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
+                    && _semanticModel.GetConstantValue(list[i].Expression).HasValue
                 || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
                     && _semanticModel.GetSymbolInfo(list[i].Expression).Symbol is ILocalSymbol or IParameterSymbol
                     // #1132: unless a later argument runs code first (`Use(x, new[] { Bump(ref x) }, c)`).
