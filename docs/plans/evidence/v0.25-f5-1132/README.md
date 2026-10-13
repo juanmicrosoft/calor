@@ -63,7 +63,24 @@ preserved as C# and reported as `array-element-block` (`FeatureSupport`, `NotSup
   rescued on main and became a `[1, 1]` array on #1521. Both are preserved now.
 
 One-dimensional multi-line elements stay native (statement position re-indents the element; the
-expression form parses), as #1521 verified.
+expression form parses), as #1521 verified. The probe also rejects an element that queues a
+binding ahead of the array (Codex PR 2 round 1): a block lambda would be bound to an untyped temp
+and lose its delegate type (`D[] { (int x) => { … } }`).
+
+Two argument-order repairs in `HoistComplexArguments` (Codex PR 2 rounds 1 and 2). When a later
+call argument must be hoisted, the earlier ones are bound first, in order (#1521). Now:
+
+- a local or parameter read stays in place only when no argument after it, up to the last
+  hoisted one, runs code (`Use(x, new int[] { Bump(ref x) }, new Cell())` read `x` after `Bump`);
+- an earlier argument whose conversion to the parameter is not identity, numeric, reference,
+  boxing or nullable is preserved (`conditional-expression-hoisting`) instead of bound: an
+  untyped temp drops a method group's target type (CS8917) and runs a user-defined conversion
+  after the hoisted argument.
+
+And one declared-type repair in `CalorEmitter` (round 2): `object[] xs = new[] { "a" }` keeps
+`xs` an `object[]` (`§B{any[]:xs}` with the array inline). The block form declared the created
+type (`string[]`), which changed overload resolution and, for `new[] { task }`, the effect
+receiver (`Task[]`, certified by a namespace default).
 
 ### Effect parity with main
 
@@ -99,7 +116,7 @@ pins this as main's behavior (rows 21-23); it is not an array-receiver certifica
 fails only on effect diagnostics it is also compiled with `--permissive-effects` (the R0 driver's
 `compile_with_fallback`), and the generated C# is run against the original.
 
-Measured at `241006e3a` (`src/` tree `51c4ade7`), Release build, macOS arm64.
+Measured at `61cf64b13` (`src/` tree `06099711`), after Codex PR 2 rounds 1-2 and the rebase onto `c020de748`; Release build, macOS arm64. The per-surface outcome is the same as at `241006e3a`.
 
 | Case | Every surface (`cli-default`, `cli-passthrough`, `cli-no-fallback`, `cli-migrate`, `mcp-default`, `mcp-passthroughOnError`, `mcp-passthroughOnError-moduleName`) |
 |---|---|
@@ -133,7 +150,7 @@ PR 1's table (below) holds, with these changes:
 (tests 137 -> 136). The cause is the `13-11` conversion snapshot: `CreateEmpty` returned
 `§C{Array.Empty<str>}` (one resolver key) and now returns a fresh `§ARR{str:arrStr005:0}`. #1521's
 note attributed the delta to element typing; with element typing removed, the delta remains, so that
-attribution was wrong. The ledger is regenerated with a pending identity, as #1521 did.
+attribution was wrong. The ledger is regenerated at `61cf64b13` with a pending identity (phase 1 names that head and the PR), as #1521 did.
 
 ### Mapped 0.24 blockers (how the READY record must resolve them)
 
@@ -156,11 +173,11 @@ whose body has a native throwing element initializer or an element store); none 
 
 ### Tests (PR 2)
 
-Fast lane, isolated HOME and CALOR_HOME, at `241006e3a`:
+Fast lane, isolated HOME and CALOR_HOME, at `61cf64b13` (the key-ledger run at the stamp commit):
 
 | Project | Total | Failed | Skipped |
 |---|---|---|---|
-| Calor.Compiler.Tests | 13313 | 0 (after the key-ledger regeneration) | 9 locally (corpus submodules not initialized; 3 in CI) |
+| Calor.Compiler.Tests | 13563 | 0 | 9 locally (corpus submodules not initialized; 3 in CI) |
 | Calor.Conversion.Tests | 476 | 0 | 0 |
 | Calor.Semantics.Tests | 55 | 0 | 0 |
 | Calor.Enforcement.Tests | 695 | 0 | 1 |
@@ -168,14 +185,19 @@ Fast lane, isolated HOME and CALOR_HOME, at `241006e3a`:
 
 ### Line ceiling
 
-Non-test source (`git diff --numstat origin/main -- src`) at `241006e3a`: +553/-284, 837 changed
-lines, against #1521's 880 (+596/-284) and EXC-F5-NONTEST-LINES' allowance of 880. The exception is
+Non-test source (`git diff --numstat origin/main...HEAD -- src`) at `61cf64b13`: +581/-285, 866
+changed lines, against #1521's 880 (+596/-284) and EXC-F5-NONTEST-LINES' allowance of 880. The exception is
 recorded "for #1521 only"; whether it covers this PR, or this PR needs its own exception, is the
 maintainer's call (it is not amended here).
 
 ### Reviews (PR 2)
 
 Fresh budget: 3 Codex rounds plus 1 verification-only pass. Records: `reviews/pr2-*`.
+
+| Invocation | Record | Verdict |
+|---|---|---|
+| 1 (round 1) | `reviews/pr2-round-1.md` | REQUEST CHANGES: 3 MAJOR, 1 MINOR; all fixed |
+| 2 (round 2) | `reviews/pr2-round-2.md` | REQUEST CHANGES: 1 BLOCKING, 1 MAJOR, 1 MINOR; all fixed |
 
 ---
 
