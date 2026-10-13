@@ -100,6 +100,15 @@ every row's `Calor04xx` diagnostics was also diffed between that tree and this b
 `src/Calor.Compiler/Effects/EffectResolver.cs`, the effect manifests and the resolver key ledger's
 scope are unchanged from main.
 
+What the parity claim covers: for a given receiver type, every array member gets main's effect
+result. It does not claim that converted code always has main's receiver types. Where main's
+converter typed a local wrongly, F5 types it as C# does, and the resolver then answers for the
+right type. Example (Codex PR 2 round 3, finding 1, contested): `var xs = new[] { t }` with `t` a
+`Task` was an `object[]` on main (wrong: C# makes it a `Task[]`); it is now a `Task[]`, so
+`xs.Initialize()` resolves through the `System.Threading.Tasks` namespace default, exactly as a
+`Task[]` written in the source does on main. Explicitly declared types are kept
+(`object[] xs = new[] { t }` stays `object[]`, round 2 finding 1).
+
 MINOR 2 (real `System.Array` overloads report `Calor0410`) does not apply as a regression: on main
 `g.GetValue(indices)` with `int[] indices` already reports `Calor0411`/`Calor0410` (row 18 of the
 parity table), and so does every other array member.
