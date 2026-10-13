@@ -64,17 +64,17 @@
         "ParseFailed": 0,
         "BindStopped": 84,
         "ReachEffectPass": 132,
-        "StopCalor0410": 104,
+        "StopCalor0410": 107,
         "StopCalor0422Or0423": 4,
         "StopCalor1002": 16,
         "CompileClean": 5,
-        "StoppedInCliOnlyPass": 3,
+        "StoppedInCliOnlyPass": 0,
         "Calor0425Modules": 28,
         "Calor0425Sites": 80
       }
     ]
   },
-  "MeasuredCommit": "a00f4a525da7a88e784436fb75259b9606ca242b",
+  "MeasuredCommit": "bad488b8db00c888b3260a35b1edfdc3b3b5c74a",
   "AggregateDiagnostics": 135,
   "AggregateModulesWithDiagnostics": 48,
   "AggregateModulesEnforced": 265,
@@ -276,7 +276,7 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 7509,
+      "Calor0411Sites": 7508,
       "Calor0411Modules": 110
     }
   ]
