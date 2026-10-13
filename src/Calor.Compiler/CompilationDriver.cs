@@ -341,7 +341,8 @@ internal static class CompilationDriver
         DriverCacheSettings? cache = null,
         Action<FileInfo, string>? onSkipped = null,
         Action<FileInfo, string, ModuleNode>? onAst = null,
-        Action<FileInfo>? onFailed = null)
+        Action<FileInfo>? onFailed = null,
+        Action<FileInfo, CompilationResult>? onFileResult = null)
     {
         var compiled = new List<FileResult>();
         var pending = new List<PendingFile>();
@@ -481,6 +482,7 @@ internal static class CompilationDriver
             var sourceBytes = File.ReadAllBytes(file.FullName);
             var source = DecodeSource(sourceBytes);
             var result = Program.Compile(source, file.FullName, options);
+            onFileResult?.Invoke(file, result);
 
             // Fires even for error-bearing files: declaration-ID enrichment of
             // their diagnostics needs the AST whenever parsing got far enough.

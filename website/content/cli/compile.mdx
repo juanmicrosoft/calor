@@ -85,16 +85,21 @@ This indicates "generated C#" and helps distinguish Calor-generated code from ex
 
 ## Error Reporting
 
-When compilation fails, errors are reported with file location:
+When compilation fails, each diagnostic is printed to stderr as
+`file(line,column): severity code: message`, and `calor` exits with code 1.
+This file uses a variable it never declared:
 
+```calor expect=Calor0200
+§M{m001:Calculator}
+  §F{f001:Increment:pub} (i32:value) -> i32
+    §E{}
+    §R (+ x 1)
 ```
-Error in Calculator.calr:12:5
-  Undefined variable 'x' in expression
 
-  §R (+ x 1)
-       ^
+`calor --input Calculator.calr` reports (the full path is shortened here):
 
-Compilation failed with 1 error
+```text output
+Calculator.calr(4,11): error Calor0200: Undefined variable 'x'
 ```
 
 For machine-readable diagnostics, use `--format json|sarif` or the
@@ -194,7 +199,7 @@ still require supported runtime lowering.
 
 Example output:
 
-```
+```text illustrative
 Compiling MyModule.calr...
   Function Square: PROVEN - Postcondition (result >= 0)
   Function Divide: ASSUMED - Postcondition (result >= 0)

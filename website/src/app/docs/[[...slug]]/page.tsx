@@ -15,6 +15,7 @@ import { DocsPageTracker } from '@/components/docs/DocsPageTracker';
 import { DocSearch } from '@/components/docs/DocSearch';
 import { mdxComponents } from '@/components/mdx';
 import { Heading, remarkHeadings } from '@/lib/headings';
+import { remarkCodeMeta } from '@/lib/code-meta';
 import { canonicalUrl, publicUrl } from '@/lib/site';
 
 interface DocPageProps {
@@ -73,7 +74,7 @@ export default async function DocPage({ params }: DocPageProps) {
   const { content } = await compileMDX({
     source: doc.content,
     components: mdxComponents,
-    options: { mdxOptions: { remarkPlugins: [remarkGfm, remarkHeadings(headings)] } },
+    options: { mdxOptions: { remarkPlugins: [remarkGfm, remarkHeadings(headings), remarkCodeMeta] } },
   });
 
   return (

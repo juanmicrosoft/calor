@@ -10,6 +10,8 @@ interface CodeBlockProps {
   language: string;
   filename?: string;
   showLineNumbers?: boolean;
+  /** Example output that CI does not check (fence annotation `illustrative`, #1143). */
+  illustrative?: boolean;
 }
 
 export function CodeBlock({
@@ -17,6 +19,7 @@ export function CodeBlock({
   language,
   filename,
   showLineNumbers = false,
+  illustrative = false,
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
@@ -57,7 +60,9 @@ export function CodeBlock({
     calor: 'Calor',
   };
 
-  const displayLanguage = languageLabels[language.toLowerCase()] || languageLabels[normalizedLanguage] || language;
+  const displayLanguage = illustrative
+    ? 'Example output (not checked)'
+    : languageLabels[language.toLowerCase()] || languageLabels[normalizedLanguage] || language;
 
   const lines = code.split('\n');
 

@@ -18,20 +18,19 @@ Suppose you split your code across two files:
 
 **`OrderService.calr`**
 
-```calor
+```calor group=orders,orders-using
 §M{m001:OrderService}
 
   §F{f001:SaveOrder:pub}
-    §I{Order:order}
     §O{void}
     §E{db:w}
-    §C{DbContext.SaveChanges} §/C
+    // A real implementation writes the order to a database here.
 
 ```
 
 **`Handler.calr`**
 
-```calor
+```calor group=orders expect=Calor0410,Calor0417
 §M{m002:Handler}
 
   §F{f001:HandleRequest:pub}
@@ -48,12 +47,18 @@ Without cross-module enforcement, `HandleRequest` silently gets a free pass beca
 
 Starting in v0.4.9, Calor runs a **cross-module effect enforcement pass** after per-file compilation. It verifies that each caller's `§E{...}` covers the declared effects of any cross-module Calor functions it calls.
 
-For the example above, the compiler emits:
+For the example above, `calor --input OrderService.calr --input Handler.calr` reports:
 
-```
-Calor0410: Function 'HandleRequest' uses effect 'db:w' via cross-module call
+```text output
+warning Calor0417: Public function 'HandleRequest' in module 'Handler' has no effect
+declaration. Cross-module callers cannot verify effect safety. Add §E{...} to
+declare effects.
+error Calor0410: Function 'HandleRequest' uses effect 'db:w' via cross-module call
 to 'SaveOrder' (in module 'OrderService') but does not declare it.
 ```
+
+The `Calor0410` error is the cross-module check. The `Calor0417` warning is explained
+under "Undeclared public functions" below.
 
 Fix by adding the effect to the caller:
 
@@ -115,7 +120,7 @@ Both forms resolve correctly:
 
 If a public or internal function lacks `§E{...}` entirely, cross-module callers have nothing to verify against. Rather than silently assuming the function is pure, the compiler emits a **warning**:
 
-```
+```text illustrative
 Calor0417: Public function 'SaveOrder' in module 'OrderService' has no effect
 declaration. Cross-module callers cannot verify effect safety. Add §E{...} to
 declare effects.
@@ -167,14 +172,14 @@ Two patterns work:
 
 ### 1. Using directive + bare name
 
-```calor
+```calor group=orders-using
 §M{m002:Handler}
-  §U{OrderService}                ← adds `using OrderService;` to generated C#
+  §U{OrderService}                // adds `using OrderService;` to generated C#
 
   §F{f001:HandleRequest:pub}
     §O{void}
     §E{db:w}
-    §C{SaveOrder} §/C             ← resolves via the using directive
+    §C{SaveOrder} §/C             // resolves via the using directive
 
 ```
 

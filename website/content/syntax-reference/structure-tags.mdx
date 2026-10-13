@@ -676,7 +676,7 @@ dedents back to (or past) the parent column.
     §O{void}
     §E{cw}
     §L{i:1:10:1}
-      §IF (> i 5)
+      §IF{if1} (> i 5)
         §P i
       §EL
         §P "small"
@@ -684,8 +684,8 @@ dedents back to (or past) the parent column.
 
 The ends of the `§IF`, `§L`, `§F`, and `§M` blocks are inferred from dedents;
 do not write structural closer lines.
-If you write them explicitly, the lexer drops them silently — but
-calorfmt will strip them in a future release.
+If you write them anyway, the compiler rejects them with `Calor0830`;
+`calor fix --heal-closers` removes them.
 
 ### Tag Reference
 
