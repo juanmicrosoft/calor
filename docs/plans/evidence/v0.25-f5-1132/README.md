@@ -125,7 +125,7 @@ pins this as main's behavior (rows 21-23); it is not an array-receiver certifica
 fails only on effect diagnostics it is also compiled with `--permissive-effects` (the R0 driver's
 `compile_with_fallback`), and the generated C# is run against the original.
 
-Measured at `61cf64b13` (`src/` tree `06099711`), after Codex PR 2 rounds 1-2 and the rebase onto `c020de748`; Release build, macOS arm64. The per-surface outcome is the same as at `241006e3a`.
+Measured at `17943b9a2` (`src/` tree `d98c3b9f`), after Codex PR 2 rounds 1-3 and the rebase onto `c020de748`; Release build, macOS arm64. The per-surface outcome is the same as at `241006e3a`.
 
 | Case | Every surface (`cli-default`, `cli-passthrough`, `cli-no-fallback`, `cli-migrate`, `mcp-default`, `mcp-passthroughOnError`, `mcp-passthroughOnError-moduleName`) |
 |---|---|
@@ -159,7 +159,7 @@ PR 1's table (below) holds, with these changes:
 (tests 137 -> 136). The cause is the `13-11` conversion snapshot: `CreateEmpty` returned
 `§C{Array.Empty<str>}` (one resolver key) and now returns a fresh `§ARR{str:arrStr005:0}`. #1521's
 note attributed the delta to element typing; with element typing removed, the delta remains, so that
-attribution was wrong. The ledger is regenerated at `61cf64b13` with a pending identity (phase 1 names that head and the PR), as #1521 did.
+attribution was wrong. The ledger is regenerated at `17943b9a2` with a pending identity (phase 1 names that head and the PR), as #1521 did.
 
 ### Mapped 0.24 blockers (how the READY record must resolve them)
 
@@ -182,11 +182,11 @@ whose body has a native throwing element initializer or an element store); none 
 
 ### Tests (PR 2)
 
-Fast lane, isolated HOME and CALOR_HOME, at `61cf64b13` (the key-ledger run at the stamp commit):
+Fast lane, isolated HOME and CALOR_HOME, at `6002c19da` (the round-3 code; later commits change only docs, the manifest and the ledger):
 
 | Project | Total | Failed | Skipped |
 |---|---|---|---|
-| Calor.Compiler.Tests | 13563 | 0 | 9 locally (corpus submodules not initialized; 3 in CI) |
+| Calor.Compiler.Tests | 13564 | 0 | 9 locally (corpus submodules not initialized; 3 in CI) |
 | Calor.Conversion.Tests | 476 | 0 | 0 |
 | Calor.Semantics.Tests | 55 | 0 | 0 |
 | Calor.Enforcement.Tests | 695 | 0 | 1 |
@@ -194,7 +194,7 @@ Fast lane, isolated HOME and CALOR_HOME, at `61cf64b13` (the key-ledger run at t
 
 ### Line ceiling
 
-Non-test source (`git diff --numstat origin/main...HEAD -- src`) at `61cf64b13`: +581/-285, 866
+Non-test source (`git diff --numstat origin/main...HEAD -- src`) at `6002c19da`: +592/-286, 878
 changed lines, against #1521's 880 (+596/-284) and EXC-F5-NONTEST-LINES' allowance of 880. The exception is
 recorded "for #1521 only"; whether it covers this PR, or this PR needs its own exception, is the
 maintainer's call (it is not amended here).
@@ -207,6 +207,7 @@ Fresh budget: 3 Codex rounds plus 1 verification-only pass. Records: `reviews/pr
 |---|---|---|
 | 1 (round 1) | `reviews/pr2-round-1.md` | REQUEST CHANGES: 3 MAJOR, 1 MINOR; all fixed |
 | 2 (round 2) | `reviews/pr2-round-2.md` | REQUEST CHANGES: 1 BLOCKING, 1 MAJOR, 1 MINOR; all fixed |
+| 3 (round 3) | `reviews/pr2-round-3.md` | REQUEST CHANGES: 1 BLOCKING (contested, not changed), 3 MAJOR (fixed) |
 
 ---
 
