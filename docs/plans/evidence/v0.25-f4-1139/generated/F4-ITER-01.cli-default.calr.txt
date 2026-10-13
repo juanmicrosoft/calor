@@ -1,0 +1,54 @@
+§M{m001:F4-ITER-01:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Bag:pub}
+      §FLD{i32:started:pub:stat} = 0
+
+      §CSHARP{
+    public IEnumerable<int> Items
+    {
+        get
+        {
+            started = started + 1;
+            yield return 1;
+            yield return 2;
+        }
+    }
+      }§/CSHARP
+
+      §CSHARP{
+    public IEnumerable<int> this[int limit]
+    {
+        get
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                if (i >= limit)
+                {
+                    yield break;
+                }
+                yield return i;
+            }
+        }
+    }
+      }§/CSHARP
+
+
+    §CL{c002:Probe:pub:stat}
+      §MT{m003:Run:pub:stat} () -> str
+        §E{alloc}
+        §B{bag} §NEW{Bag} §/NEW
+        §B{items} bag.Items
+        §B{i32:before} Bag.started
+        §B{~sum:i32} 0
+        §EACH{each004:i:var} items
+          §ASSIGN sum (+ sum i)
+        §B{~count:i32} 0
+        §EACH{each005:i:var} §IDX{bag} 3
+          §ASSIGN count (+ count 1)
+        §R (+ (+ (+ (+ (+ (+ before "|") Bag.started) "|") sum) "|") count)
+
+
+
