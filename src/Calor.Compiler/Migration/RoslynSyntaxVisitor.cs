@@ -11138,6 +11138,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         && later.Expression.DescendantNodesAndSelf().Any(RunsCode));
         }
 
+        bool KeepsMeaningInTemp(ExpressionSyntax e)
+        {
+            if (_semanticModel == null || e.SyntaxTree != _semanticModel.SyntaxTree || _semanticModel.GetTypeInfo(e).Type == null)
+                return false;
+            var conversion = _semanticModel.GetConversion(e);
+            return conversion.IsImplicit && !conversion.IsUserDefined
+                && (conversion.IsIdentity || conversion.IsNumeric || conversion.IsReference || conversion.IsBoxing || conversion.IsNullable);
+        }
+
         static bool RunsCode(SyntaxNode node) => node is InvocationExpressionSyntax or AssignmentExpressionSyntax
             or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax or BaseObjectCreationExpressionSyntax
             or ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None };
@@ -11169,6 +11178,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var hoist = Complex(args[i]) || i < last && !InPlace(i);
             if (!hoist)
                 continue;
+            // #1132: an untyped temp drops the argument's target typing (a method group) or
+            // moves a user-defined conversion after the later arguments: preserve instead.
+            if (!Complex(args[i]) && syntax is { } typed && i < typed.Count && !KeepsMeaningInTemp(typed[i].Expression))
+                throw EscalateExpression(typed[i].Expression, "conditional-expression-hoisting");
             var tempName = args[i] switch
             {
                 NewExpressionNode newNode => _context.GenerateId("_new", newNode.TypeName),

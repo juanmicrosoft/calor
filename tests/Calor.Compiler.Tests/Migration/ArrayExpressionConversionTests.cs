@@ -754,6 +754,136 @@ public class ArrayExpressionConversionTests
         Assert.Equal(Run(Round3Preserved), Run(compilation.GeneratedCode));
     }
 
+    // PR 2 Codex round 2: an earlier argument bound to an untyped temp (because a later
+    // one is hoisted) loses its target typing (an overloaded method group, CS8917) or runs
+    // its user-defined conversion after the hoisted argument ("sc" instead of "cs").
+    private const string Pr2Retyped = """
+        using System;
+
+        public class Cell
+        {
+        }
+
+        public struct X
+        {
+            public int V;
+
+            public X(int v)
+            {
+                V = v;
+            }
+
+            public static implicit operator int(X x)
+            {
+                L.Log = L.Log + "c";
+                return x.V;
+            }
+        }
+
+        public static class L
+        {
+            public static string Log = "";
+
+            public static int S()
+            {
+                Log = Log + "s";
+                return 2;
+            }
+
+            public static X MakeX(int v)
+            {
+                return new X(v);
+            }
+
+            public static int Id(int x) => x;
+            public static string Id(string x) => x;
+
+            public static int Use(int first, int[] xs, Cell c)
+            {
+                return first + xs[0];
+            }
+
+            public static int Use2(Func<int, int> f, int[] xs, Cell c)
+            {
+                return f(xs[0]);
+            }
+        }
+
+        public static class Probe
+        {
+            public static string Run()
+            {
+                return Go(L.MakeX(1));
+            }
+
+            public static string Go(X v)
+            {
+                int a = L.Use(v, new int[] { L.S() }, new Cell());
+                int b = L.Use2(L.Id, new int[] { 4 }, new Cell());
+                return a + "," + b + "|" + L.Log;
+            }
+        }
+        """;
+
+    [Fact]
+    public void RetypedEarlierArguments_ArePreserved_AndRunLikeTheOriginal()
+    {
+        var result = new CSharpToCalorConverter().Convert(Pr2Retyped);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Equal(2, result.Losses.Count(loss => loss.Feature == "conditional-expression-hoisting"));
+        var compilation = Program.Compile(result.CalorSource!, "retyped.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.Equal("3,4|cs", Run(Pr2Retyped));
+        Assert.Equal(Run(Pr2Retyped), Run(compilation.GeneratedCode));
+    }
+
+    [Fact]
+    public void ImplicitArray_KeepsTheDeclaredStaticType()
+    {
+        // PR 2 Codex round 2: `object[] xs = new[] { "a" }` creates a string[] but xs is an
+        // object[]: overload resolution (and the effect receiver) follow the declared type.
+        const string source = """
+            public static class Probe
+            {
+                static int Pick(object[] x) => 1;
+                static int Pick(string[] x) => 2;
+
+                public static string Run()
+                {
+                    object[] xs = new[] { "a" };
+                    var ys = new[] { "b" };
+                    return "" + Pick(xs) + Pick(ys) + (xs is string[]);
+                }
+            }
+            """;
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.Contains("§B{any[]:xs}", result.CalorSource);
+        var compilation = Program.Compile(result.CalorSource!, "declared.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.Equal("12True", Run(source));
+        Assert.Equal(Run(source), Run(compilation.GeneratedCode));
+
+        // The receiver keeps main's effect result: object[].Initialize is an unknown call,
+        // not a Task[] member that a namespace default would certify.
+        const string effect = """
+            public static class P
+            {
+                public static void Run(System.Threading.Tasks.Task t)
+                {
+                    object[] xs = new[] { t };
+                    xs.Initialize();
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(effect);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Contains("§B{any[]:xs}", converted.CalorSource);
+    }
+
     [Fact]
     public void ElementAccessMember_ParsesAsAGroup()
     {

@@ -177,8 +177,9 @@ responses captured from the MCP server. The refinement-type pages now say that a
     members such as `GetLength` and `Rank` are unchanged. On a receiver typed as an array
     (`i32[]`, `i32[,]`) they are still unknown calls, so a function that calls one reports
     `Calor0410` (an effect used but not declared) unless it declares that effect or is compiled
-    with `--permissive-effects`. A receiver declared as `System.Array` still resolves through
-    its effect manifest, as before.
+    with `--permissive-effects`. Two cases resolve through Calor's built-in effect manifests
+    instead, as before: a receiver declared as `System.Array`, and an array whose element type
+    is in a namespace the manifests give a default (for example `System.Threading.Tasks.ValueTask[]`).
 
 ## [0.24.0] - 2026-10-07
 

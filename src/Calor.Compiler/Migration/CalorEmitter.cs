@@ -1908,7 +1908,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitSetCreationWithName(setNode, node.Name);
             return "";
         }
-        if (node.Initializer is ArrayCreationNode arrNode)
+        // #1132: `object[] xs = new[] { "a" }` creates a string[] but declares object[]; the
+        // block form would declare string[] (overloads and effects follow the static type).
+        if (node.Initializer is ArrayCreationNode arrNode
+            && (node.TypeName is not { } declared || !declared.EndsWith("[]", StringComparison.Ordinal)
+                || TypeMapper.CSharpToCalor(declared[..^2]) == TypeMapper.CSharpToCalor(arrNode.ElementType)))
         {
             EmitArrayCreationWithName(arrNode, node.Name);
             return "";

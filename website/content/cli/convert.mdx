@@ -402,8 +402,10 @@ value, argument, binding, field or property initializer, member-access target, a
 (`i32[]`, `i32[,]`), a call to an array member, such as `g.GetLength(0)`, `g.Rank` or
 `g.Clone()`, is an unknown external call (`Calor0411`). A function that makes one and
 declares no matching effect reports `Calor0410` (an effect is used but not declared).
-Declare the effect, or compile converted code with `--permissive-effects`. A receiver
-declared as `System.Array` resolves through its effect manifest instead, as before.
+Declare the effect, or compile converted code with `--permissive-effects`. Two cases
+resolve through Calor's built-in effect manifests instead, as before: a receiver declared
+as `System.Array`, and an array whose element type is in a namespace the manifests give a
+default (for example `System.Threading.Tasks.ValueTask[]`).
 
 **Limits.** These shapes are kept as C# and reported as a conversion loss, never
 moved:
