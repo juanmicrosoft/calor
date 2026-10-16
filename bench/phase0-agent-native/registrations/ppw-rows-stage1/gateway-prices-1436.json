@@ -1,0 +1,94 @@
+{
+  "advertisedAdvisorPolicy": "header may pass; advisor tool/type/model/server operations are refused",
+  "allowedBetaCapabilities": [
+    "advisor-tool-2026-03-01",
+    "claude-code-20250219",
+    "context-1m-2025-08-07",
+    "context-management-2025-06-27",
+    "effort-2025-11-24",
+    "extended-cache-ttl-2025-04-11",
+    "fast-mode-2026-02-01",
+    "interleaved-thinking-2025-05-14",
+    "mid-conversation-system-2026-04-07",
+    "mid-conversation-tool-changes-2026-07-01",
+    "oauth-2025-04-20",
+    "prompt-caching-2024-07-31",
+    "prompt-caching-scope-2026-01-05",
+    "structured-outputs-2025-12-15",
+    "thinking-token-count-2026-05-13"
+  ],
+  "contextUpperTokens": 1000000,
+  "dataResidencyPolicy": {
+    "notAvailableResponsePricing": "US 1.1x conservative maximum",
+    "notAvailableSemantics": "observed partial native receipt sentinel; no global residency or cheaper rate inferred",
+    "omittedResponsePricing": "US 1.1x conservative maximum",
+    "requestValues": [
+      "global",
+      "us"
+    ],
+    "responseValues": [
+      "global",
+      "us",
+      "not_available"
+    ],
+    "source": "https://platform.claude.com/docs/en/manage-claude/data-residency"
+  },
+  "model": "claude-opus-4-8",
+  "modelLimitsSource": {
+    "method": "GET",
+    "path": "/v1/models/claude-opus-4-8",
+    "responseFields": {
+      "id": "claude-opus-4-8",
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000
+    },
+    "status": 200,
+    "upstreamInferenceRequests": 0,
+    "verification": "independent parent-reported metadata-only preflight, 2026-09-10"
+  },
+  "outputUpperTokens": 128000,
+  "ratesUsdPerMillion": {
+    "cacheRead": "0.50",
+    "cacheWrite1h": "10",
+    "cacheWrite5m": "6.25",
+    "fastInput": "10",
+    "fastOutput": "50",
+    "input": "5",
+    "output": "25"
+  },
+  "reconciliation": "complete provider category counts; higher priced speed/residency/cache TTL if absent",
+  "requestMultiplicity": "one model iteration only; no server-side compaction or fallback",
+  "reservation": "full context at fast 1h-write rate plus requested output at fast rate; 1.1x",
+  "residencyMaximumMultiplier": "1.1",
+  "schemaVersion": 1,
+  "serverOperations": "not admitted; request fails before forwarding, never stripped",
+  "serviceTierPolicy": {
+    "capacityPurchases": "not performed by this Messages request adapter",
+    "pricing": "published token-category rates; priority draws existing capacity",
+    "requests": [
+      "auto",
+      "standard_only"
+    ],
+    "responses": [
+      "standard",
+      "priority"
+    ]
+  },
+  "sources": [
+    "https://platform.claude.com/docs/en/models/opus-4-8/overview",
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://platform.claude.com/docs/en/api/messages/create",
+    "https://platform.claude.com/docs/en/api/models/retrieve",
+    "https://platform.claude.com/docs/en/api/service-tiers",
+    "https://platform.claude.com/docs/en/manage-claude/data-residency",
+    "https://platform.claude.com/docs/en/build-with-claude/compaction",
+    "https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback",
+    "https://platform.claude.com/docs/en/build-with-claude/context-editing",
+    "https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool",
+    "https://platform.claude.com/docs/en/build-with-claude/thinking",
+    "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+    "https://code.claude.com/docs/en/llm-gateway-protocol"
+  ],
+  "unknownBetaPolicy": "reject the entire request before reservation or upstream connection",
+  "upstream": "https://api.anthropic.com"
+}

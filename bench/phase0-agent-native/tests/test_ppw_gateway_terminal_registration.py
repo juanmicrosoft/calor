@@ -77,7 +77,14 @@ class TerminalRegistrationTests(unittest.TestCase):
             value["path"]
             for value in terminal_generator.INPUT_CONTRACT["freshEvidence"].values()
         })
-        self.assertEqual(30, len(spending.GATEWAY_ARTIFACTS))
+        historical = json.loads(
+            (gateway.ROOT / "gateway-instrument-amendment-1434.json").read_text())
+        self.assertEqual(30, len(historical["replacementHarnessArtifacts"]))
+        self.assertEqual(set(historical["replacementHarnessArtifacts"]) | {
+            "ppw-gateway-disposition.py", "ppw-gateway-disposition-registration.py",
+            "ppw-gateway-dispose.py", "ppw-gateway-register-disposition.py",
+            "ppw-gateway-progress.py",
+        }, set(spending.GATEWAY_ARTIFACTS))
         self.assertIn("ppw-gateway-register-terminal.py", spending.GATEWAY_ARTIFACTS)
         self.assertNotIn("w-rows-pilot-gateway-003",
                          json.dumps(terminal_generator.OUTPUT_SCHEMA, sort_keys=True))

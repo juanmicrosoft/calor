@@ -3,6 +3,7 @@
 import argparse
 from contextlib import contextmanager
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -116,6 +117,20 @@ def decode(raw):
         raise Refusal("invalid JSON") from error
 
 
+_DISPOSITION = None
+
+
+def disposition_module():
+    global _DISPOSITION
+    if _DISPOSITION is None:
+        path = Path(__file__).with_name("ppw-gateway-disposition.py")
+        spec = importlib.util.spec_from_file_location("ppw_gateway_disposition_budget", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _DISPOSITION = module
+    return _DISPOSITION
+
+
 PROVIDER_FAILURE_KIND = "pp-w-provider-failure-v1"
 PROVIDER_REFUSALS = {
     "invalid JSON": "PROVIDER_JSON_INVALID",
@@ -153,6 +168,8 @@ PROVIDER_REFUSALS = {
     "nonempty initial provider content": "SSE_INITIAL_CONTENT",
     "invalid terminal delta order": "SSE_DELTA_ORDER",
     "unadmitted message delta": "SSE_DELTA_SCHEMA",
+    "non-null provider message delta container": "SSE_DELTA_CONTAINER",
+    "non-null provider stop details": "SSE_DELTA_STOP_DETAILS",
     "missing final output usage": "SSE_FINAL_OUTPUT_MISSING",
     "conflicting terminal reasons": "SSE_TERMINAL_CONFLICT",
     "message stop without complete usage": "SSE_STOP_WITHOUT_USAGE",
@@ -535,6 +552,15 @@ def price_contract():
                               "cacheWrite1h": "10", "cacheRead": "0.50",
                               "fastInput": "10", "fastOutput": "50"},
         "residencyMaximumMultiplier": "1.1",
+        "dataResidencyPolicy": {
+            "requestValues": ["global", "us"],
+            "responseValues": ["global", "us", "not_available"],
+            "omittedResponsePricing": "US 1.1x conservative maximum",
+            "notAvailableResponsePricing": "US 1.1x conservative maximum",
+            "notAvailableSemantics":
+                "observed partial native receipt sentinel; no global residency or cheaper rate inferred",
+            "source": "https://platform.claude.com/docs/en/manage-claude/data-residency",
+        },
         "serviceTierPolicy": {
             "requests": ["auto", "standard_only"],
             "responses": ["standard", "priority"],
@@ -554,6 +580,7 @@ def price_contract():
             "https://platform.claude.com/docs/en/api/messages/create",
             "https://platform.claude.com/docs/en/api/models/retrieve",
             "https://platform.claude.com/docs/en/api/service-tiers",
+            "https://platform.claude.com/docs/en/manage-claude/data-residency",
             "https://platform.claude.com/docs/en/build-with-claude/compaction",
             "https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback",
             "https://platform.claude.com/docs/en/build-with-claude/context-editing",
@@ -701,7 +728,8 @@ def reconciled_cost(request, model, usage, stop_reason):
     require(request.get("serviceTier") in ("auto", "standard_only")
             and (request["serviceTier"] != "standard_only" or usage["service_tier"] == "standard"),
             "provider service tier differs from the admitted request")
-    require(usage.get("inference_geo") in (None, "global", "us"), "unknown provider geography")
+    require(usage.get("inference_geo") in (None, "global", "us", "not_available"),
+            "unknown provider geography")
     require(usage.get("speed") in (None, "standard", "fast"), "unknown provider speed")
     allowed = set(COUNTERS) | {"service_tier", "inference_geo", "speed", "cache_creation", "server_tool_use",
                               "output_tokens_details", "iterations", "fallback_credit"}
@@ -802,7 +830,12 @@ class UsageStream:
                     require(self.started, "invalid terminal delta order")
                     self.update_usage(event.get("usage"))
                     delta = event.get("delta")
-                    fields(delta, {"stop_reason", "stop_sequence"}, "unadmitted message delta")
+                    fields(delta, {"stop_reason", "stop_sequence", "container", "stop_details"},
+                           "unadmitted message delta")
+                    require(delta.get("container") is None,
+                            "non-null provider message delta container")
+                    require(delta.get("stop_details") is None,
+                            "non-null provider stop details")
                     reason = delta.get("stop_reason")
                     if reason is not None:
                         require("output_tokens" in event["usage"], "missing final output usage")
@@ -906,6 +939,16 @@ class RequestLedger:
 
     @staticmethod
     def preserved_slots(db):
+        disposition_rows = db.execute(
+            "SELECT detail FROM events WHERE kind=? ORDER BY id",
+            (disposition_module().DISPOSITION_EVENT,)).fetchall()
+        if disposition_rows:
+            require(len(disposition_rows) == 1, "duplicate historical liability disposition")
+            detail = decode(disposition_rows[0]["detail"])
+            require(isinstance(detail, dict) and isinstance(detail.get("authorization"), dict),
+                    "malformed historical liability disposition")
+            return disposition_module().validate_authorization(
+                detail["authorization"])["preservedSlots"]
         rows = db.execute(
             "SELECT detail FROM events WHERE kind='zero-request-recovery' ORDER BY id").fetchall()
         if not rows:
@@ -917,6 +960,99 @@ class RequestLedger:
                 and all(isinstance(slot, str) and slot for slot in preserved),
                 "malformed preserved attempt inventory")
         return preserved
+
+    @staticmethod
+    def _base_snapshot(db, scope=None):
+        if scope is None:
+            scope = db.execute("SELECT * FROM scope").fetchone()
+        scope = dict(scope)
+        requests = [dict(row) for row in db.execute(
+            "SELECT id,slot,request,reserved,charge,state,reason,usage FROM requests ORDER BY rowid")]
+        events = [dict(row) for row in db.execute("SELECT * FROM events ORDER BY id")]
+        binding = decode(scope["binding"])
+        result = {
+            "kind": KIND, "state": scope["state"], "binding": binding,
+            "ceilingMicroUsd": scope["ceiling"],
+            "exposureMicroUsd": sum(row["charge"] for row in requests),
+            "requests": requests, "events": events, "verdict": None,
+            "basis": "request reservations; only validated complete provider usage permits release",
+        }
+        if strict_terminal_lifecycle(binding):
+            preserved = []
+            valid = 0
+            invalid = 0
+            historical_disposition = False
+            for event in events:
+                if event["kind"] == "zero-request-recovery":
+                    preserved = decode(event["detail"])["preservedAttemptedSlots"]
+                elif event["kind"] == disposition_module().DISPOSITION_EVENT:
+                    detail = decode(event["detail"])
+                    preserved = disposition_module().validate_authorization(
+                        detail["authorization"])["preservedSlots"]
+                    historical_disposition = True
+                elif event["kind"] == "slot-complete":
+                    valid += 1
+                elif event["kind"] == TERMINAL_INVALID_EVENT:
+                    invalid += 1
+            result.update(
+                accountedSlots=len(preserved) + valid + invalid,
+                validCompletedSlots=valid,
+                invalidTerminalSlots=(1 if historical_disposition else len(preserved)) + invalid,
+                requestBearingSlots=len({row["slot"] for row in requests}),
+            )
+        return result
+
+    @staticmethod
+    def _disposition_context(db):
+        rows = db.execute(
+            "SELECT id,detail FROM events WHERE kind=? ORDER BY id",
+            (disposition_module().DISPOSITION_EVENT,)).fetchall()
+        if not rows:
+            prefix = db.execute(
+                "SELECT kind FROM events WHERE id<=10 ORDER BY id").fetchall()
+            historical = db.execute(
+                "SELECT COUNT(*) FROM requests WHERE state='unknown' "
+                "AND reason='unreconciled-provider-charge' AND usage IS NULL").fetchone()[0]
+            kinds = [row["kind"] for row in prefix]
+            if len(kinds) >= 10 and historical == 2 and kinds[:9] == [
+                    "initialized", "started", "stopped", "zero-request-recovery", "started",
+                    "reserved-before-upstream", "reserved-before-upstream",
+                    "unknown-charge-retained", "unknown-charge-retained"]:
+                raise Refusal("missing or malformed historical liability disposition event 10")
+            return None
+        require(len(rows) == 1 and rows[0]["id"] == 10,
+                "duplicate or misplaced historical liability disposition")
+        detail = decode(rows[0]["detail"])
+        require(isinstance(detail, dict)
+                and set(detail) == {
+                    "schemaVersion", "kind", "authorization", "authorizationSha256", "proof"},
+                "malformed historical liability disposition")
+        return detail["authorization"], detail["authorizationSha256"]
+
+    @classmethod
+    def _validate_disposition(cls, db, scope):
+        context = cls._disposition_context(db)
+        if context is None:
+            return None, None
+        authorization, authorization_sha256 = context
+        replay = disposition_module().validate_history(
+            cls._base_snapshot(db, scope),
+            authorization=authorization,
+            authorization_sha256=authorization_sha256,
+            target_binding=decode(scope["binding"]))
+        if scope["owner"] is not None:
+            disposition_module().validate_owner_binding(
+                scope["owner"], decode(scope["binding"]), replay["proofSha256"])
+        return context, replay
+
+    @staticmethod
+    def _halt_disposition_integrity(db, scope):
+        if scope["state"] in ("ready", "collecting"):
+            db.execute("UPDATE scope SET state='INCOMPLETE_POLICY' WHERE id=1")
+            RequestLedger.event(db, "stopped", None, {
+                "reason": "INCOMPLETE_POLICY",
+                "diagnostic": "DISPOSITION_INTEGRITY",
+            })
 
     @classmethod
     def require_next_slot(cls, db, scope, slot):
@@ -932,36 +1068,69 @@ class RequestLedger:
         require(len(terminals) < len(remaining) and slot == remaining[len(terminals)],
                 "gateway slot is duplicate, replaced, or out of registered order")
 
-    def start(self):
+    def start(self, expected_disposition_proof=None):
         owner = secrets.token_hex(32)
+        failure = None
         with self.transaction() as db:
-            row = db.execute("SELECT state FROM scope").fetchone()
-            require(row and row["state"] == "ready", "scope already started; no concurrent collector or reset")
-            db.execute("UPDATE scope SET state='collecting',owner=?", (owner,))
-            self.event(db, "started", None, {})
+            row = db.execute("SELECT * FROM scope").fetchone()
+            try:
+                context, replay = self._validate_disposition(db, row)
+                if context is not None:
+                    proof = decode(db.execute(
+                        "SELECT detail FROM events WHERE id=10").fetchone()["detail"])["proof"]
+                    require(expected_disposition_proof == proof
+                            or expected_disposition_proof is None
+                            and context[0]["evidenceMode"] == "SYNTHETIC_TEST_ONLY",
+                            "collector start does not match the registered disposition proof")
+                    owner += "." + disposition_module().owner_binding_identity(
+                        decode(row["binding"]), replay["proofSha256"])
+                else:
+                    require(expected_disposition_proof is None,
+                            "disposition proof supplied to a different scope")
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, row)
+                failure = error
+            if failure is None:
+                require(row and row["state"] == "ready",
+                        "scope already started; no concurrent collector or reset")
+                db.execute("UPDATE scope SET state='collecting',owner=?", (owner,))
+                self.event(db, "started", None, {})
+        if failure is not None:
+            raise Refusal(str(failure))
         return owner
 
     def reserve(self, owner, slot, request):
         request_id = secrets.token_hex(24)
         refused = False
+        failure = None
         with self.transaction() as db:
             row = db.execute("SELECT * FROM scope").fetchone()
-            require(row and row["owner"] == owner and row["state"] == "collecting",
-                    "budget scope is not collecting")
-            self.require_next_slot(db, row, slot)
-            exposure = db.execute("SELECT COALESCE(SUM(charge),0) AS total FROM requests").fetchone()["total"]
-            maximum = request["maximumMicroUsd"]
-            require(request["priceSha256"] == price_identity() and
-                    maximum == upper_cost(CONTEXT, integer(request["maxTokens"], OUTPUT)),
-                    "request reservation does not match implemented price bound")
-            if exposure + maximum > row["ceiling"]:
-                db.execute("UPDATE scope SET state='INCOMPLETE_BUDGET'")
-                self.event(db, "budget-refusal", None, {"requiredMicroUsd": maximum})
-                refused = True
-            else:
-                db.execute("INSERT INTO requests VALUES(?,?,?,?,?,'reserved',NULL,NULL)",
-                           (request_id, slot, canonical(request), maximum, maximum))
-                self.event(db, "reserved-before-upstream", request_id, {"maximumMicroUsd": maximum})
+            try:
+                self._validate_disposition(db, row)
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, row)
+                failure = error
+            if failure is None:
+                require(row and row["owner"] == owner and row["state"] == "collecting",
+                        "budget scope is not collecting")
+                self.require_next_slot(db, row, slot)
+                exposure = db.execute(
+                    "SELECT COALESCE(SUM(charge),0) AS total FROM requests").fetchone()["total"]
+                maximum = request["maximumMicroUsd"]
+                require(request["priceSha256"] == price_identity() and
+                        maximum == upper_cost(CONTEXT, integer(request["maxTokens"], OUTPUT)),
+                        "request reservation does not match implemented price bound")
+                if exposure + maximum > row["ceiling"]:
+                    db.execute("UPDATE scope SET state='INCOMPLETE_BUDGET'")
+                    self.event(db, "budget-refusal", None, {"requiredMicroUsd": maximum})
+                    refused = True
+                else:
+                    db.execute("INSERT INTO requests VALUES(?,?,?,?,?,'reserved',NULL,NULL)",
+                               (request_id, slot, canonical(request), maximum, maximum))
+                    self.event(db, "reserved-before-upstream", request_id,
+                               {"maximumMicroUsd": maximum})
+        if failure is not None:
+            raise Refusal(str(failure))
         require(not refused, "INCOMPLETE_BUDGET")
         return request_id
 
@@ -969,29 +1138,43 @@ class RequestLedger:
         require(diagnostic is None or cost is None, "failure diagnostic cannot reconcile a charge")
         if diagnostic is not None:
             validate_provider_diagnostic(diagnostic)
+        failure = None
         with self.transaction() as db:
             scope = db.execute("SELECT * FROM scope").fetchone()
-            require(scope and scope["owner"] == owner, "settlement owner differs")
-            row = db.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
-            require(row and row["state"] == "reserved", "unknown or duplicate settlement")
-            if cost is None:
-                db.execute("UPDATE requests SET state='unknown',reason='unreconciled-provider-charge' WHERE id=?",
-                           (request_id,))
-                db.execute("UPDATE scope SET state=CASE WHEN state='INCOMPLETE_BUDGET' THEN state "
-                           "ELSE 'INCOMPLETE_UNKNOWN_CHARGE' END")
-                self.event(db, "unknown-charge-retained", request_id,
-                           {} if diagnostic is None else {"diagnostic": diagnostic})
-            else:
-                require(type(cost) is int and 0 <= cost <= row["reserved"], "invalid reconciliation")
-                require(isinstance(usage, dict), "provider usage evidence required")
-                verified_cost, verified_receipt = reconciled_cost(
-                    decode(row["request"]), usage.get("model"), usage.get("usage"), usage.get("stopReason"))
-                require(cost == verified_cost and usage == verified_receipt,
-                        "settlement differs from complete provider usage")
-                db.execute("UPDATE requests SET state='reconciled',charge=?,usage=? WHERE id=?",
-                           (cost, canonical(usage), request_id))
-                self.event(db, "complete-provider-usage", request_id,
-                           {"conservativeChargeMicroUsd": cost, "releasedMicroUsd": row["reserved"] - cost})
+            try:
+                self._validate_disposition(db, scope)
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, scope)
+                failure = error
+            if failure is None:
+                require(scope and scope["owner"] == owner, "settlement owner differs")
+                row = db.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
+                require(row and row["state"] == "reserved", "unknown or duplicate settlement")
+                if cost is None:
+                    db.execute(
+                        "UPDATE requests SET state='unknown',"
+                        "reason='unreconciled-provider-charge' WHERE id=?", (request_id,))
+                    db.execute("UPDATE scope SET state=CASE WHEN state='INCOMPLETE_BUDGET' THEN state "
+                               "ELSE 'INCOMPLETE_UNKNOWN_CHARGE' END")
+                    self.event(db, "unknown-charge-retained", request_id,
+                               {} if diagnostic is None else {"diagnostic": diagnostic})
+                else:
+                    require(type(cost) is int and 0 <= cost <= row["reserved"],
+                            "invalid reconciliation")
+                    require(isinstance(usage, dict), "provider usage evidence required")
+                    verified_cost, verified_receipt = reconciled_cost(
+                        decode(row["request"]), usage.get("model"), usage.get("usage"),
+                        usage.get("stopReason"))
+                    require(cost == verified_cost and usage == verified_receipt,
+                            "settlement differs from complete provider usage")
+                    db.execute("UPDATE requests SET state='reconciled',charge=?,usage=? WHERE id=?",
+                               (cost, canonical(usage), request_id))
+                    self.event(db, "complete-provider-usage", request_id, {
+                        "conservativeChargeMicroUsd": cost,
+                        "releasedMicroUsd": row["reserved"] - cost,
+                    })
+        if failure is not None:
+            raise Refusal(str(failure))
 
     def stop(self, owner, reason, diagnostic=None):
         require(reason in ("INCOMPLETE_POLICY", "INCOMPLETE_INTERRUPTED", "INCOMPLETE_UNKNOWN_CHARGE"),
@@ -1016,25 +1199,34 @@ class RequestLedger:
     def complete_slot(self, owner, slot, evidence, exit_code, attempt=None):
         require(valid_client_exit(exit_code), "missing or interrupted client invocation")
         require(isinstance(evidence, dict), "trusted isolation evidence required")
+        failure = None
         with self.transaction() as db:
             scope = db.execute("SELECT * FROM scope").fetchone()
-            require(scope and scope["owner"] == owner and scope["state"] == "collecting",
-                    "incomplete scope cannot complete a slot")
-            if strict_terminal_lifecycle(decode(scope["binding"])):
-                validate_isolation_evidence(evidence)
-                validate_attempt_identity(
-                    attempt, evidence["authoritativeRoot"], slot, source_identities())
-            self.require_next_slot(db, scope, slot)
-            requests = db.execute("SELECT state FROM requests WHERE slot=?", (slot,)).fetchall()
-            require(requests and all(row["state"] == "reconciled" for row in requests),
-                    "slot lacks complete gateway-accounted requests")
-            detail = {"slot": slot, "clientExitCode": exit_code, "isolation": evidence}
-            if attempt is not None:
-                require(isinstance(attempt, dict) and attempt.get("kind") == ATTEMPT_START_KIND
-                        and attempt.get("slot") == slot and attempt.get("attemptNumber") == 1,
-                        "trusted attempt-start evidence required")
-                detail["attempt"] = attempt
-            self.event(db, "slot-complete", None, detail)
+            try:
+                self._validate_disposition(db, scope)
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, scope)
+                failure = error
+            if failure is None:
+                require(scope and scope["owner"] == owner and scope["state"] == "collecting",
+                        "incomplete scope cannot complete a slot")
+                if strict_terminal_lifecycle(decode(scope["binding"])):
+                    validate_isolation_evidence(evidence)
+                    validate_attempt_identity(
+                        attempt, evidence["authoritativeRoot"], slot, source_identities())
+                self.require_next_slot(db, scope, slot)
+                requests = db.execute("SELECT state FROM requests WHERE slot=?", (slot,)).fetchall()
+                require(requests and all(row["state"] == "reconciled" for row in requests),
+                        "slot lacks complete gateway-accounted requests")
+                detail = {"slot": slot, "clientExitCode": exit_code, "isolation": evidence}
+                if attempt is not None:
+                    require(isinstance(attempt, dict) and attempt.get("kind") == ATTEMPT_START_KIND
+                            and attempt.get("slot") == slot and attempt.get("attemptNumber") == 1,
+                            "trusted attempt-start evidence required")
+                    detail["attempt"] = attempt
+                self.event(db, "slot-complete", None, detail)
+        if failure is not None:
+            raise Refusal(str(failure))
 
     def complete_invalid_slot(
             self, owner, slot, run_directory, authoritative_root, evidence, expected_sources):
@@ -1043,26 +1235,54 @@ class RequestLedger:
                 "terminal-invalid completion requires the current registered producer sources")
         terminal = validate_terminal_attempt(
             run_directory, authoritative_root, slot, expected_sources)
+        failure = None
         with self.transaction() as db:
             scope = db.execute("SELECT * FROM scope").fetchone()
-            require(scope and scope["owner"] == owner and scope["state"] == "collecting",
-                    "incomplete scope cannot terminally account an invalid slot")
-            require(strict_terminal_lifecycle(decode(scope["binding"])),
-                    "terminal-invalid lifecycle is not source-bound by this scope")
-            self.require_next_slot(db, scope, slot)
-            requests = db.execute(
-                "SELECT state,reason FROM requests WHERE slot=?", (slot,)).fetchall()
-            require(all(row["state"] == "reconciled" and row["reason"] is None for row in requests),
-                    "terminal-invalid slot has in-flight or unknown charge")
-            self.event(db, TERMINAL_INVALID_EVENT, None, {
-                "slot": slot,
-                "clientExitCode": terminal["clientExitCode"],
-                "isolation": evidence,
-                "terminal": terminal,
-            })
+            try:
+                self._validate_disposition(db, scope)
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, scope)
+                failure = error
+            if failure is None:
+                require(scope and scope["owner"] == owner and scope["state"] == "collecting",
+                        "incomplete scope cannot terminally account an invalid slot")
+                require(strict_terminal_lifecycle(decode(scope["binding"])),
+                        "terminal-invalid lifecycle is not source-bound by this scope")
+                self.require_next_slot(db, scope, slot)
+                requests = db.execute(
+                    "SELECT state,reason FROM requests WHERE slot=?", (slot,)).fetchall()
+                require(all(row["state"] == "reconciled" and row["reason"] is None
+                            for row in requests),
+                        "terminal-invalid slot has in-flight or unknown charge")
+                self.event(db, TERMINAL_INVALID_EVENT, None, {
+                    "slot": slot,
+                    "clientExitCode": terminal["clientExitCode"],
+                    "isolation": evidence,
+                    "terminal": terminal,
+                })
+        if failure is not None:
+            raise Refusal(str(failure))
         return terminal
 
     def complete(self, owner):
+        context = None
+        failure = None
+        with self.transaction() as db:
+            row = db.execute("SELECT * FROM scope").fetchone()
+            try:
+                context, _ = self._validate_disposition(db, row)
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, row)
+                failure = error
+        if failure is not None:
+            raise Refusal(str(failure))
+        if context is not None:
+            authorization, authorization_sha256 = context
+            return disposition_module().complete_scope(
+                self.path, owner,
+                authorization=authorization,
+                authorization_sha256=authorization_sha256,
+                target_binding=decode(row["binding"]))
         with self.transaction() as db:
             row = db.execute("SELECT * FROM scope").fetchone()
             require(row and row["owner"] == owner and row["state"] == "collecting",
@@ -1093,35 +1313,30 @@ class RequestLedger:
             self.event(db, "collection-complete", None, detail)
 
     def snapshot(self):
+        failure = None
+        replay = None
         with self.transaction() as db:
-            scope = dict(db.execute("SELECT * FROM scope").fetchone())
-            requests = [dict(row) for row in db.execute(
-                "SELECT id,slot,request,reserved,charge,state,reason,usage FROM requests ORDER BY rowid")]
-            events = [dict(row) for row in db.execute("SELECT * FROM events ORDER BY id")]
-        binding = decode(scope["binding"])
-        result = {
-            "kind": KIND, "state": scope["state"], "binding": binding,
-            "ceilingMicroUsd": scope["ceiling"],
-            "exposureMicroUsd": sum(row["charge"] for row in requests),
-            "requests": requests, "events": events, "verdict": None,
-            "basis": "request reservations; only validated complete provider usage permits release",
-        }
-        if strict_terminal_lifecycle(binding):
-            preserved = []
-            valid = 0
-            invalid = 0
-            for event in events:
-                if event["kind"] == "zero-request-recovery":
-                    preserved = decode(event["detail"])["preservedAttemptedSlots"]
-                elif event["kind"] == "slot-complete":
-                    valid += 1
-                elif event["kind"] == TERMINAL_INVALID_EVENT:
-                    invalid += 1
+            scope = db.execute("SELECT * FROM scope").fetchone()
+            try:
+                _, replay = self._validate_disposition(db, scope)
+            except (Refusal, ValueError, KeyError, TypeError) as error:
+                self._halt_disposition_integrity(db, scope)
+                failure = error
+            result = self._base_snapshot(db)
+        if failure is not None:
+            raise Refusal(str(failure))
+        if replay is not None:
             result.update(
-                accountedSlots=len(preserved) + valid + invalid,
-                validCompletedSlots=valid,
-                invalidTerminalSlots=len(preserved) + invalid,
-                requestBearingSlots=len({row["slot"] for row in requests}),
+                permanentUnknownMicroUsd=replay["permanentUnknownMicroUsd"],
+                actualCost=replay["actualCost"],
+                historicalUnknownRequestCount=replay["historicalUnknownRequestCount"],
+                historicalUnknownRequestIds=replay["historicalUnknownRequestIds"],
+                historicalSourceEpochIds=replay["historicalSourceEpochIds"],
+                historicalPreservedSlots=replay["historicalPreservedSlots"],
+                liveUnknownRequestCount=replay["liveUnknownRequestCount"],
+                liveUnknownRequestIds=replay["liveUnknownRequestIds"],
+                liveReservedRequestCount=replay["liveReservedRequestCount"],
+                remainingNonterminalSlots=replay["remainingNonterminalSlots"],
             )
         return result
 

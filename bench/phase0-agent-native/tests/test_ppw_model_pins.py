@@ -97,6 +97,9 @@ class ProspectiveModelPinsTests(unittest.TestCase):
             "ppw-gateway-recovery.py", "ppw-gateway-recover.py",
             "ppw-gateway-register-recovery.py", "ppw-gateway-register-terminal.py",
             "gateway-tools/bash-env.sh",
+            "ppw-gateway-disposition.py", "ppw-gateway-disposition-registration.py",
+            "ppw-gateway-dispose.py", "ppw-gateway-register-disposition.py",
+            "ppw-gateway-progress.py",
         }, set(current))
         self.assertNotEqual(current, gateway["replacementHarnessArtifacts"])
         self.assertEqual(15, len(amendment["replacementHarnessArtifacts"]))

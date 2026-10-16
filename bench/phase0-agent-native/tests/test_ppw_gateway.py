@@ -190,6 +190,15 @@ class PriceTests(Fixture):
         self.assertEqual(863, budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")[0])
         counters.update(speed="fast", inference_geo="us")
         self.assertEqual(1898, budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")[0])
+        not_available = dict(counters, inference_geo="not_available")
+        cost, receipt = budget.reconciled_cost(
+            request, budget.MODEL, not_available, "end_turn")
+        self.assertEqual(1898, cost)
+        self.assertEqual("not_available", receipt["usage"]["inference_geo"])
+        policy = budget.price_contract()["dataResidencyPolicy"]
+        self.assertEqual(["global", "us"], policy["requestValues"])
+        self.assertEqual(["global", "us", "not_available"], policy["responseValues"])
+        self.assertIn("data-residency", policy["source"])
 
     def test_service_tier_uses_published_categories_and_honors_standard_only(self):
         automatic = budget.admit_request(body())
@@ -297,6 +306,21 @@ class PriceTests(Fixture):
             tracker.feed(malformed)
             with self.assertRaises(budget.Refusal):
                 tracker.finish()
+
+    def test_message_delta_allows_only_absent_or_null_new_optional_fields(self):
+        request = budget.admit_request(body(stream=True))
+        chunks = stream_bytes()
+        chunks[-2] = event({
+            "type": "message_delta",
+            "delta": {
+                "stop_reason": "end_turn", "stop_sequence": None,
+                "container": None, "stop_details": None,
+            },
+            "usage": {"output_tokens": 7},
+        })
+        tracker = budget.UsageStream(request)
+        tracker.feed(b"".join(chunks))
+        self.assertEqual(expected_charge(), tracker.finish()[0])
 
 
 class AdmissionTests(Fixture):
