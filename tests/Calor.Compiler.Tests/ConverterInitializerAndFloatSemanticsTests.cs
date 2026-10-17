@@ -1,0 +1,300 @@
+using System.Globalization;
+using System.Reflection;
+using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Xunit;
+
+namespace Calor.Compiler.Tests;
+
+/// <summary>
+/// #1524 (object initializers) and #1528 (whole-number double literals): convert C#
+/// to Calor, compile the Calor, run both programs and compare the observed result,
+/// including side-effect order. A case is either native (no interop loss) or kept as
+/// C# with a reported <c>object-initializer</c> loss; it is never dropped.
+/// </summary>
+public sealed class ConverterInitializerAndFloatSemanticsTests
+{
+    private const string Types = """
+        private static string Use(P p) => Trace + p.A;
+        public class Inner { public int X { get; set; } = 1; public string Keep = "keep"; }
+        public class P
+        {
+            public P() { Migrated.Trace += "k"; L.Add(0); }
+            public P(int seed) { Migrated.Trace += "k" + seed; }
+            public P(List<int> l) { Migrated.Trace += "kl"; L = l; }
+            public int A { get; set; }
+            public int B;
+            public Inner Inner { get; } = new Inner();
+            public Inner? Other { get; set; }
+            public List<int> L { get; set; } = new List<int>();
+        }
+        public static int Counter;
+        public static int Capacity;
+        public class PI { public PI() { Migrated.Counter = 10; } public int A; }
+        public class V { public static implicit operator V(int n) { Migrated.Trace += "v"; return new V(); } }
+        public class PV { public PV() { Migrated.Trace += "k"; } public List<V>? L; }
+        public class Q2 { public Q2() { Migrated.Trace += "q"; } public int A = 5; }
+        public static int Ignored, Ci, Cj;
+        public class PF { public Func<int>? F; public int A, B; }
+        private static int UseF(int x, int y, object p) => 100 * Ci + 10 * Cj + ((PF)p).A;
+        public class PB { public bool B; }
+        private static bool Get(out int x) { x = 7; return true; }
+        public class PQ { public PQ(Q2 q) { Migrated.Trace += "k"; } public Func<int>? F; }
+        """;
+
+    private const string Holder = """
+        public class H { public P Prop { get; } = new P { A = 1 }; public P Field = new P { A = 2, B = 3 }; }
+        """;
+
+    public static TheoryData<string, string, bool> InitializerCases => new()
+    {
+        // Native §NEW: constructor argument, constructor body, then members in source order.
+        { "var p = new P(T(\"c\", 1)) { A = T(\"a\", 2), B = T(\"b\", 3) }; return Trace + p.A + p.B;", "ck1ab23", false },
+        { "var p = new P(T(\"c\", 1)) { Other = new Inner { X = T(\"x\", 3) } }; return Trace + p.Other!.X;", "ck1x3", false },
+        { "var sb = new StringBuilder { Capacity = 20 }; return sb.Capacity;", "20", false },
+        { "var sb = new StringBuilder(\"ab\") { Capacity = 20 }; return sb.Capacity + sb.ToString();", "20ab", false },
+        { "return Use(new() { A = T(\"a\", 4) });", "ka4", false },
+        // An object initializer on List<T> sets members; it is not a collection initializer.
+        { "var l = new List<int> { Capacity = 20 }; return l.Count + \":\" + l.Capacity + \":\" + Capacity;", "0:20:0", false },
+        // Kept as C#: forms §NEW cannot express.
+        { "var l = new List<int>(4) { T(\"x\", 1), 2 }; return Trace + l.Count + l[0];", "x21", true },
+        { "List<int> l = new() { 1, 2 }; return l.Count;", "2", true },
+        { "var p = new P { Inner = { X = 7 } }; return Trace + p.Inner.X + p.Inner.Keep;", "k7keep", true },
+        { "var p = new P { L = { 5 } }; return Trace + string.Join(\",\", p.L);", "k0,5", true },
+        { "var p = new P(T(\"c\", 1)) { L = new List<int> { T(\"l\", 5) } }; return Trace + p.L[0];", "ck1l5", true },
+        { "var q = new P(7); q = new() { L = new List<int> { 5 } }; return Trace + string.Join(\",\", q.L);", "k7k5", true },
+        { "return X() + \"|\" + $\"{Y()}{new P { A = A5() }.A}\" + Trace;", "1|25xyka", true },
+        { "var text = $\"{X()}{new P { A = 5 }.A}\"; return text + Trace;", "15xk", true },
+        // Values that need a hoisted statement would run before the constructor.
+        { "var p = new P { L = new List<int> { 1, 2 } }; return Trace + string.Join(\",\", p.L);", "k1,2", true },
+        { "Counter = 0; var p = new PI { A = Counter++ }; return p.A + \":\" + Counter;", "10:11", true },
+        { "var p = new PV { L = new List<V> { 1 } }; return Trace + p.L!.Count;", "kv1", true },
+        { "var q = new P(7); q = new() { L = (new List<int> { 5 }) }; return Trace + string.Join(\",\", q.L);", "k7k5", true },
+        // Rollback restores the hoist queue even after a block lambda cleared it.
+        { "Ci = 0; Cj = 0; return UseF(Ignored = 0, Ignored = 0, new PF { F = () => { return 0; }, A = Ci++, B = Cj++ });", "110", true },
+        // The Calor emitter would hoist the receiver `new Q2()` ahead of P's constructor.
+        { "var p = new P { A = new Q2().A }; return Trace + p.A;", "kq5", true },
+        // A collection constructor argument would lose its elements (new List<int>(5)).
+        { "var q = new P(7); q = new(new List<int> { 5 }) { A = 1 }; return Trace + q.L.Count + q.A;", "k7kl11", true },
+        { "var q = new P(7); q = new() { A = new Q2().A }; return Trace + q.A;", "k7kq5", true },
+        // A declaration-only hoist (out int x) evaluates nothing; x stays visible.
+        { "var p = new PB { B = Get(out int x) }; return x + \":\" + p.B;", "7:True", false },
+        // A block lambda no longer discards the constructor argument's hoist.
+        { "var p = new PQ(new Q2()) { F = () => { return 0; } }; return Trace + p.F!();", "qk0", true },
+    };
+
+    [Theory]
+    [MemberData(nameof(InitializerCases))]
+    public void ObjectInitializers_PreserveBehaviorOrReportLoss(string body, string expected, bool preserved)
+    {
+        var conversion = AssertEquivalent(body, expected);
+        var initializerLosses = conversion.Losses.Where(loss => loss.Feature == "object-initializer").ToList();
+        if (preserved)
+            Assert.Contains(initializerLosses, loss =>
+                loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
+        else
+            Assert.Empty(initializerLosses);
+    }
+
+    [Fact]
+    public void AutoPropertyDefault_StaysOneObject()
+    {
+        // The getter used to rebuild the object on every read via `set_A` calls,
+        // which did not compile (CS0571) and would have discarded `h.Prop.A = 9`.
+        var conversion = AssertEquivalent(
+            "var h = new H(); h.Prop.A = 9; return Trace + h.Prop.A + h.Field.A + h.Field.B;",
+            "kk923", Types + Holder);
+        Assert.DoesNotContain("_objInit", conversion.CalorSource);
+        Assert.DoesNotContain(conversion.Losses, loss => loss.Feature == "object-initializer");
+    }
+
+    [Fact]
+    public void CollectionConstructorArgument_IsPreservedNotTruncated()
+    {
+        var conversion = AssertEquivalent("var q = new P(new List<int> { 5 }); return Trace + q.L.Count;", "kl1");
+        Assert.Contains(conversion.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "collection-initializer");
+    }
+
+    [Fact]
+    public void StringBuilderWithoutInitializer_StaysNative()
+    {
+        var conversion = AssertEquivalent("var sb = new StringBuilder(\"ab\"); return sb.ToString();", "ab");
+        Assert.Contains("(sb-new \"ab\")", conversion.CalorSource);
+    }
+
+    [Fact]
+    public void ObjectInitializer_KeepsMembersInNewBlock()
+    {
+        var conversion = AssertEquivalent("var sb = new StringBuilder { Capacity = 20 }; return sb.Capacity;", "20");
+        Assert.Contains("Capacity = 20", conversion.CalorSource);
+        Assert.DoesNotContain("(sb-new)", conversion.CalorSource);
+    }
+
+    public static TheoryData<string, string> FloatCases => new()
+    {
+        { "int n = 5; return n / 2.0;", "Double:2.5" },
+        { "return 1 / 2.0;", "Double:0.5" },
+        { "return default(double) + 1 / 2.0;", "Double:0.5" },
+        { "return default(float) + 2f;", "Single:2" },
+        { "return default(decimal) + 2m;", "Decimal:2" },
+        { "int n = 5; return n / 1e2;", "Double:0.05" },
+        { "int n = -3; return n / -2.0;", "Double:1.5" },
+        { "int n = 1; return n / 1e20;", "Double:1E-20" },
+        { "int n = 1; return n / 3f;", "Single:0.33333334" },
+        { "int n = 5; return n / 2.0m;", "Decimal:2.5" },
+        { "int n = 5; return $\"{n / 2.0}\";", "String:2.5" },
+        // Negative control: an integer literal keeps integer division.
+        { "int n = 5; return n / 2;", "Int32:2" },
+    };
+
+    [Theory]
+    [MemberData(nameof(FloatCases))]
+    public void WholeNumberFloatLiterals_KeepFloatingDivision(string body, string expected) =>
+        AssertEquivalent(body, expected, types: "", typed: true);
+
+    [Fact]
+    public void PreservedTargetTypedNew_SpellsOutItsType()
+    {
+        // The hoisted argument binding has no declared type, so a preserved `new()`
+        // would have no target type in C# (CS8754).
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            using System;
+            using System.Collections.Generic;
+            public class Migrated
+            {
+                public static string Trace = "";
+                public static object Probe() { return Use(new() { A = new Q2().A }); }
+                {{Types}}
+            }
+            """);
+        Assert.Contains("§CS{new P() { A = new Q2().A }}", conversion.CalorSource);
+        Assert.DoesNotContain("§CS{new()", conversion.CalorSource);
+        Assert.Contains(conversion.Losses, loss => loss.Feature == "object-initializer");
+    }
+
+    [Fact]
+    public void DefaultOfAliasedName_UsesTheResolvedType() =>
+        AssertEquivalent("return default(Single);", "Int32:0", types: "", typed: true,
+            usings: "using Single = System.Int32;");
+
+    [Fact]
+    public void AttributeFloatArguments_KeepTheirOverload()
+    {
+        const string attributes = """
+            public class KindAttribute : Attribute
+            {
+                private readonly string _value;
+                public KindAttribute(int x) { _value = "int"; }
+                public KindAttribute(double x) { _value = "double"; }
+                public KindAttribute(float x) { _value = "float"; }
+                public override string ToString() => _value;
+            }
+            [Kind(2.0)] public class MD { }
+            [Kind(2f)] public class MF { }
+            [Kind(2)] public class MI { }
+            """;
+        AssertEquivalent(
+            "return typeof(MD).GetCustomAttributes(false)[0] + \",\" + typeof(MF).GetCustomAttributes(false)[0] + \",\" + typeof(MI).GetCustomAttributes(false)[0];",
+            "double,float,int", types: attributes);
+    }
+
+    [Theory]
+    [InlineData(2.0, false, "2.0")]
+    [InlineData(-2.0, false, "-2.0")]
+    [InlineData(100.0, false, "100.0")]
+    [InlineData(1e20, false, "1E+20")]
+    [InlineData(0.5, false, "0.5")]
+    [InlineData(2.0, true, "SINGLE:2")]
+    public void FloatLiteral_EmitsLexerFloatForm(double value, bool single, string expected)
+    {
+        var node = new FloatLiteralNode(new TextSpan(0, 0, 1, 1), value) { IsSingle = single };
+        var emitted = new CalorEmitter().Visit(node);
+        Assert.Equal(expected, emitted);
+
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(emitted, diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        Assert.Equal(TokenKind.FloatLiteral, tokens[0].Kind);
+    }
+
+    [Theory]
+    [InlineData(double.MaxValue)]
+    [InlineData(double.Epsilon)]
+    [InlineData(123456789012345.0)]
+    [InlineData(-0.0)]
+    public void FloatLiteral_RoundTripsValueThroughLexer(double value)
+    {
+        var emitted = new CalorEmitter().Visit(new FloatLiteralNode(new TextSpan(0, 0, 1, 1), value));
+        var diagnostics = new DiagnosticBag();
+        var expression = new Parser(new Lexer($"§M{{m:R}}\n  §F{{f:V:pub}} () -> f64\n    §R {emitted}", diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, emitted + ": " + string.Join(Environment.NewLine, diagnostics.Errors));
+        var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(expression.Functions).Body[0]).Expression;
+        var literal = returned switch
+        {
+            FloatLiteralNode floating => floating.Value,
+            UnaryOperationNode { Operand: FloatLiteralNode floating } => -floating.Value,
+            _ => throw new Xunit.Sdk.XunitException($"{emitted} parsed as {returned?.GetType().Name}")
+        };
+        Assert.Equal(BitConverter.DoubleToInt64Bits(value), BitConverter.DoubleToInt64Bits(literal));
+    }
+
+    private static ConversionResult AssertEquivalent(
+        string body, string expected, string types = Types, bool typed = false, string usings = "")
+    {
+        var source = $$"""
+            using System;
+            using System.Collections.Generic;
+            using System.Text;
+            {{usings}}
+            public class Migrated
+            {
+                public static string Trace = "";
+                private static int T(string tag, int value) { Trace += tag; return value; }
+                private static int X() { Trace += "x"; return 1; }
+                private static int Y() { Trace += "y"; return 2; }
+                private static int A5() { Trace += "a"; return 5; }
+                public static object Probe() { {{body}} }
+                {{types}}
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success,
+            string.Join("; ", conversion.Issues.Select(issue => issue.Message)) + "\n" + conversion.CalorSource);
+        Assert.DoesNotContain(conversion.Losses, loss => loss.Kind == ConversionLossKind.Dropped);
+        // Effect enforcement is off: member access on the test's own classes reports
+        // effect 'unknown' (Calor0410) independently of the behavior compared here.
+        var compiled = Program.Compile(conversion.CalorSource!, "initializers.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            EnforceEffects = false,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.False(compiled.HasErrors,
+            string.Join("; ", compiled.Diagnostics.Errors) + "\n" + conversion.CalorSource);
+        Assert.Equal(expected, Observe(source, typed));
+        Assert.Equal(expected, Observe(compiled.GeneratedCode, typed));
+        return conversion;
+    }
+
+    private static string Observe(string source, bool typed)
+    {
+        var compilation = CSharpCompilation.Create("InitializerOracle_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + source)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emit = compilation.Emit(image);
+        Assert.True(emit.Success, string.Join("; ", emit.Diagnostics) + "\n" + source);
+        var value = Assembly.Load(image.ToArray()).GetTypes().Single(type => type.Name == "Migrated")
+            .GetMethod("Probe")!.Invoke(null, null)!;
+        var text = Convert.ToString(value, CultureInfo.InvariantCulture)!;
+        return typed ? value.GetType().Name + ":" + text : text;
+    }
+}

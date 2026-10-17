@@ -935,6 +935,14 @@ public sealed class NewExpressionNode : ExpressionNode
     /// </summary>
     public IReadOnlyList<ObjectInitializerAssignment> Initializers { get; }
 
+    /// <summary>
+    /// #1524: the original C# of a converted creation with an object initializer. The
+    /// Calor emitter falls back to it (as <c>§CS{...}</c>, with a reported loss) when an
+    /// initializer value can only be emitted by hoisting a statement ahead of the
+    /// constructor, which would change evaluation order.
+    /// </summary>
+    public string? CSharpSource { get; init; }
+
     public NewExpressionNode(
         TextSpan span,
         string typeName,
