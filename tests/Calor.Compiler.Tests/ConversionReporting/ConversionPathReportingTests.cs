@@ -175,7 +175,9 @@ public class ConversionPathReportingTests : IDisposable
     {
         foreach (var options in new[] { new ConversionOptions(), new ConversionOptions { RescueUnusableMembers = true, PassthroughOnError = true } })
         {
-            var result = Convert(Fixture("F3-LOCAL-01"), options);
+            // 0.25 F3 (#847): F3-LOCAL-01 now converts natively; F3-LOCAL-04 holds the
+            // local-function shapes outside the native slice, which stay converter interop.
+            var result = Convert(Fixture("F3-LOCAL-04"), options);
             Assert.NotEmpty(result.Losses);
             Assert.All(result.Losses, l =>
             {
@@ -555,9 +557,11 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public async Task F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger()
     {
-        var (isError, payload) = await Mcp("calor_convert", new { source = Fixture("F3-LOCAL-01") });
+        // 0.25 F3 (#847): F3-LOCAL-04 (out-of-slice local functions) stays interop.
+        var (isError, payload) = await Mcp("calor_convert", new { source = Fixture("F3-LOCAL-04") });
 
         Assert.False(isError);
+        Assert.NotEmpty(payload.GetProperty("lossSummary").GetProperty("locations").EnumerateArray());
         foreach (var location in payload.GetProperty("lossSummary").GetProperty("locations").EnumerateArray())
         {
             Assert.Equal("interop", location.GetProperty("path").GetString());

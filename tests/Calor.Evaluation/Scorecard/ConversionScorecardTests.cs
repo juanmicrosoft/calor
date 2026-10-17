@@ -21,7 +21,8 @@ public class ConversionScorecardTests
     // baseline.json by NoRegressionsVsCommittedBaseline.
     // #1132 (0.25 F5): 93 -> 94 fully converted and 97 -> 98 round-trip, both improvements
     // (array expressions convert and round-trip natively).
-    private const int BASELINE_FULLY_CONVERTED = 94;
+    // 0.25 F3 (#847): 94 -> 95 fully converted, 074_LocalFunctions converts natively in place.
+    private const int BASELINE_FULLY_CONVERTED = 95;
     private const int BASELINE_ROUNDTRIP = 98;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
@@ -120,14 +121,16 @@ public class ConversionScorecardTests
     }
 
     [Fact]
-    public void LocalFunctionInterop_IsNotReportedAsNativeFeatureConversion()
+    public void NonCapturingLocalFunctions_AreReportedAsNativeFeatureConversion()
     {
+        // 0.25 F3 (#847): 074's local functions are non-capturing, so they convert
+        // in place natively; the interop case is covered by LocalFunctionConversionTests.
         Assert.Contains("local_function", Scorecard.ByFeature);
         var localFunctions = Scorecard.ByFeature["local_function"];
 
         Assert.Equal(1, localFunctions.Total);
-        Assert.Equal(0, localFunctions.Passed);
-        Assert.Equal(0, localFunctions.Rate);
+        Assert.Equal(1, localFunctions.Passed);
+        Assert.Equal(1, localFunctions.Rate);
     }
 
     [Fact]
