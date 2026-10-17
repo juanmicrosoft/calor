@@ -2,7 +2,7 @@
 
 <!-- Generated from eng/ast-schema.json by calor self-check docs --fix. Do not edit by hand. -->
 
-The AST schema contains **184** node types. This is a structural inventory, not a claim that every node supports every compiler stage.
+The AST schema contains **185** node types. This is a structural inventory, not a claim that every node supports every compiler stage.
 
 Regenerate with `calor self-check docs --fix`. The drift gate compares this entire page with the schema-derived output.
 
@@ -106,6 +106,7 @@ Regenerate with `calor self-check docs --fix`. The drift gate compares this enti
 | `ListCreationNode` | [`CollectionNodes.cs`](../../src/Calor.Compiler/Ast/CollectionNodes.cs) |
 | `ListPatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `LiteralPatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
+| `LocalFunctionStatementNode` | [`FunctionNode.cs`](../../src/Calor.Compiler/Ast/FunctionNode.cs) |
 | `LockNode` | [`MetadataNodes.cs`](../../src/Calor.Compiler/Ast/MetadataNodes.cs) |
 | `MatchCaseNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `MatchExpressionNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |

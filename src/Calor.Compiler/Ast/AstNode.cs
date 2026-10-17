@@ -242,6 +242,7 @@ public interface IAstVisitor
     void Visit(ProofObligationNode node);
     void Visit(IndexedTypeNode node);
     void Visit(SyncBlockNode node);
+    void Visit(LocalFunctionStatementNode node);
 }
 
 public interface IAstVisitor<T>
@@ -430,6 +431,7 @@ public interface IAstVisitor<T>
     T Visit(ProofObligationNode node);
     T Visit(IndexedTypeNode node);
     T Visit(SyncBlockNode node);
+    T Visit(LocalFunctionStatementNode node);
 }
 
 public sealed record AstNodeSchemaEntry(
@@ -625,6 +627,7 @@ public static class AstSchemaMetadata
         Create<ProofObligationNode>("RefinementNodes.cs"),
         Create<IndexedTypeNode>("RefinementNodes.cs"),
         Create<SyncBlockNode>("UnsafeNodes.cs"),
+        Create<LocalFunctionStatementNode>("FunctionNode.cs"),
     ];
 
     public static IReadOnlyList<Type> NodeTypes { get; } =
@@ -854,6 +857,7 @@ internal static class AstVisitorDispatch
             case ProofObligationNode typed: visitor.Visit(typed); return;
             case IndexedTypeNode typed: visitor.Visit(typed); return;
             case SyncBlockNode typed: visitor.Visit(typed); return;
+            case LocalFunctionStatementNode typed: visitor.Visit(typed); return;
             default:
                 throw new InvalidOperationException(
                     $"AST node '{node.GetType().FullName}' is absent from eng/ast-schema.json.");
@@ -1050,6 +1054,7 @@ internal static class AstVisitorDispatch
             ProofObligationNode typed => visitor.Visit(typed),
             IndexedTypeNode typed => visitor.Visit(typed),
             SyncBlockNode typed => visitor.Visit(typed),
+            LocalFunctionStatementNode typed => visitor.Visit(typed),
             _ => throw new InvalidOperationException(
                 $"AST node '{node.GetType().FullName}' is absent from eng/ast-schema.json.")
         };

@@ -159,6 +159,10 @@ public static class DiagnosticCode
     /// </summary>
     public const string YieldRequiresValue = "Calor0210";
 
+    /// <summary>Error (0.25 F3, #847): a local function (nested <c>§F</c>) misplaced or
+    /// with effects, contracts, rows, generics, refinement types, yields or §PROOF.</summary>
+    public const string UnsupportedLocalFunction = "Calor0211";
+
     // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
     /// <summary>

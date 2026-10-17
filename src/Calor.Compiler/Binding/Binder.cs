@@ -669,6 +669,8 @@ public sealed class Binder
         _symbolsById.Clear();
         _symbolOrder.Clear();
         _declarationIdOccurrences.Clear();
+        _localFunctionSymbols.Clear();
+        _boundLocalFunctions.Clear();
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
@@ -696,6 +698,8 @@ public sealed class Binder
 
         foreach (var cls in module.Classes)
             BindClassMembers(cls, functions);
+
+        functions.AddRange(_boundLocalFunctions);
 
         return new BoundModule(
             module.Span,
@@ -1409,9 +1413,98 @@ public sealed class Binder
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
+    private readonly HashSet<FunctionSymbol> _localFunctionSymbols = new(ReferenceEqualityComparer.Instance);
+    private readonly List<BoundFunction> _boundLocalFunctions = new();
+
+    /// <summary>0.25 F3 (#847): declares a body's local functions in a scope between the
+    /// host and the body scope; returns the body scope's parent.</summary>
+    private Scope DeclareLocalFunctions(
+        IReadOnlyList<StatementNode> body,
+        SymbolId enclosing,
+        out List<(FunctionNode Node, FunctionSymbol Symbol)> locals)
+    {
+        locals = [];
+        var scope = _scope;
+        foreach (var local in body.OfType<LocalFunctionStatementNode>())
+        {
+            if (locals.Count == 0)
+                scope = _scope.CreateChild();
+            var function = local.Function;
+            var symbol = CreateFunctionSymbol(
+                CreateDeclarationId(enclosing, "localfunction", function.Id, function.Name),
+                function.Name,
+                function.Output?.TypeName ?? "VOID",
+                Array.Empty<string>(),
+                function.Parameters,
+                function.IdentifierSpan,
+                Visibility.Private,
+                containingTypeName: null,
+                definitionSpan: function.Span,
+                output: function.Output);
+            _localFunctionSymbols.Add(symbol);
+            if (!scope.TryDeclareOverload(function.Name, symbol, out var duplicate))
+                ReportDuplicateSignature(function.Span, function.Name, symbol, duplicate);
+            locals.Add((function, symbol));
+        }
+        return scope;
+    }
+
+    /// <summary>Binds each local body as a static callable blind to the enclosing locals.</summary>
+    private void BindLocalFunctions(
+        List<(FunctionNode Node, FunctionSymbol Symbol)> locals,
+        Scope localFunctionScope,
+        SymbolId enclosing)
+    {
+        foreach (var (function, symbol) in locals)
+        {
+            var outerFlowNarrowings = _flowNarrowingSources.ToArray();
+            var outerCallableState = CaptureCallableState();
+            var outerCallableWrites = _deferredCallableWrites;
+            _deferredCallableWrites = [];
+            _flowNarrowingSources.Clear();
+            try
+            {
+                var bodyScope = localFunctionScope.CreateChild();
+                using var _s = PushScope(bodyScope);
+                using var _c = PushStaticContext(true);
+                using var _identity = PushDeclarationContext(symbol.Id);
+                using var _returnCtx = PushReturnTypeContext(symbol.ReturnType);
+                DeclareParameters(symbol.Parameters, function.Parameters);
+                var body = BindStatements(function.Body);
+                _boundLocalFunctions.Add(new BoundFunction(function.Span, symbol, body, bodyScope,
+                    Array.Empty<string>(), BoundMemberKind.LocalFunction, containingTypeName: null)
+                {
+                    EnclosingSymbolId = enclosing
+                });
+            }
+            finally
+            {
+                _flowNarrowingSources.Clear();
+                foreach (var (narrowed, source) in outerFlowNarrowings)
+                    _flowNarrowingSources[narrowed] = source;
+                RestoreCallableState(outerCallableState);
+                _deferredCallableWrites = outerCallableWrites;
+            }
+        }
+    }
+
+    /// <summary>0.25 F3 (#847): C# lookup stops at a visible local function even when
+    /// its overload check fails here, so the call still names it.</summary>
+    private IReadOnlyList<FunctionSymbol> WithLocalFunctionCandidates(
+        string target,
+        IReadOnlyList<FunctionSymbol> resolved)
+    {
+        if (resolved.Count > 0 || target.Contains('.'))
+            return resolved;
+        var locals = _scope.GetOverloads(target).Where(_localFunctionSymbols.Contains).ToArray();
+        return locals.Length > 0 ? locals : resolved;
+    }
+
     private BoundFunction BindFunction(FunctionNode func)
     {
-        var functionScope = _scope.CreateChild();
+        var localFunctionScope = DeclareLocalFunctions(
+            func.Body, _functionSymbols[func].Id, out var localFunctions);
+        var functionScope = localFunctionScope.CreateChild();
         using var _ = PushScope(functionScope);
         // v0.17 R2, round-4 finding — a module-level generic function's type
         // parameters are declared on the FUNCTION; without this push
@@ -1432,6 +1525,7 @@ public sealed class Binder
 
             // Bind body
             var boundBody = BindStatements(func.Body);
+            BindLocalFunctions(localFunctions, localFunctionScope, functionSymbol.Id);
 
             // Extract declared effects for taint analysis
             var declaredEffects = ExtractEffects(func);
@@ -1571,6 +1665,8 @@ public sealed class Binder
             // Passthrough nodes — no executable semantics
             FallbackCommentNode => null,
             RawCSharpNode => null,
+            // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
+            LocalFunctionStatementNode => null,
             PreprocessorDirectiveNode => null,
             EventSubscribeNode => null,
             EventUnsubscribeNode => null,
@@ -1629,7 +1725,7 @@ public sealed class Binder
             call.ArgumentNames,
             call.ArgumentModifiers,
             receiverSymbol,
-            resolution.Functions,
+            WithLocalFunctionCandidates(call.Target, resolution.Functions),
             call.CalleeSpan,
             call.ReceiverSpan,
             resolution.Kind == OverloadResolutionKind.Inaccessible,
@@ -4978,7 +5074,7 @@ public sealed class Binder
             typeArguments: callExpr.TypeArguments,
             resolvedSymbol: resolution.Function,
             receiverSymbol: receiverSymbol,
-            resolvedSymbols: resolution.Functions,
+            resolvedSymbols: WithLocalFunctionCandidates(callExpr.Target, resolution.Functions),
             calleeSpan: callExpr.CalleeSpan,
             receiverSpan: callExpr.ReceiverSpan,
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
@@ -6007,6 +6103,16 @@ public sealed class Binder
         var firstDot = target.IndexOf('.');
         if (firstDot <= 0)
         {
+            // 0.25 F3 (#847): C# simple-name lookup: a local/parameter is invoked as a
+            // value; a visible local function wins over members and module functions.
+            if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null })
+                yield break;
+            if (_scope.GetOverloads(target).Any(_localFunctionSymbols.Contains))
+            {
+                yield return target;
+                yield break;
+            }
+
             if (_currentClass != null)
             {
                 foreach (var lookupName in EnumerateHierarchyLookupNames(
@@ -6971,7 +7077,9 @@ public sealed class Binder
 
     private BoundFunction BindMethod(MethodNode method, string className)
     {
-        var functionScope = _scope.CreateChild();
+        var localFunctionScope = DeclareLocalFunctions(
+            method.Body, _functionSymbols[method].Id, out var localFunctions);
+        var functionScope = localFunctionScope.CreateChild();
         using var _s = PushScope(functionScope);
         using var _c = PushStaticContext(method.IsStatic);
         using var _tp = PushMemberTypeParameters(method.TypeParameters);
@@ -6982,6 +7090,7 @@ public sealed class Binder
 
         DeclareParameters(functionSymbol.Parameters, method.Parameters);
         var boundBody = BindStatements(method.Body);
+        BindLocalFunctions(localFunctions, localFunctionScope, functionSymbol.Id);
         var declaredEffects = ExtractMethodEffects(method.Effects);
         return new BoundFunction(method.Span, functionSymbol, boundBody, functionScope,
             declaredEffects, BoundMemberKind.Method, className);

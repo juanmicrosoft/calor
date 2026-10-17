@@ -410,3 +410,20 @@ public sealed class ParameterNode : AstNode
 
 
 }
+
+/// <summary>
+/// 0.25 F3 (#847): a nested <c>§F{id:Name} (T:x) -&gt; R</c> directly in a <c>§F</c>/<c>§MT</c>
+/// body, emitted in place as a C# <c>static</c> local function. Visible in the whole
+/// body, it shadows same-named members. <see cref="Analysis.RecursiveAstWalker"/>
+/// treats it as a leaf; passes that need the body visit <see cref="Function"/>.
+/// </summary>
+public sealed class LocalFunctionStatementNode : StatementNode
+{
+    public FunctionNode Function { get; }
+
+    public LocalFunctionStatementNode(TextSpan span, FunctionNode function)
+        : base(span)
+    {
+        Function = function ?? throw new ArgumentNullException(nameof(function));
+    }
+}
