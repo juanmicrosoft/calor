@@ -6816,7 +6816,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // boundary if not here), so it does not attribute passthrough; a gate-caused
         // escalation (ConvertExpression's crash containment) already did.
         catch (Exception ex) when (ex is MemberInteropEscalationException escalation
-            ? !escalation.PreserveMember && _context.PreservesCSharp
+            ? escalation.PreserveStatement || !escalation.PreserveMember && _context.PreservesCSharp
             : _context.ShouldPreserveCSharp)
         {
             // In C#-preserving modes an escalated (or crashed) expression is
@@ -12583,19 +12583,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode PreserveObjectInitializer(ExpressionSyntax creation, string feature = "object-initializer")
     {
         _context.RecordFeatureUsage(feature);
+        // A preserved target-typed `new()` cannot stay an expression: the emitter may hoist it
+        // into an untyped binding, where it has no target type (CS8754), and spelling out its
+        // type would no longer be the source. Preserve the enclosing statement verbatim instead
+        // (the member when there is no statement), in every mode, as the expression would be.
+        if (creation is ImplicitObjectCreationExpressionSyntax)
+            throw EscalateExpression(creation, feature, preserveStatement: true);
         _context.RecordLoss(ConversionLossKind.InteropPreserved, feature,
             "Object creation that §NEW cannot express in C# evaluation order preserved verbatim",
             creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return new RawCSharpExpressionNode(GetTextSpan(creation),
-            creation is BaseObjectCreationExpressionSyntax objectCreation
-                ? CreationSourceText(objectCreation)
-                : creation.ToString());
+        return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
     }
 
     /// <summary>
-    /// The C# kept for a preserved creation. Target-typed <c>new()</c> spells out its
-    /// type: the preserved text can end up in an untyped binding (a hoisted argument),
-    /// where <c>new()</c> has no target type (CS8754).
+    /// The C# the emitter falls back to for a converted creation (<see cref="NewExpressionNode.CSharpSource"/>).
+    /// Target-typed <c>new()</c> spells out its type: the emitter's fallback can end up in an
+    /// untyped binding (a hoisted argument), where <c>new()</c> has no target type (CS8754).
     /// </summary>
     private string CreationSourceText(BaseObjectCreationExpressionSyntax creation)
     {
@@ -13970,7 +13973,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// semantic substitutions inside otherwise-native output.
     /// </summary>
     private MemberInteropEscalationException EscalateExpression(
-        SyntaxNode node, string featureName, bool preserveMember = false)
+        SyntaxNode node, string featureName, bool preserveMember = false, bool preserveStatement = false)
     {
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
@@ -13988,7 +13991,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new MemberInteropEscalationException(featureName, line,
-            $"Unsupported {featureName} escalated to containing member: {code}", preserveMember);
+            $"Unsupported {featureName} escalated to containing member: {code}", preserveMember)
+        {
+            PreserveStatement = preserveStatement
+        };
     }
 
     /// <summary>
@@ -14404,6 +14410,9 @@ internal sealed class MemberInteropEscalationException : NotSupportedException
     public string FeatureName { get; }
     public int Line { get; }
     public bool PreserveMember { get; }
+
+    /// <summary>Contained at the nearest statement in every mode, not only C#-preserving ones.</summary>
+    public bool PreserveStatement { get; init; }
 
     public MemberInteropEscalationException(string featureName, int line, string message, bool preserveMember = false)
         : base(message)

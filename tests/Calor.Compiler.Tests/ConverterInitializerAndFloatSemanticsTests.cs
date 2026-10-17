@@ -179,6 +179,37 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
     }
 
     [Fact]
+    public void PreservedTargetTypedNewElement_KeepsTheSourceText()
+    {
+        // FluentValidation ChildRulesTests' shape: target-typed `new()` elements whose nested
+        // collection initializer §NEW cannot express. Spelling out the type (`new P() { ... }`)
+        // made the preserved text differ from the source; the statement is kept verbatim instead.
+        var conversion = AssertEquivalent(
+            "var ps = new List<P> {\n new() { L = { 5 } },\n new() { L = { 6 } },\n};\n"
+            + "return Trace + ps.Count + string.Join(\",\", ps[1].L);",
+            "kk20,6");
+        Assert.Contains("new() { L = { 6 } }", conversion.CalorSource);
+        Assert.DoesNotContain("new P()", conversion.CalorSource);
+        Assert.Contains(conversion.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "object-initializer");
+        Assert.DoesNotContain(RawExpressions(conversion.Ast!), raw => raw.CSharpCode.StartsWith("new P", StringComparison.Ordinal));
+    }
+
+    private static List<RawCSharpExpressionNode> RawExpressions(ModuleNode module)
+    {
+        var found = new List<RawCSharpExpressionNode>();
+        var stack = new Stack<AstNode>([module]);
+        while (stack.TryPop(out var node))
+        {
+            if (node is RawCSharpExpressionNode raw)
+                found.Add(raw);
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+                stack.Push(child);
+        }
+        return found;
+    }
+
+    [Fact]
     public void DefaultOfAliasedName_UsesTheResolvedType() =>
         AssertEquivalent("return default(Single);", "Int32:0", types: "", typed: true,
             usings: "using Single = System.Int32;");
