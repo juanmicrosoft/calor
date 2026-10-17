@@ -161,7 +161,9 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1Return");
 
         AssertParsesClean(rt);
-        Assert.Contains("§/LAM{", rt.Calor);
+        // #943 (D1 RO-DECL-1): an out var inside a lambda is never lowered (main emitted a typeless
+        // §B that failed with Calor0250), so the member is kept as C# and still parses clean.
+        Assert.Contains("§CSHARP{", rt.Calor);
         // The block lands under a hoisted binding at the statement's own indent —
         // never at column 0 mid-module.
         Assert.DoesNotMatch(new Regex(@"\n§/LAM\{"), rt.Calor);

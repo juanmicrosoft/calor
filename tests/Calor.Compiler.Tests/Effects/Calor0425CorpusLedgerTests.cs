@@ -187,7 +187,11 @@ public class Calor0425CorpusLedgerTests
         + "across 48 modules. #1402 activates bounded arrays, whitelisted STRING generics, and "
         + "identity-proven nominal references. One MediatR module now stops on Calor0274 before "
         + "effect enforcement, moving the denominator 266 -> 265 while the "
-        + "measured set remains 135 Calor0425 sites across 48 modules";
+        + "measured set remains 135 Calor0425 sites across 48 modules. #943 (0.25 F1) lowers a "
+        + "C# out var only with a known type and keeps the member as C# otherwise, so modules that "
+        + "stopped on an untyped binding (Calor0250) now bind: the denominator moves 265 -> 275 "
+        + "(MediatR unchanged, serilog 100 -> 106, FluentValidation 132 -> 136) and the measured set "
+        + "carries 143 Calor0425 sites across 52 modules; no previously enforced module stops";
 
     private static readonly string[] Subjects = ["MediatR", "serilog", "FluentValidation"];
 
@@ -1563,7 +1567,8 @@ public class Calor0425CorpusLedgerTests
         // effect enforcement. That lowers this denominator without changing
         // R2's historical recovery result or reopening its closed MISS.
         var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
-        const int EnforcedAfterStageBActivation = 265;
+        // #943 (0.25 F1): untyped out-var bindings (Calor0250) no longer stop binding: 265 -> 275.
+        const int EnforcedAfterStageBActivation = 275;
         Assert.Equal(EnforcedAfterStageBActivation, enforcedNow);
     }
 

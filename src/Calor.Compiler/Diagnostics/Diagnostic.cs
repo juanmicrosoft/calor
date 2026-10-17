@@ -163,6 +163,16 @@ public static class DiagnosticCode
     /// with effects, contracts, rows, generics, refinement types, yields or §PROOF.</summary>
     public const string UnsupportedLocalFunction = "Calor0211";
 
+    /// <summary>
+    /// Error (#943, D1 RO-LV-2 / RO-DECL-2): a <c>§A{ref}</c>, <c>§A{out}</c> or
+    /// <c>§A{in}</c> operand that C# cannot pass by reference (a literal, computed
+    /// expression, call result, property, indexer, <c>this</c>, a readonly field
+    /// outside its constructor, or an <c>in</c> parameter passed as ref/out), or a
+    /// <c>_</c> discard that C# would bind to a declared <c>_</c>. Reported by the
+    /// binder before C# generation. (Calor0211 is #847's UnsupportedLocalFunction.)
+    /// </summary>
+    public const string InvalidByReferenceOperand = "Calor0212";
+
     // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
     /// <summary>

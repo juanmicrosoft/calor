@@ -3049,11 +3049,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var attrPrefix = "";
         if (node.CSharpAttributes.Count > 0)
         {
-            var attrs = node.CSharpAttributes.Select(a =>
-            {
-                var args = a.Arguments.Count > 0 ? $"({string.Join(", ", a.Arguments)})" : "";
-                return $"[{a.Name}{args}]";
-            });
+            // #943 (D1 RO-NULL-3): an inert [NotNullWhen(true)] on an out parameter emitted its
+            // arguments' type name; format them like every other attribute.
+            var attrs = node.CSharpAttributes.Select(Visit);
             attrPrefix = string.Join(" ", attrs) + " ";
         }
         var prefix = "";

@@ -129,6 +129,15 @@ public sealed class Binder
     private string? _currentNamespaceIdentity;
     private bool _isStaticContext;
 
+    /// <summary>#943 (D1 RO-NULL-2): the current callable's ref/out/in parameters, which may alias.</summary>
+    private IReadOnlyList<VariableSymbol> _byReferenceParameters = [];
+
+    /// <summary>#943 (D1 RO-LV-1): the constructor being bound, where its class's readonly fields are writable.</summary>
+    private ConstructorNode? _currentConstructor;
+
+    /// <summary>#943: aliased-storage changes seen so far; a loop's discovery pass compares it.</summary>
+    private int _aliasInvalidations;
+
     /// <summary>
     /// v0.14 §S3b (nullability workstream / issue #875) — lazily-constructed
     /// MetadataBinder for enriching BCL-shaped call resolutions with Roslyn
@@ -606,25 +615,36 @@ public sealed class Binder
     {
         var previousContext = _declarationContext;
         _declarationContext = context;
-        return new DeclarationContextRestorer(this, previousContext);
+        var restorer = new DeclarationContextRestorer(this, previousContext, _byReferenceParameters, _currentConstructor);
+        _byReferenceParameters = [];
+        _currentConstructor = null;
+        return restorer;
     }
 
     private sealed class DeclarationContextRestorer : IDisposable
     {
         private readonly Binder _binder;
         private readonly SymbolId _previousContext;
+        private readonly IReadOnlyList<VariableSymbol> _previousByReferenceParameters;
+        private readonly ConstructorNode? _previousConstructor;
 
         public DeclarationContextRestorer(
             Binder binder,
-            SymbolId previousContext)
+            SymbolId previousContext,
+            IReadOnlyList<VariableSymbol> previousByReferenceParameters,
+            ConstructorNode? previousConstructor)
         {
             _binder = binder;
             _previousContext = previousContext;
+            _previousByReferenceParameters = previousByReferenceParameters;
+            _previousConstructor = previousConstructor;
         }
 
         public void Dispose()
         {
             _binder._declarationContext = _previousContext;
+            _binder._byReferenceParameters = _previousByReferenceParameters;
+            _binder._currentConstructor = _previousConstructor;
         }
     }
 
@@ -1542,6 +1562,9 @@ public sealed class Binder
         IReadOnlyList<VariableSymbol> symbols,
         IReadOnlyList<ParameterNode> parameters)
     {
+        _byReferenceParameters = symbols
+            .Where(symbol => (symbol.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0)
+            .ToArray();
         for (var index = 0; index < symbols.Count; index++)
         {
             var symbol = symbols[index];
@@ -1599,11 +1622,15 @@ public sealed class Binder
         var result = new List<BoundStatement>();
         foreach (var stmt in statements)
         {
+            if (stmt is ForeachStatementNode or UsingStatementNode)
+                InvalidateByReferenceParameterNarrowing();
             var bound = BindStatement(stmt);
             if (bound != null)
             {
                 result.Add(bound);
             }
+            if (bound is BoundCallStatement || WritesAliasedStorage(stmt, bound))
+                InvalidateByReferenceParameterNarrowing();
             if (stmt is IfStatementNode
                 {
                     ElseIfClauses.Count: 0,
@@ -1683,7 +1710,7 @@ public sealed class Binder
 
     private BoundCallStatement BindCallStatement(CallStatementNode call)
     {
-        var args = BindExpressions(call.Arguments);
+        var args = BindCallArguments(call.Arguments, call.ArgumentModifiers);
         var receiverSymbol = ResolveCallReceiver(
             call.Target,
             call.ReceiverSpan ?? call.CalleeSpan);
@@ -1852,6 +1879,9 @@ public sealed class Binder
         _deferredCallableWrites = [];
         _isDiscoveringLoopCallables = true;
         CallableMutationSummary summary;
+        HashSet<string> byReferenceWrites = new(StringComparer.Ordinal);
+        var aliasInvalidationsBefore = _aliasInvalidations;
+        var loopMayWriteAliases = false;
         try
         {
             // Discover callable writes without committing diagnostics, symbols,
@@ -1863,6 +1893,18 @@ public sealed class Binder
             var body = BindStatements(statements);
             if (conditionAfterBody && condition is not null)
                 boundCondition = BindExpression(condition);
+            // #943 (D1 RO-NULL-2): a ref/out write or an aliased-storage change later in the body
+            // reaches the next iteration's reads, so it must end narrowings before the body binds.
+            foreach (var node in body.SelectMany(DescendantsAndSelf).Concat(boundCondition is null ? [] : DescendantsAndSelf(boundCondition)))
+            {
+                if (node is BoundCallExpression { ArgumentModifiers: { } expressionModifiers, Arguments: var expressionArguments })
+                    byReferenceWrites.UnionWith(ByReferenceWrittenNames(expressionModifiers, expressionArguments));
+                else if (node is BoundCallStatement { ArgumentModifiers: { } statementModifiers, Arguments: var statementArguments })
+                    byReferenceWrites.UnionWith(ByReferenceWrittenNames(statementModifiers, statementArguments));
+            }
+            // Every aliased-storage change the body binds (calls, stores, using, foreach, events) was
+            // seen by the statement and expression hooks during this discovery pass.
+            loopMayWriteAliases = _aliasInvalidations != aliasInvalidationsBefore;
             summary = new CallableMutationSummary
             {
                 Alternatives = GetDeferredCallEffects(boundCondition, body).ToArray(),
@@ -1899,6 +1941,13 @@ public sealed class Binder
         // installed on a preceding iteration. Bind receiving sites only after
         // this state is available; fresh guards in the body still narrow normally.
         ApplyCallableMutationSummary(summary);
+        foreach (var name in byReferenceWrites)
+        {
+            if (_scope.Lookup(name) is VariableSymbol visible)
+                InvalidateMutableFlowNarrowing(visible, requireRebindable: false);
+        }
+        if (loopMayWriteAliases)
+            InvalidateByReferenceParameterNarrowing();
     }
 
     private void JoinCallableState(IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> other)
@@ -3086,9 +3135,12 @@ public sealed class Binder
     {
         ArgumentNullException.ThrowIfNull(expr);
         ExpressionsBound++;
-        return ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
+        var bound = ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
+        if (MayChangeHeap(bound))
+            InvalidateByReferenceParameterNarrowing();
+        return bound;
     }
 
     private BoundExpression BindIntLiteral(IntLiteralNode literal)
@@ -3162,7 +3214,9 @@ public sealed class Binder
             BaseExpressionNode => ResolveAccessibleMembers(
                 ResolveBaseClass(_currentClass),
                 fieldAccess.FieldName),
-            _ => Array.Empty<Symbol>(),
+            // #943 (D1 RO-COPY-1): a field of an in-module struct value (`(§IDX{pts} 0).X`) is
+            // one storage path; resolving it keeps the operand typed instead of OBJECT.
+            _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
         var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
         var fieldTypes = fields
@@ -3215,7 +3269,11 @@ public sealed class Binder
             return new BoundFieldAccessExpression(
                 fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
                 fieldNameSpan: fieldAccess.FieldNameSpan,
-                resolvedType: new BoundTypes.UnresolvedBoundType(reason));
+                resolvedType: new BoundTypes.UnresolvedBoundType(reason))
+            {
+                // #943: the by-reference operand check still needs to know it is a property.
+                UnsupportedMetadataMember = member
+            };
         }
 
         return new BoundFieldAccessExpression(
@@ -3227,6 +3285,22 @@ public sealed class Binder
             fieldAccess.FieldNameSpan,
             fields,
             resolvedType);
+    }
+
+    /// <summary>#943: the instance field a (possibly dotted) path names through in-module struct values.</summary>
+    private Symbol[] ResolveStructFieldPath(string typeName, string path)
+    {
+        VariableSymbol? field = null;
+        foreach (var segment in path.Split('.'))
+        {
+            if (ResolveClass(field?.TypeName ?? typeName) is not { IsStruct: true } owner)
+                return [];
+            field = ResolveAccessibleMembers(owner, segment).OfType<VariableSymbol>()
+                .FirstOrDefault(member => member is { IsField: true, IsStatic: false });
+            if (field is null)
+                return [];
+        }
+        return field is null ? [] : [field];
     }
 
     private BoundTypeReferenceExpression? TryBindMetadataTypeReceiver(ExpressionNode expression)
@@ -4950,7 +5024,7 @@ public sealed class Binder
 
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
     {
-        var args = BindExpressions(callExpr.Arguments);
+        var args = BindCallArguments(callExpr.Arguments, callExpr.ArgumentModifiers);
         var receiverSymbol = ResolveCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan);
@@ -5429,6 +5503,11 @@ public sealed class Binder
         var argumentTypes = arguments
             .Select((argument, index) =>
                 argument is BoundVariableExpression { Variable.Id.IsNone: true }
+                    // #943: a by-reference element or member path the binder cannot type.
+                    || argument is BoundFieldAccessExpression { ResolvedField: null }
+                        or BoundArrayAccess or BoundArrayAccessExpression or BoundMultiDimArrayAccess
+                        && (argument.Type is BoundTypes.UnresolvedBoundType || argument.Type.DisplayString == "OBJECT")
+                        && !string.IsNullOrEmpty(argumentModifiers?.ElementAtOrDefault(index))
                     ? "<unresolved>"
                     : argument is BoundNullLiteral
                         ? "NULL"
@@ -6366,6 +6445,258 @@ public sealed class Binder
     private IReadOnlyList<BoundExpression> BindExpressions(IEnumerable<ExpressionNode> expressions) =>
         expressions.Select(BindExpression).ToArray();
 
+    /// <summary>
+    /// #943 (D1 RO-LV-1/2, RO-DECL-2): binds call arguments and refuses, with
+    /// <see cref="DiagnosticCode.InvalidByReferenceOperand"/>, every ref/out/in operand C# cannot
+    /// pass by reference. <c>§A{out} _</c> with no symbol <c>_</c> in scope is a discard.
+    /// </summary>
+    private IReadOnlyList<BoundExpression> BindCallArguments(
+        IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? modifiers)
+    {
+        var bound = new BoundExpression[arguments.Count];
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            var modifier = modifiers != null && index < modifiers.Count ? modifiers[index] : null;
+            if (string.IsNullOrEmpty(modifier))
+            {
+                bound[index] = BindExpression(arguments[index]);
+                continue;
+            }
+            string? reason;
+            if (arguments[index] is ReferenceNode { Name: "_" } discard)
+            {
+                var declared = _scope.LookupAll("_").Count > 0 || ResolveAccessibleMembers(_currentClass, "_").Count > 0;
+                reason = modifier != "out" ? $"'{modifier} _' is not a discard; only 'out _' is"
+                    : declared ? "'out _' would bind to the declared symbol '_', not discard" : null;
+                bound[index] = declared ? BindExpression(discard) : new BoundVariableExpression(discard.Span, CreateUnresolvedVariable(discard));
+            }
+            else
+            {
+                bound[index] = BindExpression(arguments[index]);
+                reason = GetInvalidByReferenceReason(bound[index], modifier is "ref" or "out");
+            }
+            if (reason != null)
+            {
+                _diagnostics.ReportError(arguments[index].Span, DiagnosticCode.InvalidByReferenceOperand,
+                    $"Argument {index + 1} cannot be passed '{modifier}': {reason}. " +
+                    "Pass a local, parameter, field or array element, or bind the value to a mutable local first.");
+            }
+        }
+        return bound;
+    }
+
+    private string? GetInvalidByReferenceReason(BoundExpression operand, bool writes)
+    {
+        switch (operand)
+        {
+            // A dotted name the binder left unresolved (`s.F.N`, `other.n`, `this.n`, `K.slot`).
+            case BoundVariableExpression { Variable: { Id.IsNone: true, Name: var dotted } } when dotted.IndexOf('.') > 0:
+                var head = dotted[..dotted.IndexOf('.')];
+                var rest = dotted[(head.Length + 1)..].Split('.');
+                if (head == "this" && _currentClassName != null)
+                    return MemberPathReason(new BoundThisExpression(operand.Span, _currentClassName), _currentClassName, rest, writes);
+                if (_scope.Lookup(head) is VariableSymbol root)
+                {
+                    if (IsScalarStringTypeName(root.TypeName) || IsBuiltInValueTypeName(TypeIdentity.Canonicalize(root.TypeName)))
+                        return $"'{dotted}' is a member of a built-in type, not a variable";
+                    return MemberPathReason(new BoundVariableExpression(operand.Span, root), root.TypeName, rest, writes);
+                }
+                if (rest.Length != 1)
+                    return null;
+                // Static members of a built-in type (`Int32.MaxValue`, `String.Empty`) are never variables.
+                if (TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(head)) && TypeIdentity.Canonicalize(head) != "OBJECT")
+                    return $"'{dotted}' is a member of a built-in type, not a variable";
+                if (ResolveClass(head) is { } staticOwner)
+                    return StaticMemberReason(ResolveAccessibleMembers(staticOwner, rest[0]).OfType<VariableSymbol>().FirstOrDefault(), rest[0], writes);
+                return MetadataMemberReason(
+                    (TryBindMetadataTypeReceiver(new ReferenceNode(operand.Span, head))?.Type as BoundTypes.NominalBoundType)?.RoslynSymbol?.GetMembers(rest[0]).FirstOrDefault(),
+                    rest[0], writes);
+            case BoundVariableExpression { Variable: var variable }:
+                if (variable.IsProperty)
+                    return $"'{variable.Name}' is a property";
+                if (writes && variable.IsField && !variable.IsMutable && !IsWritableReadonlyField(variable))
+                    return $"'{variable.Name}' is a readonly field outside its class's constructor";
+                if (writes && variable.IsParameter && variable.Modifier.HasFlag(ParameterModifier.In))
+                    return $"'{variable.Name}' is an 'in' parameter, which is read-only";
+                return null;
+            case BoundFieldAccessExpression { Target: BoundTypeReferenceExpression typeTarget } field:
+                // A static member: in-module (by symbol) or metadata (const, readonly, property).
+                if (ResolveClass(typeTarget.Name) is { } inModule)
+                    return StaticMemberReason(ResolveAccessibleMembers(inModule, field.FieldName).OfType<VariableSymbol>().FirstOrDefault(), field.FieldName, writes);
+                return MetadataMemberReason(field.ResolvedMetadataMember
+                    ?? (typeTarget.Type as BoundTypes.NominalBoundType)?.RoslynSymbol?.GetMembers(field.FieldName).FirstOrDefault(), field.FieldName, writes);
+            case BoundFieldAccessExpression field:
+                if (MemberPath(field.Target.Type.DisplayString, field.FieldName.Split('.')) is not null)
+                    return MemberPathReason(field.Target, field.Target.Type.DisplayString, field.FieldName.Split('.'), writes);
+                var metadataMember = MetadataMemberReason(field.ResolvedMetadataMember ?? field.UnsupportedMetadataMember, field.FieldName, writes);
+                // A metadata field of a value-type receiver is storage only when the receiver is.
+                return metadataMember ?? ((field.ResolvedMetadataMember ?? field.UnsupportedMetadataMember) is Microsoft.CodeAnalysis.IFieldSymbol { ContainingType.IsValueType: true }
+                    && GetInvalidByReferenceReason(field.Target, writes) is { } receiver
+                        ? $"its value-type receiver is not writable storage: {receiver}" : null);
+            case BoundArrayAccess access:
+                return IsKnownNonArrayType(access.Array.Type) ? "an indexer element is not a variable" : null;
+            case BoundArrayAccessExpression access:
+                return IsKnownNonArrayType(access.Array.Type) ? "an indexer element is not a variable" : null;
+            case BoundMultiDimArrayAccess access:
+                return IsKnownNonArrayType(access.Array.Type) ? "an indexer element is not a variable" : null;
+            case BoundThisExpression:
+                return "'this' cannot be passed by reference";
+            default:
+                return "the operand is a value (a literal, computed expression or call result), not a variable";
+        }
+    }
+
+    /// <summary>
+    /// #943 (D1 RO-LV-1/2): the in-module instance members a dotted path names from a type, or
+    /// null when a segment is not an in-module field or property.
+    /// </summary>
+    private List<VariableSymbol>? MemberPath(string typeName, IReadOnlyList<string> segments)
+    {
+        var path = new List<VariableSymbol>();
+        foreach (var segment in segments)
+        {
+            if (ResolveClass(path.Count == 0 ? typeName : path[^1].TypeName) is not { } owner
+                || ResolveAccessibleMembers(owner, segment).OfType<VariableSymbol>().FirstOrDefault(m => !m.IsStatic) is not { } member)
+                return null;
+            path.Add(member);
+        }
+        return path;
+    }
+
+    /// <summary>
+    /// A member path is storage when its last member is a writable field and, while each
+    /// member lives inside a struct value, its container is writable storage too. Crossing a
+    /// reference-type owner ends the walk: that storage is on the heap.
+    /// </summary>
+    private string? MemberPathReason(BoundExpression root, string rootType, IReadOnlyList<string> segments, bool writes)
+    {
+        if (MemberPath(rootType, segments) is not { } path)
+            return null;
+        for (var index = path.Count - 1; index >= 0; index--)
+        {
+            var member = path[index];
+            if (member.IsProperty)
+                return $"'{member.Name}' is a property";
+            if (writes && member.IsField && !member.IsMutable && !(index == 0 && root is BoundThisExpression && IsWritableReadonlyField(member)))
+                return $"'{member.Name}' is a readonly field outside its constructor or of another instance";
+            if (ResolveClass(member.DeclaringTypeName ?? "") is not { IsStruct: true })
+                return null;
+        }
+        return root is not BoundThisExpression && GetInvalidByReferenceReason(root, writes) is { } reason
+            ? $"its value-type receiver is not writable storage: {reason}" : null;
+    }
+
+    private static string? MetadataMemberReason(Microsoft.CodeAnalysis.ISymbol? member, string name, bool writes) => member switch
+    {
+        Microsoft.CodeAnalysis.IPropertySymbol => $"'{name}' is a property",
+        Microsoft.CodeAnalysis.IFieldSymbol { IsConst: true } => $"'{name}' is a constant",
+        Microsoft.CodeAnalysis.IFieldSymbol { IsReadOnly: true } when writes => $"'{name}' is a readonly field",
+        _ => null,
+    };
+
+    private string? StaticMemberReason(VariableSymbol? member, string name, bool writes) => member switch
+    {
+        { IsProperty: true } => $"'{name}' is a property",
+        { IsField: true, IsMutable: false } when writes && !IsWritableReadonlyField(member) => $"'{name}' is a readonly field outside its static constructor",
+        _ => null,
+    };
+
+    private bool IsWritableReadonlyField(VariableSymbol field) =>
+        _currentConstructor is { } ctor && ctor.IsStatic == field.IsStatic
+        && string.Equals(field.DeclaringTypeName, _currentClassName, StringComparison.Ordinal);
+
+    private bool IsKnownNonArrayType(BoundTypes.BoundType type)
+    {
+        if (type is BoundTypes.ArrayBoundType or BoundTypes.UnresolvedBoundType)
+            return false;
+        var name = type.DisplayString;
+        return !name.EndsWith(']') && (type is BoundTypes.GenericInstantiationBoundType
+            || type is BoundTypes.NominalBoundType { RoslynSymbol: not null } || ResolveClass(name) is not null
+            || name is "STRING" or "str" or "string" or "System.String"
+            || name.StartsWith("List<", StringComparison.Ordinal) || name.StartsWith("Dict", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// #943 (D1 RO-NULL-2, RO-ANA-1's alias condition): in a callable with by-reference parameters,
+    /// anything that may change the heap (a call, construction, element/field/property read or store)
+    /// may write storage a by-reference parameter aliases.
+    /// </summary>
+    private bool MayChangeHeap(BoundExpression bound) =>
+        _byReferenceParameters.Count > 0 && bound switch
+        {
+            // Only these kinds run no code and read no shared storage of their own; every other
+            // kind (calls of any form, construction, element/field/property reads) may.
+            BoundIntLiteral or BoundStringLiteral or BoundBoolLiteral or BoundFloatLiteral or BoundDecimalLiteral
+                or BoundNoneLiteral or BoundNullLiteral or BoundLambdaExpression => false,
+            // An operator on a user type may be an overloaded operator method.
+            BoundBinaryExpression binary => !IsBuiltInOperand(binary.Left) || !IsBuiltInOperand(binary.Right),
+            // A built-in string or character operation (`len`, `upper`) over built-in operands runs no user code.
+            BoundStructuralExpression { Children: var operands } and not BoundUnsupportedExpression => !operands.All(IsBuiltInOperand),
+            BoundUnaryExpression unary => !IsBuiltInOperand(unary.Operand),
+            // A dotted or unresolved name (`this.P`, an inherited member) may run a getter.
+            BoundVariableExpression { Variable: var variable } =>
+                variable.IsField || variable.IsProperty || variable.Id.IsNone || variable.Name.Contains('.'),
+            _ => true,
+        };
+
+    private static bool IsBuiltInOperand(BoundExpression operand) =>
+        operand is BoundNullLiteral || IsScalarStringTypeName(operand.Type.DisplayString)
+        || IsBuiltInValueTypeName(TypeIdentity.Canonicalize(operand.Type.DisplayString));
+
+    /// <summary>#943 (D1 RO-NULL-2): a statement that writes storage a by-reference parameter may alias.</summary>
+    private bool WritesAliasedStorage(StatementNode statement, BoundStatement? bound)
+    {
+        if (_byReferenceParameters.Count == 0)
+            return false;
+        var target = bound switch
+        {
+            BoundAssignmentStatement assignment => assignment.Target,
+            BoundCompoundAssignment compound => compound.Target,
+            _ => null,
+        };
+        if (target != null)
+            return AssignsAliasedStorage(target);
+        return statement is not (IfStatementNode or WhileStatementNode or ForStatementNode or DoWhileStatementNode
+            or TryStatementNode or MatchStatementNode or BindStatementNode or ReturnStatementNode or BreakStatementNode
+            or ContinueStatementNode or GotoStatementNode or LabelStatementNode or ProofObligationNode
+            or ThrowStatementNode or RethrowStatementNode or ExpressionStatementNode or PrintStatementNode
+            or YieldReturnStatementNode or YieldBreakStatementNode or ForeachStatementNode or UsingStatementNode
+            or CallStatementNode or SyncBlockNode or FallbackCommentNode or PreprocessorDirectiveNode);
+    }
+
+    private static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode node) =>
+        node.ChildNodes.SelectMany(DescendantsAndSelf).Prepend(node);
+
+    private static IEnumerable<string> ByReferenceWrittenNames(IReadOnlyList<string?> modifiers, IReadOnlyList<BoundExpression> arguments) =>
+        modifiers.Select((modifier, index) => modifier is "ref" or "out" && index < arguments.Count
+                && arguments[index] is BoundVariableExpression variable ? variable.Variable.Name : null)
+            .OfType<string>();
+
+    private bool AssignsAliasedStorage(BoundExpression target) =>
+        target is not BoundVariableExpression { Variable: var variable }
+        || variable.IsField || variable.IsProperty
+        || _byReferenceParameters.Count > 1 && _byReferenceParameters.Contains(RootOf(variable));
+
+    private VariableSymbol RootOf(VariableSymbol variable)
+    {
+        while (_flowNarrowingSources.TryGetValue(variable, out var previous))
+            variable = previous;
+        return variable;
+    }
+
+    private void InvalidateByReferenceParameterNarrowing()
+    {
+        _aliasInvalidations++;
+        foreach (var parameter in _byReferenceParameters)
+        {
+            if (_scope.Lookup(parameter.Name) is VariableSymbol visible
+                && !ReferenceEquals(visible, parameter) && ReferenceEquals(RootOf(visible), parameter))
+            {
+                InvalidateMutableFlowNarrowing(visible, requireRebindable: false);
+            }
+        }
+    }
+
     private static string MakeArrayType(string elementType, int rank) =>
         $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
 
@@ -7103,6 +7434,7 @@ public sealed class Binder
         using var _c = PushStaticContext(ctor.IsStatic);
         var functionSymbol = _functionSymbols[ctor];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
+        _currentConstructor = ctor;
         // v0.14 §S4 — ctors return VOID; TryBuildStringTarget filters them out
         // in BindReturnStatement, but push for consistency + resetting outer ctx.
         using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);

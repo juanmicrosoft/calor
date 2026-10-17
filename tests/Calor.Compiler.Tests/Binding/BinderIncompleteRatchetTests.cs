@@ -132,6 +132,11 @@ public class BinderIncompleteRatchetTests
         JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
             "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.Cases);
 
+    /// <summary>#943: guarded identities whose whole member is now preserved C#; the source stays verbatim there.</summary>
+    private static readonly Lazy<IReadOnlyList<SourceCarrierCase>> PreservedCarrierCases = new(() =>
+        JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
+            "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.PreservedCases ?? []);
+
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
     {
@@ -404,10 +409,12 @@ public class BinderIncompleteRatchetTests
         var failedBinding = WithBindingCoverage(before, bindDiagnostics);
         Assert.True(failedBinding.BindingErrorCount > 0);
         Assert.NotEqual(WithBindingCoverage(before, new DiagnosticBag()), failedBinding);
-        Assert.Equal(72, SourceCarrierCases.Value.Count);
+        // #943 (0.25 F1): 4 identities moved to PreservedCases (their member is now §CSHARP).
+        Assert.Equal(68, SourceCarrierCases.Value.Count);
+        Assert.Equal(4, PreservedCarrierCases.Value.Count);
         Assert.Equal(47, SourceCarrierCases.Value.Count(c => c.SourceKind == "GenericName"));
-        Assert.Equal(25, SourceCarrierCases.Value.Count(c => c.SourceKind == "ConditionalAccessExpression"));
-        Assert.Equal(72, SourceCarrierCases.Value
+        Assert.Equal(21, SourceCarrierCases.Value.Count(c => c.SourceKind == "ConditionalAccessExpression"));
+        Assert.Equal(68, SourceCarrierCases.Value
             .Select(c => (c.File, c.SourceStart, c.SourceEnd)).Distinct().Count());
         var carrier = new SourceCarrierCase("identity.cs", first.Start, first.End,
             "NumericLiteralExpression", "1", nameof(IntLiteralNode), first.Start, first.End, "1");
@@ -894,6 +901,12 @@ public class BinderIncompleteRatchetTests
         var nodes = Walk(module).OfType<ExpressionNode>().ToArray();
         foreach (var evidence in SourceCarrierCases.Value.Where(c => c.File == relative))
             AssertSourceCarrierPreserved(nodes, source, evidence);
+        foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
+        {
+            Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
+            Assert.True(Walk(module).OfType<CSharpInteropBlockNode>().Any(block => block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)),
+                $"Preserved source {evidence.File}:{evidence.SourceStart} is neither native nor inside a §CSHARP member.");
+        }
     }
 
     private static void AssertSourceCarrierPreserved(
@@ -996,7 +1009,7 @@ public class BinderIncompleteRatchetTests
         int ExactExpressionsWithOpaqueDescendants = 0,
         string MixedExpressionSourceIdentityHash = "");
 
-    private sealed record SourceCarrierEvidence(IReadOnlyList<SourceCarrierCase> Cases);
+    private sealed record SourceCarrierEvidence(IReadOnlyList<SourceCarrierCase> Cases, IReadOnlyList<SourceCarrierCase>? PreservedCases = null);
 
     private sealed record SourceCarrierCase(
         string File,

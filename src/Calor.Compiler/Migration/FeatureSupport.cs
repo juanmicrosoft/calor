@@ -307,15 +307,20 @@ public static class FeatureSupport
         {
             Name = "ref-parameter",
             Support = SupportLevel.Partial,
-            Description = "Ref parameters are kept as-is with warning",
-            Workaround = "Consider refactoring to return tuples"
+            // #943 (D1 RO-REP-1, RO-UNS-1): native ref parameters and §A{ref} arguments; no tuple form.
+            Description = "ref parameters and ref arguments convert natively (§A{ref}) and pass the caller's storage, never a copy. " +
+                "Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, " +
+                "by-reference delegates, constructor and indexer arguments, and method-generic by-reference parameters are preserved as C#",
+            Workaround = "Keep the preserved member as C# interop; no tuple or wrapper form is equivalent"
         },
         ["out-parameter"] = new FeatureInfo
         {
             Name = "out-parameter",
             Support = SupportLevel.Partial,
-            Description = "Out parameters are kept as-is with warning",
-            Workaround = "Consider refactoring to return tuples or Result<T, E>"
+            // #943 (D1 RO-REP-1, RO-NULL-3/4): native out parameters and §A{out} arguments.
+            Description = "out parameters and out arguments convert natively (§A{out}, out _ discards). " +
+                "Method-generic out parameters and parameters with flow attributes such as [NotNullWhen] are preserved as C#",
+            Workaround = "Keep the preserved member as C# interop; no tuple or Result<T, E> form is equivalent"
         },
         ["pattern-matching-advanced"] = new FeatureInfo
         {
@@ -524,9 +529,13 @@ public static class FeatureSupport
         ["out-var"] = new FeatureInfo
         {
             Name = "out-var",
-            Support = SupportLevel.Full,
-            Description = "Inline out variable declarations (out var x) are pre-declared as bindings",
-            Workaround = null
+            Support = SupportLevel.Partial,
+            // #943 (D1 RO-DECL-1): the bounded lowering.
+            Description = "out var x / out T x in an expression statement, local declaration, return or if condition directly " +
+                "in a block lowers to a mutable binding before the statement when the type is expressible and the name collides " +
+                "with nothing in scope. Loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
+                "initializers and expression-bodied members are preserved as C#",
+            Workaround = "Declare the variable before the statement and pass it with out"
         },
 
         // Phase 2 features
@@ -534,7 +543,9 @@ public static class FeatureSupport
         {
             Name = "in-parameter",
             Support = SupportLevel.Full,
-            Description = "in parameters (readonly ref) are converted with ParameterModifier.In"
+            // #943 (D1 RO-LV-3, RO-CALL-3): the parameter form is native; some call sites are preserved.
+            Description = "in parameters convert with ParameterModifier.In and §A{in} arguments (a C# ref argument to an in " +
+                "parameter becomes §A{in}). Call sites that omit in or pass a value to an in parameter, and in indexer parameters, are preserved as C#"
         },
         ["checked-block"] = new FeatureInfo
         {

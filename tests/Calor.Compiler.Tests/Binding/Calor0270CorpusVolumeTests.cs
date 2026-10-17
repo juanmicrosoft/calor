@@ -212,8 +212,11 @@ public class Calor0270CorpusVolumeTests
     // #1132 (0.25 F5): `var msg = result.Errors[0].ErrorMessage;` in FluentValidation.Tests/
     // GreaterThanOrEqualToValidatorTester.cs now converts in place as (§IDX result.Errors 0).ErrorMessage
     // (main: a hoisted temp), and the inferred local `msg` is an unresolved receiver: 312/36 -> 313/37.
-    private const int AggregateDiagnostics = 313;
-    private const int AggregateModulesWithDiagnostics = 37;
+    // #943 (0.25 F1): serilog 34/11 -> 16/7. Members whose C# `out var` has no type the per-file
+    // semantic model can resolve, or whose statement keeps part of itself as C#, are now preserved
+    // as C# (RO-DECL-1), so their unresolved receivers are no longer bound: 313/37 -> 295/33.
+    private const int AggregateDiagnostics = 295;
+    private const int AggregateModulesWithDiagnostics = 33;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
