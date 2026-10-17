@@ -21,10 +21,10 @@ public class RefOutContractTests
 {
     /// <summary>
     /// SHA-256 over the frozen rules, consumed revisions and case denominator. Changing any of them needs an
-    /// amendment and a new pin. Re-pinned at amendment 1.0.3, which consumes R0 scope 1.2.0 (was
-    /// 324f7509… at 1.0.2, consuming 1.1.0; 146848a8… at 1.0.0/1.0.1).
+    /// amendment and a new pin. Re-pinned at amendment 1.0.4, which consumes R0 scope 1.3.0 (was
+    /// e7cdfa96… at 1.0.3, consuming 1.2.0; 324f7509… at 1.0.2, consuming 1.1.0; 146848a8… at 1.0.0/1.0.1).
     /// </summary>
-    private const string FrozenSeal = "e7cdfa964bf7c34a2840ccbb9872c0307322de82ba2390f88b96579d74857166";
+    private const string FrozenSeal = "4ab3b8abd1888bad6cafd72e6a8c9e716bc76128e873d691adef04a2ef9fe48e";
 
     [Fact]
     public void CommittedContractPasses()
