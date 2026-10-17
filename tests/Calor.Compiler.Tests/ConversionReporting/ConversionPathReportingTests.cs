@@ -26,8 +26,59 @@ public class ConversionPathReportingTests : IDisposable
         try { Directory.Delete(_tempDir, recursive: true); } catch (IOException) { }
     }
 
-    private static string Fixture(string id) =>
-        File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), Fixtures, id + ".cs.txt"));
+    // #1132 (0.25 F5) converts F5-ARRAY-01 and F5-ARRAY-02 natively, so they no longer trigger a rescue.
+    // These stand-ins keep each id's role: F5-ARRAY-02 a 1-member parse-failure rescue of class Probe
+    // (a switch expression as a one-dimensional array element), F5-ARRAY-01 a 2-member round-trip-failure
+    // rescue (an `object[]?` local bound from a call; both pre-existing on main).
+    private const string ParseFailureStandIn = """
+        using System;
+
+        public static class Probe
+        {
+            public static int Pick(int x)
+            {
+                int[] a = { x switch { 1 => 2, _ => 3 } };
+                return a[0];
+            }
+
+            public static string Run()
+            {
+                return "" + Pick(1) + Pick(5);
+            }
+        }
+        """;
+
+    private const string RoundTripFailureStandIn = """
+        #nullable enable
+        using System;
+
+        public class Grid
+        {
+            public object[] Build()
+            {
+                object[]? cells = Make();
+                return cells;
+            }
+
+            private static string[] Make() => new string[] { "a", "b" };
+        }
+
+        public static class Probe
+        {
+            public static string Run()
+            {
+                object[]? cells = new Grid().Build();
+                return "" + cells.Length;
+            }
+        }
+        """;
+
+    private static string Fixture(string id) => id switch
+    {
+        "F5-ARRAY-02" => ParseFailureStandIn,
+        "F5-ARRAY-01" => RoundTripFailureStandIn,
+        _ => File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), Fixtures, id + ".cs.txt"))
+    };
 
     private static ConversionResult Convert(string source, ConversionOptions options) =>
         new CSharpToCalorConverter(options).Convert(source);
