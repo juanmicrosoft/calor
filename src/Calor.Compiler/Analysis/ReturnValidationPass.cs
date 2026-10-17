@@ -78,8 +78,78 @@ public sealed class ReturnValidationPass
             return;
         }
 
+        _typeNamesWithFacts = module.RefinementTypes.Select(type => type.Name)
+            .Concat(module.IndexedTypes.Select(type => type.Name))
+            .ToHashSet(StringComparer.Ordinal);
         Walk(module, ReturnShape.Kind.None);
         WalkYields(module, YieldContext.None);
+    }
+
+    // 0.25 F3 (#847): correctly placed local functions, and local FunctionNodes.
+    private readonly HashSet<LocalFunctionStatementNode> _placedLocalFunctions =
+        new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<FunctionNode> _localFunctionNodes = new(ReferenceEqualityComparer.Instance);
+    private HashSet<string> _typeNamesWithFacts = new(StringComparer.Ordinal);
+
+    /// <summary>0.25 F3 (#847): a local function value must reach a row-checked position.</summary>
+    private void CheckValueUses(AstNode node, HashSet<string> names, bool allowed, bool inLambda)
+    {
+        if (node is ReferenceNode reference && names.Contains(reference.Name) && !allowed)
+            _diagnostics.ReportError(reference.Span, DiagnosticCode.UnsupportedLocalFunction,
+                $"Local function '{reference.Name}' can be used as a value only directly in a §B initializer, " +
+                "a §R, a simple §ASSIGN or a ?: branch of those (outside lambdas), or as a §C{…} argument.");
+        var children = node is LocalFunctionStatementNode local
+            ? [new RecursiveAstWalker.ChildEdge(local.Function, null!)]
+            : RecursiveAstWalker.GetAllChildEdges(node);
+        foreach (var edge in children)
+        {
+            var child = edge.Node;
+            var direct = node switch
+            {
+                BindStatementNode bind => !inLambda && ReferenceEquals(child, bind.Initializer),
+                ReturnStatementNode => !inLambda,
+                AssignmentStatementNode { Target: ReferenceNode target } assign =>
+                    !inLambda && !target.Name.Contains('.') && ReferenceEquals(child, assign.Value),
+                CallStatementNode or CallExpressionNode => edge.Property?.Name == "Arguments",
+                ExpressionCallNode call => ReferenceEquals(child, call.TargetExpression), // a call, not a value
+                ConditionalExpressionNode conditional => allowed && !ReferenceEquals(child, conditional.Condition),
+                _ => false,
+            };
+            CheckValueUses(child, names, direct, inLambda || node is LambdaExpressionNode);
+        }
+    }
+
+    private void CheckLocalFunction(LocalFunctionStatementNode local)
+    {
+        var function = local.Function;
+        string? reason = null;
+        if (!_placedLocalFunctions.Contains(local))
+            reason = "must be declared directly in the body of a §F function or §MT method, not in a block, lambda or another local function";
+        else if (function.Effects != null || function.Output?.Row != null
+                 || function.Parameters.Any(parameter => parameter.Row != null))
+            reason = "cannot declare an effect row; its effects are charged to the enclosing callable";
+        else if (function.Preconditions.Count > 0 || function.Postconditions.Count > 0)
+            reason = "cannot declare §Q/§S contracts";
+        else if (function.TypeParameters.Count > 0 || function.EffectParameters.Count > 0
+                 || function.Name.Contains('<'))
+            reason = "cannot be generic";
+        else if (function.Parameters.Any(parameter => parameter.InlineRefinement != null
+                     || _typeNamesWithFacts.Contains(parameter.TypeName))
+                 || _typeNamesWithFacts.Contains(function.Output?.TypeName ?? ""))
+            reason = "cannot use a refinement or indexed type in its signature";
+        else if (RecursiveAstWalker.EnumerateStatements(function.Body).Any(statement =>
+                     statement is YieldReturnStatementNode or YieldBreakStatementNode))
+            reason = "cannot be an iterator (§YIELD/§YBRK)";
+        else if (RecursiveAstWalker.EnumerateStatements(function.Body).Any(statement =>
+                     statement is ProofObligationNode))
+            reason = "cannot contain §PROOF obligations";
+        if (reason != null)
+        {
+            _diagnostics.ReportError(
+                function.IdentifierSpan,
+                DiagnosticCode.UnsupportedLocalFunction,
+                $"Local function '{function.Name}' {reason}.");
+        }
     }
 
     private void Walk(AstNode node, ReturnShape.Kind context)
@@ -94,10 +164,27 @@ public sealed class ReturnValidationPass
             case FunctionNode or MethodNode or OperatorOverloadNode
                 or ConstructorNode or PropertyAccessorNode or EventDefinitionNode:
                 childContext = ReturnShape.Classify(node);
+                var body = node switch
+                {
+                    FunctionNode function when !_localFunctionNodes.Contains(function) => function.Body,
+                    MethodNode method => method.Body,
+                    _ => [],
+                };
+                var locals = body.OfType<LocalFunctionStatementNode>().ToArray();
+                _placedLocalFunctions.UnionWith(locals);
+                var names = locals.Select(local => local.Function.Name).ToHashSet(StringComparer.Ordinal);
+                foreach (var statement in names.Count > 0 ? body : [])
+                    CheckValueUses(statement, names, allowed: false, inLambda: false);
                 break;
             case ReturnStatementNode ret:
                 CheckReturn(ret, context);
                 break;
+            case LocalFunctionStatementNode local:
+                // A leaf for the walker: validated here, then walked as its own owner.
+                _localFunctionNodes.Add(local.Function);
+                CheckLocalFunction(local);
+                Walk(local.Function, context);
+                return;
         }
 
         foreach (var child in RecursiveAstWalker.GetChildren(node))
@@ -130,6 +217,15 @@ public sealed class ReturnValidationPass
                     interop.CSharpCode,
                     interop.Span);
                 break;
+        }
+
+        if (node is LocalFunctionStatementNode local)
+        {
+            // Walk() skips expressions: one first seen here is inside a lambda (#847).
+            if (_localFunctionNodes.Add(local.Function))
+                CheckLocalFunction(local);
+            WalkYields(local.Function, context);
+            return;
         }
 
         var childContext = EnterYieldOwner(node, context);

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Native local functions (#847).** A `§F` written inside a `§F` or `§MT` body is a local
+  function. Calor emits it in place as a C# `static` local function. Its name is visible in
+  the whole body, before the declaration too, and a bare call such as `§C{Add}` names it
+  even when the class has a method `Add`. It cannot capture the enclosing locals,
+  parameters or `this`; a capture is a compile error (`CS8421`). Its body's effects are
+  charged to the enclosing callable. Other placements and shapes (nested in a block,
+  `§E`, contracts, type parameters, refinement types, `§PROOF`, `§YIELD`) are rejected
+  with the new diagnostic `Calor0211`. So is a use as a value in a position whose effect
+  row Calor does not check, such as inside `??`, an array or a qualified store. See
+  [Local Functions](website/content/syntax-reference/structure-tags.mdx).
+
 ### Interpolated strings keep their C# target type (#906)
 
 - **Overload selection is kept.** In C#, `Kind($"k={x}")` can call `Kind(FormattableString)`
@@ -84,6 +97,11 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
 
 ### Fixed
 
+- **A local or parameter now shadows a same-named function in calls.** In
+  `§C{Add} §A 1 §/C`, if the innermost declaration named `Add` is a local or a parameter
+  (for example a `Func<i32, i32>`), the binder now treats the call as a delegate
+  invocation, as C# does. It used to resolve `Add` to a same-named class method or
+  module function, so overload errors and effect charges came from the wrong callee.
 - **C# → Calor conversion turned whole-number `double` literals into integers (#1528).**
   `double r = n / 2.0;` converted to `(/ n 2)`, which is integer division when `n` is an `int`.
   The converter now writes `2.0`, so the division stays floating-point. The same fix covers

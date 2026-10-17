@@ -879,6 +879,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(ReturnStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ForStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(WhileStatementNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(LocalFunctionStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(DoWhileStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(IfStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ElseIfClauseNode node) => throw new InvalidOperationException();

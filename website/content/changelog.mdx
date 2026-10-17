@@ -10,8 +10,26 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+### Added
+
+- **Native local functions (#847).** A `§F` written inside a `§F` or `§MT` body is a local
+  function. Calor emits it in place as a C# `static` local function. Its name is visible in
+  the whole body, before the declaration too, and a bare call such as `§C{Add}` names it
+  even when the class has a method `Add`. It cannot capture the enclosing locals,
+  parameters or `this`; a capture is a compile error (`CS8421`). Its body's effects are
+  charged to the enclosing callable. Other placements and shapes (nested in a block,
+  `§E`, contracts, type parameters, refinement types, `§PROOF`, `§YIELD`) are rejected
+  with the new diagnostic `Calor0211`. So is a use as a value in a position whose effect
+  row Calor does not check, such as inside `??`, an array or a qualified store. See
+  [Local Functions](/syntax-reference/structure-tags#local-functions).
+
 ### Fixed
 
+- **A local or parameter now shadows a same-named function in calls.** In
+  `§C{Add} §A 1 §/C`, if the innermost declaration named `Add` is a local or a parameter
+  (for example a `Func<i32, i32>`), the binder now treats the call as a delegate
+  invocation, as C# does. It used to resolve `Add` to a same-named class method or
+  module function, so overload errors and effect charges came from the wrong callee.
 - **C# iterator properties and indexers no longer convert to illegal Calor (#1139).** A getter
   that uses `yield return` or `yield break` is a C# *iterator accessor*. Calor has none:
   `§YIELD` inside a `§GET` is error `Calor0209`. The converter used to emit exactly that. Only

@@ -507,7 +507,8 @@ public sealed class WebsiteExampleCheckerTests
     // #1132 (0.25 F5): 51 -> 52, the array-expressions example in cli/convert.mdx.
     // #906 (0.25 F2): 52 -> 54, the two compiling interpolation examples in
     // syntax-reference/string-operations.mdx (Receipt formatting and the Greeting call hole).
-    private const string Pinned = "pages=96 complete=54 negative=5 grouped=3 checkedOutputs=2 illustrative=33";
+    // #847 (0.25 F3): 54 -> 55, the local-functions example in syntax-reference/structure-tags.mdx.
+    private const string Pinned = "pages=96 complete=55 negative=5 grouped=3 checkedOutputs=2 illustrative=33";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

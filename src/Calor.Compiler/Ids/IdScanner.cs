@@ -179,6 +179,8 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(ReferenceNode node) { }
     public void Visit(ForStatementNode node) { }
     public void Visit(WhileStatementNode node) { }
+    // 0.25 F3 (#847): a local function carries a function id like any §F.
+    public void Visit(LocalFunctionStatementNode node) => Visit(node.Function);
     public void Visit(DoWhileStatementNode node) { }
     public void Visit(IfStatementNode node) { }
     public void Visit(ElseIfClauseNode node) { }

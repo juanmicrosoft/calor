@@ -96,7 +96,7 @@ public static class RecursiveAstWalker
     /// in a deterministic order.
     /// </summary>
     public static PropertyInfo[] GetChildProperties(Type type) =>
-        NonExpressionCache.GetOrAdd(type, static t =>
+        NonExpressionCache.GetOrAdd(type, static t => IsSeparateCallable(t) ? [] :
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetIndexParameters().Length == 0 && CanHoldChildAstNode(p.PropertyType))
                 .OrderBy(p => p.MetadataToken)
@@ -191,12 +191,16 @@ public static class RecursiveAstWalker
     }
 
     public static PropertyInfo[] GetAllChildProperties(Type type) =>
-        AllChildrenCache.GetOrAdd(type, static t =>
+        AllChildrenCache.GetOrAdd(type, static t => IsSeparateCallable(t) ? [] :
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetIndexParameters().Length == 0 && CanHoldAnyAstNode(p.PropertyType))
                 .OrderBy(p => p.MetadataToken)
                 .ThenBy(p => p.Name, StringComparer.Ordinal)
                 .ToArray());
+
+    /// <summary>0.25 F3 (#847): a local function is a leaf; its body is another
+    /// callable, so nothing in it belongs to the enclosing body.</summary>
+    public static bool IsSeparateCallable(Type type) => type == typeof(LocalFunctionStatementNode);
 
     private static bool CanHoldChildAstNode(Type propertyType)
     {

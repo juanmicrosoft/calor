@@ -90,7 +90,9 @@ public enum BoundMemberKind
     IndexerGetter,
     IndexerSetter,
     EventAdd,
-    EventRemove
+    EventRemove,
+    /// <summary>0.25 F3 (#847): a local function; see <see cref="BoundFunction.EnclosingSymbolId"/>.</summary>
+    LocalFunction
 }
 
 /// <summary>
@@ -118,6 +120,12 @@ public sealed class BoundFunction : BoundNode
     /// The name of the containing type, or null for top-level functions.
     /// </summary>
     public string? ContainingTypeName { get; }
+
+    /// <summary>
+    /// For a <see cref="BoundMemberKind.LocalFunction"/>, the callable whose body
+    /// declares it. Analyses keyed by callable charge its body to that callable.
+    /// </summary>
+    public SymbolId? EnclosingSymbolId { get; init; }
     public override IEnumerable<BoundNode> ChildNodes => Body;
 
     public BoundFunction(TextSpan span, FunctionSymbol symbol, IReadOnlyList<BoundStatement> body, Scope scope)

@@ -2662,6 +2662,15 @@ public sealed class Parser
         {
             return ParseCallStatement();
         }
+        else if (Check(TokenKind.Func))
+        {
+            // 0.25 F3 (#847): a nested §F is a local function. Its placement and
+            // shape are validated by ReturnValidationPass (Calor0211).
+            var enclosingIf = _lastIfToken;
+            var function = ParseFunction();
+            _lastIfToken = enclosingIf;
+            return new LocalFunctionStatementNode(function.Span, function);
+        }
         else if (Check(TokenKind.Return))
         {
             return ParseReturnStatement();
