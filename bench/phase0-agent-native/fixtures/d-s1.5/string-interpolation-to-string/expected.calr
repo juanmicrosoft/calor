@@ -1,0 +1,9 @@
+§M{m001:Fixture:overflow=unchecked}
+  §CL{c001:InterpolationToString:pub:stat}
+    §MT{m002:Describe:pub:stat} (i32:count, str:name) -> str
+      §R "${name}:${count,4}|${count:D3}"
+
+    §MT{m003:Verify:pub:stat} () -> i32
+      §B{str:s} §C{Describe} §A 7 §A "ab" §/C
+      §B{str:wrapped} "<${s}>"
+      §R (+ (? (== s "ab:   7|007") 1000 0) (len wrapped))

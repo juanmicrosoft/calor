@@ -1,0 +1,10 @@
+{
+  "featureKey": "string-interpolation-to-string",
+  "supportLevel": "Full",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "runtimeEntryPoint": "Verify",
+  "runtimeExpectedInt": 1013,
+  "convertedRuntimeEntryPoint": "Verify",
+  "convertedExpectedUndefinedInt": 1013,
+  "convertedExpectedDefinedInt": 1013
+}

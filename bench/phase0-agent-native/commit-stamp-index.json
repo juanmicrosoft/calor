@@ -52,29 +52,24 @@
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "b732c4abf8b78e2327f565886e6366e2d64644ea",
-      "resolvableOnMain": "b732c4abf8b78e2327f565886e6366e2d64644ea",
-      "basis": "identical-src-tree",
-      "note": "#1335: both legs regenerated onb732c4ab after adding expected.calr and test.calr for the surrogate-literal D-S1.5 fixture. D-A files940->942; its45 early-stop identities and total demand3123 are unchanged. D-B is unchanged. The exact measured commit remains reachable through the PR merge commit. Historical measurements remain in git history.",
+      "measuredCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
+      "basis": "post-merge-write-back",
+      "note": "#906 (0.25 F2, PR #1522): both legs regenerated with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1 on 7b117564 (F2 rebased onto main plus the three string-interpolation D-S1.5 fixtures). D-A files 942 -> 948 (expected.calr and test.calr for string-interpolation-to-string, -formattable and -hole); its early-stop identities and total demand are unchanged. D-B is unchanged. Pending until the PR lands; the previous complete identity b732c4ab remains in git history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "b732c4abf8b78e2327f565886e6366e2d64644ea",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "/": "bb337f9a73ee5a80a7f9a4165863d1a10ee3838b",
-          "src": "4e0b13c9df53d9e8825f6e147f57284adef30f5d",
-          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
-          "Directory.Build.props": "5468043016a2f21b1b7eb5609d379445c756fcaa",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        "status": "pending",
+        "phase1": {
+          "headCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
+          "pr": 1522,
+          "treeHashes": {
+            "src": "0eafb6bf2b120cdfc14c4e7dab8081cc58bc81ca",
+            "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73"
+          },
+          "inputContentHashes": {
+            ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+            "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+          },
+          "artifactSha256": "82a72ede0fa179e1208094767fe624326097e55e9c4512b0e587991558f0ff4d"
         }
-      },
-      "measuredTreeHashes": {
-        "src": "4e0b13c9df53d9e8825f6e147f57284adef30f5d"
       }
     },
     {
@@ -106,22 +101,22 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "f0c71cfb50e66b9c9440653a76ca4473a86d514b",
+      "measuredCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
       "basis": "post-merge-write-back",
-      "note": "#1132 (0.25 F5, PR 2 narrowed): regenerated on f0c71cfb (the F5 PR 2 branch head, clean src). String-origin keys 826->825 (tests 137->136): the 13-11 conversion snapshot's CreateEmpty now returns a fresh §ARR{str:arrStr005:0} instead of calling Array.Empty<str>, which removes one string-origin key. Bound-origin 265, file counts, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity b2c43561 remains in git history.",
+      "note": "#906 (0.25 F2, PR #1522): regenerated with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1 on 7b117564 (F2 rebased onto main plus the three string-interpolation D-S1.5 fixtures). bench filesMeasured 380 -> 386 (the six new fixture .calr files); keysFromBound, keysFromString, the 200 floor, scope and all notMeasured identities are unchanged. F2's src changes do not move the key counts (a regeneration on the rebased tree before the fixtures moved only the stamp). Pending until the PR lands; F5's pending identity f0c71cfb remains in git history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "f0c71cfb50e66b9c9440653a76ca4473a86d514b",
-          "pr": 1554,
+          "headCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
+          "pr": 1522,
           "treeHashes": {
-            "src": "8076d4a3f4e2c0476618d18d18ab9db22585f15b"
+            "src": "0eafb6bf2b120cdfc14c4e7dab8081cc58bc81ca"
           },
           "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "c00dff70ce2ec9e790e294635622324d17bfdba8c73812b3970fb129d3170458"
+          "artifactSha256": "6b2306d24a5db116b83a4ccea52a02625a9164a65f5e5f89a35eb837379ea074"
         }
       }
     },
