@@ -2094,7 +2094,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.InterfacesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+        catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
         {
             AddModuleInteropBlock(CreateInteropBlock(node, "interface", InteropMemberKind.Class));
         }
@@ -2339,7 +2339,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        // #1144: an escalation reaches the member boundary in every C#-preserving mode,
+        // so evaluating it here must not attribute passthrough.
+        catch (Exception ex) when (ex is MemberInteropEscalationException
+            ? _context.PreservesCSharp
+            : _context.ShouldPreserveCSharp)
         {
             return CreateInteropBlock(
                 member,
@@ -2588,7 +2592,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+        catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
         {
             AddModuleInteropBlock(CreateInteropBlock(node, "struct", InteropMemberKind.Class));
         }
@@ -2688,7 +2692,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.EnumsConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+        catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
         {
             AddModuleInteropBlock(CreateInteropBlock(node, "enum", InteropMemberKind.Other));
         }
@@ -2752,7 +2756,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.IncrementConverted();
         }
 
-        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+        catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
         {
             AddModuleInteropBlock(CreateInteropBlock(node, "delegate", InteropMemberKind.Other));
         }
@@ -3010,7 +3014,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertClass(nestedClass));
                     _context.ExitType();
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(
@@ -3029,7 +3033,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertStruct(nestedStruct));
                     _context.ExitType();
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(
@@ -3054,7 +3058,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _context.RecordFeatureUsage("nested-type");
                     nestedInterfaces.Add(ConvertInterface(nestedIface));
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
                 {
                     interopBlocks.Add(CreateInteropBlock(
                         member,
@@ -3090,7 +3094,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(nestedEnum), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
                 {
                     interopBlocks.Add(CreateInteropBlock(
                         member,
@@ -3111,7 +3115,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _delegates.Clear();
                     _delegates.AddRange(savedDelegates);
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
                 {
                     interopBlocks.Add(CreateInteropBlock(
                         member,
@@ -3125,7 +3129,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
-            catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+            catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
             {
                 var kind = member switch
                 {
@@ -3594,13 +3598,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (member is ClassDeclarationSyntax nc)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(nc.Identifier.Text); nestedClasses.Add(ConvertClass(nc)); _context.ExitType(); }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is StructDeclarationSyntax ns)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(ns.Identifier.Text); nestedClasses.Add(ConvertStruct(ns)); _context.ExitType(); }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is RecordDeclarationSyntax nestedRecord)
@@ -3614,7 +3618,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (member is InterfaceDeclarationSyntax ni)
             {
                 try { _context.RecordFeatureUsage("nested-type"); nestedInterfaces.Add(ConvertInterface(ni)); }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is EnumDeclarationSyntax ne)
@@ -3643,7 +3647,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(ne), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is DelegateDeclarationSyntax nd)
@@ -3658,7 +3662,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _delegates.Clear();
                     _delegates.AddRange(savedDelegates);
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
+                catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
 
@@ -3666,7 +3670,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
-            catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
+            catch (Exception ex) when (ex is MemberInteropEscalationException || _context.ShouldPreserveCSharp)
             {
                 var kind = member switch
                 {
@@ -6845,8 +6849,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _ => HandleUnsupportedStatement(statement)
             };
         }
-        catch (Exception ex) when (_context.ShouldPreserveCSharp &&
-            ex is not MemberInteropEscalationException { PreserveMember: true })
+        // #1144: an escalation is preserved in every C#-preserving mode (at the member
+        // boundary if not here), so it does not attribute passthrough; a gate-caused
+        // escalation (ConvertExpression's crash containment) already did.
+        catch (Exception ex) when (ex is MemberInteropEscalationException escalation
+            ? !escalation.PreserveMember && _context.PreservesCSharp
+            : _context.ShouldPreserveCSharp)
         {
             // In C#-preserving modes an escalated (or crashed) expression is
             // contained at the nearest statement boundary: the statement is
@@ -9482,7 +9490,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             };
         }
 
-        catch (Exception ex) when (_context.ShouldPreserveCSharp && ex is not MemberInteropEscalationException)
+        catch (Exception ex) when (ex is not MemberInteropEscalationException && _context.ShouldPreserveCSharp)
         {
             // A crash while converting an expression is a loss like any other
             // unsupported expression: escalate to the nearest complete
