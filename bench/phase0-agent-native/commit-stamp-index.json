@@ -106,22 +106,22 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "75424a02885a92ca18e72fa645cb5a5a4f69b4d9",
+      "measuredCommit": "f0c71cfb50e66b9c9440653a76ca4473a86d514b",
       "basis": "post-merge-write-back",
-      "note": "#1132 (0.25 F5, PR 2 narrowed): regenerated on 75424a02 (the F5 PR 2 branch head, clean src). String-origin keys 826->825 (tests 137->136): the 13-11 conversion snapshot's CreateEmpty now returns a fresh §ARR{str:arrStr005:0} instead of calling Array.Empty<str>, which removes one string-origin key. Bound-origin 265, file counts, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity b2c43561 remains in git history.",
+      "note": "#1132 (0.25 F5, PR 2 narrowed): regenerated on f0c71cfb (the F5 PR 2 branch head, clean src). String-origin keys 826->825 (tests 137->136): the 13-11 conversion snapshot's CreateEmpty now returns a fresh §ARR{str:arrStr005:0} instead of calling Array.Empty<str>, which removes one string-origin key. Bound-origin 265, file counts, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity b2c43561 remains in git history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "75424a02885a92ca18e72fa645cb5a5a4f69b4d9",
+          "headCommit": "f0c71cfb50e66b9c9440653a76ca4473a86d514b",
           "pr": 1554,
           "treeHashes": {
-            "src": "7174d78d12e14d7b39950a96f25632359fc2f62e"
+            "src": "8076d4a3f4e2c0476618d18d18ab9db22585f15b"
           },
           "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "517a89acf49dd14a480c9a192241c0f3108988adbdbe2f8eec7c35f98069ec62"
+          "artifactSha256": "c00dff70ce2ec9e790e294635622324d17bfdba8c73812b3970fb129d3170458"
         }
       }
     },
