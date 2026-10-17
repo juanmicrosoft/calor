@@ -1,0 +1,13 @@
+{
+  "featureKey": "collection-initializer",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 321,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 321,
+  "convertedExpectedDefinedInt": 321,
+  "definedSymbols": []
+}

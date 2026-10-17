@@ -1,0 +1,25 @@
+§M{m001:Fixture:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Bag:pub:seal}
+    §FLD{List<i32>:_items:priv:readonly}
+
+    §PROP{p003:Count:i32:pub}
+      §GET{pub}
+        §R _items.Count
+
+    §CTOR{ctor002:pub} (List<i32>:items)
+      §ASSIGN _items items
+
+    §MT{m004:Sum:pub} () -> i32
+      §B{~total} 0
+      §EACH{each005:item:var} _items
+        §ASSIGN total (+ total item)
+      §R total
+
+
+  §CL{c006:CollectionInitializerHarness:pub:stat}
+    §MT{m007:Run:pub:stat} () -> i32
+      §B{bag} §CS{new Bag(new List<int> { 5, 7, 9 })}
+      §R (+ (* bag.Count 100) §C{bag.Sum} §/C)
+
