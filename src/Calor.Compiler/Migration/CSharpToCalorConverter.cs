@@ -315,6 +315,7 @@ public sealed class CSharpToCalorConverter
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
         context.OriginalSource = csharpSource;
+        context.ReserveNamesFrom(_options.AdditionalSemanticSyntaxTrees);
 
         try
         {
@@ -433,6 +434,8 @@ public sealed class CSharpToCalorConverter
                 parseOptions,
                 cancellationToken: cancellationToken);
             var root = syntaxTree.GetCompilationUnitRoot();
+            // #1132: the tree actually converted (its preprocessor symbols) also reserves names.
+            context.ReserveNamesFrom([syntaxTree]);
             effectiveOutputKind = parseOptions.Kind == SourceCodeKind.Script
                 ? OutputKind.DynamicallyLinkedLibrary
                 : root.Members.OfType<GlobalStatementSyntax>().Any()

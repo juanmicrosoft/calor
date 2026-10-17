@@ -504,7 +504,8 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     // #1139 (0.25 F4): complete 49 -> 51, the two converted-output examples in cli/convert.mdx.
-    private const string Pinned = "pages=96 complete=51 negative=5 grouped=3 checkedOutputs=2 illustrative=33";
+    // #1132 (0.25 F5): 51 -> 52, the array-expressions example in cli/convert.mdx.
+    private const string Pinned = "pages=96 complete=52 negative=5 grouped=3 checkedOutputs=2 illustrative=33";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

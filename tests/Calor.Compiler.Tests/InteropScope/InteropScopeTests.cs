@@ -186,7 +186,7 @@ public class InteropScopeTests
         ["mapped repair with another merge commit"] = ("S012", scope => {
             var m = scope["mappedBlockers"]!["applicable"]![0]!; m["mergeCommit"] = new string('3', 40); return null; }),
         ["amendment mapping differs from the packet"] = ("S012", scope => {
-            scope["amendments"]!.AsArray().Last()!["mappedBlockers"]!["R-TEXT"] = new JsonArray("F2", "F4"); return null; }),
+            scope["amendments"]!.AsArray().Last(a => a!["mappedBlockers"] is JsonObject)!["mappedBlockers"]!["R-TEXT"] = new JsonArray("F2", "F4"); return null; }),
         ["READY without a mapped blocker's witness run"] = ("S007", scope => { MappedResolution(Ready(scope, "F2"), 1496).AsObject().Remove("witnessRun"); return null; }),
         ["READY with a witness run from another candidate"] = ("S007", scope => {
             MappedResolution(Ready(scope, "F2"), 1496)["witnessRun"] = $"{Dir}/ready/witness-R-OBL.{new string('2', 40)}.json"; return null; }),
@@ -437,7 +437,9 @@ public class InteropScopeTests
     /// <summary>Copies an exception's current value into its amendment, to isolate a control from the copy check.</summary>
     private static void Reregister(JsonNode scope, string id)
     {
-        var copies = scope["amendments"]!.AsArray().Last()!["capacityExceptions"]!.AsArray();
+        // The amendment that registered this exception, not necessarily the latest one.
+        var version = Exception(scope, id)["amendment"]!.GetValue<string>();
+        var copies = scope["amendments"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == version)!["capacityExceptions"]!.AsArray();
         var i = copies.Select((c, k) => (c, k)).Single(x => x.c!["id"]!.GetValue<string>() == id).k;
         copies[i] = Exception(scope, id).DeepClone();
     }

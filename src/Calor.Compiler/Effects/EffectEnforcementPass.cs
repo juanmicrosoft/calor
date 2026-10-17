@@ -5578,8 +5578,10 @@ public sealed class EffectEnforcementPass
                         ? InferFromExpression(arrayCreation.Size)
                         : EffectSet.Empty)
                     .Union(InferFromMany(arrayCreation.Initializer)),
+                // #1132: the rows' elements are evaluated too; they were not charged.
                 MultiDimArrayCreationNode multiDim => EffectSet.From("alloc")
-                    .Union(InferFromMany(multiDim.DimensionSizes)),
+                    .Union(InferFromMany(multiDim.DimensionSizes))
+                    .Union(InferFromMany(multiDim.Initializer.SelectMany(row => row).ToList())),
                 MultiDimArrayAccessNode multiDimAccess =>
                     InferFromExpression(multiDimAccess.Array).Union(InferFromMany(multiDimAccess.Indices)),
                 ArrayLengthNode arrayLength => InferFromExpression(arrayLength.Array),
