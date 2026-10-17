@@ -93,6 +93,9 @@ public class RefOutImplementationTests
     [InlineData("readonly reference-typed field in an in struct",
         "  §CL{c1:Box:pub}\n    §FLD{i32:N:pub:readonly}\n  §CL{s1:S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C",
         "  §CL{c1:Box:pub}\n    §FLD{i32:N:pub}\n  §CL{s1:S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C")]
+    [InlineData("two-index indexer element (Codex R3-5)",
+        "  §CL{c1:Grid:pub}\n    §IXER{ix1:i32:pub}\n      §I{i32:r}\n      §I{i32:c}\n      §GET\n        §R 1\n  §F{f1:Run:pub} (Grid:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C",
+        "  §F{f1:Run:pub} (i32[,]:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C")]
     [InlineData("discard bound to a field named _",
         "  §CL{c1:K:pub}\n    §FLD{i32:_:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C",
         "  §CL{c1:K:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C")]

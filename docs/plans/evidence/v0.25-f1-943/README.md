@@ -64,12 +64,12 @@ default by `Calor0272`/`Calor0273` (nullability), preserved elsewhere.
 
 ## Tests
 
-- `tests/Calor.Compiler.Tests/InteropScope/RefOutImplementationTests.cs` (295 cases): operand
+- `tests/Calor.Compiler.Tests/InteropScope/RefOutImplementationTests.cs` (296 cases): operand
   refusals each with an accepted control, effect charges, alias and loop back-edge narrowing with
   controls, overloaded operators and disposal, proof soundness, the D1-ANA-06 witness, local
   functions, out-var bounds, `ref`→`in`, and the convert/compile/run/compare oracle for every R0 F1
   row, both interaction fixtures, every D1 C# witness and the Codex conversion reproducers on 5
-  surfaces. Round-3 finding R3-5 (`§IDX2D` on an indexer) has no dedicated test.
+  surfaces.
 - `RefOutContractTests`/`RefOutContractCaseTests`: the registry with updated observations; the
   hypothetical-allocation controls now use the real `Calor0212`.
 - Totals (`dotnet test`, 2026-10-17): see the PR body.
