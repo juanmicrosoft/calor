@@ -1,6 +1,6 @@
 {
   "schema": "calor.refout-contract/1",
-  "contractVersion": "1.0.2",
+  "contractVersion": "1.0.3",
   "status": "PROPOSED",
   "recordedAtUtc": "2026-10-07T00:00:00Z",
   "issue": 1427,
@@ -10,7 +10,7 @@
   "measuredAt": {"commit": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff", "srcTree": "bb50f35e08a93aca984f4b0a53a6f11d5b1da693"},
   "consumes": [
     {"id": "nullability-0.22", "issue": 1379, "path": "docs/plans/v0.22-nullability-enforcement-scoping.md", "revision": "d0dc0f8bf3ea400b1d7d16780a98d9ff3341abc7", "blob": "cc5fcf955d394bfd20b1321a89cba8a9ba6137ab"},
-    {"id": "r0-scope", "issue": 1426, "path": "docs/plans/evidence/v0.25-r0-1426/scope.json", "scopeVersion": "1.1.0"},
+    {"id": "r0-scope", "issue": 1426, "path": "docs/plans/evidence/v0.25-r0-1426/scope.json", "scopeVersion": "1.2.0"},
     {"id": "r-obl", "issue": 1413, "pr": 1496, "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06", "residualsPr": 1503, "residualsMergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3"}
   ],
   "vocabularies": {
@@ -730,6 +730,7 @@
   ],
   "amendments": [
     {"version": "1.0.1", "dateUtc": "2026-10-12T03:00:09Z", "pr": 1518, "justification": "Records the maintainer's answers (@juanmicrosoft, 2026-10-11) to the four section 15 questions. No rule, case, expectation, diagnostic or consumed revision changes; the seal is unchanged.", "decisions": [{"question": 1, "answer": "Accept parity for immutable bindings and loop variables.", "followUp": 1550}, {"question": 2, "answer": "Accept RO-EFF-4 parity.", "followUp": 1551}, {"question": 3, "answer": "Accept the bounded out var lowering (RO-DECL-1)."}, {"question": 4, "answer": "Allocate InvalidByReferenceOperand in #943."}], "source": "Relayed by the maintainer through the agent session; no GitHub record."},
-    {"version": "1.0.2", "dateUtc": "2026-10-12T04:44:22Z", "pr": 1518, "justification": "Consumes R0 scope version 1.1.0 (amendment 1.1.0, PR #1553, merged; R0 MET) instead of 1.0.0, because D001 requires the consumed version to equal scope.json's. Amendment 1.1.0 changes none of the R0 rows this contract consumes (F1-REFOUT-01..08, A1, A2); it adds F1-owned interaction and documentation rows and maps R-OBL (#1496) and R-OBL-RESIDUALS (#1503) as F1 blockers, both already consumed here. consumes is sealed, so the seal is re-pinned; no rule, case, expectation or diagnostic changes. No Codex review: the PR's review budget (3 rounds plus 1 verification pass) is spent and this change is mechanical, as the coordinating session directed.", "changes": [{"field": "consumes.r0-scope.scopeVersion", "from": "1.0.0", "to": "1.1.0"}], "review": "none (budget spent; mechanical change)"}
+    {"version": "1.0.2", "dateUtc": "2026-10-12T04:44:22Z", "pr": 1518, "justification": "Consumes R0 scope version 1.1.0 (amendment 1.1.0, PR #1553, merged; R0 MET) instead of 1.0.0, because D001 requires the consumed version to equal scope.json's. Amendment 1.1.0 changes none of the R0 rows this contract consumes (F1-REFOUT-01..08, A1, A2); it adds F1-owned interaction and documentation rows and maps R-OBL (#1496) and R-OBL-RESIDUALS (#1503) as F1 blockers, both already consumed here. consumes is sealed, so the seal is re-pinned; no rule, case, expectation or diagnostic changes. No Codex review: the PR's review budget (3 rounds plus 1 verification pass) is spent and this change is mechanical, as the coordinating session directed.", "changes": [{"field": "consumes.r0-scope.scopeVersion", "from": "1.0.0", "to": "1.1.0"}], "review": "none (budget spent; mechanical change)"},
+    {"version": "1.0.3", "dateUtc": "2026-10-16T00:00:00Z", "pr": 1554, "justification": "Mechanical consumption bump caused by R0 amendment 1.2.0, which the F5 PR (#1132, PR #1554) records: consumes R0 scope version 1.2.0 instead of 1.1.0, because D001 requires the consumed version to equal scope.json's. Amendment 1.2.0 only adds two F5 capacity exceptions (EXC-F5-NONTEST-LINES-PR2, EXC-F5-PR2-FIX-VERIFY); it changes no case, ceiling or gate state, so none of the R0 rows this contract consumes (F1-REFOUT-01..08, A1, A2). consumes is sealed, so the seal is re-pinned; no rule, case, expectation or diagnostic changes. Made in the F5 PR at the maintainer's direction (option b, 2026-10-16).", "changes": [{"field": "consumes.r0-scope.scopeVersion", "from": "1.1.0", "to": "1.2.0"}], "review": "none (mechanical change; reviewed only as part of the F5 PR)"}
   ]
 }

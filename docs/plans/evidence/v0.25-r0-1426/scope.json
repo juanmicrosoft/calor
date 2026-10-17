@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-interop-scope/1",
-  "scopeVersion": "1.1.0",
+  "scopeVersion": "1.2.0",
   "status": "FROZEN",
   "gateStatus": "MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
@@ -436,6 +436,37 @@
         "scope": "One verification-only pass; no further adversarial round.",
         "amendment": "1.1.0",
         "basis": "D-F5-EXCEPTIONS"
+      },
+      {
+        "id": "EXC-F5-NONTEST-LINES-PR2",
+        "ceiling": "family-nontest-lines-F5",
+        "pr": 1554,
+        "ceilingValue": 600,
+        "allowed": 880,
+        "extends": "EXC-F5-NONTEST-LINES",
+        "measured": {
+          "added": 592,
+          "removed": 286,
+          "changed": 878,
+          "at": "68ddfc8d5",
+          "command": "git diff --numstat origin/main...HEAD -- src (milestone-0.25/f5-1132-narrowed)"
+        },
+        "decision": "@juanmicrosoft, 2026-10-13: 'Exception: fix + 1 pass'. Extends EXC-F5-NONTEST-LINES (recorded for #1521 only) to F5's second and last PR, the narrowed re-scope, at no more than 880 changed non-test lines. Relayed in the agent session by the coordinating session; no GitHub record.",
+        "scope": "F5 PR 2 (branch milestone-0.25/f5-1132-narrowed) only, at <= 880 changed non-test lines (git diff --numstat origin/main...HEAD -- src). #1521 is closed unmerged, so this PR's count is F5's family total.",
+        "amendment": "1.2.0",
+        "confirmed": true
+      },
+      {
+        "id": "EXC-F5-PR2-FIX-VERIFY",
+        "ceiling": "review-rounds",
+        "pr": 1554,
+        "ceilingValue": 3,
+        "allowedExtraPasses": 1,
+        "covers": "One fix for the MAJOR left open by F5 PR 2's verification pass (reviews/pr2-verification.md): a constant earlier argument whose conversion to the parameter is user-defined kept in place while a later argument is hoisted (HoistComplexArguments.InPlace), plus its witness test.",
+        "decision": "@juanmicrosoft, 2026-10-13: 'Exception: fix + 1 pass'. Relayed in the agent session by the coordinating session; no GitHub record.",
+        "scope": "Exactly one fix and exactly one Codex verification-only pass on it (reviews/pr2-extra-verification.md); no further adversarial round. A BLOCKING or MAJOR finding in that pass stops the PR for a maintainer decision.",
+        "amendment": "1.2.0",
+        "confirmed": true
       }
     ]
   },
@@ -2938,6 +2969,61 @@
           "from": "NOT_STARTED",
           "to": "NOT_STARTED",
           "reason": "No F1 (#943) branch or PR exists; F1 waits on D1 #1427 (draft PR #1518)."
+        }
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "dateUtc": "2026-10-16T00:00:00Z",
+      "pr": 1554,
+      "afterInspection": true,
+      "justification": "Records the maintainer's 2026-10-13 decision for F5 PR 2 (#1132, narrowed re-scope after #1521): one more fix plus exactly one Codex verification-only pass for the MAJOR its verification pass left open, and an extension of EXC-F5-NONTEST-LINES to this PR at <= 880 changed non-test lines. Recorded before the fix and the pass run. No case, ceiling or gate state changes.",
+      "addedCases": [],
+      "changes": [],
+      "removedCases": [],
+      "maintainerDecisions": [
+        {
+          "id": "D-F5-PR2-EXCEPTIONS",
+          "date": "2026-10-13",
+          "by": "@juanmicrosoft",
+          "decision": "'Exception: fix + 1 pass' for F5 PR 2: EXC-F5-PR2-FIX-VERIFY and EXC-F5-NONTEST-LINES-PR2 (capacity.exceptions). Relayed in the agent session by the coordinating session; no GitHub record.",
+          "exceptions": [
+            "EXC-F5-NONTEST-LINES-PR2",
+            "EXC-F5-PR2-FIX-VERIFY"
+          ]
+        }
+      ],
+      "capacityExceptions": [
+        {
+          "id": "EXC-F5-NONTEST-LINES-PR2",
+          "ceiling": "family-nontest-lines-F5",
+          "pr": 1554,
+          "ceilingValue": 600,
+          "allowed": 880,
+          "extends": "EXC-F5-NONTEST-LINES",
+          "measured": {
+            "added": 592,
+            "removed": 286,
+            "changed": 878,
+            "at": "68ddfc8d5",
+            "command": "git diff --numstat origin/main...HEAD -- src (milestone-0.25/f5-1132-narrowed)"
+          },
+          "decision": "@juanmicrosoft, 2026-10-13: 'Exception: fix + 1 pass'. Extends EXC-F5-NONTEST-LINES (recorded for #1521 only) to F5's second and last PR, the narrowed re-scope, at no more than 880 changed non-test lines. Relayed in the agent session by the coordinating session; no GitHub record.",
+          "scope": "F5 PR 2 (branch milestone-0.25/f5-1132-narrowed) only, at <= 880 changed non-test lines (git diff --numstat origin/main...HEAD -- src). #1521 is closed unmerged, so this PR's count is F5's family total.",
+          "amendment": "1.2.0",
+          "confirmed": true
+        },
+        {
+          "id": "EXC-F5-PR2-FIX-VERIFY",
+          "ceiling": "review-rounds",
+          "pr": 1554,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "One fix for the MAJOR left open by F5 PR 2's verification pass (reviews/pr2-verification.md): a constant earlier argument whose conversion to the parameter is user-defined kept in place while a later argument is hoisted (HoistComplexArguments.InPlace), plus its witness test.",
+          "decision": "@juanmicrosoft, 2026-10-13: 'Exception: fix + 1 pass'. Relayed in the agent session by the coordinating session; no GitHub record.",
+          "scope": "Exactly one fix and exactly one Codex verification-only pass on it (reviews/pr2-extra-verification.md); no further adversarial round. A BLOCKING or MAJOR finding in that pass stops the PR for a maintainer decision.",
+          "amendment": "1.2.0",
+          "confirmed": true
         }
       ]
     }
