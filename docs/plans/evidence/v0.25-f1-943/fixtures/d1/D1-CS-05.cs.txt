@@ -1,0 +1,14 @@
+using System;
+public static class Probe
+{
+    static void SetThenThrow(out int r) { r = 1; throw new InvalidOperationException("boom"); }
+    static void BumpThenThrow(ref int r) { r = r + 10; throw new InvalidOperationException("boom"); }
+    public static string Run()
+    {
+        int r = 5;
+        try { SetThenThrow(out r); } catch (InvalidOperationException) { }
+        int s = 5;
+        try { BumpThenThrow(ref s); } catch (InvalidOperationException) { }
+        return r + "|" + s;
+    }
+}

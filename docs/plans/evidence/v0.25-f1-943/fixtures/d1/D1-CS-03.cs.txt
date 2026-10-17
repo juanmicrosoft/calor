@@ -1,0 +1,12 @@
+public struct Inner { public int X; }
+public struct Outer { public Inner In; }
+public static class Probe
+{
+    static void Bump(ref int x) { x = x + 1; }
+    public static string Run()
+    {
+        var o = new Outer();
+        Bump(ref o.In.X);
+        return o.In.X.ToString();
+    }
+}

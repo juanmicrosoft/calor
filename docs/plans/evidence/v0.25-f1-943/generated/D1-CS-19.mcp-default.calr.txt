@@ -1,0 +1,19 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Bump:priv:stat} (i32:x:ref)
+        §ASSIGN x (+ x 1)
+
+      §MT{m003:Run:pub:stat} () -> str
+        §E{alloc}
+        §B{Span<i32>:span} §SALLOC{i32} 1 2 §/SALLOC
+        §RAW
+        Bump(ref span[0]);
+        §/RAW
+        §B{~_hoist000} §IDX{span} 0
+        §R (str _hoist000)
+
+
+

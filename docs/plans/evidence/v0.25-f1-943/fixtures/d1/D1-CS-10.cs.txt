@@ -1,0 +1,12 @@
+using System.Collections.Generic;
+public static class Probe
+{
+    public static string Run()
+    {
+        var d = new Dictionary<string, int> { ["a"] = 1 };
+        string? k = null;
+        int v = 0;
+        bool ok = k != null && d.TryGetValue(k, out v);
+        return ok + "|" + v;
+    }
+}

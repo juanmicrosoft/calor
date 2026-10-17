@@ -1,0 +1,14 @@
+§M{m001:D1-CS-23:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Twice:priv:stat} (i32:x:in) -> i32
+        §R (* x 2)
+
+      §MT{m003:Run:pub:stat} () -> str
+        §B{i32:seven} 7
+        §RAW
+        return Twice(7) + "|" + Twice(seven);
+        §/RAW
+
+
+

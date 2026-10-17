@@ -1,0 +1,10 @@
+public static class Probe
+{
+    static int counter = 10;
+    static int BumpAndRead(ref int x) { x = x + 1; return counter; }
+    public static string Run()
+    {
+        int seen = BumpAndRead(ref counter);
+        return seen + "|" + counter;
+    }
+}

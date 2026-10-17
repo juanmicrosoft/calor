@@ -1,0 +1,15 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{i32:counter:priv:stat} = 10
+
+      §MT{m002:BumpAndRead:priv:stat} (i32:x:ref) -> i32
+        §ASSIGN x (+ x 1)
+        §R counter
+
+      §MT{m003:Run:pub:stat} () -> str
+        §B{i32:seen} §C{BumpAndRead} §A{ref} counter §/C
+        §R (+ (+ seen "|") counter)
+
+
+

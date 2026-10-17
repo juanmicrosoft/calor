@@ -1,0 +1,13 @@
+public static class Probe
+{
+    static void AddBoth(ref int a, ref int b) { a = a + 1; b = b + 10; }
+    static int AddAndRead(ref int a, int b) { a = a + 100; return b; }
+    public static string Run()
+    {
+        int v = 0;
+        AddBoth(ref v, ref v);
+        int w = 1;
+        int seen = AddAndRead(ref w, w);
+        return v + "|" + w + "|" + seen;
+    }
+}

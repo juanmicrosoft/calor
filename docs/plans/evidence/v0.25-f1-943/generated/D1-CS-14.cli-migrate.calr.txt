@@ -1,0 +1,18 @@
+§M{m001:Fixture:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Run:pub:stat} () -> str
+        §E{alloc,mut}
+        §B{fs} §NEW{List<Func<i32>>} §/NEW
+        §EACH{each003:s:var} §ARR{arr004:str} "1" "2" §/ARR{arr004}
+          §B{~n:i32}
+          §B{_lam007} §LAM{lam006} n §/LAM{lam006}
+          §IF{if005} §C{int.TryParse} §A s §A{out} n §/C
+            §C{fs.Add} _lam007
+        §R (+ (+ §CS{fs[0]()} "|") §CS{fs[1]()})
+
+
+
