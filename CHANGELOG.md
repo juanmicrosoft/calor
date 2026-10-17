@@ -40,6 +40,11 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
 
 ### Fixed
 
+- **C# → Calor conversion turned whole-number `double` literals into integers (#1528).**
+  `double r = n / 2.0;` converted to `(/ n 2)`, which is integer division when `n` is an `int`.
+  The converter now writes `2.0`, so the division stays floating-point. The same fix covers
+  attribute arguments (`[Kind(2.0)]` no longer picks an `int` overload) and keeps
+  `default(float)` and `default(decimal)` at their own width (`SINGLE:0`, `DEC:0`).
 - **C# iterator properties and indexers no longer convert to illegal Calor (#1139).** A getter
   that uses `yield return` or `yield break` is a C# *iterator accessor*. Calor has none:
   `§YIELD` inside a `§GET` is error `Calor0209`. The converter used to emit exactly that. Only

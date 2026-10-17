@@ -10827,11 +10827,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("default-expression");
         _context.IncrementConverted();
-        var typeName = defaultExpr.Type.ToString();
+        // #1528: dispatch on the resolved type, not its spelling (`using Single = System.Int32;`).
+        var typeName = _semanticModel?.GetTypeInfo(defaultExpr.Type).Type?.SpecialType switch
+        {
+            null => defaultExpr.Type.ToString(),
+            SpecialType.System_Int32 => "int",
+            SpecialType.System_Int64 => "long",
+            SpecialType.System_Int16 => "short",
+            SpecialType.System_Byte => "byte",
+            SpecialType.System_Double => "double",
+            SpecialType.System_Single => "float",
+            SpecialType.System_Decimal => "decimal",
+            SpecialType.System_Boolean => "bool",
+            SpecialType.System_String => "string",
+            _ => ""
+        };
         return typeName switch
         {
             "int" or "Int32" or "long" or "Int64" or "short" or "byte" => new IntLiteralNode(GetTextSpan(defaultExpr), 0),
-            "double" or "float" or "decimal" or "Double" or "Single" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0),
+            // #1528: keep the literal's width; a plain 0.0 is a double.
+            "double" or "Double" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0),
+            "float" or "Single" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0) { IsSingle = true },
+            "decimal" or "Decimal" => new DecimalLiteralNode(GetTextSpan(defaultExpr), 0m),
             "bool" or "Boolean" => new BoolLiteralNode(GetTextSpan(defaultExpr), false),
             "string" or "String" => new ReferenceNode(GetTextSpan(defaultExpr), "null"),
             _ => new ReferenceNode(GetTextSpan(defaultExpr), "default")
