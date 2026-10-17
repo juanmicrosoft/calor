@@ -66,34 +66,22 @@
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
+      "measuredCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
       "basis": "post-merge-write-back",
-      "note": "#906 (0.25 F2, PR #1522): both legs regenerated with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1 on 7b117564 (F2 rebased onto main plus the three string-interpolation D-S1.5 fixtures). D-A files 942 -> 948 (expected.calr and test.calr for string-interpolation-to-string, -formattable and -hole); its early-stop identities and total demand are unchanged. D-B is unchanged. Pending until the PR lands; the previous complete identity b732c4ab remains in git history.",
+      "note": "#847 (0.25 F3, converter PR): both legs regenerated on dee529b8 (the F3 converter PR head, clean src) after adding expected.calr and test.calr for the local-function D-S1.5 fixture. D-A files 948->950; its 45 early-stop identities and total demand 3123 are unchanged. D-B is unchanged. Pending until the PR lands; the previous identity (F2, #1522, measured 7b117564, completed by the #1557 write-back) remains in git history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "b4a58bc237ecdef9d1792e6c86b2936c1bf5b6ff",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "0eafb6bf2b120cdfc14c4e7dab8081cc58bc81ca",
-          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
-          "/": "641a3c0376fbd86578d9c91d5867b870c6d73cf1"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
-          "pr": 1522,
-          "phase1TreeHashes": {
-            "src": "0eafb6bf2b120cdfc14c4e7dab8081cc58bc81ca",
-            "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73"
+        "status": "pending",
+        "phase1": {
+          "headCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
+          "pr": 1531,
+          "treeHashes": {
+            "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "phase1ArtifactSha256": "82a72ede0fa179e1208094767fe624326097e55e9c4512b0e587991558f0ff4d"
+          "artifactSha256": "78d3237937aef7295310af5189040419d556c9be8bb6ef5f35bdea50355e0ccd"
         }
       }
     },
@@ -126,32 +114,22 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
+      "measuredCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
       "basis": "post-merge-write-back",
-      "note": "#906 (0.25 F2, PR #1522): regenerated with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1 on 7b117564 (F2 rebased onto main plus the three string-interpolation D-S1.5 fixtures). bench filesMeasured 380 -> 386 (the six new fixture .calr files); keysFromBound, keysFromString, the 200 floor, scope and all notMeasured identities are unchanged. F2's src changes do not move the key counts (a regeneration on the rebased tree before the fixtures moved only the stamp). Pending until the PR lands; F5's pending identity f0c71cfb remains in git history.",
+      "note": "#847 (0.25 F3, converter PR): regenerated on dee529b8 (the F3 converter PR head, clean src) after adding expected.calr and test.calr for the local-function D-S1.5 fixture. bench filesMeasured 386->388; bound-origin and string-origin key totals, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity (F2, #1522, measured 7b117564, completed by the #1557 write-back) remains in git history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "b4a58bc237ecdef9d1792e6c86b2936c1bf5b6ff",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "0eafb6bf2b120cdfc14c4e7dab8081cc58bc81ca",
-          "/": "641a3c0376fbd86578d9c91d5867b870c6d73cf1"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "7b1175649fe882d4b83b2f170ae2aa76dca9ffdf",
-          "pr": 1522,
-          "phase1TreeHashes": {
-            "src": "0eafb6bf2b120cdfc14c4e7dab8081cc58bc81ca"
+        "status": "pending",
+        "phase1": {
+          "headCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
+          "pr": 1531,
+          "treeHashes": {
+            "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "phase1ArtifactSha256": "6b2306d24a5db116b83a4ccea52a02625a9164a65f5e5f89a35eb837379ea074"
+          "artifactSha256": "25f9c9b1e8877299d22973375a76b35e639b043c5b5cbec1c0bdd145f04134d0"
         }
       }
     },
