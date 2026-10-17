@@ -125,7 +125,7 @@ pins this as main's behavior (rows 21-23); it is not an array-receiver certifica
 fails only on effect diagnostics it is also compiled with `--permissive-effects` (the R0 driver's
 `compile_with_fallback`), and the generated C# is run against the original.
 
-Measured at `636b98fcb` (`src/` tree `9abb7011`), after every PR 2 fix and the rebase onto `8a39bc875`; Release build, macOS arm64. The per-surface outcome is the same as at `241006e3a`.
+Measured at `75424a028` (`src/` tree `7174d78d`), after every PR 2 fix and the rebase onto `cc54c038a` (F6 #1513 merged); Release build, macOS arm64. The per-surface outcome is the same as at `241006e3a`.
 
 | Case | Every surface (`cli-default`, `cli-passthrough`, `cli-no-fallback`, `cli-migrate`, `mcp-default`, `mcp-passthroughOnError`, `mcp-passthroughOnError-moduleName`) |
 |---|---|
@@ -159,7 +159,7 @@ PR 1's table (below) holds, with these changes:
 (tests 137 -> 136). The cause is the `13-11` conversion snapshot: `CreateEmpty` returned
 `§C{Array.Empty<str>}` (one resolver key) and now returns a fresh `§ARR{str:arrStr005:0}`. #1521's
 note attributed the delta to element typing; with element typing removed, the delta remains, so that
-attribution was wrong. The ledger is regenerated at `636b98fcb` with a pending identity (PR #1554) (phase 1 names that head and the PR), as #1521 did.
+attribution was wrong. The ledger is regenerated at `75424a028` with a pending identity (PR #1554) (phase 1 names that head and the PR), as #1521 did.
 
 ### Mapped 0.24 blockers (how the READY record must resolve them)
 
@@ -182,11 +182,11 @@ whose body has a native throwing element initializer or an element store); none 
 
 ### Tests (PR 2)
 
-Fast lane, isolated HOME and CALOR_HOME, at `3be4ecee8` (the final code; later commits change only docs, the manifest and the ledger):
+Fast lane, isolated HOME and CALOR_HOME, on the branch rebased onto `cc54c038a` (final code; F6's `ConversionPathReportingTests` use rescue stand-ins for F5-ARRAY-01/02, which now convert natively):
 
 | Project | Total | Failed | Skipped |
 |---|---|---|---|
-| Calor.Compiler.Tests | 13614 | 0 | 9 locally (corpus submodules not initialized; 3 in CI) |
+| Calor.Compiler.Tests | 13650 | 0 | 9 locally (corpus submodules not initialized; 3 in CI) |
 | Calor.Conversion.Tests | 476 | 0 | 0 |
 | Calor.Semantics.Tests | 55 | 0 | 0 |
 | Calor.Enforcement.Tests | 695 | 0 | 1 |
