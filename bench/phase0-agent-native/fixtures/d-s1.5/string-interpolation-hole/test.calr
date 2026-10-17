@@ -1,0 +1,11 @@
+§M{m001:InterpolationHoleTest}
+  §F{f001:Verify:pub} () -> i32
+    §E{alloc}
+    §S (== result 58)
+    §ARR{items:i32}
+      3
+      5
+      8
+    §B{i:i32} 1
+    §B{s:str} "[${§CS{items[i]}}|${§CS{items[i + 1]}}]"
+    §R (? (== s "[5|8]") 58 (- 1))

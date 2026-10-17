@@ -216,6 +216,15 @@
       "changedSourceRecords": 22,
       "bindingErrorCountsChanged": 0,
       "inRepoDeltaNote": "F2's original record says 4820 -> 4827. The committed 4820 on F2's old base was already stale: F4 (27d59c3d2) later regenerated main's value as 4826 and attributed the +6 to earlier fixture edits, not to F4. F2's own in-repo contribution is +1."
+    },
+    "ds15Fixtures": {
+      "why": "The d-s1.5-fixtures CI job (PP-S4) has failed on this PR since its first push: string-interpolation-to-string (Full), string-interpolation-formattable (Partial) and string-interpolation-hole (Partial) are new FeatureSupport entries above NotSupported and had no registered fixture. Added with the rebase; they have not been through F2's Codex rounds.",
+      "fixtures": {
+        "string-interpolation-to-string": "Full, zero losses: string targets with alignment and a format specifier (${count,4}, ${count:D3}) and a returned interpolation; Verify returns 1013 in C#, in the converted Calor and in test.calr.",
+        "string-interpolation-formattable": "Partial, InteropPreserved certified absent: Kind(FormattableString) beside Kind(object); the converted cast keeps the FormattableString overload (Verify 107; the object overload would give -93).",
+        "string-interpolation-hole": "Partial, expected and allowed loss InteropPreserved: indexing holes {items[i]} and {items[i + 1]} convert as §CS{...} hole interop and still format \"[5|8]\" (Verify 58)."
+      },
+      "corpusCascade": "6 new tracked .calr files: formatter-corpus-baseline trackedFileCount 942 -> 948 and successfulTransformationCount 702 -> 708 (all six format safely); EffectRowCorpusShapeTests 942 -> 948; higher-order demand and effect-resolver key ledgers regenerated with their switches (see commit-stamp-index.json)."
     }
   }
 }

@@ -1,0 +1,13 @@
+{
+  "featureKey": "string-interpolation-hole",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Verify",
+  "runtimeExpectedInt": 58,
+  "convertedRuntimeEntryPoint": "Verify",
+  "convertedExpectedUndefinedInt": 58,
+  "convertedExpectedDefinedInt": 58,
+  "definedSymbols": []
+}

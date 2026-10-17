@@ -128,9 +128,11 @@ public sealed class EffectRowCorpusShapeTests
         // #1191 adds expected.calr and test.calr for each of the two conditional
         // D-S1.5 fixtures, bringing the tracked corpus to 940 without exclusions.
         // #1335 adds the two surrogate-literal D-S1.5 fixtures, bringing it to 942.
-        // The sweep below still covers every file. A drift from 942 means the sweep is no
+        // #906 (0.25 F2) adds expected.calr and test.calr for the three string-interpolation
+        // D-S1.5 fixtures (to-string, formattable, hole), bringing it to 948.
+        // The sweep below still covers every file. A drift from 948 means the sweep is no
         // longer measuring the corpus it claims to.
-        Assert.Equal(942, files.Count);
+        Assert.Equal(948, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.

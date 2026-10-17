@@ -1,0 +1,13 @@
+{
+  "featureKey": "string-interpolation-formattable",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Verify",
+  "runtimeExpectedInt": 107,
+  "convertedRuntimeEntryPoint": "Verify",
+  "convertedExpectedUndefinedInt": 107,
+  "convertedExpectedDefinedInt": 107,
+  "definedSymbols": []
+}
