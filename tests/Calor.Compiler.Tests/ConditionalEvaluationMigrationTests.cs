@@ -220,7 +220,7 @@ public class ConditionalEvaluationMigrationTests
             expected, false, members: $$"""
                 public static int Update({{modifier}} int value) { value = 9; return 0; }
                 public static int Update(int value) { return 0; }
-                """, expectEmitterFallback: true);
+                """, interopFeature: "string-interpolation-hole");
     }
 
     [Theory]
@@ -234,7 +234,7 @@ public class ConditionalEvaluationMigrationTests
                 private static int Calls;
                 public static int Update(in int value) { Calls = value; return 0; }
                 public static int Update(int value) { return 0; }
-                """, expectEmitterFallback: true);
+                """, interopFeature: "string-interpolation-hole");
     }
 
     [Theory]
@@ -608,8 +608,11 @@ public class ConditionalEvaluationMigrationTests
     private static void AssertRoundTrip(
         string body, int expected, bool expectInterop,
         ConversionMode mode = ConversionMode.Standard, string members = "", bool expectEmitterFallback = false,
-        ConversionFidelity fidelity = ConversionFidelity.Lossless)
+        ConversionFidelity fidelity = ConversionFidelity.Lossless, string? interopFeature = null)
     {
+        // 0.25 F2 (#906): a hole outside the native subset is kept as §CS hole interop.
+        if (interopFeature != null)
+            expectInterop = true;
         var original = $$"""
             public static class Probe
             {
@@ -639,8 +642,11 @@ public class ConditionalEvaluationMigrationTests
             conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.EmitterFallback));
         if (expectInterop)
         {
-            Assert.Contains(conversion.Issues, issue =>
-                issue.Feature is "conditional-expression-hoisting" or "conditional-access-shape");
+            if (interopFeature != null)
+                Assert.Contains(conversion.Losses, loss => loss.Feature == interopFeature);
+            else
+                Assert.Contains(conversion.Issues, issue =>
+                    issue.Feature is "conditional-expression-hoisting" or "conditional-access-shape");
         }
     }
 

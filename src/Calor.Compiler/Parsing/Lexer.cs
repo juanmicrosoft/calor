@@ -319,6 +319,20 @@ public sealed class Lexer
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
     }
 
+    /// <summary>
+    /// Lexes a fragment of a larger source, such as the text of a string-interpolation hole,
+    /// reporting spans relative to the enclosing source (0.25 F2, #906).
+    /// </summary>
+    internal Lexer(string source, DiagnosticBag diagnostics, int baseOffset, int line, int column)
+        : this(source, diagnostics)
+    {
+        _baseOffset = baseOffset;
+        _line = line;
+        _column = column;
+    }
+
+    private readonly int _baseOffset;
+
     private char Current => Peek(0);
     private char Lookahead => Peek(1);
 
@@ -363,7 +377,7 @@ public sealed class Lexer
     }
 
     private TextSpan CurrentSpan()
-        => new(_tokenStart, _position - _tokenStart, _tokenLine, _tokenColumn);
+        => new(_baseOffset + _tokenStart, _position - _tokenStart, _tokenLine, _tokenColumn);
 
     private string CurrentText()
         => _source[_tokenStart.._position];
@@ -2728,17 +2742,20 @@ public sealed class Lexer
                 FlushText();
                 Advance();
                 Advance();
+                var (holeStart, holeLine, holeColumn) = (_baseOffset + _position, _line, _column);
                 var expression = ScanInterpolationExpressionText();
                 if (expression == null)
                 {
                     _position = interpolationStart + 2;
+                    (_line, _column) = (holeLine, holeColumn);
                     text.Append("${");
                     continue;
                 }
                 var intent = IsLiteralInterpolationPlaceholder(expression)
                     ? InterpolationPartIntent.LiteralPlaceholder
                     : InterpolationPartIntent.Expression;
-                parts.Add(new InterpolatedStringExpressionTokenPart(expression, intent));
+                parts.Add(new InterpolatedStringExpressionTokenPart(
+                    expression, intent, holeStart, holeLine, holeColumn));
                 continue;
             }
 

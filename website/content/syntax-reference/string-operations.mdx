@@ -66,3 +66,83 @@ an enabled contract mode and supported lowering. See [verification guarantees](/
 
 Backslashes in regex patterns must be escaped in Calor strings, so regex `\d`
 is written as `"\\d"`.
+
+## Interpolated Strings
+
+A `${...}` hole inside a string literal is an interpolation hole. The hole holds a Calor
+expression, optionally followed by an alignment (`,10`) and a format specifier (`:F2`), as in C#.
+The compiler emits a C# interpolated string (`$"..."`), so formatting uses the same .NET rules,
+including the current culture.
+
+```calor
+§M{m001:Receipt}
+  §F{f001:Line:pub} (str:item, f64:amount) -> str
+    §E{}
+    §R "${item,-8}|${amount,10:F2}|${(* amount 2):F1}"
+
+  §F{f002:Main:pub} () -> void
+    §E{cw}
+    §P §C{Line} §A "coffee" §A 3.5 §/C
+```
+
+Under the invariant or `en-US` culture this prints `coffee  |      3.50|7.0`. Under `de-DE` it
+prints `coffee  |      3,50|7,0`, exactly as the same C# would.
+
+To write the characters `${` as text, escape the dollar sign: `"\${x}"` is the five characters
+`${x}`.
+
+### Holes are checked like other expressions
+
+Names in a hole are bound, and calls in a hole are effect-checked. An undefined name is reported
+at the hole's own line and column. A call written in C# form, such as `${Console.ReadLine()}`, is
+analyzed as an ordinary call when its target is a dotted name and each argument is a literal, a
+name or a Calor expression. This function must declare `cr` (console read). With `§E{}` it fails
+with `Calor0410`, the "undeclared effect" error:
+
+```calor
+§M{m001:Greeting}
+  §F{f001:Greet:pub} () -> str
+    §E{cr}
+    §R "hello ${Console.ReadLine()}"
+```
+
+A hole that is not in that form, for example a call with named arguments, stays raw C#. Its
+effects are then *assumed*, and the compiler says so with warning `Calor0419`.
+
+### Converting C# interpolated strings
+
+In C#, the type an interpolated string converts to (its *target type*) can change which overload
+runs. `calor convert` keeps that choice:
+
+| C# target | Conversion |
+|:----------|:-----------|
+| `string`, `object`, or a return of either | Native Calor string with `${...}` holes. Format specifiers, alignment, culture and left-to-right hole order are kept. |
+| `FormattableString` or `IFormattable`, with at least one hole | Native, wrapped in an explicit cast such as `(cast global::System.FormattableString "x=${x}")`. The cast keeps the overload C# selected, for example `Kind(FormattableString)` over `Kind(object)`. |
+| An `[InterpolatedStringHandler]` parameter: custom logging and assertion APIs, and .NET overloads such as `StringBuilder.Append($"...")` and `string.Create(provider, $"...")` | Not representable. The enclosing statement or member is kept as C# interop (`§CSHARP`), so the call still builds its handler. With fallback disabled (`--no-fallback`) the conversion reports `string-interpolation-handler` instead. |
+
+A `FormattableString` target with no holes, such as `FormattableString.Invariant($"text")`, has
+no Calor form either, so its statement is kept as C#.
+
+Holes convert natively when they are names, string, character, `bool` and `int` literals,
+`double` literals with a fractional part, dotted member access (`order.Total`), operators,
+`nameof`, `typeof`, or calls with a dotted target and positional arguments
+(`Math.Max(a, b)`). Any other hole, for example `{items[i]}`, `{customer?.Name}` or
+`{value.GetType().Name}`, keeps its original C# text as `§CS{...}` inside the hole. The conversion
+report counts it as interop, and its effects are assumed (`Calor0419`). A call argument that is
+`null` or a member of something other than a name (`typeof(T).Name`) also keeps the hole as C#.
+A verbatim or raw interpolated string (`$@"..."`, `$"""..."""`) whose format clause contains a
+backslash keeps its whole statement as C#.
+
+For example, this C# selects `Kind(FormattableString)`, and so does the converted program:
+
+```csharp
+public static string Kind(FormattableString f) => "fs:" + f.Format;
+public static string Kind(object o) => "object:" + o;
+public static string Run(int x) => Kind($"k={x}");   // "fs:k={0}"
+```
+
+`calor feature-check string-interpolation` reports **Partial** because of the handler row.
+Interpolation is converted using the C# semantic model of the single file being converted. If a
+target type cannot be resolved there, for example a method from an assembly the converter was not
+given, the literal converts as a string-target literal and C# applies target typing again when
+the generated code is compiled.
