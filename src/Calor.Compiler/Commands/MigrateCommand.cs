@@ -376,6 +376,9 @@ public static class MigrateCommand
             Console.WriteLine($"  Successful: {report.Summary.SuccessfulFiles}");
             if (report.Summary.PartialFiles > 0)
                 Console.WriteLine($"  Partial: {report.Summary.PartialFiles} (need review)");
+            // #1144: which path preserved each member, read from the loss ledger.
+            if (ConversionPathSummary.Describe(report.FileResults.SelectMany(f => f.Losses), "PassthroughOnError") is { } pathLine)
+                Console.WriteLine($"  {pathLine}");
             if (report.Summary.FailedFiles > 0)
                 Console.WriteLine($"  Failed: {report.Summary.FailedFiles}");
             Console.WriteLine();

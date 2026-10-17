@@ -416,7 +416,7 @@ public sealed class ConvertTool : McpToolBase
                 Explanation = explanationOutput,
                 FeatureHints = featureHints.Count > 0 ? featureHints : null,
                 NativeFeaturesUsed = nativeFeaturesUsed.Count > 0 ? nativeFeaturesUsed : null,
-                LossSummary = ConversionLossSummaryOutput.From(result),
+                LossSummary = ConversionLossSummaryOutput.From(result, success),
                 Tip = "Use calor_help with feature='overview' to see all available Calor syntax before writing or editing .calr files."
             };
 
@@ -754,6 +754,7 @@ public sealed class ConvertTool : McpToolBase
         string? roundTrippedCSharp = null;
         var conversionSuccess = false;
         var compilationSuccess = false;
+        ConversionResult? conversionResult = null;
 
         // Step 1: Convert C# → Calor
         cancellationToken.ThrowIfCancellationRequested();
@@ -787,11 +788,14 @@ public sealed class ConvertTool : McpToolBase
                 TargetFramework = GetString(arguments, "targetFramework"),
                 ParseOptions = ResolveParseOptions(arguments),
                 References = GetConversionReferences(arguments),
+                // #1144: honour the documented passthroughOnError argument here too.
+                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false),
                 UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);
             var result = converter.Convert(source, null, cancellationToken);
+            conversionResult = result;
 
             if (result.Success && !string.IsNullOrWhiteSpace(result.CalorSource))
             {
@@ -887,7 +891,10 @@ public sealed class ConvertTool : McpToolBase
             RoundTrippedCSharp = roundTrippedCSharp,
             Differences = differences.Count > 0 ? differences : null,
             ConversionErrors = conversionErrors.Count > 0 ? conversionErrors : null,
-            CompilationErrors = compilationErrors.Count > 0 ? compilationErrors : null
+            CompilationErrors = compilationErrors.Count > 0 ? compilationErrors : null,
+            LossSummary = conversionResult == null
+                ? null
+                : ConversionLossSummaryOutput.From(conversionResult, conversionSuccess)
         };
 
         return Task.FromResult(McpToolResult.Json(output, isError: !roundTripMatch));
@@ -1172,7 +1179,7 @@ public sealed class ConvertTool : McpToolBase
             },
             DurationMs = (int)duration.TotalMilliseconds,
             FeatureHints = featureHints.Count > 0 ? featureHints : null,
-            LossSummary = ConversionLossSummaryOutput.From(result)
+            LossSummary = ConversionLossSummaryOutput.From(result, success)
         };
     }
 
@@ -1249,8 +1256,13 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("locations")]
         public required List<ConversionLossLocationOutput> Locations { get; init; }
 
-        public static ConversionLossSummaryOutput From(ConversionResult result) => new()
+        /// <summary>#1144: per-path counts, triggers, outcome and the rescue/passthrough options that applied.</summary>
+        [JsonPropertyName("paths")]
+        public required ConversionPathSummary Paths { get; init; }
+
+        public static ConversionLossSummaryOutput From(ConversionResult result, bool success) => new()
         {
+            Paths = ConversionPathSummary.From(result, success),
             NativeConversions = result.NativeConversionCount,
             InteropPreservations = result.InteropPreservationCount,
             LossySubstitutions = result.LossySubstitutionCount,
@@ -1261,7 +1273,10 @@ public sealed class ConvertTool : McpToolBase
                 Feature = loss.Feature,
                 File = loss.File,
                 Line = loss.Line,
-                Description = loss.Description
+                Description = loss.Description,
+                Path = loss.Path,
+                Trigger = loss.Trigger,
+                EnabledBy = loss.EnabledBy
             }).ToList()
         };
     }
@@ -1284,6 +1299,18 @@ public sealed class ConvertTool : McpToolBase
 
         [JsonPropertyName("description")]
         public required string Description { get; init; }
+
+        /// <summary>#1144: interop | rescue | passthrough | lossy | dropped.</summary>
+        [JsonPropertyName("path")]
+        public required string Path { get; init; }
+
+        [JsonPropertyName("trigger")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Trigger { get; init; }
+
+        [JsonPropertyName("enabledBy")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? EnabledBy { get; init; }
     }
 
     private sealed class ExplanationOutput
@@ -1416,6 +1443,11 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("compilationErrors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<EnvelopeDiagnostic>? CompilationErrors { get; init; }
+
+        /// <summary>#1144: losses and conversion paths of the C# → Calor step.</summary>
+        [JsonPropertyName("lossSummary")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ConversionLossSummaryOutput? LossSummary { get; init; }
     }
 
     private sealed class LineDifference

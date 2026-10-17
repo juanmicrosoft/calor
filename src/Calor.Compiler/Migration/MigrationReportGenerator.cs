@@ -45,6 +45,12 @@ public sealed class MigrationReportGenerator
         sb.AppendLine($"| Total Warnings | {_report.Summary.TotalWarnings} |");
         sb.AppendLine($"| Duration | {FormatDuration(_report.Summary.TotalDuration)} |");
         sb.AppendLine();
+        // #1144: which path kept members as C#, with the trigger that fired.
+        if (ConversionPathSummary.Describe(_report.FileResults.SelectMany(f => f.Losses), "PassthroughOnError") is { } paths)
+        {
+            sb.AppendLine($"**{paths}**");
+            sb.AppendLine();
+        }
 
         // Analysis summary
         if (_report.Analysis != null)
@@ -146,6 +152,7 @@ public sealed class MigrationReportGenerator
                 foreach (var file in partialFiles)
                 {
                     sb.AppendLine($"- `{Path.GetFileName(file.SourcePath)}`");
+                    AppendLossPaths(sb, file);
                     foreach (var issue in file.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning))
                     {
                         sb.AppendLine($"  - ⚠️ {issue.Message}");
@@ -161,6 +168,7 @@ public sealed class MigrationReportGenerator
                 foreach (var file in failedFiles)
                 {
                     sb.AppendLine($"- `{Path.GetFileName(file.SourcePath)}`");
+                    AppendLossPaths(sb, file);
                     foreach (var issue in file.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error))
                     {
                         sb.AppendLine($"  - ❌ {issue.Message}");
@@ -338,6 +346,16 @@ public sealed class MigrationReportGenerator
             MigrationDirection.CalorToCSharp => "Calor → C#",
             _ => "Unknown"
         };
+    }
+
+    /// <summary>#1144: one line per preserved member, naming its path and trigger.</summary>
+    private static void AppendLossPaths(StringBuilder sb, FileMigrationResult file)
+    {
+        foreach (var loss in file.Losses.Where(l => l.Path is ConversionPath.Interop or ConversionPath.Rescue or ConversionPath.Passthrough))
+        {
+            var trigger = loss.Trigger != null ? $" ({loss.Trigger}, enabled by {loss.EnabledBy})" : "";
+            sb.AppendLine($"  - {loss.Path}{trigger}: {loss.Description}");
+        }
     }
 
     private static string FormatDuration(TimeSpan duration)
