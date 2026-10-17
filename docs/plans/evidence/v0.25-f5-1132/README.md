@@ -1,6 +1,6 @@
 # 0.25 F5 (#1132) evidence: array expressions
 
-**Status:** IN_PROGRESS on PR 2 (branch `milestone-0.25/f5-1132-narrowed`; review budget spent with 1 open MAJOR, see `reviews/pr2-verification.md`; no PR opened). Not a READY record:
+**Status:** IN_PROGRESS on PR 2 (branch `milestone-0.25/f5-1132-narrowed`). The verification pass's open MAJOR was fixed under EXC-F5-PR2-FIX-VERIFY (R0 amendment 1.2.0) and its one extra verification pass approved (`reviews/pr2-extra-verification.md`). Not a READY record:
 READY needs a candidate commit, per-case evidence carrying `requirementSha256`, the blocker
 references below and the maintainer's approval (`docs/plans/v0.25-interop-scope-and-baseline.md` §10).
 Reduced independence: Codex records only; not independently reviewed.
@@ -196,8 +196,9 @@ Fast lane, isolated HOME and CALOR_HOME, at `6002c19da` (the round-3 code; later
 
 Non-test source (`git diff --numstat origin/main...HEAD -- src`) at `6002c19da`: +592/-286, 878
 changed lines, against #1521's 880 (+596/-284) and EXC-F5-NONTEST-LINES' allowance of 880. The exception is
-recorded "for #1521 only"; whether it covers this PR, or this PR needs its own exception, is the
-maintainer's call (it is not amended here).
+recorded "for #1521 only"; the maintainer extended it to this PR on 2026-10-13 as
+EXC-F5-NONTEST-LINES-PR2 (R0 amendment 1.2.0, at <= 880). After the extra-verification fix the
+count is unchanged: +592/-286, 878 (the fix edits one already-added line).
 
 ### Reviews (PR 2)
 
@@ -208,7 +209,8 @@ Fresh budget: 3 Codex rounds plus 1 verification-only pass. Records: `reviews/pr
 | 1 (round 1) | `reviews/pr2-round-1.md` | REQUEST CHANGES: 3 MAJOR, 1 MINOR; all fixed |
 | 2 (round 2) | `reviews/pr2-round-2.md` | REQUEST CHANGES: 1 BLOCKING, 1 MAJOR, 1 MINOR; all fixed |
 | 3 (round 3) | `reviews/pr2-round-3.md` | REQUEST CHANGES: 1 BLOCKING (contested, not changed), 3 MAJOR (fixed) |
-| 4 (verification) | `reviews/pr2-verification.md` | REQUEST CHANGES: round-3 items 2-4 VERIFIED, item 1 ACCEPTED; 1 new MAJOR introduced by the round-3 constant exemption (a constant with a user-defined conversion runs it after a hoisted argument). **Open; budget spent; PR not opened** |
+| 4 (verification) | `reviews/pr2-verification.md` | REQUEST CHANGES: round-3 items 2-4 VERIFIED, item 1 ACCEPTED; 1 new MAJOR introduced by the round-3 constant exemption (a constant with a user-defined conversion runs it after a hoisted argument) |
+| 5 (extra verification, EXC-F5-PR2-FIX-VERIFY) | `reviews/pr2-extra-verification.md` | APPROVE: the fix (`3be4ecee8`, `!GetConversion(e).IsUserDefined` on the constant exemption) VERIFIED and revert-sensitive; no new BLOCKING or MAJOR |
 
 ---
 
