@@ -108,7 +108,22 @@ public class BinderIncompleteRatchetTests
         + "visit had no source span), and FluentValidation.Tests/EmptyTester.cs and NotEmptyTester.cs "
         + "TestModel.Strings (get { yield break; }) keep their visit counts while 2 unmapped source "
         + "expressions each become opaque. Net 35159 -> 35152 visits, 129 -> 132 opaque boundaries "
-        + "and 6944 -> 6959 opaque expressions, with incomplete diagnostics still zero";
+        + "and 6944 -> 6959 opaque expressions, with incomplete diagnostics still zero. "
+        + "#906 (0.25 F2) parses C#-form call holes such as ${Console.ReadLine()} as calls, reports "
+        + "hole diagnostics at the hole, and converts holes outside the native subset (indexing, calls "
+        + "on call results, ?., ?:, named/ref/generic calls) as explicit \u00A7CS{...} hole interop "
+        + "instead of C#-syntax text that reparsed as raw C# anyway. Measured on main after #1132: "
+        + "in-repo bound expressions 4827 -> 4828 (Conversion.Tests 12-01.approved.calr, whose "
+        + "${Format(x)} hole now binds as a call); conversion visits 35176 -> 35177; opaque boundaries "
+        + "132 -> 140 and opaque expressions 6959 -> 7009 (newly counted holes, not new preservation): "
+        + "+1 boundary each in FluentValidation MessageFormatterTests.cs, IValidationContext.cs, "
+        + "Internal/MessageFormatter.cs, TestHelper/ValidatorTestExtensions.cs, "
+        + "Validators/PolymorphicValidator.cs and serilog Formatting/Display/MessageTemplateTextFormatter.cs, "
+        + "+2 in TestHelper/TestValidationResult.cs; serialized opaque boundaries in serilog "
+        + "Debugging/SelfLog.cs 3 -> 1 and FluentValidation ValidationException.cs 1 -> 0 (lifted call "
+        + "holes); 22 source records change with the same per-file deltas as on F2's original base, "
+        + "binding-error identities by location only, with binding-error counts and incomplete "
+        + "diagnostics unchanged";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
