@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-interop-scope/1",
-  "scopeVersion": "1.2.0",
+  "scopeVersion": "1.3.0",
   "status": "FROZEN",
   "gateStatus": "MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
@@ -479,6 +479,18 @@
         "decision": "@juanmicrosoft, 2026-10-17: 'One more fix + 1 pass'. Any further problem after this cycle drops F5 from 0.25. Relayed in the agent session by the coordinating session; no GitHub record.",
         "scope": "Exactly one fix and exactly one Codex verification-only pass on it (reviews/pr2-closer-verification.md); no further adversarial round. Non-test lines stay within EXC-F5-NONTEST-LINES-PR2 (<= 880).",
         "amendment": "1.2.0",
+        "confirmed": true
+      },
+      {
+        "id": "EXC-1540-OPAQUE-FIX",
+        "ceiling": "review-rounds",
+        "pr": 1540,
+        "ceilingValue": 3,
+        "allowedExtraPasses": 1,
+        "covers": "One fix for the corpus regression CI found on #1540: the converter preserves a target-typed object creation with an initializer (FluentValidation ChildRulesTests: `new() { Names = { string.Empty }}`) as raw C#, but writes it with its explicit type (`new RulesetChildValidatorRulesValidator.Foo() { ... }`), so the preserved text is not the source at its recorded span (BinderIncompleteRatchetTests). Plus its witness test and the regenerated corpus ledgers.",
+        "decision": "@juanmicrosoft, 2026-10-17: one more fix plus exactly one Codex verification pass for #1540's opaque-span mismatch. Relayed in the agent session by the coordinating session; no GitHub record.",
+        "scope": "Exactly one fix and exactly one Codex verification-only pass on it (docs/plans/evidence/fix-1524-1528/reviews/extra-verification-pass-codex.md); no further adversarial round. A BLOCKING or MAJOR finding in that pass stops the PR for a maintainer decision.",
+        "amendment": "1.3.0",
         "confirmed": true
       }
     ]
@@ -3057,6 +3069,41 @@
           "decision": "@juanmicrosoft, 2026-10-17: 'One more fix + 1 pass'. Any further problem after this cycle drops F5 from 0.25. Relayed in the agent session by the coordinating session; no GitHub record.",
           "scope": "Exactly one fix and exactly one Codex verification-only pass on it (reviews/pr2-closer-verification.md); no further adversarial round. Non-test lines stay within EXC-F5-NONTEST-LINES-PR2 (<= 880).",
           "amendment": "1.2.0",
+          "confirmed": true
+        }
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "dateUtc": "2026-10-17T00:00:00Z",
+      "pr": 1540,
+      "afterInspection": true,
+      "justification": "Records the maintainer's 2026-10-17 decision for #1540 (#1524/#1528 converter drops): one more fix plus exactly one Codex verification-only pass for the opaque-span mismatch CI found (EXC-1540-OPAQUE-FIX). Recorded before the fix and the pass run. No case, ceiling or gate state changes.",
+      "addedCases": [],
+      "changes": [],
+      "removedCases": [],
+      "maintainerDecisions": [
+        {
+          "id": "D-1540-OPAQUE-FIX",
+          "date": "2026-10-17",
+          "by": "@juanmicrosoft",
+          "decision": "'One more fix + 1 Codex verification pass' for #1540's opaque-span mismatch (EXC-1540-OPAQUE-FIX, capacity.exceptions). Relayed in the agent session by the coordinating session; no GitHub record.",
+          "exceptions": [
+            "EXC-1540-OPAQUE-FIX"
+          ]
+        }
+      ],
+      "capacityExceptions": [
+        {
+          "id": "EXC-1540-OPAQUE-FIX",
+          "ceiling": "review-rounds",
+          "pr": 1540,
+          "ceilingValue": 3,
+          "allowedExtraPasses": 1,
+          "covers": "One fix for the corpus regression CI found on #1540: the converter preserves a target-typed object creation with an initializer (FluentValidation ChildRulesTests: `new() { Names = { string.Empty }}`) as raw C#, but writes it with its explicit type (`new RulesetChildValidatorRulesValidator.Foo() { ... }`), so the preserved text is not the source at its recorded span (BinderIncompleteRatchetTests). Plus its witness test and the regenerated corpus ledgers.",
+          "decision": "@juanmicrosoft, 2026-10-17: one more fix plus exactly one Codex verification pass for #1540's opaque-span mismatch. Relayed in the agent session by the coordinating session; no GitHub record.",
+          "scope": "Exactly one fix and exactly one Codex verification-only pass on it (docs/plans/evidence/fix-1524-1528/reviews/extra-verification-pass-codex.md); no further adversarial round. A BLOCKING or MAJOR finding in that pass stops the PR for a maintainer decision.",
+          "amendment": "1.3.0",
           "confirmed": true
         }
       ]

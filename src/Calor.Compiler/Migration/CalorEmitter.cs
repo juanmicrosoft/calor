@@ -19,6 +19,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _ternaryCounter;
     private int _hoistCounter;
     private int _conditionalExpressionDepth;
+    private int _tempHoistCount;
     private int _memberBodyDepth;
     private int _inlineObjectInitializers;
 
@@ -3012,9 +3013,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // emitter re-emits `f` instead of widening to double.
         if (node.IsSingle)
             return $"SINGLE:{((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-        return node.IsDecimal
-            ? $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
-            : node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (node.IsDecimal)
+            return $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        // #1528: the lexer reads a bare literal as a double only when it has a
+        // fraction or an exponent. A whole-number double such as 2.0 prints as "2",
+        // which would re-parse as an int and turn x / 2.0 into integer division.
+        var text = node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return double.IsFinite(node.Value) && text.IndexOfAny(['.', 'E', 'e']) < 0
+            ? text + ".0"
+            : text;
     }
 
     public string Visit(DecimalLiteralNode node)
@@ -3163,6 +3170,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return expr;
 
         var varName = FreshTemp("_hoist");
+        _tempHoistCount++;
         _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
         return varName;
     }
@@ -3271,6 +3279,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
         // the v0.6.1 emitter default would otherwise let the next §A be absorbed
         // as the nested call's inline argument (silent AST corruption).
+        var hoistedLinesBefore = _pendingHoistedLines.Count;
         // #1132: if one argument is hoisted, every non-literal argument is, in order
         // (`new Cell(x, Next())` read x after Next() ran).
         var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true).Select(val => $"§A {val}");
@@ -3281,11 +3290,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             // Pre-evaluate initializer values to collect hoisted bindings
             var evalInits = new List<(string PropName, string Value)>();
+            var tempHoistsBefore = _tempHoistCount;
             foreach (var init in node.Initializers)
             {
                 var valueStr = init.Value.Accept(this);
                 if (!string.IsNullOrWhiteSpace(valueStr))
                     evalInits.Add((init.PropertyName, valueStr));
+            }
+
+            // #1524: a value hoisted to a §B line ahead of the statement would run before
+            // the constructor. Fall back to the original C#, dropping this creation's
+            // hoisted lines so nothing is evaluated twice. (Hoisted lambdas only allocate.)
+            if (_tempHoistCount != tempHoistsBefore && node.CSharpSource != null)
+            {
+                _pendingHoistedLines.RemoveRange(
+                    hoistedLinesBefore, _pendingHoistedLines.Count - hoistedLinesBefore);
+                RecordEmitterFallback(node, "object-initializer",
+                    "Object creation whose initializer value would be hoisted ahead of the constructor preserved verbatim");
+                return $"§CS{{{node.CSharpSource}}}";
             }
 
             // #1132: an array element stays on its line (`§NEW{T} A = x §/NEW`), not hoisted early.
@@ -4729,7 +4751,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private static string FormatAttributeArgument(CalorAttributeArgument arg)
     {
-        var value = arg.GetFormattedValue();
+        var value = arg.GetCalorFormattedValue();
 
         if (arg.IsNamed)
         {

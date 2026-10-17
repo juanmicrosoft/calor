@@ -1,0 +1,7 @@
+1. **MAJOR — Lambda preservation loses target typing.** [RoslynSyntaxVisitor.cs:12591](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a71483d80560b9e8d/src/Calor.Compiler/Migration/RoslynSyntaxVisitor.cs:12591) escalates `Use(() => { return new() { L = { 5 } }; })` only to the lambda’s return statement. For `Use(Func<P>)`, that statement needs the delegate’s return type. Argument hoisting at line 11207 subsequently creates an untyped lambda binding, producing `var _lam = () => { return new() { L = { 5 } }; };`, whose delegate type cannot be inferred. Preservation must retain the lambda’s typing context.
+
+2. **MAJOR — Statement preservation duplicates conditional directives.** [RoslynSyntaxVisitor.cs:6835](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a71483d80560b9e8d/src/Calor.Compiler/Migration/RoslynSyntaxVisitor.cs:6835) copies leading trivia through `ToFullString()`. If the first statement under `#if true` is `P p = new() { L = { 5 } };`, the raw statement includes that opening directive. `ConvertBlock` also wraps it in a preprocessor node (lines 6567–6579), which emits another opening directive. The resulting C# has an unmatched `#if` and fails compilation.
+
+The witness exercises the corpus shape and rejects the old output. Unrelated escalations retain their existing behavior. Runtime verification was blocked by the read-only sandbox; no files were modified.
+
+REQUEST CHANGES

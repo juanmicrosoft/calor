@@ -1,0 +1,4 @@
+§M{m001:CollectionInitializerFixture}
+  §CL{c001:FixtureOracle:pub:stat}
+    §MT{m001:Run:pub:stat} () -> i32
+      §R 321

@@ -233,7 +233,7 @@ public static class FeatureSupport
         {
             Name = "object-initializer",
             Support = SupportLevel.Full,
-            Description = "Object initializers are converted to Calor §NEW with property assignments"
+            Description = "Name = value object initializers are converted to Calor §NEW with member assignments. Collection-initializer elements, nested initializers, untyped target-typed new, interpolated strings whose holes create initialized objects, and initializers whose values need a hoisted statement (i++, assignments, block-level collections) are preserved as inline C# interop with a reported loss."
         },
         ["dictionary-initializer"] = new FeatureInfo
         {
@@ -246,6 +246,13 @@ public static class FeatureSupport
             Name = "list-initializer",
             Support = SupportLevel.Full,
             Description = "List initializers are converted to Calor §LIST nodes"
+        },
+        ["collection-initializer"] = new FeatureInfo
+        {
+            Name = "collection-initializer",
+            Support = SupportLevel.Partial,
+            Description = "A constructor argument that is a non-empty collection initializer (new P(new List<int> { 5 })) has no inline Calor form; the enclosing creation is preserved as inline C# interop with a reported loss.",
+            Workaround = "The creation is kept as §CS{...}; bind the collection to a local first to convert it natively."
         },
         ["hashset-initializer"] = new FeatureInfo
         {
