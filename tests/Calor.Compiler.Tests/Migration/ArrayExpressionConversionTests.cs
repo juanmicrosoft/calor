@@ -815,6 +815,19 @@ public class ArrayExpressionConversionTests
             public static int UseB(byte? x, int[] xs, Cell c) => 1;
 
             public static int UseB(long? x, int[] xs, Cell c) => 2;
+
+            // PR 2 extra verification: a constant whose conversion to the parameter is
+            // user-defined is not left in place either (the conversion ran after S(): "sy").
+            public static int UseY(Y y, int[] xs, Cell c) => xs[0];
+        }
+
+        public class Y
+        {
+            public static implicit operator Y(int value)
+            {
+                L.Log = L.Log + "y";
+                return new Y();
+            }
         }
 
         public static class Probe
@@ -829,7 +842,8 @@ public class ArrayExpressionConversionTests
                 int a = L.Use(v, new int[] { L.S() }, new Cell());
                 int b = L.Use2(L.Id, new int[] { 4 }, new Cell());
                 int k = L.UseB(L.C, new int[] { 1 }, new Cell());
-                return a + "," + b + "," + k + "|" + L.Log;
+                int y = L.UseY(L.C, new int[] { L.S() }, new Cell());
+                return a + "," + b + "," + k + "," + y + "|" + L.Log;
             }
         }
         """;
@@ -839,11 +853,11 @@ public class ArrayExpressionConversionTests
     {
         var result = new CSharpToCalorConverter().Convert(Pr2Retyped);
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Equal(2, result.Losses.Count(loss => loss.Feature == "conditional-expression-hoisting"));
+        Assert.Equal(3, result.Losses.Count(loss => loss.Feature == "conditional-expression-hoisting"));
         var compilation = Program.Compile(result.CalorSource!, "retyped.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
-        Assert.Equal("3,4,1|cs", Run(Pr2Retyped));
+        Assert.Equal("3,4,1,2|csys", Run(Pr2Retyped));
         Assert.Equal(Run(Pr2Retyped), Run(compilation.GeneratedCode));
     }
 

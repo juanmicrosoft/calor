@@ -11133,7 +11133,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 || list[i].Expression is LiteralExpressionSyntax or DefaultExpressionSyntax
                 // A constant evaluates nothing, and its constant conversions need it in place.
                 || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
-                    && _semanticModel.GetConstantValue(list[i].Expression).HasValue
+                    && _semanticModel.GetConstantValue(list[i].Expression).HasValue && !_semanticModel.GetConversion(list[i].Expression).IsUserDefined
                 || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
                     && _semanticModel.GetSymbolInfo(list[i].Expression).Symbol is ILocalSymbol or IParameterSymbol
                     // #1132: unless a later argument runs code first (`Use(x, new[] { Bump(ref x) }, c)`).
