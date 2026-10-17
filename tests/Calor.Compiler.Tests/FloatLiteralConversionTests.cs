@@ -25,6 +25,9 @@ public sealed class FloatLiteralConversionTests
         { "return default(double) + 1 / 2.0;", "Double:0.5" },
         { "return default(float) + 2f;", "Single:2" },
         { "return default(decimal) + 2m;", "Decimal:2" },
+        // The widths on their own: an int 0 would pass the two sums above.
+        { "return default(float);", "Single:0" },
+        { "return default(decimal);", "Decimal:0" },
         { "int n = 5; return n / 1e2;", "Double:0.05" },
         { "int n = -3; return n / -2.0;", "Double:1.5" },
         { "int n = 1; return n / 1e20;", "Double:1E-20" },
@@ -149,9 +152,20 @@ public sealed class FloatLiteralConversionTests
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.True(emit.Success, string.Join("; ", emit.Diagnostics) + "\n" + source);
-        var value = Assembly.Load(image.ToArray()).GetTypes().Single(type => type.Name == "Migrated")
-            .GetMethod("Probe")!.Invoke(null, null)!;
-        var text = Convert.ToString(value, CultureInfo.InvariantCulture)!;
-        return typed ? value.GetType().Name + ":" + text : text;
+        // Both programs run under the invariant culture, so an interpolated double formats
+        // the same way on every host.
+        var culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+        try
+        {
+            var value = Assembly.Load(image.ToArray()).GetTypes().Single(type => type.Name == "Migrated")
+                .GetMethod("Probe")!.Invoke(null, null)!;
+            var text = Convert.ToString(value, CultureInfo.InvariantCulture)!;
+            return typed ? value.GetType().Name + ":" + text : text;
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+        }
     }
 }
