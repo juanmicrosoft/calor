@@ -7,7 +7,7 @@
   "Conversion": {
     "Incomplete": 0,
     "LegacySourceOrderAttempted": 18005,
-    "RoslynSelectedAttempted": 35177,
+    "RoslynSelectedAttempted": 34361,
     "FilesSeen": 364,
     "ConvertedAndBound": 364,
     "ConvertExceptions": 0,
@@ -16,10 +16,10 @@
   },
   "PreserveCoverage": {
     "FilesSeen": 364,
-    "OpaqueBoundaries": 140,
-    "OpaqueExpressions": 7009,
+    "OpaqueBoundaries": 147,
+    "OpaqueExpressions": 7742,
     "OpaqueUnmapped": 0,
-    "OpaqueIdentityCount": 140,
+    "OpaqueIdentityCount": 147,
     "UnconvertedFiles": 0,
     "UnconvertedIdentityCount": 0,
     "ConvertExceptions": 0,
