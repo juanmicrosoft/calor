@@ -27,16 +27,16 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "bad488b8db00c888b3260a35b1edfdc3b3b5c74a",
+      "measuredCommit": "3dbd108ee84de4010db57839545b5d6fffbc5800",
       "basis": "post-merge-write-back",
-      "note": "#1139 (0.25 F4, PR #1510): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at the F4 branch head bad488b8 (a single linear commit on main c020de74). F4 preserves iterator accessors as member interop, so the three FluentValidation modules that stopped in the CLI-only ReturnValidationPass at Calor0209 (EmptyTester, NotEmptyTester, ITestValidationContinuation) now reach the effect pass in the CLI and stop at Calor0410: StopCalor0410 104 -> 107, StoppedInCliOnlyPass 3 -> 0. In-process FluentValidation Calor0411Sites 7509 -> 7508: the unresolved predicate(failure) call inside ITestValidationContinuation.UnmatchedFailures is now inside the preserved block. The denominator stays 265 and Calor0425 stays 135/48. The previous measurement (a00f4a52, measured-on-top-of, landed by 2a79dfdf) stays in git history. The PR's later commits change no src/ file, so the measured src tree is the landing src tree.",
+      "note": "#1132 (0.25 F5, PR #1554): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 3dbd108e (the F5 code head after EXC-F5-PR2-CLOSER-FIX). Calor0411Sites MediatR 288 -> 289 (Internal/HandlersOrderer.cs +1), serilog 574 -> 575 (Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs +1), FluentValidation 7508 -> 7669 (+161 over 23 FluentValidation.Tests files: ForEachRuleTests +34, InheritanceValidatorTest +20, PrecisionScaleValidatorTests +19, ValidatorSelectorTests +17, AbstractValidatorTester +10, ChainedValidationTester +8, JsonSerializationTests +8, and 16 more files +1..+5): a member of an indexed element now converts in place as (§IDX a i).Member instead of through a hoisted temp (§B{~_hoistN} §IDX a i, then _hoistN.Member, which on main also bound .Member to the index and copied struct elements); each in-place access whose element type the effect pass cannot resolve counts as an unknown external call. Modules enforced, excluded and Calor0425 counts are unchanged (FluentValidation enforced 132, the Gate 9 floor). F4's pending measurement bad488b8 (PR #1510) remains in git history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "bad488b8db00c888b3260a35b1edfdc3b3b5c74a",
-          "pr": 1510,
+          "headCommit": "3dbd108ee84de4010db57839545b5d6fffbc5800",
+          "pr": 1554,
           "treeHashes": {
-            "src": "d4149cfdf7360531fb3bd06d10f4569c24bd37e9",
+            "src": "8076d4a3f4e2c0476618d18d18ab9db22585f15b",
             "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
             "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
             "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
@@ -46,7 +46,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "1d3bf20f4cfda13528966c7fc5e07d3935488391542f7951a3d113f1f78b5840"
+          "artifactSha256": "a8b9d4b419705f07aad5e96e8a303dad21e1a5a3cc0e176ec918b08102b92233"
         }
       }
     },

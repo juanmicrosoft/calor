@@ -19,8 +19,10 @@ public class ConversionScorecardTests
     // Baselines are exact (no slack): the corpus and converter are
     // deterministic, and per-fixture zero-regression is enforced against
     // baseline.json by NoRegressionsVsCommittedBaseline.
-    private const int BASELINE_FULLY_CONVERTED = 93;
-    private const int BASELINE_ROUNDTRIP = 97;
+    // #1132 (0.25 F5): 93 -> 94 fully converted and 97 -> 98 round-trip, both improvements
+    // (array expressions convert and round-trip natively).
+    private const int BASELINE_FULLY_CONVERTED = 94;
+    private const int BASELINE_ROUNDTRIP = 98;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
     {

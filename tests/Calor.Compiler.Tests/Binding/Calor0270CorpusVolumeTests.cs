@@ -209,8 +209,11 @@ public class Calor0270CorpusVolumeTests
     // #1385: scalar STRING activation and its flow repairs resolve one
     // FluentValidation actionable receiver: 313/37 -> 312/36. All 364 parsed
     // modules remain in the denominator.
-    private const int AggregateDiagnostics = 312;
-    private const int AggregateModulesWithDiagnostics = 36;
+    // #1132 (0.25 F5): `var msg = result.Errors[0].ErrorMessage;` in FluentValidation.Tests/
+    // GreaterThanOrEqualToValidatorTester.cs now converts in place as (§IDX result.Errors 0).ErrorMessage
+    // (main: a hoisted temp), and the inferred local `msg` is an unresolved receiver: 312/36 -> 313/37.
+    private const int AggregateDiagnostics = 313;
+    private const int AggregateModulesWithDiagnostics = 37;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>

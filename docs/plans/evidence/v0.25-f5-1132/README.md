@@ -192,13 +192,69 @@ Fast lane, isolated HOME and CALOR_HOME, on the branch rebased onto `cc54c038a` 
 | Calor.Enforcement.Tests | 695 | 0 | 1 |
 | Calor.Verification.Tests | 473 | 0 | 0 |
 
+### Corpus ledgers (CI on #1554, EXC-F5-PR2-CLOSER-FIX)
+
+CI's corpus-gated ratchets (which need the `bench/corpus` submodules) found that
+FluentValidation's `Ids = new Guid[0]` (`FluentValidation.Tests/DefaultValidatorExtensionTester.cs:230`)
+converted to `§ARR{guid:arrGuid152:0} §/ARR{arrGuid152}`. The parser does not read `guid` as a type, so
+it took `guid` as the id and the closer mismatched. That module dropped out of the measurement, and
+FluentValidation fell below the Gate 9 floor (132 → 131). The fix (`3dbd108ee`) puts the id first
+unless the parser reads the type first. FluentValidation is back at 132 enforced modules, and all 364
+corpus files convert and bind (`OutputParseFailures` 0).
+
+The three ledgers were regenerated with their documented switches at `3dbd108ee`. Every delta is
+attributed per file. The attribution comes from a per-file run of each ledger's own measurement
+against this branch and against origin/main `cc54c038a`.
+
+- **Most deltas come from one cause.** A member of an indexed element now converts in place, as
+  `(§IDX a i).Member`. On main it went through a hoisted temp: `§B{~_hoistN} §IDX a i`, then
+  `_hoistN.Member`. That form also bound `.Member` to the index, and it copied struct elements.
+- **`calor0425-corpus-ledger.json`** (`CALOR_REGENERATE_CALOR0425_LEDGER=1`): `Calor0411Sites`
+  counts unknown external calls. Each in-place element access whose element type the effect pass
+  cannot resolve now counts as one.
+  - MediatR 288 → 289: `Internal/HandlersOrderer.cs` +1.
+  - serilog 574 → 575: `Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs` +1.
+  - FluentValidation 7508 → 7669: +161 across 23 `FluentValidation.Tests` files. The largest are
+    ForEachRuleTests +34, InheritanceValidatorTest +20, PrecisionScaleValidatorTests +19,
+    ValidatorSelectorTests +17, AbstractValidatorTester +10, ChainedValidationTester +8 and
+    JsonSerializationTests +8; 16 more files are +1 to +5.
+  - Unchanged: modules enforced (265; FluentValidation 132, the Gate 9 floor), modules excluded, and
+    the Calor0425 counts.
+  - There is a pending stamp in `commit-stamp-index.json` at `3dbd108ee` for #1554. It replaces F4's
+    pending entry, which stays in git history.
+- **`calor0270-corpus-ledger.json`** (`CALOR_REGENERATE_CALOR0270_LEDGER=1`): Calor0270 is the "receiver
+  type unresolved" diagnostic.
+  - FluentValidation 249/21 → 250/22, and the aggregate 312/36 → 313/37.
+  - The single new one is `GreaterThanOrEqualToValidatorTester.cs`. There,
+    `var msg = result.Errors[0].ErrorMessage;` now converts in place, and the inferred local `msg` is an
+    unresolved receiver for `msg.ShouldEqual(...)`.
+  - `Calor0270CorpusVolumeTests`' pinned constants were updated to match, with a comment.
+- **`binder-incomplete-baseline.json` and `binder-source-coverage.json`** (`CALOR_UPDATE_BINDER_BASELINE=1`):
+  - Incomplete binding is still 0, and all 364 files convert and bind.
+  - Conversion leg `RoslynSelectedAttempted` 35152 → 35176 (+24). These are binder visits: the hoisted
+    temps are gone and their element accesses are now visited in place.
+  - In-repo `ExpressionsBound` 4826 → 4827: the `13-11` snapshot's `CreateEmpty` is now a fresh
+    `§ARR` instead of a call to `Array.Empty`.
+  - The per-file source coverage moves in 57 files (MediatR 2, serilog 13, FluentValidation 42), with
+    the same cause. `BindingErrorCount` drops in most FluentValidation test files (for example
+    ForEachRuleTests 188 → 154 and InheritanceValidatorTest 81 → 61), because member access no longer
+    binds to the index. It rises in a few, where an in-place element access has an unresolved receiver:
+    IValidationContext.cs 29 → 33, Serilog Events/LogEvent.cs 16 → 24, PropertyValueConverter.cs
+    47 → 48, LogEventPropertyValueRewriter.cs 16 → 17, MediatR Mediator.cs 7 → 8, UserStateTester.cs
+    16 → 17.
+  - The exact per-file before/after values are in the commit diff of `binder-source-coverage.json`.
+
+`ConversionScorecardTests.BASELINE_ROUNDTRIP` goes 97 → 98. This is an improvement: one more of the
+100 scorecard programs round-trips.
+
 ### Line ceiling
 
 Non-test source (`git diff --numstat origin/main...HEAD -- src`) at `3be4ecee8`: +592/-286, 878
 changed lines, against #1521's 880 (+596/-284) and EXC-F5-NONTEST-LINES' allowance of 880. The exception is
 recorded "for #1521 only"; the maintainer extended it to this PR on 2026-10-13 as
 EXC-F5-NONTEST-LINES-PR2 (R0 amendment 1.2.0, at <= 880). After the extra-verification fix the
-count is unchanged: +592/-286, 878 (the fix edits one already-added line).
+count is unchanged: +592/-286, 878 (the fix edits one already-added line). After the closer fix
+(EXC-F5-PR2-CLOSER-FIX): +593/-286, **879**.
 
 ### Reviews (PR 2)
 
@@ -211,6 +267,7 @@ Fresh budget: 3 Codex rounds plus 1 verification-only pass. Records: `reviews/pr
 | 3 (round 3) | `reviews/pr2-round-3.md` | REQUEST CHANGES: 1 BLOCKING (contested, not changed), 3 MAJOR (fixed) |
 | 4 (verification) | `reviews/pr2-verification.md` | REQUEST CHANGES: round-3 items 2-4 VERIFIED, item 1 ACCEPTED; 1 new MAJOR introduced by the round-3 constant exemption (a constant with a user-defined conversion runs it after a hoisted argument) |
 | 5 (extra verification, EXC-F5-PR2-FIX-VERIFY) | `reviews/pr2-extra-verification.md` | APPROVE: the fix (`3be4ecee8`, `!GetConversion(e).IsUserDefined` on the constant exemption) VERIFIED and revert-sensitive; no new BLOCKING or MAJOR |
+| 6 (closer fix, EXC-F5-PR2-CLOSER-FIX) | `reviews/pr2-closer-verification.md` | REQUEST CHANGES with no BLOCKING or MAJOR: the `new Guid[0]` closer fix (`3dbd108ee`) fixes the scoped defect and is revert-sensitive; NOT-VERIFIED only for a pre-existing combination the migration path cannot produce (a non-type element type with an id the parser reads as a type) |
 
 ---
 
