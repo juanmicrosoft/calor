@@ -1,0 +1,25 @@
+§M{m001:Fixture:overflow=unchecked}
+  §CL{c001:LocalFunctionFixture:pub:stat}
+    §MT{m002:Add:pub:stat} (i32:x) -> i32
+      §R (+ x 1000)
+
+    §MT{m003:Run:pub:stat} () -> i32
+      §S (== result 31620)
+      §B{i32:shadowed} §C{Add} 2
+      §IF{if004} (!= shadowed 3)
+        §R (- 1)
+      §B{i32:squared} §C{Square} 4
+      §IF{if005} (!= squared 16)
+        §R (- 2)
+      §B{i32:factorial} §C{Fact} 5
+      §IF{if006} (!= factorial 120)
+        §R (- 3)
+      §R (+ (+ (* shadowed 10000) (* squared 100)) (% factorial 100))
+      §F{f007:Add} (i32:x) -> i32
+        §R (+ x 1)
+      §F{f008:Square} (i32:n) -> i32
+        §R (* n n)
+      §F{f009:Fact} (i32:n) -> i32
+        §IF{if010} (<= n 1)
+          §R 1
+        §R (* n §C{Fact} §A (- n 1) §/C)

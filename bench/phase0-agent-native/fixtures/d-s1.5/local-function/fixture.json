@@ -1,0 +1,13 @@
+{
+  "featureKey": "local-function",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 31620,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 31620,
+  "convertedExpectedDefinedInt": 31620,
+  "definedSymbols": []
+}

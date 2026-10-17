@@ -429,7 +429,8 @@ public class ConvertToolTests
         var path = Path.Combine(Path.GetTempPath(), $"Example-{Guid.NewGuid():N}.cs");
         await File.WriteAllTextAsync(
             path,
-            "public class Example { public int Get() { int Local() => 42; return Local(); } }");
+            // 0.25 F3 (#847): a capturing local function keeps the member as interop.
+            "public class Example { public int Get(int k) { int Local() => k; return Local(); } }");
         try
         {
             var args = JsonSerializer.SerializeToElement(new { inputPath = path });
@@ -453,11 +454,11 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithLocalFunction_EscalatesToInterop()
+    public async Task ExecuteAsync_WithNonCapturingLocalFunction_ConvertsInPlace()
     {
-        // #777 (WS-W4 D4): a member containing a local function is preserved verbatim
-        // as interop rather than hoisted to a module-level function (the hoist orphans
-        // the call site — build break or silent rebind).
+        // #777 (WS-W4 D4): never hoisted to a module-level function (the hoist orphans
+        // the call site — build break or silent rebind). 0.25 F3 (#847): a
+        // non-capturing local function converts in place to a nested §F.
         var args = JsonDocument.Parse("""
             {
                 "source": "public class Example { public int Calculate(int x) { int Square(int n) => n * n; return Square(x); } }",
@@ -471,9 +472,9 @@ public class ConvertToolTests
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
-        Assert.Contains("\u00A7CSHARP", calorSource);   // member preserved as interop
-        Assert.Contains("Square", calorSource);
-        Assert.DoesNotContain("\u00A7F{", calorSource);  // NOT hoisted to a module-level function
+        Assert.DoesNotContain("\u00A7CSHARP", calorSource);
+        // Nested inside Calculate (indented under its §MT), not a module-level §F.
+        Assert.Matches(@"\n {6,}\u00A7F\{f\d+:Square\} \(i32:n\) -> i32", calorSource);
     }
 
     [Fact]

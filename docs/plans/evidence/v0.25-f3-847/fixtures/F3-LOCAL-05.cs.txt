@@ -1,0 +1,22 @@
+// 0.25 F3 (#847) fixture F3-LOCAL-05 (registered at R0, not fixtured there): an async local
+// function is outside the native slice and must stay preserved as §CSHARP, never native.
+using System.Threading.Tasks;
+
+public static class Probe
+{
+    public static string Run()
+    {
+        int value = Compute().Result;
+        return "" + value;
+    }
+
+    private static async Task<int> Compute()
+    {
+        async Task<int> Inner()
+        {
+            await Task.Yield();
+            return 41;
+        }
+        return await Inner() + 1;
+    }
+}
