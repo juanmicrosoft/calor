@@ -170,7 +170,7 @@
   },
   "rebasedOntoMain": {
     "date": "2026-10-17",
-    "main": "f7510f32e (after the 0.24 release work and 0.25 W0, D1, F4, F6, F5, #1520 and #1538)",
+    "main": "aaaca630e (after the 0.24 release work and 0.25 W0, D1, F4, F6, F5, #1520, #1538 and #1556; the corpus baselines were measured on f7510f32e and re-checked unchanged on aaaca630e)",
     "note": "F2's reviewed commits 66a8db449..0d8f332e5 were merged with main and rewritten as one linear commit on main. src/ is unchanged apart from the textual merge. The binder baselines were reset to main's versions and regenerated with CALOR_UPDATE_BINDER_BASELINE=1 on the merged tree: the same 22 source records change, with per-file numeric deltas and changed hash fields identical to F2's original measurement; only main's starting values differ. The calor0425, calor0270, higher-order demand and effect-resolver key ledgers were regenerated with their switches on the merged tree and only their measuredCommit stamps moved, so main's files are kept. Website example coverage pin: complete 52 -> 54 (the two compiling examples F2 adds to string-operations.mdx). Row 09 is re-measured below. It is not READY and must still be re-measured on the #1423 candidate.",
     "row09OnMain": {
       "incompleteDiagnostics": {
