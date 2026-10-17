@@ -3651,8 +3651,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (node.Size != null)
         {
             var size = EmitSizeAttribute(node.Size);
-            // #1132: closed, so a sized element cannot take its enclosing §ARR's closer.
-            return $"§ARR{{{elementType}:{id}:{size}}} §/ARR{{{id}}}";
+            // #1132: closed (a sized element cannot take its parent's closer); id first unless the parser reads the type first.
+            var head = AttributeHelper.IsLikelyType(elementType) && !AttributeHelper.IsLikelyType(id) ? $"{elementType}:{id}" : $"{id}:{elementType}";
+            return $"§ARR{{{head}:{size}}} §/ARR{{{id}}}";
         }
         else
         {

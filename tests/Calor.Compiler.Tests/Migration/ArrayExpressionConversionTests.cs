@@ -930,6 +930,44 @@ public class ArrayExpressionConversionTests
     }
 
     [Fact]
+    public void SizedArrays_OfLowercaseMappedTypes_ParseWithTheirCloser()
+    {
+        // #1554 CI (FluentValidation `Ids = new Guid[0]`): `guid`, `datetime` and `timespan` are
+        // not types to the §ARR attribute reader, so `§ARR{guid:arrGuid1:0} §/ARR{arrGuid1}` read
+        // `guid` as the id and the closer mismatched. The id now goes first for such types.
+        const string source = """
+            using System;
+
+            public class Model
+            {
+                public Guid[] Ids = Array.Empty<Guid>();
+            }
+
+            public static class Probe
+            {
+                static string Use(Guid[] g, DateTime[] d, TimeSpan[] t, int[] i) => g.Length + "," + d.Length + "," + t.Length + "," + i.Length;
+
+                public static string Run()
+                {
+                    var model = new Model { Ids = new Guid[0] };
+                    return Use(new Guid[2], new DateTime[3], new TimeSpan[1], new int[4]) + "," + model.Ids.Length + "," + model.Ids.GetType().Name;
+                }
+            }
+            """;
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.Matches(@"§ARR\{arrGuid\d+:guid:2\} §/ARR\{arrGuid\d+\}", result.CalorSource!);
+        Assert.Matches(@"§ARR\{arrDatetime\d+:datetime:3\}|§ARR\{\w+:datetime:3\}", result.CalorSource!);
+        Assert.Matches(@"§ARR\{i32:arrI32\d+:4\}", result.CalorSource!);
+        var compilation = Program.Compile(result.CalorSource!, "lowercase.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.Equal("2,3,1,4,0,Guid[]", Run(source));
+        Assert.Equal(Run(source), Run(compilation.GeneratedCode));
+    }
+
+    [Fact]
     public void EmptyJaggedArray_KeepsItsElementRank()
     {
         // PR 2 Codex round 3: an empty §ARR of i32[] is Array.Empty<int[]>(), not Array.Empty<int>().
