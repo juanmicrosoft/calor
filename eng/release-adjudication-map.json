@@ -1,0 +1,40 @@
+{
+  "schema": "calor.release-adjudication-map/1",
+  "issue": 1567,
+  "rule": "The #1410 release gate (scripts/verify_release_adjudication.py) and the 0.24.0 maintainer-override check (scripts/verify_maintainer_override.py) read this file from beside the script that runs, never from the checkout being published. Each release names its A1 issue, the path of its terminal record, the contract packet and seal the record is adjudicated under, and the claim registry the record must name. An identity passes only for a release whose status is 'adjudicated' and whose record is at that path; a version that matches no entry fails (G016). 'MAJOR.MINOR.x' matches every patch release of that minor. Changing this file is a reviewed change to the gate. Design: docs/plans/evidence/r2-1410/release-gate.md section 9.",
+  "releases": [
+    {
+      "version": "0.24.0",
+      "status": "adjudicated",
+      "a1Issue": 1408,
+      "terminalRecord": "docs/plans/evidence/adjudication-1408/terminal-record.json",
+      "contractPacket": {
+        "issue": 1407,
+        "format": "calor.evidence-contract-packet/1407",
+        "dir": "docs/plans/evidence/evidence-contract-1407",
+        "contract": "docs/plans/evidence/evidence-contract-1407/contract.json",
+        "inventory": "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json",
+        "seal": "docs/plans/evidence/evidence-contract-1407/sha256.json"
+      },
+      "claimRegistry": "docs/plans/evidence/c2-1424/regeneration-3/claim-registry.json",
+      "maintainerOverride": "docs/plans/evidence/adjudication-1408/maintainer-override.json",
+      "note": "The record's outcome is MILESTONE-FAILED, so every 0.24.0 identity fails G006. 0.24.0 shipped through the recorded maintainer override (#1544)."
+    },
+    {
+      "version": "0.25.x",
+      "status": "not-yet-adjudicated",
+      "a1Issue": 1430,
+      "terminalRecord": "docs/plans/evidence/adjudication-1430/terminal-record.json",
+      "contractPacket": {
+        "issue": 1426,
+        "format": "calor.v0.25-interop-scope/1",
+        "dir": "docs/plans/evidence/v0.25-r0-1426",
+        "contract": "docs/plans/evidence/v0.25-r0-1426/scope.json",
+        "inventory": null,
+        "seal": "docs/plans/evidence/v0.25-r0-1426/scope.json"
+      },
+      "claimRegistry": "docs/plans/evidence/adjudication-1430/claim-registry.json",
+      "note": "Future paths. No identity passes until #1430's terminal record lands and a reviewed change sets status to 'adjudicated'. The contract packet named here is the frozen 0.25 R0 scope (#1426, seal: its evidenceSeal block); which contract governs the 0.25 release is the #1548 maintainer decision, and the gate does not yet check this packet format (G016)."
+    }
+  ]
+}

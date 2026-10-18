@@ -90,6 +90,9 @@ class ParseFailure(Exception):
     pass
 
 
+DEFAULT_COLLECTION_TAGS = (None, "tag:yaml.org,2002:map", "tag:yaml.org,2002:seq")
+
+
 def strict_loader():
     """yaml.SafeLoader that rejects duplicate keys (also keys equal under case folding)."""
     if yaml is None:
@@ -121,6 +124,12 @@ def load_workflow(text: str) -> tuple[object, bool]:
     loader = strict_loader()
     try:
         events = list(yaml.parse(text, Loader=loader))
+        # #1567: an explicitly tagged collection (`!!set`, `!!omap`, `!!pairs`, a local `!tag`)
+        # is not built by the strict mapping constructor, so it skips the duplicate-key check.
+        # Only untagged collections, or the default `!!map` and `!!seq`, are checked.
+        for event in events:
+            if isinstance(event, yaml.CollectionStartEvent) and event.tag not in DEFAULT_COLLECTION_TAGS:
+                raise ParseFailure(f"non-default collection tag {event.tag!r} at {event.start_mark}")
         anchored = any(isinstance(e, yaml.AliasEvent) or getattr(e, "anchor", None) for e in events) \
             or any(isinstance(e, yaml.ScalarEvent) and e.value == "<<" and e.style is None for e in events)
         documents = list(yaml.load_all(text, Loader=loader))
@@ -166,7 +175,8 @@ def check_workflows(workflow_dir: Path) -> list[str]:
     environment is not exactly nuget-release; W007 the publish job's first step is not the guard;
     W008 the key or environment appears outside a job, or jobs are not mappings; W009 anchors,
     aliases, or merge keys; W011 a job-level `uses` other than a local workflow file; W012 a
-    workflow cannot be parsed or has a duplicate key. (W010, a key split across lines, is retired:
+    workflow cannot be parsed, has a duplicate key, or tags a collection other than `!!map` or
+    `!!seq` (for example `!!set`, which would skip the duplicate-key check). (W010, a key split across lines, is retired:
     the parser decodes those.)"""
     problems: list[str] = []
     files = sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))

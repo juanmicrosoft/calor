@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed release gate for milestone 0.24 (#1410).
+"""Fail-closed release gate (#1410), for every release in the adjudication map (#1567).
 
 Every public release surface (NuGet packages, the GitHub release and its notes,
 release metadata, the website, benchmark publication, and the installed-tool
@@ -8,10 +8,14 @@ identity:
 
     calor-adjudication:v1:<adjudication commit, 40 hex>:<record SHA-256, 64 hex>
 
-The identity names the #1408 terminal record committed at RECORD_PATH in a
-commit on protected main, and the SHA-256 of that blob's exact bytes. The script
-exits 0 only when the record is the one named, the record is a successful
-adjudication under the frozen #1407 contract, the checkout being published is
+The identity names a terminal record committed in a commit on protected main, and
+the SHA-256 of that blob's exact bytes. Which A1 issue, record path, contract packet,
+and claim registry apply to a release comes from the committed, reviewed map
+eng/release-adjudication-map.json (MAP_PATH), read from beside this script, never from
+the checkout being published (#1567). The script exits 0 only when the record is the
+one named and sits at the path the map gives its version, the map marks that release
+adjudicated, the record is a successful adjudication under the release's frozen
+contract (0.24.0: #1408 under #1407), the checkout being published is
 the adjudicated candidate, and every surface artifact passed on the command
 line matches the hash the record adjudicated. Anything missing, malformed,
 changed, or unverifiable is a failure; there is no warning-only mode and no
@@ -38,8 +42,19 @@ import sys
 import zipfile
 from pathlib import Path
 
-RECORD_PATH = "docs/plans/evidence/adjudication-1408/terminal-record.json"
-PACKET_DIR = "docs/plans/evidence/evidence-contract-1407"
+# #1567: the per-release A1 issue, record path, contract packet, and claim registry live in this
+# map, beside the gate (benchmark.yml copies both), so the checkout being published cannot change it.
+MAP_PATH = Path(__file__).resolve().parent.parent / "eng" / "release-adjudication-map.json"
+MAP_SCHEMA = "calor.release-adjudication-map/1"
+ADJUDICATED, NOT_YET_ADJUDICATED = "adjudicated", "not-yet-adjudicated"
+# The only contract-packet format this gate checks: #1407's contract.json, artifact-inventory.json,
+# and sha256.json seal. Another format fails (G016) until a reviewed change teaches the gate to read it.
+PACKET_FORMAT_1407 = "calor.evidence-contract-packet/1407"
+# The only release the 0.24.0 maintainer override may name (see scripts/verify_maintainer_override.py).
+OVERRIDE_RELEASE = "0.24.0"
+VERSION_KEY_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+|x)$")
+VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$")
+REPO_PATH_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*(?:/[A-Za-z0-9_][A-Za-z0-9._-]*)*$")
 RECORD_SCHEMA = "calor.adjudication-terminal-record/1"
 MAIN_REF = "refs/remotes/origin/main"
 IDENTITY_RE = re.compile(r"^calor-adjudication:v1:([0-9a-f]{40}):([0-9a-f]{64})$")
@@ -68,6 +83,92 @@ TEXT_SUFFIXES = {".html", ".htm", ".txt", ".md", ".mdx", ".json", ".xml", ".rss"
 
 class GateError(Exception):
     pass
+
+
+class MapError(Exception):
+    """The adjudication map is missing or malformed; every identity fails (G016)."""
+
+
+ENTRY_FIELDS = {"version", "status", "a1Issue", "terminalRecord", "contractPacket", "claimRegistry",
+                "maintainerOverride", "note"}
+PACKET_FIELDS = {"issue", "format", "dir", "contract", "inventory", "seal"}
+
+
+def _repo_path(value: object, what: str) -> str:
+    if not isinstance(value, str) or not REPO_PATH_RE.match(value):
+        raise MapError(f"{what} must be a relative repository path, got {value!r}")
+    return value
+
+
+def _issue(value: object, what: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise MapError(f"{what} must be a positive issue number, got {value!r}")
+    return value
+
+
+def load_map(path: Path = MAP_PATH) -> list[dict]:
+    """The release entries of the adjudication map, validated strictly. Raises MapError."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise MapError(f"cannot read {path.name}: {error}") from error
+    if not isinstance(data, dict) or data.get("schema") != MAP_SCHEMA:
+        raise MapError(f"{path.name} schema must be {MAP_SCHEMA}")
+    entries = data.get("releases")
+    if not isinstance(entries, list) or not entries:
+        raise MapError(f"{path.name} lists no releases")
+    keys: set[str] = set()
+    records: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) - ENTRY_FIELDS:
+            raise MapError(f"release entry has unknown fields: {sorted(set(entry) - ENTRY_FIELDS) if isinstance(entry, dict) else entry!r}")
+        key = entry.get("version")
+        if not isinstance(key, str) or not VERSION_KEY_RE.match(key):
+            raise MapError(f"release key must be MAJOR.MINOR.PATCH or MAJOR.MINOR.x, got {key!r}")
+        if key in keys:
+            raise MapError(f"release {key} is listed twice")
+        keys.add(key)
+        if entry.get("status") not in (ADJUDICATED, NOT_YET_ADJUDICATED):
+            raise MapError(f"release {key}: status must be '{ADJUDICATED}' or '{NOT_YET_ADJUDICATED}'")
+        _issue(entry.get("a1Issue"), f"release {key}: a1Issue")
+        record = _repo_path(entry.get("terminalRecord"), f"release {key}: terminalRecord")
+        if record in records:
+            raise MapError(f"release {key}: terminal record {record} is named by another release")
+        records.add(record)
+        _repo_path(entry.get("claimRegistry"), f"release {key}: claimRegistry")
+        packet = entry.get("contractPacket")
+        if not isinstance(packet, dict) or set(packet) != PACKET_FIELDS:
+            raise MapError(f"release {key}: contractPacket must have exactly {sorted(PACKET_FIELDS)}")
+        _issue(packet.get("issue"), f"release {key}: contractPacket.issue")
+        if not isinstance(packet.get("format"), str) or not packet["format"]:
+            raise MapError(f"release {key}: contractPacket.format must be named")
+        for field in ("dir", "contract", "seal"):
+            _repo_path(packet.get(field), f"release {key}: contractPacket.{field}")
+        if packet.get("inventory") is not None:
+            _repo_path(packet.get("inventory"), f"release {key}: contractPacket.inventory")
+        if "maintainerOverride" in entry:
+            if key != OVERRIDE_RELEASE:
+                raise MapError(f"release {key}: only {OVERRIDE_RELEASE} may name a maintainer override (#1548)")
+            _repo_path(entry["maintainerOverride"], f"release {key}: maintainerOverride")
+    # An exact key inside a MAJOR.MINOR.x key would make a version resolve to two releases.
+    wildcards = {k[:-2] for k in keys if k.endswith(".x")}
+    for key in keys:
+        if not key.endswith(".x") and key.rsplit(".", 1)[0] in wildcards:
+            raise MapError(f"release {key} overlaps {key.rsplit('.', 1)[0]}.x")
+    return entries
+
+
+def map_entry(entries: list[dict], version: object) -> dict | None:
+    """The one entry whose key covers this version, or None."""
+    found = VERSION_RE.match(version) if isinstance(version, str) else None
+    if not found:
+        return None
+    major, minor, patch = found.groups()
+    for entry in entries:
+        k_major, k_minor, k_patch = VERSION_KEY_RE.match(entry["version"]).groups()
+        if (k_major, k_minor) == (major, minor) and (k_patch == "x" or (k_patch == patch and version == entry["version"])):
+            return entry
+    return None
 
 
 class Gate:
@@ -192,10 +293,10 @@ def scan_text(gate: Gate, label: str, text: str) -> None:
             if negated > literal_negations:
                 hits.add("negation supplied by markup")
     for hit in sorted(hits):
-        gate.fail("G012", f"{label}: forbidden wording '{hit}'; 0.24 evidence is not independently adjudicated")
+        gate.fail("G012", f"{label}: forbidden wording '{hit}'; release evidence is not independently adjudicated")
 
 
-def load_record(gate: Gate, identity: str) -> tuple[str, dict] | None:
+def load_record(gate: Gate, identity: str, entries: list[dict]) -> tuple[str, dict, dict] | None:
     match = IDENTITY_RE.match(identity)
     if not match:
         gate.fail("G001", "adjudication identity must be calor-adjudication:v1:<40-hex commit>:<64-hex sha256>")
@@ -215,12 +316,31 @@ def load_record(gate: Gate, identity: str) -> tuple[str, dict] | None:
         gate.fail("G003", f"adjudication commit {commit} is not on protected main")
         return None
 
-    data = gate.blob(commit, RECORD_PATH)
-    if data is None:
-        gate.fail("G004", f"no terminal record at {commit}:{RECORD_PATH}")
+    # #1567: the record is the blob, at one of the map's terminal-record paths, that the identity
+    # hashes. Its release entry then decides everything else the gate reads.
+    present = {e["terminalRecord"]: (e, gate.blob(commit, e["terminalRecord"])) for e in entries}
+    present = {path: pair for path, pair in present.items() if pair[1] is not None}
+    named = [pair for pair in present.values() if sha256(pair[1]) == digest]
+    if not present:
+        gate.fail("G004", f"no terminal record at {commit} under any path in {MAP_PATH.name}: "
+                          f"{sorted(e['terminalRecord'] for e in entries)}")
         return None
-    if sha256(data) != digest:
-        gate.fail("G004", f"terminal record hash {sha256(data)} does not match the identity {digest}")
+    if not named:
+        found = ", ".join(f"{path} has {sha256(pair[1])}" for path, pair in sorted(present.items()))
+        gate.fail("G004", f"no terminal record at {commit} matches the identity {digest} ({found})")
+        return None
+    if len(named) != 1:
+        gate.fail("G016", "the identity's record bytes sit at more than one mapped record path")
+        return None
+    entry, data = named[0]
+    if entry["status"] != ADJUDICATED:
+        gate.fail("G016", f"release {entry['version']} (#{entry['a1Issue']}) is {entry['status']} in "
+                          f"{MAP_PATH.name}; no identity passes until a reviewed change marks it {ADJUDICATED}")
+        return None
+    packet = entry["contractPacket"]
+    if packet["format"] != PACKET_FORMAT_1407 or packet["inventory"] is None:
+        gate.fail("G016", f"release {entry['version']}: the gate cannot check contract packet format "
+                          f"{packet['format']!r}; only {PACKET_FORMAT_1407}")
         return None
     try:
         record = json.loads(data.decode("utf-8"))
@@ -230,21 +350,32 @@ def load_record(gate: Gate, identity: str) -> tuple[str, dict] | None:
     if not isinstance(record, dict) or record.get("schema") != RECORD_SCHEMA:
         gate.fail("G004", f"terminal record schema must be {RECORD_SCHEMA}")
         return None
-    return commit, record
+    candidate = record.get("candidate")
+    version = candidate.get("version") if isinstance(candidate, dict) else None
+    if isinstance(version, str) and VERSION_RE.match(version):  # otherwise G009 reports it
+        resolved = map_entry(entries, version)
+        if resolved is None:
+            gate.fail("G009", f"candidate version {version} is not in {MAP_PATH.name}; no release is mapped for it")
+        elif resolved is not entry:
+            gate.fail("G016", f"the record at {entry['terminalRecord']} adjudicates {version}, which "
+                              f"{MAP_PATH.name} maps to release {resolved['version']}, not {entry['version']}")
+            return None
+    return commit, record, entry
 
 
-def check_contract(gate: Gate, commit: str, record: dict) -> tuple[dict, dict] | None:
-    raw_contract = gate.blob(commit, f"{PACKET_DIR}/contract.json")
-    raw_inventory = gate.blob(commit, f"{PACKET_DIR}/artifact-inventory.json")
-    raw_hashes = gate.blob(commit, f"{PACKET_DIR}/sha256.json")
+def check_contract(gate: Gate, commit: str, record: dict, entry: dict) -> tuple[dict, dict] | None:
+    packet = entry["contractPacket"]
+    raw_contract = gate.blob(commit, packet["contract"])
+    raw_inventory = gate.blob(commit, packet["inventory"])
+    raw_hashes = gate.blob(commit, packet["seal"])
     if raw_contract is None or raw_inventory is None or raw_hashes is None:
-        gate.fail("G005", "the #1407 contract packet is missing at the adjudication commit")
+        gate.fail("G005", f"the #{packet['issue']} contract packet is missing at the adjudication commit")
         return None
     contract = json.loads(raw_contract)
     inventory = json.loads(raw_inventory)
     files = json.loads(raw_hashes).get("files")
     if contract.get("status") != "FROZEN" or contract.get("gateStatus") != "MET":
-        gate.fail("G005", "the #1407 contract is not FROZEN with R0 MET")
+        gate.fail("G005", f"the #{packet['issue']} contract is not FROZEN with R0 MET")
     if not isinstance(files, dict) or not files:
         gate.fail("G005", "sha256.json lists no packet files")
         return None
@@ -252,7 +383,7 @@ def check_contract(gate: Gate, commit: str, record: dict) -> tuple[dict, dict] |
         blob = gate.blob(commit, path)
         actual = None if blob is None else sha256(blob.replace(b"\r\n", b"\n"))
         if actual != expected:
-            gate.fail("G005", f"packet file {path} does not match sha256.json")
+            gate.fail("G005", f"packet file {path} does not match {packet['seal']}")
     declared = record.get("contract")
     if not isinstance(declared, dict):
         gate.fail("G005", "record has no contract block")
@@ -264,12 +395,17 @@ def check_contract(gate: Gate, commit: str, record: dict) -> tuple[dict, dict] |
     return contract, inventory
 
 
-def claim_registry(gate: Gate, commit: str, record: dict) -> set[str]:
-    """The #1424 claim registry the record names: {path, sha256} of {"claims": ["claim:<id>", ...]}."""
+def claim_registry(gate: Gate, commit: str, record: dict, entry: dict) -> set[str]:
+    """The claim registry the record names: {path, sha256} of {"claims": ["claim:<id>", ...]}. The
+    path must be the one the map gives the release (0.24.0: #1424's regeneration-3 registry)."""
     ref = record.get("claimRegistry")
-    blob = gate.blob(commit, str(ref.get("path"))) if isinstance(ref, dict) else None
+    if not isinstance(ref, dict) or ref.get("path") != entry["claimRegistry"]:
+        gate.fail("G008", f"record must name the claim registry {entry['claimRegistry']} that "
+                          f"{MAP_PATH.name} gives release {entry['version']}")
+        return set()
+    blob = gate.blob(commit, str(ref.get("path")))
     if blob is None or sha256(blob) != ref.get("sha256"):
-        gate.fail("G008", "record must name the committed #1424 claim registry by path and sha256")
+        gate.fail("G008", "record must name the committed claim registry by path and sha256")
         return set()
     claims = json.loads(blob).get("claims")
     if not isinstance(claims, list) or not all(
@@ -280,9 +416,10 @@ def claim_registry(gate: Gate, commit: str, record: dict) -> set[str]:
     return set(claims)
 
 
-def check_terminal(gate: Gate, commit: str, record: dict, contract: dict, inventory: dict) -> None:
-    if record.get("issue") != 1408:
-        gate.fail("G006", "record is not the #1408 terminal record")
+def check_terminal(gate: Gate, commit: str, record: dict, entry: dict, contract: dict, inventory: dict) -> None:
+    a1 = entry["a1Issue"]
+    if record.get("issue") != a1:
+        gate.fail("G006", f"record is not the #{a1} terminal record")
     if record.get("outcome") != "MILESTONE-SUCCEEDED":
         gate.fail("G006", f"terminal outcome is {record.get('outcome')!r}, not MILESTONE-SUCCEEDED")
 
@@ -303,8 +440,8 @@ def check_terminal(gate: Gate, commit: str, record: dict, contract: dict, invent
         if cls == "stale":
             gate.fail("G008", f"{artifact}: inventory still classifies it stale; a stale artifact can only be BLOCKED")
     required = set(classes)
-    required |= {f"gate:#{c['issue']}" for c in contract.get("children", []) if c.get("issue") != 1408}
-    required |= claim_registry(gate, commit, record)
+    required |= {f"gate:#{c['issue']}" for c in contract.get("children", []) if c.get("issue") != a1}
+    required |= claim_registry(gate, commit, record, entry)
     rows = record.get("adjudications")
     if not isinstance(rows, list) or not rows:
         gate.fail("G008", "record has no adjudication rows")
@@ -334,7 +471,7 @@ def check_terminal(gate: Gate, commit: str, record: dict, contract: dict, invent
         gate.fail("G008", f"{missing}: required subject is not adjudicated")
 
 
-def check_candidate(gate: Gate, commit: str, record: dict, args: argparse.Namespace) -> str | None:
+def check_candidate(gate: Gate, commit: str, record: dict, entry: dict, args: argparse.Namespace) -> str | None:
     candidate = record.get("candidate")
     if not isinstance(candidate, dict):
         gate.fail("G009", "record has no candidate block")
@@ -356,10 +493,11 @@ def check_candidate(gate: Gate, commit: str, record: dict, args: argparse.Namesp
         gate.fail("G009", f"Directory.Build.props at the candidate does not declare version {version}")
     else:
         check_release_pr_products(gate, cand, version, record)
-    packet_at_candidate = gate.git("rev-parse", f"{cand}:{PACKET_DIR}", check=False).stdout.strip()
-    packet_at_record = gate.git("rev-parse", f"{commit}:{PACKET_DIR}", check=False).stdout.strip()
+    packet = entry["contractPacket"]
+    packet_at_candidate = gate.git("rev-parse", f"{cand}:{packet['dir']}", check=False).stdout.strip()
+    packet_at_record = gate.git("rev-parse", f"{commit}:{packet['dir']}", check=False).stdout.strip()
     if not packet_at_candidate or packet_at_candidate != packet_at_record:
-        gate.fail("G005", "the #1407 contract packet changed between the candidate and the adjudication")
+        gate.fail("G005", f"the #{packet['issue']} contract packet changed between the candidate and the adjudication")
     if args.expect_head and gate.resolve("HEAD") != cand:
         gate.fail("G009", f"checked-out HEAD {gate.resolve('HEAD')} is not the adjudicated candidate {cand}")
     if args.version is not None and args.version != version:
@@ -532,18 +670,23 @@ def run(args: argparse.Namespace) -> int:
     gate = Gate(Path(args.repo).resolve())
     outputs: dict[str, str] = {}
     try:
-        loaded = load_record(gate, args.identity.strip())
+        entries = load_map()
+        if args.version is not None and map_entry(entries, args.version) is None:
+            gate.fail("G009", f"requested version {args.version} is not in {MAP_PATH.name}")
+        loaded = load_record(gate, args.identity.strip(), entries)
         if loaded:
-            commit, record = loaded
-            packet = check_contract(gate, commit, record)
+            commit, record, entry = loaded
+            packet = check_contract(gate, commit, record, entry)
             if packet:
-                check_terminal(gate, commit, record, *packet)
-            cand = check_candidate(gate, commit, record, args)
+                check_terminal(gate, commit, record, entry, *packet)
+            cand = check_candidate(gate, commit, record, entry, args)
             check_surfaces(gate, args.identity.strip(), record, args)
             if cand:
                 version = record["candidate"]["version"]
                 outputs = {"candidate": cand, "version": version, "tag": f"v{version}",
                            "prerelease": "true" if version.startswith("0.") or "-" in version else "false"}
+    except MapError as error:
+        gate.fail("G016", f"{MAP_PATH.name}: {error}")
     except Exception as error:  # noqa: BLE001 - any failure to verify is a failed gate
         gate.fail("G000", f"gate could not complete: {error}")
 
