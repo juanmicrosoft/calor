@@ -94,6 +94,11 @@ jobs:
             echo "::error::benchmark publication is dispatched only from main (got $GITHUB_REF)"; exit 1
           fi
           python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+          # The checkout below replaces the work tree with the candidate, whose copy of the gate
+          # may predate checks such as G015 (#1547). Every later gate run uses main's copy, kept
+          # outside the work tree, against the candidate checkout (--repo .).
+          mkdir -p "$RUNNER_TEMP/main-gate/scripts"
+          cp scripts/verify_release_adjudication.py "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py"
 
       - name: Check out the candidate and verify the GitHub release (#1410)
         if: github.event_name == 'workflow_dispatch'
@@ -107,7 +112,7 @@ jobs:
           git checkout -q --detach "$CANDIDATE"
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
           TITLE="$(gh release view "$TAG" --json name --jq .name)"
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+          python3 "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py" --repo . --identity "$ADJUDICATION_IDENTITY" \
             --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md" \
             --release-tag "$TAG" --release-title "$TITLE"
 
@@ -328,7 +333,7 @@ jobs:
           REPORT: ${{ steps.methodology.outputs.report }}
         run: |
           set -euo pipefail
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+          python3 "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py" --repo . --identity "$ADJUDICATION_IDENTITY" \
             --expect-head --require-tag --version "$VER" --benchmark-worktree
           BRANCH="benchmark-results-$TAG"
           git switch -q -c "$BRANCH"

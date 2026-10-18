@@ -102,6 +102,13 @@ public class ReleaseWorkflowGateTests
         var only = Assert.Single(publishing);
         Assert.Contains("\n        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_results == 'true'\n", only);
         Assert.Contains("--benchmark-worktree", only);
+        // Round 2 review: after the candidate checkout, the gate is main's copy, not the
+        // candidate's (an older candidate's gate would not know G015).
+        Assert.Contains("python3 \"$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py\" --repo . --identity", only);
+        var checkout = text.IndexOf("git checkout -q --detach \"$CANDIDATE\"", StringComparison.Ordinal);
+        var copy = text.IndexOf("cp scripts/verify_release_adjudication.py \"$RUNNER_TEMP/main-gate/scripts/", StringComparison.Ordinal);
+        Assert.True(copy > 0 && copy < checkout, $"copy {copy}, checkout {checkout}");
+        Assert.DoesNotMatch(new Regex(@"(?m)^\s+python3 scripts/verify_release_adjudication\.py"), text[checkout..]);
     }
 
     [Fact]
