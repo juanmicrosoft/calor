@@ -1,0 +1,17 @@
+tokens used
+94,059
+VERDICT: REQUEST-CHANGES
+
+- **MAJOR — [scripts/check_release_credentials.py:205](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/release-gaps-a/scripts/check_release_credentials.py:205): Multiline flow-style jobs still bypass W011.** The scan only checks lines at the first content line’s indentation. This valid YAML puts `{` at four spaces and `uses` at six:
+
+  ```yaml
+  jobs:
+    remote:
+      {
+        uses: someone/else/.github/workflows/publish.yml@main
+      }
+  ```
+
+  Adding this separate job to the committed workflows returns exit **0**, `RELEASE CREDENTIALS: CLOSED`, including with closed settings fixtures. This is ordinary flow-mapping syntax that could appear in a reviewed PR. The uninspected called workflow can declare `environment: nuget-release` and access its secret when invoked from main. [GitHub documents this environment-secret behavior](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow). The added flow-style regression test covers only a single-line job header, so it misses this form.
+
+Verification: the original folded-value and quoted-key cases now fail correctly. All 23 Python tests passed with fixtures held in memory; committed workflows report CLOSED. Earlier regression controls passed. README check names, code descriptions, and API fields match the implementation; W005 is unused. C# tests were inspected but not executed under the read-only constraint.

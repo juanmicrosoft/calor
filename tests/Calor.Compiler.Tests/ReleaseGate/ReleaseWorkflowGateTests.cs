@@ -284,6 +284,39 @@ public class ReleaseWorkflowGateTests
     }
 
     [Fact]
+    public void NugetKeyIsReachableOnlyThroughTheMainOnlyEnvironment()
+    {
+        // #1545: older tags read the repository secret NUGET_API_KEY. The full analysis, on parsed
+        // YAML with its mutation controls, is scripts/check_release_credentials.py and
+        // scripts/test_check_release_credentials.py; this lane has no PyYAML, so it checks the
+        // committed facts directly and that CI runs the parser-based check with the pinned parser.
+        var lines = File.ReadAllLines(Path.Combine(WorkflowDir(), "publish-nuget.yml"));
+        var publish = Read("publish-nuget.yml").Replace("\r\n", "\n");
+        Assert.Contains("  publish:\n    runs-on: ubuntu-latest\n    needs: [adjudication-gate, test, sdk-consumer, release-quality]\n", publish);
+        Assert.Single(lines, l => l == "    environment: nuget-release");
+        Assert.Contains("    steps:\n      # Fail closed before any work", publish);
+        Assert.Contains("      - name: Require the environment-scoped NuGet key (#1545)\n        env:\n          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}\n", publish);
+        Assert.Contains("--api-key \"$NUGET_RELEASE_API_KEY\"", publish);
+        foreach (var path in Directory.GetFiles(WorkflowDir(), "*.yml"))
+            Assert.DoesNotContain("NUGET_API_KEY", File.ReadAllText(path), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CiRunsTheCredentialCheckWithThePinnedYamlParser()
+    {
+        // EXC-RELEASE-GAPS-A-YAML: the check decides on parsed YAML. CI installs the hash-pinned
+        // parser into its own environment and runs both the check's tests and the check with it.
+        var requirements = File.ReadAllText(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "eng", "release-credentials-requirements.txt"));
+        Assert.Matches(new Regex(@"(?m)^PyYAML==\d+\.\d+\.\d+ \\$"), requirements);
+        Assert.Matches(new Regex(@"--hash=sha256:[0-9a-f]{64}"), requirements);
+        var test = Read("test.yml").Replace("\r\n", "\n");
+        Assert.Contains("/bin/pip\" install --require-hashes -r eng/release-credentials-requirements.txt", test);
+        Assert.Contains("\"$CRED_PY\" scripts/test_check_release_credentials.py", test);
+        Assert.Contains("\"$CRED_PY\" scripts/check_release_credentials.py", test);
+        Assert.DoesNotContain("python3 scripts/test_check_release_credentials.py", test);
+    }
+
+    [Fact]
     public void PublishWorkflowHasNoVersionOverrideAndNoAssetClobber()
     {
         var text = string.Join("\n", File.ReadAllLines(Path.Combine(WorkflowDir(), "publish-nuget.yml"))

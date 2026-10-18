@@ -1,0 +1,19 @@
+tokens used
+139,266
+VERDICT: REQUEST-CHANGES
+
+**MAJOR — scripts/check_release_credentials.py:196:** Multiline reusable-workflow references bypass `W011`. For example:
+
+```yaml
+jobs:
+  shared-release:
+    uses: >-
+      juanmicrosoft/shared-workflows/.github/workflows/release.yml@<commit-sha>
+    secrets: inherit
+```
+
+I reproduced exit 0 and `CLOSED (workflows and repository settings)` with this syntax and valid settings fixtures. The callee is uninspected and can declare `environment: nuget-release` on another job ([GitHub documentation](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow)). A caller on `main` satisfies the deployment policy. Wrapping a long pinned reference is plausible in a reviewed PR, meeting the requested MAJOR threshold. Quoted `"uses"` keys also bypass the check. Fail closed on unrecognized job-level calls and add regression cases.
+
+The recorded fixes from all three rounds are present: pagination/completeness, environment and secret syntax checks, exact first-step guard, queued-run revocation guidance, and tag-remediation corrections. The `0.24.0` override pin is enforced.
+
+Validation: all 21 Python tests passed with fixture files held in memory; direct override negative controls passed. C# tests were inspected but not executed under the read-only constraint. Live repository settings were not verified.

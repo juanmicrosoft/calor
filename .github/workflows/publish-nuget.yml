@@ -419,6 +419,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [adjudication-gate, test, sdk-consumer, release-quality]
+    # #1545: the NuGet credential lives only in the `nuget-release` environment, whose deployment
+    # policy admits `main` alone. Workflow files on older tags never name this environment or this
+    # secret, so they cannot read it. Until the maintainer creates the environment and its secret
+    # (docs/plans/evidence/release-gaps-0.25/README.md), the key is empty and the job stops before
+    # anything is attested or pushed. scripts/check_release_credentials.py reports the settings.
+    environment: nuget-release
     permissions:
       contents: write
       id-token: write
@@ -429,6 +435,18 @@ jobs:
       OVERRIDE_SHA256: ${{ needs.adjudication-gate.outputs.override_sha256 }}
 
     steps:
+      # Fail closed before any work: an empty key means the environment or its secret is missing,
+      # or this run is not allowed into the environment. First step, unconditional, never
+      # continue-on-error (ReleaseWorkflowGateTests and check_release_credentials.py check this).
+      - name: Require the environment-scoped NuGet key (#1545)
+        env:
+          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}
+        run: |
+          if [ -z "$NUGET_RELEASE_API_KEY" ]; then
+            echo "::error::NUGET_RELEASE_API_KEY is not available; create it in the nuget-release environment (#1545)"
+            exit 1
+          fi
+
       - name: Checkout the adjudicated candidate with full history
         uses: actions/checkout@v4
         with:
@@ -559,7 +577,9 @@ jobs:
           esac
 
       - name: Push to NuGet
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_RELEASE_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified
       # package in place. Wait until nuget.org serves both packages, then compare them with

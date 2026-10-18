@@ -97,10 +97,45 @@ public class MaintainerOverrideTests
     [Fact]
     public void VersionMismatchFails()
     {
-        using var repo = OverrideRepo.Build();
-        AssertCodes(repo.Run(new[] { "--override", "0.24.1", "--candidate", repo.Candidate }), "O005");
         using var props = OverrideRepo.Build(propsVersion: "0.25.0");
         AssertCodes(props.Run(props.Basic()), "O005");
+    }
+
+    // ------------------------------------------------------------------
+    // #1548: the override is closed to every version but 0.24.0
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("0.24.1")]
+    [InlineData("0.25.0")]
+    [InlineData("1.0.0")]
+    public void ModeSelectionRefusesTheOverrideForAnyOtherVersion(string version)
+    {
+        var (code, output) = RunScript(".", "--select-mode", "--identity", "", "--override", version);
+        Assert.Equal(1, code);
+        Assert.Contains("O014", output);
+        Assert.DoesNotContain("mode=", output);
+    }
+
+    [Theory]
+    [InlineData("0.24.1")]
+    [InlineData("0.25.0")]
+    public void OverrideForAnyOtherVersionFailsEvenWithAMatchingCommittedRecord(string version)
+    {
+        // Every committed fact agrees with the other version (record, tag, props, notes), as an
+        // edited or newly added override record would. The script still refuses it.
+        using var repo = OverrideRepo.Build(version: version);
+        AssertCodes(repo.Run(repo.AllSurfaces()), "O014");
+        using var pinned = OverrideRepo.Build();
+        AssertCodes(pinned.Run(new[] { "--override", version, "--candidate", pinned.Candidate }), "O014");
+    }
+
+    [Fact]
+    public void TheOverrideVersionIsPinnedInTheScriptNotOnlyInTheRecord()
+    {
+        var script = File.ReadAllText(Path.Combine(RepoRoot(), Script));
+        Assert.Matches(new Regex(@"(?m)^OVERRIDE_VERSION = ""0\.24\.0""$"), script);
+        Assert.Single(Regex.Matches(script, @"(?m)^OVERRIDE_VERSION ="));
     }
 
     [Theory]
@@ -245,7 +280,9 @@ public class MaintainerOverrideTests
     {
         var root = RepoRoot();
         var record = JsonNode.Parse(File.ReadAllText(Path.Combine(root, OverridePath)))!;
-        var version = Regex.Match(File.ReadAllText(Path.Combine(root, "Directory.Build.props")), "<Version>([^<]+)</Version>").Groups[1].Value;
+        // #1548: pinned to 0.24.0, not to Directory.Build.props, so a later version bump on main
+        // neither breaks this test nor appears to extend the override.
+        const string version = "0.24.0";
         Assert.Equal("calor.maintainer-override/1", record["schema"]!.GetValue<string>());
         Assert.Equal(version, record["version"]!.GetValue<string>());
         Assert.Equal("I authorize changing the release gate", record["authorization"]!.GetValue<string>());
@@ -301,6 +338,7 @@ public class MaintainerOverrideTests
     {
         public required string Root { get; init; }
         public required string Scratch { get; init; }
+        public required string Version { get; init; }
         public string Base { get; private set; } = "";
         public string Candidate { get; private set; } = "";
         public string OverrideSha { get; private set; } = "";
@@ -312,10 +350,11 @@ public class MaintainerOverrideTests
 
         public static OverrideRepo Build(
             Action<JsonObject>? over = null, string outcome = Required, bool writeOverride = true,
-            bool writeRecord = true, string propsVersion = ReleaseVersion, string extraNote = "")
+            bool writeRecord = true, string? propsVersion = null, string extraNote = "", string version = ReleaseVersion)
         {
+            propsVersion ??= version;
             var baseDir = Path.Combine(Path.GetTempPath(), "calor-ovr-" + Guid.NewGuid().ToString("N")[..12]);
-            var repo = new OverrideRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch") };
+            var repo = new OverrideRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch"), Version = version };
             foreach (var dir in new[] { repo.Root, repo.NugetDir, repo.MetadataDir, repo.RegistryDir })
                 Directory.CreateDirectory(dir);
             repo.Git("init", "-q", "-b", "main");
@@ -328,13 +367,13 @@ public class MaintainerOverrideTests
                 ["issue"] = 1408,
                 ["outcome"] = outcome,
             }.ToJsonString());
-            var notes = $"## [{ReleaseVersion}] - 2026-10-07\n\nThe adjudication recorded {Required} "
+            var notes = $"## [{version}] - 2026-10-07\n\nThe adjudication recorded {Required} "
                 + $"([record]({RecordPath})). This is a maintainer override. {extraNote}\n";
             var overrideNode = new JsonObject
             {
                 ["schema"] = "calor.maintainer-override/1",
-                ["version"] = ReleaseVersion,
-                ["tag"] = "v" + ReleaseVersion,
+                ["version"] = version,
+                ["tag"] = "v" + version,
                 ["publishCommit"] = "dispatch-ref",
                 ["terminalRecord"] = new JsonObject
                 {
@@ -359,8 +398,8 @@ public class MaintainerOverrideTests
 
             File.WriteAllText(repo.NotesPath, notes);
             File.WriteAllText(repo.BodyPath, notes + $"\n<!-- calor-maintainer-override: v1:{repo.Candidate}:{repo.OverrideSha} -->\n");
-            WritePackage(Path.Combine(repo.NugetDir, $"calor.{ReleaseVersion}.nupkg"), "calor", $"<version>{ReleaseVersion}</version>");
-            WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", $"<version>{ReleaseVersion}</version>");
+            WritePackage(Path.Combine(repo.NugetDir, $"calor.{version}.nupkg"), "calor", $"<version>{version}</version>");
+            WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{version}.nupkg"), "Calor.Sdk", $"<version>{version}</version>");
             repo.WriteMetadata(repo.Candidate);
             return repo;
         }
@@ -398,11 +437,11 @@ public class MaintainerOverrideTests
         }
 
         public string[] Basic(params string[] extra) =>
-            new[] { "--override", ReleaseVersion, "--candidate", Candidate }.Concat(extra).ToArray();
+            new[] { "--override", Version, "--candidate", Candidate }.Concat(extra).ToArray();
 
         public string[] AllSurfaces() => Basic(
             "--expect-head", "--release-notes", NotesPath, "--release-body", BodyPath,
-            "--release-tag", "v" + ReleaseVersion, "--release-title", "v" + ReleaseVersion,
+            "--release-tag", "v" + Version, "--release-title", "v" + Version,
             "--nuget-dir", NugetDir, "--registry-dir", RegistryDir, "--metadata-dir", MetadataDir);
 
         public (int Code, string Output) Run(string[] args) => RunScript(Root, args);
