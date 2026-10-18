@@ -5,7 +5,8 @@ not a READY record (see "What READY still needs"). Reduced independence: the rev
 Codex records only; nothing here was independently reviewed or verified.
 
 Specification: the merged D1 contract, `docs/plans/v0.25-refout-contract.md` and
-`docs/plans/evidence/v0.25-d1-1427/contract.json` (1.0.3), with its §15 answers: parity with
+`docs/plans/evidence/v0.25-d1-1427/contract.json` (1.0.3; amendment 1.0.4 later corrected D1-LV-03's
+source), with its §15 answers: parity with
 `§ASSIGN` for immutable bindings and loop variables (#1550), RO-EFF-4 parity for bare-name fields
 (#1551), the bounded `out var` lowering (RO-DECL-1), and `InvalidByReferenceOperand` allocated here
 as **`Calor0212`** (`Calor0211` is #847's).
