@@ -57,17 +57,8 @@ def select_mode(identity: str, override: str) -> tuple[str | None, str | None]:
     return ("identity" if identity else "override"), None
 
 
-def changelog_section(changelog: str, version: str) -> str:
-    """The `## [VERSION]` section, as publish-nuget's awk renders it."""
-    out, inside = [], False
-    for line in changelog.replace("\r\n", "\n").split("\n"):
-        if line.startswith(f"## [{version}]"):
-            inside = True
-        elif inside and line.startswith("## ["):
-            break
-        if inside:
-            out.append(line)
-    return "\n".join(out)
+# One rendering for both checks: the #1410 gate's.
+changelog_section = r2.changelog_section
 
 
 def load_json(gate: r2.Gate, code: str, data: bytes | None, what: str) -> dict | None:

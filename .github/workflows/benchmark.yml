@@ -2,12 +2,15 @@ name: Benchmarks
 
 # #1410 (0.24 R2): benchmark publication (the headline PR) is gated on one successful
 # #1408 adjudication identity AND the #1422 refusal gate; nothing publishes without both.
+# #1547 (0.25): publication is also a separate, explicit action. The release path never
+# dispatches this workflow. A dispatch publishes only with publish_results=true, and the gate
+# then also requires the record's own approval (publication.benchmark-results.approved, G015).
+# Any other dispatch, and every push run, measures and uploads run artifacts only.
 # The agent-refactoring job is read-only (#1422) and publishes nothing. A dispatch must
 # carry the identity and fails before any benchmark runs if it does not verify; the
 # publishing step re-verifies that the changed files are exactly the adjudicated #1422
 # outputs (benchmark-headline.json and its commit-stamp-index.json entry).
-# Push runs measure only and never publish. There is no `release: created` trigger:
-# publish-nuget dispatches this workflow from main after the release exists, and a
+# Push runs measure only and never publish. There is no `release: created` trigger, and a
 # dispatch checks out the adjudicated candidate, not the dispatch ref.
 # Design: docs/plans/evidence/r2-1410/release-gate.md.
 on:
@@ -30,6 +33,11 @@ on:
         description: 'Run agent refactoring benchmark'
         required: false
         default: 'false'
+        type: boolean
+      publish_results:
+        description: 'Open the adjudicated benchmark-results PR (#1547). A separate maintainer action; the record must also approve it.'
+        required: false
+        default: false
         type: boolean
       # #1422: no input may weaken or bypass the publication gate. A method change needs a
       # merged #1407 amendment that names the new comparability key, never an override flag.
@@ -86,6 +94,11 @@ jobs:
             echo "::error::benchmark publication is dispatched only from main (got $GITHUB_REF)"; exit 1
           fi
           python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+          # The checkout below replaces the work tree with the candidate, whose copy of the gate
+          # may predate checks such as G015 (#1547). Every later gate run uses main's copy, kept
+          # outside the work tree, against the candidate checkout (--repo .).
+          mkdir -p "$RUNNER_TEMP/main-gate/scripts"
+          cp scripts/verify_release_adjudication.py "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py"
 
       - name: Check out the candidate and verify the GitHub release (#1410)
         if: github.event_name == 'workflow_dispatch'
@@ -99,7 +112,7 @@ jobs:
           git checkout -q --detach "$CANDIDATE"
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
           TITLE="$(gh release view "$TAG" --json name --jq .name)"
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+          python3 "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py" --repo . --identity "$ADJUDICATION_IDENTITY" \
             --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md" \
             --release-tag "$TAG" --release-title "$TITLE"
 
@@ -303,15 +316,16 @@ jobs:
           retention-days: 90
 
       # #1410: runs only after the #1422 refusal gate above passed (a refusal fails the job and
-      # skips this step), and only on a dispatch that carried a verified identity. Push runs
-      # never publish. The publication branch is built here from the candidate and pushed as is.
+      # skips this step), and only on a dispatch that carried a verified identity and asked to
+      # publish (#1547: publish_results, plus the record's approval checked by the gate). Push
+      # runs never publish. The publication branch is built here from the candidate and pushed as is.
       # (the peter-evans PR action would re-apply the changes onto main after the check, so the
       # pushed bytes could differ from the verified ones.) The work tree is verified
       # immediately before the commit: the changed files must be exactly the two #1422 outputs
       # (headline and stamp index), each with the adjudicated hash, and the commit records
       # exactly that tree.
       - name: Verify and publish the benchmark results PR (#1410)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_results == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.gate.outputs.tag }}
@@ -319,7 +333,7 @@ jobs:
           REPORT: ${{ steps.methodology.outputs.report }}
         run: |
           set -euo pipefail
-          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+          python3 "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py" --repo . --identity "$ADJUDICATION_IDENTITY" \
             --expect-head --require-tag --version "$VER" --benchmark-worktree
           BRANCH="benchmark-results-$TAG"
           git switch -q -c "$BRANCH"

@@ -17,6 +17,10 @@ line matches the hash the record adjudicated. Anything missing, malformed,
 changed, or unverifiable is a failure; there is no warning-only mode and no
 override flag.
 
+The release PR (#1546) is not a separate surface: it prepares the candidate, and every run checks
+its products (the candidate's version and CHANGELOG section) against the record (G009, G014).
+Benchmark publication (#1547) also needs the record's explicit approval (G015).
+
 Design and record schema: docs/plans/evidence/r2-1410/release-gate.md.
 Negative controls: tests/Calor.Compiler.Tests/ReleaseGate/.
 """
@@ -111,6 +115,25 @@ def tree_digest(root: Path) -> str:
     files = {p.relative_to(root).as_posix(): p for p in root.rglob("*") if p.is_file()}
     lines = [f"{sha256(files[rel].read_bytes())}  {rel}\n" for rel in sorted(files)]
     return sha256("".join(lines).encode("utf-8"))
+
+
+def version_headers(changelog: str, version: str) -> int:
+    """How many `## [VERSION]` headers CHANGELOG.md holds (matched literally)."""
+    return sum(1 for line in changelog.replace("\r\n", "\n").split("\n") if line.startswith(f"## [{version}]"))
+
+
+def changelog_section(changelog: str, version: str) -> str:
+    """The `## [VERSION]` section of CHANGELOG.md, the version matched literally. publish-nuget
+    renders the notes with this function (scripts/render_release_notes.py)."""
+    out, inside = [], False
+    for line in changelog.replace("\r\n", "\n").split("\n"):
+        if line.startswith(f"## [{version}]"):
+            inside = True
+        elif inside and line.startswith("## ["):
+            break
+        if inside:
+            out.append(line)
+    return "\n".join(out)
 
 
 def forbidden_wording(text: str) -> tuple[list[str], int]:
@@ -331,6 +354,8 @@ def check_candidate(gate: Gate, commit: str, record: dict, args: argparse.Namesp
     found = re.search(rb"<Version>([^<]+)</Version>", props or b"")
     if not found or found.group(1).decode() != version:
         gate.fail("G009", f"Directory.Build.props at the candidate does not declare version {version}")
+    else:
+        check_release_pr_products(gate, cand, version, record)
     packet_at_candidate = gate.git("rev-parse", f"{cand}:{PACKET_DIR}", check=False).stdout.strip()
     packet_at_record = gate.git("rev-parse", f"{commit}:{PACKET_DIR}", check=False).stdout.strip()
     if not packet_at_candidate or packet_at_candidate != packet_at_record:
@@ -359,6 +384,28 @@ def check_candidate(gate: Gate, commit: str, record: dict, args: argparse.Namesp
         elif manifest_candidate(blob) != cand:
             gate.fail("G010", f"{role} manifest {named[0].get('path')} does not bind the candidate {cand}")
     return cand
+
+
+def check_release_pr_products(gate: Gate, cand: str, version: str, record: dict) -> None:
+    """#1546: the release PR is not a publication surface. It prepares the candidate, and its only
+    products are bytes of the candidate: the version in Directory.Build.props (checked above) and
+    the CHANGELOG.md section the notes are rendered from. The identity names the candidate, so
+    every surface consumes those products here, on every invocation, whether or not the caller
+    passes --release-notes: the section must be the adjudicated notes and pass the wording scan."""
+    notes_hash = surface(record, "release-notes").get("sha256")
+    if not SHA64.match(str(notes_hash or "")):
+        return  # the publication schema check reports the missing hash (G011)
+    text = (gate.blob(cand, "CHANGELOG.md") or b"").decode("utf-8", "replace")
+    if version_headers(text, version) > 1:
+        gate.fail("G014", f"CHANGELOG.md at the candidate has more than one [{version}] header")
+        return
+    section = changelog_section(text, version)
+    if not section.strip():
+        gate.fail("G014", f"CHANGELOG.md at the candidate has no [{version}] section; the release PR's notes are missing")
+        return
+    if text_digest(section) != notes_hash:
+        gate.fail("G014", f"the candidate's CHANGELOG.md [{version}] section (the release PR's notes) is not the adjudicated notes")
+    scan_text(gate, f"CHANGELOG.md [{version}] at the candidate", section)
 
 
 def manifest_candidate(blob: bytes) -> str | None:
@@ -462,6 +509,11 @@ def check_surfaces(gate: Gate, identity: str, record: dict, args: argparse.Names
             if path.is_file() and path.suffix in TEXT_SUFFIXES:
                 scan_text(gate, path.relative_to(root).as_posix(), path.read_text(encoding="utf-8", errors="replace"))
     if args.benchmark_worktree:
+        # #1547: adjudicating the benchmark hashes is not approval to publish them. Publication
+        # needs the record's explicit approval as well as the separate dispatch input.
+        if surface(record, "benchmark-results").get("approved") is not True:
+            gate.fail("G015", "the record does not approve benchmark publication "
+                              "(publication.benchmark-results.approved is not true)")
         expected = surface(record, "benchmark-results").get("files")
         status = gate.git("status", "--porcelain=v1", "-z", "--untracked-files=all").stdout.decode()
         changed = {entry[3:] for entry in status.split("\0") if len(entry) > 3}
