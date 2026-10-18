@@ -1,0 +1,66 @@
+// 0.25 T1 (#1428) shared control: ref/out with nullable locals. Nullable reference and
+// nullable value locals passed by reference; a TryGetValue miss resets a nullable reference
+// local to null; one variable passed twice by ref (aliasing); an out written before a throw.
+#nullable enable
+using System;
+using System.Collections.Generic;
+
+public static class Probe
+{
+    static string log = "";
+
+    static void Fill(ref string? s)
+    {
+        log = log + "f";
+        s = s == null ? "new" : s + "+";
+    }
+
+    static void Bump(ref int? n)
+    {
+        log = log + "b";
+        n = n.HasValue ? n + 1 : 10;
+    }
+
+    static int AddBoth(ref int a, ref int b)
+    {
+        a = a + 1;
+        b = b + 1;
+        return a + b;
+    }
+
+    static void SetThenThrow(out string? s)
+    {
+        s = "partial";
+        throw new InvalidOperationException("boom");
+    }
+
+    public static string Run()
+    {
+        string? s = null;
+        Fill(ref s);
+        Fill(ref s);
+        int? n = null;
+        Bump(ref n);
+        Bump(ref n);
+        var map = new Dictionary<string, string?>();
+        map.Add("k", "v");
+        string? hit = "seed";
+        string? miss = "seed";
+        bool h = map.TryGetValue("k", out hit);
+        bool m = map.TryGetValue("z", out miss);
+        int v = 1;
+        int sum = AddBoth(ref v, ref v);
+        string? partial = null;
+        string err = "";
+        try
+        {
+            SetThenThrow(out partial);
+        }
+        catch (InvalidOperationException e)
+        {
+            err = e.Message;
+        }
+        return s + "|" + n + "|" + h + ":" + hit + "|" + m + ":" + (miss == null ? "null" : miss)
+            + "|" + v + ":" + sum + "|" + partial + ":" + err + "|" + log;
+    }
+}

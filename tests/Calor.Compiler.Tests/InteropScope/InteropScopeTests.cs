@@ -243,7 +243,45 @@ public class InteropScopeTests
             return GateReader("CLOSED"); }),
         ["MET with the planning doc as evidence"] = ("S009", scope => { MetWithAmendment(scope); scope["gateConditions"]![0]!["evidence"] = "docs/plans/v0.25-interop-scope-and-baseline.md"; return GateReader("CLOSED"); }),
         ["MET while the 1413 record is open"] = ("S009", scope => { MetWithAmendment(scope); return GateReader("OPEN"); }),
+        // 1.3.0: the "#1408 succeeds" precondition is replaced by a re-proof on the 0.25 candidate.
+        ["A1 still waits on 1408"] = ("S014", scope => { A1Blockers(scope).Add(1408); return null; }),
+        ["release gap dropped from A1"] = ("S014", scope => {
+            var b = A1Blockers(scope); b.Remove(b.Single(x => x!.GetValue<int>() == 1547)); return null; }),
+        ["precondition copy drifts from its amendment"] = ("S014", scope => { scope["acceptancePreconditions"]!["requires"] = "#1408 succeeds"; return null; }),
+        ["precondition without its recorded decision"] = ("S014", scope => { Preconditions(scope, p => p["decision"] = "D-NONE"); return null; }),
+        ["precondition misstates the 1408 outcome"] = ("S014", scope => { Preconditions(scope, p => p["replaces"]!["outcome"] = "MILESTONE-SUCCEEDED"); return null; }),
+        ["re-proof on another candidate's SHA"] = ("S014", scope => { Preconditions(scope, p => p["reproof"]!["onCandidate"] = "0.24-candidate"); return null; }),
+        ["re-proof without a release check"] = ("S014", scope => { Preconditions(scope, p => {
+            var checks = p["reproof"]!["checks"]!.AsArray(); checks.Remove(checks.Single(c => c!["kind"]!.GetValue<string>() == "release")); }); return null; }),
+        ["re-proof check citing a missing source"] = ("S014", scope => { Preconditions(scope, p => p["reproof"]!["checks"]![0]!["source"] = "docs/plans/evidence/none.json"); return null; }),
+        // Codex R1-2: dropping a decided gap or check from both copies (and from A1) still fails.
+        ["release gap dropped from both copies and A1"] = ("S014", scope => {
+            var b = A1Blockers(scope); b.Remove(b.Single(x => x!.GetValue<int>() == 1547));
+            Preconditions(scope, p => { var g = p["releaseGaps"]!.AsArray(); g.Remove(g.Single(x => x!["issue"]!.GetValue<int>() == 1547)); }); return null; }),
+        ["determinism re-proof dropped from both copies"] = ("S014", scope => { Preconditions(scope, p => {
+            var checks = p["reproof"]!["checks"]!.AsArray(); checks.Remove(checks.Single(c => c!["id"]!.GetValue<string>() == "provenance-determinism")); }); return null; }),
+        // Codex R2-1: deleting the packet copy and the amendment copy together still fails at 1.3.0.
+        ["preconditions removed from the packet and the amendment"] = ("S014", scope => {
+            scope.AsObject().Remove("acceptancePreconditions");
+            scope["amendments"]!.AsArray().Last(a => a!["acceptancePreconditions"] is JsonObject)!.AsObject().Remove("acceptancePreconditions");
+            return null; }),
+        // Codex R3-3: weakening the recorded obligations in place (both copies) fails the pinned 1.3.0 text.
+        ["re-proof requirement weakened in both copies"] = ("S014", scope => {
+            Preconditions(scope, p => p["reproof"]!["checks"]![0]!["requirement"] = "Reuse the 0.24 result."); return null; }),
+        ["re-proof source redirected in both copies"] = ("S014", scope => {
+            Preconditions(scope, p => p["reproof"]!["checks"]![4]!["source"] = "docs/plans/v0.24-c1-candidate.md"); return null; }),
+        ["preconditions removed from the packet"] = ("S014", scope => { scope.AsObject().Remove("acceptancePreconditions"); return null; }),
     };
+
+    private static JsonArray A1Blockers(JsonNode scope) =>
+        scope["supportingIssues"]!.AsArray().Single(s => s!["issue"]!.GetValue<int>() == 1430)!["blockers"]!.AsArray();
+
+    /// <summary>Applies one edit to the packet's preconditions and to the amendment copy, isolating S014's content checks from its copy check.</summary>
+    private static void Preconditions(JsonNode scope, Action<JsonNode> edit)
+    {
+        edit(scope["acceptancePreconditions"]!);
+        edit(scope["amendments"]!.AsArray().Last(a => a!["acceptancePreconditions"] is JsonObject)!["acceptancePreconditions"]!);
+    }
 
     // ------------------------------------------------------------------
 

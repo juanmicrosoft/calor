@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-interop-scope/1",
-  "scopeVersion": "1.2.0",
+  "scopeVersion": "1.3.0",
   "status": "FROZEN",
   "gateStatus": "MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
@@ -273,12 +273,88 @@
         1139,
         1143,
         1144,
-        1408,
         1428,
-        1429
+        1429,
+        1545,
+        1546,
+        1547
       ]
     }
   ],
+  "acceptancePreconditions": {
+    "amendment": "1.3.0",
+    "decision": "D-A1-1408-REPROVE",
+    "replaces": {
+      "issue": 1408,
+      "precondition": "#1408 succeeds",
+      "appliedTo": [
+        "#1430 PARTIAL_READY",
+        "#1430 ACCEPTED",
+        "#1428 partial delivery",
+        "#1430 mechanical requirement: rerun applicable 0.24 proof/provenance/release checks"
+      ],
+      "terminalRecord": "docs/plans/evidence/adjudication-1408/terminal-record.json",
+      "outcome": "MILESTONE-FAILED"
+    },
+    "requires": "Before #1430 records PARTIAL_READY or ACCEPTED, the 0.25 candidate passes 0.24's proof, provenance and release checks re-run on its own SHA, and the 0.24 release gaps below are closed. No 0.24 approval, record or SHA is reused for the 0.25 candidate.",
+    "reproof": {
+      "onCandidate": "own-sha",
+      "checks": [
+        {
+          "id": "proof-s2-witnesses",
+          "kind": "proof",
+          "gate": 1413,
+          "source": "docs/plans/evidence/s2-1413/dispositions.json",
+          "requirement": "Every 0.24 S2 repair's regression witnesses pass on the 0.25 candidate SHA, and no false unconditional proof is unresolved (0.24 contract section 8, condition 4)."
+        },
+        {
+          "id": "provenance-candidate-manifest",
+          "kind": "provenance",
+          "gate": 1423,
+          "source": "docs/plans/v0.24-c1-candidate.md",
+          "requirement": "A candidate manifest in the 0.24 C1 form is frozen for the 0.25 candidate SHA and passes CandidateManifestTests (linear history, every pinned identity)."
+        },
+        {
+          "id": "provenance-regeneration",
+          "kind": "provenance",
+          "gate": 1424,
+          "source": "docs/plans/evidence/c2-1424/regeneration.md",
+          "requirement": "Every authoritative and derived artifact is regenerated on the 0.25 candidate SHA and frozen, as 0.24 C2 did (0.24 contract section 8, condition 6)."
+        },
+        {
+          "id": "provenance-determinism",
+          "kind": "provenance",
+          "gate": 1421,
+          "source": "scripts/determinism_protocol.py",
+          "requirement": "The 0.24 G2 determinism protocol runs on the 0.25 candidate SHA under its registered pins and failure rule."
+        },
+        {
+          "id": "release-gate",
+          "kind": "release",
+          "gate": 1410,
+          "source": "docs/plans/evidence/r2-1410/release-gate.md",
+          "requirement": "The 0.24 R2 release gate (adjudication-gated publish) passes for the 0.25 candidate's own identity, and every release surface consumes that one identity (0.24 contract section 8, condition 7)."
+        }
+      ]
+    },
+    "releaseGaps": [
+      {
+        "issue": 1545,
+        "gap": "ungated publish-nuget.yml on older tags can read NUGET_API_KEY",
+        "requirement": "closed before acceptance"
+      },
+      {
+        "issue": 1546,
+        "gap": "the release PR consumes no adjudication identity",
+        "requirement": "closed before acceptance"
+      },
+      {
+        "issue": 1547,
+        "gap": "benchmark.yml publishes the benchmark headline independently of the release gate",
+        "requirement": "closed before acceptance"
+      }
+    ]
+  },
   "capacity": {
     "status": "ACCEPTED",
     "ceilings": [
@@ -3064,6 +3140,137 @@
           "confirmed": true
         }
       ]
+    },
+    {
+      "version": "1.3.0",
+      "dateUtc": "2026-10-18T00:00:00Z",
+      "pr": 1562,
+      "afterInspection": true,
+      "justification": "Records the maintainer's 2026-10-18 decision on #1430's '#1408 succeeds' precondition. 0.24 A1 #1408 recorded MILESTONE-FAILED (docs/plans/evidence/adjudication-1408/terminal-record.json), so that precondition can never hold. The maintainer chose to amend: 0.25 re-proves it. The precondition is replaced by acceptancePreconditions: the 0.25 candidate passes 0.24's proof, provenance and release checks re-run on its own SHA, and the 0.24 release gaps #1545, #1546 and #1547 are closed before acceptance. A1 (#1430) waits on those three issues instead of #1408. No case, family, ceiling, gate condition or readiness record changes.",
+      "addedCases": [],
+      "changes": [],
+      "removedCases": [],
+      "maintainerDecisions": [
+        {
+          "id": "D-A1-1408-REPROVE",
+          "date": "2026-10-18",
+          "by": "@juanmicrosoft",
+          "decision": "Amend: 0.25 re-proves it",
+          "question": "#1430's ACCEPTED and PARTIAL_READY paths require '#1408 succeeds', but 0.24 A1 #1408 recorded MILESTONE-FAILED. Options: keep the precondition (0.25 cannot be accepted), or amend so 0.25 re-proves it.",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        }
+      ],
+      "capacityExceptions": [],
+      "preconditionChanges": [
+        {
+          "target": "supportingIssues[issue=1430].blockers",
+          "from": [
+            847,
+            906,
+            943,
+            1132,
+            1139,
+            1143,
+            1144,
+            1408,
+            1428,
+            1429
+          ],
+          "to": [
+            847,
+            906,
+            943,
+            1132,
+            1139,
+            1143,
+            1144,
+            1428,
+            1429,
+            1545,
+            1546,
+            1547
+          ]
+        },
+        {
+          "target": "acceptancePreconditions",
+          "from": null,
+          "to": "registered (replaces '#1408 succeeds')"
+        }
+      ],
+      "acceptancePreconditions": {
+        "amendment": "1.3.0",
+        "decision": "D-A1-1408-REPROVE",
+        "replaces": {
+          "issue": 1408,
+          "precondition": "#1408 succeeds",
+          "appliedTo": [
+            "#1430 PARTIAL_READY",
+            "#1430 ACCEPTED",
+            "#1428 partial delivery",
+            "#1430 mechanical requirement: rerun applicable 0.24 proof/provenance/release checks"
+          ],
+          "terminalRecord": "docs/plans/evidence/adjudication-1408/terminal-record.json",
+          "outcome": "MILESTONE-FAILED"
+        },
+        "requires": "Before #1430 records PARTIAL_READY or ACCEPTED, the 0.25 candidate passes 0.24's proof, provenance and release checks re-run on its own SHA, and the 0.24 release gaps below are closed. No 0.24 approval, record or SHA is reused for the 0.25 candidate.",
+        "reproof": {
+          "onCandidate": "own-sha",
+          "checks": [
+            {
+              "id": "proof-s2-witnesses",
+              "kind": "proof",
+              "gate": 1413,
+              "source": "docs/plans/evidence/s2-1413/dispositions.json",
+              "requirement": "Every 0.24 S2 repair's regression witnesses pass on the 0.25 candidate SHA, and no false unconditional proof is unresolved (0.24 contract section 8, condition 4)."
+            },
+            {
+              "id": "provenance-candidate-manifest",
+              "kind": "provenance",
+              "gate": 1423,
+              "source": "docs/plans/v0.24-c1-candidate.md",
+              "requirement": "A candidate manifest in the 0.24 C1 form is frozen for the 0.25 candidate SHA and passes CandidateManifestTests (linear history, every pinned identity)."
+            },
+            {
+              "id": "provenance-regeneration",
+              "kind": "provenance",
+              "gate": 1424,
+              "source": "docs/plans/evidence/c2-1424/regeneration.md",
+              "requirement": "Every authoritative and derived artifact is regenerated on the 0.25 candidate SHA and frozen, as 0.24 C2 did (0.24 contract section 8, condition 6)."
+            },
+            {
+              "id": "provenance-determinism",
+              "kind": "provenance",
+              "gate": 1421,
+              "source": "scripts/determinism_protocol.py",
+              "requirement": "The 0.24 G2 determinism protocol runs on the 0.25 candidate SHA under its registered pins and failure rule."
+            },
+            {
+              "id": "release-gate",
+              "kind": "release",
+              "gate": 1410,
+              "source": "docs/plans/evidence/r2-1410/release-gate.md",
+              "requirement": "The 0.24 R2 release gate (adjudication-gated publish) passes for the 0.25 candidate's own identity, and every release surface consumes that one identity (0.24 contract section 8, condition 7)."
+            }
+          ]
+        },
+        "releaseGaps": [
+          {
+            "issue": 1545,
+            "gap": "ungated publish-nuget.yml on older tags can read NUGET_API_KEY",
+            "requirement": "closed before acceptance"
+          },
+          {
+            "issue": 1546,
+            "gap": "the release PR consumes no adjudication identity",
+            "requirement": "closed before acceptance"
+          },
+          {
+            "issue": 1547,
+            "gap": "benchmark.yml publishes the benchmark headline independently of the release gate",
+            "requirement": "closed before acceptance"
+          }
+        ]
+      }
     }
   ],
   "mappedBlockers": {

@@ -1,0 +1,46 @@
+// 0.25 T1 (#1428) shared control: arrays in arguments and returns. Element initializers have
+// side effects (evaluation order), the callee mutates the array it receives (aliasing: the
+// caller sees the write through a second reference), and a returned 2-D array is indexed.
+using System;
+
+public static class Probe
+{
+    static string log = "";
+
+    static int Next(int v)
+    {
+        log = log + v;
+        return v;
+    }
+
+    static int SumAndClobber(int[] xs)
+    {
+        int s = 0;
+        foreach (var x in xs)
+        {
+            s = s + x;
+        }
+        xs[0] = 100;
+        return s;
+    }
+
+    static int[] Make()
+    {
+        return new int[] { Next(4), Next(5), Next(6) };
+    }
+
+    static int[,] Grid()
+    {
+        return new int[,] { { Next(1), Next(2) }, { Next(3), 9 } };
+    }
+
+    public static string Run()
+    {
+        int direct = SumAndClobber(new int[] { Next(1), Next(2), Next(3) });
+        int[] made = Make();
+        int[] alias = made;
+        int viaAlias = SumAndClobber(alias);
+        int[,] g = Grid();
+        return direct + "|" + viaAlias + ":" + made[0] + "|" + g[1, 0] + g[0, 1] + "|" + log;
+    }
+}

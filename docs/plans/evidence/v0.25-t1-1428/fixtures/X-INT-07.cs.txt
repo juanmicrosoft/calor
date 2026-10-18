@@ -1,0 +1,40 @@
+// 0.25 T1 (#1428) fixture X-INT-07 (F3 x F5): expression-position arrays inside a native local
+// function. Local functions return a 1-D array and (expression-bodied) a 2-D `new int[,]`, pass
+// an array as an argument, and build a 2-D array in a declaration; a user local named like the converter's hoist temporaries checks for name collisions,
+// and element initializers log their evaluation order.
+using System;
+
+public static class Probe
+{
+    static string log = "";
+
+    static int Tag(int v)
+    {
+        log = log + v;
+        return v;
+    }
+
+    static int Sum(int[] xs)
+    {
+        int s = 0;
+        foreach (var x in xs)
+        {
+            s = s + x;
+        }
+        return s;
+    }
+
+    public static string Run()
+    {
+        int[] Make(int a) => new int[] { Tag(a), Tag(a + 1) };
+        int Total(int a) { int _hoist000 = 100; return Sum(new int[] { Tag(a), _hoist000 }); }
+        int Corner(int a) { int[,] g = new int[,] { { Tag(a), 0 }, { 0, Tag(a * 2) } }; return g[1, 1]; }
+        int[,] Grid(int a) => new int[,] { { Tag(a), Tag(a + 1) }, { Tag(a + 2), 0 } };
+
+        int[] m = Make(1);
+        int t = Total(5);
+        int c = Corner(3);
+        int[,] g2 = Grid(7);
+        return m.Length + ":" + m[1] + "|" + t + "|" + c + "|" + g2[1, 0] + ":" + g2[0, 1] + ":" + g2.Length + "|" + log;
+    }
+}
