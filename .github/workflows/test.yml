@@ -79,6 +79,17 @@ jobs:
           python3 scripts/check_test_quality.py --self-test
           python3 scripts/check_trx.py --self-test
 
+      # #1545, EXC-RELEASE-GAPS-A-YAML: the release-credential check decides on parsed YAML. Its
+      # parser is hash-pinned and installed into its own environment; a missing parser fails it.
+      - name: Check release credentials reach only the gated publish job (#1545)
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/cred-venv"
+          "$RUNNER_TEMP/cred-venv/bin/pip" install --require-hashes -r eng/release-credentials-requirements.txt --quiet
+          CRED_PY="$RUNNER_TEMP/cred-venv/bin/python"
+          "$CRED_PY" scripts/test_check_release_credentials.py
+          "$CRED_PY" scripts/check_release_credentials.py
+
       - name: Check test manifest, skips, and assertion quality
         run: |
           python3 scripts/check_test_quality.py
@@ -88,7 +99,6 @@ jobs:
           python3 scripts/test_z3_hermetic.py
           python3 scripts/test_tier2_verification.py
           python3 scripts/test_benchmark_publication_gate.py
-          python3 scripts/test_check_release_credentials.py
           python3 scripts/test_reproducible_builds.py
 
       # #1421 (0.24 G2): the determinism protocol's gates. The validator checks these three

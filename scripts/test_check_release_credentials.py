@@ -185,7 +185,7 @@ class CredentialCheckTests(unittest.TestCase):
         path.write_text(path.read_text(encoding="utf-8").replace(
             "secrets.NUGET_RELEASE_API_KEY }}\n        run: dotnet nuget push",
             "secrets.NUGET_API_KEY }}\n        run: dotnet nuget push"), encoding="utf-8")
-        self.assert_codes({"W002"})
+        self.assert_codes({"W002", "W005"})
 
     def test_publish_job_without_the_environment_is_open(self) -> None:
         path = self.f.workflow("publish-nuget.yml")
@@ -218,19 +218,29 @@ class CredentialCheckTests(unittest.TestCase):
             ("    'environment': nuget-release\n", {"W004"}),
             ("    env:\n      K: ${{ secrets.nuget_release_api_key }}\n", {"W003"}),
             ('    env:\n      K: "${{ secrets.NUGET_\\u0052ELEASE_API_KEY }}"\n', {"W003"}),
-            ("    <<: *defaults\n", {"W009"}),
+            # EXC-RELEASE-GAPS-A-YAML: the parser fails closed on an undefined alias (W012); a
+            # defined anchor is still reported (W009).
+            ("    <<: *defaults\n", {"W012"}),
+            ("    timeout-minutes: &t 30\n", {"W009"}),
+            # Formerly C# ReleaseWorkflowGateTests cases (the C# lane has no PyYAML).
+            ("    env:\n      K: ${{ secrets.NUGET_API_KEY }}\n", {"W002"}),
             # Round 3: escaped keys, flow mappings under a block header, complex keys, escaped
             # line breaks, and workflows called from another repository.
             ('    "environm\\u0065nt": nuget-release\n', {"W004"}),
-            ("    {environment: nuget-release}\n", {"W004"}),
+            ("    {environment: nuget-release}\n", {"W012"}),
             ("    ? environment\n    : nuget-release\n", {"W004"}),
-            ('    "environ\\\n      ment": nuget-release\n', {"W010"}),
+            ('    "environ\\\n      ment": nuget-release\n', {"W012"}),
             ("    uses: someone/else/.github/workflows/publish.yml@main\n", {"W011"}),
             # EXC-RELEASE-GAPS-A-CHECKER (verification-pass finding): folded and quoted forms.
             ("    uses: >-\n      someone/else/.github/workflows/publish.yml@0123456789abcdef\n    secrets: inherit\n",
              {"W011"}),
             ('    "uses": someone/else/.github/workflows/publish.yml@main\n', {"W011"}),
-            ("    'uses': ./.github/workflows/test.yml\n", {"W011"}),
+            ("    uses: ./.github/workflows/no-such-file.yml\n", {"W011"}),
+            ("    uses: ./.github/workflows/sub/test.yml\n", {"W011"}),
+            ("    uses: someone/else/.github/workflows/publish.yml@main\n    secrets: inherit\n", {"W011"}),
+            # Duplicate keys, also under case folding, fail closed.
+            ("    runs-on: ubuntu-22.04\n", {"W012"}),
+            ("    Environment: github-pages\n    environment: github-pages\n", {"W012"}),
             ("    uses: ./.github/workflows/test.yml@main\n", {"W011"}),
         ):
             with self.subTest(injected=injected):
@@ -247,13 +257,48 @@ class CredentialCheckTests(unittest.TestCase):
                     shutil.rmtree(fixture.base, ignore_errors=True)
 
     def test_local_reusable_workflow_call_is_accepted(self) -> None:
+        for call in ("    uses: ./.github/workflows/test.yml\n", "    'uses': ./.github/workflows/test.yml\n",
+                     '    "uses": "./.github/workflows/test.yml"\n    secrets: inherit\n'):
+            with self.subTest(call=call):
+                fixture = Fixture()
+                try:
+                    path = fixture.workflow("benchmark.yml")
+                    marker = "  benchmark:\n    runs-on: ubuntu-latest\n"
+                    text = path.read_text(encoding="utf-8")
+                    path.write_text(text.replace(marker, "  local-call:\n" + call + marker), encoding="utf-8")
+                    code, out = fixture.run()
+                    self.assertEqual(0, code, out)
+                finally:
+                    shutil.rmtree(fixture.base, ignore_errors=True)
+
+    def test_multiline_flow_mapping_job_is_open(self) -> None:
+        # The exception verification pass's finding: a job body written as a multiline flow mapping.
         path = self.f.workflow("benchmark.yml")
         marker = "  benchmark:\n    runs-on: ubuntu-latest\n"
         text = path.read_text(encoding="utf-8")
-        path.write_text(text.replace(marker, "  local-call:\n    uses: ./.github/workflows/test.yml\n" + marker),
-                        encoding="utf-8")
-        code, out = self.f.run()
-        self.assertEqual(0, code, out)
+        path.write_text(text.replace(marker, "  remote:\n    {\n      uses: someone/else/.github/workflows/publish.yml@main\n"
+                                             "    }\n" + marker), encoding="utf-8")
+        self.assert_codes({"W011"})
+
+    def test_unparseable_workflow_is_open(self) -> None:
+        path = self.f.workflow("benchmark.yml")
+        path.write_text(path.read_text(encoding="utf-8") + "\n  broken: [\n", encoding="utf-8")
+        self.assert_codes({"W012"})
+
+    def test_missing_yaml_parser_fails_closed(self) -> None:
+        with unittest.mock.patch.object(cred, "yaml", None):
+            code, out = self.f.run(live=False)
+        self.assertEqual(1, code, out)
+        self.assertIn("W012", out)
+        self.assertNotIn("CLOSED", out)
+
+    def test_push_step_without_the_key_is_open(self) -> None:
+        path = self.f.workflow("publish-nuget.yml")
+        text = path.read_text(encoding="utf-8")
+        old = ("      - name: Push to NuGet\n        env:\n          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}\n")
+        self.assertIn(old, text)
+        path.write_text(text.replace(old, "      - name: Push to NuGet\n"), encoding="utf-8")
+        self.assert_codes({"W005"})
 
     def test_flow_style_reusable_call_is_open(self) -> None:
         path = self.f.workflow("benchmark.yml")
@@ -269,7 +314,7 @@ class CredentialCheckTests(unittest.TestCase):
         marker = "  benchmark:\n    runs-on: ubuntu-latest\n"
         path.write_text(text.replace(marker, "  sneaky: {runs-on: ubuntu-latest, environment: nuget-release}\n" + marker),
                         encoding="utf-8")
-        self.assert_codes({"W008"})
+        self.assert_codes({"W004"})
 
     def test_other_environments_are_not_flagged(self) -> None:
         # nextjs-gh-pages deploys into github-pages with an expression url; that is not this key.

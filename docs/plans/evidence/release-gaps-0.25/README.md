@@ -7,7 +7,7 @@
 Delivery: two PRs.
 
 - PR A covers #1545 and part of #1548. Reviews: `reviews/pr-a-*`. It runs under exception
-  EXC-RELEASE-GAPS-A-CHECKER (below).
+  exceptions EXC-RELEASE-GAPS-A-CHECKER and EXC-RELEASE-GAPS-A-YAML (below).
 - PR B, #1563 (merged), covers #1546 and #1547. Reviews: `reviews/pr-b-*`.
 
 ## #1545: older tags can read the NuGet key
@@ -33,7 +33,8 @@ copy of an old workflow can still ask for the repository secret. Code can do onl
   script.
 - `scripts/check_release_credentials.py` is a read-only check, with tests in
   `scripts/test_check_release_credentials.py` and
-  `ReleaseWorkflowGateTests.NugetKeyIsReachableOnlyThroughTheMainOnlyEnvironment`.
+  `ReleaseWorkflowGateTests.NugetKeyIsReachableOnlyThroughTheMainOnlyEnvironment` and
+  `CiRunsTheCredentialCheckWithThePinnedYamlParser`.
   - With no options, it checks only the workflows. No workflow may name `NUGET_API_KEY`. Only the
     `publish` job may name the new key or enter `nuget-release`.
   - With `--live`, it also reads the settings through `gh api --method GET`. No NuGet secret may
@@ -42,20 +43,50 @@ copy of an old workflow can still ask for the repository secret. Code can do onl
     `NUGET_RELEASE_API_KEY`.
   - It exits 0 only when the result is `CLOSED`. A setting it cannot read, or a list whose
     entries do not add up to its `total_count`, is `UNKNOWN`, never `CLOSED`. It reads every page.
-  - The workflow scan does not parse YAML, so it accepts only what it recognizes. The publish
-    job's environment must be exactly `    environment: nuget-release`. Every other environment
-    declaration must match an allowlist verbatim (today only the `github-pages` deploy). Anything
-    else fails, including:
-    - case changes, YAML escapes (`\u0065`, or escaped line breaks), and quoted keys;
-    - flow mappings, complex keys (`? environment`), flow-style jobs, and anchors;
-    - expressions;
-    - any job-level `uses` key other than a one-line local call,
-      `uses: ./.github/workflows/<file>.yml`. A call to another repository, a folded `uses: >-`
-      value, and a quoted, escaped, or flow-style `uses` key all fail (`W011`).
+  - The workflow check decides on the **parsed YAML**, never on text. It uses PyYAML 6.0.2,
+    hash-pinned in `eng/release-credentials-requirements.txt` and loaded with `yaml.SafeLoader`.
+    It fails closed (`W012`) when PyYAML is missing, when a workflow does not parse, or when a
+    mapping has a duplicate key, including keys that differ only in case. On the parsed workflow:
+    - The publish job's `environment` must be exactly `nuget-release` (`W006`).
+    - Its first step must equal the committed guard step (`W007`): its `name`, its `env`, and its
+      `run` script. So an added `if`, an uncalled shell function, or `exit 0` fails.
+    - Its `dotnet nuget push` step must read the key through `env` (`W005`).
+    - Every other job's `environment` must equal an allowlisted value, today only the
+      `github-pages` deploy (`W004`). Names are compared without case.
+    - The key may not appear in any other job (`W003`) or outside `jobs` (`W008`).
+    - `NUGET_API_KEY` may not appear anywhere (`W002`).
+    - Every job-level `uses` must be a local `./.github/workflows/<file>.yml` that exists, with no
+      `@ref` (`W011`). This is decided on the parsed value, so folded, quoted, flow-style, and
+      multiline flow-mapping forms are all judged by what they mean. A local call's own jobs are
+      checked like any other workflow, `secrets: inherit` included.
+    - Anchors, aliases, and merge keys are reported (`W009`).
 
-    Mentions of the key outside the publish job fail in any case or escape. The publish job's
-    first step must match the committed guard text exactly, so an added `if`, an uncalled shell
-    function, or `exit 0` fails.
+    `W010` (a key split across lines) is retired, because the parser decodes those. `W001` means
+    `publish-nuget.yml` is missing.
+  - CI runs the check and its tests (`scripts/test_check_release_credentials.py`) in
+    `test.yml`'s `calor-first-guard` job. It uses a venv holding the pinned parser, installed with
+    `--require-hashes`. The C# lane has no PyYAML, so `ReleaseWorkflowGateTests` checks only the
+    committed facts and that CI wiring. The mutation cases that used to run in C# now run in the
+    Python tests.
+
+### Exception EXC-RELEASE-GAPS-A-YAML (@juanmicrosoft, 2026-10-18)
+
+The EXC-RELEASE-GAPS-A-CHECKER pass (record: `reviews/pr-a-exception-verification-codex.md`) left
+one MAJOR finding: a multiline flow-mapping job body got past the line scan. The maintainer chose
+to rewrite the check's workflow analysis with a real YAML parser, and granted one more fix plus
+exactly one Codex verification pass.
+
+- **Parser:** PyYAML is hash-pinned, and duplicate keys are rejected.
+- **Decisions on the parsed structure:** a job-level `uses` must be a local file with no `@ref`.
+  The codes keep their meanings. `W005` is now emitted. `W010` is retired, and `W012` is new
+  (cannot parse).
+- **Tests:** every earlier case is kept as a regression test. Cases where the parser now gives a
+  different but still fail-closed answer have updated expected codes. A quoted local call is now
+  accepted, because it means the same thing as an unquoted one.
+- **New cases:** a multiline flow mapping, duplicate keys, a parse failure, a missing parser, and
+  a push step that does not read the key.
+- **The pass:** if it reports anything BLOCKING or MAJOR, PR A stops. Record:
+  `reviews/pr-a-yaml-verification-codex.md`.
 
 ### Exception EXC-RELEASE-GAPS-A-CHECKER (@juanmicrosoft, 2026-10-18)
 
@@ -75,7 +106,7 @@ first use, with no rules. A publish dispatched before the setup below therefore 
 step. The repository `NUGET_API_KEY` stays readable by older tags until step 4 below. The check
 then reports `S003`/`S004` for the auto-created environment.
 
-**State on 2026-10-18** (`python3 scripts/check_release_credentials.py --live`, read-only):
+**State on 2026-10-18** (`scripts/check_release_credentials.py --live`, read-only):
 `OPEN`. It reported `S001` (the repository-level `NUGET_API_KEY` exists) and `S002` (no
 `nuget-release` environment).
 
@@ -106,8 +137,15 @@ step 4.
    *Delete*. Actions reads a secret when a run is queued, so a run queued before step 4 can still
    hold the old value. Revocation is what ends that. The check in step 6 cannot see nuget.org, so
    it cannot confirm this step.
-6. **Check:** `python3 scripts/check_release_credentials.py --live`. Run it with your own `gh`
-   login, because listing secrets needs admin rights. It must print
+6. **Check**, from a checkout of `main`, with the pinned parser in a throwaway venv:
+
+   ```bash
+   python3 -m venv /tmp/cred-venv
+   /tmp/cred-venv/bin/pip install --require-hashes -r eng/release-credentials-requirements.txt
+   /tmp/cred-venv/bin/python scripts/check_release_credentials.py --live
+   ```
+
+   Run it with your own `gh` login, because listing secrets needs admin rights. It must print
    `RELEASE CREDENTIALS: CLOSED`. Each code it can print means one thing to fix:
    - `S001`: a repository-level secret whose name contains `NUGET` still exists (step 4).
    - `S002`: the environment is missing (step 2).
@@ -116,7 +154,9 @@ step 4.
    - `S005`: the policy's rules are not exactly branch `main` (step 2).
    - `S006`: the environment has no `NUGET_RELEASE_API_KEY` (step 3).
    - `U00x`: a setting could not be read; rerun with an admin login.
-   - `W0xx`: a workflow on this checkout breaks the rules above.
+   - `W0xx`: a workflow on this checkout breaks the rules above. `W012` alone, on every file,
+     means PyYAML is missing: `pip install --require-hashes -r
+     eng/release-credentials-requirements.txt`, in a venv.
 7. **Actions permissions, for #1547's residual.** Older refs' benchmark workflows can still push
    a branch and open a PR with `GITHUB_TOKEN`. Open *Settings → Actions → General → Workflow
    permissions*:

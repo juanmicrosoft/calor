@@ -10,9 +10,12 @@ publish-nuget.yml on main names that environment and that secret.
 This script reports whether the gap is closed. It changes nothing: every GitHub API call it makes
 is an explicit `gh api --method GET`.
 
-  * Workflow check (always, offline): no workflow names NUGET_API_KEY; only the `publish` job of
-    publish-nuget.yml names NUGET_RELEASE_API_KEY, that job declares `environment: nuget-release`,
-    and no other job declares that environment.
+  * Workflow check (always, offline), on the parsed YAML (PyYAML, pinned in
+    eng/release-credentials-requirements.txt; duplicate keys and parse failures fail closed): no
+    workflow names NUGET_API_KEY; only the `publish` job of publish-nuget.yml names
+    NUGET_RELEASE_API_KEY, that job declares `environment: nuget-release` and starts with the
+    exact empty-key guard, no other job declares an unrecognized environment, and every job-level
+    `uses` is a local workflow file (codes: check_workflows).
   * Settings check (`--live`, or `--from-dir` with saved API responses for tests):
       - no repository-level Actions secret whose name contains NUGET;
       - the environment exists, admins cannot bypass it, and its deployment policy is custom
@@ -35,6 +38,11 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Callable
+
+try:  # pinned in eng/release-credentials-requirements.txt; missing means W012 (fail closed)
+    import yaml
+except ImportError:  # pragma: no cover - exercised by the tests through monkeypatching
+    yaml = None
 
 REPO = "juanmicrosoft/calor"
 ENVIRONMENT = "nuget-release"
@@ -60,178 +68,162 @@ class NotFound(Exception):
     """The API answered 404."""
 
 
-def split_jobs(lines: list[str]) -> tuple[dict[str, list[str]], list[str]]:
-    """Block-style jobs under the top-level `jobs:` key (two-space job headers), and every other
-    line of the file (top-level keys, and anything in `jobs:` that is not a block-style job)."""
-    found: dict[str, list[str]] = {}
-    outside: list[str] = []
-    current = None
-    inside = False
-    for line in lines:
-        if not inside:
-            if line.rstrip() == "jobs:":
-                inside = True
-            else:
-                outside.append(line)
-            continue
-        if line and not line.startswith((" ", "#")):
-            inside, current = False, None
-            outside.append(line)
-            continue
-        header = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
-        if header:
-            current = header.group(1)
-            found[current] = []
-        elif current is not None and (not line.strip() or line.startswith("   ")):
-            found[current].append(line)
-        else:
-            outside.append(line)
-    return found, outside
-
-
-def jobs(lines: list[str]) -> dict[str, list[str]]:
-    return split_jobs(lines)[0]
-
-
 GUARD_STEP = "Require the environment-scoped NuGet key (#1545)"
-PUBLISH_ENVIRONMENT = f"    environment: {ENVIRONMENT}"
-# Every other environment declaration on main, verbatim (whitespace-normalized). The scan does not
-# parse YAML; it accepts only declarations it has seen, so case changes, escapes, quoting, flow
-# mappings, anchors, and expressions all fail instead of being interpreted.
-OTHER_ENVIRONMENTS = {
-    "environment: name: github-pages url: ${{ steps.deployment.outputs.page_url }}",
+SECRET_REF = "${{ secrets.NUGET_RELEASE_API_KEY }}"
+# The publish job's first step, as parsed. Only this exact mapping counts as the guard.
+GUARD = {
+    "name": GUARD_STEP,
+    "env": {SECRET: SECRET_REF},
+    "run": ('if [ -z "$NUGET_RELEASE_API_KEY" ]; then\n'
+            '  echo "::error::NUGET_RELEASE_API_KEY is not available; create it in the nuget-release environment (#1545)"\n'
+            "  exit 1\n"
+            "fi\n"),
 }
-ESCAPE = re.compile(r"\\(?:x([0-9A-Fa-f]{2})|u([0-9A-Fa-f]{4})|U([0-9A-Fa-f]{8}))")
-# A possible `environment` key after escapes are decoded and case is folded: the word, an optional
-# quote, and a colon; or a complex key `? environment` alone on its line (its colon is on the
-# next line). Prose such as "the nuget-release environment (#1545)" does not match.
-ENV_WORD = re.compile(r"""(?<![a-z0-9_-])environment["']?[ \t]*:|^\s*\?[ \t]*["']?environment["']?\s*$""")
-# A possible `uses` key (decoded, case-folded), and the only job-level form accepted.
-USES_KEY = re.compile(r"""(?<![a-z0-9_-])uses["']?[ \t]*:|^\s*\?[ \t]*["']?uses["']?\s*$""")
-LOCAL_USES = re.compile(r"^\s+uses: \./\.github/workflows/[A-Za-z0-9._/-]+\.ya?ml\s*$")
-# The publish job's first step, verbatim. Only this exact script counts as the guard.
-GUARD_LINES = [
-    "      - name: Require the environment-scoped NuGet key (#1545)",
-    "        env:",
-    "          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}",
-    "        run: |",
-    '          if [ -z "$NUGET_RELEASE_API_KEY" ]; then',
-    '            echo "::error::NUGET_RELEASE_API_KEY is not available; create it in the nuget-release environment (#1545)"',
-    "            exit 1",
-    "          fi",
+# Every other job-level environment on main, as parsed. Anything else is reported.
+OTHER_ENVIRONMENTS = [
+    {"name": "github-pages", "url": "${{ steps.deployment.outputs.page_url }}"},
 ]
-ANCHOR = re.compile(r"(?:^|[\s:\-\[{,])[&*][A-Za-z0-9_]|^\s*<<\s*:")
+LOCAL_WORKFLOW = re.compile(r"\./\.github/workflows/[A-Za-z0-9._-]+\.ya?ml")
 
 
-def code_lines(lines: list[str]) -> list[str]:
-    return [line for line in lines if not line.lstrip().startswith("#")]
+class ParseFailure(Exception):
+    pass
 
 
-def decoded(text: str) -> str:
-    """YAML escapes decoded, escaped line breaks joined, case folded."""
-    text = re.sub(r"\\\n\s*", "", text)
-    return ESCAPE.sub(lambda m: chr(int(next(g for g in m.groups() if g), 16)), text).casefold()
+def strict_loader():
+    """yaml.SafeLoader that rejects duplicate keys (also keys equal under case folding)."""
+    if yaml is None:
+        raise ParseFailure("PyYAML is not installed; pip install --require-hashes -r eng/release-credentials-requirements.txt")
+
+    class StrictLoader(yaml.SafeLoader):
+        pass
+
+    def mapping(loader, node):
+        seen = set()
+        for key_node, _ in node.value:
+            key = loader.construct_object(key_node, deep=True)
+            folded_key = key.casefold() if isinstance(key, str) else key
+            try:
+                duplicate = folded_key in seen
+            except TypeError as error:
+                raise ParseFailure(f"unhashable mapping key at {key_node.start_mark}") from error
+            if duplicate:
+                raise ParseFailure(f"duplicate key {key!r} at {key_node.start_mark}")
+            seen.add(folded_key)
+        return yaml.SafeLoader.construct_mapping(loader, node, deep=True)
+
+    StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+    return StrictLoader
 
 
-def folded(text: str) -> str:
-    """For name searches: decoded, with all whitespace, quotes, and backslashes removed."""
-    return re.sub(r"""[\s"'\\]""", "", decoded(text))
+def load_workflow(text: str) -> tuple[object, bool]:
+    """(document, uses anchors/aliases/merge keys). Any parse problem raises ParseFailure."""
+    loader = strict_loader()
+    try:
+        events = list(yaml.parse(text, Loader=loader))
+        anchored = any(isinstance(e, yaml.AliasEvent) or getattr(e, "anchor", None) for e in events) \
+            or any(isinstance(e, yaml.ScalarEvent) and e.value == "<<" and e.style is None for e in events)
+        documents = list(yaml.load_all(text, Loader=loader))
+    except ParseFailure:
+        raise
+    except yaml.YAMLError as error:
+        raise ParseFailure(str(error).replace("\n", " ")) from error
+    if len(documents) != 1 or not isinstance(documents[0], dict):
+        raise ParseFailure("a workflow must be exactly one YAML mapping")
+    return documents[0], anchored
 
 
-def environment_keys(lines: list[str]) -> int:
-    return sum(1 for line in lines if ENV_WORD.search(decoded(line)))
+def strings(value: object):
+    """Every string in a parsed value, keys included."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield from strings(key)
+            yield from strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from strings(item)
 
 
-def environment_declarations(body: list[str]) -> list[str]:
-    """Every possible `environment` key in a job (any indentation, quoting, escape, or case), with
-    its continuation lines, whitespace-normalized."""
-    found = []
-    for i, line in enumerate(body):
-        if ENV_WORD.search(decoded(line)):
-            indent = len(line) - len(line.lstrip())
-            decl = [line.strip()]
-            for more in body[i + 1:]:
-                if more.strip() and len(more) - len(more.lstrip()) <= indent:
-                    break
-                decl.append(more.strip())
-            found.append(" ".join(part for part in decl if part))
-    return found
+def mentions(value: object, needle: str) -> bool:
+    return any(needle.casefold() in text.casefold() for text in strings(value))
 
 
-def first_step(body: list[str]) -> list[str]:
-    starts = [i for i, line in enumerate(body) if re.match(r"^      - ", line)]
-    if not starts:
-        return []
-    end = starts[1] if len(starts) > 1 else len(body)
-    return [line for line in body[starts[0]:end] if line.strip()]
-
-
-def guard_is_sound(step: list[str]) -> bool:
-    """The first step is exactly GUARD_LINES: no added keys (`if`, `continue-on-error`, quoted or
-    not) and no edited script (an uncalled function or `exit 0` changes the text)."""
-    return [line.rstrip() for line in step] == GUARD_LINES
+def keyed(mapping: dict, name: str) -> list[object]:
+    """Values under keys equal to `name` ignoring case (duplicates were already rejected)."""
+    return [v for k, v in mapping.items() if isinstance(k, str) and k.casefold() == name]
 
 
 def check_workflows(workflow_dir: Path) -> list[str]:
-    """Conservative text checks. Entering an environment is the only way to read an environment
-    secret, so every environment declaration must be the publish job's exact line or one of
-    OTHER_ENVIRONMENTS; anything else is reported, not interpreted. Mentions of a NuGet secret
-    outside the publish job are reported in any case, quoting, or escape (defense in depth)."""
+    """Decide on the parsed structure (PyYAML, duplicate keys rejected), never on text. Entering
+    an environment is the only way to read an environment secret, so every job-level
+    environment must be the publish job's exact `nuget-release` or one of OTHER_ENVIRONMENTS, and
+    every job-level `uses` must be a local ./.github/workflows/ file with no @ref (its own jobs
+    are checked here too). Codes: W001 publish workflow missing; W002 a workflow names
+    NUGET_API_KEY; W003 another job names the key; W004 another job declares an unrecognized
+    environment; W005 the publish job's push step does not read the key; W006 the publish job's
+    environment is not exactly nuget-release; W007 the publish job's first step is not the guard;
+    W008 the key or environment appears outside a job, or jobs are not mappings; W009 anchors,
+    aliases, or merge keys; W011 a job-level `uses` other than a local workflow file; W012 a
+    workflow cannot be parsed or has a duplicate key. (W010, a key split across lines, is retired:
+    the parser decodes those.)"""
     problems: list[str] = []
     files = sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))
     if not any(f.name == PUBLISH_WORKFLOW for f in files):
         return [f"W001: {PUBLISH_WORKFLOW} is missing from {workflow_dir}"]
-    publish_ok = False
+    local_files = {f.name for f in files}
+    publish_seen = False
     for path in files:
-        lines = code_lines(path.read_text(encoding="utf-8").replace("\r\n", "\n").split("\n"))
-        if folded(OLD_SECRET) in folded("\n".join(lines)):
+        try:
+            doc, anchored = load_workflow(path.read_text(encoding="utf-8"))
+        except ParseFailure as error:
+            problems.append(f"W012: {path.name} cannot be checked: {error}")
+            continue
+        if anchored:
+            problems.append(f"W009: {path.name} uses a YAML anchor, alias, or merge key")
+        if mentions(doc, OLD_SECRET):
             problems.append(f"W002: {path.name} names {OLD_SECRET}; older workflow versions read that secret")
-        for line in lines:
-            if ANCHOR.search(line.split(" #", 1)[0]) and not re.search(r"""["'][^"']*[&*][^"']*["']""", line):
-                problems.append(f"W009: {path.name} uses a YAML anchor, alias, or merge key: '{line.strip()}'")
-        found, outside = split_jobs(lines)
-        # Backstop: the whole file, with escaped line breaks joined, may hold no more possible
-        # environment keys than the per-line scan below sees.
-        whole = len(re.findall(r"""(?<![a-z0-9_-])environment["'\s]*:""", decoded("\n".join(lines))))
-        if whole > environment_keys(lines):
-            problems.append(f"W010: {path.name} has an environment key split across lines")
-        # EXC-RELEASE-GAPS-A-CHECKER: a job-level `uses` key (a reusable-workflow call) is
-        # accepted only as `uses: ./.github/workflows/<file>.yml` on one line; any other form
-        # (another repository, a folded `>-` value, a quoted, escaped, or flow-style key) fails.
-        for job, body in found.items():
-            content = [line for line in body if line.strip()]
-            indent = len(content[0]) - len(content[0].lstrip()) if content else 0
-            for line in content:
-                if len(line) - len(line.lstrip()) == indent and USES_KEY.search(decoded(line)) \
-                        and not LOCAL_USES.match(line):
-                    problems.append(f"W011: {path.name} job '{job}' calls a workflow other than a local "
-                                    f"./.github/workflows/ file on one line: '{line.strip()}'")
-        for line in outside:
-            if USES_KEY.search(decoded(line)):
-                problems.append(f"W011: {path.name} has a `uses` key outside a parsed job: '{line.strip()}'")
-        for job, body in found.items():
+        jobs_values = keyed(doc, "jobs")
+        outside = {k: v for k, v in doc.items() if not (isinstance(k, str) and k.casefold() == "jobs")}
+        if mentions(outside, SECRET) or mentions(outside, ENVIRONMENT):
+            problems.append(f"W008: {path.name} names {SECRET} or {ENVIRONMENT} outside a job")
+        jobs = jobs_values[0] if jobs_values else {}
+        if not isinstance(jobs, dict) or not all(isinstance(j, dict) for j in jobs.values()):
+            problems.append(f"W008: {path.name} has jobs that are not mappings")
+            continue
+        for job, body in jobs.items():
             is_publish = path.name == PUBLISH_WORKFLOW and job == PUBLISH_JOB
-            decls = environment_declarations(body)
+            for uses in keyed(body, "uses"):
+                if not (isinstance(uses, str) and LOCAL_WORKFLOW.fullmatch(uses)
+                        and uses.rsplit("/", 1)[1] in local_files):
+                    problems.append(f"W011: {path.name} job '{job}' calls {uses!r}; only a local "
+                                    "./.github/workflows/<file>.yml with no @ref is allowed")
+            environments = keyed(body, "environment")
             if is_publish:
-                publish_ok = decls == [PUBLISH_ENVIRONMENT.strip()] and PUBLISH_ENVIRONMENT in body
-                if not guard_is_sound(first_step(body)):
-                    problems.append(f"W007: the first step of {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' must be the "
-                                    f"unconditional '{GUARD_STEP}' check (keys name, env, run only)")
+                publish_seen = True
+                if environments != [ENVIRONMENT]:
+                    problems.append(f"W006: {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' must declare exactly "
+                                    f"`environment: {ENVIRONMENT}`")
+                steps = (keyed(body, "steps") or [None])[0]
+                if not isinstance(steps, list) or not steps or steps[0] != GUARD:
+                    problems.append(f"W007: the first step of {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' must be "
+                                    f"exactly the '{GUARD_STEP}' check")
+                pushes = [step for step in (steps or [])[1:] if isinstance(step, dict)
+                          and "dotnet nuget push" in str(step.get("run", ""))
+                          and isinstance(step.get("env"), dict) and SECRET_REF in step["env"].values()]
+                if not pushes:
+                    problems.append(f"W005: {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' has no `dotnet nuget push` "
+                                    f"step that reads {SECRET} through env")
                 continue
-            if folded(SECRET) in folded("\n".join(body)):
+            if mentions(body, SECRET):
                 problems.append(f"W003: {path.name} job '{job}' names {SECRET}; only the gated publish job may")
-            for decl in decls:
-                if decl not in OTHER_ENVIRONMENTS:
+            for environment in environments:
+                if environment not in OTHER_ENVIRONMENTS or mentions(environment, ENVIRONMENT):
                     problems.append(f"W004: {path.name} job '{job}' declares an environment the check does not "
-                                    f"recognize (it may be {ENVIRONMENT}): '{decl}'")
-        # Outside parsed jobs (flow-style jobs, top-level keys) nothing may declare an environment
-        # or mention the key.
-        for line in outside:
-            if "environment" in folded(line) or folded(SECRET) in folded(line):
-                problems.append(f"W008: {path.name} declares an environment or names {SECRET} outside a parsed job: "
-                                f"'{line.strip()}'")
-    if not publish_ok:
-        problems.append(f"W006: {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' must declare exactly `{PUBLISH_ENVIRONMENT.strip()}`")
+                                    f"recognize (it may be {ENVIRONMENT}): {environment!r}")
+    if not publish_seen and not any(p.startswith("W012: " + PUBLISH_WORKFLOW) for p in problems):
+        problems.append(f"W006: {PUBLISH_WORKFLOW} has no job '{PUBLISH_JOB}'")
     return problems
 
 
