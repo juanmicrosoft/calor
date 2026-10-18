@@ -65,14 +65,33 @@ public class ReleaseWorkflowGateTests
     }
 
     [Fact]
-    public void OverrideModeKeepsTheReleaseTestGatesAndNeverPublishesBenchmarks()
+    public void ReleasePathKeepsTheTestGatesAndNeverDispatchesBenchmarkPublication()
     {
+        // #1547: neither mode of the release path dispatches benchmark.yml; only the website.
         var text = Read("publish-nuget.yml");
         Assert.Contains("needs: [adjudication-gate, test, sdk-consumer, release-quality]", text);
-        var dispatch = Regex.Match(text, @"(?s)- name: Dispatch website and benchmark publication.*").Value;
-        var overrideBranch = Regex.Match(dispatch, @"(?s)\n\s*override\)(.*?);;").Groups[1].Value;
-        Assert.Contains("nextjs-gh-pages.yml", overrideBranch);
-        Assert.DoesNotContain("benchmark.yml", overrideBranch);
+        var dispatch = Regex.Match(text, @"(?s)- name: Dispatch the website deployment.*").Value;
+        foreach (var mode in new[] { "identity", "override" })
+            Assert.Contains("nextjs-gh-pages.yml", Regex.Match(dispatch, $@"(?s)\n\s*{mode}\)(.*?);;").Groups[1].Value);
+        foreach (var path in Directory.GetFiles(WorkflowDir(), "*.yml"))
+        {
+            var code = File.ReadAllLines(path).Where(l => !l.TrimStart().StartsWith('#'));
+            Assert.DoesNotContain(code, l => Regex.IsMatch(l, @"gh workflow run\s+\S*benchmark"));
+        }
+    }
+
+    [Fact]
+    public void BenchmarkPublicationIsASeparateExplicitDispatch()
+    {
+        // #1547: publishing needs publish_results=true on a dispatch (default false); the step
+        // that pushes and opens the PR is the only publishing step and carries that condition.
+        var text = Read("benchmark.yml").Replace("\r\n", "\n");
+        Assert.Matches(new Regex(@"\n      publish_results:\n(?:        .*\n)*?        default: false\n(?:        .*\n)*?        type: boolean\n"), text);
+        var steps = Regex.Split(text, @"\n(?=      - name: )");
+        var publishing = steps.Where(step => Regex.IsMatch(step, @"(?m)^\s+(?:git push|gh pr create)\b")).ToList();
+        var only = Assert.Single(publishing);
+        Assert.Contains("\n        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_results == 'true'\n", only);
+        Assert.Contains("--benchmark-worktree", only);
     }
 
     [Fact]

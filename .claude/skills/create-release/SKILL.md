@@ -162,31 +162,25 @@ git commit -m "chore: bump version to X.Y.Z"
 git push -u origin release/vX.Y.Z
 ```
 
-Create the PR:
+Create the PR. Since 0.25 (#1546) this is the **candidate-preparation PR**, not a release surface:
+its products (the version and the `CHANGELOG.md` section) become candidate bytes that the gate
+checks on every run (`G009`, `G014`). Its body is not release text: do not restate the notes or
+any benchmark number in it.
 
 ```bash
-gh pr create --title "Release vX.Y.Z" --body "$(cat <<'EOF'
-## Summary
-- Bump version to X.Y.Z
-- Update CHANGELOG.md with release date and benchmark results
-- Update website changelog and WhatsNewBanner
-- Update benchmark results JSON for website dashboard
-
-## Benchmark Results
-[Include brief benchmark summary here]
+gh pr create --title "Prepare the vX.Y.Z candidate" --body "$(cat <<'EOF'
+Prepares the vX.Y.Z candidate: version bump and the `## [X.Y.Z]` CHANGELOG section.
+Nothing is published by this PR. The notes reach users only through the #1410 gate,
+which checks this section against the adjudicated notes (G014).
 
 ## Checklist
 - [ ] Version updated in Directory.Build.props
 - [ ] Version updated in website/package.json
 - [ ] Version updated in website/package-lock.json
 - [ ] Version updated in website/src/lib/version.ts
-- [ ] CHANGELOG.md updated with version, date, and benchmark summary
-- [ ] website/content/changelog.mdx updated with version and changes (no benchmark stats)
+- [ ] CHANGELOG.md updated with version and date
+- [ ] website/content/changelog.mdx updated with version and changes
 - [ ] website/src/components/landing/WhatsNewBanner.tsx updated with version and headline
-- [ ] website/public/data/benchmark-results.json updated with latest results
-- [ ] website/public/data/benchmark-provenance.json matches the benchmark source
-- [ ] Benchmark index, methodology, and results pages match the new artifact
-- [ ] Philosophy benchmark summary matches release, source, version, and run count
 - [ ] website/tests/public-claims.spec.ts pins every live release surface
 EOF
 )"
@@ -216,7 +210,12 @@ runs the release test gates on the candidate commit; packs and verifies the pack
 (the `CHANGELOG.md` section for the version, rendered from the candidate) against the adjudicated
 hashes; pushes to NuGet; creates the GitHub release `vX.Y.Z` at the candidate with the notes plus a
 `<!-- calor-adjudication: ... -->` trailer; attaches release metadata; and dispatches the website
-and benchmark workflows from `main` with the same identity; each checks out the candidate.
+workflow from `main` with the same identity, which checks out the candidate.
+
+It never dispatches benchmark publication (#1547). Publishing the adjudicated benchmark headline
+is a separate decision. It needs the record's `publication.benchmark-results.approved: true` and
+an explicit dispatch:
+`gh workflow run benchmark.yml --ref main -f adjudication_identity="$ID" -f publish_results=true`.
 
 ### 7. Cleanup and Return to Main Branch
 
@@ -240,8 +239,8 @@ gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ID"
 
 ### 8. Verify NuGet — DO NOT SKIP
 
-**Dispatching `publish-nuget` does not make it succeed.** Since #1410 the GitHub release, the
-website, and the benchmark PR come only after the NuGet push, but a successful push is still not
+**Dispatching `publish-nuget` does not make it succeed.** Since #1410 the GitHub release and the
+website come only after the NuGet push, but a successful push is still not
 proof that nuget.org serves the packages.
 
 **Wait for the publish workflow first.** Querying nuget.org before it finishes shows the previous

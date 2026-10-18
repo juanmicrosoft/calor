@@ -44,11 +44,11 @@ calor-adjudication:v1:<adjudication commit, 40 hex>:<terminal record SHA-256, 64
 | `evidenceManifests` | `[{role, path, sha256}]` with exactly one `candidate-manifest` (#1423) and one `raw-artifact-freeze` (#1424); each blob at the adjudication commit has that SHA-256 and is JSON whose top-level `candidate` is the candidate SHA or `{"commit": <candidate SHA>}` |
 | `claimRegistry` | `{path, sha256}` of the #1424 claim registry `{"claims": ["claim:<id>", ...]}` committed at the adjudication commit |
 | `adjudications` | exactly one row per subject: every inventory artifact, `gate:#<issue>` for every child but #1408, and every registered claim; no other subject; outcome in the frozen set, never `BLOCKED`, never `SUPPORTED` under the deviation, `HISTORICAL-ONLY` only for a historical-only artifact; `independence = reduced-maintainer-adjudicated`; no inventory artifact still classified `stale` |
-| `publication.release-notes.sha256` | hash of the rendered notes (CRLF to LF, trailing whitespace trimmed, one final newline); the GitHub release's tag and title must both be `v<version>` |
+| `publication.release-notes.sha256` | hash of the rendered notes (CRLF to LF, trailing whitespace trimmed, one final newline); the GitHub release's tag and title must both be `v<version>`. Since 0.25 (#1546) every run also renders the candidate's `CHANGELOG.md` `## [<version>]` section itself and requires this hash and a clean wording scan (`G014`, `G012`) |
 | `publication.nuget-packages.files` | `{<file name>: sha256}`; the pushed directory holds exactly these files; a version already on nuget.org must match entry for entry except `.signature.p7s` |
 | `publication.release-metadata.files` | `{<file name>: sha256}` of the SBOM and provenance JSON |
 | `publication.website.treeSha256` | SHA-256 over sorted `<sha256>  <relative path>` lines of the built tree |
-| `publication.benchmark-results.files` | `{<repo path>: sha256}` naming exactly the two #1422 (B2) outputs, `website/public/data/benchmark-headline.json` and `bench/phase0-agent-native/commit-stamp-index.json` (any other key set is `G011`); the changed files in the publishing work tree must be exactly these, with these hashes |
+| `publication.benchmark-results.files` | `{<repo path>: sha256}` naming exactly the two #1422 (B2) outputs, `website/public/data/benchmark-headline.json` and `bench/phase0-agent-native/commit-stamp-index.json` (any other key set is `G011`); the changed files in the publishing work tree must be exactly these, with these hashes. Since 0.25 (#1547) `approved: true` (the JSON literal) is also required to publish them (`G015`); without it the hashes are adjudicated but nothing may publish them |
 
 Every publication block is schema-checked on every invocation, whichever surface is publishing.
 The gate checks the subset of the §8 predicate that a record can show; the full T001-T003 rules stay
@@ -59,7 +59,8 @@ proves a gate-valid fixture (with a non-empty claim registry) is also valid ther
 
 All surfaces publish from the one candidate commit named in the record. Order:
 adjudication gate, then release test gates, then NuGet push, then the GitHub release, then release
-metadata, then website and benchmark dispatch.
+metadata, then website dispatch. Benchmark publication is not on the release path (0.25, #1547):
+it is a separate maintainer dispatch, after the release, that the record must also approve.
 
 | Surface (§7 id) | Workflow | Gate | Negative controls |
 |---|---|---|---|
@@ -68,10 +69,10 @@ metadata, then website and benchmark dispatch.
 | NuGet packages (`nuget-packages`) | `publish-nuget.yml`: `workflow_dispatch` from `main` only, required `adjudication_identity`, no `release` trigger, no version override; every job checks out the candidate | `adjudication-gate` job first; `publish` job verifies packages, metadata, notes, and package descriptions before attestation, and compares any version already on nuget.org before `dotnet nuget push --skip-duplicate` | `ChangedPackageFails`, `UnadjudicatedExtraPackageFails`, `RegistryPackageWithOtherContentFails`, `IndependentClaimInThePackageDescriptionFails`, `CheckoutOtherThanTheCandidateFails` |
 | SBOM / provenance (`release-metadata`) | `publish` job, generated from the packages and stamped with the candidate SHA; verified before attestation; an existing asset must be byte-identical (no `--clobber`), a missing one is uploaded | same job | `ChangedReleaseMetadataFails`, `PublishWorkflowHasNoVersionOverrideAndNoAssetClobber` |
 | Website (`website`) | `nextjs-gh-pages.yml`: dispatch from `main` only, required identity, builds the candidate; dispatched by `publish-nuget` | build job: identity + release body, then `--website-dir website/out`; deploy job checks out the candidate and re-verifies the downloaded Pages artifact before `deploy-pages` | `ChangedWebsiteTreeFails`, `IndependentClaimOnTheAdjudicatedWebsiteFails`, `ObfuscatedIndependentClaimOnTheWebsiteFails` (3) |
-| Benchmark publication (`benchmark-publication`) | `benchmark.yml`: dispatch from `main` only with the identity, on the candidate; push runs measure only and never publish. The publishing step runs only after #1422's refusal gate (step `methodology`) passed, so nothing publishes without both. The PR branch is built from the candidate and pushed as verified (no `create-pull-request` re-application onto `main`); #1422's stale-PR cleanup stays the job's last step | identity + release body first; `--benchmark-worktree` in the publishing step, immediately before the commit: the changed files must be exactly #1422's two outputs (`benchmark-headline.json` and its `commit-stamp-index.json` entry) with the adjudicated hashes | `UnadjudicatedBenchmarkFileFails`, `ChangedBenchmarkFileFails`, `BenchmarkRecordOtherThanExactlyTheB2OutputsFails` (2) |
+| Benchmark publication (`benchmark-publication`) | `benchmark.yml`: dispatch from `main` only with the identity, on the candidate, and (0.25, #1547) only with `publish_results: true`, a separate maintainer action the release path never takes; push runs and other dispatches measure only and never publish. The publishing step runs only after #1422's refusal gate (step `methodology`) passed, so nothing publishes without both. The PR branch is built from the candidate and pushed as verified (no `create-pull-request` re-application onto `main`); #1422's stale-PR cleanup stays the job's last step | identity + release body first; `--benchmark-worktree` in the publishing step, immediately before the commit: the record must approve publication (`G015`), and the changed files must be exactly #1422's two outputs (`benchmark-headline.json` and its `commit-stamp-index.json` entry) with the adjudicated hashes | `UnadjudicatedBenchmarkFileFails`, `ChangedBenchmarkFileFails`, `BenchmarkRecordOtherThanExactlyTheB2OutputsFails` (2), `BenchmarkPublicationWithoutTheRecordsApprovalFails` (3), `BenchmarkPublicationIsASeparateExplicitDispatch`, `ReleasePathKeepsTheTestGatesAndNeverDispatchesBenchmarkPublication` |
 | Agent refactoring data (`agent-refactoring-results`) | `benchmark.yml` `agent-refactoring-benchmark`; since #1422 the job is read-only (`contents: read`) and has no commit step, so it publishes nothing (the inventory classifies agent results historical-only) | none needed; any publishing command added to the job without a preceding gate fails the structural control | `EveryPublishingCommandFollowsTheGateInItsJob` |
 | Installed-tool check (`installed-tool-verification`) | `verify-release.yml`: dispatch from `main`, required identity; the install matrix checks out the candidate's sample | identity, version, tag, release body | `RequestedVersionOtherThanTheAdjudicatedOneFails`, `MissingRequiredTagFails` |
-| Release PR (`release-pr`) | manual, before the candidate freeze. See §6: it cannot consume an identity that does not exist yet | the gate checks the candidate's `Directory.Build.props` version and its rendered notes | `CandidateVersionThatDiffersFromTheBuildPropsFails`, `ChangedReleaseNotesFail` |
+| Release PR (`release-pr`) | 0.25 (#1546): not a publication surface. It is the candidate-preparation PR, merged before the freeze; its products are bytes of the candidate. See §6 | every run, on every surface, checks the candidate's `Directory.Build.props` version (`G009`) and renders the candidate's `CHANGELOG.md` section, which must be the adjudicated notes and pass the wording scan (`G014`, `G012`) | `CandidateVersionThatDiffersFromTheBuildPropsFails`, `CandidateChangelogThatIsNotTheAdjudicatedNotesFails` (2), `CandidateWithoutTheVersionsChangelogSectionFails` (2), `IndependentClaimInTheCandidateChangelogFailsWithoutAnySurfaceOption` |
 | Hand-made release (bypass detector) | `release-audit.yml` on every `release` event; the only workflow that listens to them | body must end with an identity that verifies against its own tag and notes; fails red otherwise; changes nothing | `OnlyTheAuditListensToReleaseEvents` |
 
 Identity-level controls that apply to every surface: `MissingOrMalformedIdentityFails` (4 cases),
@@ -112,7 +113,9 @@ fetched; `G003` adjudication commit missing or off `main`; `G004` record missing
 invalid, or wrong schema; `G005` contract not frozen, packet hashes wrong, or contract changed;
 `G006` not `MILESTONE-SUCCEEDED`; `G007` independence fields; `G008` adjudication rows;
 `G009` candidate, checkout, version, or tag; `G010` evidence manifests; `G011` surface bytes;
-`G012` forbidden wording; `G013` release body. Exit status 1 on any code; there is no
+`G012` forbidden wording; `G013` release body; `G014` (0.25) the candidate's `CHANGELOG.md` section
+is missing or is not the adjudicated notes; `G015` (0.25) benchmark publication without the
+record's `approved: true`. Exit status 1 on any code; there is no
 warning-only mode and no override flag.
 
 ## 5. What a workflow gate cannot enforce (maintainer settings)
@@ -143,10 +146,30 @@ These are repository settings. R2 changes none of them. Recommended, in priority
 
 §7 inventories the release PR as a surface and §8 condition 7 asks every §7 surface to consume the
 identity. The release PR bumps the version and writes the notes before #1423 freezes the candidate,
-so it necessarily precedes #1408 and cannot consume an identity that does not exist yet. R2 does not
-resolve this by exemption: the gate checks the release PR's products (the candidate's version and
-its rendered notes) against the record. Whether that satisfies condition 7, or the release PR row
-needs a #1407 amendment, is a maintainer decision.
+so it necessarily precedes #1408 and cannot consume an identity that does not exist yet. 0.24's #1408
+did not waive this (AD-1), and condition 7 failed on it.
+
+**0.25 resolution (#1546): the release PR is dropped as a publication surface.** Of the two options
+(freeze first and generate the PR afterwards, or drop the surface), dropping it is the simpler sound
+one:
+
+- *Freezing first does not work.* The candidate must already declare the version and carry the
+  notes (`G009`, and the notes hash), so a PR generated after the freeze would change the candidate.
+- *The release PR publishes nothing.* It pushes no package, creates no tag or release, and deploys
+  nothing. It is an ordinary reviewed change to `main`, like any other candidate commit.
+- *Its products are candidate bytes, and the identity names the candidate.* There are two: the
+  `Directory.Build.props` version and the `CHANGELOG.md` section. Since 0.25 the gate checks both
+  on every run, whichever surface runs it and whether or not `--release-notes` is passed. The
+  version is checked by `G009`. The section must hash to `publication.release-notes.sha256` and
+  pass the wording scan (`G014`, `G012`). A release PR whose notes differ from what #1408
+  adjudicated therefore blocks every surface.
+- *Its text is not release text.* The PR body is not the release notes and must not restate notes
+  or benchmark numbers. `.claude/skills/create-release/SKILL.md` step 4 gives the body to use.
+  What users read comes only from the gated surfaces.
+
+The 0.24 contract (#1407) is frozen and is not amended here. The 0.25 contract must say the same
+thing: its §7 inventory either lists no `release-pr` surface or classifies it as candidate
+preparation checked through `G009`/`G014`. That is a maintainer decision for the 0.25 contract.
 
 ## 7. No maintenance-release path
 

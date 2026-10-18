@@ -4,7 +4,8 @@ name: Publish to NuGet
 # `release: created` and takes no version override. It publishes only the candidate
 # named by one successful #1408 adjudication identity, in this order: adjudication
 # gate -> release test gates -> NuGet push -> GitHub release -> release metadata ->
-# website and benchmark dispatch. The publishing job re-runs
+# website dispatch. It never dispatches benchmark publication (#1547): that is a separate,
+# explicitly approved dispatch of benchmark.yml. The publishing job re-runs
 # scripts/verify_release_adjudication.py against the bytes it is about to publish.
 # Design: docs/plans/evidence/r2-1410/release-gate.md.
 #
@@ -666,22 +667,21 @@ jobs:
             fi
           done
 
-      # Releases created with GITHUB_TOKEN raise no `release` events, so the downstream
-      # surfaces are dispatched explicitly, from main, with the same identity. Each one
-      # re-runs the gate, checks out the candidate, and checks this release's body.
-      # Override mode dispatches only the website, which re-runs the override check against the
-      # tag. It never dispatches benchmark publication.
-      - name: Dispatch website and benchmark publication
+      # Releases created with GITHUB_TOKEN raise no `release` events, so the website is
+      # dispatched explicitly, from main, with the same identity (or override). It re-runs the
+      # gate, checks out the candidate, and checks this release's body.
+      # #1547: no mode dispatches benchmark publication. Publishing benchmark results is a
+      # separate maintainer dispatch of benchmark.yml with publish_results=true, and the gate
+      # also requires the record's explicit approval (G015).
+      - name: Dispatch the website deployment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           case "$RELEASE_MODE" in
             identity)
-              gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY"
-              gh workflow run benchmark.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY" ;;
+              gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY" ;;
             override)
-              gh workflow run nextjs-gh-pages.yml --ref main -f maintainer_override="$MAINTAINER_OVERRIDE"
-              echo "Maintainer override: benchmark publication is not dispatched." ;;
+              gh workflow run nextjs-gh-pages.yml --ref main -f maintainer_override="$MAINTAINER_OVERRIDE" ;;
             *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
           esac

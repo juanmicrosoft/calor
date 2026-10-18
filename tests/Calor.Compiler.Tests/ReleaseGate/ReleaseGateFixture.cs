@@ -40,7 +40,8 @@ internal sealed class GateRepo : IDisposable
         string description = "Calor compiler",
         string? freezeManifest = null,
         string? readme = null,
-        string benchmark = "{\"overallAdvantage\":1.0}\n")
+        string benchmark = "{\"overallAdvantage\":1.0}\n",
+        string? changelog = null)
     {
         var baseDir = Path.Combine(Path.GetTempPath(), "calor-r2-" + Guid.NewGuid().ToString("N")[..12]);
         var repo = new GateRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch") };
@@ -74,6 +75,11 @@ internal sealed class GateRepo : IDisposable
         repo.Write($"{PacketDir}/artifact-inventory.json", inventoryNode.ToJsonString());
         repo.WritePacketHashes();
         repo.Write("Directory.Build.props", $"<Project><PropertyGroup><Version>{ReleaseVersion}</Version></PropertyGroup></Project>\n");
+        // #1546: the release PR's notes are the candidate's CHANGELOG section; {NOTES} marks where.
+        var notesText = notes ?? $"## [{ReleaseVersion}] - 2026-11-01\n\nEvidence is {Limitation}.\n";
+        var changelogText = (changelog ?? "# Changelog\n\n## [Unreleased]\n\n{NOTES}\n## [0.22.0] - 2026-09-15\n\nOld.\n")
+            .Replace("{NOTES}", notesText);
+        repo.Write("CHANGELOG.md", changelogText);
         repo.Candidate = repo.Commit("candidate");
         var recordedCandidate = repo.Candidate;
         if (sideCandidate)
@@ -96,7 +102,6 @@ internal sealed class GateRepo : IDisposable
         var registry = new JsonObject { ["claims"] = new JsonArray(Claims.Select(c => (JsonNode)c).ToArray()) }.ToJsonString();
         repo.Write(RegistryPath, registry);
 
-        var notesText = notes ?? $"## [{ReleaseVersion}] - 2026-11-01\n\nEvidence is {Limitation}.\n";
         File.WriteAllText(repo.NotesPath, notesText);
         WritePackage(Path.Combine(repo.NugetDir, $"Calor.{ReleaseVersion}.nupkg"), "Calor", description, readme: readme);
         WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", description);
@@ -138,6 +143,7 @@ internal sealed class GateRepo : IDisposable
                 ["website"] = new JsonObject { ["treeSha256"] = TreeDigest(repo.WebsiteDir) },
                 ["benchmark-results"] = new JsonObject
                 {
+                    ["approved"] = true,
                     ["files"] = new JsonObject
                     {
                         [BenchmarkPath] = Sha(Encoding.UTF8.GetBytes(benchmark)),

@@ -384,6 +384,58 @@ public class ReleaseAdjudicationGateTests
         AssertCodes(repo, new[] { "G011" });
     }
 
+    // ------------------------------------------------------------------
+    // #1546: the release PR's products are checked on every run
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("# Changelog\n\n## [0.24.0] - 2026-11-01\n\nSomething else.\n")]
+    [InlineData("# Changelog\n\n{NOTES}\nAlso faster.\n")]
+    public void CandidateChangelogThatIsNotTheAdjudicatedNotesFails(string changelog)
+    {
+        // No surface option is passed: the identity alone binds the release PR's notes.
+        using var repo = GateRepo.Build(changelog: changelog);
+        AssertCodes(repo, new[] { "G014" });
+    }
+
+    [Theory]
+    [InlineData("# Changelog\n\n## [Unreleased]\n\nNothing yet.\n")]
+    [InlineData("")]
+    public void CandidateWithoutTheVersionsChangelogSectionFails(string changelog)
+    {
+        using var repo = GateRepo.Build(changelog: changelog);
+        AssertCodes(repo, new[] { "G014" });
+    }
+
+    [Fact]
+    public void IndependentClaimInTheCandidateChangelogFailsWithoutAnySurfaceOption()
+    {
+        using var repo = GateRepo.Build(notes: $"## [{ReleaseVersion}]\n\nEvidence was independently verified.\n");
+        AssertCodes(repo, new[] { "G012" });
+    }
+
+    // ------------------------------------------------------------------
+    // #1547: benchmark publication needs the record's explicit approval
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData("true")]
+    public void BenchmarkPublicationWithoutTheRecordsApprovalFails(object? approved)
+    {
+        using var repo = GateRepo.Build(record: r =>
+        {
+            var block = r["publication"]!["benchmark-results"]!.AsObject();
+            block.Remove("approved");
+            if (approved is bool flag) block["approved"] = flag;
+            else if (approved is string text) block["approved"] = text;
+        });
+        AssertCodes(repo, new[] { "G015" }, "--benchmark-worktree");
+        // Without approval every other surface still passes: declining publication is valid.
+        AssertCodes(repo, Array.Empty<string>(), "--expect-head", "--release-notes", repo.NotesPath);
+    }
+
     [Theory]
     [InlineData("0.24 evidence was independently adjudicated.")]
     [InlineData("Every proof is Independently\n  Verified.")]
