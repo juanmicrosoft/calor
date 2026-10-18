@@ -117,8 +117,14 @@ def tree_digest(root: Path) -> str:
     return sha256("".join(lines).encode("utf-8"))
 
 
+def version_headers(changelog: str, version: str) -> int:
+    """How many `## [VERSION]` headers CHANGELOG.md holds (matched literally)."""
+    return sum(1 for line in changelog.replace("\r\n", "\n").split("\n") if line.startswith(f"## [{version}]"))
+
+
 def changelog_section(changelog: str, version: str) -> str:
-    """The `## [VERSION]` section of CHANGELOG.md, as publish-nuget's awk renders the notes."""
+    """The `## [VERSION]` section of CHANGELOG.md, the version matched literally. publish-nuget
+    renders the notes with this function (scripts/render_release_notes.py)."""
     out, inside = [], False
     for line in changelog.replace("\r\n", "\n").split("\n"):
         if line.startswith(f"## [{version}]"):
@@ -390,6 +396,9 @@ def check_release_pr_products(gate: Gate, cand: str, version: str, record: dict)
     if not SHA64.match(str(notes_hash or "")):
         return  # the publication schema check reports the missing hash (G011)
     text = (gate.blob(cand, "CHANGELOG.md") or b"").decode("utf-8", "replace")
+    if version_headers(text, version) > 1:
+        gate.fail("G014", f"CHANGELOG.md at the candidate has more than one [{version}] header")
+        return
     section = changelog_section(text, version)
     if not section.strip():
         gate.fail("G014", f"CHANGELOG.md at the candidate has no [{version}] section; the release PR's notes are missing")

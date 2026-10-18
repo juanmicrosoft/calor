@@ -407,6 +407,46 @@ public class ReleaseAdjudicationGateTests
         AssertCodes(repo, new[] { "G014" });
     }
 
+    [Theory]
+    [InlineData("# Changelog\n\n{NOTES}\n## [0.25.0] - later\n\nNewer.\n")]
+    [InlineData("# Changelog\r\n\r\n{NOTES}   \r\n## [0x24y0] decoy, matched by a regex but not literally\r\n\r\nDecoy.\r\n")]
+    public void RenderedNotesAreTheSectionTheGateBinds(string changelog)
+    {
+        // publish-nuget renders the notes with scripts/render_release_notes.py, the gate's own
+        // function: the rendered file passes --release-notes, so G014 and G011 cannot disagree.
+        using var repo = GateRepo.Build(changelog: changelog);
+        var source = Path.Combine(repo.Scratch, "CHANGELOG.md");
+        File.WriteAllText(source, GateRepo.RunGit(repo.Root, "show", $"{repo.Candidate}:CHANGELOG.md") + "\n");
+        var rendered = Path.Combine(repo.Scratch, "rendered.md");
+        var (code, output) = RunPython(Path.Combine(RepoRoot(), "scripts", "render_release_notes.py"), ReleaseVersion, source);
+        Assert.True(code == 0, output);
+        File.WriteAllText(rendered, output);
+        AssertCodes(repo, Array.Empty<string>(), "--expect-head", "--release-notes", rendered);
+    }
+
+    [Fact]
+    public void CandidateChangelogWithADuplicateVersionHeaderFails()
+    {
+        using var repo = GateRepo.Build(changelog: "# Changelog\n\n{NOTES}\n## [0.24.0] - again\n\nMore.\n");
+        AssertCodes(repo, new[] { "G014" });
+        var source = Path.Combine(repo.Scratch, "CHANGELOG.md");
+        File.WriteAllText(source, GateRepo.RunGit(repo.Root, "show", $"{repo.Candidate}:CHANGELOG.md") + "\n");
+        var (code, _) = RunPython(Path.Combine(RepoRoot(), "scripts", "render_release_notes.py"), ReleaseVersion, source);
+        Assert.Equal(1, code);
+    }
+
+    private static (int Code, string Output) RunPython(string script, params string[] args)
+    {
+        var start = new ProcessStartInfo("python3") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        start.ArgumentList.Add(script);
+        foreach (var arg in args) start.ArgumentList.Add(arg);
+        using var process = Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return (process.ExitCode, stdout.Result + stderr);
+    }
+
     [Fact]
     public void IndependentClaimInTheCandidateChangelogFailsWithoutAnySurfaceOption()
     {

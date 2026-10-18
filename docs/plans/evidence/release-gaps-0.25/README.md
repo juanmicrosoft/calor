@@ -72,6 +72,28 @@ Tests:
 - `scripts/test_benchmark_publication_gate.py`, which now allows only the narrowing
   `publish_results` input and checks the step condition.
 
+**Scope: workflows on `main` only.** Workflow files on older refs keep their own publication
+logic. For example, `v0.22.0`'s `benchmark.yml` is dispatchable, declares `contents: write`, and
+opens a PR with `peter-evans/create-pull-request`. Both run with the write-capable
+`GITHUB_TOKEN`, and #1545's NuGet credential isolation does not restrict them. Closing that path
+takes repository settings, which the maintainer owns:
+
+- *Settings → Actions → General → Workflow permissions*: set **Read repository contents and
+  packages permissions**, and turn **off** *Allow GitHub Actions to create and approve pull
+  requests*. Older workflows that declare `contents: write` still get it, but none can open a PR.
+  The gated publishing step on `main` would then push its verified branch, and the maintainer
+  opens the PR by hand, which suits a separately approved action.
+- A branch ruleset on `benchmark-results*` that restricts creation, so an older workflow cannot
+  push that branch.
+
+Until then, the guarantee is: **no workflow on `main` publishes benchmark results without both
+locks.**
+
+The renderer also changed in round 1. publish-nuget used to render the notes with `awk`, which
+matched the version as a regular expression. It now uses `scripts/render_release_notes.py`,
+which is the gate's own literal `changelog_section`. A version header that appears twice fails
+(`G014`, and the renderer exits 1).
+
 **Wording that stays true.** "The release does not publish benchmark results." Run artifacts are
 the exception: every `benchmark.yml` run uploads its measurements as workflow artifacts. Anyone
 signed in to GitHub can download artifacts on a public repository. Those artifacts are diagnostic

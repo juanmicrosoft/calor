@@ -494,8 +494,9 @@ jobs:
           VER: ${{ needs.adjudication-gate.outputs.version }}
         run: |
           set -euo pipefail
-          awk -v v="$VER" '$0 ~ "^## \\[" v "\\]" {f=1; print; next} f && /^## \[/ {exit} f' \
-            CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          # #1546: the gate's own renderer (literal version match), so the published notes and
+          # the section the gate binds to the identity (G014) are one rendering.
+          python3 scripts/render_release_notes.py "$VER" CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           test -s "$RUNNER_TEMP/notes.md"
 
       # Override mode cannot compare hashes with an adjudication (none succeeded). It re-checks

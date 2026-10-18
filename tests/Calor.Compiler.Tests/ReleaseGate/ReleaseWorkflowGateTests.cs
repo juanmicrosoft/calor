@@ -81,6 +81,16 @@ public class ReleaseWorkflowGateTests
     }
 
     [Fact]
+    public void ReleaseNotesAreRenderedByTheGatesOwnRenderer()
+    {
+        // #1546: one rendering for the published notes and the section G014 binds.
+        var text = Read("publish-nuget.yml");
+        Assert.Contains("python3 scripts/render_release_notes.py \"$VER\" CHANGELOG.md > \"$RUNNER_TEMP/notes.md\"", text);
+        Assert.DoesNotContain(File.ReadAllLines(Path.Combine(WorkflowDir(), "publish-nuget.yml")),
+            l => !l.TrimStart().StartsWith('#') && l.Contains("awk") && l.Contains("## "));
+    }
+
+    [Fact]
     public void BenchmarkPublicationIsASeparateExplicitDispatch()
     {
         // #1547: publishing needs publish_results=true on a dispatch (default false); the step
