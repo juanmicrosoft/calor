@@ -83,6 +83,7 @@ default by `Calor0272`/`Calor0273` (nullability), preserved elsewhere.
 | `calor0270-corpus-ledger.json` | 313 / 37 | 295 / 33 | serilog 34/11 → 16/7: unresolved receivers inside newly preserved members |
 | `calor0425-corpus-ledger.json` enforced modules | 265 | 275 | modules that stopped on an untyped `out var` binding (`Calor0250`) now bind; 143 Calor0425 sites over 52 modules |
 | `EffectInferrerCorpusDepthTests` cycle stops | 2 | 0 | both cyclic Serilog members are preserved |
+| `tests/Calor.Evaluation/Scorecard/baseline.json` | 086 partial, 4 round-trip errors | 086 partial, 1 error, 1 interop | `Swap<T>(ref T a, ref T b)` (method-generic `ref`, RO-UNS-1) is preserved; only entry 086 was updated, totals unchanged (95 fully converted, 98 round-trip) |
 
 33 more members and types are preserved: 31 for an `out var` that cannot be lowered (type
 unresolved in a one-file conversion, inside a lambda, or in a statement already partly C#; before,
