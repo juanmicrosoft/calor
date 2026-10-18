@@ -51,15 +51,18 @@ copy of an old workflow can still ask for the repository secret. Code can do onl
     - Its first step must equal the committed guard step (`W007`): its `name`, its `env`, and its
       `run` script. So an added `if`, an uncalled shell function, or `exit 0` fails.
     - Its `dotnet nuget push` step must read the key through `env` (`W005`).
-    - Every other job's `environment` must equal an allowlisted value, today only the
-      `github-pages` deploy (`W004`). Names are compared without case.
+    - Every other job's `environment` must equal an allowlisted value exactly, today only the
+      `github-pages` deploy (`W004`). Any variant, including a case change such as
+      `GITHUB-PAGES`, fails closed. Mentions of `nuget-release` and of the key are matched
+      without case.
     - The key may not appear in any other job (`W003`) or outside `jobs` (`W008`).
     - `NUGET_API_KEY` may not appear anywhere (`W002`).
     - Every job-level `uses` must be a local `./.github/workflows/<file>.yml` that exists, with no
       `@ref` (`W011`). This is decided on the parsed value, so folded, quoted, flow-style, and
       multiline flow-mapping forms are all judged by what they mean. A local call's own jobs are
       checked like any other workflow, `secrets: inherit` included.
-    - Anchors, aliases, and merge keys are reported (`W009`).
+    - Anchors and aliases are reported (`W009`). Merge keys (`<<`) fail closed at construction
+      (`W012`).
 
     `W010` (a key split across lines) is retired, because the parser decodes those. `W001` means
     `publish-nuget.yml` is missing.
