@@ -233,10 +233,22 @@ SHA-256 (`G004` otherwise). That entry must be `adjudicated` with a supported pa
 entry (`G016`). A `--version` that is not in the map also fails (`G009`). Every later check reads
 its paths and issue numbers from the entry.
 
-**Trust.** Both scripts read the map from beside themselves (`<script dir>/../eng/`), never from
-`--repo`. There is no flag that names another map. `benchmark.yml`, which runs main's gate against
-the candidate checkout, copies the map with the script. Changing the map is a reviewed change to
-the gate.
+**Where the map is read.** Both scripts read the map from fetched protected main
+(`refs/remotes/origin/main:eng/release-adjudication-map.json`), the ref every run already
+requires (`G002`). They never read it from the work tree, and no flag names another map. A map
+that is missing at main, is not valid JSON, repeats a JSON member, or breaks any rule above fails
+`G016` (the override check: `O006`).
+
+Main, not the candidate or the adjudication commit, because:
+
+- *Not the candidate.* The publishing jobs check out the candidate. The candidate is frozen
+  before its A1 record lands, so its copy of the map still says `not-yet-adjudicated`. A gate that
+  read the work tree would refuse every surface after the first (Codex round 1, #1567).
+- *Not the adjudication commit.* 0.24.0's adjudication commit predates the map. It would have no
+  entry to resolve.
+
+So a reviewed change to the map on main changes which records the gate accepts, exactly as a
+reviewed change to the gate script does. The identity still names immutable record bytes.
 
 **Entries today.**
 
@@ -255,5 +267,7 @@ the gate.
 Tests: `ReleaseAdjudicationMapTests` (a version missing from the map, an entry pointing at a
 missing record, a record at another release's path, a claim registry other than the map's, 0.24.0
 still resolving, 0.25 failing until adjudicated and passing once a map marks it adjudicated, and
-eight malformed maps). The fixture's claim-registry path changed to 0.24.0's real one because the
-map now binds it; no existing assertion changed.
+twelve malformed maps), plus `test_explicit_yaml_tags_are_open` for the credential check. Fixture
+changes, with no existing assertion changed: the `GateRepo` claim-registry path is now 0.24.0's
+real one, because the map binds it; and `GateRepo` and `OverrideRepo` commit the committed map
+into the throwaway repository's main, because the scripts read it there.

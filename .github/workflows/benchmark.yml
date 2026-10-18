@@ -97,10 +97,8 @@ jobs:
           # The checkout below replaces the work tree with the candidate, whose copy of the gate
           # may predate checks such as G015 (#1547). Every later gate run uses main's copy, kept
           # outside the work tree, against the candidate checkout (--repo .).
-          # #1567: the gate reads its release map from beside itself, so main's map goes with it.
-          mkdir -p "$RUNNER_TEMP/main-gate/scripts" "$RUNNER_TEMP/main-gate/eng"
+          mkdir -p "$RUNNER_TEMP/main-gate/scripts"
           cp scripts/verify_release_adjudication.py "$RUNNER_TEMP/main-gate/scripts/verify_release_adjudication.py"
-          cp eng/release-adjudication-map.json "$RUNNER_TEMP/main-gate/eng/release-adjudication-map.json"
 
       - name: Check out the candidate and verify the GitHub release (#1410)
         if: github.event_name == 'workflow_dispatch'

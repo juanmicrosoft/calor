@@ -13,7 +13,7 @@ passes only when:
 
   * the candidate commit is on fetched protected main and declares <Version>VERSION</Version>;
   * the candidate contains the override record the adjudication map names for 0.24.0
-    (eng/release-adjudication-map.json, read from beside the #1410 gate, #1567), naming VERSION,
+    (eng/release-adjudication-map.json at fetched protected main, #1567), naming VERSION,
     `gated: false`, the maintainer's verbatim authorization, and the map's terminal-record path
     and its sha256;
   * the candidate contains that terminal record with exactly that sha256, and its outcome is
@@ -93,21 +93,15 @@ def load_json(gate: r2.Gate, code: str, data: bytes | None, what: str) -> dict |
     return value
 
 
-def override_entry() -> dict:
-    """The map's 0.24.0 entry (#1567): its maintainer override, terminal record, and A1 issue."""
-    entry = r2.map_entry(r2.load_map(), OVERRIDE_VERSION)
+def override_entry(gate: r2.Gate) -> dict:
+    """The map's 0.24.0 entry at fetched main (#1567): its override, terminal record, and A1 issue."""
+    entry = r2.map_entry(r2.load_map(gate), OVERRIDE_VERSION)
     if entry is None or entry["version"] != OVERRIDE_VERSION or "maintainerOverride" not in entry:
-        raise r2.MapError(f"{r2.MAP_PATH.name} does not map {OVERRIDE_VERSION} to a maintainer override")
+        raise r2.MapError(f"{r2.MAP_FILE} does not map {OVERRIDE_VERSION} to a maintainer override")
     return entry
 
 
 def check_record(gate: r2.Gate, args: argparse.Namespace, version: str) -> tuple[str, dict, str] | None:
-    try:
-        entry = override_entry()
-    except r2.MapError as error:
-        gate.fail("O006", f"adjudication map: {error}")
-        return None
-    override_path, record_path, a1 = entry["maintainerOverride"], entry["terminalRecord"], entry["a1Issue"]
     if gate.git("rev-parse", "--is-shallow-repository").stdout.decode().strip() != "false":
         gate.fail("O003", "shallow clone; the check needs full history")
         return None
@@ -128,6 +122,12 @@ def check_record(gate: r2.Gate, args: argparse.Namespace, version: str) -> tuple
     if not gate.is_ancestor(cand, r2.MAIN_REF):
         gate.fail("O003", f"candidate {cand} is not on protected main")
         return None
+    try:
+        entry = override_entry(gate)
+    except r2.MapError as error:
+        gate.fail("O006", f"adjudication map: {error}")
+        return None
+    override_path, record_path, a1 = entry["maintainerOverride"], entry["terminalRecord"], entry["a1Issue"]
 
     raw = gate.blob(cand, override_path)
     override = load_json(gate, "O004", raw, f"maintainer override record at {cand}:{override_path}")

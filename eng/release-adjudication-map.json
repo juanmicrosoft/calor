@@ -1,7 +1,7 @@
 {
   "schema": "calor.release-adjudication-map/1",
   "issue": 1567,
-  "rule": "The #1410 release gate (scripts/verify_release_adjudication.py) and the 0.24.0 maintainer-override check (scripts/verify_maintainer_override.py) read this file from beside the script that runs, never from the checkout being published. Each release names its A1 issue, the path of its terminal record, the contract packet and seal the record is adjudicated under, and the claim registry the record must name. An identity passes only for a release whose status is 'adjudicated' and whose record is at that path; a version that matches no entry fails (G016). 'MAJOR.MINOR.x' matches every patch release of that minor. Changing this file is a reviewed change to the gate. Design: docs/plans/evidence/r2-1410/release-gate.md section 9.",
+  "rule": "The #1410 release gate (scripts/verify_release_adjudication.py) and the 0.24.0 maintainer-override check (scripts/verify_maintainer_override.py) read this file from fetched protected main (refs/remotes/origin/main), never from the checkout being published. Each release names its A1 issue, the path of its terminal record, the contract packet and seal the record is adjudicated under, and the claim registry the record must name. An identity passes only for a release whose status is 'adjudicated' and whose record is at that path; a version that matches no entry fails (G009); any other map problem fails G016. 'MAJOR.MINOR.x' matches every patch release of that minor. Changing this file is a reviewed change to the gate. Design: docs/plans/evidence/r2-1410/release-gate.md section 9.",
   "releases": [
     {
       "version": "0.24.0",

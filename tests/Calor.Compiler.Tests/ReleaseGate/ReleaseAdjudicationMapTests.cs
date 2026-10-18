@@ -66,7 +66,7 @@ public class ReleaseAdjudicationMapTests
         using var repo = GateRepo.Build(version: "0.26.0");
         var result = repo.Run(Array.Empty<string>());
         AssertCodes(result, "G009");
-        Assert.Contains("candidate version 0.26.0 is not in release-adjudication-map.json", result.Output);
+        Assert.Contains("candidate version 0.26.0 is not in eng/release-adjudication-map.json", result.Output);
         AssertCodes(repo.Run(repo.AllSurfaces()), "G009");
     }
 
@@ -76,16 +76,16 @@ public class ReleaseAdjudicationMapTests
         using var repo = GateRepo.Build();
         var result = repo.Run(new[] { "--version", "0.24.1" });
         AssertCodes(result, "G009");
-        Assert.Contains("requested version 0.24.1 is not in release-adjudication-map.json", result.Output);
+        Assert.Contains("requested version 0.24.1 is not in eng/release-adjudication-map.json", result.Output);
     }
 
     [Fact]
     public void MapEntryPointingAtAMissingRecordFails()
     {
-        using var repo = GateRepo.Build();
         var map = GateRepo.CommittedMap();
         Entry(map, "0.24.0")["terminalRecord"] = "docs/plans/evidence/adjudication-1408/terminal-record-v2.json";
-        AssertCodes(repo.RunWithMap(map), "G004");
+        using var repo = GateRepo.Build(map: map.ToJsonString());
+        AssertCodes(repo.Run(Array.Empty<string>()), "G004");
     }
 
     [Fact]
@@ -122,16 +122,19 @@ public class ReleaseAdjudicationMapTests
     [Fact]
     public void Release025FailsUntilItIsAdjudicated()
     {
-        using var repo = Build025();
         // The committed map: not yet adjudicated, whatever the record says.
-        AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
+        using (var repo = Build025())
+            AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
         // Marking it adjudicated is not enough while its contract packet is a format the gate cannot read.
         var map = GateRepo.CommittedMap();
         Entry(map, "0.25.x")["status"] = "adjudicated";
-        AssertCodes(repo.RunWithMap(map, repo.AllSurfaces()), "G016");
-        // With no record at the mapped path, the identity names nothing.
-        var identity = $"calor-adjudication:v1:{repo.Candidate}:{repo.RecordSha}";
-        AssertCodes(repo.RunWithMap(map, "--identity", identity), "G004");
+        using (var repo = Build025(map.ToJsonString()))
+        {
+            AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
+            // With no record at the mapped path (the candidate commit), the identity names nothing.
+            var identity = $"calor-adjudication:v1:{repo.Candidate}:{repo.RecordSha}";
+            AssertCodes(repo.Run(new[] { "--identity", identity }, includeIdentity: false), "G004");
+        }
     }
 
     [Fact]
@@ -139,12 +142,12 @@ public class ReleaseAdjudicationMapTests
     {
         // Positive control for the generalization: the same gate, with a map entry for 0.25.x
         // whose packet is a format it checks, passes a 0.25.0 record at #1430's path.
-        using var repo = Build025();
         var map = GateRepo.CommittedMap();
         var entry = Entry(map, "0.25.x");
         entry["status"] = "adjudicated";
         entry["contractPacket"] = Entry(map, "0.24.0")["contractPacket"]!.DeepClone();
-        var (code, output) = repo.RunWithMap(map, repo.AllSurfaces());
+        using var repo = Build025(map.ToJsonString());
+        var (code, output) = repo.Run(repo.AllSurfaces());
         Assert.True(code == 0, output);
         Assert.Contains("version=0.25.0", output);
     }
@@ -162,9 +165,12 @@ public class ReleaseAdjudicationMapTests
     [InlineData("parent path")]
     [InlineData("unknown status")]
     [InlineData("shared record path")]
+    [InlineData("duplicate status member")]
+    [InlineData("duplicate packet member")]
+    [InlineData("not JSON")]
+    [InlineData("missing")]
     public void MalformedMapFails(string defect)
     {
-        using var repo = GateRepo.Build();
         var map = GateRepo.CommittedMap();
         var e024 = Entry(map, "0.24.0");
         var e025 = Entry(map, "0.25.x");
@@ -179,12 +185,32 @@ public class ReleaseAdjudicationMapTests
             case "unknown status": e024["status"] = "assumed"; break;
             case "shared record path": e025["terminalRecord"] = RecordPath; break;
         }
-        AssertCodes(repo.RunWithMap(map, repo.AllSurfaces()), "G016");
+        var text = map.ToJsonString();
+        // Codex round 1: JSON duplicate members must not silently pick the last value.
+        text = defect switch
+        {
+            "duplicate status member" => text.Replace("\"status\":\"adjudicated\"", "\"status\":\"not-yet-adjudicated\",\"status\":\"adjudicated\""),
+            "duplicate packet member" => text.Replace("\"format\":\"calor.evidence-contract-packet/1407\"",
+                "\"format\":\"calor.v0.25-interop-scope/1\",\"format\":\"calor.evidence-contract-packet/1407\""),
+            "not JSON" => text[..^1],
+            "missing" => "",
+            _ => text,
+        };
+        using var repo = GateRepo.Build(map: text);
+        if (defect == "missing")
+        {
+            repo.Git("checkout", "-q", repo.Adjudication);
+            repo.Git("rm", "-q", GateRepo.MapFile);
+            repo.Git("commit", "-q", "-m", "drop the map");
+            repo.Git("update-ref", "refs/remotes/origin/main", "HEAD");
+            repo.Git("checkout", "-q", "--detach", repo.Candidate);
+        }
+        AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
     }
 
-    private static GateRepo Build025() => GateRepo.Build(
+    private static GateRepo Build025(string? map = null) => GateRepo.Build(
         version: "0.25.0", recordPath: Record025, issue: 1430, registryPath: Registry025,
-        website: "<p>Calor 0.25.0</p>");
+        website: "<p>Calor 0.25.0</p>", map: map);
 
     private static JsonObject Entry(JsonObject map, string version) =>
         map["releases"]!.AsArray().Single(e => e!["version"]!.GetValue<string>() == version)!.AsObject();

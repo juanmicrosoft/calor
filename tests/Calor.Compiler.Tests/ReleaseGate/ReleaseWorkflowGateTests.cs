@@ -108,9 +108,6 @@ public class ReleaseWorkflowGateTests
         var checkout = text.IndexOf("git checkout -q --detach \"$CANDIDATE\"", StringComparison.Ordinal);
         var copy = text.IndexOf("cp scripts/verify_release_adjudication.py \"$RUNNER_TEMP/main-gate/scripts/", StringComparison.Ordinal);
         Assert.True(copy > 0 && copy < checkout, $"copy {copy}, checkout {checkout}");
-        // #1567: main's copy of the gate needs main's release map beside it.
-        var map = text.IndexOf("cp eng/release-adjudication-map.json \"$RUNNER_TEMP/main-gate/eng/release-adjudication-map.json\"", StringComparison.Ordinal);
-        Assert.True(map > 0 && map < checkout, $"map copy {map}, checkout {checkout}");
         Assert.DoesNotMatch(new Regex(@"(?m)^\s+python3 scripts/verify_release_adjudication\.py"), text[checkout..]);
     }
 

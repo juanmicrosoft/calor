@@ -46,7 +46,8 @@ internal sealed class GateRepo : IDisposable
         string version = ReleaseVersion,
         string recordPath = RecordPath,
         int issue = 1408,
-        string registryPath = RegistryPath)
+        string registryPath = RegistryPath,
+        string? map = null)
     {
         var baseDir = Path.Combine(Path.GetTempPath(), "calor-r2-" + Guid.NewGuid().ToString("N")[..12]);
         var repo = new GateRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch"), Version = version };
@@ -162,6 +163,8 @@ internal sealed class GateRepo : IDisposable
         var recordBytes = Encoding.UTF8.GetBytes(recordNode.ToJsonString());
         repo.Write(recordPath, Encoding.UTF8.GetString(recordBytes));
         repo.RecordSha = Sha(recordBytes);
+        // #1567: the gate reads the release map from fetched main, which here is the adjudication commit.
+        repo.Write(MapFile, map ?? File.ReadAllText(Path.Combine(source, MapFile)));
         repo.Adjudication = repo.Commit("adjudication");
         repo.Git("update-ref", "refs/remotes/origin/main", repo.Adjudication);
         repo.Git("checkout", "-q", "--detach", repo.Candidate);
@@ -179,28 +182,14 @@ internal sealed class GateRepo : IDisposable
         "--release-title", "v" + Version,
     };
 
-    /// <summary>
-    /// #1567: runs a copy of the gate that reads <paramref name="map"/> as its adjudication map. The
-    /// gate reads the map only from beside itself (there is no flag), so the copy and the map go in
-    /// a scratch tree laid out like the repository.
-    /// </summary>
-    public (int Code, string Output) RunWithMap(JsonNode map, params string[] args)
-    {
-        var home = Path.Combine(Scratch, "gate-" + Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(Path.Combine(home, "scripts"));
-        Directory.CreateDirectory(Path.Combine(home, "eng"));
-        var script = Path.Combine(home, "scripts", "verify_release_adjudication.py");
-        File.Copy(Path.Combine(RepoRoot(), "scripts", "verify_release_adjudication.py"), script);
-        File.WriteAllText(Path.Combine(home, "eng", "release-adjudication-map.json"), map.ToJsonString());
-        return Run(args, script: script);
-    }
+    public const string MapFile = "eng/release-adjudication-map.json";
 
     public static JsonObject CommittedMap() =>
-        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "eng", "release-adjudication-map.json")))!.AsObject();
+        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), MapFile)))!.AsObject();
 
-    public (int Code, string Output) Run(string[] args, bool includeIdentity = true, bool includeRepo = true, string? script = null)
+    public (int Code, string Output) Run(string[] args, bool includeIdentity = true, bool includeRepo = true)
     {
-        var all = new List<string> { script ?? Path.Combine(RepoRoot(), "scripts", "verify_release_adjudication.py") };
+        var all = new List<string> { Path.Combine(RepoRoot(), "scripts", "verify_release_adjudication.py") };
         if (includeIdentity) all.AddRange(new[] { "--identity", Identity });
         if (includeRepo) all.AddRange(new[] { "--repo", Root });
         all.AddRange(args);

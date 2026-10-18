@@ -285,9 +285,11 @@ class CredentialCheckTests(unittest.TestCase):
         path.write_text(path.read_text(encoding="utf-8") + "\n  broken: [\n", encoding="utf-8")
         self.assert_codes({"W012"})
 
-    def test_non_default_collection_tags_are_open(self) -> None:
-        # #1567 (the #1565 verification pass): `!!set` and other explicit collection tags are not
-        # built by the strict mapping constructor, so a duplicate key under one would go unseen.
+    def test_explicit_yaml_tags_are_open(self) -> None:
+        # #1567 (the #1565 verification pass): `!!set` and other tagged collections are not built
+        # by the strict mapping constructor, so a duplicate key under one would go unseen. Codex
+        # round 1: a tagged scalar can erase the text the checks look for (`!!null` turns the
+        # secret reference into None). Any explicit tag, on any node, is W012.
         marker = "  benchmark:\n    runs-on: ubuntu-latest\n"
         for injected in (
             "    environment: !!set\n      ? nuget-release\n      ? nuget-release\n",
@@ -296,6 +298,13 @@ class CredentialCheckTests(unittest.TestCase):
             "    steps2: !!pairs\n      - a: 1\n",
             "    env: !local\n      K: v\n",
             "    env: !!python/dict\n      K: v\n",
+            "    env2: !!map\n      K: v\n",
+            "    outputs2: !!seq [a]\n",
+            '    env: {K: !!null "${{ secrets.NUGET_RELEASE_API_KEY }}"}\n',
+            '    env:\n      K: !!binary "JHt7IHNlY3JldHMuTlVHRVRfUkVMRUFTRV9BUElfS0VZIH19"\n',
+            "    env:\n      !!str K: v\n",
+            "    env:\n      K: ! v\n",
+            "    timeout-minutes: !!int 30\n",
         ):
             with self.subTest(injected=injected):
                 fixture = Fixture()
@@ -309,11 +318,10 @@ class CredentialCheckTests(unittest.TestCase):
                 finally:
                     self.f = saved
                     shutil.rmtree(fixture.base, ignore_errors=True)
-        # The default tags written out are still parsed and checked as ordinary collections.
+        # The same keys untagged pass, so the cases above fail on the tag alone.
         path = self.f.workflow("benchmark.yml")
         text = path.read_text(encoding="utf-8")
-        path.write_text(text.replace(marker, marker + "    env2: !!map\n      K: v\n    outputs2: !!seq [a]\n"),
-                        encoding="utf-8")
+        path.write_text(text.replace(marker, marker + "    env2:\n      K: v\n    outputs2: [a]\n"), encoding="utf-8")
         code, out = self.f.run()
         self.assertEqual(0, code, out)
 

@@ -11,8 +11,8 @@ identity:
 The identity names a terminal record committed in a commit on protected main, and
 the SHA-256 of that blob's exact bytes. Which A1 issue, record path, contract packet,
 and claim registry apply to a release comes from the committed, reviewed map
-eng/release-adjudication-map.json (MAP_PATH), read from beside this script, never from
-the checkout being published (#1567). The script exits 0 only when the record is the
+eng/release-adjudication-map.json (MAP_FILE), read from fetched protected main, never
+from the checkout being published (#1567). The script exits 0 only when the record is the
 one named and sits at the path the map gives its version, the map marks that release
 adjudicated, the record is a successful adjudication under the release's frozen
 contract (0.24.0: #1408 under #1407), the checkout being published is
@@ -43,8 +43,9 @@ import zipfile
 from pathlib import Path
 
 # #1567: the per-release A1 issue, record path, contract packet, and claim registry live in this
-# map, beside the gate (benchmark.yml copies both), so the checkout being published cannot change it.
-MAP_PATH = Path(__file__).resolve().parent.parent / "eng" / "release-adjudication-map.json"
+# map. It is read from fetched protected main (MAIN_REF), so the checkout being published, which
+# may be a candidate frozen before its A1 record and map change landed, cannot change it.
+MAP_FILE = "eng/release-adjudication-map.json"
 MAP_SCHEMA = "calor.release-adjudication-map/1"
 ADJUDICATED, NOT_YET_ADJUDICATED = "adjudicated", "not-yet-adjudicated"
 # The only contract-packet format this gate checks: #1407's contract.json, artifact-inventory.json,
@@ -106,17 +107,31 @@ def _issue(value: object, what: str) -> int:
     return value
 
 
-def load_map(path: Path = MAP_PATH) -> list[dict]:
-    """The release entries of the adjudication map, validated strictly. Raises MapError."""
+def _unique_members(pairs: list[tuple[str, object]]) -> dict:
+    keys = [k for k, _ in pairs]
+    if len(set(keys)) != len(keys):
+        raise MapError(f"duplicate JSON member(s) {sorted({k for k in keys if keys.count(k) > 1})}")
+    return dict(pairs)
+
+
+def load_map(gate: Gate) -> list[dict]:
+    """The release entries of the map at fetched protected main, validated strictly. Raises MapError."""
+    raw = gate.blob(MAIN_REF, MAP_FILE)
+    if raw is None:
+        raise MapError(f"no {MAP_FILE} at {MAIN_REF}")
+    return parse_map(raw)
+
+
+def parse_map(raw: bytes) -> list[dict]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise MapError(f"cannot read {path.name}: {error}") from error
+        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_members)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise MapError(f"{MAP_FILE} is not valid JSON: {error}") from error
     if not isinstance(data, dict) or data.get("schema") != MAP_SCHEMA:
-        raise MapError(f"{path.name} schema must be {MAP_SCHEMA}")
+        raise MapError(f"{MAP_FILE} schema must be {MAP_SCHEMA}")
     entries = data.get("releases")
     if not isinstance(entries, list) or not entries:
-        raise MapError(f"{path.name} lists no releases")
+        raise MapError(f"{MAP_FILE} lists no releases")
     keys: set[str] = set()
     records: set[str] = set()
     for entry in entries:
@@ -296,7 +311,7 @@ def scan_text(gate: Gate, label: str, text: str) -> None:
         gate.fail("G012", f"{label}: forbidden wording '{hit}'; release evidence is not independently adjudicated")
 
 
-def load_record(gate: Gate, identity: str, entries: list[dict]) -> tuple[str, dict, dict] | None:
+def load_record(gate: Gate, identity: str) -> tuple[str, dict, dict, list[dict]] | None:
     match = IDENTITY_RE.match(identity)
     if not match:
         gate.fail("G001", "adjudication identity must be calor-adjudication:v1:<40-hex commit>:<64-hex sha256>")
@@ -315,6 +330,7 @@ def load_record(gate: Gate, identity: str, entries: list[dict]) -> tuple[str, di
     if not gate.is_ancestor(commit, MAIN_REF):
         gate.fail("G003", f"adjudication commit {commit} is not on protected main")
         return None
+    entries = load_map(gate)
 
     # #1567: the record is the blob, at one of the map's terminal-record paths, that the identity
     # hashes. Its release entry then decides everything else the gate reads.
@@ -322,7 +338,7 @@ def load_record(gate: Gate, identity: str, entries: list[dict]) -> tuple[str, di
     present = {path: pair for path, pair in present.items() if pair[1] is not None}
     named = [pair for pair in present.values() if sha256(pair[1]) == digest]
     if not present:
-        gate.fail("G004", f"no terminal record at {commit} under any path in {MAP_PATH.name}: "
+        gate.fail("G004", f"no terminal record at {commit} under any path in {MAP_FILE}: "
                           f"{sorted(e['terminalRecord'] for e in entries)}")
         return None
     if not named:
@@ -335,7 +351,7 @@ def load_record(gate: Gate, identity: str, entries: list[dict]) -> tuple[str, di
     entry, data = named[0]
     if entry["status"] != ADJUDICATED:
         gate.fail("G016", f"release {entry['version']} (#{entry['a1Issue']}) is {entry['status']} in "
-                          f"{MAP_PATH.name}; no identity passes until a reviewed change marks it {ADJUDICATED}")
+                          f"{MAP_FILE}; no identity passes until a reviewed change marks it {ADJUDICATED}")
         return None
     packet = entry["contractPacket"]
     if packet["format"] != PACKET_FORMAT_1407 or packet["inventory"] is None:
@@ -355,12 +371,12 @@ def load_record(gate: Gate, identity: str, entries: list[dict]) -> tuple[str, di
     if isinstance(version, str) and VERSION_RE.match(version):  # otherwise G009 reports it
         resolved = map_entry(entries, version)
         if resolved is None:
-            gate.fail("G009", f"candidate version {version} is not in {MAP_PATH.name}; no release is mapped for it")
+            gate.fail("G009", f"candidate version {version} is not in {MAP_FILE}; no release is mapped for it")
         elif resolved is not entry:
             gate.fail("G016", f"the record at {entry['terminalRecord']} adjudicates {version}, which "
-                              f"{MAP_PATH.name} maps to release {resolved['version']}, not {entry['version']}")
+                              f"{MAP_FILE} maps to release {resolved['version']}, not {entry['version']}")
             return None
-    return commit, record, entry
+    return commit, record, entry, entries
 
 
 def check_contract(gate: Gate, commit: str, record: dict, entry: dict) -> tuple[dict, dict] | None:
@@ -401,7 +417,7 @@ def claim_registry(gate: Gate, commit: str, record: dict, entry: dict) -> set[st
     ref = record.get("claimRegistry")
     if not isinstance(ref, dict) or ref.get("path") != entry["claimRegistry"]:
         gate.fail("G008", f"record must name the claim registry {entry['claimRegistry']} that "
-                          f"{MAP_PATH.name} gives release {entry['version']}")
+                          f"{MAP_FILE} gives release {entry['version']}")
         return set()
     blob = gate.blob(commit, str(ref.get("path")))
     if blob is None or sha256(blob) != ref.get("sha256"):
@@ -670,12 +686,11 @@ def run(args: argparse.Namespace) -> int:
     gate = Gate(Path(args.repo).resolve())
     outputs: dict[str, str] = {}
     try:
-        entries = load_map()
-        if args.version is not None and map_entry(entries, args.version) is None:
-            gate.fail("G009", f"requested version {args.version} is not in {MAP_PATH.name}")
-        loaded = load_record(gate, args.identity.strip(), entries)
+        loaded = load_record(gate, args.identity.strip())
         if loaded:
-            commit, record, entry = loaded
+            commit, record, entry, entries = loaded
+            if args.version is not None and map_entry(entries, args.version) is None:
+                gate.fail("G009", f"requested version {args.version} is not in {MAP_FILE}")
             packet = check_contract(gate, commit, record, entry)
             if packet:
                 check_terminal(gate, commit, record, entry, *packet)
@@ -686,7 +701,7 @@ def run(args: argparse.Namespace) -> int:
                 outputs = {"candidate": cand, "version": version, "tag": f"v{version}",
                            "prerelease": "true" if version.startswith("0.") or "-" in version else "false"}
     except MapError as error:
-        gate.fail("G016", f"{MAP_PATH.name}: {error}")
+        gate.fail("G016", f"{MAP_FILE}: {error}")
     except Exception as error:  # noqa: BLE001 - any failure to verify is a failed gate
         gate.fail("G000", f"gate could not complete: {error}")
 

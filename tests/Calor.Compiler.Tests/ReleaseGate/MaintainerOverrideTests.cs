@@ -392,6 +392,8 @@ public class MaintainerOverrideTests
             if (writeRecord) repo.Write(RecordPath, Encoding.UTF8.GetString(recordBytes));
             if (writeOverride) repo.Write(OverridePath, Encoding.UTF8.GetString(overrideBytes));
             repo.Write("Directory.Build.props", $"<Project><PropertyGroup><Version>{propsVersion}</Version></PropertyGroup></Project>\n");
+            // #1567: the override's record and terminal-record paths come from the map at fetched main.
+            repo.Write(GateRepo.MapFile, File.ReadAllText(Path.Combine(RepoRoot(), GateRepo.MapFile)));
             repo.Write("CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n" + notes + "\n## [0.22.0] - 2026-09-15\n\nOld.\n");
             repo.Candidate = repo.Commit("candidate");
             repo.Git("update-ref", "refs/remotes/origin/main", repo.Candidate);
