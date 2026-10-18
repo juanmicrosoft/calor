@@ -1,0 +1,13 @@
+tokens used
+117,817
+VERDICT: REQUEST-CHANGES
+
+- **MAJOR — scripts/check_release_credentials.py:108,161:** The scan still reports false `CLOSED` results. I injected another job with `environment: NUGET-RELEASE` and `${{ secrets.nuget_release_api_key }}`; the simulated live check returned `CLOSED`. GitHub treats [environment names](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments#creating-an-environment) and [secret references](https://docs.github.com/en/actions/reference/security/secrets#naming-your-secrets) as case insensitive. YAML `"nuget-\u0072elease"` also escapes detection. **Fix:** parse and decode YAML scalars, compare names without case sensitivity, and reject unsupported forms conservatively. Add these mutations to the Python tests and `ReleaseWorkflowGateTests`.
+
+- **MINOR — scripts/check_release_credentials.py:155:** The round 1 guard check accepts quoted YAML keys. Adding `"if": false` or `"continue-on-error": true` to the first step still produces no violations, although GitHub skips the guard or ignores its failure. **Fix:** inspect parsed step properties and add both negative controls.
+
+- **MINOR — docs/plans/evidence/release-gaps-0.25/README.md:18:** Deleting tags is presented as sufficient remediation. Existing runs can rerun using their original SHA/ref, and branch copies can still request the repository secret. [GitHub rerun behavior](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs) preserves the original SHA/ref. **Fix:** remove tag deletion as a sufficient alternative; retain credential removal/scoping and old-key revocation.
+
+The pagination fix and queued-run note check out. The committed guard executes first and fails closed. I found no bypass of the 0.24.0 pin across the named workflows.
+
+Validation used read-only, in-memory mutations and targeted checks; full test suites were not run.

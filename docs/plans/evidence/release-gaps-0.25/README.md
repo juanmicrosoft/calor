@@ -1,12 +1,192 @@
-# 0.25: closing the release-gate gaps 0.24 left open (#1546, #1547)
+# 0.25: closing the release-gate gaps 0.24 left open (#1545–#1548)
 
 **Maintainer decision (2026-10-18):** 0.25 re-proves 0.24's checks on its own candidate, and the
 0.24 gaps (#1545–#1547) close before 0.25's acceptance. The goal is that 0.25 releases through the
 #1410 gate (`scripts/verify_release_adjudication.py`), not through an override.
 
-This PR covers #1546 and #1547. #1545 and the override part of #1548 are on branch
-`milestone-0.25/release-gaps-1545-1548`, which stopped at its review budget
-(`reviews/pr-a-*` on that branch). Reviews for this PR: `reviews/pr-b-*`.
+Delivery: two PRs.
+
+- PR A covers #1545 and part of #1548. Reviews: `reviews/pr-a-*`. It runs under exception
+  EXC-RELEASE-GAPS-A-CHECKER (below).
+- PR B, #1563 (merged), covers #1546 and #1547. Reviews: `reviews/pr-b-*`.
+
+## #1545: older tags can read the NuGet key
+
+**Gap.** Every older tag holds a `publish-nuget.yml` without the adjudication gate. That file reads
+the repository secret `NUGET_API_KEY`, and `workflow_dispatch --ref v0.9.0` or `gh run rerun`
+runs it. A workflow file in an existing tag cannot be edited.
+
+**Why there is no code-only fix.** A tag's workflow file is fixed git content. Nothing committed
+to `main` can change what an older file reads. The key leaves those files only when the key itself
+changes: the repository secret is deleted and the key lives only in an environment that older
+files never enter, and the old key is revoked on nuget.org. These are repository and nuget.org
+actions. Deleting tags is not enough: a rerun replays the original commit and ref, and any branch
+copy of an old workflow can still ask for the repository secret. Code can do only the half that
+`main` controls, and PR A does that.
+
+**Design (code half, PR A).**
+
+- The `publish` job in `publish-nuget.yml` declares `environment: nuget-release`.
+- It reads the key as `secrets.NUGET_RELEASE_API_KEY`, a name no older workflow uses. Its first
+  step fails the job when the key is empty, so the job stops before it packs, attests, or pushes.
+- The key reaches `dotnet nuget push` through `env:`. It is no longer interpolated into the
+  script.
+- `scripts/check_release_credentials.py` is a read-only check, with tests in
+  `scripts/test_check_release_credentials.py` and
+  `ReleaseWorkflowGateTests.NugetKeyIsReachableOnlyThroughTheMainOnlyEnvironment`.
+  - With no options, it checks only the workflows. No workflow may name `NUGET_API_KEY`. Only the
+    `publish` job may name the new key or enter `nuget-release`.
+  - With `--live`, it also reads the settings through `gh api --method GET`. No NuGet secret may
+    exist at repository level. The environment must exist, with admin bypass off. Its deployment
+    policy must be "selected branches and tags" with exactly one rule, branch `main`. It must hold
+    `NUGET_RELEASE_API_KEY`.
+  - It exits 0 only when the result is `CLOSED`. A setting it cannot read, or a list whose
+    entries do not add up to its `total_count`, is `UNKNOWN`, never `CLOSED`. It reads every page.
+  - The workflow scan does not parse YAML, so it accepts only what it recognizes. The publish
+    job's environment must be exactly `    environment: nuget-release`. Every other environment
+    declaration must match an allowlist verbatim (today only the `github-pages` deploy). Anything
+    else fails, including:
+    - case changes, YAML escapes (`\u0065`, or escaped line breaks), and quoted keys;
+    - flow mappings, complex keys (`? environment`), flow-style jobs, and anchors;
+    - expressions;
+    - any job-level `uses` key other than a one-line local call,
+      `uses: ./.github/workflows/<file>.yml`. A call to another repository, a folded `uses: >-`
+      value, and a quoted, escaped, or flow-style `uses` key all fail (`W011`).
+
+    Mentions of the key outside the publish job fail in any case or escape. The publish job's
+    first step must match the committed guard text exactly, so an added `if`, an uncalled shell
+    function, or `exit 0` fails.
+
+### Exception EXC-RELEASE-GAPS-A-CHECKER (@juanmicrosoft, 2026-10-18)
+
+PR A spent its review budget: 3 rounds plus 1 verification pass. The verification pass left one
+MAJOR finding: a folded `uses: >-` call or a quoted `"uses"` key got past `W011`. The maintainer
+granted one fix plus one verification-only Codex pass.
+
+- **The fix:** any job-level `uses` key, in any quoting, case, or escape, fails unless its value
+  on the same line is a local `./.github/workflows/` path.
+- **Tests:** folded, quoted, and flow-style calls fail. A one-line local call is accepted.
+- **The pass:** if it reports anything BLOCKING or MAJOR, PR A stops. Record:
+  `reviews/pr-a-exception-verification-codex.md`.
+
+**Behavior until the maintainer acts.** GitHub creates an environment named in a workflow on its
+first use, with no rules. A publish dispatched before the setup below therefore creates a bare
+`nuget-release` and runs the job. The job finds no `NUGET_RELEASE_API_KEY` and fails at its first
+step. The repository `NUGET_API_KEY` stays readable by older tags until step 4 below. The check
+then reports `S003`/`S004` for the auto-created environment.
+
+**State on 2026-10-18** (`python3 scripts/check_release_credentials.py --live`, read-only):
+`OPEN`. It reported `S001` (the repository-level `NUGET_API_KEY` exists) and `S002` (no
+`nuget-release` environment).
+
+### Maintainer steps (repository settings; an agent must not do these)
+
+Do them in this order. Publishing fails closed until step 3 is done. Older tags lose the key at
+step 4.
+
+1. **Create a new NuGet key** on nuget.org: *API Keys → Create*.
+   - Key name: `calor-release` (any name works).
+   - Expiration: 365 days or less.
+   - Scopes: *Push → Push new packages and package versions*.
+   - Packages: select `calor` and `Calor.Sdk`, or use the glob `calor*`.
+   - Copy the key. A new key is used because the old one was readable by every ref.
+2. **Create the environment.** In GitHub, open *Settings → Environments → New environment* and
+   name it `nuget-release`.
+   - *Deployment branches and tags*: choose **Selected branches and tags**. Add one rule:
+     *Ref type* **Branch**, *Name pattern* `main`. Add no tag rule.
+   - *Allow administrators to bypass configured protection rules*: **off**.
+   - *Required reviewers* (recommended): add `@juanmicrosoft` and leave *Prevent self-review*
+     off. Each publish then waits for one approval click after the test jobs pass.
+3. **Store the key in the environment.** On the `nuget-release` page, open *Environment secrets →
+   Add environment secret*. Name it `NUGET_RELEASE_API_KEY` and paste the value from step 1. Do
+   not add it as a repository secret.
+4. **Delete the repository secret.** Open *Settings → Secrets and variables → Actions →
+   Repository secrets* and delete `NUGET_API_KEY`.
+5. **Revoke the old key** on nuget.org: *API Keys*, the key that was in `NUGET_API_KEY` →
+   *Delete*. Actions reads a secret when a run is queued, so a run queued before step 4 can still
+   hold the old value. Revocation is what ends that. The check in step 6 cannot see nuget.org, so
+   it cannot confirm this step.
+6. **Check:** `python3 scripts/check_release_credentials.py --live`. Run it with your own `gh`
+   login, because listing secrets needs admin rights. It must print
+   `RELEASE CREDENTIALS: CLOSED`. Each code it can print means one thing to fix:
+   - `S001`: a repository-level secret whose name contains `NUGET` still exists (step 4).
+   - `S002`: the environment is missing (step 2).
+   - `S003`: admin bypass is on (step 2).
+   - `S004`: the deployment policy is not *Selected branches and tags* (step 2).
+   - `S005`: the policy's rules are not exactly branch `main` (step 2).
+   - `S006`: the environment has no `NUGET_RELEASE_API_KEY` (step 3).
+   - `U00x`: a setting could not be read; rerun with an admin login.
+   - `W0xx`: a workflow on this checkout breaks the rules above.
+7. **Actions permissions, for #1547's residual.** Older refs' benchmark workflows can still push
+   a branch and open a PR with `GITHUB_TOKEN`. Open *Settings → Actions → General → Workflow
+   permissions*:
+   - Choose **Read repository contents and packages permissions**. Workflows without a
+     `permissions:` block then get a read-only token.
+   - Turn **off** *Allow GitHub Actions to create and approve pull requests*. No workflow, old or
+     current, can then open a PR with `GITHUB_TOKEN`.
+
+   Effect on the current code: `benchmark.yml`'s gated publishing step (a dispatch with
+   `publish_results=true` and an approving record) still pushes its verified
+   `benchmark-results-v<version>` branch. It then fails at `gh pr create`, which marks the job
+   red. Open that PR by hand from the pushed branch. No script checks this setting:
+   `check_release_credentials.py` does not read it. An older workflow that declares
+   `contents: write` can still push a branch. Only the optional ruleset in the #1547 section
+   below stops that.
+
+The same settings through the CLI, as an alternative to steps 2–4 and 7. The maintainer runs
+these, never an agent:
+
+```bash
+gh api -X PUT repos/juanmicrosoft/calor/environments/nuget-release --input - <<'EOF'
+{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true},
+ "can_admins_bypass": false}
+EOF
+gh api -X POST repos/juanmicrosoft/calor/environments/nuget-release/deployment-branch-policies \
+  -f name=main -f type=branch
+gh secret set NUGET_RELEASE_API_KEY --env nuget-release --repo juanmicrosoft/calor   # prompts for the value
+gh secret delete NUGET_API_KEY --repo juanmicrosoft/calor
+gh api -X PUT repos/juanmicrosoft/calor/actions/permissions/workflow \
+  -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
+```
+
+`can_approve_pull_request_reviews=false` is the API name of the *create and approve pull
+requests* checkbox.
+
+**What this does not cover.**
+
+- Someone with write access can push straight to `main` unless branch protection stops them
+  (`release-gate.md` §5 item 2).
+- An administrator can change any of these settings.
+- Older tags can still create GitHub releases with `GITHUB_TOKEN`. `release-audit.yml` flags
+  them, and a `v*` tag ruleset (§5 item 4) narrows that path.
+- A stronger option for later is nuget.org *Trusted Publishing*, which uses GitHub OIDC and
+  stores no key. Its policy must name the `nuget-release` environment, because older tags use the
+  same workflow file name.
+
+## #1548 (part): the maintainer override is pinned to 0.24.0
+
+0.24.0 shipped through a recorded maintainer override (#1544). The override's check,
+`scripts/verify_maintainer_override.py`, used to accept whatever version the committed override
+record named. A record edited or added for another version, at a commit on `main`, would have
+reopened the override.
+
+- The script now declares `OVERRIDE_VERSION = "0.24.0"`. Any other well-formed version fails with
+  `O014`, both in mode selection (`--select-mode`, which every override workflow runs first) and
+  in the check itself. This holds whatever the committed records say. Reopening the override now
+  takes a reviewed change to the script on `main`.
+- The mode stays, because the 0.24.0 release (its body trailer, `release-audit.yml`, and
+  `verify-release.yml`) refers to it. 0.24.0 is already on nuget.org, and the existing
+  registry-comparison step means an override run can only republish byte-identical packages.
+- Tests (`MaintainerOverrideTests`):
+  - `ModeSelectionRefusesTheOverrideForAnyOtherVersion` (3 cases);
+  - `OverrideForAnyOtherVersionFailsEvenWithAMatchingCommittedRecord` (2), where every committed
+    fact agrees with the other version;
+  - `TheOverrideVersionIsPinnedInTheScriptNotOnlyInTheRecord`.
+- `CommittedOverrideRecordMatchesTheRepository` is now pinned to 0.24.0 instead of reading the
+  version from `Directory.Build.props`. Without that, the 0.25 version bump would have failed it.
+
+Out of scope here, with recommendations in the PR report: SDK pinning, Google Fonts, and the
+review-round ceilings.
 
 ## #1546: the release PR could not consume an identity
 
@@ -80,11 +260,13 @@ takes repository settings, which the maintainer owns:
 
 - *Settings → Actions → General → Workflow permissions*: set **Read repository contents and
   packages permissions**, and turn **off** *Allow GitHub Actions to create and approve pull
-  requests*. Older workflows that declare `contents: write` still get it, but none can open a PR.
-  The gated publishing step on `main` would then push its verified branch, and the maintainer
-  opens the PR by hand, which suits a separately approved action.
-- A branch ruleset on `benchmark-results*` that restricts creation, so an older workflow cannot
-  push that branch.
+  requests* (maintainer step 7 in the #1545 section). Older workflows that declare
+  `contents: write` still get it and can push a branch, but none can open a PR. The gated
+  publishing step on `main` still pushes its verified branch, then fails at `gh pr create`. The
+  maintainer opens that PR by hand, which suits a separately approved action.
+- Optionally, a branch ruleset on `benchmark-results*` that restricts creation. It stops older
+  workflows from pushing those branches. It also stops the gated step unless the ruleset's bypass
+  list allows it, and in that case publication becomes a fully manual branch push.
 
 Until then, the guarantee is: **no workflow on `main` publishes benchmark results without both
 locks.**

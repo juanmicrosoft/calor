@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Maintainer-override release check for Calor 0.24.0 (ungated; outside the #1410 gate).
+"""Maintainer-override release check for Calor 0.24.0 only (ungated; outside the #1410 gate).
 
 The #1408 terminal record is MILESTONE-FAILED, so no successful adjudication identity exists and
 scripts/verify_release_adjudication.py (the #1410 gate) refuses every 0.24.0 surface. On
@@ -7,7 +7,9 @@ scripts/verify_release_adjudication.py (the #1410 gate) refuses every 0.24.0 sur
 is the check for that override. It does not adjudicate anything and does not change the gate.
 
 It runs only when a dispatch passes `maintainer_override: <version>` and no adjudication identity
-(`--select-mode` enforces exactly one of the two). It passes only when:
+(`--select-mode` enforces exactly one of the two). Any version but OVERRIDE_VERSION (0.24.0) fails
+with O014, in mode selection and in the check, whatever the committed records say (#1548). It
+passes only when:
 
   * the candidate commit is on fetched protected main and declares <Version>VERSION</Version>;
   * the candidate contains OVERRIDE_PATH, naming VERSION, `gated: false`, the maintainer's
@@ -40,6 +42,12 @@ from xml.etree import ElementTree
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verify_release_adjudication as r2  # noqa: E402  (the #1410 gate; reused, not changed)
 
+# #1548: the override exists for 0.24.0 alone. Every other version must release through the #1410
+# gate. The restriction lives here, in the script main runs, not in the committed record, so a
+# record edited (or added) for another version cannot reopen the override; changing it takes a
+# reviewed change to this file. 0.24.0 is already on nuget.org, so the override can only
+# re-verify or re-deploy those bytes.
+OVERRIDE_VERSION = "0.24.0"
 OVERRIDE_PATH = "docs/plans/evidence/adjudication-1408/maintainer-override.json"
 OVERRIDE_SCHEMA = "calor.maintainer-override/1"
 AUTHORIZATION = "I authorize changing the release gate"
@@ -54,7 +62,14 @@ def select_mode(identity: str, override: str) -> tuple[str | None, str | None]:
         return None, "O001: both adjudication_identity and maintainer_override were given; pass exactly one"
     if not identity and not override:
         return None, "O001: neither adjudication_identity nor maintainer_override was given; pass exactly one"
+    if override and VERSION_RE.match(override) and override != OVERRIDE_VERSION:
+        return None, "O014: " + closed_message(override)
     return ("identity" if identity else "override"), None
+
+
+def closed_message(version: str) -> str:
+    return (f"the maintainer override is closed to {version}; it applies to {OVERRIDE_VERSION} only. "
+            "Release through the #1410 adjudication gate")
 
 
 # One rendering for both checks: the #1410 gate's.
@@ -298,6 +313,8 @@ def run(args: argparse.Namespace) -> int:
             gate.fail("O001", "an adjudication identity was given; use scripts/verify_release_adjudication.py")
         elif not VERSION_RE.match(version):
             gate.fail("O002", f"maintainer_override must be MAJOR.MINOR.PATCH, got {version!r}")
+        elif version != OVERRIDE_VERSION:
+            gate.fail("O014", closed_message(version))  # unreachable after select_mode; kept as a second lock
         else:
             checked = check_record(gate, args, version)
             if checked:

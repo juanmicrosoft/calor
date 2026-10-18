@@ -284,6 +284,78 @@ public class ReleaseWorkflowGateTests
     }
 
     [Fact]
+    public void NugetKeyIsReachableOnlyThroughTheMainOnlyEnvironment()
+    {
+        // #1545: older tags read the repository secret NUGET_API_KEY. No workflow on main may name
+        // it; the renamed key is read only by publish-nuget's publish job, inside nuget-release, and
+        // that job's first, unconditional step fails when the key is empty. One implementation of
+        // the scan (scripts/check_release_credentials.py, mutation-tested in
+        // scripts/test_check_release_credentials.py) judges the committed workflows here.
+        var (code, output) = RunCredentialCheck(ReleaseAdjudicationGateTests.RepoRoot());
+        Assert.True(code == 0, output);
+        Assert.Contains("RELEASE CREDENTIALS: CLOSED", output);
+        var publish = Read("publish-nuget.yml");
+        Assert.Contains("    environment: nuget-release\n", publish.Replace("\r\n", "\n"));
+        Assert.Contains("--api-key \"$NUGET_RELEASE_API_KEY\"", publish);
+    }
+
+    [Theory]
+    [InlineData("    environment:\n      name: nuget-release\n")]
+    [InlineData("    environment: { name: nuget-release }\n")]
+    [InlineData("    environment: ${{ inputs.env }}\n")]
+    [InlineData("    env:\n      K: ${{ secrets['NUGET_RELEASE_API_KEY'] }}\n")]
+    [InlineData("    env:\n      K: ${{ secrets.NUGET_API_KEY }}\n")]
+    [InlineData("    environment: NUGET-RELEASE\n")]
+    [InlineData("    environment: \"nuget-\\u0072elease\"\n")]
+    [InlineData("    env:\n      K: ${{ secrets.nuget_release_api_key }}\n")]
+    [InlineData("    \"environm\\u0065nt\": nuget-release\n")]
+    [InlineData("    {environment: nuget-release}\n")]
+    [InlineData("    uses: >-\n      someone/else/.github/workflows/publish.yml@0123456789abcdef\n    secrets: inherit\n")]
+    [InlineData("    \"uses\": someone/else/.github/workflows/publish.yml@main\n")]
+    public void CredentialCheckRejectsAnotherJobReachingTheKey(string injected)
+    {
+        // Mutation control: the scan the test above relies on must see every syntax.
+        var copy = Path.Combine(Path.GetTempPath(), "calor-cred-" + Guid.NewGuid().ToString("N")[..12]);
+        try
+        {
+            var dir = Path.Combine(copy, ".github", "workflows");
+            Directory.CreateDirectory(dir);
+            foreach (var file in Directory.GetFiles(WorkflowDir(), "*.yml"))
+                File.Copy(file, Path.Combine(dir, Path.GetFileName(file)));
+            var target = Path.Combine(dir, "benchmark.yml");
+            const string marker = "  benchmark:\n    runs-on: ubuntu-latest\n";
+            var text = File.ReadAllText(target).Replace("\r\n", "\n");
+            Assert.Contains(marker, text);
+            File.WriteAllText(target, text.Replace(marker, marker + injected));
+            var (code, output) = RunCredentialCheck(copy);
+            Assert.True(code == 1, output);
+            Assert.Contains("RELEASE CREDENTIALS: OPEN", output);
+        }
+        finally
+        {
+            GateRepo.Delete(copy);
+        }
+    }
+
+    private static (int Code, string Output) RunCredentialCheck(string repo)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("python3")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        start.ArgumentList.Add(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "scripts", "check_release_credentials.py"));
+        start.ArgumentList.Add("--repo");
+        start.ArgumentList.Add(repo);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return (process.ExitCode, stdout.Result + stderr);
+    }
+
+    [Fact]
     public void PublishWorkflowHasNoVersionOverrideAndNoAssetClobber()
     {
         var text = string.Join("\n", File.ReadAllLines(Path.Combine(WorkflowDir(), "publish-nuget.yml"))

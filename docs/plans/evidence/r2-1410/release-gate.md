@@ -128,6 +128,12 @@ These are repository settings. R2 changes none of them. Recommended, in priority
    `NUGET_API_KEY` is visible to it. Moving publication credentials into environments with a
    `main`-only deployment policy (item 3) removes that authority from every older workflow version.
    Until then, the R2 gate covers the workflow files on `main` only.
+   **0.25 (#1545):** the workflow half is done. The `publish` job declares
+   `environment: nuget-release` and reads only `NUGET_RELEASE_API_KEY`, a name no older workflow
+   uses; an empty key stops the job before it packs. The settings half (create the environment,
+   store the new key there, delete the repository `NUGET_API_KEY`) is the maintainer's:
+   `docs/plans/evidence/release-gaps-0.25/README.md`. `scripts/check_release_credentials.py --live`
+   reports CLOSED only when it is done (read-only).
 2. **Branch protection on `main`:** turn on "Do not allow bypassing the above settings"
    (enforcement currently `non_admins`); add `tests (verification)` (release-critical, carries the
    #1135 oracle) to the required checks. The R2 tests run in `tests (compiler)`, which is already
@@ -135,6 +141,7 @@ These are repository settings. R2 changes none of them. Recommended, in priority
 3. **NuGet secret scope:** move `NUGET_API_KEY` from repository secrets to an environment (for
    example `nuget-release`) whose deployment policy allows only `main`, and add `environment:` to
    the `publish` job. Today any branch or tag that edits or predates `publish-nuget.yml` can read it.
+   (0.25, #1545: `environment:` added and the secret renamed; see item 1.)
 4. **Tag ruleset:** restrict creation, update, and deletion of `v*` tags to the release workflow
    (or to admins). The workflow reads the remote tag immediately before and after creating the
    release, but only a ruleset closes the remaining window.
