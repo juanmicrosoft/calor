@@ -64,10 +64,11 @@ contract in `docs/plans/v0.25-refout-contract.md` (#1427).
   modules now get through binding to effect checking.
 
 These are checked by tests that compile every case in the contract, and by convert, compile
-and run comparisons on the CLI, `calor migrate` and MCP conversion paths. Two cases stay
-open: one registered witness (`D1-LV-03`) declares a property named `i32` by mistake, so it
-cannot show the property refusal, and a struct array element's field read still needs
-`--permissive-effects`. The 0.25 scope packet records this family as in progress, not ready.
+and run comparisons on the CLI, `calor migrate` and MCP conversion paths. All 57 Calor cases
+in the contract now hold. One registered witness (`D1-LV-03`) had declared a property named
+`i32` by mistake, so it could not show the property refusal; a contract amendment corrected it,
+and it now reports `Calor0212`. One case stays open: a struct array element's field read still
+needs `--permissive-effects`. The 0.25 scope packet records this family as in progress, not ready.
 
 ### Interpolated strings keep their C# target type (#906)
 

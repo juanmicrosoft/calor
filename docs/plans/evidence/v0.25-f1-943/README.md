@@ -47,11 +47,12 @@ R0's rule) and its C# run against the original (R0 ProbeRunner). Data: `results.
 | X-INT-08 | native-or-preserved | preserved, matches | an `out var` in an interpolation hole preserves the member; never inline `§CS{}` |
 | DOC-F1-01 | native | example compiles | `website/content/syntax-reference/calls.mdx` "By-reference arguments", plus a `Calor0212` negative example; `calor self-check docs` clean |
 
-D1 registry (`contract.json`): 57 Calor cases; **56 hold**, 15 of them changed from `violates` by this
-work. **D1-LV-03 still violates**: its sealed source declares `§PROP{p1:i32:N:pub}`, a property named
-`i32` of type `N`, so `N` is undefined and only the C# compile fails. A correctly declared property
-reports `Calor0212` (`InvalidOperand_…("property")`). Fixing the registered source needs a D1
-amendment and a new seal. Of the two spec cases, D1-ANA-06 now has an executable witness
+D1 registry (`contract.json`): 57 Calor cases; **57 hold**. This work changed 15 of them from
+`violates`. The 16th, **D1-LV-03**, held only after D1 amendment 1.0.4 (2026-10-18): its sealed
+source had declared `§PROP{p1:i32:N:pub}`, a property named `i32` of type `N`, so `N` was undefined
+and only the C# compile failed. The amended source declares `§PROP{p1:N:i32:pub}` and reports
+`Calor0212`, as `InvalidOperand_…("property")` in `RefOutImplementationTests` does. No compiler change
+was needed. Of the two spec cases, D1-ANA-06 now has an executable witness
 (`DivisionByZeroChecker_DoesNotUseThePreCallValueOfARefOperand`, which discriminates in both
 directions); D1-ANA-07 stays covered by R-OBL's opacity rule for preserved C# (no new witness).
 
@@ -110,7 +111,7 @@ applicable; D1-ANA-05 keeps its two-program witness.
 
 ## Residuals for the maintainer
 
-- D1-LV-03's registered source is wrong (above); an amendment is needed for it to hold.
+- D1-LV-03's registered source was wrong (above); resolved by D1 amendment 1.0.4.
 - The opacity added by RO-DECL-1 over the corpora (+7 boundaries, +733 expressions) exceeds the
   20-boundary / 180-expression budget accepted for #1191 if that budget applies here.
 - Loop back-edges keep a narrowing across a plain `§ASSIGN x null` later in the body (no
