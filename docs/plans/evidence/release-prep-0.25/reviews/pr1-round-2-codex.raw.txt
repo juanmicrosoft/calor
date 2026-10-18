@@ -1,0 +1,9 @@
+VERDICT: APPROVE
+
+| Severity | File:line | Finding | Suggested fix |
+|---|---|---|---|
+| — | — | No actionable issues found. | — |
+
+Round 1 fixes hold. The 0.24.0 simulation reproduces G006 + 9 G008 + G009; its override still passes. Committed 0.25 entries remain fail-closed. Main-tip map semantics are documented honestly, and existing assertions are unchanged.
+
+Full test suites were not run in this read-only environment.
