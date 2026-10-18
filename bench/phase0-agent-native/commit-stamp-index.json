@@ -31,22 +31,36 @@
       "basis": "post-merge-write-back",
       "note": "#943 (0.25 F1, PR #1558): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 9b9ba79f (the F1 code head). Members whose C# out var cannot be lowered (RO-DECL-1) are now preserved instead of becoming untyped bindings that failed with Calor0250, so more modules bind: ModulesEnforced 265 -> 275 (MediatR 33 unchanged, serilog 100 -> 106, FluentValidation 132 -> 136), Calor0425 135 sites / 48 modules -> 143 / 52 over the larger enforced set, and Calor0411Sites rises with it. No previously enforced module stops. F5's completed identity (measured 3dbd108e, landed f7510f32, PR #1554) remains in the repository history.",
       "durableIdentity": {
-        "status": "pending",
-        "phase1": {
-          "headCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
+        "status": "complete",
+        "commit": "f83b4e5937a55bb1ad04e57ab2e410bf667c6232",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "src": "3b5ecf97e2adf00c3de704ce8de126a66dfcbdf2",
+          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
+          "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
+          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30",
+          "/": "a023ed5cf0f205c589ac78345c96b624b75f8114"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        },
+        "writeBack": {
+          "phase1HeadCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
           "pr": 1558,
-          "treeHashes": {
+          "phase1TreeHashes": {
             "src": "3b5ecf97e2adf00c3de704ce8de126a66dfcbdf2",
             "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
             "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
             "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
             "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
           },
-          "inputContentHashes": {
+          "phase1InputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "4e15966057a0adb3649c705d90f9378e7d230b79744708003bb459b3bdb5d265"
+          "phase1ArtifactSha256": "4e15966057a0adb3649c705d90f9378e7d230b79744708003bb459b3bdb5d265"
         }
       }
     },
@@ -56,18 +70,28 @@
       "basis": "post-merge-write-back",
       "note": "#847 (0.25 F3, converter PR): both legs regenerated on dee529b8 (the F3 converter PR head, clean src) after adding expected.calr and test.calr for the local-function D-S1.5 fixture. D-A files 948->950; its 45 early-stop identities and total demand 3123 are unchanged. D-B is unchanged. Pending until the PR lands; the previous identity (F2, #1522, measured 7b117564, completed by the #1557 write-back) remains in git history.",
       "durableIdentity": {
-        "status": "pending",
-        "phase1": {
-          "headCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
+        "status": "complete",
+        "commit": "5bbc15b6a020f88b55a41109b93a7d8322726dfc",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d",
+          "/": "276388565e96a881258c82396e2a4a03122a188e"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        },
+        "writeBack": {
+          "phase1HeadCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
           "pr": 1531,
-          "treeHashes": {
+          "phase1TreeHashes": {
             "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d"
           },
-          "inputContentHashes": {
+          "phase1InputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "78d3237937aef7295310af5189040419d556c9be8bb6ef5f35bdea50355e0ccd"
+          "phase1ArtifactSha256": "78d3237937aef7295310af5189040419d556c9be8bb6ef5f35bdea50355e0ccd"
         }
       }
     },
@@ -104,18 +128,28 @@
       "basis": "post-merge-write-back",
       "note": "#847 (0.25 F3, converter PR): regenerated on dee529b8 (the F3 converter PR head, clean src) after adding expected.calr and test.calr for the local-function D-S1.5 fixture. bench filesMeasured 386->388; bound-origin and string-origin key totals, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity (F2, #1522, measured 7b117564, completed by the #1557 write-back) remains in git history.",
       "durableIdentity": {
-        "status": "pending",
-        "phase1": {
-          "headCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
+        "status": "complete",
+        "commit": "5bbc15b6a020f88b55a41109b93a7d8322726dfc",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d",
+          "/": "276388565e96a881258c82396e2a4a03122a188e"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        },
+        "writeBack": {
+          "phase1HeadCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
           "pr": 1531,
-          "treeHashes": {
+          "phase1TreeHashes": {
             "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d"
           },
-          "inputContentHashes": {
+          "phase1InputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "25f9c9b1e8877299d22973375a76b35e639b043c5b5cbec1c0bdd145f04134d0"
+          "phase1ArtifactSha256": "25f9c9b1e8877299d22973375a76b35e639b043c5b5cbec1c0bdd145f04134d0"
         }
       }
     },
