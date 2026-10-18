@@ -236,7 +236,8 @@ public sealed class MigrationAnalyzer
             {
                 Name = "out-var",
                 // #943: the bounded D1 RO-DECL-1 lowering (see FeatureSupport "out-var").
-                Description = "Inline out declarations (out var x) lower to a mutable binding in simple statements; loop headers, " +
+                Description = "Inline out declarations (out var x) lower to a mutable binding before the statement only when the " +
+                    "statement sits directly in a block, the type is known and the name collides with nothing in scope; loop headers, " +
                     "lambdas, expression bodies and other positions stay C#",
                 Count = visitor.VarDeclarationInArgumentCount,
                 Examples = visitor.VarDeclarationInArgumentExamples

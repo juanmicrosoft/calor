@@ -850,6 +850,7 @@ public class MigrationAnalyzerTests
         Assert.Contains("convert natively", byRef.Description);
         var outVar = Assert.Single(result.UnsupportedConstructs, c => c.Name == "out-var");
         Assert.Contains("lower to a mutable binding", outVar.Description);
+        Assert.Contains("collides with nothing", outVar.Description); // RO-DECL-1 bounds, not "always"
         Assert.All(result.UnsupportedConstructs.Where(c => c.Name is "ref-parameter" or "out-var"),
             c => Assert.DoesNotContain("not yet supported", c.Description));
     }

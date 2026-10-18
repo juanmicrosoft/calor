@@ -162,11 +162,11 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
 
 ### Fixed
 
-- **`calor assess` and `calor coverage` no longer say `ref`, `out` and `in` parameters are
+- **`calor assess` and `calor coverage` no longer say `ref` and `out` parameters are
   unsupported.** Since #943 they convert natively, but the migration analyzer behind these
   commands (and MCP's analysis tools) still described them as "not yet supported", and
-  `out var` the same way. The descriptions now say what converts
-  and which shapes stay C# (for example ref returns and method-generic `ref T`). The
+  `out var` the same way. The descriptions now say what converts and which shapes stay C#
+  (for example ref returns, method-generic `ref T`, and an `out var` inside a lambda). The
   constructs are still listed, with the same names and counts, because those shapes keep
   part of a file as C#. Scores do not change.
 - **Expression-bodied compound assignments keep their operator.** `void M() => Log += s;`
