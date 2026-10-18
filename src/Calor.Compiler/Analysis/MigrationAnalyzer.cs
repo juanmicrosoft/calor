@@ -222,7 +222,9 @@ public sealed class MigrationAnalyzer
             result.Add(new UnsupportedConstruct
             {
                 Name = "ref-parameter",
-                Description = "out/ref parameters not yet supported",
+                // #943: native since F1; only the D1 RO-UNS-1 shapes stay C# (see FeatureSupport "ref-parameter").
+                Description = "out/ref parameters convert natively (§A{ref}, §A{out}); ref locals and returns, scoped and ref readonly " +
+                    "parameters, by-reference delegates and method-generic by-reference parameters stay C#",
                 Count = visitor.OutRefParameterCount,
                 Examples = visitor.OutRefParameterExamples
             });
@@ -233,7 +235,10 @@ public sealed class MigrationAnalyzer
             result.Add(new UnsupportedConstruct
             {
                 Name = "out-var",
-                Description = "Inline variable declarations (out var x) not yet supported",
+                // #943: the bounded D1 RO-DECL-1 lowering (see FeatureSupport "out-var").
+                Description = "Inline out declarations (out var x) lower to a mutable binding before the statement only when the " +
+                    "statement sits directly in a block, the type is known and the name collides with nothing in scope; loop headers, " +
+                    "lambdas, expression bodies and other positions stay C#",
                 Count = visitor.VarDeclarationInArgumentCount,
                 Examples = visitor.VarDeclarationInArgumentExamples
             });
@@ -346,7 +351,7 @@ public sealed class MigrationAnalyzer
             result.Add(new UnsupportedConstruct
             {
                 Name = "in-parameter",
-                Description = "in parameters (readonly ref) not yet supported",
+                Description = "in parameters convert natively (§A{in}); call sites that omit in stay C#",
                 Count = visitor.InParameterCount,
                 Examples = visitor.InParameterExamples
             });

@@ -827,6 +827,35 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
+    public void AnalyzeSource_ByReferenceParameters_DescribedAsNativeSinceF1()
+    {
+        // #943 (F1) converts ref/out/in natively and lowers simple out var; the analyzer must not
+        // still say they are unsupported. They stay listed because some shapes are kept as C#
+        // (FeatureSupport: ref-parameter/out-parameter/out-var Partial).
+        var source = """
+            public class Parser
+            {
+                public bool TryParse(string input, ref int count, out int result)
+                {
+                    count++;
+                    return int.TryParse(input, out var parsed) && (result = parsed) >= 0;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        var byRef = Assert.Single(result.UnsupportedConstructs, c => c.Name == "ref-parameter");
+        Assert.Equal(2, byRef.Count);
+        Assert.Contains("convert natively", byRef.Description);
+        var outVar = Assert.Single(result.UnsupportedConstructs, c => c.Name == "out-var");
+        Assert.Contains("lower to a mutable binding", outVar.Description);
+        Assert.Contains("collides with nothing", outVar.Description); // RO-DECL-1 bounds, not "always"
+        Assert.All(result.UnsupportedConstructs.Where(c => c.Name is "ref-parameter" or "out-var"),
+            c => Assert.DoesNotContain("not yet supported", c.Description));
+    }
+
+    [Fact]
     public void AnalyzeSource_NestedGenericType_NowFullySupported()
     {
         var source = """
