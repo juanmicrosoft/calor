@@ -92,6 +92,21 @@ unresolved in a one-file conversion, inside a lambda, or in a statement already 
 most became an untyped `§B{~x}` that failed with `Calor0250`) and 2 for a method-generic `out T`
 (FluentValidation `IValidationRule`, `RuleBase`).
 
+## Maintainer decisions after merge (2026-10-18, @juanmicrosoft)
+
+F1 merged as PR #1558 (`f83b4e593`). The maintainer then decided the two open questions below. They
+were relayed through the agent session; no GitHub comment records them.
+
+1. **Corpus opacity: accepted as F1's cost.** F1 adds 7 opaque boundaries (140 → 147) and 733
+   opaque expressions (7,009 → 7,742) over the vendored corpora. They come from RO-DECL-1, which
+   keeps a member as C# when its `out var` cannot be lowered (31 members), and from 2 method-generic
+   `out T` parameters (RO-UNS-1). This is more than the 20-boundary / 180-expression budget, but that
+   budget was written for #1191 and does not apply to F1.
+2. **Scorecard entry 086: accepted.** F1 keeps `Swap<T>(ref T a, ref T b)` as C#, as D1 RO-UNS-1
+   requires for a method-generic by-reference parameter. The PR's `conversion-scorecard` check failed
+   only because it compares against the base branch's baseline, which did not have the new 086 entry
+   yet. On main, `conversion-scorecard` passes for `f83b4e593` (Tests run 39137814012).
+
 ## What READY still needs (not claimed here)
 
 READY (`docs/plans/v0.25-interop-scope-and-baseline.md` §10) needs: a #1423 candidate commit;
@@ -114,7 +129,8 @@ applicable; D1-ANA-05 keeps its two-program witness.
 
 - D1-LV-03's registered source was wrong (above); resolved by D1 amendment 1.0.4.
 - The opacity added by RO-DECL-1 over the corpora (+7 boundaries, +733 expressions) exceeds the
-  20-boundary / 180-expression budget accepted for #1191 if that budget applies here.
+  20-boundary / 180-expression budget accepted for #1191. Resolved: the maintainer accepted it as
+  F1's cost on 2026-10-18 (above).
 - Loop back-edges keep a narrowing across a plain `§ASSIGN x null` later in the body (no
   by-reference argument): a pre-existing 0.22 flow gap, not changed here.
 - Struct members are still unknown calls for effects (`Calor0410` on F1-REFOUT-08's default
