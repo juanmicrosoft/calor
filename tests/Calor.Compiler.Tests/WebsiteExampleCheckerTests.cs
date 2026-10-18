@@ -509,7 +509,9 @@ public sealed class WebsiteExampleCheckerTests
     // syntax-reference/string-operations.mdx (Receipt formatting and the Greeting call hole).
     // #847 (0.25 F3): 54 -> 55, the local-functions example in syntax-reference/structure-tags.mdx.
     // #847 (0.25 F3, converter): 55 -> 56, the local-functions example in cli/convert.mdx.
-    private const string Pinned = "pages=96 complete=56 negative=5 grouped=3 checkedOutputs=2 illustrative=33";
+    // #943 (0.25 F1): complete 56 -> 58 and negative 5 -> 6, the two complete programs in
+    // syntax-reference/calls.mdx: the ref/out/in example and the Calor0212 refusal (negative).
+    private const string Pinned = "pages=96 complete=58 negative=6 grouped=3 checkedOutputs=2 illustrative=33";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

@@ -1518,8 +1518,12 @@ public sealed class TypeChecker
                 : ErrorType.Instance;
         }
 
+        // #943 (RO-DECL-2): `§A{out} _` with no `_` in scope is a discard, typed by the parameter.
         var preliminaryTypes = call.Arguments
-            .Select(argument => RequiresTargetType(argument)
+            .Select((argument, index) => RequiresTargetType(argument)
+                    || argument is ReferenceNode { Name: "_" }
+                        && !string.IsNullOrEmpty(call.ArgumentModifiers?.ElementAtOrDefault(index))
+                        && _env.LookupVariable("_") == null
                 ? ErrorType.Instance
                 : InferExpressionType(argument))
             .ToArray();
@@ -2524,6 +2528,7 @@ public sealed class TypeChecker
             var modifier = candidate.ParameterModifiers[parameterIndex]
                 & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
             if (modifier != ParameterModifier.None
+                && preliminaryTypes[argumentIndex] is not ErrorType
                 && !target.Equals(preliminaryTypes[argumentIndex]))
             {
                 return false;
@@ -2835,6 +2840,7 @@ public sealed class TypeChecker
             else if ((candidate.ParameterModifiers[i]
                     & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In))
                 != ParameterModifier.None
+                && argument.Type is not ErrorType
                 && !parameterTypes[i].Equals(argument.Type))
             {
                 return null;

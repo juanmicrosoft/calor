@@ -208,11 +208,84 @@ For complete nullable-input examples, see
 
 ---
 
+## By-reference arguments (`ref`, `out`, `in`)
+
+A parameter declared `(T:name:ref)`, `(T:name:out)` or `(T:name:in)` takes its
+argument by reference. Mark the argument with the same modifier: `§A{ref} x`,
+`§A{out} x` or `§A{in} x`. A named argument puts the name after the modifier:
+`§A{out}[result] x`. The generated C# passes the caller's own storage
+(`Bump(ref count)`), never a copy, so the callee's writes are visible to the caller.
+
+```calor
+§M{m001:RefOutDemo}
+  §F{f001:Bump:pub} (i32:x:ref) -> void
+    §ASSIGN x (+ x 1)
+
+  §F{f002:Twice:pub} (i32:x:in) -> i32
+    §R (* x 2)
+
+  §F{f003:ParseOr:pub} (str:text, i32:fallback) -> i32
+    §B{~n:i32} 0
+    §IF{if1} §C{Int32.TryParse} §A text §A{out} n §/C
+      §R n
+    §R fallback
+
+  §F{f004:IsNumber:pub} (str:text) -> bool
+    §R §C{Int32.TryParse} §A text §A{out} _ §/C
+
+  §F{f005:Main:pub} () -> i32
+    §B{~count:i32} 1
+    §C{Bump} §A{ref} count §/C
+    §B{doubled:i32} §C{Twice} §A{in} count §/C
+    §R (+ doubled §C{ParseOr} §A "40" §A 0 §/C)
+```
+
+The rules:
+
+1. **The modifier must match the parameter.** `§A x` for a `ref` parameter, or
+   `§A{ref} x` for an `out` parameter, is `Calor0208`. A modifier never falls back to a
+   by-value overload.
+2. **The operand must be a variable.** A local, a parameter, a field (`n`, `this.n`,
+   `k.n`), an array element (`§IDX{arr} 1`), or a field path through value-type fields
+   (`(§IDX{pts} 0).X`) can be passed. A literal, a computed expression, a call result,
+   a property, an indexer element, `this`, a readonly field outside its constructor,
+   and an `in` parameter passed as `ref` or `out` are rejected with `Calor0212`
+   before any C# is generated.
+3. **`§A{out} _` is a discard.** It is rejected with `Calor0212` when a variable named
+   `_` is in scope, because C# would write to that variable instead.
+4. **Writes are charged as effects.** Passing an array element or a field through a
+   receiver as `ref` or `out` charges `mut`, exactly like `§ASSIGN` to the same operand.
+   Passing a local charges nothing.
+5. **Facts about the operand end at the call.** A null check, a precondition (`§Q`), or
+   a refinement about a variable passed as `ref` or `out` no longer holds after the call.
+   Inside a function with two or more by-reference parameters, or one by-reference
+   parameter and any call or field access, a null check on those parameters ends too,
+   because they may name the same storage.
+
+Calor has no inline `out var` declaration. Declare a mutable binding first, as
+`ParseOr` does. When `calor convert` meets C# `out var n` in an expression statement,
+a local declaration, a `return`, or an `if` condition directly inside a block, it writes
+that binding for you. Other placements, such as a `while` header or a lambda, stay C#.
+
+```calor expect=Calor0212
+§M{m001:RefOutRejected}
+  §F{f001:Bump:pub} (i32:x:ref) -> void
+    §ASSIGN x (+ x 1)
+
+  §F{f002:Main:pub} () -> i32
+    §B{~v:i32} 1
+    §C{Bump} §A{ref} (+ v 1) §/C
+    §R v
+```
+
+---
+
 ## Diagnostics
 
 | Code | Name | Description |
 |:-----|:-----|:------------|
 | `Calor0150` | AmbiguousCallContinuation | Two consecutive expression-start tokens follow a closer-less `§C{target} arg` — second positional argument is ambiguous. Use the explicit `§A` / `§/C` form. |
+| `Calor0212` | InvalidByReferenceOperand | A `§A{ref}`, `§A{out}` or `§A{in}` operand that C# cannot pass by reference (a value, property, indexer element, `this`, readonly field, or an `in` parameter passed as `ref`/`out`), or an `out _` discard that would bind to a variable named `_`. |
 
 ---
 

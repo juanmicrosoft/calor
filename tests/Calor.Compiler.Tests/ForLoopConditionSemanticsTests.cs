@@ -70,7 +70,7 @@ public class ForLoopConditionSemanticsTests
                 unchecked { {{mutation}} }
             }
             return count;
-            """, "2", native: false, """
+            """, "2", native: false, memberPreserved: mutation.StartsWith("ref ", StringComparison.Ordinal), members: """
             private static unsafe void Change(in int value)
             {
                 unchecked
@@ -149,7 +149,7 @@ public class ForLoopConditionSemanticsTests
             """);
 
     private static void AssertEquivalent(string body, string expected, bool native, string members = "",
-        bool preserved = false, string types = "", bool asyncProbe = false)
+        bool preserved = false, string types = "", bool asyncProbe = false, bool memberPreserved = false)
     {
         var returnType = asyncProbe ? "async System.Threading.Tasks.Task<int>" : "int";
         var source = $$"""
@@ -187,6 +187,8 @@ public class ForLoopConditionSemanticsTests
         }
         else if (native)
             Assert.Contains("§L{", conversion.CalorSource);
+        else if (memberPreserved)
+            Assert.Contains("§CSHARP{", conversion.CalorSource); // #943 (D1 RO-UNS-1): a ref local keeps its member as C#
         else
             Assert.True(conversion.CalorSource!.Contains("§WH{"),
                 conversion.CalorSource + "\n" + string.Join("; ", conversion.Issues.Select(issue => issue.Message)));

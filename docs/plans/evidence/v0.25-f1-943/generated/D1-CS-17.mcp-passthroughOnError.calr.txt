@@ -1,0 +1,15 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System.Diagnostics.CodeAnalysis}
+
+  §NS{ns_global:_global:global}
+    §CSHARP{public static class Probe
+{
+    static bool TryName(int id, [NotNullWhen(true)] out string? name) { name = id == 1 ? "one" : null; return name != null; }
+    public static string Run()
+    {
+        if (TryName(1, out var n)) { string s = n; return s.Length.ToString(); }
+        return "none";
+    }
+}}§/CSHARP
+
+

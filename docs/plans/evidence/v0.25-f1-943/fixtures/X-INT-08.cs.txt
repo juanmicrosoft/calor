@@ -1,0 +1,17 @@
+// 0.25 F1 (#943) fixture X-INT-08 (#1428 shared control, F1 x F2): an out variable declared in an
+// interpolation hole. RO-DECL-1 lowers it to a mutable binding before the return statement; the
+// hole keeps the call in place.
+using System;
+
+public static class Probe
+{
+    public static string Show(string s)
+    {
+        return $"{(int.TryParse(s, out var n) ? n : -1)}";
+    }
+
+    public static string Run()
+    {
+        return Show("12") + "|" + Show("x");
+    }
+}

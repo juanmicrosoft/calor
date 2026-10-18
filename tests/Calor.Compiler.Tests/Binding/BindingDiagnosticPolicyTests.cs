@@ -51,7 +51,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void EveryCatalogEntry_HasAnExplicitDispositionReasonAndOwner()
     {
-        Assert.Equal(19, BindingDiagnosticPolicy.Catalog.Count);
+        Assert.Equal(20, BindingDiagnosticPolicy.Catalog.Count); // #943 adds InvalidByReferenceOperand
         foreach (var (code, rule) in BindingDiagnosticPolicy.Catalog)
         {
             Assert.Equal(code, rule.Code);

@@ -132,6 +132,8 @@ public static class BindingDiagnosticPolicy
             Active(DiagnosticCode.InstanceMemberInStaticContext, "Illegal static-context member access is already a compilation error."),
             Active(DiagnosticCode.EffectRowMisplaced, "Effect-row declaration placement is already enforced."),
             Active(DiagnosticCode.EffectVariableScope, "Unbound effect-row variables are already enforced."),
+            new(DiagnosticCode.InvalidByReferenceOperand, BindingDiagnosticDisposition.CompilationError,
+                "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2.", 943),
             new(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticDisposition.CompilationError,
                 "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation.", 1397),
             Analysis(DiagnosticCode.ExpectedTypeName, "Parser owns the user-facing missing-type error; binder recovery is not a new activation.", 1396),

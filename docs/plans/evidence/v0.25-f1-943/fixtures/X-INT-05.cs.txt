@@ -1,0 +1,26 @@
+// 0.25 F1 (#943) fixture X-INT-05 (#1428 shared control, F1 x F3): a local function with ref and
+// out parameters, called with ref/out arguments from its enclosing member; one call assigns its
+// out argument before throwing, so the caller must observe the partial write.
+using System;
+
+public static class Probe
+{
+    public static string Run()
+    {
+        void Bump(ref int x) { x = x + 1; }
+        void SetThenThrow(out int y) { y = 7; throw new InvalidOperationException(); }
+
+        int a = 1;
+        Bump(ref a);
+        Bump(ref a);
+        int b = 0;
+        try
+        {
+            SetThenThrow(out b);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        return a + "|" + b;
+    }
+}

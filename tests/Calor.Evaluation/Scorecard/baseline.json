@@ -3290,25 +3290,29 @@
       ],
       "status": "PartiallyConverted",
       "conversionSuccess": false,
-      "conversionErrors": 4,
-      "conversionWarnings": 0,
+      "conversionErrors": 1,
+      "conversionWarnings": 4,
       "conversionIssues": [
-        "Error [roundtrip-csharp-validation] (line 24, col 13): Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027temp\u0027 could not be found (are you missing a using directive or an assembly reference?)",
-        "Error [roundtrip-csharp-validation] (line 24, col 18): Round-tripped C# failed compilation (CS0412): \u0027T\u0027: a parameter, local variable, or local function cannot have the same name as a method type parameter",
-        "Error [roundtrip-csharp-validation] (line 30, col 17): Round-tripped C# failed compilation (CS0103): The name \u0027temp\u0027 does not exist in the current context",
-        "Error [roundtrip-csharp-validation] (line 37, col 30): Round-tripped C# failed compilation (CS0118): \u0027result\u0027 is a variable but is used like a type"
+        "Warning [ref-parameter] (line 10): Unsupported feature [ref-parameter] escalated to \u00A7CSHARP interop preservation: ref T a",
+        "Info [method] (line 10): C# interop block preserved for [method]",
+        "Warning [nullable-oblivious-nested-shape] (line 17, col 23): Nested oblivious reference semantics for \u0027T[]\u0027 are not modeled; preserving syntax-only type mapping.",
+        "Warning [nullable-oblivious-nested-shape] (line 19, col 13): Nested oblivious reference semantics for \u0027T[]\u0027 are not modeled; preserving syntax-only type mapping.",
+        "Warning [for]: Feature \u0027for\u0027 is partially supported. ",
+        "Error [roundtrip-csharp-validation] (line 30, col 30): Round-tripped C# failed compilation (CS0118): \u0027result\u0027 is a variable but is used like a type"
       ],
       "compilationSuccess": false,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": false,
       "cSharpCompilationSuccess": false,
-      "conversionDuration": "00:00:00.0180760",
+      "conversionDuration": "00:00:00.0212143",
       "compilationDuration": "00:00:00",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
-      "interopPreservationCount": 0,
-      "interopPreservationDiagnostics": [],
+      "interopPreservationCount": 1,
+      "interopPreservationDiagnostics": [
+        "[InteropPreserved] Level5_Advanced/086_GenericMethod.cs:10 [method] Method preserved as \u00A7CSHARP interop: public static void Swap\u003CT\u003E(ref T a, ref T b)\n        {\n            T temp = a..."
+      ],
       "roundTripSuccess": false
     },
     {

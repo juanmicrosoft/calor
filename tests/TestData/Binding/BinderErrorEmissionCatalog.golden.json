@@ -112,6 +112,19 @@
     "reason": "Duplicate declarations are already compilation errors."
   },
   {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallArguments::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindCallArguments",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0212"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 943,
+    "reason": "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2."
+  },
+  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindForStatement::DiagnosticBag.ReportError#01",
     "member": "Calor.Compiler.Binding.Binder.BindForStatement",
     "sink": "DiagnosticBag.ReportError",

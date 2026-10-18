@@ -126,11 +126,12 @@ public class EffectInferrerCorpusDepthTests
 
         Assert.Equal(0, bound.DepthCapStops);
 
-        // The corpus's two known cycles (Serilog Logger.cs and BatchingSink.cs)
-        // are still found — a sweep that stopped finding them would be
-        // measuring nothing. The count is the pass's, not a ledger's.
-        Assert.True(bound.CycleStops > 0,
-            "the corpus's two cyclic modules must still be reached by this sweep");
+        // The corpus had two known cycles (Serilog Logger.cs and BatchingSink.cs). #943
+        // (0.25 F1) keeps both members that formed them as C# (their `out var` types do not
+        // resolve in a one-file conversion, D1 RO-DECL-1), so the sweep now reaches none.
+        // Cycle detection itself stays covered by EffectInferrerRecursionTests; pinning 0
+        // here makes a returning cycle a visible change rather than a silent one.
+        Assert.Equal(0, bound.CycleStops);
     }
 
     private static string[] CorpusRoots()

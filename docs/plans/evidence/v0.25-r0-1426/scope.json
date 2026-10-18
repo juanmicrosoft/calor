@@ -132,7 +132,11 @@
       ],
       "provisionalSize": "L",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f1-943-refout",
+        "evidence": "docs/plans/evidence/v0.25-f1-943/README.md",
+        "tests": "tests/Calor.Compiler.Tests/InteropScope/RefOutImplementationTests.cs",
+        "note": "Implementation evidence only. Not READY: needs a #1423 candidate, approver review, per-case evidence with requirementSha256 on that candidate, and witness runs of the R-OBL (#1496) and R-OBL-RESIDUALS (#1503) regression tests on the candidate. D1-LV-03 needs a D1 amendment (its registered source declares no property N)."
       }
     },
     {

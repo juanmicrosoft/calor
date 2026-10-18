@@ -27,40 +27,26 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "3dbd108ee84de4010db57839545b5d6fffbc5800",
+      "measuredCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
       "basis": "post-merge-write-back",
-      "note": "#1132 (0.25 F5, PR #1554): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 3dbd108e (the F5 code head after EXC-F5-PR2-CLOSER-FIX). Calor0411Sites MediatR 288 -> 289 (Internal/HandlersOrderer.cs +1), serilog 574 -> 575 (Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs +1), FluentValidation 7508 -> 7669 (+161 over 23 FluentValidation.Tests files: ForEachRuleTests +34, InheritanceValidatorTest +20, PrecisionScaleValidatorTests +19, ValidatorSelectorTests +17, AbstractValidatorTester +10, ChainedValidationTester +8, JsonSerializationTests +8, and 16 more files +1..+5): a member of an indexed element now converts in place as (§IDX a i).Member instead of through a hoisted temp (§B{~_hoistN} §IDX a i, then _hoistN.Member, which on main also bound .Member to the index and copied struct elements); each in-place access whose element type the effect pass cannot resolve counts as an unknown external call. Modules enforced, excluded and Calor0425 counts are unchanged (FluentValidation enforced 132, the Gate 9 floor). F4's pending measurement bad488b8 (PR #1510) remains in git history.",
+      "note": "#943 (0.25 F1, PR #1558): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 9b9ba79f (the F1 code head). Members whose C# out var cannot be lowered (RO-DECL-1) are now preserved instead of becoming untyped bindings that failed with Calor0250, so more modules bind: ModulesEnforced 265 -> 275 (MediatR 33 unchanged, serilog 100 -> 106, FluentValidation 132 -> 136), Calor0425 135 sites / 48 modules -> 143 / 52 over the larger enforced set, and Calor0411Sites rises with it. No previously enforced module stops. F5's completed identity (measured 3dbd108e, landed f7510f32, PR #1554) remains in the repository history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "f7510f32e906394e34262552572c065c36d6f772",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "8076d4a3f4e2c0476618d18d18ab9db22585f15b",
-          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
-          "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30",
-          "/": "d930072b02c2f02ba17386aa8895ed2fc6b02786"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "3dbd108ee84de4010db57839545b5d6fffbc5800",
-          "pr": 1554,
-          "phase1TreeHashes": {
-            "src": "8076d4a3f4e2c0476618d18d18ab9db22585f15b",
+        "status": "pending",
+        "phase1": {
+          "headCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
+          "pr": 1558,
+          "treeHashes": {
+            "src": "3b5ecf97e2adf00c3de704ce8de126a66dfcbdf2",
             "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
             "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
             "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
             "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "phase1ArtifactSha256": "a8b9d4b419705f07aad5e96e8a303dad21e1a5a3cc0e176ec918b08102b92233"
+          "artifactSha256": "4e15966057a0adb3649c705d90f9378e7d230b79744708003bb459b3bdb5d265"
         }
       }
     },

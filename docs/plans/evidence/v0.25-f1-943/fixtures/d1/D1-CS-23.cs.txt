@@ -1,0 +1,9 @@
+public static class Probe
+{
+    static int Twice(in int x) { return x * 2; }
+    public static string Run()
+    {
+        int seven = 7;
+        return Twice(7) + "|" + Twice(seven);
+    }
+}

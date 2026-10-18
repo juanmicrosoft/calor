@@ -17,6 +17,58 @@ All notable changes to this project will be documented in this file.
   row Calor does not check, such as inside `??`, an array or a qualified store. See
   [Local Functions](website/content/syntax-reference/structure-tags.mdx).
 
+### `ref`, `out` and `in` arguments are checked before C# generation (#943)
+
+Calor already had `§A{ref} x`, `§A{out} x` and `§A{in} x`. This release follows the
+contract in `docs/plans/v0.25-refout-contract.md` (#1427).
+
+- **New error `Calor0212` (InvalidByReferenceOperand).** Passing something C# cannot pass by
+  reference is now a Calor error: a literal, a computed value such as `(+ v 1)`, a call
+  result, a property, an indexer element, `this`, a readonly field outside its constructor,
+  or an `in` parameter passed as `ref` or `out`. Before, these failed only when the generated
+  C# was compiled (`Calor1002`).
+- **More valid operands compile.** An array element (`§A{ref} §IDX{arr} 1`) and a field
+  through a receiver (`§A{ref} k.n`) now compile in module functions too. `§A{out} _` is a
+  discard in module functions. It is rejected with `Calor0212` when a variable named `_` is
+  in scope, because C# would write to that variable.
+- **Writes through `ref`/`out` are charged as effects.** Passing an array element, a field
+  through a receiver, or a dotted path as `ref` or `out` now charges `mut`, the same as
+  `§ASSIGN` to it. Before, a function declared `§E{alloc}` could write an array element
+  through `ref` without declaring `mut`. That was an effect laundering bug: a write the effect
+  checker did not see. Code with this bug now fails with `Calor0410`; add `mut` to `§E{...}`.
+- **Null checks on parameters that may share storage end earlier.** In a function with two or
+  more by-reference parameters, writing one ends a null check on the others. With one or more
+  by-reference parameters, any call, construction, or field, element or property read ends it
+  too. Code that relied on the old behavior now reports `Calor0272`.
+- **`calor convert` keeps by-reference identity.** `Bump(ref pts[0].X)` on an array of
+  structs now passes the element's field itself, so the callee's write is kept.
+  C# `out var n` becomes a mutable binding declared just before the statement, when it
+  appears in an expression statement, a local declaration, a `return`, or an `if` condition
+  directly in a block, its type is known, and its name clashes with nothing in scope. Other
+  forms keep their statement or member as C#. Before, an `out var` inside `?:` became
+  inline `§CS{...}`, and one in a `while` header was declared outside the loop.
+- **Shapes without a native form stay C#.** These are ref locals and returns, conditional
+  refs, `scoped` and `ref readonly` parameters, `this ref`/`this in` extension calls,
+  by-reference delegates and lambdas, by-reference constructor and indexer arguments, calls
+  that omit `in`, method-generic `out T` parameters, and parameters with flow attributes such
+  as `[NotNullWhen]`. A C# `ref` argument to an `in` parameter now converts to `§A{in}`.
+- **`calor feature-check` changes.** `out-var` is now `Partial`, because only the forms above
+  are lowered. The `ref-parameter` and `out-parameter` entries no longer suggest tuples or
+  `Result<T, E>`, and `in-parameter` names the call sites that stay C#.
+- **Effect on converted real-world code.** Over the three vendored corpora (MediatR, Serilog,
+  FluentValidation), 33 more members and types are kept as C#. In 31, an `out var` cannot be
+  lowered: the one-file conversion cannot resolve its type, it sits in a lambda, or part of its
+  statement already stays C#. The other 2 declare a method-generic `out T` parameter. Before,
+  most of the first group became an untyped binding that failed with `Calor0250`. The native
+  source expressions over the corpora drop from 35,177 to 34,361 (2.3%), and 10 more of 364
+  modules now get through binding to effect checking.
+
+These are checked by tests that compile every case in the contract, and by convert, compile
+and run comparisons on the CLI, `calor migrate` and MCP conversion paths. Two cases stay
+open: one registered witness (`D1-LV-03`) declares a property named `i32` by mistake, so it
+cannot show the property refusal, and a struct array element's field read still needs
+`--permissive-effects`. The 0.25 scope packet records this family as in progress, not ready.
+
 ### Interpolated strings keep their C# target type (#906)
 
 - **Overload selection is kept.** In C#, `Kind($"k={x}")` can call `Kind(FormattableString)`

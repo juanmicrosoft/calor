@@ -3176,6 +3176,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return joined.Any(char.IsWhiteSpace) ? target : joined;
     }
 
+    private static bool IsElementFieldPath(ExpressionNode node) =>
+        node is FieldAccessNode field
+        && (field.Target is ArrayAccessNode or MultiDimArrayAccessNode || IsElementFieldPath(field.Target));
+
     private string HoistToTempVar(string expr)
     {
         // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
@@ -3268,7 +3272,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             target = "base";
         // Hoist call results that contain section markers (e.g., §C{method} §/C.Property)
         // Only hoist when inside an executable body (method, ctor, etc.)
-        else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0)
+        // #943 (D1 RO-COPY-1): never a field path rooted in an element (`a[0].X.Y`); a temp
+        // would copy the value-type step and lose by-reference and store identity.
+        else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0 && !IsElementFieldPath(node.Target))
             target = HoistToTempVar(target);
         var fieldName = node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName;
         return $"{target}.{fieldName}";

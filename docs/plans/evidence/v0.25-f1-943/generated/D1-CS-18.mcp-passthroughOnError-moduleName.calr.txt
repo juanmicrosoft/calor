@@ -1,0 +1,12 @@
+§M{m001:Custom:overflow=unchecked}
+  §CL{c001:Probe:pub:stat}
+    §CSHARP{    public static string Run()
+    {
+        var arr = new int[] { 1, 2 };
+        ref int r = ref arr[0];
+        r = 5;
+        return arr[0].ToString();
+    }
+    }§/CSHARP
+
+

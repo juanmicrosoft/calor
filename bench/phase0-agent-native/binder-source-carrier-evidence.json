@@ -220,7 +220,7 @@
       "CarrierKind": "CallExpressionNode",
       "CarrierStart": 8602,
       "CarrierEnd": 8675,
-      "CarrierCode": "PropertyRule<T, TProperty>.Create(expression, _lam039)",
+      "CarrierCode": "PropertyRule<T, TProperty>.Create(expression, _lam038)",
       "Resolution": "Generic receiver retained in direct call target; no standalone ReferenceNode required"
     },
     {
@@ -232,7 +232,7 @@
       "CarrierKind": "CallExpressionNode",
       "CarrierStart": 9283,
       "CarrierEnd": 9365,
-      "CarrierCode": "CollectionPropertyRule<T, TElement>.Create(expression, _lam042)",
+      "CarrierCode": "CollectionPropertyRule<T, TElement>.Create(expression, _lam041)",
       "Resolution": "Generic receiver retained in direct call target; no standalone ReferenceNode required"
     },
     {
@@ -244,7 +244,7 @@
       "CarrierKind": "CallExpressionNode",
       "CarrierStart": 14551,
       "CarrierEnd": 14616,
-      "CarrierCode": "IncludeRule<T>.Create(rulesToInclude, _lam073)",
+      "CarrierCode": "IncludeRule<T>.Create(rulesToInclude, _lam072)",
       "Resolution": "Generic receiver retained in direct call target; no standalone ReferenceNode required"
     },
     {
@@ -256,7 +256,7 @@
       "CarrierKind": "CallExpressionNode",
       "CarrierStart": 14916,
       "CarrierEnd": 14981,
-      "CarrierCode": "IncludeRule<T>.Create(rulesToInclude, _lam076)",
+      "CarrierCode": "IncludeRule<T>.Create(rulesToInclude, _lam075)",
       "Resolution": "Generic receiver retained in direct call target; no standalone ReferenceNode required"
     },
     {
@@ -596,18 +596,6 @@
       "Resolution": "Generic receiver retained in direct call target; no standalone ReferenceNode required"
     },
     {
-      "File": "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs",
-      "SourceStart": 2862,
-      "SourceEnd": 2879,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "value?.ToString()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 2868,
-      "CarrierEnd": 2879,
-      "CarrierCode": "value?.ToString()",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
       "File": "FluentValidation/src/FluentValidation/Internal/PropertyRule.cs",
       "SourceStart": 1685,
       "SourceEnd": 1701,
@@ -824,42 +812,6 @@
       "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
     },
     {
-      "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
-      "SourceStart": 3342,
-      "SourceEnd": 3370,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "logEvent.TraceId?.ToString()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 3359,
-      "CarrierEnd": 3370,
-      "CarrierCode": "logEvent.TraceId?.ToString()",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
-      "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
-      "SourceStart": 3536,
-      "SourceEnd": 3563,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "logEvent.SpanId?.ToString()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 3552,
-      "CarrierEnd": 3563,
-      "CarrierCode": "logEvent.SpanId?.ToString()",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
-      "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
-      "SourceStart": 6312,
-      "SourceEnd": 6321,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "sv?.Value",
-      "CarrierKind": "NullConditionalNode",
-      "CarrierStart": 6315,
-      "CarrierEnd": 6321,
-      "CarrierCode": "sv?.Value",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
       "File": "serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs",
       "SourceStart": 994,
       "SourceEnd": 1015,
@@ -871,5 +823,56 @@
       "CarrierCode": "format?.Contains(\"j\")",
       "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
     }
-  ]
+  ],
+  "PreservedCases": [
+    {
+      "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+      "SourceStart": 3342,
+      "SourceEnd": 3370,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "logEvent.TraceId?.ToString()",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 3359,
+      "CarrierEnd": 3370,
+      "CarrierCode": "logEvent.TraceId?.ToString()",
+      "Resolution": "#943 (0.25 F1, D1 RO-DECL-1): MessageTemplateTextFormatter.Format is preserved as a §CSHARP member because `out var propertyValue` has no type the per-file semantic model can resolve; the source expression is kept verbatim inside that member"
+    },
+    {
+      "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+      "SourceStart": 3536,
+      "SourceEnd": 3563,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "logEvent.SpanId?.ToString()",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 3552,
+      "CarrierEnd": 3563,
+      "CarrierCode": "logEvent.SpanId?.ToString()",
+      "Resolution": "#943 (0.25 F1, D1 RO-DECL-1): MessageTemplateTextFormatter.Format is preserved as a §CSHARP member because `out var propertyValue` has no type the per-file semantic model can resolve; the source expression is kept verbatim inside that member"
+    },
+    {
+      "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+      "SourceStart": 6312,
+      "SourceEnd": 6321,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "sv?.Value",
+      "CarrierKind": "NullConditionalNode",
+      "CarrierStart": 6315,
+      "CarrierEnd": 6321,
+      "CarrierCode": "sv?.Value",
+      "Resolution": "#943 (0.25 F1, D1 RO-DECL-1): MessageTemplateTextFormatter.Format is preserved as a §CSHARP member because `out var propertyValue` has no type the per-file semantic model can resolve; the source expression is kept verbatim inside that member"
+    },
+    {
+      "File": "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs",
+      "SourceStart": 2862,
+      "SourceEnd": 2879,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "value?.ToString()",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 2868,
+      "CarrierEnd": 2879,
+      "CarrierCode": "value?.ToString()",
+      "Resolution": "#943 (0.25 F1, D1 RO-DECL-1): MessageFormatter.BuildMessage is preserved as a §CSHARP member because its `out var value` is declared inside a block lambda, where the bounded lowering never applies; the source expression is kept verbatim inside that member"
+    }
+  ],
+  "F1PreservedCases": "#943 moved 4 ConditionalAccessExpression identities (two members: Serilog MessageTemplateTextFormatter.Format and FluentValidation MessageFormatter.BuildMessage) from Cases to PreservedCases; the remaining 68 keep native carriers. Four AbstractValidator lambda names shifted by one (_lam039/042/073/076 -> _lam038/041/072/075) because SetExecutedRuleSets (`out var obj`, type unresolved per file) is now preserved and generates no lambda name; spans and tokens are otherwise unchanged"
 }

@@ -1,0 +1,16 @@
+§M{m001:Custom:overflow=unchecked}
+  §CL{c001:Table:pub:seal}
+    §CSHARP{    public int this[in int key] => key * 3;
+    }§/CSHARP
+
+
+  §CL{c002:Probe:pub:stat}
+    §CSHARP{    public static string Run()
+    {
+        var t = new Table();
+        int k = 2;
+        return t[in k].ToString();
+    }
+    }§/CSHARP
+
+

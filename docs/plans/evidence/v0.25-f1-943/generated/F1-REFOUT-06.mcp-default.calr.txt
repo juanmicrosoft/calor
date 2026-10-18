@@ -1,0 +1,27 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Run:pub:stat} () -> str
+        §E{alloc,mut}
+        §B{counts} §NEW{Dictionary<str,i32>} §/NEW
+        §PUT{counts} "a" 3
+        §B{~hit:i32} `default`
+        §B{bool:foundA} §C{counts.TryGetValue} §A "a" §A{out} hit §/C
+        §B{~miss:i32} 99
+        §B{bool:foundB} §C{counts.TryGetValue} §A "b" §A{out} miss §/C
+        §B{names} §NEW{Dictionary<i32,List<str>>} §/NEW
+        §LIST{_putVal004:str}
+          "x"
+          "y"
+        §SETIDX{names} 1 _putVal004
+        §B{~list:List<str>} `default`
+        §B{bool:foundList} §C{names.TryGetValue} §A 1 §A{out} list §/C
+        §B{~none:List<str>} `default`
+        §B{bool:foundNone} §C{names.TryGetValue} §A 2 §A{out} none §/C
+        §R (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ foundA ":") hit) "|") foundB) ":") miss) "|") foundList) ":") list.Count) "|") foundNone) ":") (== none null))
+
+
+

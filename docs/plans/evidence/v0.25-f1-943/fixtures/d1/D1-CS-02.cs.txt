@@ -1,0 +1,11 @@
+public struct Point { public int X; }
+public static class Probe
+{
+    static void Reset(ref Point p) { p.X = 9; }
+    public static string Run()
+    {
+        var pts = new Point[] { new Point { X = 1 } };
+        Reset(ref pts[0]);
+        return pts[0].X.ToString();
+    }
+}

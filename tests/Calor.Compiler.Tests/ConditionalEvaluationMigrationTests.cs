@@ -542,7 +542,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"bool gate = {gate}; if (gate && int.TryParse(\"5\", out int value)) return value; return 0;",
-            expected, true);
+            expected, false); // #943 (D1 RO-DECL-1): an if-condition out declaration now lowers natively
     }
 
     [Theory]

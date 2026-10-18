@@ -56,23 +56,24 @@ public class RefOutContractTests
     [Fact]
     public void ObservationUpdatesDoNotChangeTheSeal()
     {
+        // #943 updated observed/status and allocated the code; reverting them to the measured
+        // commit's values (D1-EFF-01 laundered, no code) must not move the seal either.
         var contract = Contract();
-        Case(contract, "D1-EFF-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor0410") };
-        Case(contract, "D1-EFF-01")["status"] = "holds";
-        contract["diagnostics"]![0]!["code"] = "Calor0299";
-        Assert.Empty(Run(contract, symbol => symbol == "InvalidByReferenceOperand" ? "Calor0299" : null));
+        Case(contract, "D1-EFF-01")["observed"] = new JsonObject { ["errors"] = new JsonArray() };
+        Case(contract, "D1-EFF-01")["status"] = "violates";
+        contract["diagnostics"]![0]!["code"] = null;
         Assert.Equal(FrozenSeal, RefOutContractValidator.Seal(contract));
+        Assert.Equal(FrozenSeal, RefOutContractValidator.Seal(Contract()));
     }
 
     [Fact]
     public void AllocatedSymbolResolvesToItsCode()
     {
-        // As if #943 had added DiagnosticCode.InvalidByReferenceOperand = "Calor0299".
+        // #943 allocated DiagnosticCode.InvalidByReferenceOperand = "Calor0212"; the registry records it.
         var contract = Contract();
-        contract["diagnostics"]![0]!["code"] = "Calor0299";
-        Case(contract, "D1-LV-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor0299") };
-        Case(contract, "D1-LV-01")["status"] = "holds";
-        Assert.Empty(Run(contract, symbol => symbol == "InvalidByReferenceOperand" ? "Calor0299" : null));
+        Assert.Equal("Calor0212", contract["diagnostics"]![0]!["code"]!.GetValue<string>());
+        Assert.Equal("Calor0212", RefOutContractValidator.CompilerConstant("InvalidByReferenceOperand"));
+        Assert.Empty(Run(contract));
     }
 
     [Fact]
@@ -135,14 +136,24 @@ public class RefOutContractTests
         ["refusal by generated-C# failure"] = ("D007", c =>
         {
             Case(c, "D1-LV-01")["expected"]!["diagnostic"] = "Calor1002";
+            Case(c, "D1-LV-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor1002") };
             Case(c, "D1-LV-01")["status"] = "holds";
         }),
-        ["refusal by unregistered symbol"] = ("D007", c => Case(c, "D1-LV-01")["expected"]!["diagnostic"] = "SomethingElse"),
-        ["status disagrees with observation"] = ("D008", c => Case(c, "D1-EFF-01")["status"] = "holds"),
+        ["refusal by unregistered symbol"] = ("D007", c =>
+        {
+            Case(c, "D1-LV-01")["expected"]!["diagnostic"] = "SomethingElse";
+            Case(c, "D1-LV-01")["status"] = "violates";
+        }),
+        ["status disagrees with observation"] = ("D008", c => Case(c, "D1-EFF-01")["status"] = "violates"),
         ["version without amendment"] = ("D009", c => c["contractVersion"] = "1.1.0"),
         ["independence claim"] = ("D010", c => Case(c, "D1-LV-01")["note"] = "Independently reviewed."),
         ["measured identity zeroed"] = ("D001", c => c["measuredAt"]!["commit"] = new string('0', 40)),
-        ["allocated code outside the range"] = ("D007", c => c["diagnostics"]![0]!["code"] = "Calor0999"),
+        ["allocated code outside the range"] = ("D007", c =>
+        {
+            c["diagnostics"]![0]!["code"] = "Calor0999";
+            foreach (var x in Cases(c).Where(x => x["observed"]?["errors"] is JsonArray e && e.Any(v => v!.GetValue<string>() == "Calor0212")))
+                x["observed"]!["errors"] = new JsonArray("Calor0999");
+        }),
         ["proof observation removed"] = ("D003", c =>
         {
             Case(c, "D1-ANA-01")["observed"]!.AsObject().Remove("proof");

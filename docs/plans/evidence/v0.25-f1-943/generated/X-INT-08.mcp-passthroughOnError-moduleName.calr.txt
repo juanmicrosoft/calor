@@ -1,0 +1,14 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m003:Run:pub:stat} () -> str
+      §R (+ (+ §C{Show} §A "12" §/C "|") §C{Show} §A "x" §/C)
+
+    §CSHARP{    public static string Show(string s)
+    {
+        return $"{(int.TryParse(s, out var n) ? n : -1)}";
+    }
+    }§/CSHARP
+
+

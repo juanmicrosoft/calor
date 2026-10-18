@@ -57,6 +57,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// ConvertBlock and VisitGlobalStatement flush these before the containing statement.
     /// </summary>
     private readonly List<StatementNode> _pendingStatements = new();
+
+    /// <summary>#943 (D1 RO-DECL-1): `out var x` / `out T x` lowered to a binding before their statement.</summary>
+    private readonly HashSet<DeclarationExpressionSyntax> _loweredOutDeclarations = new();
     private int _conditionalRegionDepth;
 
     /// <summary>
@@ -4419,6 +4422,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var visibility = GetVisibility(node.Modifiers, defaultVis);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
+        // #943 (D1 RO-UNS-1): by-reference indexer parameters are preserved.
+        if (node.ParameterList.Parameters.FirstOrDefault(IsByReferenceParameter) is { } byReferenceParameter)
+            throw EscalateExpression(byReferenceParameter, "in-parameter");
+
         // Convert parameters (indexers use BracketedParameterListSyntax)
         var parameters = node.ParameterList.Parameters
             .Select(p =>
@@ -6690,6 +6697,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .FirstOrDefault(local => !IsNativeLocalFunction(local));
             if (localFn != null)
                 throw EscalateExpression(localFn, "local-function");
+            // #943 (D1 RO-UNS-1): ref locals/returns, conditional refs, by-reference lambdas and
+            // by-reference arguments to constructors or indexers have no native form.
+            var byReference = block.DescendantNodes().FirstOrDefault(node =>
+                node is RefExpressionSyntax or RefTypeSyntax
+                || node is ParameterSyntax parameter && parameter.Parent?.Parent is AnonymousFunctionExpressionSyntax
+                    && IsByReferenceParameter(parameter)
+                || node is ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None } argument
+                    && argument.Parent?.Parent is not InvocationExpressionSyntax);
+            if (byReference != null)
+                throw EscalateExpression(byReference, "ref-parameter");
         }
 
         // Extract preprocessor regions from trivia
@@ -6710,8 +6727,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ppCoveredIndices.Add(idx);
         }
 
+        // #943 (D1 RO-DECL-1): a statement with lowered out declarations that any part of was
+        // kept as C# would declare the names twice; checked once the statement is converted.
+        (StatementSyntax Statement, int LossMark)? lowered = null;
+        void CheckLowered()
+        {
+            if (lowered is { } check && _context.Losses.Count > check.LossMark)
+                throw EscalateExpression(check.Statement, "out-var");
+            lowered = null;
+        }
         for (int stmtIndex = 0; stmtIndex < block.Statements.Count; stmtIndex++)
         {
+            CheckLowered();
             // Handle preprocessor regions
             if (ppRegionsByStart.TryGetValue(stmtIndex, out var ppRegion))
             {
@@ -6760,6 +6787,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Expression-level chain hoisting in ConvertInvocationExpression may add
             // temp bind statements here; they must be flushed before the containing statement.
             _pendingStatements.Clear();
+
+            // #943 (D1 RO-DECL-1): pre-declare lowerable out variables in this block.
+            var outDeclarations = LowerOutDeclarations(statement);
+            statements.AddRange(outDeclarations);
+            if (outDeclarations.Count > 0)
+                lowered = (statement, _context.Losses.Count);
 
             // Handle local declarations with multiple variables specially
             if (statement is LocalDeclarationStatementSyntax localDecl && localDecl.Declaration.Variables.Count > 1)
@@ -6868,6 +6901,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 statements.Add(converted);
             }
         }
+
+        CheckLowered();
 
         // Handle preprocessor regions with no parsed statements (entirely disabled text on close brace)
         if (ppRegionsByStart.TryGetValue(block.Statements.Count, out var trailingPP))
@@ -7482,7 +7517,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     .ToList()
                 : null;
 
-            var stmtArgModifiers = ExtractArgumentModifiers(invocation.ArgumentList.Arguments);
+            var stmtArgModifiers = ExtractArgumentModifiers(invocation);
 
             // Check for Console.WriteLine as special case
             if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
@@ -7681,7 +7716,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 : null;
             var call = new CallStatementNode(span, $"{callReceiver}.{member.Name.Identifier.Text}",
                 false, convertedArguments, new AttributeCollection(), names,
-                ExtractArgumentModifiers(arguments), typeArguments: typeArguments);
+                ExtractArgumentModifiers(conditionalInvocation), typeArguments: typeArguments);
             // A type test is null identity, not an overloaded equality operator.
             var condition = new TypeOperationNode(span, TypeOp.Is,
                 new ReferenceNode(span, receiverName), "object");
@@ -8321,6 +8356,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var steps = new List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)>();
         var current = invocation;
+        // #943 (D1 RO-SYN-3, RO-COPY-4): chain steps keep no argument modifiers; preserve.
+        if (invocation.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
+                .OfType<ArgumentSyntax>().FirstOrDefault(a => !a.RefKindKeyword.IsKind(SyntaxKind.None)) is { } byReference)
+            throw EscalateExpression(byReference, "ref-parameter");
 
         while (current.Expression is MemberAccessExpressionSyntax memberAccess)
         {
@@ -9522,7 +9561,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         if (_conditionalRegionDepth > 0 && expression is InvocationExpressionSyntax conditionalInvocation &&
             conditionalInvocation.ArgumentList.Arguments.Any(argument =>
-                argument.Expression is DeclarationExpressionSyntax))
+                argument.Expression is DeclarationExpressionSyntax declaration
+                && !_loweredOutDeclarations.Contains(declaration)))
             return PreserveConditionalOperand(expression);
 
         if (_conditionalRegionDepth > 0 &&
@@ -10078,6 +10118,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("out-var");
 
+        // #943 (D1 RO-DECL-1): only a lowered declaration converts; any other out declaration
+        // (loop or using header, lambda, query, expression body, initializer) is preserved.
+        if (_loweredOutDeclarations.Contains(declExpr) && declExpr.Designation is SingleVariableDesignationSyntax lowered)
+            return new ReferenceNode(GetTextSpan(declExpr), lowered.Identifier.ValueText);
+        if (declExpr.Parent is ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None }
+            && declExpr.Designation is SingleVariableDesignationSyntax)
+            throw EscalateExpression(declExpr, "out-var");
+
         if (_conditionalRegionDepth > 0)
             return PreserveConditionalOperand(declExpr);
 
@@ -10131,6 +10179,115 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return CreateFallbackExpression(declExpr, "complex-declaration");
     }
+
+    /// <summary>
+    /// #943 (D1 RO-DECL-1, RO-DECL-2, RO-NULL-4, RO-UNS-1): for a statement directly in a block,
+    /// returns a mutable binding for each `out var x` / `out T x` in an expression statement, local
+    /// declaration, return, or `if` condition (outside lambdas and queries), placed before the
+    /// statement. Escalates the statement to C# when a declaration's type is not expressible or
+    /// its name is visible or declared elsewhere in its scope, when a `_` operand binds to a
+    /// declared symbol, or when a by-reference argument targets a method type parameter.
+    /// </summary>
+    private List<StatementNode> LowerOutDeclarations(StatementSyntax statement)
+    {
+        var result = new List<StatementNode>();
+        if (_semanticModel == null || statement.SyntaxTree != _semanticModel.SyntaxTree)
+            return result;
+        // RO-DECL-1 never lowers in a lambda; its out declarations stay C# (ConvertDeclarationExpression).
+        var inLambda = statement.Ancestors().Any(node => node is AnonymousFunctionExpressionSyntax);
+        foreach (var argument in statement.DescendantNodes().OfType<ArgumentSyntax>()
+                     .Where(argument => !argument.RefKindKeyword.IsKind(SyntaxKind.None)))
+        {
+            if (argument.Expression is IdentifierNameSyntax { Identifier.ValueText: "_" } discard
+                && _semanticModel.GetSymbolInfo(discard).Symbol is not (null or IDiscardSymbol))
+                throw EscalateExpression(statement, "out-var");
+            if (argument.Parent?.Parent is ExpressionSyntax call
+                && _semanticModel.GetSymbolInfo(call).Symbol is IMethodSymbol method
+                && DetermineParameter(argument, method)?.OriginalDefinition.Type is ITypeParameterSymbol
+                    { TypeParameterKind: TypeParameterKind.Method })
+                throw EscalateExpression(statement, "out-parameter");
+        }
+        SyntaxNode? scanned = inLambda ? null : statement switch
+        {
+            ExpressionStatementSyntax or LocalDeclarationStatementSyntax or ReturnStatementSyntax => statement,
+            IfStatementSyntax ifStatement => ifStatement.Condition,
+            _ => null
+        };
+        if (scanned == null)
+            return result;
+        var declarations = scanned.DescendantNodesAndSelf(node =>
+                node is not (AnonymousFunctionExpressionSyntax or QueryExpressionSyntax))
+            .OfType<DeclarationExpressionSyntax>()
+            .Where(declaration => declaration.Parent is ArgumentSyntax { RefKindKeyword.RawKind: (int)SyntaxKind.OutKeyword }
+                && declaration.Designation is SingleVariableDesignationSyntax);
+        foreach (var declaration in declarations)
+        {
+            var designation = (SingleVariableDesignationSyntax)declaration.Designation;
+            var name = designation.Identifier.ValueText;
+            var local = _semanticModel.GetDeclaredSymbol(designation) as ILocalSymbol;
+            var type = local?.Type;
+            // The local shadows same-named members in a lookup at the statement, so members are
+            // looked up from the enclosing type declaration as well.
+            var collides = local == null
+                || _semanticModel.LookupSymbols(statement.SpanStart, name: name)
+                    .Any(symbol => !SymbolEqualityComparer.Default.Equals(symbol, local))
+                || statement.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault() is { } container
+                    && _semanticModel.LookupSymbols(container.OpenBraceToken.Span.End, name: name).Length > 0
+                || statement.Parent!.DescendantNodes().Any(node => node != designation && DeclaresName(node, name));
+            // An interpolation hole is converted from its text, so the declaration cannot move out of it.
+            // An explicit `out T x` names its type; `out var x` needs a type the semantic model knows.
+            var unknownType = declaration.Type.IsVar && (type is null or { TypeKind: TypeKind.Error or TypeKind.Dynamic }
+                or { IsAnonymousType: true } || !type.CanBeReferencedByName && type is not IArrayTypeSymbol);
+            if (collides || unknownType || type is { IsRefLikeType: true }
+                || declaration.Ancestors().Any(node => node is InterpolationSyntax))
+                throw EscalateExpression(statement, "out-var");
+            _loweredOutDeclarations.Add(declaration);
+            var typeName = declaration.Type.IsVar
+                ? TypeMapper.CSharpToCalor(type!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat
+                    .WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+                        | SymbolDisplayMiscellaneousOptions.ExpandNullable
+                        | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)))
+                : TypeMapper.CSharpToCalor(declaration.Type.ToString());
+            result.Add(new BindStatementNode(GetTextSpan(declaration), name, typeName, isMutable: true,
+                initializer: null, new AttributeCollection()));
+        }
+        return result;
+    }
+
+    private static bool IsByReferenceParameter(ParameterSyntax parameter) =>
+        parameter.Modifiers.Any(modifier => modifier.Kind() is SyntaxKind.RefKeyword or SyntaxKind.OutKeyword or SyntaxKind.InKeyword);
+
+    // RO-NULL-3: flow attributes such as [NotNullWhen] stay inert metadata on a native declaration;
+    // callers that type-check only through them are refused by the nullability checks.
+    private static bool IsUnsupportedByReferenceParameter(ParameterSyntax parameter)
+    {
+        if (!IsByReferenceParameter(parameter))
+            return false;
+        var typeName = parameter.Type?.ToString();
+        var methodTypeParameters = (parameter.Parent?.Parent as MethodDeclarationSyntax)?.TypeParameterList?.Parameters;
+        return parameter.Modifiers.Any(modifier => modifier.Kind() is SyntaxKind.ScopedKeyword or SyntaxKind.ReadOnlyKeyword or SyntaxKind.ThisKeyword)
+            || parameter.Parent?.Parent is DelegateDeclarationSyntax
+            || methodTypeParameters?.Any(typeParameter => typeParameter.Identifier.ValueText == typeName?.TrimEnd('?')) == true;
+    }
+
+    private static IParameterSymbol? DetermineParameter(ArgumentSyntax argument, IMethodSymbol method)
+    {
+        if (argument.NameColon is { } nameColon)
+            return method.Parameters.FirstOrDefault(parameter => parameter.Name == nameColon.Name.Identifier.ValueText);
+        var index = ((BaseArgumentListSyntax)argument.Parent!).Arguments.IndexOf(argument);
+        return index >= 0 && index < method.Parameters.Length ? method.Parameters[index] : null;
+    }
+
+    private static bool DeclaresName(SyntaxNode node, string name) => node switch
+    {
+        VariableDeclaratorSyntax declarator => declarator.Identifier.ValueText == name,
+        SingleVariableDesignationSyntax designation => designation.Identifier.ValueText == name,
+        ParameterSyntax parameter => parameter.Identifier.ValueText == name,
+        ForEachStatementSyntax forEach => forEach.Identifier.ValueText == name,
+        CatchDeclarationSyntax catchDeclaration => catchDeclaration.Identifier.ValueText == name,
+        LocalFunctionStatementSyntax localFunction => localFunction.Identifier.ValueText == name,
+        _ => false
+    };
 
     /// <summary>
     /// Converts "x is SomeType varName" to a type check expression and hoists a variable binding.
@@ -11312,14 +11469,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (Complex(args[i]) && args[i] is not LambdaExpressionNode)
                 last = i;
         }
+        // #943 (D1 RO-CALL-1, RO-ORD-1): a hoisted argument would run before the receiver and the
+        // by-reference operand's own checks; a by-reference call with a hoist is preserved.
+        if (last >= 0 && syntax is { } byReferenceList && byReferenceList.FirstOrDefault(a => !a.RefKindKeyword.IsKind(SyntaxKind.None)) is { } byReference)
+            throw EscalateExpression(byReference, "conditional-expression-hoisting");
         for (var i = 0; i < args.Count; i++)
         {
             // A ref/out/in argument must stay storage, so an address it computes
             // (`in xs[I()]`) cannot move ahead of a hoisted later argument: preserve.
+            // #943 (D1 RO-ORD-1): taking an element or member reference performs null, bounds and
+            // covariance checks in place, so only a plain local or parameter may precede a hoist.
             if (i < last && syntax is { } refs && i < refs.Count && !refs[i].RefKindKeyword.IsKind(SyntaxKind.None)
-                && refs[i].Expression.DescendantNodesAndSelf().Any(node => node is InvocationExpressionSyntax
-                    or AssignmentExpressionSyntax or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax
-                    or BaseObjectCreationExpressionSyntax))
+                && !(refs[i].Expression is IdentifierNameSyntax plain && _semanticModel != null
+                    && plain.SyntaxTree == _semanticModel.SyntaxTree
+                    && _semanticModel.GetSymbolInfo(plain).Symbol is ILocalSymbol or IParameterSymbol))
                 throw EscalateExpression(refs[i], "conditional-expression-hoisting");
             var hoist = Complex(args[i]) || i < last && !InPlace(i);
             if (!hoist)
@@ -11453,10 +11616,38 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
-    private static IReadOnlyList<string?>? ExtractArgumentModifiers(SeparatedSyntaxList<ArgumentSyntax> arguments)
+    private IReadOnlyList<string?>? ExtractArgumentModifiers(InvocationExpressionSyntax invocation)
     {
+        var arguments = invocation.ArgumentList.Arguments;
+        // #943 (D1 RO-CALL-3, RO-LV-3, RO-NULL-4, RO-UNS-1): consult the callee. `ref` for an `in`
+        // parameter becomes `§A{in}`; an omitted `in`, a method-generic by-reference parameter, a
+        // by-reference delegate, or a `this ref`/`this in` receiver is preserved.
+        var method = _semanticModel != null && invocation.SyntaxTree == _semanticModel.SyntaxTree
+                ? _semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol
+                : null;
+        if (method != null && (method.MethodKind == MethodKind.DelegateInvoke
+                    && method.Parameters.Any(parameter => parameter.RefKind != RefKind.None)
+                || method.ReducedFrom?.Parameters[0].RefKind is RefKind.Ref or RefKind.In or RefKind.RefReadOnlyParameter))
+            throw EscalateExpression(invocation, "ref-parameter");
         var modifiers = arguments
-            .Select(a => a.RefKindKeyword.IsKind(SyntaxKind.None) ? null : a.RefKindKeyword.ValueText)
+            .Select(a =>
+            {
+                var parameter = method == null ? null : DetermineParameter(a, method);
+                if (parameter?.RefKind is RefKind.In or RefKind.RefReadOnlyParameter && a.RefKindKeyword.IsKind(SyntaxKind.None)
+                    || parameter?.OriginalDefinition.Type is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method }
+                        && parameter.RefKind != RefKind.None
+                    // An element of a non-array (Span<T>, an indexer) is not a variable Calor can pass.
+                    || !a.RefKindKeyword.IsKind(SyntaxKind.None) && a.Expression is ElementAccessExpressionSyntax element
+                        && _semanticModel!.GetTypeInfo(element.Expression).Type is not IArrayTypeSymbol
+                    // An operand that runs code (`ref Get().X`, `ref a[Next()]`) would be hoisted ahead
+                    // of earlier arguments, and a value-type receiver copied (RO-ORD-1, RO-COPY-1/2).
+                    || !a.RefKindKeyword.IsKind(SyntaxKind.None) && a.Expression.DescendantNodesAndSelf().Any(node =>
+                        node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax
+                            or AssignmentExpressionSyntax or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax))
+                    throw EscalateExpression(a, "in-parameter");
+                return a.RefKindKeyword.IsKind(SyntaxKind.None) ? null
+                    : parameter?.RefKind == RefKind.In ? "in" : a.RefKindKeyword.ValueText;
+            })
             .ToList();
         return modifiers.Any(m => m != null) ? modifiers : null;
     }
@@ -11546,7 +11737,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList()
             : null;
 
-        var argModifiers = ExtractArgumentModifiers(invocation.ArgumentList.Arguments);
+        var argModifiers = ExtractArgumentModifiers(invocation);
 
         // Extract explicit generic type arguments from the invocation.
         // For member access like list.Cast<int>(), the Name is GenericNameSyntax.
@@ -13801,6 +13992,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private IReadOnlyList<ParameterNode> ConvertParameters(ParameterListSyntax paramList)
     {
+        // #943 (D1 RO-UNS-1, RO-NULL-3/4): by-reference parameter shapes outside the native slice.
+        if (paramList.Parameters.FirstOrDefault(IsUnsupportedByReferenceParameter) is { } unsupported)
+        {
+            // A member with a non-native local function reports that (#777, #847) first, as before.
+            if (paramList.Parent?.DescendantNodes().OfType<LocalFunctionStatementSyntax>()
+                    .FirstOrDefault(local => !IsNativeLocalFunction(local)) is { } local)
+                throw EscalateExpression(local, "local-function");
+            throw EscalateExpression(unsupported, "ref-parameter");
+        }
         return paramList.Parameters
             .Select(p =>
             {

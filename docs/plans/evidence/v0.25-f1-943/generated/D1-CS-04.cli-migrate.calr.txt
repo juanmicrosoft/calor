@@ -1,0 +1,25 @@
+§M{m001:Fixture:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Box:pub:seal}
+      §FLD{i32:X:pub} = 1
+
+
+    §CL{c002:Probe:pub:stat}
+      §FLD{Box:shared:priv:stat,readonly} = §NEW{Box} §/NEW
+      §FLD{i32:calls:priv:stat}
+
+      §MT{m003:Get:priv:stat} () -> Box
+        §ASSIGN calls (+ calls 1)
+        §R shared
+
+      §MT{m004:Bump:priv:stat} (i32:x:ref)
+        §ASSIGN x (+ x 1)
+
+      §MT{m005:Run:pub:stat} () -> str
+        §RAW
+        Bump(ref Get().X);
+        §/RAW
+        §R (+ (+ shared.X "|") calls)
+
+
+

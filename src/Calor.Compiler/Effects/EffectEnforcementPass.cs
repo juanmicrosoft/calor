@@ -3391,7 +3391,7 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromCallStatement(CallStatementNode call)
         {
             var effects = InferFromCallTarget(call.Target, call.Span, call.Arguments);
-            return effects.Union(InferFromCallArguments(call.Target, call.Arguments));
+            return effects.Union(InferFromCallArguments(call.Target, call.Arguments, call.ArgumentModifiers));
         }
 
         /// <summary>
@@ -3404,12 +3404,20 @@ public sealed class EffectEnforcementPass
         /// - a function-typed VALUE argument passed to an external receiver call is
         ///   surfaced as a Calor0419 assumption — the callee may invoke it invisibly.
         /// </summary>
-        private EffectSet InferFromCallArguments(string callTarget, IEnumerable<ExpressionNode> arguments)
+        private EffectSet InferFromCallArguments(
+            string callTarget, IEnumerable<ExpressionNode> arguments, IReadOnlyList<string?>? modifiers = null)
         {
             var effects = EffectSet.Empty;
+            var index = -1;
             foreach (var arg in arguments)
             {
-                effects = effects.Union(InferFromExpression(arg));
+                index++;
+                // #943 (D1 RO-EFF-1): a ref/out argument charges the caller what `§ASSIGN` to the
+                // same operand charges (`mut` for an element, receiver field or dotted path).
+                var modifier = modifiers != null && index < modifiers.Count ? modifiers[index] : null;
+                effects = effects.Union(modifier is "ref" or "out"
+                    ? InferFromAssignmentTarget(arg, readValue: modifier == "ref")
+                    : InferFromExpression(arg));
 
                 if (arg is not ReferenceNode reference || reference.Name.Contains('.'))
                     continue;
@@ -5930,7 +5938,7 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromCallExpression(CallExpressionNode call)
         {
             var effects = InferFromCallTarget(call.Target, call.Span, call.Arguments);
-            return effects.Union(InferFromCallArguments(call.Target, call.Arguments));
+            return effects.Union(InferFromCallArguments(call.Target, call.Arguments, call.ArgumentModifiers));
         }
 
         private EffectSet InferFromMatchExpression(MatchExpressionNode match)

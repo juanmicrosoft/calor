@@ -570,6 +570,15 @@ public class ArchitectureTests
                 ("Universal DescendantsAndSelf traversal; the switch selects the two node kinds " +
                     "that carry resolved function symbols, and unmatched nodes contribute no callees.",
                     "Array.Empty<FunctionSymbol>()"),
+            ["Binding/Binder.cs:GetInvalidByReferenceReason"] =
+                ("#943 by-reference operand classifier, not traversal; every unlisted expression is " +
+                    "refused as a value, so a new expression kind fails closed.",
+                    "not a variable"),
+            ["Binding/Binder.cs:MayChangeHeap"] =
+                ("#943 alias-narrowing classifier, not traversal; BindExpression applies it to every " +
+                    "bound expression bottom-up, so children are covered. It lists the kinds with no heap " +
+                    "effect of their own; every unlisted kind is assumed to change the heap.",
+                    "_ => true"),
             ["Verification/Z3/KInduction/KInductionProver.cs:GetIntValue"] =
                 ("Constant classifier; unsupported expressions explicitly return null.",
                     "_ => null"),

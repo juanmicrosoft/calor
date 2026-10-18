@@ -215,11 +215,49 @@ explicit form for `Foo.bar`.
 
 ---
 
+## By-reference arguments (`ref`, `out`, `in`)
+
+Mark an argument for a `(T:name:ref|out|in)` parameter with the same modifier:
+`§A{ref} x`, `§A{out} x`, `§A{in} x`, or `§A{out}[name] x` for a named argument. The
+generated C# passes the caller's storage, never a copy. Contract:
+`docs/plans/v0.25-refout-contract.md` (#1427); implementation #943.
+
+```calor
+§M{m001:RefOutDemo}
+  §F{f001:Bump:pub} (i32:x:ref) -> void
+    §ASSIGN x (+ x 1)
+
+  §F{f002:ParseOr:pub} (str:text, i32:fallback) -> i32
+    §B{~n:i32} 0
+    §IF{if1} §C{Int32.TryParse} §A text §A{out} n §/C
+      §R n
+    §R fallback
+
+  §F{f003:Main:pub} () -> i32
+    §B{~count:i32} 1
+    §C{Bump} §A{ref} count §/C
+    §R (+ count §C{ParseOr} §A "40" §A 0 §/C)
+```
+
+- A modifier that does not match the parameter is `Calor0208`.
+- An operand C# cannot pass by reference (literal, computed value, call result, property,
+  indexer element, `this`, readonly field outside its constructor, `in` parameter passed as
+  `ref`/`out`) is `Calor0212`, reported by the binder before C# generation.
+- `§A{out} _` is a discard; it is `Calor0212` when a symbol named `_` is in scope.
+- `ref`/`out` to an array element, receiver field or dotted path charges `mut`, like `§ASSIGN`.
+- Narrowing and contract facts about a `ref`/`out` operand end at the call; by-reference
+  parameters that may alias lose narrowing on any write to one of them or any heap-changing step.
+- The converter lowers C# `out var x` only in an expression statement, local declaration,
+  `return` or `if` condition directly in a block; other placements are preserved as C#.
+
+---
+
 ## Diagnostics
 
 | Code | Name | Description |
 |:-----|:-----|:------------|
 | `Calor0150` | AmbiguousCallContinuation | Two consecutive expression-start tokens follow a closer-less `§C{target} arg` — second positional argument is ambiguous. Use the explicit `§A` / `§/C` form. |
+| `Calor0212` | InvalidByReferenceOperand | A `§A{ref}`/`§A{out}`/`§A{in}` operand C# cannot pass by reference, or an `out _` discard that would bind to a declared `_`. |
 
 ---
 

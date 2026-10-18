@@ -1737,6 +1737,8 @@ public sealed class BoundBaseExpression : BoundExpression
 public sealed class BoundFieldAccessExpression : BoundExpression
 {
     internal Microsoft.CodeAnalysis.ISymbol? ResolvedMetadataMember { get; init; }
+    /// <summary>#943: a metadata member whose read is unsupported here (the result stays unresolved).</summary>
+    internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember { get; init; }
     public BoundExpression Target { get; }
     public string FieldName { get; }
     public TextSpan FieldNameSpan { get; }

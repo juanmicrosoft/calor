@@ -1,0 +1,17 @@
+§M{m001:D1-CS-13:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Pick:priv:stat} (i32:x) -> i32
+        §R 1
+
+      §MT{m003:Pick:priv:stat} (i32:x:ref) -> i32
+        §ASSIGN x 5
+        §R 2
+
+      §MT{m004:Run:pub:stat} () -> str
+        §B{~v:i32} 0
+        §B{i32:which} §C{Pick} §A{ref} v §/C
+        §R (+ (+ which "|") v)
+
+
+
