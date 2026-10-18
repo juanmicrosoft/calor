@@ -1,0 +1,58 @@
+// 0.25 T1 (#1428) shared control: a custom conditional interpolated-string handler. The
+// handler's constructor takes an argument from the call ([InterpolatedStringHandlerArgument])
+// and an out bool: when it answers false, no hole is evaluated. Flattening the argument to a
+// string would evaluate the holes and change the log.
+using System;
+using System.Runtime.CompilerServices;
+using System.Text;
+
+[InterpolatedStringHandler]
+public ref struct GateHandler
+{
+    private StringBuilder builder;
+
+    public GateHandler(int literalLength, int formattedCount, bool enabled, out bool shouldAppend)
+    {
+        builder = new StringBuilder();
+        shouldAppend = enabled;
+        Probe.log = Probe.log + (enabled ? "on" : "off");
+    }
+
+    public void AppendLiteral(string s)
+    {
+        builder.Append(s);
+    }
+
+    public void AppendFormatted<T>(T value)
+    {
+        builder.Append("{" + value + "}");
+    }
+
+    public string Result()
+    {
+        return builder.ToString();
+    }
+}
+
+public static class Probe
+{
+    public static string log = "";
+
+    static int Hole(int v)
+    {
+        log = log + "h" + v;
+        return v;
+    }
+
+    public static string Write(bool enabled, [InterpolatedStringHandlerArgument("enabled")] GateHandler handler)
+    {
+        return handler.Result();
+    }
+
+    public static string Run()
+    {
+        string on = Write(true, $"a{Hole(1)}b");
+        string off = Write(false, $"c{Hole(2)}d");
+        return on + "|" + off + "|" + log;
+    }
+}

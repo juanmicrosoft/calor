@@ -1,0 +1,26 @@
+// 0.25 T1 (#1428) shared control: local functions containing interpolation and calls. A
+// non-capturing local function formats with an interpolated string (format, alignment, a
+// call hole); another calls a class method with side effects, so call order is observable.
+using System;
+
+public static class Probe
+{
+    static string log = "";
+
+    static int Next(string tag)
+    {
+        log = log + tag;
+        return log.Length;
+    }
+
+    public static string Run()
+    {
+        string Fmt(int x) => $"<{x:D3}|{x,4}|{Next("h")}>";
+        int Twice(int x) { int a = Next("a"); int b = Next("b"); return x * 2 + a * 10 + b; }
+
+        string first = Fmt(7);
+        int second = Twice(3);
+        string third = Fmt(Twice(1));
+        return first + "|" + second + "|" + third + "|" + log;
+    }
+}

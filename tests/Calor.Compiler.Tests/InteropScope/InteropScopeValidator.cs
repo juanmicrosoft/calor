@@ -9,7 +9,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 
 /// <summary>
 /// #1426 (0.25 R0): validates <c>scope.json</c> against the sealed baseline evidence and fails closed
-/// (codes S001-S013, documented in docs/plans/v0.25-interop-scope-and-baseline.md §11). It checks that
+/// (codes S001-S014, documented in docs/plans/v0.25-interop-scope-and-baseline.md §11). It checks that
 /// evidence is present and consistent; it does not re-run the converter.
 /// </summary>
 internal static class InteropScopeValidator
@@ -369,6 +369,8 @@ internal static class InteropScopeValidator
             }
         }
 
+        ValidateAcceptancePreconditions(v, scope, amendments, readRepoFile, Exists);
+
         // S013: the baseline evidence is sealed, and every recorded baseline is recomputed from it.
         var seal = scope["evidenceSeal"];
         if (Str(seal?["baselineResults"]) != Sha256(readRepoFile(PacketDir + "/baseline-results.json") ?? []))
@@ -412,6 +414,75 @@ internal static class InteropScopeValidator
         }
         return v;
     }
+
+    /// <summary>
+    /// S014 (1.3.0): once an amendment replaces A1's "#1408 succeeds" precondition, the packet carries the
+    /// amendment's exact copy; the copy cites the recorded maintainer decision and the #1408 terminal record
+    /// (whose outcome it restates); A1 (#1430) no longer waits on #1408 but on every listed release gap; and
+    /// the re-proof runs on the candidate's own SHA with at least one proof, provenance and release check,
+    /// each citing a retained source.
+    /// </summary>
+    /// <summary>The release gaps the 2026-10-18 decision names; a later amendment may add gaps, never drop these.</summary>
+    public static readonly int[] RequiredReleaseGaps = [1545, 1546, 1547];
+
+    /// <summary>The 0.24 checks amendment 1.3.0 registers for the re-proof: a floor, as for the gaps.</summary>
+    public static readonly (string Id, string Kind, int Gate, string Source)[] RequiredReproofChecks =
+    [
+        ("proof-s2-witnesses", "proof", 1413, S2Record),
+        ("provenance-candidate-manifest", "provenance", 1423, "docs/plans/v0.24-c1-candidate.md"),
+        ("provenance-regeneration", "provenance", 1424, "docs/plans/evidence/c2-1424/regeneration.md"),
+        ("provenance-determinism", "provenance", 1421, "scripts/determinism_protocol.py"),
+        ("release-gate", "release", 1410, "docs/plans/evidence/r2-1410/release-gate.md"),
+    ];
+
+    private static void ValidateAcceptancePreconditions(List<ContractViolation> v, JsonNode scope, List<JsonNode> amendments,
+        Func<string, byte[]?> read, Func<string?, bool> exists)
+    {
+        var recorded = amendments.LastOrDefault(a => a["acceptancePreconditions"] is JsonObject);
+        var pre = scope["acceptancePreconditions"];
+        // From 1.3.0 on, the replacement is mandatory: deleting every copy does not restore "#1408 succeeds".
+        if (recorded is null && pre is null
+            && (Version(Str(scope["scopeVersion"])) is not { } sv || sv.CompareTo((1, 3, 0)) < 0))
+            return;
+        void Fail(string what) => v.Add(new("S014", "acceptancePreconditions", what));
+        if (recorded is null || pre is not JsonObject || !JsonNode.DeepEquals(pre, recorded["acceptancePreconditions"]))
+        {
+            Fail("the packet's acceptance preconditions must equal the copy the latest amendment that records them registered");
+            return;
+        }
+        var version = Str(recorded["version"]);
+        var decision = Arr(recorded["maintainerDecisions"]).FirstOrDefault(d => Str(d["id"]) == Str(pre["decision"]));
+        if (Str(pre["amendment"]) != version || decision is null || !NonBlank(decision["decision"]) || !NonBlank(decision["by"])
+            || Str(decision["date"]) is not { } date || !DateTime.TryParse(date, out _))
+            Fail("the preconditions must cite their amendment and a recorded maintainer decision with its text, author and date");
+        var replaced = pre["replaces"];
+        JsonNode? terminal = null;
+        try { terminal = Str(replaced?["terminalRecord"]) is { } tp && exists(tp) ? JsonNode.Parse(read(tp)!) : null; }
+        catch (JsonException) { }
+        if (Int(replaced?["issue"]) != 1408 || terminal is null || Int(terminal["issue"]) != 1408
+            || Str(terminal["outcome"]) is not { Length: > 0 } outcome || outcome != Str(replaced?["outcome"]))
+            Fail("the replaced #1408 precondition must cite the retained #1408 terminal record and restate its outcome");
+        var a1 = Arr(scope["supportingIssues"]).FirstOrDefault(s => Int(s["issue"]) == 1430);
+        var a1Blockers = Arr(a1?["blockers"]).Select(Int).ToHashSet();
+        var gaps = Arr(pre["releaseGaps"]).Select(g => Int(g["issue"])).ToList();
+        if (a1 is null || a1Blockers.Contains(1408) || RequiredReleaseGaps.Any(g => !gaps.Contains(g))
+            || gaps.Any(g => g <= 0 || !a1Blockers.Contains(g)))
+            Fail("A1 (#1430) must wait on every listed release gap (at least #1545, #1546, #1547) instead of #1408");
+        var checks = Arr(pre["reproof"]?["checks"]).ToList();
+        if (Str(pre["reproof"]?["onCandidate"]) != "own-sha"
+            || RequiredReproofChecks.Any(r => !checks.Any(c => Str(c["id"]) == r.Id && Str(c["kind"]) == r.Kind && Int(c["gate"]) == r.Gate
+                && Str(c["source"]) == r.Source))
+            || checks.Any(c => !NonBlank(c["id"]) || !NonBlank(c["requirement"]) || !exists(Str(c["source"]))))
+            Fail("the re-proof must run on the candidate's own SHA with proof, provenance and release checks that cite retained sources");
+        // The 1.3.0 copy records the decision's normative text (requirements, sources, gaps); it is pinned, so it
+        // cannot be weakened in place. A later change is a later amendment with its own copy, under the floors above.
+        var registered = amendments.FirstOrDefault(a => Str(a["version"]) == "1.3.0")?["acceptancePreconditions"];
+        if (registered is not null && Sha256(Encoding.UTF8.GetBytes(registered.ToJsonString())) is var digest && digest != PreconditionsDigest130)
+            Fail($"amendment 1.3.0's recorded preconditions (digest {digest}) differ from the pinned decision text");
+    }
+
+    /// <summary>SHA-256 of amendment 1.3.0's <c>acceptancePreconditions</c> (compact JSON), as the maintainer's decision recorded it.</summary>
+    public const string PreconditionsDigest130 = "82c07b93a4b9784a9776a41b515d02fb1e34c4017d7b352d103c4b9fa255d89b";
 
     private static void ValidateReady(List<ContractViolation> v, string fid, JsonNode r, JsonNode family,
         List<JsonNode> familyCases, Func<string?, bool> exists, Func<string, byte[]?> read, string? recordValue, bool deviation,

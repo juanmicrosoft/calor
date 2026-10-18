@@ -1,0 +1,33 @@
+// 0.25 T1 (#1428) shared control: interpolation with a string target. Format specifiers,
+// alignment, escaped braces, a null hole, and holes with side effects (left-to-right order,
+// each evaluated once), in a local, an argument and a return.
+using System;
+
+public static class Probe
+{
+    static string log = "";
+
+    static int Next()
+    {
+        log = log + "n";
+        return log.Length;
+    }
+
+    static string Echo(string s)
+    {
+        return "[" + s + "]";
+    }
+
+    static string Build(int a, double d)
+    {
+        return $"{a:D4}/{d:F2}/{a,5}|{a,-3}|";
+    }
+
+    public static string Run()
+    {
+        string? none = null;
+        string local = $"{{x}}={Next()}-{Next()}-{none}.";
+        string arg = Echo($"{Next():X2}");
+        return local + arg + Build(42, 2.5) + log;
+    }
+}

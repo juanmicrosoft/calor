@@ -1,0 +1,25 @@
+// 0.25 T1 (#1428) shared control: competing overloads. C# picks a different overload for an
+// interpolated string depending on the candidates (string beats FormattableString; with no
+// string overload, FormattableString or IFormattable beats object). Each overload reports its
+// name, so a regenerated call that binds another overload is observable.
+using System;
+
+public static class Probe
+{
+    static string A(string s) => "A:string:" + s;
+    static string A(FormattableString f) => "A:fs:" + f.Format;
+
+    static string B(FormattableString f) => "B:fs:" + f.Format;
+    static string B(object o) => "B:object:" + o;
+
+    static string C(IFormattable f) => "C:iformattable:" + f.ToString(null, null);
+    static string C(object o) => "C:object:" + o;
+
+    static string D(object o) => "D:object:" + o;
+
+    public static string Run()
+    {
+        int x = 3;
+        return A($"x{x}") + "|" + B($"x{x}") + "|" + C($"x{x}") + "|" + D($"x{x}");
+    }
+}

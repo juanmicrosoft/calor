@@ -1,0 +1,34 @@
+// 0.25 T1 (#1428) shared control: FormattableString and IFormattable targets. The target type
+// keeps the composite format and the argument list (holes evaluated once, in order) instead of
+// a finished string, so Format, ArgumentCount and culture-specific ToString are observable.
+using System;
+using System.Globalization;
+
+public static class Probe
+{
+    static string log = "";
+
+    static double Value(double d)
+    {
+        log = log + "v" + d;
+        return d;
+    }
+
+    static string Describe(FormattableString f)
+    {
+        return f.Format + "#" + f.ArgumentCount + "#" + f.ToString(CultureInfo.InvariantCulture)
+            + "#" + f.ToString(new CultureInfo("de-DE"));
+    }
+
+    static string Render(IFormattable f)
+    {
+        return f.ToString(null, new CultureInfo("fr-FR"));
+    }
+
+    public static string Run()
+    {
+        FormattableString fs = $"a={Value(1.5)} b={Value(2.25):F1}";
+        IFormattable fm = $"c={Value(3.5)}";
+        return Describe(fs) + "|" + Render(fm) + "|" + Describe($"d={Value(4.5),6}") + "|" + log;
+    }
+}
