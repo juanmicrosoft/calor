@@ -14,6 +14,21 @@ toolchain, decisions, open items), the generated `candidate-manifest.json`, and
 through P1's `DurableProvenance.Verify`, and runs the scope, T1 and D1 validators on the
 candidate's blobs.
 
+## The freeze (#1430 step 2)
+
+| Field | Value |
+|---|---|
+| Candidate | `48cae911700ceb0dfc358e00933650445d81604f`, the merge of #1576, committed 2026-10-19T18:18:59Z; the tip of `origin/main` at the freeze (2026-10-19T18:23:52Z) |
+| Version | 0.25.0; no `v0.25.0` tag, local or remote |
+| Tree | `45d072a911d298b8c802219b206c80b351c32f19` (equal to #1576's head `f8413cc9e`) |
+| Release SDK | 10.0.401; `dotnetSdkBuild` `sha256:a5b223b4…` (Linux x86_64, reproducible-builds run 39295103845 on that tree, both builds) |
+| Release gaps | #1545, #1546, #1547 closed 2026-10-19 at 15:23:15Z, 15:23:17Z, 15:23:19Z; the live credential check reports `CLOSED` (Actions workflow permissions by maintainer attestation), output in `release-credentials-live-2026-10-19.txt` |
+| Accepted residuals | `D-ACCEPT-FILE-FREEZE` (@juanmicrosoft, 2026-10-19, "Accept, file issue, freeze"): the gate's code-span link-text anchors (MAJOR) and the coarse S004 parity theory (MINOR), tracked in #1578; record `reviews/prefreeze-exception-codex.md` |
+
+`candidate-manifest.json` is generated from `inputs.json`; `V025CandidateManifestTests` re-verifies it from git,
+runs the scope, T1 and D1 validators on the candidate's blobs, and classifies the range from the candidate.
+The landing is this freeze PR's merge.
+
 ## Generator
 
 `generate_candidate_manifest.py` reads only git objects at the candidate; `--check` regenerates
