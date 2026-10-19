@@ -308,7 +308,7 @@ public static class BenchmarkCommand
         }
         statusOut.WriteLine();
 
-        var result = await BenchmarkIntegration.RunProjectBenchmarkAsync(project.FullName, category, verbose);
+        var result = await BenchmarkIntegration.RunProjectBenchmarkAsync(project.FullName, category, verbose, statusOut);
 
         if (result.ProjectResults == null || result.ProjectResults.Count == 0)
         {

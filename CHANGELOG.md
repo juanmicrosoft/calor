@@ -168,6 +168,16 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
 
 ### Fixed
 
+- **`--format json --verbose` now keeps stdout a single JSON document.** Three commands
+  printed `--verbose` progress text to stdout before the JSON envelope, so a program that
+  parsed stdout failed. `calor convert` on a C# file printed `Converted N nodes` and member
+  counts; `calor verify` printed compiler phase lines such as `Lexer produced N tokens`;
+  and `calor benchmark <directory>` printed `Benchmarked: <name>`. In JSON mode this text
+  now goes to stderr, as the rest of the human-readable report already did. The JSON
+  content and text-mode output do not change. Tests pin the same contract for every
+  command that has both `--format` and `--verbose`: the root compile command, `convert`,
+  `format`, `lint`, `verify`, `ids check`, `assess`, `analyze-convertibility`,
+  `benchmark` and `watch` (one JSON document per stdout line). (`calor migrate` has no `--format` option; its JSON report goes to a file.)
 - **`calor assess` and `calor coverage` no longer say `ref` and `out` parameters are
   unsupported.** Since #943 they convert natively, but the migration analyzer behind these
   commands (and MCP's analysis tools) still described them as "not yet supported", and

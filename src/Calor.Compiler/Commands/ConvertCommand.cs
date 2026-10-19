@@ -452,12 +452,16 @@ public static class ConvertCommand
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
-        var converter = new CSharpToCalorConverter(
-            BuildCSharpToCalorOptions(
-                benchmark, verbose, explain, noFallback, passthrough,
-                explicitCallClosers, lossy, selectBranch, definedSymbols,
-                configuration, targetFramework, languageVersion,
-                documentationMode, sourceKind, features, references));
+        var conversionOptions = BuildCSharpToCalorOptions(
+            benchmark, verbose, explain, noFallback, passthrough,
+            explicitCallClosers, lossy, selectBranch, definedSymbols,
+            configuration, targetFramework, languageVersion,
+            documentationMode, sourceKind, features, references);
+        // Envelope mode: the converter's --verbose progress lines go to stderr
+        // with the rest of the human-readable report, so stdout stays one
+        // JSON document. Text mode keeps them on stdout.
+        conversionOptions.StatusWriter = envelope != null ? Console.Error : null;
+        var converter = new CSharpToCalorConverter(conversionOptions);
 
         using var timeoutCts = timeoutSeconds > 0
             ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds))

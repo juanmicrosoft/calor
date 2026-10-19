@@ -131,6 +131,14 @@ public sealed class ConversionOptions
     public bool Verbose { get; set; }
 
     /// <summary>
+    /// Writer for <see cref="Verbose"/> progress lines (node and member counts).
+    /// Null (the default) means standard output. Machine-readable CLI modes
+    /// (<c>calor convert --format json</c>) set this to standard error so stdout
+    /// carries only the envelope document.
+    /// </summary>
+    public TextWriter? StatusWriter { get; set; }
+
+    /// <summary>
     /// Whether to auto-generate unique IDs for Calor elements.
     /// </summary>
     public bool AutoGenerateIds { get; set; } = true;
@@ -717,12 +725,13 @@ public sealed class CSharpToCalorConverter
 
             if (_options.Verbose)
             {
-                Console.WriteLine($"Converted {context.Stats.ConvertedNodes} nodes");
-                Console.WriteLine($"  Classes: {context.Stats.ClassesConverted}");
-                Console.WriteLine($"  Interfaces: {context.Stats.InterfacesConverted}");
-                Console.WriteLine($"  Methods: {context.Stats.MethodsConverted}");
-                Console.WriteLine($"  Properties: {context.Stats.PropertiesConverted}");
-                Console.WriteLine($"  Fields: {context.Stats.FieldsConverted}");
+                var status = _options.StatusWriter ?? Console.Out;
+                status.WriteLine($"Converted {context.Stats.ConvertedNodes} nodes");
+                status.WriteLine($"  Classes: {context.Stats.ClassesConverted}");
+                status.WriteLine($"  Interfaces: {context.Stats.InterfacesConverted}");
+                status.WriteLine($"  Methods: {context.Stats.MethodsConverted}");
+                status.WriteLine($"  Properties: {context.Stats.PropertiesConverted}");
+                status.WriteLine($"  Fields: {context.Stats.FieldsConverted}");
             }
 
             return new ConversionResult

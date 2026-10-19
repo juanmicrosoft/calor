@@ -57,10 +57,14 @@ public sealed class BenchmarkIntegration
     /// <summary>
     /// Runs benchmarks for all paired files in a directory.
     /// </summary>
+    /// <param name="statusWriter">Writer for <paramref name="verbose"/> progress
+    /// lines; null means standard output. <c>calor benchmark --format json</c>
+    /// passes standard error so stdout carries only the envelope.</param>
     public static async Task<FullBenchmarkResult> RunProjectBenchmarkAsync(
         string directory,
         string? category = null,
-        bool verbose = false)
+        bool verbose = false,
+        TextWriter? statusWriter = null)
     {
         var options = new BenchmarkRunnerOptions
         {
@@ -95,7 +99,7 @@ public sealed class BenchmarkIntegration
 
                 if (verbose)
                 {
-                    Console.WriteLine($"  Benchmarked: {baseName}");
+                    (statusWriter ?? Console.Out).WriteLine($"  Benchmarked: {baseName}");
                 }
             }
             catch (Exception ex)
