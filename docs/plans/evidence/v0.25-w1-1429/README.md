@@ -73,7 +73,11 @@ After Codex round 2: `[NotNullWhen]` on an `out` parameter converts natively wit
 strings and non-plain doubles are not native holes; `post-validation-fallback` is not a registry
 entry; diagnostic codes are pinned with counts; the fragment check is ordered and keeps indentation.
 
-Found while checking (documented, not fixed: W1 changes no `src/`):
+Found while checking (documented, not fixed: W1 changes no `src/`). **Update (F1 PR 2, #1571):**
+findings 1, 2 and 4 are fixed in the converter (an out var call statement converts natively with a
+`default`-initialized binding; an expression-bodied ref return is preserved; the five registry
+descriptions say what converts), and the W1 pages, `records.json` and the F1 transcripts were
+updated with `CALOR_REGENERATE_W1_TRANSCRIPTS=1`. Finding 3 (`--format json --verbose`) is #1570's.
 
 1. **`out var` in a call statement** (`int.TryParse(s, out var n);`): the RO-DECL-1 lowering writes
    `§B{~n:i32}` with no initializer, and the parser reads the next statement's call as its initializer

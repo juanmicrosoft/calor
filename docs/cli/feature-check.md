@@ -109,7 +109,7 @@ The interop features the 0.25 converter changes, as the registry reports them:
 
 | Feature | Level | Notes |
 |---------|-------|-------|
-| `ref-parameter`, `out-parameter`, `out-var` | Partial | By-reference arguments convert natively (`§A{ref}`, `§A{out}`, `out _`). Ref locals, ref returns, method-generic `out T`, and `out var` outside a local declaration, `return` or `if` condition stay C#. `[NotNullWhen]` is copied but inert (the `out-parameter` description says it is preserved). The `out-var` description also lists the expression statement, but that output fails the C# round trip in 0.25 |
+| `ref-parameter`, `out-parameter`, `out-var` | Partial | By-reference arguments convert natively (`§A{ref}`, `§A{out}`, `out _`). Ref locals, ref returns, method-generic `out T`, and `out var` outside an expression statement, local declaration, `return` or `if` condition stay C#. `[NotNullWhen]` is copied but inert |
 | `in-parameter` | Full | Call sites that omit `in`, or pass an operand that runs code, keep their statement as C# |
 | `string-interpolation` | Partial | Not `Full`: `[InterpolatedStringHandler]` targets and hole-free `FormattableString` targets have no Calor form and stay C# |
 | `local-function` | Partial | A bounded slice of non-capturing local functions becomes a nested `§F`; any other keeps its member as `§CSHARP` |
@@ -117,12 +117,8 @@ The interop features the 0.25 converter changes, as the registry reports them:
 | `string-interpolation-handler` | NotSupported | Keep the call as C#, or pass an already formatted string to a `string` overload |
 | `array-element-block` | NotSupported | A collection-initializer element, or a multi-line element in a rectangular array row, keeps its statement as C# |
 
-Five registry entries do not match 0.25 behavior: `out-var` (the expression
-statement), `ref-expression` ("stripped"; ref locals and returns are preserved or fail the
-round trip), `multidim-array` ("fully supported"; see `array-element-block`), `out-parameter`
-(flow attributes are copied, not preserved as C#), and
-`yield-return` (methods only). The website's `calor feature-check` page lists them as
-known gaps.
+One registry entry does not match 0.25 behavior: `yield-return` (methods only). The
+website's `calor feature-check` page lists it as a known gap.
 
 ## Use in AI Agents
 
