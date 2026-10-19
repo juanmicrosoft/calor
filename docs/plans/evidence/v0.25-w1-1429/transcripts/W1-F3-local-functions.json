@@ -1,0 +1,137 @@
+{
+  "cli-convert": {
+    "command": "calor convert Shapes.cs -o Shapes.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Shapes.cs:9 [method]",
+      "    {",
+      "        int Scale(int v) =>...",
+      "  ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.",
+      "  Preservation paths: 1 by converter interop (unsupported construct)",
+      "Warnings (1):",
+      "  ⚠ Unsupported feature [local-function] escalated to §CSHARP interop preservation: int Scale(int v) => v * factor;",
+      "Output: <dir>/Shapes.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Shapes:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Shapes:pub:stat}\n      §MT{m002:Area:pub:stat} (i32:w, i32:h) -> i32\n        §F{f003:Clamp} (i32:v) -> i32\n          §R (? (< v 0) 0 v)\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n      }§/CSHARP\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Shapes.cs -o Shapes.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 3,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false
+    },
+    "diagnosticCodes": [
+      "Calor1343 x2"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Shapes.calr --output Shapes.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 3,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    },
+    "issueCodes": [
+      "info:Calor1343:method",
+      "warning:Calor1343:local-function"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Shapes:pub:stat}\n      §MT{m002:Area:pub:stat} (i32:w, i32:h) -> i32\n        §F{f003:Clamp} (i32:v) -> i32\n          §R (? (< v 0) 0 v)\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n      }§/CSHARP\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 3,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true
+    },
+    "issueCodes": [
+      "info:Calor1343:method",
+      "warning:Calor1343:local-function"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Shapes:pub:stat}\n      §MT{m002:Area:pub:stat} (i32:w, i32:h) -> i32\n        §F{f003:Clamp} (i32:v) -> i32\n          §R (? (< v 0) 0 v)\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n      }§/CSHARP\n\n\n\n"
+  }
+}

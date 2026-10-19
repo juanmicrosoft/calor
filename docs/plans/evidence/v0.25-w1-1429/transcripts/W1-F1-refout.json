@@ -1,0 +1,111 @@
+{
+  "cli-convert": {
+    "command": "calor convert Inventory.cs -o Inventory.calr",
+    "exit": 0,
+    "stdout": [
+      "✓ Conversion successful",
+      "Warnings (2):",
+      "  ⚠ Feature 'out-var' is partially supported. Declare the variable before the statement and pass it with out",
+      "  ⚠ Nested oblivious reference semantics for 'Dictionary<string, int>' are not modeled; preserving syntax-only type mapping.",
+      "Output: <dir>/Inventory.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Inventory:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Inventory:pub:stat}\n      §MT{m002:ParseOr:pub:stat} (str:text, i32:fallback) -> i32\n        §B{~n:i32}\n        §IF{if003} §C{int.TryParse} §A text §A{out} n §/C\n          §R n\n        §R fallback\n\n      §MT{m004:CountOf:pub:stat} (Dict<str, i32>:stock, str:item) -> i32\n        §B{~count:i32} `default`\n        §C{stock.TryGetValue} §A item §A{out} count §/C\n        §R count\n\n      §MT{m005:IsNumber:pub:stat} (str:text) -> bool\n        §R §C{int.TryParse} §A text §A{out} _ §/C\n\n      §MT{m006:Bump:pub:stat} (i32:x:ref)\n        §ASSIGN x (+ x 1)\n\n      §MT{m007:Twice:pub:stat} (i32:x:in) -> i32\n        §R (* x 2)\n\n      §MT{m008:Run:pub:stat} () -> i32\n        §B{~total:i32} 1\n        §C{Bump} §A{ref} total §/C\n        §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A \"40\" §A 0 §/C)\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Inventory.cs -o Inventory.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 17,
+    "interopPreservationCount": 0,
+    "lossCount": 0,
+    "losses": [],
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false
+    },
+    "diagnosticCodes": [
+      "Calor1343 x2"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Inventory.calr --output Inventory.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 17,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    },
+    "issueCodes": [
+      "warning:Calor1343:nullable-oblivious-nested-shape",
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Inventory:pub:stat}\n      §MT{m002:ParseOr:pub:stat} (str:text, i32:fallback) -> i32\n        §B{~n:i32}\n        §IF{if003} §C{int.TryParse} §A text §A{out} n §/C\n          §R n\n        §R fallback\n\n      §MT{m004:CountOf:pub:stat} (Dict<str, i32>:stock, str:item) -> i32\n        §B{~count:i32} `default`\n        §C{stock.TryGetValue} §A item §A{out} count §/C\n        §R count\n\n      §MT{m005:IsNumber:pub:stat} (str:text) -> bool\n        §R §C{int.TryParse} §A text §A{out} _ §/C\n\n      §MT{m006:Bump:pub:stat} (i32:x:ref)\n        §ASSIGN x (+ x 1)\n\n      §MT{m007:Twice:pub:stat} (i32:x:in) -> i32\n        §R (* x 2)\n\n      §MT{m008:Run:pub:stat} () -> i32\n        §B{~total:i32} 1\n        §C{Bump} §A{ref} total §/C\n        §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A \"40\" §A 0 §/C)\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 17,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true
+    },
+    "issueCodes": [
+      "warning:Calor1343:nullable-oblivious-nested-shape",
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Inventory:pub:stat}\n      §MT{m002:ParseOr:pub:stat} (str:text, i32:fallback) -> i32\n        §B{~n:i32}\n        §IF{if003} §C{int.TryParse} §A text §A{out} n §/C\n          §R n\n        §R fallback\n\n      §MT{m004:CountOf:pub:stat} (Dict<str, i32>:stock, str:item) -> i32\n        §B{~count:i32} `default`\n        §C{stock.TryGetValue} §A item §A{out} count §/C\n        §R count\n\n      §MT{m005:IsNumber:pub:stat} (str:text) -> bool\n        §R §C{int.TryParse} §A text §A{out} _ §/C\n\n      §MT{m006:Bump:pub:stat} (i32:x:ref)\n        §ASSIGN x (+ x 1)\n\n      §MT{m007:Twice:pub:stat} (i32:x:in) -> i32\n        §R (* x 2)\n\n      §MT{m008:Run:pub:stat} () -> i32\n        §B{~total:i32} 1\n        §C{Bump} §A{ref} total §/C\n        §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A \"40\" §A 0 §/C)\n\n\n\n"
+  }
+}

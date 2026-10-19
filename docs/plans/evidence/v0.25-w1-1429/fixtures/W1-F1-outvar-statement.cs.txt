@@ -1,0 +1,8 @@
+public static class Parser
+{
+    public static int ParseOrZero(string text)
+    {
+        int.TryParse(text, out var n);
+        return n;
+    }
+}

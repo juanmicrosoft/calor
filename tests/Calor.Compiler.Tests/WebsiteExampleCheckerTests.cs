@@ -511,7 +511,10 @@ public sealed class WebsiteExampleCheckerTests
     // #847 (0.25 F3, converter): 55 -> 56, the local-functions example in cli/convert.mdx.
     // #943 (0.25 F1): complete 56 -> 58 and negative 5 -> 6, the two complete programs in
     // syntax-reference/calls.mdx: the ref/out/in example and the Calor0212 refusal (negative).
-    private const string Pinned = "pages=96 complete=58 negative=6 grouped=3 checkedOutputs=2 illustrative=33";
+    // #1429 (0.25 W1): pages 96 -> 97, complete 58 -> 62 and illustrative 33 -> 34, the new
+    // guides/csharp-interoperability.mdx: four converted outputs (each also pinned to its CLI
+    // transcript by W1GuideTranscriptTests) and one unchecked report excerpt.
+    private const string Pinned = "pages=97 complete=62 negative=6 grouped=3 checkedOutputs=2 illustrative=34";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

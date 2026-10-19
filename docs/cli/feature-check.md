@@ -24,28 +24,28 @@ calor feature-check --list --level notsupported
 
 ## Examples
 
-### Check if yield-return is supported
+### Check if iterator accessors are supported
 
 ```bash
-calor feature-check yield-return
+calor feature-check iterator-accessor
 ```
 
-Output is wrapped in the [envelope schema v1.1](/calor/cli/envelope-schema/);
-the feature payload lives under `data`:
+Output is wrapped in the [envelope schema 2.0](/calor/cli/envelope-schema/);
+the feature payload lives under `data` (0.25 output, `§` shown unescaped):
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "feature-check",
   "diagnostics": [],
   "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
   "data": {
-    "feature": "yield-return",
+    "feature": "iterator-accessor",
     "found": true,
     "supported": false,
     "supportLevel": "notsupported",
-    "description": "Yield return (iterator methods) is not supported",
-    "alternative": "Use explicit List<T> construction and return the complete list"
+    "description": "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a §CSHARP interop block; Calor has no iterator accessors (Calor0209)",
+    "alternative": "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"
   }
 }
 ```
@@ -101,77 +101,28 @@ calor feature-check some-unknown-feature
 
 ## Feature Reference
 
-### Fully Supported Features
+The registry in `src/Calor.Compiler/Migration/FeatureSupport.cs` is the source of truth;
+run `calor feature-check --list` (optionally with `--level`) for the current level and
+description of every feature. This page does not copy the full list, because a copy drifts.
 
-| Feature | Description |
-|---------|-------------|
-| `class`, `interface`, `struct`, `record`, `enum` | Type definitions |
-| `method`, `property`, `field`, `constructor` | Members |
-| `if`, `for`, `foreach`, `while`, `switch` | Control flow |
-| `try-catch` | Exception handling |
-| `async-await` | Async functions |
-| `lambda` | Lambda expressions |
-| `generics` | Generic types and methods |
-| `pattern-matching-basic` | Type, constant, var patterns |
-| `string-interpolation` | String formatting |
-| `null-coalescing`, `null-conditional` | Null operators |
+The interop features the 0.25 converter changes, as the registry reports them:
 
-### Partially Supported Features
+| Feature | Level | Notes |
+|---------|-------|-------|
+| `ref-parameter`, `out-parameter`, `out-var` | Partial | By-reference arguments convert natively (`§A{ref}`, `§A{out}`, `out _`). Ref locals, ref returns, method-generic `out T`, and `out var` outside a local declaration, `return` or `if` condition stay C#. `[NotNullWhen]` is copied but inert (the `out-parameter` description says it is preserved). The `out-var` description also lists the expression statement, but that output fails the C# round trip in 0.25 |
+| `in-parameter` | Full | Call sites that omit `in`, or pass an operand that runs code, keep their statement as C# |
+| `string-interpolation` | Partial | Not `Full`: `[InterpolatedStringHandler]` targets and hole-free `FormattableString` targets have no Calor form and stay C# |
+| `local-function` | Partial | A bounded slice of non-capturing local functions becomes a nested `§F`; any other keeps its member as `§CSHARP` |
+| `iterator-accessor`, `partial-property` | NotSupported | The member stays `§CSHARP`; iterator *methods* (`yield-return`) are Full |
+| `string-interpolation-handler` | NotSupported | Keep the call as C#, or pass an already formatted string to a `string` overload |
+| `array-element-block` | NotSupported | A collection-initializer element, or a multi-line element in a rectangular array row, keeps its statement as C# |
 
-| Feature | Description |
-|---------|-------------|
-| `linq-method`, `linq-query` | LINQ (may need review) |
-| `ref-parameter`, `out-parameter` | Reference parameters (kept with warning) |
-| `pattern-matching-advanced` | Advanced patterns (may be simplified) |
-| `attributes` | Converted to comments |
-| `dynamic` | Converted to 'any' with warning |
-| `is-type-pattern` | Type patterns (declaration patterns unsupported) |
-| `nested-generic-type` | May have issues |
-
-### Not Supported Features
-
-| Feature | Workaround |
-|---------|------------|
-| `yield-return` | Use explicit List<T> construction |
-| `primary-constructor` | Use traditional constructor |
-| `relational-pattern`, `compound-pattern` | Use explicit comparisons |
-| `generic-type-constraint` | Remove or add runtime checks |
-| `range-expression`, `index-from-end` | Use explicit bounds |
-| `target-typed-new` | Use `new TypeName()` |
-| `null-conditional-method` | Use explicit null check |
-| `named-argument` | Use positional arguments |
-| `declaration-pattern` | Check type and cast separately |
-| `throw-expression` | Use if-throw statement |
-| `out-var` | Declare variable before call |
-| `in-parameter` | Pass by value or use ref |
-| `checked-block` | Remove wrapper |
-| `with-expression` | Create new instance manually |
-| `init-accessor` | Use regular set or constructor |
-| `required-member` | Use constructor parameters |
-| `list-pattern` | Use explicit indexing |
-| `static-abstract-member` | Use instance/static methods |
-| `ref-struct`, `readonly-struct` | Use regular struct |
-| `lock-statement` | Use Monitor.Enter/Exit |
-| `await-foreach` | Enumerate manually |
-| `await-using` | Use try/finally with DisposeAsync |
-| `scoped-parameter` | Remove scoped keyword |
-| `collection-expression` | Use array/list constructor |
-| `goto`, `labeled-statement` | Use structured control flow |
-| `unsafe`, `pointer`, `stackalloc`, `fixed`, `volatile` | Use safe alternatives |
-| `default-lambda-parameter` | Use overloads or null checks |
-| `file-scoped-type` | Use internal or nested types |
-| `utf8-string-literal` | Use `Encoding.UTF8.GetBytes()` |
-| `generic-attribute` | Use typeof() in non-generic attribute |
-| `using-type-alias` | Define explicit record/class types |
-
-### Manual Required Features
-
-| Feature | Workaround |
-|---------|------------|
-| `extension-method` | Convert to instance methods or traits |
-| `operator-overload` | Define explicit methods |
-| `implicit-conversion`, `explicit-conversion` | Use conversion methods |
-| `equals-operator` | Define Equals method |
+Five registry entries do not match 0.25 behavior: `out-var` (the expression
+statement), `ref-expression` ("stripped"; ref locals and returns are preserved or fail the
+round trip), `multidim-array` ("fully supported"; see `array-element-block`), `out-parameter`
+(flow attributes are copied, not preserved as C#), and
+`yield-return` (methods only). The website's `calor feature-check` page lists them as
+known gaps.
 
 ## Use in AI Agents
 
@@ -179,12 +130,12 @@ Before attempting to convert C# code to Calor, agents should:
 
 1. Check if specific features are supported:
    ```bash
-   calor feature-check yield-return
+   calor feature-check iterator-accessor
    ```
 
 2. If unsupported, use the `alternative` field to rewrite the code first:
    ```json
-   {"alternative": "Use explicit List<T> construction and return the complete list"}
+   {"alternative": "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"}
    ```
 
 3. For bulk checking, use `--list` to get all unsupported features upfront.

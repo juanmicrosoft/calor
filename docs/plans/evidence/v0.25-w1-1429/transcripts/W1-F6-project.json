@@ -1,0 +1,130 @@
+{
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 1,
+    "calrFilesWritten": 0,
+    "files": [
+      {
+        "file": "Counter.cs",
+        "conversionPaths": {
+          "schemaVersion": 1,
+          "outcome": "refused",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false
+        },
+        "issues": []
+      },
+      {
+        "file": "Inventory.cs",
+        "conversionPaths": {
+          "schemaVersion": 1,
+          "outcome": "refused",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false
+        },
+        "issues": []
+      }
+    ]
+  },
+  "mcp-migrate": {
+    "arguments": "{ projectPath, phase: \"convert\" }",
+    "isError": true,
+    "files": [
+      {
+        "file": "Counter.cs",
+        "conversionPaths": {
+          "schemaVersion": 1,
+          "outcome": "refused",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false
+        },
+        "issues": [
+          "error:Calor1343:roundtrip-csharp-validation"
+        ]
+      },
+      {
+        "file": "Inventory.cs",
+        "conversionPaths": {
+          "schemaVersion": 1,
+          "outcome": "refused",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false
+        },
+        "issues": [
+          "error:Calor1343:roundtrip-csharp-validation",
+          "warning:Calor1343:nullable-oblivious-nested-shape",
+          "warning:Calor1343:out-var"
+        ]
+      }
+    ]
+  },
+  "mcp-batch": {
+    "arguments": "{ action: \"convert\", projectPath }",
+    "isError": true,
+    "failedFiles": 2,
+    "files": [
+      {
+        "file": "Counter.cs",
+        "conversionPaths": {
+          "schemaVersion": 1,
+          "outcome": "refused",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false
+        },
+        "issues": [
+          "error:Calor1343:roundtrip-csharp-validation"
+        ]
+      },
+      {
+        "file": "Inventory.cs",
+        "conversionPaths": {
+          "schemaVersion": 1,
+          "outcome": "refused",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false
+        },
+        "issues": [
+          "error:Calor1343:roundtrip-csharp-validation",
+          "warning:Calor1343:nullable-oblivious-nested-shape",
+          "warning:Calor1343:out-var"
+        ]
+      }
+    ]
+  }
+}

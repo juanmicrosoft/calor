@@ -1,0 +1,131 @@
+{
+  "cli-convert": {
+    "command": "calor convert Parser.cs -o Parser.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Parser.cs:? [post-validation-fallback] [rescue: round-trip-failure]",
+      "  ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.",
+      "  Preservation paths: 1 by automatic rescue (round-trip-failure: 1; no passthrough request needed)",
+      "Warnings (1):",
+      "  ⚠ Feature 'out-var' is partially supported. Declare the variable before the statement and pass it with out",
+      "Output: <dir>/Parser.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Parser:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CSHARP{public static class Parser\n{\n    public static int ParseOrZero(string text)\n    {\n        int.TryParse(text, out var n);\n        return n;\n    }\n}}§/CSHARP\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Parser.cs -o Parser.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 4,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "post-validation-fallback",
+        "path": "rescue",
+        "trigger": "round-trip-failure",
+        "enabledBy": "rescueUnusableMembers"
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 0,
+      "rescue": 1,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {
+        "round-trip-failure": 1
+      },
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false
+    },
+    "diagnosticCodes": [
+      "Calor1343 x1"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Parser.calr --output Parser.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 1,
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "refused",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": true,
+    "success": false,
+    "nativeConversions": 4,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "refused",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    },
+    "issueCodes": [
+      "error:Calor1343:roundtrip-csharp-validation",
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Parser:pub:stat}\n      §MT{m002:ParseOrZero:pub:stat} (str:text) -> i32\n        §B{~n:i32}\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 4,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "post-validation-fallback",
+        "path": "passthrough",
+        "trigger": "round-trip-failure",
+        "enabledBy": "passthroughOnError"
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 1,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {
+        "round-trip-failure": 1
+      },
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true
+    },
+    "issueCodes": [
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CSHARP{public static class Parser\n{\n    public static int ParseOrZero(string text)\n    {\n        int.TryParse(text, out var n);\n        return n;\n    }\n}}§/CSHARP\n\n\n"
+  }
+}

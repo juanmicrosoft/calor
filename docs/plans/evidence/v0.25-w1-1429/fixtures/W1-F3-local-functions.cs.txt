@@ -1,0 +1,14 @@
+public static class Shapes
+{
+    public static int Area(int w, int h)
+    {
+        int Clamp(int v) => v < 0 ? 0 : v;
+        return Clamp(w) * Clamp(h);
+    }
+
+    public static int Scaled(int w, int factor)
+    {
+        int Scale(int v) => v * factor;
+        return Scale(w);
+    }
+}

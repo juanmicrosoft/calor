@@ -1,0 +1,139 @@
+{
+  "cli-convert": {
+    "command": "calor convert Grid.cs -o Grid.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Grid.cs:26 [array-element-block]",
+      "  Preservation paths: 1 by converter interop (unsupported construct)",
+      "Warnings (4):",
+      "  ⚠ Nested oblivious reference semantics for 'int[,]' are not modeled; preserving syntax-only type mapping.",
+      "  ⚠ Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
+      "  ⚠ Nested oblivious reference semantics for 'object[]' are not modeled; preserving syntax-only type mapping.",
+      "  ⚠ Unsupported feature [array-element-block] escalated to §CSHARP interop preservation: new List<int> { 1 }",
+      "Output: <dir>/Grid.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Grid:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Grid:pub:stat}\n      §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]\n        §E{alloc}\n        §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}\n\n      §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32\n        §B{~s:i32} start\n        §EACH{each008:x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §MT{m009:Total:pub:stat} (i32:v) -> i32\n        §E{alloc}\n        §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §MT{m011:Mixed:pub:stat} () -> i32\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R (len items)\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Grid.cs -o Grid.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 12,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "array-element-block",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false
+    },
+    "diagnosticCodes": [
+      "Calor1343 x4"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Grid.calr --output Grid.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": [
+      "Calor0419 x1"
+    ]
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 12,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "array-element-block",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    },
+    "issueCodes": [
+      "warning:Calor1343:array-element-block",
+      "warning:Calor1343:nullable-oblivious-nested-shape"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Grid:pub:stat}\n      §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]\n        §E{alloc}\n        §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}\n\n      §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32\n        §B{~s:i32} start\n        §EACH{each008:x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §MT{m009:Total:pub:stat} (i32:v) -> i32\n        §E{alloc}\n        §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §MT{m011:Mixed:pub:stat} () -> i32\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R (len items)\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 12,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "array-element-block",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true
+    },
+    "issueCodes": [
+      "warning:Calor1343:array-element-block",
+      "warning:Calor1343:nullable-oblivious-nested-shape"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §U{System.Collections.Generic}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Grid:pub:stat}\n      §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]\n        §E{alloc}\n        §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}\n\n      §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32\n        §B{~s:i32} start\n        §EACH{each008:x:var} xs\n          §ASSIGN s (+ s x)\n        §R s\n\n      §MT{m009:Total:pub:stat} (i32:v) -> i32\n        §E{alloc}\n        §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C\n\n      §MT{m011:Mixed:pub:stat} () -> i32\n        §RAW\n        object[] items = { new List<int> { 1 }, 2 };\n        §/RAW\n        §R (len items)\n\n\n\n"
+  }
+}

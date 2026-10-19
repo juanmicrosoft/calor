@@ -1,0 +1,20 @@
+using System;
+using System.Text;
+
+public static class Report
+{
+    public static string Line(string item, double amount) => $"{item,-8}|{amount,10:F2}";
+
+    public static string Kind(FormattableString f) => "fs:" + f.Format;
+
+    public static string Kind(object o) => "object:" + o;
+
+    public static string Pick(int x) => Kind($"k={x}");
+
+    public static string Build(int x)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"x={x}");
+        return sb.ToString();
+    }
+}

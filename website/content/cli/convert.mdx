@@ -53,6 +53,7 @@ calor convert MyService.cs --benchmark
 | `--no-fallback` | — | `false` | Fail on unsupported constructs instead of emitting fallback TODOs |
 | `--validate` | — | `false` | Parse generated Calor before writing and report errors |
 | `--passthrough` | — | `false` | Widen the set of C# members preserved as `§CSHARP` interop blocks. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
+| `--lossy` | — | `false` | Allow reported semantic substitutions and drops. Without it, conversion is lossless: a construct with no exact Calor form is preserved as C# or refused |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
@@ -79,7 +80,8 @@ operators, patterns, compound assignments, namespace handling, and local
 functions no longer silently substitute a different construct.
 
 When native conversion is impossible, the containing member is preserved as a
-`§CSHARP` interop block and counted — on the command line this happens by
+`§CSHARP` interop block (for some features only the statement, as `§RAW`, or the
+expression, as `§CS{...}`) and counted — on the command line this happens by
 default, without `--passthrough`, which widens it further. "Conversion
 successful" is printed only when there are no recorded losses and requested
 validation passed.
@@ -155,6 +157,35 @@ conversion writes nothing, exits `1`, and prints
 Before 0.25 the text said "via --passthrough fallback" for every rescue, even
 when you had not passed the flag.
 
+### Counts, Partial Results, and the JSON Envelope
+
+With `--format json`, stdout holds exactly one [schema 2.0 envelope](/docs/cli/envelope-schema/)
+and the text report goes to stderr. The exception in 0.25 is `--verbose`: the converter
+then also prints progress lines (`Converted N nodes`, …) to stdout before the envelope, so
+do not combine `--verbose` with `--format json` when a program parses stdout. Each conversion issue is a `Calor1343`
+diagnostic whose message starts with the feature name, for example
+`[out-var] Feature 'out-var' is partially supported…`. The counts are under `data`:
+
+| Field | Meaning |
+|:------|:--------|
+| `nativeConversionCount` | Constructs the converter wrote as Calor. A type later replaced by a rescue still counts its constructs here |
+| `interopPreservationCount`, `lossySubstitutionCount`, `dropCount` | Preserved, substituted, and dropped pieces; their sum is `lossCount` |
+| `losses[]` | One entry per loss: `feature`, `path`, and `trigger`/`enabledBy` when they apply |
+| `conversionPaths` | The per-file outcome and per-path counts above |
+
+So `nativeConversionCount > 0` does not mean the file is native. Read
+`conversionPaths.outcome`. A conversion can be partial in two ways:
+
+- **Preserved** (`outcome: "preserved"`, exit `0`): the file is written, and some
+  members, statements, or holes are still C#.
+- **Refused** (`outcome: "refused"`, exit `1`): nothing is written. This happens when
+  `--no-fallback` meets a construct with no Calor form, or when no rescue applies.
+
+A rescue keeps the original C# of the whole top-level type, not only the member that
+failed. The [C# interoperability guide](/docs/guides/csharp-interoperability/) lists, per
+feature, which shapes convert natively in 0.25 and which stay C#, with the CLI and MCP
+transcripts behind each example.
+
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
 | `namespace` | `§M{id:Name}` module |
@@ -174,8 +205,12 @@ Since 0.25 (#847), a C# local function converts natively when it is in this slic
   or operator);
 - no capture of the enclosing locals, parameters or `this` (a `static` local function
   always qualifies);
-- no attributes, type parameters, `async`, `unsafe` or `extern`, no `yield`, no nested
-  local function, and plain by-value parameters without default values.
+- no attributes, type parameters, `async`, `unsafe` or `extern`, no ref return, no
+  `yield`, no nested local function, and plain by-value parameters without default
+  values or attributes;
+- its name is used only as a call, a call argument, or (outside lambdas) a binding
+  initializer, `return` value or simple assignment value. Other uses, such as an array
+  element, keep the member as C#.
 
 It becomes a nested `§F` in the same method, and the compiler emits it back as a C#
 `static` local function in the same place. So a call keeps naming the local function,
@@ -499,12 +534,13 @@ assuming it reproduces the website headline.
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
-| `1` | Missing input, unsupported route without fallback, timeout, or conversion failure |
+| `1` | Missing input, unsupported construct with `--no-fallback`, timeout, or a refused conversion (`outcome: "refused"`; no file written) |
 
 ---
 
 ## See Also
 
+- [Converting C#: What Stays C# and Why](/docs/guides/csharp-interoperability/) - Per-feature support in 0.25
 - [calor migrate](/docs/cli/migrate/) - Convert entire projects
 - [calor assess](/docs/cli/analyze/) - Find best conversion candidates
 - [calor benchmark](/docs/cli/benchmark/) - Detailed metrics comparison

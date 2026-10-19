@@ -1,0 +1,29 @@
+using System.Collections.Generic;
+
+public static class Grid
+{
+    public static int[,] Pick(bool wide, int v)
+    {
+        return wide
+            ? new int[,] { { v, v + 1 } }
+            : new int[,] { { v } };
+    }
+
+    public static int Sum(int[] xs, int start)
+    {
+        int s = start;
+        foreach (var x in xs)
+        {
+            s = s + x;
+        }
+        return s;
+    }
+
+    public static int Total(int v) => Sum(new int[] { v, v * 2 }, Pick(true, v)[0, 1]);
+
+    public static int Mixed()
+    {
+        object[] items = { new List<int> { 1 }, 2 };
+        return items.Length;
+    }
+}

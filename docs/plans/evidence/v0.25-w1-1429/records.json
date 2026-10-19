@@ -1,0 +1,219 @@
+{
+  "schema": "calor.v0.25.w1-family-records/1",
+  "issue": 1429,
+  "epic": 1425,
+  "scopeVersion": "1.3.0",
+  "registerVersion": "1.0.0",
+  "independence": "reduced",
+  "note": "W1 documentation records. Not READY records: no 0.25 candidate is frozen, and READY needs the maintainer's claim approval. Each family's status mirrors scope.json readiness (W1 does not change it). Pages and transcripts were checked against main at the PR's base; they must be re-checked on the frozen candidate.",
+  "sharedPages": [
+    "website/content/guides/csharp-interoperability.mdx",
+    "website/content/guides/adding-calor-to-existing-projects.mdx",
+    "website/content/guides/index.mdx",
+    "website/content/cli/feature-check.mdx",
+    "website/content/cli/structured-output.mdx",
+    "website/content/cli/self-check.mdx",
+    "docs/cli/feature-check.md"
+  ],
+  "families": [
+    {
+      "family": "F1",
+      "issue": 943,
+      "status": "IN_PROGRESS",
+      "docCases": [
+        "DOC-F1-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#call-tryparse-trygetvalue-and-other-ref-out-in-methods",
+        "website/content/syntax-reference/calls.mdx#by-reference-arguments-ref-out-in"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F1-refout converted output (compiled by self-check docs; equal to the CLI transcript)",
+        "syntax-reference/calls.mdx: RefOutDemo (complete program) and the Calor0212 refusal (expect=Calor0212)"
+      ],
+      "transcripts": [
+        "W1-F1-refout",
+        "W1-F1-outvar-statement",
+        "W1-F1-ref-return-expression",
+        "W1-F1-notnullwhen"
+      ],
+      "claimsCorrected": [
+        "out var in a call statement: calls.mdx and CHANGELOG said it converts; it fails the C# round trip (CLI rescue, MCP and migrate refuse)",
+        "expression-bodied ref return: not preserved by the converter; fails the round trip (rescued or refused). Block-bodied ref returns are preserved",
+        "omitted-in call sites and by-reference operands that run code keep only the statement as §RAW (feature in-parameter), not the member",
+        "[NotNullWhen] on an out parameter: the guide, adding-Calor table and CHANGELOG said it stays C#; it converts natively with the attribute copied and inert (the out-parameter registry description says the same wrong thing)",
+        "omitted-in in an expression-bodied member preserves the whole member (feature method), not only a statement"
+      ],
+      "readyNeeds": [
+        "the frozen 0.25 candidate (0.24 C1 form) and the scope 1.3.0 acceptancePreconditions re-proof on it",
+        "per-case result records for F1-REFOUT-01..08, A1, A2, X-INT-01/05/08 and DOC-F1-01 naming the candidate and current requirementSha256",
+        "W1GuideTranscriptTests and self-check docs passing on the candidate; these transcripts regenerated there if they differ",
+        "witness runs of R-OBL #1496 and R-OBL-RESIDUALS #1503 on the candidate; #1427 at its current version",
+        "the maintainer's claim approval (pull-request review URL) for the pages above, with independence reduced",
+        "a decision on the two converter defects above (fix, or keep the documented limitation)"
+      ]
+    },
+    {
+      "family": "F2",
+      "issue": 906,
+      "status": "IN_PROGRESS",
+      "docCases": [
+        "DOC-F2-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#format-strings-with-interpolation",
+        "website/content/syntax-reference/string-operations.mdx#converting-c-interpolated-strings"
+      ],
+      "examples": [
+        "syntax-reference/string-operations.mdx: Receipt and Greeting (complete programs)",
+        "guides/csharp-interoperability.mdx: W1-F2-interpolation output quoted as a fragment (its default compile reports Calor0410, as the page says)"
+      ],
+      "transcripts": [
+        "W1-F2-interpolation"
+      ],
+      "claimsCorrected": [
+        "handler targets: string-operations.mdx said the enclosing statement or member is kept as §CSHARP; a statement is kept as §RAW",
+        "docs/cli/feature-check.md listed string-interpolation as fully supported; it is Partial",
+        "the native hole subset excludes decimal, long and whole-number double literals and operators with call operands",
+        "verbatim string literals and doubles that do not render as plain digits with a fraction (1e-7, 0.0000001) are not native holes"
+      ],
+      "readyNeeds": [
+        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
+        "per-case records for F2-INTERP-01..10, X-INT-04/06/08 and DOC-F2-01 on the candidate",
+        "F2-INTERP-09 corpus counts re-measured on the candidate with submodules",
+        "witness runs of R-TEXT #1497, #1496 and #1503 on the candidate",
+        "W1GuideTranscriptTests and self-check docs passing on the candidate",
+        "the maintainer's claim approval, independence reduced"
+      ]
+    },
+    {
+      "family": "F3",
+      "issue": 847,
+      "status": "IN_PROGRESS",
+      "docCases": [
+        "DOC-F3-01",
+        "DOC-F3-02"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#keep-a-small-local-helper-function",
+        "website/content/cli/convert.mdx#local-functions",
+        "website/content/syntax-reference/structure-tags.mdx#local-functions"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F3-local-functions converted output (one native, one capturing and preserved)",
+        "cli/convert.mdx and syntax-reference/structure-tags.mdx: the existing local-function programs"
+      ],
+      "transcripts": [
+        "W1-F3-local-functions"
+      ],
+      "claimsCorrected": [
+        "the bounded slice also excludes ref returns, attributed parameters and value uses outside calls, call arguments, binding initializers, returns and simple assignments"
+      ],
+      "readyNeeds": [
+        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
+        "per-case records for F3-LOCAL-01..05, A1, DOC-F3-01/02 on the candidate",
+        "witness runs of #1496 and #1503 on the candidate",
+        "W1GuideTranscriptTests and self-check docs passing on the candidate",
+        "the maintainer's claim approval, independence reduced"
+      ]
+    },
+    {
+      "family": "F4",
+      "issue": 1139,
+      "status": "IN_PROGRESS",
+      "docCases": [
+        "DOC-F4-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#convert-a-class-with-iterator-properties",
+        "website/content/cli/convert.mdx#iterator-properties-and-indexers"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F4-iterator-accessor converted output",
+        "cli/convert.mdx: the Countdown preserved and rewritten programs"
+      ],
+      "transcripts": [
+        "W1-F4-iterator-accessor"
+      ],
+      "claimsCorrected": [
+        "docs/cli/feature-check.md said yield-return is not supported; iterator methods are Full and iterator accessors are iterator-accessor (NotSupported)"
+      ],
+      "readyNeeds": [
+        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
+        "per-case records for F4-ITER-01..04, X-INT-03 and DOC-F4-01 on the candidate",
+        "F4-ITER-04 measured, or an approved amendment",
+        "W1GuideTranscriptTests and self-check docs passing on the candidate",
+        "the maintainer's claim approval, independence reduced"
+      ]
+    },
+    {
+      "family": "F5",
+      "issue": 1132,
+      "status": "IN_PROGRESS",
+      "docCases": [
+        "DOC-F5-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#build-arrays-inside-expressions",
+        "website/content/cli/convert.mdx#array-expressions"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F5-arrays converted output (native arrays plus one array-element-block statement)",
+        "cli/convert.mdx: the Grids program"
+      ],
+      "transcripts": [
+        "W1-F5-arrays"
+      ],
+      "claimsCorrected": [
+        "multi-line elements are preserved only in rectangular array rows; one-dimensional multi-line elements stay native"
+      ],
+      "registryGaps": [
+        "multidim-array says 'fully supported' (Full) while array-element-block shapes are preserved"
+      ],
+      "readyNeeds": [
+        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
+        "per-case records for F5-ARRAY-01..06, X-INT-02/07 and DOC-F5-01 on the candidate",
+        "witness runs of #1496 and #1503 on the candidate, and an F5-ARRAY-06 boundary record",
+        "W1GuideTranscriptTests and self-check docs passing on the candidate",
+        "the maintainer's claim approval, independence reduced"
+      ]
+    },
+    {
+      "family": "F6",
+      "issue": 1144,
+      "status": "IN_PROGRESS",
+      "docCases": [
+        "DOC-F6-01",
+        "DOC-F6-02"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#which-mechanism-kept-the-c",
+        "website/content/cli/convert.mdx#counts-partial-results-and-the-json-envelope",
+        "website/content/cli/mcp.mdx#defaults-counts-and-partial-failures",
+        "website/content/cli/migrate.mdx#migration-reports",
+        "website/content/cli/structured-output.mdx#conversion-output"
+      ],
+      "examples": [
+        "cli/convert.mdx: the Counter rescue output (pinned by ConversionPathReportingTests.F6_REPORT_12)",
+        "cli/mcp.mdx: the passthroughOnError payload (pinned by F6_REPORT_13)"
+      ],
+      "transcripts": [
+        "W1-F6-rescue",
+        "W1-F6-project"
+      ],
+      "claimsCorrected": [
+        "native counts include constructs of a type a rescue later replaced; pages now say to read conversionPaths.outcome",
+        "calor_batch in lossless mode refuses every file when one fails (failedFiles 2 in W1-F6-project); a draft claim that the rest still convert was removed before review",
+        "calor convert --format json --verbose writes progress lines to stdout before the envelope",
+        "MCP diagnostics: calor_convert issues[], calor_migrate perFile[].errors/warnings, calor_batch files[].issues",
+        "post-validation-fallback is a mechanism label, not a feature-check registry entry"
+      ],
+      "readyNeeds": [
+        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
+        "per-case records for F6-REPORT-01..13 and DOC-F6-01/02 on the candidate, including the per-surface matrix re-run",
+        "W1GuideTranscriptTests and self-check docs passing on the candidate",
+        "the maintainer's claim approval, independence reduced"
+      ]
+    }
+  ]
+}

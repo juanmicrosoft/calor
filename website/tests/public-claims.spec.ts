@@ -68,6 +68,36 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
   }
 });
 
+test('0.25 C# interoperability guide is discoverable, version-scoped and bounded', async ({ page }) => {
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  const guide = '/docs/guides/csharp-interoperability/';
+  await page.route('https://**/*', route => route.abort());
+  for (const path of ['guides', 'guides/adding-calor-to-existing-projects', 'cli/convert', 'cli/mcp',
+    'cli/migrate', 'cli/feature-check', 'cli/structured-output', 'syntax-reference/calls']) {
+    await page.goto(`${base}/docs/${path}/`);
+    await expect(page.locator(`article a[href^="${base}${guide}"]`).first()).toBeVisible();
+  }
+  await page.goto(`${base}${guide}`);
+  const article = page.locator('article');
+  // Version scope and bounded claims: unreleased behavior is never presented as the current release.
+  for (const text of ['which is not released yet', 'Changed since 0.24', 'Preserved C# is a migration boundary',
+    'fails the C# round trip', 'is not recognized in 0.25', 'reports Partial', 'rescueUnusableMembers: true',
+    'passthroughOnError: true', 'conversionPaths.outcome', 'In the tested cases']) {
+    await expect(article).toContainText(text);
+  }
+  await expect(article).not.toContainText(/independently (reviewed|verified)/i);
+  const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
+    [...new Set(elements.map(element => element.getAttribute('href')!))]);
+  for (const link of links) {
+    const response = await page.request.get(link);
+    expect(response.status(), link).toBe(200);
+    const anchor = link.split('#')[1];
+    if (anchor) expect(await response.text(), link).toContain(`id="${anchor}"`);
+  }
+  await page.goto(`${base}/docs/cli/feature-check/`);
+  await expect(page.locator('article')).toContainText('Known gaps between the registry and 0.25 behavior');
+});
+
 test('nullability correction distinguishes binder diagnostics from CLI rejection and preserves history', async ({ page }) => {
   const root = await readFile('../CHANGELOG.md', 'utf8');
   const website = await readFile('content/changelog.mdx', 'utf8');

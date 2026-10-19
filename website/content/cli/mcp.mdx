@@ -102,6 +102,41 @@ Before 0.25, a custom `moduleName` (or an `inputPath`, from which the module
 name is derived) stopped the rescue from finding a global-namespace type's
 original C#, so these calls failed. They now rescue like the others.
 
+### Defaults, Counts, and Partial Failures
+
+Every conversion result reports the two options that applied, so you can check
+the defaults below in `paths` or `conversionPaths`:
+
+| Surface | `rescueUnusableMembers` | `passthroughOnError` |
+|:--------|:------------------------|:---------------------|
+| `calor_convert` | `false` | `false` (opt in with `passthroughOnError: true`) |
+| `calor_migrate` (`phase: "convert"`) | `false` | `false` (no option) |
+| `calor_batch` (`action: "convert"`) | `false` | `false` (the option exists but does not rescue a round-trip failure) |
+| `calor convert` (CLI, for comparison) | `true` | `false` (`--passthrough`) |
+
+`calor_convert` returns its own result object, not the CLI envelope. Its
+`issues[]` entries are envelope-style diagnostics: code `Calor1343`, a severity,
+and a message that starts with the feature name (`[iterator-accessor] …`).
+`lossSummary.nativeConversions` counts constructs written as Calor, and
+`lossSummary.interopPreservations` counts preserved pieces. As on the CLI, the
+native count still includes constructs of a type that was later rescued, so read
+`lossSummary.paths.outcome` to know whether the result is fully native.
+
+Partial results look like this:
+
+- **`calor_convert`:** `isError: false` with `outcome: "preserved"` means usable
+  output with some C# kept. `isError: true` with `outcome: "refused"` means no
+  usable output.
+- **`calor_batch` and `calor_migrate`:** in the default lossless mode, one failed
+  file means no file is written. Every file then reports `outcome: "refused"` with
+  its counts, and the result has `isError: true`. In the `W1-F6-project` fixture, a
+  two-file project with one file that needs a rescue, `calor_batch` reports
+  `failedFiles: 2`. With `skipOnError: false`, the response also carries `error`,
+  naming the first failed file, and a `preservationPaths` line.
+
+The [C# interoperability guide](/docs/guides/csharp-interoperability/) shows, per
+C# feature, what `calor_convert` returns with and without `passthroughOnError`.
+
 ## The calor_query Tool
 
 New in 0.16. This tool answers questions about how your code fits together by
