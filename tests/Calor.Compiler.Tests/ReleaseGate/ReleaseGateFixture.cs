@@ -59,6 +59,10 @@ internal sealed class GateRepo : IDisposable
         Directory.CreateDirectory(repo.MetadataDir);
         Directory.CreateDirectory(repo.RegistryDir);
         repo.Git("init", "-q", "-b", "main");
+        // No background auto-gc or maintenance: a detached git process rewriting .git/objects while Dispose
+        // deletes the repository made the cleanup throw on CI (the scope-packet fixture commits many objects).
+        repo.Git("config", "gc.auto", "0");
+        repo.Git("config", "maintenance.auto", "false");
 
         var source = RepoRoot();
         var contractNode = JsonNode.Parse(File.ReadAllText(Path.Combine(source, PacketDir, "contract.json")))!.AsObject();
