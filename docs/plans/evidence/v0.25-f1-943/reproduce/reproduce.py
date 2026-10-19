@@ -38,7 +38,9 @@ CONTRACT = os.path.join("docs", "plans", "evidence", "v0.25-d1-1427", "contract.
 CLI_MODES = {"cli-default": [], "cli-passthrough": ["--passthrough"]}
 # Rows and their allowed outcomes (scope.json `expected`; D1 `conversion` for the witnesses).
 R0_ROWS = {f"F1-REFOUT-0{i}": None for i in range(1, 9)}
-INTERACTION_ROWS = {"X-INT-05": "native-or-preserved", "X-INT-08": "native-or-preserved"}
+INTERACTION_ROWS = {"X-INT-05": "native-or-preserved", "X-INT-08": "native-or-preserved",
+                    # F1 PR 2: the W1 (#1429) findings, fixed.
+                    "P2-OUTVAR-PLACEMENTS": "native", "P2-REFRETURN-EXPRESSION": "preserved"}
 
 
 def cases():

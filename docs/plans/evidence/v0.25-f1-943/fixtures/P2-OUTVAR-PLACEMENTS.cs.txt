@@ -1,0 +1,46 @@
+// 0.25 F1 PR 2 (#943) fixture: every placement D1 RO-DECL-1 lowers, including a call that is
+// a statement by itself (W1 finding 1: its bare binding took the next call as its initializer).
+using System.Collections.Generic;
+
+public static class Probe
+{
+    static string Log = "";
+
+    static void Use(int x) { Log += x + ";"; }
+
+    public static string Statement(string s)
+    {
+        int.TryParse(s, out var n);
+        Use(n);
+        int.TryParse("3", out int m);
+        Use(m);
+        return Log;
+    }
+
+    public static string Declaration(string s)
+    {
+        bool ok = int.TryParse(s, out var n);
+        return ok + ":" + n;
+    }
+
+    public static int Return(string s)
+    {
+        return int.TryParse(s, out var n) ? n : -1;
+    }
+
+    public static string Condition(Dictionary<int, string> d)
+    {
+        if (d.TryGetValue(1, out var v))
+        {
+            return v;
+        }
+        return "none";
+    }
+
+    public static string Run()
+    {
+        var d = new Dictionary<int, string>();
+        d.Add(1, "one");
+        return Statement("5") + "|" + Declaration("x") + "|" + Return("8") + "|" + Condition(d);
+    }
+}

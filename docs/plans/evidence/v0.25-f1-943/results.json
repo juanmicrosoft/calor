@@ -1,7 +1,7 @@
 {
   "schema": "v0.25-f1-943-evidence/1",
-  "measuredCommit": "7b41c373c680fe85c9e455d15a577e772a9461b5",
-  "srcTree": "3b5ecf97e2adf00c3de704ce8de126a66dfcbdf2",
+  "measuredCommit": "8bdc63f49692ef426a8b28725eef2f9869c1f74e",
+  "srcTree": "84491cf5010995de30fa0c143c6c281b26baee4b",
   "build": "Release",
   "dotnetSdk": "10.0.401",
   "platform": "Darwin arm64",
@@ -1677,6 +1677,394 @@
       "allowed": true
     },
     {
+      "case": "P2-OUTVAR-PLACEMENTS",
+      "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-OUTVAR-PLACEMENTS.cs.txt",
+      "fixtureSha256": "08a49f2b877ceaf800a9ae9807c04f54e2ad739a98d89180d6285d522e31dfba",
+      "expected": "native",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 23,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|False:0|8|one",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "native"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 23,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|False:0|8|one",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "native"
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|False:0|8|one",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "native"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|False:0|8|one",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "native"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|False:0|8|one",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "native"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|False:0|8|one",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "native"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "5;3;|False:0|8|one",
+        "exception": null
+      },
+      "allowed": true
+    },
+    {
+      "case": "P2-REFRETURN-EXPRESSION",
+      "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-REFRETURN-EXPRESSION.cs.txt",
+      "fixtureSha256": "14a30f7f278c747c3e51e43ee2d8713e90e86dcf0ffa5aa935300a5365dd1253",
+      "expected": "preserved",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 8,
+          "interopPreservationCount": 3,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method",
+            "property"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 3,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "7|9|4",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 8,
+          "interopPreservationCount": 3,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method",
+            "property"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 3,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "7|9|4",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [
+            "method",
+            "property"
+          ],
+          "csharpInteropBlocks": 3,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "7|9|4",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method",
+            "property"
+          ],
+          "csharpInteropBlocks": 3,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "7|9|4",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method",
+            "property"
+          ],
+          "csharpInteropBlocks": 3,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "7|9|4",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method",
+            "property"
+          ],
+          "csharpInteropBlocks": 3,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 6
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "7|9|4",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "7|9|4",
+        "exception": null
+      },
+      "allowed": true
+    },
+    {
       "case": "D1-CS-01",
       "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/d1/D1-CS-01.cs.txt",
       "fixtureSha256": "d0d737592e8ec913f22f51f06ca74c06d05f5f5cd2fde67243b56cc8302a8985",
@@ -2281,7 +2669,7 @@
           "lossySubstitutionCount": 0,
           "dropCount": 0,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "errorCodes": [],
           "csharpInteropBlocks": 0,
@@ -2311,7 +2699,7 @@
           "lossySubstitutionCount": 0,
           "dropCount": 0,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "errorCodes": [],
           "csharpInteropBlocks": 0,
@@ -2336,7 +2724,7 @@
         "cli-migrate": {
           "migrateExit": 0,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 0,
           "rawCSharpExpressions": 0,
@@ -2361,7 +2749,7 @@
           "isError": false,
           "success": true,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 0,
           "rawCSharpExpressions": 0,
@@ -2386,7 +2774,7 @@
           "isError": false,
           "success": true,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 0,
           "rawCSharpExpressions": 0,
@@ -2411,7 +2799,7 @@
           "isError": false,
           "success": true,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 0,
           "rawCSharpExpressions": 0,
@@ -4698,8 +5086,8 @@
           "lossySubstitutionCount": 0,
           "dropCount": 0,
           "lossFeatures": [
-            "in-parameter",
-            "post-validation-fallback"
+            "post-validation-fallback",
+            "ref-parameter"
           ],
           "errorCodes": [],
           "csharpInteropBlocks": 1,
@@ -4727,8 +5115,8 @@
           "lossySubstitutionCount": 0,
           "dropCount": 0,
           "lossFeatures": [
-            "in-parameter",
-            "post-validation-fallback"
+            "post-validation-fallback",
+            "ref-parameter"
           ],
           "errorCodes": [],
           "csharpInteropBlocks": 1,
@@ -4751,7 +5139,7 @@
         "cli-migrate": {
           "migrateExit": 1,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "output": "0 files",
           "outcome": "rejected"
@@ -4760,7 +5148,7 @@
           "isError": true,
           "success": false,
           "lossFeatures": [
-            "in-parameter"
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 0,
           "rawCSharpExpressions": 0,
@@ -4779,8 +5167,8 @@
           "isError": false,
           "success": true,
           "lossFeatures": [
-            "in-parameter",
-            "post-validation-fallback"
+            "post-validation-fallback",
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 1,
           "rawCSharpExpressions": 0,
@@ -4803,8 +5191,8 @@
           "isError": false,
           "success": true,
           "lossFeatures": [
-            "in-parameter",
-            "post-validation-fallback"
+            "post-validation-fallback",
+            "ref-parameter"
           ],
           "csharpInteropBlocks": 1,
           "rawCSharpExpressions": 0,

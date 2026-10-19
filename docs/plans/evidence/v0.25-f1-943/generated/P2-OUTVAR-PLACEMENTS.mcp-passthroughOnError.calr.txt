@@ -1,0 +1,42 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{str:Log:priv:stat} = ""
+
+      §MT{m002:Use:priv:stat} (i32:x)
+        §ASSIGN Log (+ Log (+ x ";"))
+
+      §MT{m003:Statement:pub:stat} (str:s) -> str
+        §B{~n:i32} `default`
+        §C{int.TryParse} §A s §A{out} n §/C
+        §C{Use} n
+        §B{~m:i32} `default`
+        §C{int.TryParse} §A "3" §A{out} m §/C
+        §C{Use} m
+        §R Log
+
+      §MT{m004:Declaration:pub:stat} (str:s) -> str
+        §B{~n:i32} `default`
+        §B{bool:ok} §C{int.TryParse} §A s §A{out} n §/C
+        §R (+ (+ ok ":") n)
+
+      §MT{m005:Return:pub:stat} (str:s) -> i32
+        §B{~n:i32} `default`
+        §R (? §C{int.TryParse} §A s §A{out} n §/C n (- 1))
+
+      §MT{m006:Condition:pub:stat} (Dict<i32, str>:d) -> str
+        §B{~v:str} `default`
+        §IF{if007} §C{d.TryGetValue} §A 1 §A{out} v §/C
+          §R v
+        §R "none"
+
+      §MT{m008:Run:pub:stat} () -> str
+        §E{alloc,mut}
+        §B{d} §NEW{Dictionary<i32,str>} §/NEW
+        §C{d.Add} §A 1 §A "one" §/C
+        §R (+ (+ (+ (+ (+ (+ §C{Statement} §A "5" §/C "|") §C{Declaration} §A "x" §/C) "|") §C{Return} §A "8" §/C) "|") §C{Condition} §A d §/C)
+
+
+
