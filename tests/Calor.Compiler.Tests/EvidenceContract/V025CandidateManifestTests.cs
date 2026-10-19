@@ -56,18 +56,22 @@ public class V025CandidateManifestTests
         var git = Git();
         var candidate = Str(Manifest()["candidate"]!["commit"]);
         var requested = Environment.GetEnvironmentVariable(TargetVariable);
-        var target = string.IsNullOrWhiteSpace(requested) ? NewestCandidateCommit(git, candidate) : requested.Trim();
+        var errors = new List<string>();
+        var target = string.IsNullOrWhiteSpace(requested) ? NewestProfileCommit(git, V025, candidate, errors) : requested.Trim();
+        Assert.True(errors.Count == 0, string.Join(Environment.NewLine, errors));
         Assert.True(target != null, "no commit after the candidate changes a candidate file; is history fetched?");
         var report = ClassifyRange(git, V025, candidate, target!);
         _output.WriteLine(report.ToString());
         if (!string.IsNullOrWhiteSpace(requested))
         {
             Assert.True(report.Landing != null, "the freeze has not landed on origin/main; judge later commits only after it lands");
-            var (_, listed, _) = git.Run("ls-tree", "-r", "--name-only", report.Landing!, "--", V025.Directory);
-            var trusted = listed.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(p => !p.StartsWith(V025.Reviews, StringComparison.Ordinal))
-                .Concat(V025.Files).ToList();
-            var drift = trusted.Where(p => git.RevParse("HEAD:" + p) != git.RevParse($"{report.Landing}:{p}")).ToList();
-            Assert.True(drift.Count == 0, $"run this from a checkout of the landing commit {report.Landing}; differing at HEAD: {string.Join(", ", drift)}");
+            // Trust anchor: the whole compiled test project (the classifier, its shared verdicts in CandidateInvalidation,
+            // GitRepo, this test) and the candidate directory must be the landing's, committed and clean.
+            var paths = new[] { "--", "tests/Calor.Compiler.Tests", V025.Directory, $":(exclude){V025.Reviews}" };
+            var (diffExit, drift, _) = git.Run(new[] { "diff", "--name-only", report.Landing!, "HEAD" }.Concat(paths).ToArray());
+            var (statusExit, dirty, _) = git.Run(new[] { "status", "--porcelain" }.Concat(paths).ToArray());
+            Assert.True(diffExit == 0 && statusExit == 0 && drift.Trim() == "" && dirty.Trim() == "",
+                $"run this from a clean checkout of the landing commit {report.Landing}; differing: {drift}{dirty}");
         }
         Assert.True(report.Verdict == CandidateInvalidation.NotInvalidated, report.ToString());
         if (string.IsNullOrWhiteSpace(requested))
@@ -89,6 +93,21 @@ public class V025CandidateManifestTests
     [InlineData("s2Witnesses.0.regressionWitness.0", "tests/NoSuchWitness.cs", "S2 witness")]
     [InlineData("merged.0.prs.0.mergeCommit", "0000000000000000000000000000000000000004", "merge")]
     [InlineData("issueStatesAtFreeze.releaseGaps.liveCheck.output.sha256", "00", "live check")]
+    [InlineData("merged.6.prs.0.pr", "1512", "PR")] // the reviewed table and the merge check both catch a substituted PR
+    [InlineData("merged.6", "<remove>", "gate")]
+    [InlineData("toolchain.releaseSdk", "10.0.402", "SDK")] // the job pins and the fingerprint evidence both name 10.0.401
+    [InlineData("toolchain.releaseWorkflowPins.publish-nuget.yml:publish.0", "10.0.402", "toolchain")]
+    [InlineData("toolchain.runtime", "10.0.13", "toolchain")]
+    [InlineData("toolchain.dotnetSdkBuild.value", "sha256:0000000000000000000000000000000000000000000000000000000000000000", "fingerprint")]
+    [InlineData("toolchain.dotnetSdkBuild.evidence.0.sha256", "00", "fingerprint")]
+    [InlineData("packets.seals.scope.computed", "00", "scope seal")]
+    [InlineData("packets.seals.scope.pinned", "00", "scope seal")]
+    [InlineData("packets.seals.t1Baseline.pinned", "00", "T1 seal")]
+    [InlineData("packets.scope.scopeVersion", "1.3.0", "scope packet")]
+    [InlineData("packets.scope.readiness.F1", "READY", "scope packet")]
+    [InlineData("packets.t1Register.registerVersion", "1.0.1", "T1 register")]
+    [InlineData("packets.d1Contract.contractVersion", "1.0.5", "D1 contract")]
+    [InlineData("packets.w1Records.scopeVersion", "1.3.0", "W1 records")]
     public void ATamperedFieldIsFound(string pointer, string value, string expected)
     {
         var manifest = Manifest();
@@ -167,6 +186,67 @@ public class V025CandidateManifestTests
         var w1 = JsonNode.Parse(Blob(Str(packets["w1Records"]!["path"]))!)!;
         if (Str(w1["scopeVersion"]) != Str(scope["scopeVersion"])) Fail("W1 records: consumed scope version differs");
 
+        // Packet summaries against the candidate's files.
+        var sp = packets["scope"]!;
+        if (Str(sp["scopeVersion"]) != Str(scope["scopeVersion"]) || Str(sp["status"]) != Str(scope["status"]) || Str(sp["gateStatus"]) != Str(scope["gateStatus"])
+            || !JsonNode.DeepEquals(sp["evidenceSeal"], scope["evidenceSeal"]) || !JsonNode.DeepEquals(sp["acceptancePreconditions"], scope["acceptancePreconditions"])
+            || !scope["families"]!.AsArray().Select(f => $"{f!["id"]}={f["readiness"]!["status"]}").SequenceEqual(sp["readiness"]!.AsObject().Select(kv => $"{kv.Key}={Str(kv.Value)}"))
+            || !scope["amendments"]!.AsArray().Select(a => $"{a!["version"]}|{a["dateUtc"]}|{a["pr"]}|{a["afterInspection"]}")
+                .SequenceEqual(sp["amendments"]!.AsArray().Select(a => $"{a!["version"]}|{a["dateUtc"]}|{a["pr"]}|{a["afterInspection"]}")))
+            Fail("scope packet: a recorded summary field differs from scope.json");
+        if (Str(packets["t1Register"]!["registerVersion"]) != Str(register["registerVersion"])) Fail("T1 register: registerVersion differs");
+        if (Str(packets["d1Contract"]!["contractVersion"]) != Str(d1["contractVersion"]) || Str(packets["d1Contract"]!["status"]) != Str(d1["status"])
+            || !JsonNode.DeepEquals(packets["d1Contract"]!["consumes"], d1["consumes"]))
+            Fail("D1 contract: a recorded summary field differs");
+        if (Str(packets["w1Records"]!["scopeVersion"]) != Str(w1["scopeVersion"]) || Str(packets["w1Records"]!["registerVersion"]) != Str(w1["registerVersion"]))
+            Fail("W1 records: a recorded summary field differs");
+        var seals = packets["seals"]!;
+        string Pin(string test, string name) => System.Text.RegularExpressions.Regex.Match(Encoding.UTF8.GetString(Blob(test) ?? []), name + @"\s*=\s*""([0-9a-f]{64})""").Groups[1].Value;
+        var scopeSeal = DurableProvenance.Sha256(Encoding.UTF8.GetBytes(scope["denominatorV1"]!.ToJsonString() + "\n" + Str(scope["evidenceSeal"]!["baselineResults"])
+            + "\n" + Str(scope["evidenceSeal"]!["generated"]) + "\n" + scope["evidenceSeal"]!["producers"]!.ToJsonString()));
+        var scopePin = Pin("tests/Calor.Compiler.Tests/InteropScope/InteropScopeTests.cs", "FrozenSeal");
+        if (Str(seals["scope"]!["computed"]) != scopeSeal || Str(seals["scope"]!["pinned"]) != scopePin || scopeSeal != scopePin)
+            Fail("scope seal: computed or pinned value differs from the candidate");
+        if (Str(seals["d1Contract"]!["pinned"]) != Pin("tests/Calor.Compiler.Tests/InteropScope/RefOutContractTests.cs", "FrozenSeal")
+            || Str(seals["d1Contract"]!["pinned"]) != Str(seals["d1Contract"]!["computed"]))
+            Fail("D1 seal: the pinned value differs from the candidate's test");
+        var t1Amend = string.Join(";", register["amendments"]!.AsArray().Select(a => $"{a!["version"]},{a["approvalSeal"]}"));
+        var t1Pins = string.Join(";", System.Text.RegularExpressions.Regex.Matches(Encoding.UTF8.GetString(Blob("tests/Calor.Compiler.Tests/InteropScope/T1RegisterTests.cs") ?? []),
+            @"\(""([0-9.]+)"",\s*""([0-9a-f]{64})""\)").Select(m => $"{m.Groups[1].Value},{m.Groups[2].Value}"));
+        string Pairs(JsonNode? n) => string.Join(";", n!.AsArray().Select(x => $"{Str(x![0])},{Str(x[1])}"));
+        if (Str(seals["t1Baseline"]!["recorded"]) != Str(register["approvalSeal"])
+            || Str(seals["t1Baseline"]!["pinned"]) != Pin("tests/Calor.Compiler.Tests/InteropScope/T1RegisterTests.cs", "BaselineApprovalSeal")
+            || Pairs(seals["t1Amendments"]!["recorded"]) != t1Amend || Pairs(seals["t1Amendments"]!["pinned"]) != t1Pins)
+            Fail("T1 seal: recorded or pinned approval seals differ from the candidate");
+
+        // Toolchain: the release SDK as every release-workflow job installs it, the runtime pin, and the SDK build fingerprint
+        // from the retained reproducible-builds evidence.
+        var tc = manifest["toolchain"]!;
+        var recordedPins = tc["releaseWorkflowPins"]!.AsObject();
+        foreach (var wf in new[] { "publish-nuget.yml", "verify-release.yml", "reproducible-builds.yml", "benchmark.yml" })
+        {
+            var actual = System.Text.RegularExpressions.Regex.Matches(Encoding.UTF8.GetString(Blob($".github/workflows/{wf}") ?? []), @"dotnet-version:[ \t]*(\S+)")
+                .Select(m => m.Groups[1].Value.Trim('\'', '"'));
+            var recordedForWf = recordedPins.Where(kv => kv.Key.StartsWith(wf + ":", StringComparison.Ordinal)).SelectMany(kv => kv.Value!.AsArray().Select(Str));
+            if (!actual.SequenceEqual(recordedForWf)) Fail($"toolchain: {wf} SDK pins differ from the recorded jobs");
+        }
+        if (Str(tc["releaseSdk"]) != "10.0.401" || recordedPins.Any(kv => Str(kv.Value![0]) != Str(tc["releaseSdk"])))
+            Fail("toolchain: the release SDK is not the first install of every release job");
+        var protocol = JsonNode.Parse(Blob("docs/plans/evidence/g2-1421/protocol.json")!)!;
+        if (!Str(tc["runtime"]).StartsWith(Str(protocol["toolchain"]!["runtime"]) + " ", StringComparison.Ordinal)) Fail("toolchain: runtime differs from the G2 pin");
+        var fingerprint = tc["dotnetSdkBuild"]!;
+        var evidence = fingerprint["evidence"]!.AsArray();
+        if (evidence.Count == 0) Fail("fingerprint: no retained evidence");
+        foreach (var e in evidence)
+        {
+            var path = Path.Combine(RepoRoot(), Str(e!["path"]));
+            if (!File.Exists(path) || DurableProvenance.Sha256(File.ReadAllBytes(path)) != Str(e["sha256"])) { Fail($"fingerprint: {Str(e["path"])} is missing or differs"); continue; }
+            if (!path.EndsWith(".json", StringComparison.Ordinal)) continue;
+            var hashes = JsonNode.Parse(File.ReadAllText(path))!["toolchain"];
+            if (Str(hashes?["dotnetSdkBuild"]) != Str(fingerprint["value"]) || Str(hashes?["dotnet"]) != Str(tc["releaseSdk"]) || Str(hashes?["os"]) != Str(fingerprint["os"]))
+                Fail($"fingerprint: {Str(e["path"])} records another SDK build");
+        }
+
         // 0.24 S2 repairs: the dispositions' witnesses, present at the candidate.
         var s2 = JsonNode.Parse(Blob("docs/plans/evidence/s2-1413/dispositions.json")!)!;
         var repairs = s2["repairs"]!.AsArray().Select(r => $"{r!["id"]} {r["pr"]} {r["mergeCommit"]} {string.Join(",", r["regressionWitness"]!.AsArray().Select(Str))}");
@@ -175,8 +255,13 @@ public class V025CandidateManifestTests
             || witnesses.Any(w => w!["regressionWitness"]!.AsArray().Any(p => Blob(Str(p)) == null)))
             Fail("S2 witness list differs from dispositions.json or a witness is missing");
 
-        // Every recorded PR is GitHub's merge of that PR, inside the candidate.
-        foreach (var gate in manifest["merged"]!.AsArray())
+        // The gate set and each gate's PRs equal the table reviewed with this freeze; every recorded PR is GitHub's
+        // merge of that PR, inside the candidate.
+        var gates = manifest["merged"]!.AsArray();
+        if (gates.Count != GatePrs.Count || gates.Any(g => !GatePrs.TryGetValue(Str(g!["gate"]), out var want)
+                || want.Issue.ToString() != g["issue"]!.ToString() || !want.Prs.Select(x => x.ToString()).SequenceEqual(g["prs"]!.AsArray().Select(x => x!["pr"]!.ToString()))))
+            Fail("gate: the gate set or a gate's PRs differ from the reviewed table");
+        foreach (var gate in gates)
             foreach (var pr in gate!["prs"]!.AsArray())
             {
                 var merge = Str(pr!["mergeCommit"]);
@@ -201,18 +286,14 @@ public class V025CandidateManifestTests
 
     private static byte[] Lf(byte[] bytes) => Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(bytes).Replace("\r\n", "\n"));
 
-    private static string? NewestCandidateCommit(GitRepo git, string candidate)
+    /// <summary>The gates and merged PRs reviewed with this freeze (the 0.25 form of the 0.24 C1 child table).</summary>
+    private static readonly Dictionary<string, (int Issue, int[] Prs)> GatePrs = new()
     {
-        var (_, log, _) = git.Run("rev-list", $"{candidate}..HEAD");
-        foreach (var commit in log.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var (_, names, _) = git.Run("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--root", commit);
-            if (names.Split('\0').Any(p => (p.StartsWith(V025.Directory, StringComparison.Ordinal) && !p.StartsWith(V025.Reviews, StringComparison.Ordinal))
-                    || V025.Files.Contains(p)))
-                return commit;
-        }
-        return null;
-    }
+        ["R0"] = (1426, [1483, 1552, 1553]), ["D1"] = (1427, [1518, 1559]), ["F1"] = (943, [1558, 1571]), ["F2"] = (906, [1522]),
+        ["F3"] = (847, [1519, 1531]), ["F4"] = (1139, [1510]), ["F5"] = (1132, [1554]), ["F6"] = (1144, [1513]), ["W0"] = (1143, [1512]),
+        ["T1"] = (1428, [1562]), ["W1"] = (1429, [1566]), ["R2-1545"] = (1545, [1565, 1577]), ["R2-1546"] = (1546, [1563]),
+        ["R2-1547"] = (1547, [1563]), ["PREP"] = (1430, [1568, 1569, 1575, 1576]),
+    };
 
     private static void Set(JsonNode root, string pointer, string value)
     {
@@ -226,7 +307,8 @@ public class V025CandidateManifestTests
             JsonNode? Child() => node is JsonArray a ? a[int.Parse(key)] : node![key];
             if (rest == "")
             {
-                if (node is JsonArray arr) arr[int.Parse(key)] = JsonValue.Create(value);
+                if (value == "<remove>" && node is JsonArray removeFrom) removeFrom.RemoveAt(int.Parse(key));
+                else if (node is JsonArray arr) arr[int.Parse(key)] = JsonValue.Create(value);
                 else node![key] = JsonValue.Create(value);
                 return;
             }

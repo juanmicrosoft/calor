@@ -184,6 +184,20 @@
       "os": "Linux x86_64",
       "source": "reproducible-builds.yml run 39295103845 on #1576 head f8413cc9e (tree 45d072a911d298b8c802219b206c80b351c32f19, equal to the candidate tree): reproducible-packages-hashes packages-1.json and packages-2.json toolchain, both builds",
       "sameAs": "C2 regeneration 3 Linux CI (docs/plans/evidence/c2-1424/regeneration-3/)",
+      "evidence": [
+        {
+          "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-1.json",
+          "sha256": "30ff65f3ccb792b302a063d99a5e36c798a148f42f591e96f1b9135bb71e7d33"
+        },
+        {
+          "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-2.json",
+          "sha256": "30ff65f3ccb792b302a063d99a5e36c798a148f42f591e96f1b9135bb71e7d33"
+        },
+        {
+          "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages.md",
+          "sha256": "45114a7fa46cfa49c71511fb8c46409de8f569e96067955cf23481f54a547c52"
+        }
+      ],
       "darwinArm64": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053 (Microsoft SDK 10.0.401 through dotnet-install.sh on macOS arm64, C2 regeneration 2/3 local builds); not re-measured at this freeze"
     },
     "runtime": "10.0.12 (the G2 protocol pin; Microsoft.NETCore.App of SDK 10.0.401)",
