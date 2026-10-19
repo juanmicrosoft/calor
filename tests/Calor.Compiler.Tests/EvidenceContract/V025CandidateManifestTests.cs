@@ -84,7 +84,38 @@ public class V025CandidateManifestTests
         if (git.RevParse("HEAD") != landing) problems.Add($"run this from a checkout of the landing commit {landing}; HEAD is {git.RevParse("HEAD")}");
         var (exit, dirty, _) = git.Run("status", "--porcelain", "--untracked-files=all");
         if (exit != 0 || dirty.Trim() != "") problems.Add($"the landing checkout is not clean: {dirty.Trim()}");
+        // An ignored file is invisible to status but still compiled by the SDK's default globs (or imported by MSBuild).
+        // Build output (bin/, obj/) is regenerated; the ignored Z3 assets are binaries checked by the download script's pins.
+        var (ignoredExit, ignored, _) = git.Run("ls-files", "--others", "--ignored", "--exclude-standard", "--", "src", "tests", "tools",
+            ":(glob)*", ":(exclude,glob)**/bin/**", ":(exclude,glob)**/obj/**");
+        var inputs = ignored.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(f => CompileInputExtensions.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) || Path.GetFileName(f).StartsWith("Directory.Build.", StringComparison.Ordinal))
+            .ToList();
+        if (ignoredExit != 0 || inputs.Count > 0) problems.Add($"the landing checkout has ignored build inputs: {string.Join(", ", inputs)}");
         return problems;
+    }
+
+    private static readonly string[] CompileInputExtensions =
+        [".cs", ".csproj", ".props", ".targets", ".rsp", ".editorconfig", ".globalconfig", ".resx", ".runsettings"];
+
+    /// <summary>An ignored C# file (which the SDK would compile into the test assembly) is refused.</summary>
+    [Fact]
+    public void TheTrustAnchorRefusesAnIgnoredSourceFile()
+    {
+        var dir = Directory.CreateTempSubdirectory("calor-v025-anchor-").FullName;
+        try
+        {
+            var git = new GitRepo(dir);
+            File.WriteAllText(Path.Combine(dir, ".gitignore"), "tmp/\n");
+            Assert.Equal(0, git.Run("init", "-q").ExitCode);
+            Assert.Equal(0, git.Run("add", ".gitignore").ExitCode);
+            Assert.Equal(0, git.Run("-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "root").ExitCode);
+            Directory.CreateDirectory(Path.Combine(dir, "tests", "tmp"));
+            File.WriteAllText(Path.Combine(dir, "tests", "tmp", "Injected.cs"), "// injected\n");
+            var problems = TrustAnchorProblems(git, git.RevParse("HEAD")!);
+            Assert.Equal(new[] { "the landing checkout has ignored build inputs: tests/tmp/Injected.cs" }, problems);
+        }
+        finally { Directory.Delete(dir, true); }
     }
 
     /// <summary>A checkout other than the landing (here the candidate stands in for any non-landing commit) is refused.</summary>
@@ -131,6 +162,23 @@ public class V025CandidateManifestTests
     [InlineData("packets.t1Register.registerVersion", "1.0.1", "T1 register")]
     [InlineData("packets.d1Contract.contractVersion", "1.0.5", "D1 contract")]
     [InlineData("packets.w1Records.scopeVersion", "1.3.0", "W1 records")]
+    [InlineData("dependencies.lockfiles.src/Calor.Compiler/packages.lock.json", "<remove>", "lockfile")]
+    [InlineData("dependencies.lockfiles", "<clear>", "lockfile")]
+    [InlineData("dependencies.node.website/package-lock.json", "<remove>", "lockfile")]
+    [InlineData("producers.2", "<remove>", "producer")]
+    [InlineData("producers.0.files.docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py", "<remove>", "producer")]
+    [InlineData("toolchain.globalJson.version", "10.0.101", "toolchain")]
+    [InlineData("toolchain.determinismProtocol.version", "1.5.0", "toolchain")]
+    [InlineData("toolchain.seeds.0.value", "7", "toolchain")]
+    [InlineData("toolchain.z3.upstreamArchives.0.sha256", "00", "Z3")]
+    [InlineData("toolchain.releaseWorkflowPins.publish-nuget.yml:publish", "<rename:publish-nuget.yml:no-such-job>", "toolchain")]
+    [InlineData("issueStatesAtFreeze.releaseGaps.closures.0.closedAtUtc|issueStatesAtFreeze.states.1545.closedAtUtc", "2099-01-01T00:00:00Z", "issue states")]
+    [InlineData("issueStatesAtFreeze.states.1578.state", "CLOSED", "issue states")]
+    [InlineData("maintainerDecisions.0.decision", "Accept and freeze", "decision")]
+    [InlineData("maintainerDecisions.0.record", "docs/plans/evidence/v0.25-candidate/reviews/no-such-record.md", "decision")]
+    [InlineData("issueStatesAtFreeze.releaseGaps.liveCheck.exitCode", "1", "live check")]
+    [InlineData("issueStatesAtFreeze.releaseGaps.liveCheck.treeAtCommit", "0000000000000000000000000000000000000005", "live check")]
+    [InlineData("issueStatesAtFreeze.releaseGaps.liveCheck.attestation", "none", "live check")]
     public void ATamperedFieldIsFound(string pointer, string value, string expected)
     {
         var manifest = Manifest();
@@ -177,17 +225,41 @@ public class V025CandidateManifestTests
             .Select(p => $"{p[3]} {p[2]}").ToHashSet();
         var recorded = manifest["dependencies"]!["submodules"]!.AsArray().Select(s => $"{Str(s!["path"])} {Str(s["commit"])}").ToHashSet();
         if (gitlinks.Count != 3 || !gitlinks.SetEquals(recorded)) Fail("submodule inventory differs from the candidate's gitlinks");
-        foreach (var group in new[] { "lockfiles", "node" })
-            foreach (var (path, want) in manifest["dependencies"]![group]!.AsObject())
+        var allPaths = git.Run("ls-tree", "-r", "--name-only", candidate).Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lockPaths = allPaths.Where(f => f.EndsWith("packages.lock.json", StringComparison.Ordinal) || f.EndsWith("Directory.Packages.props", StringComparison.Ordinal)
+            || f.EndsWith("dotnet-tools.json", StringComparison.Ordinal) || f.ToLowerInvariant().EndsWith("nuget.config", StringComparison.Ordinal)).ToHashSet();
+        foreach (var (group, required) in new[] { ("lockfiles", lockPaths), ("node", new HashSet<string> { "website/package.json", "website/package-lock.json" }) })
+        {
+            var recordedLocks = manifest["dependencies"]![group]!.AsObject();
+            if (required.Count == 0 || !recordedLocks.Select(kv => kv.Key).ToHashSet().SetEquals(required))
+                Fail($"lockfile inventory ({group}) differs from the candidate's lockfiles");
+            foreach (var (path, want) in recordedLocks)
                 if (Sha(path) != Str(want)) Fail($"lockfile {path} differs");
-        foreach (var p in manifest["producers"]!.AsArray())
+        }
+        var producers = manifest["producers"]!.AsArray();
+        if (!producers.Select(p => Str(p!["id"])).SequenceEqual(Producers.Select(p => p.Id)))
+            Fail("producer: the producer set differs from the reviewed table");
+        foreach (var p in producers)
+        {
+            var reviewed = Producers.FirstOrDefault(r => r.Id == Str(p!["id"]));
+            var required = (reviewed.Directory is { } d ? allPaths.Where(f => f.StartsWith(d, StringComparison.Ordinal)) : Enumerable.Empty<string>()).Concat(reviewed.Extra ?? []).ToHashSet();
+            if (reviewed.Id == null || required.Count == 0 || !p!["files"]!.AsObject().Select(kv => kv.Key).ToHashSet().SetEquals(required))
+                Fail($"producer {Str(p!["id"])}: its file set differs from the candidate");
             foreach (var (path, want) in p!["files"]!.AsObject())
                 if (Sha(path) != Str(want)) Fail($"producer {Str(p["id"])}: {path} differs");
+        }
         var pins = Encoding.UTF8.GetString(Blob(".github/z3-binaries-4.15.7.sha256") ?? []).Split('\n')
             .Where(l => !l.StartsWith('#')).Select(l => l.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             .Where(p => p.Length == 3).Select(p => $"{p[1]} {p[0]} {p[2]}").ToHashSet();
         var assets = manifest["toolchain"]!["z3"]!["assets"]!.AsArray().Select(a => $"{Str(a!["name"])} {Str(a["sha256"])} {a["bytes"]}").ToHashSet();
         if (pins.Count == 0 || !pins.SetEquals(assets)) Fail("Z3 pins differ from .github/z3-binaries-4.15.7.sha256 at the candidate");
+        var upstream = Encoding.UTF8.GetString(Blob("src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256") ?? []).Split('\n')
+            .Where(l => !l.StartsWith('#')).Select(l => l.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .Where(p => p.Length == 3).Select(p => $"{p[1]} {p[0]} {p[2]}").ToHashSet();
+        var z3 = manifest["toolchain"]!["z3"]!;
+        if (upstream.Count == 0 || !upstream.SetEquals(z3["upstreamArchives"]!.AsArray().Select(a => $"{Str(a!["name"])} {Str(a["sha256"])} {a["bytes"]}"))
+            || Str(z3["version"]) != Str(JsonNode.Parse(Blob("eng/z3-consumers.json")!)!["z3Version"]))
+            Fail("Z3 upstream archives or version differ from the candidate");
 
         // The packets at the candidate, and the 0.25 validators on the candidate's own blobs.
         var packets = manifest["packets"]!;
@@ -205,6 +277,8 @@ public class V025CandidateManifestTests
         if (T1RegisterValidator.ApprovalSeal(register) != Str(packets["seals"]!["t1Amendments"]!["recorded"]!.AsArray()[^1]![1]))
             Fail("T1 register: the approval seal differs from the recorded one");
         var d1 = JsonNode.Parse(Blob(Str(packets["d1Contract"]!["path"]))!)!;
+        foreach (var v in RefOutContractValidator.Validate(d1, scope, p => Blob(p)))
+            Fail($"D1 contract: {v.Code} {v.Subject}: {v.Message}");
         if (RefOutContractValidator.Seal(d1) != Str(packets["seals"]!["d1Contract"]!["computed"])) Fail("D1 seal differs from the recorded seal");
         var w1 = JsonNode.Parse(Blob(Str(packets["w1Records"]!["path"]))!)!;
         if (Str(w1["scopeVersion"]) != Str(scope["scopeVersion"])) Fail("W1 records: consumed scope version differs");
@@ -250,17 +324,36 @@ public class V025CandidateManifestTests
         // from the retained reproducible-builds evidence.
         var tc = manifest["toolchain"]!;
         var recordedPins = tc["releaseWorkflowPins"]!.AsObject();
-        foreach (var wf in new[] { "publish-nuget.yml", "verify-release.yml", "reproducible-builds.yml", "benchmark.yml" })
+        var releaseWorkflows = new[] { "publish-nuget.yml", "verify-release.yml", "reproducible-builds.yml", "benchmark.yml" };
+        foreach (var wf in releaseWorkflows)
         {
-            var actual = System.Text.RegularExpressions.Regex.Matches(Encoding.UTF8.GetString(Blob($".github/workflows/{wf}") ?? []), @"dotnet-version:[ \t]*(\S+)")
-                .Select(m => m.Groups[1].Value.Trim('\'', '"'));
-            var recordedForWf = recordedPins.Where(kv => kv.Key.StartsWith(wf + ":", StringComparison.Ordinal)).SelectMany(kv => kv.Value!.AsArray().Select(Str));
-            if (!actual.SequenceEqual(recordedForWf)) Fail($"toolchain: {wf} SDK pins differ from the recorded jobs");
+            var text = Encoding.UTF8.GetString(Blob($".github/workflows/{wf}") ?? []);
+            var parts = System.Text.RegularExpressions.Regex.Split(text.Split("\njobs:", 2)[^1], @"(?m)^  ([A-Za-z0-9_-]+):[ \t]*$");
+            var actual = Enumerable.Range(0, (parts.Length - 1) / 2)
+                .Select(i => (Job: $"{wf}:{parts[1 + 2 * i]}", Versions: System.Text.RegularExpressions.Regex.Matches(parts[2 + 2 * i], @"dotnet-version:[ \t]*(\S+)")
+                    .Select(m => m.Groups[1].Value.Trim('\'', '"')).ToList()))
+                .Where(j => j.Versions.Count > 0).Select(j => $"{j.Job}={string.Join(",", j.Versions)}").ToList();
+            var recordedForWf = recordedPins.Where(kv => kv.Key.StartsWith(wf + ":", StringComparison.Ordinal))
+                .Select(kv => $"{kv.Key}={string.Join(",", kv.Value!.AsArray().Select(Str))}").ToList();
+            if (actual.Count == 0 || !actual.SequenceEqual(recordedForWf)) Fail($"toolchain: {wf} SDK pins differ from the recorded jobs");
         }
+        if (recordedPins.Any(kv => !releaseWorkflows.Any(wf => kv.Key.StartsWith(wf + ":", StringComparison.Ordinal))))
+            Fail("toolchain: a recorded job is not in a release workflow");
+        if (!JsonNode.DeepEquals(tc["globalJson"], JsonNode.Parse(Blob("global.json")!)!["sdk"])) Fail("toolchain: globalJson differs from the candidate's global.json");
         if (Str(tc["releaseSdk"]) != "10.0.401" || recordedPins.Any(kv => Str(kv.Value![0]) != Str(tc["releaseSdk"])))
             Fail("toolchain: the release SDK is not the first install of every release job");
         var protocol = JsonNode.Parse(Blob("docs/plans/evidence/g2-1421/protocol.json")!)!;
         if (!Str(tc["runtime"]).StartsWith(Str(protocol["toolchain"]!["runtime"]) + " ", StringComparison.Ordinal)) Fail("toolchain: runtime differs from the G2 pin");
+        var dp = tc["determinismProtocol"]!;
+        if (Str(dp["version"]) != Str(protocol["protocolVersion"]) || dp.AsObject().Count != 8
+            || new[] { "environments", "environmentRule", "checkout" }.Any(k => !JsonNode.DeepEquals(dp[k], protocol[k]))
+            || new[] { "sdk", "runtime", "globalJson", "configuration" }.Any(k => !JsonNode.DeepEquals(dp[k], protocol["toolchain"]![k])))
+            Fail("toolchain: determinismProtocol differs from the candidate's G2 protocol");
+        var seeds = tc["seeds"]!.AsArray();
+        var seed = protocol["z3"]!["randomSeed"]!;
+        if (seeds.Count != 2 || Str(seeds[0]!["id"]) != "z3-random-seed" || new[] { "value", "source", "applied" }.Any(k => !JsonNode.DeepEquals(seeds[0]![k], seed[k]))
+            || Str(seeds[1]!["id"]) != "0.25-producers" || seeds[1]!["value"] != null)
+            Fail("toolchain: seeds differ from the candidate's G2 protocol");
         var fingerprint = tc["dotnetSdkBuild"]!;
         var evidence = fingerprint["evidence"]!.AsArray();
         var hashFiles = evidence.Select(e => Str(e!["path"])).Where(p => p.EndsWith(".json", StringComparison.Ordinal)).ToHashSet();
@@ -303,15 +396,33 @@ public class V025CandidateManifestTests
 
         // The release-gap closures and the live check output retained beside the manifest.
         var gaps = manifest["issueStatesAtFreeze"]!["releaseGaps"]!;
-        var states = manifest["issueStatesAtFreeze"]!["states"]!;
-        foreach (var c in gaps["closures"]!.AsArray())
-            if (Str(states[c!["issue"]!.ToString()]?["state"]) != "CLOSED" || Str(states[c["issue"]!.ToString()]?["closedAtUtc"]) != Str(c["closedAtUtc"]))
-                Fail($"live check: release gap #{c["issue"]} is not recorded closed");
-        var output = gaps["liveCheck"]!["output"]!;
+        var states = manifest["issueStatesAtFreeze"]!["states"]!.AsObject();
+        var freezeUtc = Str(manifest["candidate"]!["freezeObservedUtc"]);
+        if (!states.Select(kv => $"{kv.Key}={Str(kv.Value!["state"])}|{Str(kv.Value["stateReason"])}|{Str(kv.Value["closedAtUtc"])}").SequenceEqual(IssueStates.Select(kv => $"{kv.Key}={kv.Value}")))
+            Fail("issue states: the recorded states differ from the reviewed snapshot");
+        var closures = gaps["closures"]!.AsArray();
+        if (!closures.Select(c => $"{c!["issue"]}|{Str(c["stateReason"])}|{Str(c["closedAtUtc"])}").SequenceEqual(new[] { 1545, 1546, 1547 }.Select(i => $"{i}|{IssueStates[i.ToString()][7..]}"))
+            || closures.Any(c => string.CompareOrdinal(Str(c!["closedAtUtc"]), freezeUtc) >= 0) || gaps["met"]?.GetValue<bool>() != true)
+            Fail("issue states: the release-gap closures differ from the reviewed snapshot or follow the freeze");
+        var live = gaps["liveCheck"]!;
+        const string Attestation = "docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.json";
+        var output = live["output"]!;
         var file = Path.Combine(RepoRoot(), Str(output["path"]));
+        var liveText = File.Exists(file) ? File.ReadAllText(file) : "";
         if (!File.Exists(file) || DurableProvenance.Sha256(File.ReadAllBytes(file)) != Str(output["sha256"])
-            || !File.ReadAllText(file).Contains("RELEASE CREDENTIALS: CLOSED", StringComparison.Ordinal))
-            Fail("live check: the retained output is missing, differs, or is not CLOSED");
+            || !liveText.Contains("RELEASE CREDENTIALS: CLOSED", StringComparison.Ordinal) || !liveText.TrimEnd().EndsWith(Str(live["verdict"]), StringComparison.Ordinal)
+            || !liveText.Contains($"A001: Actions workflow permissions ATTESTED", StringComparison.Ordinal) || !liveText.Contains(Attestation, StringComparison.Ordinal))
+            Fail("live check: the retained output is missing, differs, is not CLOSED, or does not carry the A001 attestation");
+        if (Str(live["treeAtCommit"]) != candidate || live["exitCode"]?.ToString() != "0" || Str(live["ranAtUtc"]) != freezeUtc
+            || Str(live["command"]) != $"python3 scripts/check_release_credentials.py --live --attest-workflow-permissions {Attestation}"
+            || !Str(live["attestation"]).StartsWith("A001: Actions workflow permissions ATTESTED", StringComparison.Ordinal) || !Str(live["attestation"]).Contains(Attestation, StringComparison.Ordinal)
+            || Blob(Attestation) == null)
+            Fail("live check: the recorded command, tree, exit code, time or attestation differs");
+        var accept = manifest["maintainerDecisions"]!.AsArray().Where(d => Str(d!["id"]) == "D-ACCEPT-FILE-FREEZE").ToList();
+        if (accept.Count != 1 || Str(accept[0]!["decision"]) != "Accept, file issue, freeze" || Str(accept[0]!["by"]) != "@juanmicrosoft"
+            || Str(accept[0]!["date"]) != "2026-10-19" || accept[0]!["issue"]?.ToString() != "1578"
+            || Str(accept[0]!["record"]) != "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md" || Blob(Str(accept[0]!["record"])) == null)
+            Fail("decision: D-ACCEPT-FILE-FREEZE differs from the maintainer's decision or its review record is missing at the candidate");
         return findings;
     }
 
@@ -326,8 +437,40 @@ public class V025CandidateManifestTests
         ["R2-1547"] = (1547, [1563]), ["PREP"] = (1430, [1568, 1569, 1575, 1576]),
     };
 
+    /// <summary>Issue states observed at the freeze (gh issue view at 2026-10-19T18:23:52Z), reviewed with this freeze.</summary>
+    private static readonly Dictionary<string, string> IssueStates = new()
+    {
+        ["1425"] = "OPEN||", ["1426"] = "OPEN||", ["1427"] = "OPEN||", ["1428"] = "OPEN||", ["1429"] = "OPEN||", ["1430"] = "OPEN||",
+        ["943"] = "OPEN||", ["906"] = "OPEN||", ["847"] = "OPEN||", ["1139"] = "OPEN||", ["1132"] = "OPEN||", ["1144"] = "OPEN||",
+        ["1143"] = "OPEN||", ["1545"] = "CLOSED|COMPLETED|2026-10-19T15:23:15Z", ["1546"] = "CLOSED|COMPLETED|2026-10-19T15:23:17Z",
+        ["1547"] = "CLOSED|COMPLETED|2026-10-19T15:23:19Z", ["1548"] = "OPEN||", ["1573"] = "OPEN||", ["1578"] = "OPEN||",
+    };
+
+    /// <summary>The evidence producers reviewed with this freeze: a directory whose files are all included, plus extra files.</summary>
+    private static readonly (string Id, string? Directory, string[]? Extra)[] Producers =
+    [
+        ("r0-reproduce", "docs/plans/evidence/v0.25-r0-1426/reproduce/", null),
+        ("family-reproduce", null, ["docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py", "docs/plans/evidence/v0.25-f3-847/reproduce/reproduce.py",
+            "docs/plans/evidence/v0.25-f4-1139/reproduce/reproduce.py", "docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce.py",
+            "docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce_pr2.py"]),
+        ("t1-aggregate", "docs/plans/evidence/v0.25-t1-1428/reproduce/", null),
+        ("w1-wording-scan", "docs/plans/evidence/v0.25-w1-1429/reproduce/", null),
+        ("g2-determinism", null, ["scripts/determinism_protocol.py", "scripts/determinism_runner.py", "docs/plans/evidence/g2-1421/protocol.json",
+            "docs/plans/evidence/g2-1421/cases.json"]),
+        ("r2-release-gate", null, ["scripts/verify_release_adjudication.py", "scripts/render_release_notes.py", "scripts/verify_maintainer_override.py",
+            "scripts/check_release_credentials.py", "scripts/test_reproducible_builds.py"]),
+        ("candidate-generator", null, ["docs/plans/evidence/v0.25-candidate/generate_candidate_manifest.py"]),
+    ];
+
+    /// <summary>Sets one field; <c>a|b</c> sets several. Values: a literal, <c>&lt;remove&gt;</c>, <c>&lt;clear&gt;</c>,
+    /// <c>&lt;copy:N&gt;</c>, <c>&lt;only:N&gt;</c>, or <c>&lt;rename:key&gt;</c>.</summary>
     private static void Set(JsonNode root, string pointer, string value)
     {
+        if (pointer.Contains('|'))
+        {
+            foreach (var part in pointer.Split('|')) Set(root, part, value);
+            return;
+        }
         var node = root;
         var rest = pointer;
         while (true)
@@ -339,6 +482,16 @@ public class V025CandidateManifestTests
             if (rest == "")
             {
                 if (value == "<remove>" && node is JsonArray removeFrom) removeFrom.RemoveAt(int.Parse(key));
+                else if (value == "<remove>" && node is JsonObject removeKey) removeKey.Remove(key);
+                else if (value == "<clear>" && Child() is JsonObject clearObject) clearObject.Clear();
+                else if (value.StartsWith("<rename:", StringComparison.Ordinal) && node is JsonObject renameIn)
+                {
+                    var moved = renameIn[key]!.DeepClone();
+                    var order = renameIn.Select(kv => kv.Key).ToList();
+                    var copy = order.Select(k => (Key: k == key ? value[8..^1] : k, Value: k == key ? moved : renameIn[k]!.DeepClone())).ToList();
+                    renameIn.Clear();
+                    foreach (var (k, v) in copy) renameIn[k] = v;
+                }
                 else if (value.StartsWith("<copy:", StringComparison.Ordinal) && node is JsonArray copyIn)
                     copyIn[int.Parse(key)] = copyIn[int.Parse(value[6..^1])]!.DeepClone();
                 else if (value.StartsWith("<only:", StringComparison.Ordinal) && Child() is JsonArray keepIn)
