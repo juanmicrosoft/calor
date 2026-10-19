@@ -1,7 +1,7 @@
 {
   "schema": "v0.25-f1-943-evidence/1",
-  "measuredCommit": "cc383f4d92c52ddc1f4c98c6903b176a5d2e90fd",
-  "srcTree": "3efac36756c91d23ad13f8a99734eb2ed0d6cb13",
+  "measuredCommit": "ef768516196377f30ad86723684c1ff9a6eaf04f",
+  "srcTree": "7f1edba1fd3bd00317294d490843e13bc76ace8f",
   "build": "Release",
   "dotnetSdk": "10.0.401",
   "platform": "Darwin arm64",
@@ -1679,13 +1679,13 @@
     {
       "case": "P2-OUTVAR-PLACEMENTS",
       "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-OUTVAR-PLACEMENTS.cs.txt",
-      "fixtureSha256": "8fa12ca038425af084449614ab01c367939be45e01c30b2025348142f802bec2",
+      "fixtureSha256": "9e7017eb5e5097881be37bb961e3cc4bc95f89beb2810d939b3baa692ebed151",
       "expected": "native",
       "surfaces": {
         "cli-default": {
           "convertExit": 0,
           "success": true,
-          "nativeConversionCount": 22,
+          "nativeConversionCount": 18,
           "interopPreservationCount": 0,
           "lossySubstitutionCount": 0,
           "dropCount": 0,
@@ -1702,7 +1702,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "True:5|False:0|8|one|0",
+            "result": "True:5|False:0|8|one",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1711,7 +1711,7 @@
         "cli-passthrough": {
           "convertExit": 0,
           "success": true,
-          "nativeConversionCount": 22,
+          "nativeConversionCount": 18,
           "interopPreservationCount": 0,
           "lossySubstitutionCount": 0,
           "dropCount": 0,
@@ -1728,7 +1728,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "True:5|False:0|8|one|0",
+            "result": "True:5|False:0|8|one",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1748,7 +1748,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "True:5|False:0|8|one|0",
+            "result": "True:5|False:0|8|one",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1769,7 +1769,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "True:5|False:0|8|one|0",
+            "result": "True:5|False:0|8|one",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1790,7 +1790,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "True:5|False:0|8|one|0",
+            "result": "True:5|False:0|8|one",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1811,7 +1811,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "True:5|False:0|8|one|0",
+            "result": "True:5|False:0|8|one",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1820,7 +1820,7 @@
       },
       "original": {
         "compiled": true,
-        "result": "True:5|False:0|8|one|0",
+        "result": "True:5|False:0|8|one",
         "exception": null
       },
       "allowed": true
@@ -1828,7 +1828,7 @@
     {
       "case": "P2-OUTVAR-CALL-STATEMENT",
       "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-OUTVAR-CALL-STATEMENT.cs.txt",
-      "fixtureSha256": "de0f96e5143023f19fcfc45e42f172a1151c5f83f49153e45e545057ce9ba4be",
+      "fixtureSha256": "da28032a70200d4a435062472e3289d6b457228e1644c39f641d7ff963477f15",
       "expected": "native",
       "surfaces": {
         "cli-default": {
@@ -2131,6 +2131,167 @@
       "original": {
         "compiled": true,
         "result": "1:1:True:True",
+        "exception": null
+      },
+      "allowed": true
+    },
+    {
+      "case": "P2-OUTVAR-DEFAULT-MEMBER",
+      "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-OUTVAR-DEFAULT-MEMBER.cs.txt",
+      "fixtureSha256": "35f8e9abce576765dfe635817ca50c5a3875ed24f73b5ec98ae80b77dddb2b6b",
+      "expected": "preserved",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 5,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0:5:True",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 5,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0:5:True",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0:5:True",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0:5:True",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0:5:True",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0:5:True",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "0:5:True",
         "exception": null
       },
       "allowed": true

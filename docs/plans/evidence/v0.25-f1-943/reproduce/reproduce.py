@@ -41,7 +41,7 @@ R0_ROWS = {f"F1-REFOUT-0{i}": None for i in range(1, 9)}
 INTERACTION_ROWS = {"X-INT-05": "native-or-preserved", "X-INT-08": "native-or-preserved",
                     # F1 PR 2: the W1 (#1429) findings, fixed.
                     "P2-OUTVAR-PLACEMENTS": "native", "P2-OUTVAR-CALL-STATEMENT": "native",
-                    "P2-OUTVAR-CHAINED": "preserved",
+                    "P2-OUTVAR-CHAINED": "preserved", "P2-OUTVAR-DEFAULT-MEMBER": "preserved",
                     "P2-REFRETURN-EXPRESSION": "preserved"}
 
 

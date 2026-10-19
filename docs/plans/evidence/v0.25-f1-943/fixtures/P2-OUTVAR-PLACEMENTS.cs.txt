@@ -1,18 +1,11 @@
 // 0.25 F1 PR 2 (#943) fixture: the D1 RO-DECL-1 placements that lower natively (an assignment,
-// a local declaration, a return and an if condition), with no synthesized initializer; a member
-// named `default` must not be read.
+// a local declaration, a return and an if condition); each binding starts at `default`.
 using System.Collections.Generic;
 
 public static class Probe
 {
-    public static int reads;
-
-    public static int @default { get { reads++; return 0; } }
-
     public static string Assignment(string s)
     {
-        // Initialized: the converter writes `int x;` as `§B{~x} default`, which would read the
-        // `@default` member (a pre-existing defect, outside F1; see the README residuals).
         bool ok = false;
         ok = int.TryParse(s, out var n);
         return ok + ":" + n;
@@ -42,6 +35,6 @@ public static class Probe
     {
         var d = new Dictionary<int, string>();
         d.Add(1, "one");
-        return Assignment("5") + "|" + Declaration("x") + "|" + Return("8") + "|" + Condition(d) + "|" + reads;
+        return Assignment("5") + "|" + Declaration("x") + "|" + Return("8") + "|" + Condition(d);
     }
 }

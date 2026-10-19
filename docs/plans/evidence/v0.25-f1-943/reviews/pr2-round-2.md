@@ -23,3 +23,7 @@
 Non-test lines 48 of the ~51 left (src 33, CHANGELOG 15). Ledgers regenerated from `main`
 (`RoslynSelectedAttempted` 34,358; opaque boundaries 148, expressions 7,746), F1 evidence re-run
 (four P2 rows), T1 amendment 1.0.1 re-sealed (`598a5d7c…`).
+
+**Superseded in round 3.** The parser rule (P2R2-1) silently changed valid hand-written Calor and was
+reverted; the converter's explicit `default` initializer (with a `default`-symbol collision check)
+closes P2R2-1 instead. P2R2-2…5 stand. See `pr2-round-3.md`.

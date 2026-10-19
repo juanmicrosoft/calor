@@ -7,10 +7,10 @@
         §ASSIGN Log (+ Log (+ x ";"))
 
       §MT{m003:Statement:pub:stat} (str:s) -> str
-        §B{~n:i32}
+        §B{~n:i32} `default`
         §C{int.TryParse} §A s §A{out} n §/C
         §C{Use} n
-        §B{~m:i32}
+        §B{~m:i32} `default`
         §C{int.TryParse} §A "3" §A{out} m §/C
         §C{Use} m
         §R Log
@@ -24,7 +24,7 @@
 
       §MT{m006:ArrayDeclaration:pub:stat} () -> str
         §E{alloc}
-        §B{~n:i32[]}
+        §B{~n:i32[]} `default`
         §ARR{a:i32}
           §C{Set} §A{out} n §/C
         §R (+ (+ §IDX{n} 0 ":") §IDX{a} 0)

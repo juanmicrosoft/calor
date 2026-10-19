@@ -2,38 +2,31 @@
   §U{System.Collections.Generic}
 
   §CL{c001:Probe:pub:stat}
-    §FLD{i32:reads:pub:stat}
-
-    §PROP{p002:`default`:i32:pub:stat}
-      §GET{pub}
-        §ASSIGN reads (+ reads 1)
-        §R 0
-
-    §MT{m003:Assignment:pub:stat} (str:s) -> str
+    §MT{m002:Assignment:pub:stat} (str:s) -> str
       §B{~ok:bool} false
-      §B{~n:i32}
+      §B{~n:i32} `default`
       §ASSIGN ok §C{int.TryParse} §A s §A{out} n §/C
       §R (+ (+ ok ":") n)
 
-    §MT{m004:Declaration:pub:stat} (str:s) -> str
-      §B{~n:i32}
+    §MT{m003:Declaration:pub:stat} (str:s) -> str
+      §B{~n:i32} `default`
       §B{bool:ok} §C{int.TryParse} §A s §A{out} n §/C
       §R (+ (+ ok ":") n)
 
-    §MT{m005:Return:pub:stat} (str:s) -> i32
-      §B{~n:i32}
+    §MT{m004:Return:pub:stat} (str:s) -> i32
+      §B{~n:i32} `default`
       §R (? §C{int.TryParse} §A s §A{out} n §/C n (- 1))
 
-    §MT{m006:Condition:pub:stat} (Dict<i32, str>:d) -> str
-      §B{~v:str}
-      §IF{if007} §C{d.TryGetValue} §A 1 §A{out} v §/C
+    §MT{m005:Condition:pub:stat} (Dict<i32, str>:d) -> str
+      §B{~v:str} `default`
+      §IF{if006} §C{d.TryGetValue} §A 1 §A{out} v §/C
         §R v
       §R "none"
 
-    §MT{m008:Run:pub:stat} () -> str
+    §MT{m007:Run:pub:stat} () -> str
       §E{alloc,mut}
       §B{d} §NEW{Dictionary<i32,str>} §/NEW
       §C{d.Add} §A 1 §A "one" §/C
-      §R (+ (+ (+ (+ (+ (+ (+ (+ §C{Assignment} §A "5" §/C "|") §C{Declaration} §A "x" §/C) "|") §C{Return} §A "8" §/C) "|") §C{Condition} §A d §/C) "|") reads)
+      §R (+ (+ (+ (+ (+ (+ §C{Assignment} §A "5" §/C "|") §C{Declaration} §A "x" §/C) "|") §C{Return} §A "8" §/C) "|") §C{Condition} §A d §/C)
 
 
