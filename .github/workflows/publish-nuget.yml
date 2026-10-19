@@ -471,11 +471,16 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [adjudication-gate, test, sdk-consumer, release-quality]
-    # #1545: the NuGet credential lives only in the `nuget-release` environment, whose deployment
-    # policy admits `main` alone. Workflow files on older tags never name this environment or this
-    # secret, so they cannot read it. Until the maintainer creates the environment and its secret
-    # (docs/plans/evidence/release-gaps-0.25/README.md), the key is empty and the job stops before
-    # anything is attested or pushed. scripts/check_release_credentials.py reports the settings.
+    # #1545: no NuGet key is stored anywhere. nuget.org Trusted Publishing (policy "calor-release":
+    # juanmicrosoft/calor, workflow file publish-nuget.yml, environment nuget-release) exchanges this
+    # job's GitHub OIDC token for a one-hour key. nuget.org matches the workflow file NAME and
+    # ignores the ref, so the environment is what keeps older tags out: their publish-nuget.yml
+    # names no environment, and `nuget-release` admits `main` alone (admin bypass off). That branch
+    # rule is a required security control, not a fail-safe: an unrestricted (or auto-recreated)
+    # `nuget-release` would still yield a matching environment claim. Only a missing or mismatched
+    # nuget.org policy makes the exchange fail, which stops the job before anything is attested or
+    # pushed. Settings and checklist: docs/plans/evidence/release-gaps-0.25/README.md;
+    # scripts/check_release_credentials.py --live reports them.
     environment: nuget-release
     permissions:
       contents: write
@@ -487,15 +492,24 @@ jobs:
       OVERRIDE_SHA256: ${{ needs.adjudication-gate.outputs.override_sha256 }}
 
     steps:
-      # Fail closed before any work: an empty key means the environment or its secret is missing,
-      # or this run is not allowed into the environment. First step, unconditional, never
-      # continue-on-error (ReleaseWorkflowGateTests and check_release_credentials.py check this).
-      - name: Require the environment-scoped NuGet key (#1545)
+      # Fail closed before any work: the OIDC exchange runs first, so a missing or mismatched
+      # nuget.org policy, or a run outside `nuget-release`, stops the job before it packs, attests,
+      # or pushes. The key lives one hour; the push follows within this job. Both steps are
+      # unconditional and never continue-on-error (ReleaseWorkflowGateTests and
+      # check_release_credentials.py check this). `user` is the nuget.org account that owns
+      # calor and Calor.Sdk and the policy (not a secret).
+      - name: Exchange the GitHub OIDC token for a short-lived NuGet key (#1545)
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: juanmicrosoft
+
+      - name: Require the Trusted Publishing NuGet key (#1545)
         env:
-          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}
+          NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
-          if [ -z "$NUGET_RELEASE_API_KEY" ]; then
-            echo "::error::NUGET_RELEASE_API_KEY is not available; create it in the nuget-release environment (#1545)"
+          if [ -z "$NUGET_OIDC_KEY" ]; then
+            echo "::error::nuget.org Trusted Publishing returned no key; check the calor-release policy and the nuget-release environment (#1545)"
             exit 1
           fi
 
@@ -646,8 +660,8 @@ jobs:
 
       - name: Push to NuGet
         env:
-          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_RELEASE_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_OIDC_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified
       # package in place. Wait until nuget.org serves both packages, then compare them with

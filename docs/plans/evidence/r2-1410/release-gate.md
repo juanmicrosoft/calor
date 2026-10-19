@@ -132,12 +132,25 @@ These are repository settings. R2 changes none of them. Recommended, in priority
    `NUGET_API_KEY` is visible to it. Moving publication credentials into environments with a
    `main`-only deployment policy (item 3) removes that authority from every older workflow version.
    Until then, the R2 gate covers the workflow files on `main` only.
-   **0.25 (#1545):** the workflow half is done. The `publish` job declares
-   `environment: nuget-release` and reads only `NUGET_RELEASE_API_KEY`, a name no older workflow
-   uses; an empty key stops the job before it packs. The settings half (create the environment,
-   store the new key there, delete the repository `NUGET_API_KEY`) is the maintainer's:
-   `docs/plans/evidence/release-gaps-0.25/README.md`. `scripts/check_release_credentials.py --live`
-   reports CLOSED only when it is done (read-only).
+   **0.25 (#1545), revised 2026-10-19: nuget.org Trusted Publishing, no stored key.** The
+   `publish` job keeps `environment: nuget-release` and `id-token: write`. Its first step is the
+   official `NuGet/login` action, pinned to commit `8d196754b4036150537f80ac539e15c2f1028841`
+   (v1.2.0), with `user: juanmicrosoft`. The action exchanges the job's OIDC token for a one-hour
+   key. Step 2 stops the job if no key came back, before it packs, attests, or pushes.
+   - The nuget.org policy `calor-release` names repository `juanmicrosoft/calor`, workflow file
+     `publish-nuget.yml`, and environment `nuget-release`.
+   - nuget.org matches the workflow file name from `job_workflow_ref` and ignores the ref. An
+     older tag's `publish-nuget.yml` names no environment, so its token is refused.
+   - A non-`main` ref that names the environment is stopped by GitHub's `main`-only deployment
+     rule, with admin bypass off, before the job runs. The environment rule is therefore
+     load-bearing.
+   - The repository `NUGET_API_KEY` is deleted, the old key is revoked, and no environment holds a
+     NuGet secret.
+   - `scripts/check_release_credentials.py --live` (read-only) checks the workflow and the GitHub
+     settings. One setting cannot be read this way: the Actions workflow permissions answer
+     HTTP 403 to the maintainer's `gh` login. For it, the check reads a dated maintainer
+     attestation and labels the result ATTESTED.
+   - Steps and the 2026-10-19 state: `docs/plans/evidence/release-gaps-0.25/README.md`.
 2. **Branch protection on `main`:** turn on "Do not allow bypassing the above settings"
    (enforcement currently `non_admins`); add `tests (verification)` (release-critical, carries the
    #1135 oracle) to the required checks. The R2 tests run in `tests (compiler)`, which is already
@@ -145,7 +158,8 @@ These are repository settings. R2 changes none of them. Recommended, in priority
 3. **NuGet secret scope:** move `NUGET_API_KEY` from repository secrets to an environment (for
    example `nuget-release`) whose deployment policy allows only `main`, and add `environment:` to
    the `publish` job. Today any branch or tag that edits or predates `publish-nuget.yml` can read it.
-   (0.25, #1545: `environment:` added and the secret renamed; see item 1.)
+   (0.25, #1545: `environment:` added; since 2026-10-19 no NuGet secret exists at all, and
+   publishing uses Trusted Publishing; see item 1.)
 4. **Tag ruleset:** restrict creation, update, and deletion of `v*` tags to the release workflow
    (or to admins). The workflow reads the remote tag immediately before and after creating the
    release, but only a ruleset closes the remaining window.
