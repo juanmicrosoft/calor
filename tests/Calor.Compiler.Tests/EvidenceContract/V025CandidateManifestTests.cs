@@ -65,17 +65,35 @@ public class V025CandidateManifestTests
         if (!string.IsNullOrWhiteSpace(requested))
         {
             Assert.True(report.Landing != null, "the freeze has not landed on origin/main; judge later commits only after it lands");
-            // Trust anchor: the whole compiled test project (the classifier, its shared verdicts in CandidateInvalidation,
-            // GitRepo, this test) and the candidate directory must be the landing's, committed and clean.
-            var paths = new[] { "--", "tests/Calor.Compiler.Tests", V025.Directory, $":(exclude){V025.Reviews}" };
-            var (diffExit, drift, _) = git.Run(new[] { "diff", "--name-only", report.Landing!, "HEAD" }.Concat(paths).ToArray());
-            var (statusExit, dirty, _) = git.Run(new[] { "status", "--porcelain" }.Concat(paths).ToArray());
-            Assert.True(diffExit == 0 && statusExit == 0 && drift.Trim() == "" && dirty.Trim() == "",
-                $"run this from a clean checkout of the landing commit {report.Landing}; differing: {drift}{dirty}");
+            var anchor = TrustAnchorProblems(git, report.Landing!);
+            Assert.True(anchor.Count == 0, string.Join(Environment.NewLine, anchor));
         }
         Assert.True(report.Verdict == CandidateInvalidation.NotInvalidated, report.ToString());
         if (string.IsNullOrWhiteSpace(requested))
             Assert.Contains(report.Commits.SelectMany(c => c.Decisions), d => d.Path == V025.ManifestPath);
+    }
+
+    /// <summary>
+    /// Trust anchor: an explicit target is judged only by the reviewed classifier, so the running checkout must be the
+    /// landing commit itself (every compiled input, including linked shared sources and MSBuild files) with no
+    /// modified tracked file and no untracked file outside ignored build output.
+    /// </summary>
+    internal static List<string> TrustAnchorProblems(GitRepo git, string landing)
+    {
+        var problems = new List<string>();
+        if (git.RevParse("HEAD") != landing) problems.Add($"run this from a checkout of the landing commit {landing}; HEAD is {git.RevParse("HEAD")}");
+        var (exit, dirty, _) = git.Run("status", "--porcelain", "--untracked-files=all");
+        if (exit != 0 || dirty.Trim() != "") problems.Add($"the landing checkout is not clean: {dirty.Trim()}");
+        return problems;
+    }
+
+    /// <summary>A checkout other than the landing (here the candidate stands in for any non-landing commit) is refused.</summary>
+    [Fact]
+    public void TheTrustAnchorRefusesAnotherCheckout()
+    {
+        var git = Git();
+        var problems = TrustAnchorProblems(git, Str(Manifest()["candidate"]!["commit"]));
+        Assert.Contains(problems, p => p.StartsWith("run this from a checkout of the landing commit", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -95,6 +113,11 @@ public class V025CandidateManifestTests
     [InlineData("issueStatesAtFreeze.releaseGaps.liveCheck.output.sha256", "00", "live check")]
     [InlineData("merged.6.prs.0.pr", "1512", "PR")] // the reviewed table and the merge check both catch a substituted PR
     [InlineData("merged.6", "<remove>", "gate")]
+    [InlineData("merged.6", "<copy:8>", "gate")]
+    [InlineData("toolchain.dotnetSdkBuild.evidence", "<only:2>", "fingerprint")]
+    [InlineData("packets.t1Register.readiness.F1", "READY", "T1 register")]
+    [InlineData("packets.t1Register.approvalSeal", "00", "T1 register")]
+    [InlineData("packets.t1Register.baselineApprovalSeal", "00", "T1 register")]
     [InlineData("toolchain.releaseSdk", "10.0.402", "SDK")] // the job pins and the fingerprint evidence both name 10.0.401
     [InlineData("toolchain.releaseWorkflowPins.publish-nuget.yml:publish.0", "10.0.402", "toolchain")]
     [InlineData("toolchain.runtime", "10.0.13", "toolchain")]
@@ -194,7 +217,11 @@ public class V025CandidateManifestTests
             || !scope["amendments"]!.AsArray().Select(a => $"{a!["version"]}|{a["dateUtc"]}|{a["pr"]}|{a["afterInspection"]}")
                 .SequenceEqual(sp["amendments"]!.AsArray().Select(a => $"{a!["version"]}|{a["dateUtc"]}|{a["pr"]}|{a["afterInspection"]}")))
             Fail("scope packet: a recorded summary field differs from scope.json");
-        if (Str(packets["t1Register"]!["registerVersion"]) != Str(register["registerVersion"])) Fail("T1 register: registerVersion differs");
+        var t1 = packets["t1Register"]!;
+        if (Str(t1["registerVersion"]) != Str(register["registerVersion"]) || Str(t1["approvalSeal"]) != T1RegisterValidator.ApprovalSeal(register)
+            || Str(t1["baselineApprovalSeal"]) != Str(register["approvalSeal"])
+            || !register["families"]!.AsArray().Select(f => $"{f!["id"]}={f["readiness"]}").SequenceEqual(t1["readiness"]!.AsObject().Select(kv => $"{kv.Key}={Str(kv.Value)}")))
+            Fail("T1 register: a recorded summary field differs (registerVersion, readiness or approval seals)");
         if (Str(packets["d1Contract"]!["contractVersion"]) != Str(d1["contractVersion"]) || Str(packets["d1Contract"]!["status"]) != Str(d1["status"])
             || !JsonNode.DeepEquals(packets["d1Contract"]!["consumes"], d1["consumes"]))
             Fail("D1 contract: a recorded summary field differs");
@@ -236,7 +263,9 @@ public class V025CandidateManifestTests
         if (!Str(tc["runtime"]).StartsWith(Str(protocol["toolchain"]!["runtime"]) + " ", StringComparison.Ordinal)) Fail("toolchain: runtime differs from the G2 pin");
         var fingerprint = tc["dotnetSdkBuild"]!;
         var evidence = fingerprint["evidence"]!.AsArray();
-        if (evidence.Count == 0) Fail("fingerprint: no retained evidence");
+        var hashFiles = evidence.Select(e => Str(e!["path"])).Where(p => p.EndsWith(".json", StringComparison.Ordinal)).ToHashSet();
+        if (!hashFiles.SetEquals(new[] { "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-1.json", "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-2.json" }))
+            Fail("fingerprint: the evidence must retain both reproducible-builds hash files (packages-1.json and packages-2.json)");
         foreach (var e in evidence)
         {
             var path = Path.Combine(RepoRoot(), Str(e!["path"]));
@@ -258,7 +287,9 @@ public class V025CandidateManifestTests
         // The gate set and each gate's PRs equal the table reviewed with this freeze; every recorded PR is GitHub's
         // merge of that PR, inside the candidate.
         var gates = manifest["merged"]!.AsArray();
-        if (gates.Count != GatePrs.Count || gates.Any(g => !GatePrs.TryGetValue(Str(g!["gate"]), out var want)
+        var gateIds = gates.Select(g => Str(g!["gate"])).ToList();
+        if (gates.Count != GatePrs.Count || gateIds.Distinct().Count() != gateIds.Count || !gateIds.ToHashSet().SetEquals(GatePrs.Keys)
+            || gates.Any(g => !GatePrs.TryGetValue(Str(g!["gate"]), out var want)
                 || want.Issue.ToString() != g["issue"]!.ToString() || !want.Prs.Select(x => x.ToString()).SequenceEqual(g["prs"]!.AsArray().Select(x => x!["pr"]!.ToString()))))
             Fail("gate: the gate set or a gate's PRs differ from the reviewed table");
         foreach (var gate in gates)
@@ -308,6 +339,14 @@ public class V025CandidateManifestTests
             if (rest == "")
             {
                 if (value == "<remove>" && node is JsonArray removeFrom) removeFrom.RemoveAt(int.Parse(key));
+                else if (value.StartsWith("<copy:", StringComparison.Ordinal) && node is JsonArray copyIn)
+                    copyIn[int.Parse(key)] = copyIn[int.Parse(value[6..^1])]!.DeepClone();
+                else if (value.StartsWith("<only:", StringComparison.Ordinal) && Child() is JsonArray keepIn)
+                {
+                    var keep = keepIn[int.Parse(value[6..^1])]!.DeepClone();
+                    keepIn.Clear();
+                    keepIn.Add(keep);
+                }
                 else if (node is JsonArray arr) arr[int.Parse(key)] = JsonValue.Create(value);
                 else node![key] = JsonValue.Create(value);
                 return;
