@@ -247,7 +247,7 @@ generated C# passes the caller's storage, never a copy. Contract:
 - `ref`/`out` to an array element, receiver field or dotted path charges `mut`, like `§ASSIGN`.
 - Narrowing and contract facts about a `ref`/`out` operand end at the call; by-reference
   parameters that may alias lose narrowing on any write to one of them or any heap-changing step.
-- The converter lowers C# `out var x` only in an expression statement, local declaration,
+- The converter lowers C# `out var x` only in an assignment, local declaration,
   `return` or `if` condition directly in a block; other placements are preserved as C#.
 
 ---

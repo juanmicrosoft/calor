@@ -7,7 +7,7 @@
       §E{alloc,mut}
       §B{fs} §NEW{List<Func<i32>>} §/NEW
       §EACH{each003:s:var} §ARR{arr004:str} "1" "2" §/ARR{arr004}
-        §B{~n:i32} `default`
+        §B{~n:i32}
         §B{_lam007} §LAM{lam006} n §/LAM{lam006}
         §IF{if005} §C{int.TryParse} §A s §A{out} n §/C
           §C{fs.Add} _lam007

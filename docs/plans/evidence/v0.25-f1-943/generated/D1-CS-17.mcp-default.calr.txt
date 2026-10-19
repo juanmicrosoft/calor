@@ -11,7 +11,7 @@
         §R (!= name null)
 
       §MT{m003:Run:pub:stat} () -> str
-        §B{~n:?str} `default`
+        §B{~n:?str}
         §IF{if004} §C{TryName} §A 1 §A{out} n §/C
           §B{str:s} n
           §R (str (len s))

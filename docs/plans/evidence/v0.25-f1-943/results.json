@@ -1,7 +1,7 @@
 {
   "schema": "v0.25-f1-943-evidence/1",
-  "measuredCommit": "353e9f789200c99bd819aaa4ab9aeb42604f3ee4",
-  "srcTree": "84491cf5010995de30fa0c143c6c281b26baee4b",
+  "measuredCommit": "db416e53cf8b9155ce960e9dd286da060702c69c",
+  "srcTree": "df293c43b61335e03d228d86e9f2c5e4d50e5265",
   "build": "Release",
   "dotnetSdk": "10.0.401",
   "platform": "Darwin arm64",
@@ -1679,13 +1679,13 @@
     {
       "case": "P2-OUTVAR-PLACEMENTS",
       "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-OUTVAR-PLACEMENTS.cs.txt",
-      "fixtureSha256": "08a49f2b877ceaf800a9ae9807c04f54e2ad739a98d89180d6285d522e31dfba",
+      "fixtureSha256": "8fa12ca038425af084449614ab01c367939be45e01c30b2025348142f802bec2",
       "expected": "native",
       "surfaces": {
         "cli-default": {
           "convertExit": 0,
           "success": true,
-          "nativeConversionCount": 23,
+          "nativeConversionCount": 22,
           "interopPreservationCount": 0,
           "lossySubstitutionCount": 0,
           "dropCount": 0,
@@ -1702,7 +1702,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "5;3;|False:0|8|one",
+            "result": "True:5|False:0|8|one|0",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1711,7 +1711,7 @@
         "cli-passthrough": {
           "convertExit": 0,
           "success": true,
-          "nativeConversionCount": 23,
+          "nativeConversionCount": 22,
           "interopPreservationCount": 0,
           "lossySubstitutionCount": 0,
           "dropCount": 0,
@@ -1728,7 +1728,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "5;3;|False:0|8|one",
+            "result": "True:5|False:0|8|one|0",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1748,7 +1748,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "5;3;|False:0|8|one",
+            "result": "True:5|False:0|8|one|0",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1769,7 +1769,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "5;3;|False:0|8|one",
+            "result": "True:5|False:0|8|one|0",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1790,7 +1790,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "5;3;|False:0|8|one",
+            "result": "True:5|False:0|8|one|0",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1811,7 +1811,7 @@
           },
           "execution": {
             "compiled": true,
-            "result": "5;3;|False:0|8|one",
+            "result": "True:5|False:0|8|one|0",
             "exception": null,
             "matchesOriginal": true
           },
@@ -1820,7 +1820,240 @@
       },
       "original": {
         "compiled": true,
-        "result": "5;3;|False:0|8|one",
+        "result": "True:5|False:0|8|one|0",
+        "exception": null
+      },
+      "allowed": true
+    },
+    {
+      "case": "P2-OUTVAR-CALL-STATEMENT",
+      "fixture": "docs/plans/evidence/v0.25-f1-943/fixtures/P2-OUTVAR-CALL-STATEMENT.cs.txt",
+      "fixtureSha256": "a97eb9b4851a8aaf1482571e8e3a9ca552d47f3416922d9405437659803a5260",
+      "expected": "preserved",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 6,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 9
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|5;3;0;3;",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 6,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 9
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|5;3;0;3;",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 9
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|5;3;0;3;",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 9
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|5;3;0;3;",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 9
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|5;3;0;3;",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "rawCSharpExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 8
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5;3;|5;3;0;3;",
+            "exception": null,
+            "matchesOriginal": true
+          },
+          "outcome": "preserved"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "5;3;|5;3;0;3;",
         "exception": null
       },
       "allowed": true
