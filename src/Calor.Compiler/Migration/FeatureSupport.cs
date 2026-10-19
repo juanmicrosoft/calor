@@ -531,9 +531,9 @@ public static class FeatureSupport
             Name = "out-var",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-DECL-1): the bounded lowering.
-            Description = "out var x / out T x in an expression statement, local declaration, return or if condition directly " +
-                "in a block lowers to a mutable binding (§B{~x:T} default) before the statement when the type is expressible and the name collides " +
-                "with nothing in scope. Loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
+            Description = "out var x / out T x in an assignment, local declaration, return or if condition directly " +
+                "in a block lowers to a mutable binding before the statement when the type is expressible and the name collides " +
+                "with nothing in scope. Call statements, loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
                 "initializers and expression-bodied members are preserved as C#",
             Workaround = "Declare the variable before the statement and pass it with out"
         },
@@ -1196,7 +1196,7 @@ public static class FeatureSupport
             Name = "ref-expression",
             Support = SupportLevel.Full,
             Description = "ref expressions never convert natively: members with ref locals, ref returns (block or expression " +
-                "bodied), conditional refs or ref assignments are preserved as C#, reported as ref-parameter"
+                "bodied), conditional refs or ref assignments are preserved as C#, with a ref-parameter warning"
         },
         ["global-qualified-name"] = new FeatureInfo
         {

@@ -10240,7 +10240,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var unknownType = declaration.Type.IsVar && (type is null or { TypeKind: TypeKind.Error or TypeKind.Dynamic }
                 or { IsAnonymousType: true } || !type.CanBeReferencedByName && type is not IArrayTypeSymbol);
             if (collides || unknownType || type is { IsRefLikeType: true }
-                || declaration.Ancestors().Any(node => node is InterpolationSyntax))
+                || declaration.Ancestors().Any(node => node is InterpolationSyntax)
+                // A bare binding before a call statement would take the call as its initializer (W1).
+                || statement is ExpressionStatementSyntax { Expression: not AssignmentExpressionSyntax })
                 throw EscalateExpression(statement, "out-var");
             _loweredOutDeclarations.Add(declaration);
             var typeName = declaration.Type.IsVar
@@ -10249,9 +10251,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         | SymbolDisplayMiscellaneousOptions.ExpandNullable
                         | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)))
                 : TypeMapper.CSharpToCalor(declaration.Type.ToString());
-            // `default`, as for `int x;`: a bare binding would take a next-line `§C` as its initializer.
             result.Add(new BindStatementNode(GetTextSpan(declaration), name, typeName, isMutable: true,
-                new ReferenceNode(GetTextSpan(declaration), "default"), new AttributeCollection()));
+                initializer: null, new AttributeCollection()));
         }
         return result;
     }
@@ -11647,7 +11648,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax
                             or AssignmentExpressionSyntax or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax))
                     throw EscalateExpression(a, (parameter == null ? a.RefKindKeyword.ValueText // the parameter's own feature
-                        : parameter.RefKind is RefKind.Out ? "out" : parameter.RefKind is RefKind.Ref ? "ref" : "in") + "-parameter");
+                        : parameter.RefKind is RefKind.Out ? "out" : parameter.RefKind is RefKind.In ? "in" : "ref") + "-parameter");
                 return a.RefKindKeyword.IsKind(SyntaxKind.None) ? null
                     : parameter?.RefKind == RefKind.In ? "in" : a.RefKindKeyword.ValueText;
             })
