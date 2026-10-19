@@ -24,7 +24,8 @@ public class ReleaseAdjudicationGateTests
     internal const string RecordPath = "docs/plans/evidence/adjudication-1408/terminal-record.json";
     internal const string ManifestPath = "docs/plans/evidence/candidate-1423/manifest.json";
     internal const string FreezePath = "docs/plans/evidence/regeneration-1424/freeze-manifest.json";
-    internal const string RegistryPath = "docs/plans/evidence/regeneration-1424/claim-registry.json";
+    // #1567: the map binds each release's claim registry path, so the fixture uses 0.24.0's real one.
+    internal const string RegistryPath = "docs/plans/evidence/c2-1424/regeneration-3/claim-registry.json";
     // #1422 (B2): the only publishable benchmark files are the headline and its stamp-index entry.
     internal const string BenchmarkPath = "website/public/data/benchmark-headline.json";
     internal const string StampIndexPath = "bench/phase0-agent-native/commit-stamp-index.json";

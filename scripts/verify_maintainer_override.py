@@ -12,8 +12,10 @@ with O014, in mode selection and in the check, whatever the committed records sa
 passes only when:
 
   * the candidate commit is on fetched protected main and declares <Version>VERSION</Version>;
-  * the candidate contains OVERRIDE_PATH, naming VERSION, `gated: false`, the maintainer's
-    verbatim authorization, and the terminal record's path and sha256;
+  * the candidate contains the override record the adjudication map names for 0.24.0
+    (eng/release-adjudication-map.json at fetched protected main, #1567), naming VERSION,
+    `gated: false`, the maintainer's verbatim authorization, and the map's terminal-record path
+    and its sha256;
   * the candidate contains that terminal record with exactly that sha256, and its outcome is
     MILESTONE-FAILED (a successful record must use the gate, not this override);
   * every surface passed on the command line is consistent with the candidate: notes equal the
@@ -48,7 +50,7 @@ import verify_release_adjudication as r2  # noqa: E402  (the #1410 gate; reused,
 # reviewed change to this file. 0.24.0 is already on nuget.org, so the override can only
 # re-verify or re-deploy those bytes.
 OVERRIDE_VERSION = "0.24.0"
-OVERRIDE_PATH = "docs/plans/evidence/adjudication-1408/maintainer-override.json"
+assert OVERRIDE_VERSION == r2.OVERRIDE_RELEASE  # the map accepts maintainerOverride on this release only
 OVERRIDE_SCHEMA = "calor.maintainer-override/1"
 AUTHORIZATION = "I authorize changing the release gate"
 FAILED = "MILESTONE-FAILED"
@@ -91,6 +93,14 @@ def load_json(gate: r2.Gate, code: str, data: bytes | None, what: str) -> dict |
     return value
 
 
+def override_entry(gate: r2.Gate) -> dict:
+    """The map's 0.24.0 entry at fetched main (#1567): its override, terminal record, and A1 issue."""
+    entry = r2.map_entry(r2.load_map(gate), OVERRIDE_VERSION)
+    if entry is None or entry["version"] != OVERRIDE_VERSION or "maintainerOverride" not in entry:
+        raise r2.MapError(f"{r2.MAP_FILE} does not map {OVERRIDE_VERSION} to a maintainer override")
+    return entry
+
+
 def check_record(gate: r2.Gate, args: argparse.Namespace, version: str) -> tuple[str, dict, str] | None:
     if gate.git("rev-parse", "--is-shallow-repository").stdout.decode().strip() != "false":
         gate.fail("O003", "shallow clone; the check needs full history")
@@ -112,9 +122,15 @@ def check_record(gate: r2.Gate, args: argparse.Namespace, version: str) -> tuple
     if not gate.is_ancestor(cand, r2.MAIN_REF):
         gate.fail("O003", f"candidate {cand} is not on protected main")
         return None
+    try:
+        entry = override_entry(gate)
+    except r2.MapError as error:
+        gate.fail("O006", f"adjudication map: {error}")
+        return None
+    override_path, record_path, a1 = entry["maintainerOverride"], entry["terminalRecord"], entry["a1Issue"]
 
-    raw = gate.blob(cand, OVERRIDE_PATH)
-    override = load_json(gate, "O004", raw, f"maintainer override record at {cand}:{OVERRIDE_PATH}")
+    raw = gate.blob(cand, override_path)
+    override = load_json(gate, "O004", raw, f"maintainer override record at {cand}:{override_path}")
     if override is None:
         return None
     if override.get("schema") != OVERRIDE_SCHEMA:
@@ -136,12 +152,12 @@ def check_record(gate: r2.Gate, args: argparse.Namespace, version: str) -> tuple
 
     named = override.get("terminalRecord")
     named = named if isinstance(named, dict) else {}
-    if named.get("path") != r2.RECORD_PATH or not r2.SHA64.match(str(named.get("sha256"))):
-        gate.fail("O006", f"override record must name {r2.RECORD_PATH} and its 64-hex sha256")
+    if named.get("path") != record_path or not r2.SHA64.match(str(named.get("sha256"))):
+        gate.fail("O006", f"override record must name {record_path} and its 64-hex sha256")
         return None
-    data = gate.blob(cand, r2.RECORD_PATH)
+    data = gate.blob(cand, record_path)
     if data is None:
-        gate.fail("O006", f"no terminal record at {cand}:{r2.RECORD_PATH}")
+        gate.fail("O006", f"no terminal record at {cand}:{record_path}")
         return None
     if r2.sha256(data) != named["sha256"]:
         gate.fail("O006", f"terminal record hash {r2.sha256(data)} does not match the override record {named['sha256']}")
@@ -149,8 +165,8 @@ def check_record(gate: r2.Gate, args: argparse.Namespace, version: str) -> tuple
     record = load_json(gate, "O006", data, "terminal record")
     if record is None:
         return None
-    if record.get("schema") != r2.RECORD_SCHEMA or record.get("issue") != 1408:
-        gate.fail("O006", "terminal record is not the #1408 terminal record")
+    if record.get("schema") != r2.RECORD_SCHEMA or record.get("issue") != a1:
+        gate.fail("O006", f"terminal record is not the #{a1} terminal record")
     if record.get("outcome") != FAILED or named.get("outcome") != FAILED:
         gate.fail("O007", f"terminal outcome is {record.get('outcome')!r}; the override applies only to {FAILED}")
 

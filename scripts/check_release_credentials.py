@@ -90,6 +90,7 @@ class ParseFailure(Exception):
     pass
 
 
+
 def strict_loader():
     """yaml.SafeLoader that rejects duplicate keys (also keys equal under case folding)."""
     if yaml is None:
@@ -121,6 +122,13 @@ def load_workflow(text: str) -> tuple[object, bool]:
     loader = strict_loader()
     try:
         events = list(yaml.parse(text, Loader=loader))
+        # #1567: an explicit tag changes what a node is built as. A tagged collection (`!!set`,
+        # `!!omap`, `!!pairs`) skips the strict mapping constructor's duplicate-key check, and a
+        # tagged scalar (`!!null`, `!!binary`) can erase the text the checks look for. Workflows
+        # need no tags, so any explicit tag, on any node, fails closed.
+        for event in events:
+            if isinstance(event, (yaml.CollectionStartEvent, yaml.ScalarEvent)) and event.tag is not None:
+                raise ParseFailure(f"explicit YAML tag {event.tag!r} at {event.start_mark}")
         anchored = any(isinstance(e, yaml.AliasEvent) or getattr(e, "anchor", None) for e in events) \
             or any(isinstance(e, yaml.ScalarEvent) and e.value == "<<" and e.style is None for e in events)
         documents = list(yaml.load_all(text, Loader=loader))
@@ -166,7 +174,8 @@ def check_workflows(workflow_dir: Path) -> list[str]:
     environment is not exactly nuget-release; W007 the publish job's first step is not the guard;
     W008 the key or environment appears outside a job, or jobs are not mappings; W009 anchors,
     aliases, or merge keys; W011 a job-level `uses` other than a local workflow file; W012 a
-    workflow cannot be parsed or has a duplicate key. (W010, a key split across lines, is retired:
+    workflow cannot be parsed, has a duplicate key, or carries an explicit YAML tag on any node
+    (`!!set` would skip the duplicate-key check, `!!null` would erase a value). (W010, a key split across lines, is retired:
     the parser decodes those.)"""
     problems: list[str] = []
     files = sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))

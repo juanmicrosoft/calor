@@ -27,6 +27,7 @@ internal sealed class GateRepo : IDisposable
     public string WebsiteDir => Path.Combine(Scratch, "site");
     public string MetadataDir => Path.Combine(Scratch, "metadata");
     public string RegistryDir => Path.Combine(Scratch, "registry");
+    public string Version { get; private set; } = ReleaseVersion;
     public static readonly string[] Claims = { "claim:release-gate-consumes-identity" };
 
     public static GateRepo Build(
@@ -41,10 +42,15 @@ internal sealed class GateRepo : IDisposable
         string? freezeManifest = null,
         string? readme = null,
         string benchmark = "{\"overallAdvantage\":1.0}\n",
-        string? changelog = null)
+        string? changelog = null,
+        string version = ReleaseVersion,
+        string recordPath = RecordPath,
+        int issue = 1408,
+        string registryPath = RegistryPath,
+        string? map = null)
     {
         var baseDir = Path.Combine(Path.GetTempPath(), "calor-r2-" + Guid.NewGuid().ToString("N")[..12]);
-        var repo = new GateRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch") };
+        var repo = new GateRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch"), Version = version };
         Directory.CreateDirectory(repo.Root);
         Directory.CreateDirectory(repo.NugetDir);
         Directory.CreateDirectory(repo.WebsiteDir);
@@ -74,9 +80,9 @@ internal sealed class GateRepo : IDisposable
         repo.Write($"{PacketDir}/contract.json", contractNode.ToJsonString());
         repo.Write($"{PacketDir}/artifact-inventory.json", inventoryNode.ToJsonString());
         repo.WritePacketHashes();
-        repo.Write("Directory.Build.props", $"<Project><PropertyGroup><Version>{ReleaseVersion}</Version></PropertyGroup></Project>\n");
+        repo.Write("Directory.Build.props", $"<Project><PropertyGroup><Version>{version}</Version></PropertyGroup></Project>\n");
         // #1546: the release PR's notes are the candidate's CHANGELOG section; {NOTES} marks where.
-        var notesText = notes ?? $"## [{ReleaseVersion}] - 2026-11-01\n\nEvidence is {Limitation}.\n";
+        var notesText = notes ?? $"## [{version}] - 2026-11-01\n\nEvidence is {Limitation}.\n";
         var changelogText = (changelog ?? "# Changelog\n\n## [Unreleased]\n\n{NOTES}\n## [0.22.0] - 2026-09-15\n\nOld.\n")
             .Replace("{NOTES}", notesText);
         repo.Write("CHANGELOG.md", changelogText);
@@ -100,18 +106,18 @@ internal sealed class GateRepo : IDisposable
         var freeze = freezeManifest?.Replace("{CANDIDATE}", recordedCandidate) ?? manifest;
         repo.Write(FreezePath, freeze);
         var registry = new JsonObject { ["claims"] = new JsonArray(Claims.Select(c => (JsonNode)c).ToArray()) }.ToJsonString();
-        repo.Write(RegistryPath, registry);
+        repo.Write(registryPath, registry);
 
         File.WriteAllText(repo.NotesPath, notesText);
-        WritePackage(Path.Combine(repo.NugetDir, $"Calor.{ReleaseVersion}.nupkg"), "Calor", description, readme: readme);
-        WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", description);
+        WritePackage(Path.Combine(repo.NugetDir, $"Calor.{version}.nupkg"), "Calor", description, readme: readme);
+        WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{version}.nupkg"), "Calor.Sdk", description);
         File.WriteAllText(Path.Combine(repo.MetadataDir, "sbom.json"), "{\"sbom\":true}\n");
         File.WriteAllText(Path.Combine(repo.WebsiteDir, "index.html"), website);
 
         var subjects = inventoryNode["artifacts"]!.AsArray()
             .Select(a => (a!["id"]!.GetValue<string>(), a["classification"]!.GetValue<string>()))
             .Concat(contractNode["children"]!.AsArray().Select(c => c!["issue"]!.GetValue<int>())
-                .Where(i => i != 1408).Select(i => ($"gate:#{i}", "gate")))
+                .Where(i => i != issue).Select(i => ($"gate:#{i}", "gate")))
             .Concat(Claims.Select(c => (c, "claim")));
         var rows = new JsonArray(subjects.Select(s => (JsonNode)new JsonObject
         {
@@ -123,17 +129,17 @@ internal sealed class GateRepo : IDisposable
         var recordNode = new JsonObject
         {
             ["schema"] = "calor.adjudication-terminal-record/1",
-            ["issue"] = 1408,
+            ["issue"] = issue,
             ["outcome"] = "MILESTONE-SUCCEEDED",
             ["adjudicationIndependence"] = "reduced",
             ["limitation"] = Limitation,
             ["epicIndependentAdjudicationMet"] = false,
             ["contract"] = new JsonObject { ["version"] = contractNode["contractVersion"]!.DeepClone(), ["files"] = packetHashes },
-            ["candidate"] = new JsonObject { ["commit"] = recordedCandidate, ["version"] = ReleaseVersion },
+            ["candidate"] = new JsonObject { ["commit"] = recordedCandidate, ["version"] = version },
             ["evidenceManifests"] = new JsonArray(
                 new JsonObject { ["role"] = "candidate-manifest", ["path"] = ManifestPath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(manifest)) },
                 new JsonObject { ["role"] = "raw-artifact-freeze", ["path"] = FreezePath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(freeze)) }),
-            ["claimRegistry"] = new JsonObject { ["path"] = RegistryPath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(registry)) },
+            ["claimRegistry"] = new JsonObject { ["path"] = registryPath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(registry)) },
             ["adjudications"] = rows,
             ["publication"] = new JsonObject
             {
@@ -155,8 +161,10 @@ internal sealed class GateRepo : IDisposable
         record?.Invoke(recordNode);
         repo.Record = recordNode;
         var recordBytes = Encoding.UTF8.GetBytes(recordNode.ToJsonString());
-        repo.Write(RecordPath, Encoding.UTF8.GetString(recordBytes));
+        repo.Write(recordPath, Encoding.UTF8.GetString(recordBytes));
         repo.RecordSha = Sha(recordBytes);
+        // #1567: the gate reads the release map from fetched main, which here is the adjudication commit.
+        repo.Write(MapFile, map ?? File.ReadAllText(Path.Combine(source, MapFile)));
         repo.Adjudication = repo.Commit("adjudication");
         repo.Git("update-ref", "refs/remotes/origin/main", repo.Adjudication);
         repo.Git("checkout", "-q", "--detach", repo.Candidate);
@@ -168,11 +176,16 @@ internal sealed class GateRepo : IDisposable
 
     public string[] AllSurfaces() => new[]
     {
-        "--expect-head", "--version", ReleaseVersion, "--release-notes", NotesPath, "--release-body", BodyPath,
+        "--expect-head", "--version", Version, "--release-notes", NotesPath, "--release-body", BodyPath,
         "--nuget-dir", NugetDir, "--registry-dir", RegistryDir, "--metadata-dir", MetadataDir,
-        "--website-dir", WebsiteDir, "--benchmark-worktree", "--release-tag", "v" + ReleaseVersion,
-        "--release-title", "v" + ReleaseVersion,
+        "--website-dir", WebsiteDir, "--benchmark-worktree", "--release-tag", "v" + Version,
+        "--release-title", "v" + Version,
     };
+
+    public const string MapFile = "eng/release-adjudication-map.json";
+
+    public static JsonObject CommittedMap() =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), MapFile)))!.AsObject();
 
     public (int Code, string Output) Run(string[] args, bool includeIdentity = true, bool includeRepo = true)
     {

@@ -20,7 +20,8 @@ calor-adjudication:v1:<adjudication commit, 40 hex>:<terminal record SHA-256, 64
 ```
 
 - The **adjudication commit** is a full SHA on protected `main` (an ancestor of fetched
-  `refs/remotes/origin/main`). It holds the #1408 terminal record at
+  `refs/remotes/origin/main`). It holds the release's terminal record at the path the
+  adjudication map gives that release (§9). For 0.24.0 that is the #1408 record at
   `docs/plans/evidence/adjudication-1408/terminal-record.json`.
 - The **record hash** is SHA-256 over the record blob's exact bytes at that commit (no
   normalization). A changed record is a different identity.
@@ -34,15 +35,15 @@ calor-adjudication:v1:<adjudication commit, 40 hex>:<terminal record SHA-256, 64
 | Field | Rule |
 |---|---|
 | `schema` | `calor.adjudication-terminal-record/1` |
-| `issue` | `1408` |
+| `issue` | the release's A1 issue in the map (§9); `1408` for 0.24.0 |
 | `outcome` | `MILESTONE-SUCCEEDED` (a `MILESTONE-FAILED` record never passes) |
 | `adjudicationIndependence` | `reduced` while the §9 deviation stands |
 | `limitation` | the contract's `publishedLimitation`, verbatim |
 | `epicIndependentAdjudicationMet` | `false` |
 | `contract` | `{version, files}`; `files` equals `sha256.json` `files` at the adjudication commit, and the packet tree is identical at the candidate and the adjudication commit |
-| `candidate` | `{commit, version}`; full SHA, an ancestor of the adjudication commit; `Directory.Build.props` at the candidate declares `version` |
+| `candidate` | `{commit, version}`; full SHA, an ancestor of the adjudication commit; `Directory.Build.props` at the candidate declares `version`; since #1567 `version` must be in the map (`G009`) and map to the release whose record path holds the record (`G016`) |
 | `evidenceManifests` | `[{role, path, sha256}]` with exactly one `candidate-manifest` (#1423) and one `raw-artifact-freeze` (#1424); each blob at the adjudication commit has that SHA-256 and is JSON whose top-level `candidate` is the candidate SHA or `{"commit": <candidate SHA>}` |
-| `claimRegistry` | `{path, sha256}` of the #1424 claim registry `{"claims": ["claim:<id>", ...]}` committed at the adjudication commit |
+| `claimRegistry` | `{path, sha256}` of the claim registry `{"claims": ["claim:<id>", ...]}` committed at the adjudication commit; since #1567 `path` must be the map's `claimRegistry` for the release (0.24.0: #1424's `c2-1424/regeneration-3/claim-registry.json`) |
 | `adjudications` | exactly one row per subject: every inventory artifact, `gate:#<issue>` for every child but #1408, and every registered claim; no other subject; outcome in the frozen set, never `BLOCKED`, never `SUPPORTED` under the deviation, `HISTORICAL-ONLY` only for a historical-only artifact; `independence = reduced-maintainer-adjudicated`; no inventory artifact still classified `stale` |
 | `publication.release-notes.sha256` | hash of the rendered notes (CRLF to LF, trailing whitespace trimmed, one final newline); the GitHub release's tag and title must both be `v<version>`. Since 0.25 (#1546) every run also renders the candidate's `CHANGELOG.md` `## [<version>]` section itself and requires this hash and a clean wording scan (`G014`, `G012`) |
 | `publication.nuget-packages.files` | `{<file name>: sha256}`; the pushed directory holds exactly these files; a version already on nuget.org must match entry for entry except `.signature.p7s` |
@@ -115,7 +116,10 @@ invalid, or wrong schema; `G005` contract not frozen, packet hashes wrong, or co
 `G009` candidate, checkout, version, or tag; `G010` evidence manifests; `G011` surface bytes;
 `G012` forbidden wording; `G013` release body; `G014` (0.25) the candidate's `CHANGELOG.md` section
 is missing or is not the adjudicated notes; `G015` (0.25) benchmark publication without the
-record's `approved: true`. Exit status 1 on any code; there is no
+record's `approved: true`; `G016` (#1567) the adjudication map is missing or malformed, the
+release is `not-yet-adjudicated`, its contract-packet format is one the gate cannot check, or the
+record sits at another release's path. A version that is not in the map (the record's or
+`--version`) is a version failure, `G009`. Exit status 1 on any code; there is no
 warning-only mode and no override flag.
 
 ## 5. What a workflow gate cannot enforce (maintainer settings)
@@ -203,3 +207,67 @@ installed-tool check. A maintenance path would need a #1407 amendment first.
   publishing step sits after it; **provenance identity resolution** remains
   #1417 (P1). The gate reuses the §6 rules (full SHA on fetched `main`, no shallow skip) and does
   not reimplement either.
+
+## 9. The release adjudication map (#1567)
+
+Until #1567 the gate hard-coded three 0.24 values: the record path, `issue == 1408`, and the
+#1407 packet. A 0.25 record (#1430) could not pass without editing those constants, and a new
+record at the 1408 path would also have broken the override's terminal-record hash check. The
+values now live in `eng/release-adjudication-map.json`, a committed, reviewed map keyed by release
+version. Each entry names:
+
+| Field | Meaning |
+|---|---|
+| `version` | `MAJOR.MINOR.PATCH` (exact) or `MAJOR.MINOR.x` (every patch of that minor, prereleases included); keys may not overlap |
+| `status` | `adjudicated` or `not-yet-adjudicated`; only `adjudicated` can pass |
+| `a1Issue` | the A1 issue whose terminal record governs the release; the record's `issue` must equal it, and its `gate:#<issue>` row is the one not required |
+| `terminalRecord` | the record's path; paths are unique across entries |
+| `contractPacket` | `{issue, format, dir, contract, inventory, seal}`: the frozen contract the record is adjudicated under, and its hash seal. The gate checks format `calor.evidence-contract-packet/1407` only; any other is `G016` until a reviewed change teaches it |
+| `claimRegistry` | the claim-registry path the record must name |
+| `maintainerOverride` | 0.24.0 only (any other entry is rejected): the override record `scripts/verify_maintainer_override.py` reads |
+
+**Resolution.** The identity carries no version, so the gate finds the record by bytes: of the
+map's record paths at the adjudication commit, exactly one blob must hash to the identity's
+SHA-256 (`G004` otherwise). That entry must be `adjudicated` with a supported packet format
+(`G016`). The record's `candidate.version` must then be in the map (`G009`) and resolve to the same
+entry (`G016`). A `--version` that is not in the map also fails (`G009`). Every later check reads
+its paths and issue numbers from the entry.
+
+**Where the map is read.** Both scripts read the map from fetched protected main
+(`refs/remotes/origin/main:eng/release-adjudication-map.json`), the ref every run already
+requires (`G002`). They never read it from the work tree, and no flag names another map. A map
+that is missing at main, is not valid JSON, repeats a JSON member, or breaks any rule above fails
+`G016` (the override check: `O006`).
+
+Main, not the candidate or the adjudication commit, because:
+
+- *Not the candidate.* The publishing jobs check out the candidate. The candidate is frozen
+  before its A1 record lands, so its copy of the map still says `not-yet-adjudicated`. A gate that
+  read the work tree would refuse every surface after the first (Codex round 1, #1567).
+- *Not the adjudication commit.* 0.24.0's adjudication commit predates the map. It would have no
+  entry to resolve.
+
+So a reviewed change to the map on main changes which records the gate accepts, exactly as a
+reviewed change to the gate script does. The identity still names immutable record bytes.
+
+**Entries today.**
+
+- **0.24.0**: `adjudicated`, #1408, the committed MILESTONE-FAILED record, the #1407 packet and its
+  `sha256.json` seal, #1424's regeneration-3 claim registry, and the maintainer override. Every
+  0.24.0 identity still fails exactly as before (`G006`, `G008`, `G009` on main). The override
+  check still passes for v0.24.0; its version lock (`OVERRIDE_VERSION`, O014) stays in the script.
+- **0.25.x**: `not-yet-adjudicated`, #1430, record
+  `docs/plans/evidence/adjudication-1430/terminal-record.json`, registry
+  `docs/plans/evidence/adjudication-1430/claim-registry.json`, and the frozen 0.25 R0 scope packet
+  (#1426, `scope.json`, sealed by its `evidenceSeal` block). Every 0.25 identity fails `G016`.
+  Which contract governs the 0.25 release is the #1548 maintainer decision; the R0 packet is named
+  provisionally. To release 0.25, the PR that lands the #1430 record also sets `status` to
+  `adjudicated` and either names a 1407-format packet or adds a reviewed check for the new format.
+
+Tests: `ReleaseAdjudicationMapTests` (a version missing from the map, an entry pointing at a
+missing record, a record at another release's path, a claim registry other than the map's, 0.24.0
+still resolving, 0.25 failing until adjudicated and passing once a map marks it adjudicated, and
+twelve malformed maps), plus `test_explicit_yaml_tags_are_open` for the credential check. Fixture
+changes, with no existing assertion changed: the `GateRepo` claim-registry path is now 0.24.0's
+real one, because the map binds it; and `GateRepo` and `OverrideRepo` commit the committed map
+into the throwaway repository's main, because the scripts read it there.
