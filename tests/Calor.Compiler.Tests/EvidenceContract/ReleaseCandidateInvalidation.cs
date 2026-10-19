@@ -138,7 +138,9 @@ public static class ReleaseCandidateInvalidation
         foreach (var line in revExit == 0 ? revs.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : [])
         {
             var ids = line.Split(' ');
-            var phase = landing != null && !git.IsAncestor(ids[0], landing) ? Phase.AfterLanding : Phase.BeforeLanding;
+            var inLanding = landing == null ? 0 : run("merge-base", "--is-ancestor", ids[0], landing).ExitCode;
+            if (inLanding is not (0 or 1)) errors.Add($"git merge-base cannot place {ids[0]} relative to the landing {landing}");
+            var phase = inLanding == 1 ? Phase.AfterLanding : Phase.BeforeLanding;
             foreach (var parent in ids.Length > 1 ? ids.Skip(1) : new[] { EmptyTree })
                 reports.Add(new CommitReport(ids[0], parent, phase,
                     Diff(git, run, parent, ids[0], errors).Select(c => Classify(profile, c, phase)).ToList()));

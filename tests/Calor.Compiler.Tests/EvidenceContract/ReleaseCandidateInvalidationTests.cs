@@ -161,6 +161,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [Theory]
     [InlineData("merge-base", "target", "git merge-base cannot read the history from")]
     [InlineData("merge-base", "main", "git merge-base cannot read the history from")]
+    [InlineData("merge-base", "phase", "git merge-base cannot place ")]
     [InlineData("rev-list", "--parents", "git rev-list ")]
     [InlineData("rev-list", "--first-parent", "git rev-list --first-parent ")]
     [InlineData("ls-tree", "", "git ls-tree ")]
@@ -175,6 +176,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         {
             "target" => a[^1] == target,
             "main" => a[^1] == main,
+            "phase" => a[^2] == target && a[^1] == main,
             "" => true,
             _ => a[1] == which,
         };
@@ -184,18 +186,23 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         Assert.Contains(report.Errors, e => e.StartsWith(error, StringComparison.Ordinal));
     }
 
-    /// <summary>A landing whose manifest blob cannot be read is an error, not "not landed".</summary>
-    [Fact]
-    public void AnUnreadableManifestBlobIsUndecided()
+    /// <summary>Each blob guard alone: a landing whose manifest blob is unreadable, and an unreadable added record.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AnUnreadableBlobIsAnError(bool manifest)
     {
         var candidate = _repo.Candidate();
         _repo.Commit((P.ManifestPath, "{\"unique\": 1430}"));
         _repo.PublishMain();
-        _repo.Commit(("docs/plans/evidence/v0.25-candidate/reviews/r.md", "x"));
-        _repo.DeleteObject(_repo.Git.RevParse("HEAD:" + P.ManifestPath)!);
-        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
-        Assert.True(report.Verdict == Undecided, report.ToString());
-        Assert.Contains(report.Errors, e => e.Contains("cannot be read", StringComparison.Ordinal));
+        var record = "docs/plans/evidence/adjudication-1430/terminal-record.json";
+        _repo.Commit((record, "{\"unique\": 1431}"));
+        _repo.DeleteObject(_repo.Git.RevParse("HEAD:" + (manifest ? P.ManifestPath : record))!);
+        var errors = new List<string>();
+        Assert.Equal(manifest ? null : _repo.Git.RevParse("HEAD^"), FindLanding(_repo.Git, P, candidate, errors));
+        Assert.Equal(manifest, errors.Count > 0);
+        if (!manifest)
+            Assert.Contains(ClassifyRange(_repo.Git, P, candidate, "HEAD").Errors, e => e.StartsWith("a blob of " + record, StringComparison.Ordinal));
     }
 
     private const string TestManifest = """

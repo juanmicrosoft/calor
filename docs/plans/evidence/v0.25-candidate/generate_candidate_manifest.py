@@ -81,11 +81,8 @@ def jloads(data):
     return json.loads(data, parse_int=RawNumber, parse_float=RawNumber)
 
 def git(*args, binary=False, env_utc=False):
-    env = dict(os.environ, TZ='UTC') if env_utc else None
-    out = subprocess.run(['git', *args], capture_output=True, check=False, env=env)
-    if out.returncode != 0:
-        return None
-    return out.stdout if binary else out.stdout.decode().strip()
+    out = subprocess.run(['git', *args], capture_output=True, check=False, env=dict(os.environ, TZ='UTC') if env_utc else None)
+    return None if out.returncode != 0 else out.stdout if binary else out.stdout.decode().strip()
 
 def check(ok, message):
     if not ok:
@@ -93,9 +90,7 @@ def check(ok, message):
     return ok
 
 def sha(data, lf=False):
-    if lf:
-        data = data.decode('utf-8').replace('\r\n', '\n').encode('utf-8')
-    return hashlib.sha256(data).hexdigest()
+    return hashlib.sha256(data.decode('utf-8').replace('\r\n', '\n').encode('utf-8') if lf else data).hexdigest()
 
 def ancestor(commit, of):
     return subprocess.run(['git', 'merge-base', '--is-ancestor', commit, of], capture_output=True).returncode == 0

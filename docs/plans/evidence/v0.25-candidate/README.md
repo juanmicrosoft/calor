@@ -53,7 +53,7 @@ landing; added data or text files under `reviews/` at any time; the compiler-tes
 is the freeze PR's merge; after it, the profile's own files are frozen (a change returns to #1430).
 Any git failure, including an unreadable landing manifest, gives `UNDECIDED`. As in 0.24, it is not
 a required gate on later merges, and later runs come from a checkout of the landing.
-Controls: `ReleaseCandidateInvalidationTests` (44).
+Controls: `ReleaseCandidateInvalidationTests` (46).
 
 ## Open questions for the maintainer
 
