@@ -295,13 +295,18 @@ candidate must contain this code.
 **Packet checks at the adjudication commit (`G005`).**
 
 - `scope.json`: schema `v0.25-interop-scope/1`, `FROZEN`, gate `MET`; its `evidenceSeal` recomputes
-  (`baseline-results.json`, both producers, and every file under `generated/`, LF-normalized).
-- `acceptancePreconditions`: the re-proof is on the candidate's own SHA, names the five checks
-  (`proof-s2-witnesses`, `provenance-candidate-manifest`, `provenance-regeneration`,
-  `provenance-determinism`, `release-gate`), and the release gaps are exactly #1545, #1546, #1547.
-- The T1 register (`v0.25-t1-1428/register.json`) and W1 records (`v0.25-w1-1429/records.json`)
-  consume the scope's version; every T1-approved evidence, fixture and results hash matches, and
-  the approval seal recomputes; W1 records reduced independence.
+  (`baseline-results.json`, exactly the two registered producers, and every file under `generated/`,
+  LF-normalized).
+- `acceptancePreconditions`, as `InteropScopeValidator` S014 checks them: equal to the latest
+  amendment copy, citing that amendment and its recorded decision; the replaced #1408 precondition
+  cites the retained #1408 record and its outcome; A1 waits on every gap (at least #1545, #1546,
+  #1547) and not on #1408; the re-proof is on the candidate's own SHA with the five registered
+  `(id, kind, gate, source)` checks, each with a requirement and a retained source; and amendment
+  1.3.0's copy hashes to the pinned decision text (`PreconditionsDigest130`).
+- The T1 register (`v0.25-t1-1428/register.json`, schema `calor.v0.25.t1-register/1`) and W1
+  records (`v0.25-w1-1429/records.json`, `calor.v0.25.w1-family-records/1`) cover the six families,
+  record reduced independence and consume the scope's version; every T1-approved evidence, fixture
+  and results hash matches, and the approval seal recomputes.
 - The record's `contract` is `{version: scopeVersion, files: {scope.json, register.json,
   records.json: LF SHA-256}}`.
 - The packet directory, the T1 register and the W1 records are identical at the candidate and the
@@ -315,11 +320,11 @@ exactly one row per subject (`G008`), each with `independence = reduced-maintain
 
 | Subject | Outcomes |
 |---|---|
-| `family:F1` … `family:F6` | `READY`, or `PENDING` only in a `PARTIAL_READY` record (which needs at least one `READY`). A `READY` row cites `readyRecord {path, sha256}`: a file under the family's evidence directory's `ready/` (the directory of `readiness.evidence`), committed at the adjudication commit, whose `candidate` (or `candidate.commit`) is the record's candidate |
+| `family:F1` … `family:F6` | `READY`, or `PENDING` only in a `PARTIAL_READY` record (which needs at least one `READY`). A `READY` row cites `readyRecord {path, sha256}`: a file under the family's evidence directory's `ready/` (the directory of `readiness.evidence`), committed at the adjudication commit, that is complete under S007: it names its family, a registered scope version and the candidate; every case the T1 register lists for the family has a passed row and a retained result record for this candidate, case, `requirementSha256` and cells; tests, existing website pages, retained review records, an approver with a GitHub approval URL, reduced independence; every family blocker resolved, and each mapped 0.24 repair with its merge commit and a retained passing witness run on the candidate |
 | `reproof:<check id>` for each re-proof check | `PASSED` |
 | `gap:#<issue>` for each release gap | `CLOSED` |
 | each claim in the registry | `BOUNDED` |
 
 Every other field (`candidate`, `evidenceManifests`, `claimRegistry`, `publication`) is read as for
-0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 3 positive and 19 negative controls)
+0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 3 positive and 34 negative controls)
 and `ReleaseAdjudicationMapTests`.
