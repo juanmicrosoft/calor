@@ -73,7 +73,8 @@ PRECONDITIONS_DIGEST_130 = "82c07b93a4b9784a9776a41b515d02fb1e34c4017d7b352d103c
 # InteropScopeTests.FrozenSeal: SHA-256 over denominatorV1 and the evidence seal. It pins the registered case
 # denominator; the gate replays the amendments from it to the current cases (S004).
 SCOPE_FROZEN_SEAL_1426 = "65307b91a3c57b54c6484219f67fc6bdb285b23858cbe15a7d7293b422ed7ff8"
-CASE_FIELDS_1426 = ("family", "role", "expected", "baselineStatus", "fixture", "fixtureSha256")
+# InteropScopeValidator.TrackedFields: the case fields an amendment may change (S004).
+TRACKED_FIELDS_1426 = ("family", "role", "expected", "baselineStatus", "fixtureSha256", "requirementSha256")
 APPROVAL_URL_RE = re.compile(r"^https://github\.com/juanmicrosoft/calor/pull/\d+#pullrequestreview-\d+$")
 RELEASE_GAPS_1426 = [1545, 1546, 1547]
 OUTCOMES_1426 = ("ACCEPTED", "PARTIAL_READY")
@@ -593,31 +594,25 @@ def family_cases(scope: dict, family: str) -> list[dict]:
     return [c for c in scope.get("cases", []) if isinstance(c, dict) and c.get("family") == family]
 
 
-def touched_versions(scope: dict, family: str) -> set[str]:
-    """The amendments that added, removed, changed or moved one of the family's cases (S007 staleness)."""
-    registry = {c.get("id"): c.get("family") for c in scope.get("denominatorV1", []) if isinstance(c, dict)}
-    touched = set()
-    for amendment in (a for a in scope.get("amendments", []) if isinstance(a, dict)):
-        version = amendment.get("version")
-        for added in (c for c in amendment.get("addedCases", []) if isinstance(c, dict)):
-            registry[added.get("id")] = added.get("family")
-            if added.get("family") == family:
-                touched.add(version)
-        for removed in amendment.get("removedCases", []):
-            rid = removed.get("id") if isinstance(removed, dict) else removed
-            if registry.get(rid) == family or (isinstance(removed, dict) and removed.get("family") == family):
-                touched.add(version)
-        for change in (c for c in amendment.get("changes", []) if isinstance(c, dict)):
-            cid = change.get("id")
-            if registry.get(cid) == family or (change.get("field") == "family" and family in (change.get("from"), change.get("to"))):
-                touched.add(version)
-            if change.get("field") == "family":
-                registry[cid] = change.get("to")
-    return touched
-
-
 def version_key(value: object) -> tuple:
     return tuple(int(x) for x in value.split(".")) if isinstance(value, str) and re.fullmatch(r"\d+\.\d+\.\d+", value) else ()
+
+
+def heading_text(source: str) -> str:
+    """mdast-util-to-string of a heading's inline content: code spans keep their literal text; outside them an image
+    contributes its alt text and a link its text (images first, so an image inside a link resolves), reference links
+    their text, JSX/HTML tags nothing but their children, and backslash escapes their character."""
+    out = []
+    for k, part in enumerate(re.split(r"(`+)(.*?)\1", source)):
+        if k % 3 == 2:
+            out.append(part)
+        elif k % 3 == 0:
+            part = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", part)
+            part = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", part)
+            part = re.sub(r"\[([^\]]*)\]\[[^\]]*\]", r"\1", part)
+            part = re.sub(r"<[^>]+>", "", part)
+            out.append(re.sub(r"\\(.)", r"\1", part))
+    return "".join(out)
 
 
 def heading_ids(markdown: str) -> list[str]:
@@ -644,11 +639,8 @@ def heading_ids(markdown: str) -> list[str]:
         if not atx and not setext:
             paragraph = bool(line.strip()) and not re.match(r"^ {0,3}([|>*+-]|\d+[.)])", line)
             continue
-        text = (atx.group(1) or "") if atx else lines[i - 1].strip()
+        text = heading_text((atx.group(1) or "") if atx else lines[i - 1].strip())
         paragraph = False
-        text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)
-        text = re.sub(r"\[([^\]]*)\]\[[^\]]*\]", r"\1", text)
-        text = re.sub(r"<[^>]+>", "", text).replace("\\", "")
         base = re.sub(r"(^-|-$)", "", re.sub(r"[^a-z0-9]+", "-", text.lower())) or "section"
         hid, suffix = base, 1
         while hid in used:
@@ -669,35 +661,80 @@ def page_exists(gate: Gate, commit: str, page: object) -> bool:
     return not anchor or anchor in heading_ids(blob.decode("utf-8", "replace"))
 
 
+def jstr(value: object) -> str | None:
+    """InteropScopeValidator.Str: a JSON string, or None for anything else."""
+    return value if isinstance(value, str) else None
+
+
+def json_items(value: object) -> list[dict]:
+    return [x for x in value if isinstance(x, dict)] if isinstance(value, list) else []
+
+
+def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """A port of InteropScopeValidator S004, in its order: per amendment, added cases, then changes, then removals;
+    then every active case against the current cases. Returns the (case, problem) pairs and the (family, version)
+    pairs each step touched, which S007 uses for staleness."""
+    problems: list[tuple[str, str]] = []
+    touched: list[tuple[str, str]] = []
+    registry: dict[str, dict] = {}
+    for case in json_items(scope.get("denominatorV1")):
+        cid = jstr(case.get("id")) or ""
+        if cid in registry:
+            problems.append((cid, "the denominator registers the case twice"))
+        registry[cid] = dict(case)
+    active = set(registry)
+    for amendment in json_items(scope.get("amendments")):
+        version = jstr(amendment.get("version")) or "?"
+
+        def touch(entry: dict) -> None:
+            touched.append((jstr(entry.get("family")) or "?", version))
+        for added in json_items(amendment.get("addedCases")):
+            aid = jstr(added.get("id")) or ""
+            if aid in active:
+                problems.append((aid, f"amendment {version} registers a case that is already registered"))
+            registry[aid] = dict(added)
+            active.add(aid)
+            touch(added)
+        for change in json_items(amendment.get("changes")):
+            cid, field = jstr(change.get("id")) or "", jstr(change.get("field")) or ""
+            if cid not in active or field not in TRACKED_FIELDS_1426 or jstr(registry[cid].get(field)) != jstr(change.get("from")):
+                problems.append((cid, f"amendment {version} changes {field} from a value that is not the registered one"))
+            else:
+                touch(registry[cid])
+                registry[cid][field] = jstr(change.get("to"))
+                touch(registry[cid])
+        for removed in json_items(amendment.get("removedCases")):
+            rid = jstr(removed.get("id")) or ""
+            was_active = rid in active
+            active.discard(rid)
+            if not was_active or not nonblank(removed.get("lastStatus")):
+                problems.append((rid, f"amendment {version} removes a case that is not registered, or without its last status"))
+            else:
+                touch(registry[rid])
+    cases = json_items(scope.get("cases"))
+    for cid in sorted(active):
+        current = next((c for c in cases if jstr(c.get("id")) == cid), None)
+        if current is None:
+            problems.append((cid, "registered case removed without an amendment that retains it with its last status"))
+            continue
+        for field in TRACKED_FIELDS_1426:
+            value = requirement_digest(current) if field == "requirementSha256" else jstr(current.get(field))
+            if value != jstr(registry[cid].get(field)):
+                problems.append((cid, f"{field} differs from its registered value without a matching amendment change"))
+    for case in cases:
+        if (jstr(case.get("id")) or "") not in active:
+            problems.append((jstr(case.get("id")) or "?", "case is not registered (or was removed) by the 1.0.0 denominator or an amendment"))
+    return problems, touched
+
+
 def denominator_problems(scope: dict) -> list[str]:
-    """S004 for the gate: the pinned denominator seal, then the amendments replayed from denominatorV1 must give
-    exactly the current cases, with the same tracked fields and recomputed requirement digests."""
+    """The pinned denominator seal (InteropScopeTests.FrozenSeal), then S004's replay (replay_cases)."""
     seal = scope.get("evidenceSeal") or {}
     frozen = sha256("\n".join([dotnet_json(scope.get("denominatorV1")), str(seal.get("baselineResults", "")),
                                str(seal.get("generated", "")), dotnet_json(seal.get("producers"))]).encode())
     if frozen != SCOPE_FROZEN_SEAL_1426:
         return [f"denominatorV1 and the evidenceSeal hash to {frozen}, not the pinned {SCOPE_FROZEN_SEAL_1426}"]
-    registry = {c.get("id"): dict(c) for c in scope.get("denominatorV1", []) if isinstance(c, dict)}
-    for amendment in (a for a in scope.get("amendments", []) if isinstance(a, dict)):
-        for added in (c for c in amendment.get("addedCases", []) if isinstance(c, dict)):
-            registry[added.get("id")] = dict(added)
-        for removed in amendment.get("removedCases", []):
-            registry.pop(removed.get("id") if isinstance(removed, dict) else removed, None)
-        for change in (c for c in amendment.get("changes", []) if isinstance(c, dict)):
-            if change.get("id") in registry:
-                registry[change["id"]][change.get("field")] = change.get("to")
-    cases = [c for c in scope.get("cases", []) if isinstance(c, dict)]
-    ids = [c.get("id") for c in cases]
-    problems = []
-    if len(ids) != len(set(ids)) or set(ids) != set(registry):
-        problems.append("the current cases differ from the denominator replayed through the amendments")
-    for case in cases:
-        registered = registry.get(case.get("id"))
-        if registered and (any(case.get(f) != registered.get(f) for f in CASE_FIELDS_1426)
-                           or requirement_digest(case) != registered.get("requirementSha256")):
-            problems.append(f"case {case.get('id')} differs from its registered fields or requirement digest")
-    return problems
-
+    return [f"case {cid}: {problem}" for cid, problem in replay_cases(scope)[0]]
 
 def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tuple[dict, dict] | None:
     """#1426 (0.25.x): the frozen R0 scope packet, its evidence seal, the 1.3.0 re-proof preconditions (as S014 checks
@@ -816,7 +853,8 @@ def ready_problems(gate: Gate, commit: str, candidate: str, family: str, ready: 
     assessed = ready.get("scopeVersion")
     if ready.get("family") != family or assessed not in versions:
         problems.append("it must name its family and the registered scope version it was assessed under")
-    for stale in sorted(v for v in touched_versions(scope, family) if version_key(v) > version_key(assessed)):
+    touched = {v for f, v in replay_cases(scope)[1] if f == family}
+    for stale in sorted(v for v in touched if version_key(assessed) and version_key(v) > version_key(assessed)):
         problems.append(f"it is stale: amendment {stale} changed this family's cases after {assessed}")
     if (ready.get("candidate") or {}).get("commit") != candidate if isinstance(ready.get("candidate"), dict) else True:
         problems.append("candidate.commit must be the adjudicated candidate")

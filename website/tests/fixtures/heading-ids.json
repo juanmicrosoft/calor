@@ -1,0 +1,337 @@
+{
+  "note": "Heading ids that website/src/lib/headings.ts assigns, for every heading of each vector source and of each page the W1 records name (after front matter is removed, as lib/docs does). tests/heading-ids.spec.ts checks the site produces them; the release gate's heading_ids (scripts/verify_release_adjudication.py) must produce the same (ReleaseGateScopePacketTests.GateHeadingIdsMatchTheSiteVectors).",
+  "vectors": [
+    {
+      "markdown": "## Foo\n\n## Foo\n",
+      "ids": [
+        "foo",
+        "foo-1"
+      ]
+    },
+    {
+      "markdown": "## Repeat\n\n# Repeat\n\n### Repeat\n",
+      "ids": [
+        "repeat",
+        "repeat-1",
+        "repeat-2"
+      ]
+    },
+    {
+      "markdown": "```\n## Phantom\n```\n\n## Real\n",
+      "ids": [
+        "real"
+      ]
+    },
+    {
+      "markdown": "~~~calor\n# not a heading\n~~~\n\n## After\n",
+      "ids": [
+        "after"
+      ]
+    },
+    {
+      "markdown": "## [Text](https://x.example/y)\n",
+      "ids": [
+        "text"
+      ]
+    },
+    {
+      "markdown": "## [![Build](x.png)](https://example.com)\n",
+      "ids": [
+        "build"
+      ]
+    },
+    {
+      "markdown": "## ![Logo](logo.png) Calor\n",
+      "ids": [
+        "logo-calor"
+      ]
+    },
+    {
+      "markdown": "---\ntitle: x\n---\n# Top\n\n### `code` *em*\n",
+      "ids": [
+        "top",
+        "code-em"
+      ]
+    },
+    {
+      "markdown": "## Heading with `[link](x)` code\n",
+      "ids": [
+        "heading-with-link-x-code"
+      ]
+    },
+    {
+      "markdown": "Para\n---\n",
+      "ids": [
+        "para"
+      ]
+    },
+    {
+      "markdown": "## !!!\n",
+      "ids": [
+        "section"
+      ]
+    },
+    {
+      "markdown": "## Use <code>x</code> here\n",
+      "ids": [
+        "use-x-here"
+      ]
+    },
+    {
+      "markdown": "## a_b **c**\n",
+      "ids": [
+        "a-b-c"
+      ]
+    },
+    {
+      "markdown": "## 1\\. Step\n",
+      "ids": [
+        "1-step"
+      ]
+    },
+    {
+      "markdown": "## Closing hashes ##\n",
+      "ids": [
+        "closing-hashes"
+      ]
+    },
+    {
+      "markdown": "## Call `TryParse`, `TryGetValue` and other `ref`/`out`/`in` methods\n",
+      "ids": [
+        "call-tryparse-trygetvalue-and-other-ref-out-in-methods"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "path": "content/cli/convert.mdx",
+      "ids": [
+        "overview",
+        "quick-start",
+        "options",
+        "auto-detected-output-paths",
+        "supported-constructs",
+        "which-path-preserved-each-member",
+        "counts-partial-results-and-the-json-envelope",
+        "local-functions",
+        "iterator-properties-and-indexers",
+        "what-changed-in-0-17",
+        "what-changed-in-0-16",
+        "array-expressions",
+        "benchmark-comparison",
+        "exit-codes",
+        "see-also"
+      ]
+    },
+    {
+      "path": "content/cli/feature-check.mdx",
+      "ids": [
+        "interop-features-in-0-25"
+      ]
+    },
+    {
+      "path": "content/cli/mcp.mdx",
+      "ids": [
+        "options",
+        "the-tool-surface",
+        "conversion-paths-in-calor-convert-calor-migrate-and-calor-batch",
+        "defaults-counts-and-partial-failures",
+        "the-calor-query-tool",
+        "where-it-may-look-and-what-it-may-write",
+        "calor-compile-options",
+        "project-configuration"
+      ]
+    },
+    {
+      "path": "content/cli/migrate.mdx",
+      "ids": [
+        "overview",
+        "quick-start",
+        "options",
+        "migration-plan",
+        "benchmark-summary",
+        "migration-reports",
+        "exit-codes",
+        "see-also"
+      ]
+    },
+    {
+      "path": "content/cli/self-check.mdx",
+      "ids": []
+    },
+    {
+      "path": "content/cli/structured-output.mdx",
+      "ids": [
+        "envelope-shape",
+        "conversion-output"
+      ]
+    },
+    {
+      "path": "content/guides/adding-calor-to-existing-projects.mdx",
+      "ids": [
+        "overview",
+        "step-1-enable-calor-in-your-project",
+        "step-2-analyze-your-codebase",
+        "understanding-the-output",
+        "step-3-add-your-first-calor-file",
+        "step-4-build-and-verify",
+        "step-5-convert-high-scoring-c-files",
+        "review-the-conversion-result",
+        "common-c-features-in-a-pilot-file",
+        "use-a-migration-waiver-deliberately",
+        "step-6-build-and-inspect-project-impact",
+        "optional-enable-claude-code-integration",
+        "using-claude-code",
+        "best-practices",
+        "what-to-convert-first",
+        "what-to-keep-in-c",
+        "next-steps"
+      ]
+    },
+    {
+      "path": "content/guides/csharp-interoperability.mdx",
+      "ids": [
+        "before-you-start-run-one-file-and-read-the-report",
+        "call-tryparse-trygetvalue-and-other-ref-out-in-methods",
+        "format-strings-with-interpolation",
+        "keep-a-small-local-helper-function",
+        "build-arrays-inside-expressions",
+        "convert-a-class-with-iterator-properties",
+        "what-stays-c-and-why",
+        "which-mechanism-kept-the-c",
+        "next-steps"
+      ]
+    },
+    {
+      "path": "content/guides/index.mdx",
+      "ids": [
+        "available-guides",
+        "nullability-and-net-interop",
+        "adoption-playbook",
+        "verification-guarantees-and-limits",
+        "project-intelligence-for-agents",
+        "converting-c-what-stays-c-and-why",
+        "adding-calor-to-existing-projects",
+        "dependent-types-tutorial",
+        "effect-manifests-net-ecosystem-coverage",
+        "cross-assembly-il-analysis",
+        "cross-module-effect-propagation",
+        "telemetry-and-privacy",
+        "getting-started"
+      ]
+    },
+    {
+      "path": "content/syntax-reference/calls.mdx",
+      "ids": [
+        "syntax",
+        "rules",
+        "disambiguation",
+        "nullable-arguments",
+        "call-parsing",
+        "case-a-trailing-member-on-an-inline-argument",
+        "case-b-two-consecutive-expression-start-tokens-calor0150",
+        "case-c-nested-implicit-close-calls",
+        "examples",
+        "statement-context",
+        "expression-context-zero-arg",
+        "expression-context-one-inline-arg",
+        "expression-context-two-or-more-args-explicit-form",
+        "trailing-member-access",
+        "by-reference-arguments-ref-out-in",
+        "diagnostics",
+        "related"
+      ]
+    },
+    {
+      "path": "content/syntax-reference/string-operations.mdx",
+      "ids": [
+        "core-operations",
+        "comparison-modes",
+        "verification-boundary",
+        "regex-character-and-stringbuilder-operations",
+        "interpolated-strings",
+        "holes-are-checked-like-other-expressions",
+        "converting-c-interpolated-strings"
+      ]
+    },
+    {
+      "path": "content/syntax-reference/structure-tags.mdx",
+      "ids": [
+        "modules",
+        "syntax",
+        "example",
+        "rules",
+        "functions",
+        "syntax-1",
+        "visibility",
+        "examples",
+        "async-functions",
+        "syntax-2",
+        "examples-1",
+        "automatic-task-wrapping",
+        "async-methods",
+        "syntax-3",
+        "example-1",
+        "modifiers",
+        "await-expression",
+        "syntax-4",
+        "examples-2",
+        "using-await-in-conditions-and-expressions",
+        "lambda-expressions",
+        "syntax-5",
+        "single-parameter",
+        "multiple-parameters",
+        "no-parameters",
+        "as-linq-arguments",
+        "statement-body-lambdas",
+        "async-lambdas",
+        "local-functions",
+        "syntax-6",
+        "rules-1",
+        "example-2",
+        "delegate-definitions",
+        "syntax-7",
+        "examples-3",
+        "enum-definitions",
+        "syntax-8",
+        "examples-4",
+        "enum-extension-methods",
+        "syntax-9",
+        "example-3",
+        "event-definitions",
+        "syntax-10",
+        "example-4",
+        "event-subscribe-unsubscribe",
+        "syntax-11",
+        "examples-5",
+        "input-parameters",
+        "syntax-12",
+        "examples-6",
+        "multiple-parameters-1",
+        "output-type",
+        "syntax-13",
+        "examples-7",
+        "array-types",
+        "syntax-14",
+        "examples-8",
+        "usage-in-fields-and-methods",
+        "block-structure-indentation",
+        "rules-2",
+        "example-5",
+        "tag-reference",
+        "generics",
+        "type-parameters",
+        "constraints",
+        "generic-type-references",
+        "examples-9",
+        "c-attributes",
+        "syntax-15",
+        "examples-10",
+        "attribute-arguments",
+        "supported-elements",
+        "why-indent-based-blocks",
+        "next"
+      ]
+    }
+  ]
+}

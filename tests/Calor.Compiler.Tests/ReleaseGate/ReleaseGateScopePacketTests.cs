@@ -111,7 +111,6 @@ public class ReleaseGateScopePacketTests
     [InlineData("witness run", "mapped blocker R-OBL ")]
     [InlineData("stale scope version", "is stale")]
     [InlineData("duplicate passing case row", "listed more than once")]
-    [InlineData("failed first case row with a passing duplicate", "F1-REFOUT-03")]
     [InlineData("boolean test total", "tests must")]
     [InlineData("blank reviewer", "reviews must")]
     public void IncompleteReadyRecordsFail(string defect, string message)
@@ -134,10 +133,8 @@ public class ReleaseGateScopePacketTests
                 case "blocker unresolved": ready["blockersResolved"]!.AsArray().Remove(ready["blockersResolved"]!.AsArray().First(b => b!["issue"]!.GetValue<int>() == 1427)); break;
                 case "witness run": Edit(files, "witness-1496", e => e["result"] = "failed"); break;
                 case "stale scope version": ready["scopeVersion"] = "1.0.0"; break;
-                case "duplicate passing case row" or "failed first case row with a passing duplicate":
-                    var row = ready["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-03")!.DeepClone();
-                    if (defect.StartsWith("failed", StringComparison.Ordinal)) row["result"] = "failed";
-                    ready["cases"]!.AsArray().Insert(0, row);
+                case "duplicate passing case row":
+                    ready["cases"]!.AsArray().Insert(0, ready["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-03")!.DeepClone());
                     break;
                 case "boolean test total": ready["tests"]![0]!["total"] = true; break;
                 case "blank reviewer": ready["reviews"]![0]!["reviewer"] = "  "; break;
@@ -225,6 +222,123 @@ public class ReleaseGateScopePacketTests
             w["families"]![0]!["pages"]![0] = $"{page}#{anchor}";
         });
         File.AppendAllText(Path.Combine(repo.Root, page), append);
+    }
+
+    /// <summary>As in C#, the first of duplicate rows is the one judged: a failed first row fails even when a passing duplicate follows.</summary>
+    [Fact]
+    public void TheFirstOfDuplicateRowsIsJudged()
+    {
+        using var repo = Build(readyEdit: (family, ready, files) =>
+        {
+            if (family != "F1") return;
+            var row = ready["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-03")!.DeepClone();
+            row["result"] = "failed";
+            ready["cases"]!.AsArray().Insert(0, row);
+        });
+        var result = repo.Run(repo.AllSurfaces());
+        AssertCodes(result, "G008");
+        Assert.Contains("case F1-REFOUT-03 is listed more than once", result.Output);
+        Assert.Contains("case F1-REFOUT-03 needs a passed result", result.Output);
+    }
+
+    /// <summary>
+    /// The gate's S004 replay (replay_cases) is a port of InteropScopeValidator S004: on each mutated packet both must
+    /// flag exactly the same cases. Each mutation is one S004 rule: the recorded old value, the tracked fields, an
+    /// active case on add and remove, a removal's last status, and the validator's order (changes before removals).
+    /// </summary>
+    [Theory]
+    [InlineData("unchanged", false)]
+    [InlineData("change from a wrong value", true)]
+    [InlineData("change of an untracked field", true)]
+    [InlineData("change of an unregistered case", true)]
+    [InlineData("add of an active case", true)]
+    [InlineData("removal without its last status", true)]
+    [InlineData("removal of an unregistered case", true)]
+    [InlineData("valid removal", false)]
+    [InlineData("valid change", false)]
+    [InlineData("change then removal in one amendment", false)]
+    [InlineData("tracked field drifts without a change", true)]
+    [InlineData("case dropped without an amendment", true)]
+    [InlineData("case added without an amendment", true)]
+    public void GateReplayMatchesTheValidatorsS004(string mutation, bool flagged)
+    {
+        var root = RepoRoot();
+        var scope = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Scope)))!;
+        var last = scope["amendments"]!.AsArray()[^1]!;
+        JsonNode CaseOf(string id) => scope["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == id)!;
+        void Change(string id, string field, string? from, string to) => last["changes"]!.AsArray().Add(new JsonObject { ["id"] = id, ["field"] = field, ["from"] = from, ["to"] = to });
+        void Drop(string id) => scope["cases"]!.AsArray().Remove(CaseOf(id));
+        switch (mutation)
+        {
+            case "change from a wrong value": Change("F1-REFOUT-01", "baselineStatus", "wrong", "reproduces"); break;
+            case "change of an untracked field": Change("F1-REFOUT-01", "note", CaseOf("F1-REFOUT-01")["note"]!.GetValue<string>(), "x"); break;
+            case "change of an unregistered case": Change("NO-SUCH-CASE", "role", null, "control"); break;
+            case "add of an active case": last["addedCases"]!.AsArray().Add(CaseOf("F1-REFOUT-01").DeepClone()); break;
+            case "removal without its last status": last["removedCases"]!.AsArray().Add(new JsonObject { ["id"] = "F1-REFOUT-02" }); Drop("F1-REFOUT-02"); break;
+            case "removal of an unregistered case": last["removedCases"]!.AsArray().Add(new JsonObject { ["id"] = "NO-SUCH-CASE", ["lastStatus"] = "reproduces" }); break;
+            case "valid removal": last["removedCases"]!.AsArray().Add(new JsonObject { ["id"] = "F1-REFOUT-02", ["lastStatus"] = "reproduces" }); Drop("F1-REFOUT-02"); break;
+            case "valid change":
+                Change("F1-REFOUT-01", "baselineStatus", CaseOf("F1-REFOUT-01")["baselineStatus"]!.GetValue<string>(), "no-longer-reproduces");
+                CaseOf("F1-REFOUT-01")["baselineStatus"] = "no-longer-reproduces";
+                break;
+            case "change then removal in one amendment":
+                Change("F1-REFOUT-03", "baselineStatus", CaseOf("F1-REFOUT-03")["baselineStatus"]!.GetValue<string>(), "no-longer-reproduces");
+                last["removedCases"]!.AsArray().Add(new JsonObject { ["id"] = "F1-REFOUT-03", ["lastStatus"] = "no-longer-reproduces" });
+                Drop("F1-REFOUT-03");
+                break;
+            case "tracked field drifts without a change": CaseOf("F1-REFOUT-01")["expected"] = "preserved"; break;
+            case "case dropped without an amendment": Drop("F1-REFOUT-04"); break;
+            case "case added without an amendment": var extra = CaseOf("F1-REFOUT-01").DeepClone(); extra["id"] = "F1-EXTRA"; scope["cases"]!.AsArray().Add(extra); break;
+        }
+        var results = JsonNode.Parse(File.ReadAllText(Path.Combine(root, ScopeDir, "baseline-results.json")))!;
+        List<string> Files(string sub) => Directory.EnumerateFiles(Path.Combine(root, ScopeDir, sub)).Where(f => Path.GetFileName(f) != ".DS_Store")
+            .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).ToList();
+        byte[]? Read(string path) => File.Exists(Path.Combine(root, path)) ? File.ReadAllBytes(Path.Combine(root, path)) : null;
+        var csharp = Calor.Compiler.Tests.InteropScope.InteropScopeValidator.Validate(scope, results, Read, Files("fixtures"), Files("generated"))
+            .Where(v => v.Code == "S004").Select(v => v.Subject).ToHashSet();
+        var file = Path.Combine(Path.GetTempPath(), $"calor-s004-{Guid.NewGuid():N}.json");
+        File.WriteAllText(file, scope.ToJsonString());
+        try
+        {
+            var (code, output) = Python("import json, sys; sys.path.insert(0, sys.argv[1]); import verify_release_adjudication as v; "
+                + "print(json.dumps(sorted({c for c, _ in v.replay_cases(json.load(open(sys.argv[2], encoding='utf-8')))[0]})))",
+                Path.Combine(root, "scripts"), file);
+            Assert.True(code == 0, output);
+            var gate = JsonNode.Parse(output.Trim())!.AsArray().Select(x => x!.GetValue<string>()).ToHashSet();
+            Assert.Equal(flagged, csharp.Count > 0);
+            Assert.True(csharp.SetEquals(gate), $"C# S004 flags [{string.Join(", ", csharp)}]; the gate flags [{string.Join(", ", gate)}]");
+        }
+        finally { File.Delete(file); }
+    }
+
+    /// <summary>The gate's heading ids equal the site's (website/tests/heading-ids.spec.ts checks the same file against headings.ts).</summary>
+    [Fact]
+    public void GateHeadingIdsMatchTheSiteVectors()
+    {
+        var site = Path.Combine(RepoRoot(), "website");
+        var (code, output) = Python("import json, sys, os; sys.path.insert(0, sys.argv[1]); import verify_release_adjudication as v; "
+            + "d = json.load(open(os.path.join(sys.argv[2], 'tests/fixtures/heading-ids.json'), encoding='utf-8')); "
+            + "pages = [{'markdown': open(os.path.join(sys.argv[2], p['path']), encoding='utf-8').read(), 'ids': p['ids']} for p in d['pages']]; "
+            + "bad = [x['markdown'][:60] for x in d['vectors'] + pages if v.heading_ids(x['markdown']) != x['ids']]; "
+            + "print(len(d['vectors']), len(pages), json.dumps(bad))",
+            Path.Combine(RepoRoot(), "scripts"), site);
+        Assert.True(code == 0, output);
+        var parts = output.Trim().Split(' ', 3);
+        Assert.True(int.Parse(parts[0]) >= 16 && int.Parse(parts[1]) >= 12, output);
+        Assert.Equal("[]", parts[2]);
+    }
+
+    private static (int Code, string Output) Python(string code, params string[] args)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("python3") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add(code);
+        foreach (var arg in args) start.ArgumentList.Add(arg);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return (process.ExitCode, stdout.Result + stderr);
     }
 
     // ---- fixture ----

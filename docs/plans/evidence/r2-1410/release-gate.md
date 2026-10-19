@@ -297,8 +297,10 @@ candidate must contain this code.
 - `scope.json`: schema `v0.25-interop-scope/1`, `FROZEN`, gate `MET`; its `evidenceSeal` recomputes
   (`baseline-results.json`, exactly the two registered producers, and every file under `generated/`,
   LF-normalized); `denominatorV1` with the seal hashes to the pinned `InteropScopeTests.FrozenSeal`,
-  and replaying the amendments from it gives exactly the current cases, with their tracked fields and
-  recomputed requirement digests (S004).
+  and `replay_cases`, a port of `InteropScopeValidator` S004 in its order (per amendment: added cases,
+  changes with their recorded old value on a tracked field of an active case, removals of active cases
+  with their last status; then every active case against the current cases), flags nothing. A parity
+  test checks it flags exactly the cases S004 flags on 13 mutated packets.
 - `acceptancePreconditions`, as `InteropScopeValidator` S014 checks them: equal to the latest
   amendment copy, citing that amendment and its recorded decision; the replaced #1408 precondition
   cites the retained #1408 record and its outcome; A1 waits on every gap (at least #1545, #1546,
@@ -313,7 +315,10 @@ candidate must contain this code.
   Each W1 family's status mirrors scope readiness (never `READY`), lists ready needs, and every
   transcript, page and shared page exists; a page anchor must be a heading id as
   `website/src/lib/headings.ts` assigns it (no headings in fenced code or front matter, inline markup
-  contributes its text, repeats get `-1`, `-2`).
+  contributes its text, an image inside a link its alt text, repeats get `-1`, `-2`). The shared
+  vectors `website/tests/fixtures/heading-ids.json` (16 sources and the 12 W1 pages) are checked
+  against `headings.ts` by `website/tests/heading-ids.spec.ts` and against the gate by
+  `ReleaseGateScopePacketTests`, so the two cannot drift silently.
 - The record's `contract` is `{version: scopeVersion, files: {scope.json, register.json,
   records.json: LF SHA-256}}`.
 - The packet directory, the T1 register and the W1 records are identical at the candidate and the
@@ -333,5 +338,5 @@ exactly one row per subject (`G008`), each with `independence = reduced-maintain
 | each claim in the registry | `BOUNDED` |
 
 Every other field (`candidate`, `evidenceManifests`, `claimRegistry`, `publication`) is read as for
-0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 4 positive and 45 negative controls)
+0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 63 cases: end-to-end positive and negative controls, the S004 parity theory, and the heading-id vectors)
 and `ReleaseAdjudicationMapTests`.

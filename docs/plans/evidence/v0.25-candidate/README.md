@@ -82,6 +82,17 @@ In `docs/plans/evidence/v0.25-f1-943/README.md`: "Count the 85 against W1" (F1 a
 "Accept as known residual" (P2V-1, #1573). Neither changes a case, ceiling or exception, so
 `scope.json` is not amended.
 
+## Review exception EXC-PREFREEZE-GATE (@juanmicrosoft, 2026-10-19)
+
+The pre-freeze PR (#1576) spent its review budget with two MAJOR findings open (verification pass
+NOT-VERIFIED). The maintainer granted, verbatim: **"Exception: fix + 1 pass"**, relayed in the agent
+session (no GitHub record). Scope: one fix of those two MAJORs (the gate's S004 case-history replay,
+and heading ids for an image inside a link) and the MINOR (the first-of-duplicate-rows control), then
+exactly one Codex verification-only pass. That pass also covers the changes made after the budget: the
+`[0.25.0]` notes on the #1545–#1547 closures and Trusted Publishing, and the no-auto-gc gate-fixture fix.
+A BLOCKING or MAJOR finding in that pass stops the PR for a maintainer decision. Record:
+`reviews/prefreeze-exception-codex.md`.
+
 ## Reviews
 
 Codex (`codex exec -s read-only --ephemeral -c model_reasoning_effort="high"`), at most 3 rounds plus
