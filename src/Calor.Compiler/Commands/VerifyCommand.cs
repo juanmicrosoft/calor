@@ -143,10 +143,11 @@ public static class VerifyCommand
         // both text and JSON modes.
         var hasErrors = false;
 
-        // Machine-readable formats (json): --verbose compiler phase lines go to
-        // stderr so stdout carries only the document. Text mode keeps them on
-        // stdout (null = the compiler's default, standard output).
-        var statusWriter = format.Equals("text", StringComparison.OrdinalIgnoreCase) ? null : Console.Error;
+        // JSON (the only machine-readable format; FormatOutput renders every
+        // other value as text): --verbose compiler phase lines go to stderr so
+        // stdout carries only the document. Text output keeps them on stdout
+        // (null = the compiler's default, standard output).
+        var statusWriter = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? Console.Error : null;
 
         foreach (var file in files)
         {

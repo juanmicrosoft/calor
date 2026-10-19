@@ -160,10 +160,12 @@ public class JsonVerboseStdoutTests : IDisposable
         finally
         {
             try { proc.Kill(entireProcessTree: true); } catch { /* best-effort */ }
-            // The parameterless overload also waits for the async stdout/stderr
-            // readers to reach end-of-stream, so no buffered line is lost.
-            if (proc.WaitForExit(30_000)) proc.WaitForExit();
         }
+
+        Assert.True(proc.WaitForExit(30_000), "watch child did not exit after Kill");
+        // The parameterless overload also waits for the async stdout/stderr
+        // readers to reach end-of-stream, so no buffered line is lost.
+        proc.WaitForExit();
 
         string outText, errText;
         lock (stdOut) outText = stdOut.ToString();
@@ -194,6 +196,8 @@ public class JsonVerboseStdoutTests : IDisposable
     [Theory]
     [InlineData("convert|Counter.cs|-o|Counter.calr|--verbose", "Converted 7 nodes")]
     [InlineData("verify|hello.calr|--verbose", "Lexer produced")]
+    // verify renders any format other than json as text; that stays on stdout too.
+    [InlineData("verify|hello.calr|--format|console|--verbose", "Lexer produced")]
     [InlineData("benchmark|proj|--verbose", "Benchmarked: hello")]
     public void TextFormat_WithVerbose_KeepsProgressOnStdout(string args, string stdoutMarker)
     {
