@@ -43,15 +43,14 @@ contract in `docs/plans/v0.25-refout-contract.md` (#1427).
 - **`calor convert` keeps by-reference identity.** `Bump(ref pts[0].X)` on an array of
   structs now passes the element's field itself, so the callee's write is kept.
   C# `out var n` becomes a mutable binding declared just before the statement, when it
-  appears in a local declaration, a `return`, or an `if` condition directly in a block, its
-  type is known, and its name clashes with nothing in scope. Other forms keep their
-  statement or member as C#. A call that is a statement by itself
-  (`int.TryParse(s, out var n);`) also gets the binding, but that output fails the C# round
-  trip, so `calor convert` keeps the type as C# and MCP `calor_convert` and `calor migrate`
-  refuse the file. Before, an `out var` inside `?:` became
+  appears in an expression statement such as `int.TryParse(s, out var n);`, a local
+  declaration, a `return`, or an `if` condition directly in a block, its type is known, and
+  its name clashes with nothing in scope. The binding starts at `default`, so the next line is
+  never read as its value. Other forms, including chained assignments and code with a member
+  named `default`, keep their statement or member as C#. Before, an `out var` inside `?:` became
   inline `§CS{...}`, and one in a `while` header was declared outside the loop.
-- **Shapes without a native form stay C#.** These are ref locals and block-bodied ref
-  returns, conditional refs, `scoped` and `ref readonly` parameters, `this ref`/`this in`
+- **Shapes without a native form stay C#.** These are ref locals and ref returns (block or
+  `=>` bodied), conditional refs, `scoped` and `ref readonly` parameters, `this ref`/`this in`
   extension calls, by-reference delegates and lambdas, by-reference constructor and indexer
   arguments, calls that omit `in`, and method-generic `out T` parameters. A flow attribute
   such as `[NotNullWhen]` on an `out` parameter is copied to the native declaration but has
@@ -59,13 +58,14 @@ contract in `docs/plans/v0.25-refout-contract.md` (#1427).
   `§A{in}`.
 - **`calor feature-check` changes.** `out-var` is now `Partial`, because only the forms above
   are lowered. The `ref-parameter` and `out-parameter` entries no longer suggest tuples or
-  `Result<T, E>`, and `in-parameter` names the call sites that stay C#.
+  `Result<T, E>`, and `in-parameter` names the call sites that stay C#. `ref-expression` and
+  `multidim-array` no longer claim that every form converts.
 - **Effect on converted real-world code.** Over the three vendored corpora (MediatR, Serilog,
   FluentValidation), 33 more members and types are kept as C#. In 31, an `out var` cannot be
   lowered: the one-file conversion cannot resolve its type, it sits in a lambda, or part of its
   statement already stays C#. The other 2 declare a method-generic `out T` parameter. Before,
   most of the first group became an untyped binding that failed with `Calor0250`. The native
-  source expressions over the corpora drop from 35,177 to 34,361 (2.3%), and 10 more of 364
+  source expressions over the corpora drop from 35,177 to 34,371 (2.3%), and 10 more of 364
   modules now get through binding to effect checking.
 
 These are checked by tests that compile every case in the contract, and by convert, compile
@@ -276,14 +276,10 @@ conversion returns.
 
 Corrections found while checking the pages against the converter:
 
-- `out var` in a call statement is not converted natively (see the `#943` entry above, now
-  corrected). An expression-bodied ref return (`=> ref a[0]`) is not preserved either: its
-  Calor fails the C# round trip, so it is rescued or refused. A block-bodied ref return is
-  preserved.
-- `calor feature-check` does not match the converter for five entries: `out-var` (lists the
-  call statement), `ref-expression` ("stripped"), `multidim-array` ("fully supported"),
-  `out-parameter` (says `[NotNullWhen]` parameters stay C#; they convert, with the attribute
-  inert), and `yield-return` (methods only). The feature-check page lists these gaps.
+- Four `#943` defects, fixed in the same release (see the `#943` entry): `out var` in a call
+  statement failed the C# round trip, an expression-bodied ref return lost its `ref`, four
+  `calor feature-check` descriptions did not match the converter, and `ref a[Next()]` was
+  reported as `in-parameter`. `yield-return` (methods only) is still a listed gap.
 - `docs/cli/feature-check.md` no longer lists `string-interpolation` as fully supported, and its
   example now shows current output.
 

@@ -353,7 +353,7 @@ public class RefOutImplementationTests
     public void OutVar_IsLoweredBeforeItsStatement()
     {
         var calor = new CSharpToCalorConverter().Convert(R0Fixture("F1-REFOUT-02")).CalorSource!;
-        Assert.Contains("§B{~n:i32}\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
+        Assert.Contains("§B{~n:i32} `default`\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
         Assert.Contains("§A{out} _ §/C", calor);
     }
 
@@ -403,6 +403,8 @@ public class RefOutImplementationTests
         // argument that throws, and an out declaration in a statement that is preserved.
         foreach (var (id, source) in ReviewWitnesses)
             yield return (id, source, "native-or-preserved");
+        foreach (var (id, source, allowed) in Pr2Witnesses)
+            yield return (id, source, allowed);
         foreach (var id in new[] { "X-INT-05", "X-INT-08" })
             yield return (id, File.ReadAllText(Path.Combine(root, "docs/plans/evidence/v0.25-f1-943/fixtures", id + ".cs.txt")), "native-or-preserved");
         foreach (var c in RefOutContractTests.Contract()["cases"]!.AsArray().Where(c => c!["kind"]!.GetValue<string>() == "csharp"))
@@ -432,6 +434,91 @@ public class RefOutImplementationTests
         ("R3-receiver-before-hoist", "public class Box { public int N; public Box(int n) { N = n; } public void Use(ref int x, Bomb b) { x = N; } } public class Bomb { public Bomb() { Probe.b = Probe.second; } } public static class Probe { public static Box b = new Box(1), second = new Box(2); public static string Run() { int x = 0; b.Use(ref x, new Bomb()); return x.ToString(); } }"),
         ("R3-reference-field-of-in-struct", "public class Box { public int N; } public struct S { public Box B; } public static class Probe { static void Bump(ref int n) { n = 7; } static void Use(in S s) { Bump(ref s.B.N); } public static string Run() { var s = new S { B = new Box() }; Use(in s); return s.B.N.ToString(); } }"),
     ];
+
+    // F1 PR 2 (W1 findings). A bare §B{~n:i32} took the next sibling statement as its initializer
+    // (a call statement, an §ARR declaration), so a lowered binding starts at `default`, as the
+    // converter already writes `int x;`. That `default` would read a symbol named `default`, so
+    // such code is preserved (Codex PR 2 round 1). A chained assignment evaluates its right side
+    // once per target when converted, so it is preserved too (round 2). The parser is unchanged
+    // (round 3: a next-line initializer is valid Calor). An expression-bodied ref return is
+    // preserved like a block-bodied one.
+    private static readonly (string Id, string Source, string Allowed)[] Pr2Witnesses =
+    [
+        ("P2-out-var-call-statement", "public static class Probe { public static string Run() { int.TryParse(\"5\", out var n); return n.ToString(); } }", "native"),
+        ("P2-out-var-statement-then-call", "public static class Probe { static string Log = \"\"; static void Use(int x) { Log += x; } public static string Run() { int.TryParse(\"5\", out var n); Use(n); int.TryParse(\"x\", out int m); Use(m); return Log; } }", "native"),
+        ("P2-out-var-string-statement", "using System.Collections.Generic; public static class Probe { public static string Run() { var d = new Dictionary<int, string>(); d.Add(1, \"one\"); d.TryGetValue(1, out var v); return v ?? \"null\"; } }", "native"),
+        ("P2-out-var-array-declaration", "public static class Probe { static int Set(out int[] n) { n = new[] { 7 }; return 1; } public static string Run() { int[] a = new[] { Set(out var n) }; return n[0] + \":\" + a[0]; } }", "native"),
+        ("P2-out-var-chained-assignment", "public static class Probe { static int calls; static bool Set(out int n) { n = ++calls; return true; } public static string Run() { bool x = false, y = false; x = y = Set(out var n); return calls + \":\" + n + \":\" + x; } }", "preserved"),
+        ("P2-out-var-assignment-statement", "public static class Probe { public static string Run() { bool ok; ok = int.TryParse(\"6\", out var n); return ok + \":\" + n; } }", "native"),
+        ("P2-out-var-local-declaration", "public static class Probe { public static string Run() { bool ok = int.TryParse(\"7\", out var n); return ok + \":\" + n; } }", "native"),
+        ("P2-out-var-return", "public static class Probe { static int Get(string s) { return int.TryParse(s, out var n) ? n : -1; } public static string Run() => Get(\"8\") + \"|\" + Get(\"x\"); }", "native"),
+        ("P2-out-var-if", "public static class Probe { public static string Run() { if (int.TryParse(\"9\", out var n)) { return n.ToString(); } return \"none\"; } }", "native"),
+        ("P2-out-var-member-named-default", "public static class Probe { public static int reads; public static int @default { get { reads++; return 0; } } public static string Run() { bool ok = int.TryParse(\"5\", out var n); return reads + \":\" + n + \":\" + ok; } }", "preserved"),
+        ("P2-ref-return-expression", "public static class Probe { static ref int First(int[] a) => ref a[0]; public static string Run() { var a = new[] { 1, 2 }; First(a) = 5; return a[0].ToString(); } }", "preserved"),
+        ("P2-ref-return-property", "public static class Probe { static int slot = 3; static ref int Slot => ref slot; public static string Run() { Slot = 4; return slot.ToString(); } }", "preserved"),
+    ];
+
+    // Codex PR 2 round 3: hand-written Calor keeps its meaning; a next-line expression is still the
+    // initializer of a bare binding, which is why the converter writes `default` instead.
+    [Fact]
+    public void HandWrittenNextLineInitializer_KeepsItsMeaning()
+    {
+        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n    §R n\n",
+            "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        Assert.Equal("7", Run(result.GeneratedCode + "\npublic static class Probe { public static string Run() => P.PModule.Run().ToString(); }"));
+    }
+
+    // The lowered binding carries an explicit `default`, so the next statement is never its initializer.
+    [Fact]
+    public void OutDeclaration_IsLoweredWithAnExplicitDefault()
+    {
+        var calor = new CSharpToCalorConverter().Convert("public static class Probe { static bool Set(out string value) { value = \"ok\"; return true; } public static string Run() { Set(out string value); return value; } }").CalorSource!;
+        Assert.Contains("§B{~value:str} `default`\n        §C{Set} §A{out} value §/C", calor.Replace("\r\n", "\n"));
+    }
+
+    [Theory]
+    [InlineData("static void Use(ref int x) { x++; } static void M(int[] a) { Use(ref a[Next()]); }", "ref-parameter")]
+    [InlineData("static void Use(out int x) { x = 1; } static void M(int[] a) { Use(out a[Next()]); }", "out-parameter")]
+    [InlineData("static void Use(ref readonly int x) { } static void M(int[] a) { Use(in a[Next()]); }", "ref-parameter")]
+    [InlineData("static void Use<T>(ref T x) { } static void M() { int x = 0; Use<int>(ref x); }", "ref-parameter")]
+    [InlineData("static void Use<T>(in T x) { } static void M() { int x = 0; Use<int>(in x); }", "in-parameter")]
+    [InlineData("static void Use(in int x) { } static void M(int[] a) { Use(in a[Next()]); }", "in-parameter")] // control
+    [InlineData("static void Use(in int x) { } static void M(int v) { Use(v); }", "in-parameter")]                  // control
+    public void ByReferenceStatementLoss_IsReportedUnderTheParametersFeature(string members, string feature)
+    {
+        var result = new CSharpToCalorConverter().Convert("public static class C { static int Next() => 0; " + members + " }");
+        var features = result.Losses.Select(loss => loss.Feature).Concat(result.Issues.Where(i => i.Feature?.EndsWith("-parameter") == true && i.Message.Contains("Use", StringComparison.Ordinal))
+            .Select(i => i.Feature!)).Distinct().ToArray();
+        Assert.Contains(feature, features); // a `ref readonly` parameter also preserves its declaring member (`method`)
+        Assert.All(features, f => Assert.True(f == feature || f == "method", f));
+    }
+
+    [Fact]
+    public void ExpressionBodiedRefReturn_IsPreserved_NotStripped()
+    {
+        var result = new CSharpToCalorConverter().Convert("public static class C { public static ref int First(int[] a) => ref a[0]; }");
+        Assert.Contains("§CSHARP{", result.CalorSource);
+        Assert.DoesNotContain("-> ref", result.CalorSource);
+        var block = new CSharpToCalorConverter().Convert("public static class C { public static ref int First(int[] a) { return ref a[0]; } }");
+        Assert.Equal(block.Losses.Select(loss => loss.Feature), result.Losses.Select(loss => loss.Feature)); // the same report
+        Assert.Contains(result.Issues, issue => issue.Feature == "ref-parameter");
+    }
+
+    // FeatureSupport states what converts (W1 finding 4); no level is promoted (D-S1.5).
+    [Theory]
+    [InlineData("ref-expression", "stripped", SupportLevel.Full)]
+    [InlineData("multidim-array", "fully supported", SupportLevel.Full)]
+    [InlineData("out-parameter", "[NotNullWhen] are preserved", SupportLevel.Partial)]
+    [InlineData("in-parameter", "pass a value to an in parameter", SupportLevel.Full)]
+    [InlineData("out-var", "Chained assignments", SupportLevel.Partial)]
+    public void FeatureSupportText_MatchesTheConverter(string feature, string phrase, SupportLevel level)
+    {
+        var info = FeatureSupport.GetFeatureInfo(feature)!;
+        Assert.Equal(level, info.Support);
+        Assert.Equal(feature == "out-var", info.Description!.Contains(phrase, StringComparison.Ordinal));
+        Assert.Contains("C#", info.Description);
+    }
 
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
         EvidenceContractTests.RepoRoot(), "docs/plans/evidence/v0.25-r0-1426/fixtures", id + ".cs.txt"));

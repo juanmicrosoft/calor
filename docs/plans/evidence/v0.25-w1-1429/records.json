@@ -38,10 +38,10 @@
         "W1-F1-notnullwhen"
       ],
       "claimsCorrected": [
-        "out var in a call statement: calls.mdx and CHANGELOG said it converts; it fails the C# round trip (CLI rescue, MCP and migrate refuse)",
-        "expression-bodied ref return: not preserved by the converter; fails the round trip (rescued or refused). Block-bodied ref returns are preserved",
-        "omitted-in call sites and by-reference operands that run code keep only the statement as §RAW (feature in-parameter), not the member",
-        "[NotNullWhen] on an out parameter: the guide, adding-Calor table and CHANGELOG said it stays C#; it converts natively with the attribute copied and inert (the out-parameter registry description says the same wrong thing)",
+        "out var in a call statement: calls.mdx and CHANGELOG said it converts; it failed the C# round trip (CLI rescue, MCP and migrate refuse). Fixed by F1 PR 2 (#1571): the lowered binding starts at default and converts natively (transcript W1-F1-outvar-statement regenerated)",
+        "expression-bodied ref return: not preserved by the converter; failed the round trip (rescued or refused). Fixed by F1 PR 2 (#1571): preserved like block-bodied ref returns (transcript W1-F1-ref-return-expression regenerated)",
+        "omitted-in call sites and by-reference operands that run code keep only the statement as §RAW, not the member (since F1 PR 2 #1571 the feature is the parameter's own kind, e.g. ref-parameter for ref a[Next()])",
+        "[NotNullWhen] on an out parameter: the guide, adding-Calor table and CHANGELOG said it stays C#; it converts natively with the attribute copied and inert (the out-parameter registry description said the same wrong thing; corrected by F1 PR 2, #1571)",
         "omitted-in in an expression-bodied member preserves the whole member (feature method), not only a statement"
       ],
       "readyNeeds": [

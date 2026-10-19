@@ -30,6 +30,21 @@ public class T1RegisterTests
         Assert.Equal(BaselineApprovalSeal, register["approvalSeal"]!.GetValue<string>());
     }
 
+    /// <summary>Each approved amendment's seal, in order. 1.0.1: F1 PR 2 (#943, PR #1571) re-ran F1's results.json.</summary>
+    private static readonly (string Version, string Seal)[] AmendmentSeals =
+    [
+        ("1.0.1", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
+    ];
+
+    [Fact]
+    public void AmendmentApprovalsMatchThePinnedSeals()
+    {
+        var register = Register();
+        var amendments = register["amendments"]!.AsArray();
+        Assert.Equal(AmendmentSeals, amendments.Select(a => (a!["version"]!.GetValue<string>(), a["approvalSeal"]!.GetValue<string>())).ToArray());
+        Assert.Equal(AmendmentSeals[^1].Seal, T1RegisterValidator.ApprovalSeal(register));
+    }
+
     [Fact]
     public void CommittedRegisterHoldsNoReadyRecord()
     {
@@ -49,8 +64,9 @@ public class T1RegisterTests
         var (code, apply) = Controls[mutation];
         var read = apply(register, scope) ?? ReadRepo;
         // Re-approve the mutated hashes so a T004/T006/T007 control isolates its own code from T009's seal check.
+        // With amendments, the latest amendment carries the approval the validator checks.
         if (code != "T009")
-            register["approvalSeal"] = T1RegisterValidator.ApprovalSeal(register);
+            (register["amendments"]!.AsArray().LastOrDefault() ?? register)["approvalSeal"] = T1RegisterValidator.ApprovalSeal(register);
         var violations = T1RegisterValidator.Validate(register, scope, read);
         Assert.True(violations.Count > 0 && violations.All(x => x.Code == code), $"{mutation}: {EvidenceContractTests.Describe(violations)}");
     }

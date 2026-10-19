@@ -1,0 +1,33 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{i32:slot:priv:stat} = 3
+
+      §MT{m004:Run:pub:stat} () -> str
+        §E{alloc}
+        §ARR{a:i32}
+          1
+          2
+          3
+        §ASSIGN §C{First} §A a §/C 7
+        §ASSIGN §C{Last} §A a §/C 9
+        §ASSIGN Slot 4
+        §R (+ (+ (+ (+ §IDX{a} 0 "|") §IDX{a} 2) "|") slot)
+
+      §CSHARP{
+    static ref int First(int[] a) => ref a[0];
+      }§/CSHARP
+
+      §CSHARP{
+    static ref int Last(int[] a)
+    {
+        return ref a[a.Length - 1];
+    }
+      }§/CSHARP
+
+      §CSHARP{
+    static ref int Slot => ref slot;
+      }§/CSHARP
+
+
+

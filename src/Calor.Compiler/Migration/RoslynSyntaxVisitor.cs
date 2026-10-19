@@ -9640,7 +9640,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
                 CheckedExpressionSyntax checkedExpr => ConvertCheckedExpression(checkedExpr),
                 AnonymousMethodExpressionSyntax anonMethod => ConvertAnonymousMethodExpression(anonMethod),
-                RefExpressionSyntax refExpr => ConvertExpression(refExpr.Expression),
+                // #943 (D1 RO-UNS-1): `=> ref a[0]` is preserved as block-bodied ref returns are.
+                RefExpressionSyntax refExpr => throw EscalateExpression(refExpr, "ref-parameter"),
                 AliasQualifiedNameSyntax aliasName => new ReferenceNode(GetTextSpan(aliasName), aliasName.Name.ToString()),
                 QualifiedNameSyntax qualifiedName => new ReferenceNode(GetTextSpan(qualifiedName), qualifiedName.ToString()),
                 ImplicitElementAccessSyntax implicitElement =>
@@ -10205,7 +10206,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && _semanticModel.GetSymbolInfo(call).Symbol is IMethodSymbol method
                 && DetermineParameter(argument, method)?.OriginalDefinition.Type is ITypeParameterSymbol
                     { TypeParameterKind: TypeParameterKind.Method })
-                throw EscalateExpression(statement, "out-parameter");
+                throw EscalateExpression(statement, argument.RefKindKeyword.ValueText + "-parameter");
         }
         SyntaxNode? scanned = inLambda ? null : statement switch
         {
@@ -10239,7 +10240,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var unknownType = declaration.Type.IsVar && (type is null or { TypeKind: TypeKind.Error or TypeKind.Dynamic }
                 or { IsAnonymousType: true } || !type.CanBeReferencedByName && type is not IArrayTypeSymbol);
             if (collides || unknownType || type is { IsRefLikeType: true }
-                || declaration.Ancestors().Any(node => node is InterpolationSyntax))
+                || declaration.Ancestors().Any(node => node is InterpolationSyntax)
+                // A chained assignment (`x = y = F(out var n)`) is converted by evaluating F twice.
+                || scanned.DescendantNodes().Any(node => node is AssignmentExpressionSyntax { Parent: not ExpressionStatementSyntax })
+                || _semanticModel.LookupSymbols(statement.SpanStart, name: "default").Length > 0) // `default` would read it
                 throw EscalateExpression(statement, "out-var");
             _loweredOutDeclarations.Add(declaration);
             var typeName = declaration.Type.IsVar
@@ -10248,8 +10252,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         | SymbolDisplayMiscellaneousOptions.ExpandNullable
                         | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)))
                 : TypeMapper.CSharpToCalor(declaration.Type.ToString());
+            // `default`, as for `int x;`: a bare binding would take a next-line `§C` as its initializer.
             result.Add(new BindStatementNode(GetTextSpan(declaration), name, typeName, isMutable: true,
-                initializer: null, new AttributeCollection()));
+                new ReferenceNode(GetTextSpan(declaration), "default"), new AttributeCollection()));
         }
         return result;
     }
@@ -11644,7 +11649,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     || !a.RefKindKeyword.IsKind(SyntaxKind.None) && a.Expression.DescendantNodesAndSelf().Any(node =>
                         node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax
                             or AssignmentExpressionSyntax or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax))
-                    throw EscalateExpression(a, "in-parameter");
+                    throw EscalateExpression(a, (parameter == null ? a.RefKindKeyword.ValueText // the parameter's own feature
+                        : parameter.RefKind is RefKind.Out ? "out" : parameter.RefKind is RefKind.In ? "in" : "ref") + "-parameter");
                 return a.RefKindKeyword.IsKind(SyntaxKind.None) ? null
                     : parameter?.RefKind == RefKind.In ? "in" : a.RefKindKeyword.ValueText;
             })

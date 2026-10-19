@@ -263,14 +263,11 @@ The rules:
    because they may name the same storage.
 
 Calor has no inline `out var` declaration. Declare a mutable binding first, as
-`ParseOr` does. When `calor convert` meets C# `out var n` in a local declaration, a
-`return`, or an `if` condition directly inside a block, it writes that binding for you.
-Other placements, such as a `while` header or a lambda, stay C#. In 0.25 a call that is
-a statement by itself (`int.TryParse(s, out var n);`) also gets the binding, but the
-result fails the C# round trip: `calor convert` keeps the type as C# and MCP
-`calor_convert` refuses it. Give a hand-written binding an initial value, as `ParseOr`
-does, because a bare `§B{~n:i32}` followed by a call statement reads that call as its
-initializer. See the [C# interoperability guide](/docs/guides/csharp-interoperability/#call-tryparse-trygetvalue-and-other-ref-out-in-methods)
+`ParseOr` does. When `calor convert` meets C# `out var n` in a call statement, a local
+declaration, a `return`, or an `if` condition directly inside a block, it writes that
+binding for you, starting at `default`. Other placements, such as a `while` header or a
+lambda, stay C#. Give a hand-written binding an initial value too, because a bare
+`§B{~n:i32}` followed by a call statement reads that call as its initializer. See the [C# interoperability guide](/docs/guides/csharp-interoperability/#call-tryparse-trygetvalue-and-other-ref-out-in-methods)
 for the converter's full list.
 
 ```calor expect=Calor0212

@@ -117,7 +117,7 @@ with default options:
   §NS{ns_global:_global:global}
     §CL{c001:Inventory:pub:stat}
       §MT{m002:ParseOr:pub:stat} (str:text, i32:fallback) -> i32
-        §B{~n:i32}
+        §B{~n:i32} `default`
         §IF{if003} §C{int.TryParse} §A text §A{out} n §/C
           §R n
         §R fallback
@@ -149,10 +149,10 @@ with default options:
 
 - `TryParse` and `TryGetValue` with a variable declared earlier (`int count;` then
   `out count`), and the `out _` discard.
-- `out var n` / `out T n` when the call is in a local declaration
+- `out var n` / `out T n` when the call is a statement by itself, a local declaration
   (`bool ok = int.TryParse(s, out var n);`), a `return`, or an `if` condition directly
   inside a block. Calor has no inline declaration, so the converter writes a mutable
-  binding (`§B{~n:i32}`) just before the statement.
+  binding (`§B{~n:i32} \`default\``) just before the statement.
 - `ref` and `in` arguments that are locals, parameters, fields, array elements, or fields
   of struct array elements (`Bump(ref pts[0].X)` passes the element's own field), when
   the operand runs no code of its own. A C# `ref` argument to an `in` parameter becomes
@@ -160,28 +160,20 @@ with default options:
 
 **What stays C# in 0.25:**
 
-- **`out var` in a call that is a statement by itself** (`int.TryParse(s, out var n);`).
-  The converter writes the binding, but the result fails the C# round trip, so it is not
-  usable. `calor convert` keeps the whole type as C# (an automatic rescue); MCP
-  `calor_convert` and `calor migrate` refuse the file. Declare the variable first, or use
-  the call's result. The transcript is fixture `W1-F1-outvar-statement`.
-- `out var` in other places: `while`/`for`/`using`/`lock` headers, lambdas, LINQ queries,
+- `out var` in other places: chained assignments (`x = y = F(out var n)`), code where a
+  member named `default` is visible, `while`/`for`/`using`/`lock` headers, lambdas, LINQ queries,
   interpolation holes, `catch` filters, initializers, and expression-bodied members. The
   expression, statement or member that holds it stays C#.
-- Ref locals (`ref int r = ref a[0];`), block-bodied ref returns, conditional refs,
+- Ref locals (`ref int r = ref a[0];`), ref returns (block or `=>` bodied), conditional refs,
   `scoped` and `ref readonly` parameters, `this ref`/`this in` extension calls,
   by-reference delegates and lambdas, by-reference constructor and indexer arguments,
   and method-generic `out T` or `ref T` parameters. The member stays `§CSHARP`; the
   report names feature `method` and warns with the shape, such as `ref-parameter`.
 - Call sites C# allows but Calor cannot write: an `in` argument passed without `in`
   (`Twice(x)`), or a by-reference operand that runs code (`Bump(ref a[Next()])`). In a
-  block body only that statement stays C#, as `§RAW`, reported as `in-parameter`. In an
+  block body only that statement stays C#, as `§RAW`, reported as `in-parameter` or `ref-parameter`. In an
   expression-bodied member (`int Run(int x) => Twice(x);`) the whole member stays
   `§CSHARP`, reported as `method`.
-- **An expression-bodied ref return** (`ref int First(int[] a) => ref a[0];`) is not
-  recognized in 0.25. Its Calor fails the C# round trip, so the CLI rescues the whole type
-  and MCP `calor_convert` and `calor migrate` refuse the file (fixture
-  `W1-F1-ref-return-expression`). Write it with a block body to get member preservation.
 
 In the tested cases, each shape on this list either keeps its C# or fails with a report.
 
@@ -485,10 +477,9 @@ not compile.
 
 | C# you wrote | What you get | Reported feature |
 |:-------------|:-------------|:-----------------|
-| `out var` in a call statement; an expression-bodied ref return | Type rescued (CLI) or file refused (MCP, migrate) | `post-validation-fallback` |
 | `out var` in a loop header, a lambda or a hole | That expression, statement or member kept as C# | varies, for example `conditional-expression-hoisting` |
-| Ref locals, block-bodied ref returns, `scoped`/`ref readonly`, generic `out T` | Member preserved | `method`, with a warning naming the shape |
-| An `in` argument passed without `in`; a by-reference operand that runs code | Statement kept as `§RAW` (whole member in an expression-bodied member) | `in-parameter` (`method`) |
+| Ref locals, ref returns, `scoped`/`ref readonly`, generic `out T` | Member preserved | `method`, with a warning naming the shape |
+| An `in` argument passed without `in`; a by-reference operand that runs code | Statement kept as `§RAW` (whole member in an expression-bodied member) | the parameter's kind, such as `in-parameter` (`method`) |
 | Interpolated-string handler targets, hole-free `FormattableString` | Statement or member preserved | `string-interpolation-handler`, `string-interpolation-formattable-constant` |
 | Unsupported interpolation holes | The hole keeps its C# text (`§CS{...}`) | `string-interpolation-hole` |
 | Capturing, generic, async or iterator local functions | Member preserved | `method` with a `local-function` warning |
