@@ -497,7 +497,10 @@ jobs:
     # Inventory grew from 7,978 to 12,018. Run 34981014060 completed the first
     # 6,466-case host, then hit the old 20m cap during the second host.
     # Keep both fresh hosts and all inventory/assertion gates unchanged.
-    timeout-minutes: ${{ fromJSON(matrix.name == 'compiler' && '30' || '15') }}
+    # 0.25 W1 (#1566) added W1GuideTranscriptTests, which re-run the CLI and MCP surfaces against fresh
+    # processes; the shard went from about 23.5 to 29-30 minutes. Main's run 39197466834 (676701415) and two
+    # #1570 runs were cancelled at the 30m cap with 0 failing tests (14414/14417 passed when cut off).
+    timeout-minutes: ${{ fromJSON(matrix.name == 'compiler' && '40' || '15') }}
     strategy:
       fail-fast: false
       matrix:
