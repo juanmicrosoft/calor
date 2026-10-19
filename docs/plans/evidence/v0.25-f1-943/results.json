@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-f1-943-evidence/1",
-  "measuredCommit": "06f24f0aa237e2ccfa940588af41d40b950be78f",
+  "measuredCommit": "b56377a8bae8ff7a26cfd35ae12f771303a00414",
   "srcTree": "507fceeaf5e49ee1846ed1cba09647c16c76ad41",
   "build": "Release",
   "dotnetSdk": "10.0.401",
