@@ -60,8 +60,9 @@ Native/interop counts: `W1-F6-rescue` reports `nativeConversionCount` 3 with out
 pages say to read `conversionPaths.outcome`. Partial failures: `W1-F6-project` (CLI migrate exit 1, no
 `.calr` written; MCP migrate and batch `isError`, `failedFiles` 2, every file `refused`). Feature-check
 output for every row of the feature-check table was read from `calor feature-check --list` on the base.
-After Codex round 1: `--format json --verbose` prints progress to stdout before the envelope
-(pinned in `W1-F6-rescue` `cli-convert-json-verbose`); MCP diagnostics live in `issues[]`
+After Codex round 1: `--format json --verbose` printed progress to stdout before the envelope
+(pinned in `W1-F6-rescue` `cli-convert-json-verbose`; fixed by #1570, which regenerated the record
+to `stdoutIsOneJsonDocument: true`); MCP diagnostics live in `issues[]`
 (`calor_convert`), `perFile[].errors[]`/`warnings[]` (`calor_migrate`) and `files[].issues[]`
 (`calor_batch`), pinned in `W1-F6-project`; the local-function slice includes the ref-return,
 parameter-attribute and value-use restrictions of `IsNativeLocalFunction`; the native hole subset
@@ -80,8 +81,10 @@ Found while checking (documented, not fixed: W1 changes no `src/`):
    FeatureSupport `out-var` text, `calls.mdx` and the changelog claimed it was native.
 2. **Expression-bodied ref return** (`=> ref a[0]`): not preserved; emitted as `-> ref int` with the
    `ref` stripped, failing the round trip (`W1-F1-ref-return-expression`). Block bodies are preserved.
-3. **`--format json --verbose`** is not a single JSON document on stdout (the converter's verbose
-   progress lines). Documented on `cli/convert` and `cli/structured-output`.
+3. **`--format json --verbose`** was not a single JSON document on stdout (the converter's verbose
+   progress lines). Fixed after W1 by #1570: the progress lines go to stderr, `W1-F6-rescue`
+   `cli-convert-json-verbose` now records `stdoutIsOneJsonDocument: true`, and the known-gap notes
+   on `cli/convert` and `cli/structured-output` were removed.
 4. **FeatureSupport text** that does not match behavior: `ref-expression` (Full, "stripped"),
    `multidim-array` (Full, "fully supported"), `out-var` (lists the expression statement), `out-parameter`
    (says `[NotNullWhen]` parameters are preserved), `in-parameter` (Full with preserved call sites). Fixing them is a `src/` change; the feature-check page lists the gaps.

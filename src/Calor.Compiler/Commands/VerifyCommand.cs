@@ -143,6 +143,12 @@ public static class VerifyCommand
         // both text and JSON modes.
         var hasErrors = false;
 
+        // JSON (the only machine-readable format; FormatOutput renders every
+        // other value as text): --verbose compiler phase lines go to stderr so
+        // stdout carries only the document. Text output keeps them on stdout
+        // (null = the compiler's default, standard output).
+        var statusWriter = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? Console.Error : null;
+
         foreach (var file in files)
         {
             if (!file.Exists)
@@ -166,7 +172,7 @@ public static class VerifyCommand
 
             try
             {
-                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds);
+                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds, statusWriter);
                 results.Add(result);
                 aggregatedDiagnostics.AddRange(result.Diagnostics);
 
@@ -230,7 +236,8 @@ public static class VerifyCommand
         int timeout,
         bool noCache,
         bool clearCache,
-        DeclarationIdResolver declarationIds)
+        DeclarationIdResolver declarationIds,
+        TextWriter? statusWriter)
     {
         var source = await File.ReadAllTextAsync(file.FullName);
         var diagnostics = new DiagnosticBag();
@@ -246,6 +253,7 @@ public static class VerifyCommand
         var options = new CompilationOptions
         {
             Verbose = verbose,
+            StatusWriter = statusWriter,
             VerifyContracts = true,
             ProjectDirectory = Path.GetDirectoryName(file.FullName),
             VerificationCacheOptions = cacheOptions,

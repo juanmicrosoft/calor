@@ -46,8 +46,8 @@
   },
   "cli-convert-json-verbose": {
     "command": "calor convert Counter.cs -o Counter.calr --format json --verbose",
-    "stdoutIsOneJsonDocument": false,
-    "firstStdoutLine": "Converted 3 nodes"
+    "stdoutIsOneJsonDocument": true,
+    "firstStdoutLine": "{"
   },
   "cli-compile": {
     "command": "calor --input Counter.calr --output Counter.g.cs",
