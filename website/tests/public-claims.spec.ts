@@ -12,9 +12,11 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.24.0';
-const releaseDate = '2026-10-07';
-// The release that last published static benchmark numbers. 0.24.0 publishes none: benchmark
+const currentRelease = '0.25.0';
+const releaseDate = '2026-10-19';
+// 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
+const advisoryRelease = '0.24.0';
+// The release that last published static benchmark numbers. 0.24.0 and 0.25.0 publish none: benchmark
 // publication is governed separately (#1276/#1422) and follows adjudication through #1410.
 const benchmarkRelease = '0.22.0';
 const benchmarkReleaseDate = '2026-09-15';
@@ -241,7 +243,7 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'Verifier soundness repairs, plus an advisory for 0.21.0 users.', { exact: true },
+      'Converting C# to Calor: ref/out, interpolated strings, local functions and arrays.', { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
     await expect(page).toHaveURL(/\/docs\/changelog\/$/);
@@ -256,7 +258,11 @@ for (const width of [1366, 390]) {
       'This release publishes no new benchmark results',
       'recorded maintainer override, not a gated release',
       'MILESTONE-FAILED',
-      'never reached NuGet']) {
+      'never reached NuGet',
+      'frozen with the release candidate on 2026-10-19, before the 0.25 acceptance',
+      'No family was ready',
+      'Independence is reduced',
+      'at most bounded']) {
       await expect(article).toContainText(text);
     }
   });
@@ -436,7 +442,12 @@ test('research milestones stay distinct from software releases', async () => {
   expect(rootChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
   expect(rootCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
   expect(normalizedRootCurrentSection).toContain('This release publishes no new benchmark results');
-  expect(normalizedRootCurrentSection).toContain('7 false proofs in 4 areas');
+  expect(normalizedRootCurrentSection).toContain('Nothing was released.');
+  const rootAdvisorySection = rootChangelog.match(
+    new RegExp(`^## \\[${advisoryRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
+  )?.[0] ?? '';
+  expect(rootAdvisorySection.replace(/\s+/g, ' ')).toContain('7 false proofs in 4 areas');
+  expect(websiteCurrentSection).toBe(rootCurrentSection);
   expect(rootBenchmarkSection).toContain('Benchmark Results (Statistical: 30 runs)');
   expect(rootBenchmarkSection).toContain('Programs Tested');
   expect(websiteChangelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');

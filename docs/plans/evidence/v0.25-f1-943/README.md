@@ -174,6 +174,24 @@ unchanged; the T1 register records the new `results.json` hash as amendment 1.0.
 `LookupSymbols`, which omits inaccessible members, so a private base-class member named `@default`
 lets the lowering proceed and the emitted `int n = @default;` fails with `CS0122` (`Calor1002`; MCP
 refuses). The failure is loud, not silent. The review budget is spent, so it is not fixed here.
+Accepted as a known residual and tracked as #1573 (maintainer decision 2026-10-19, below).
+
+## Maintainer decisions after PR 2 (2026-10-19, @juanmicrosoft)
+
+PR 2 merged as #1571 (`e075f848a`). The maintainer then decided the two questions below. They were
+relayed through the agent session; no GitHub comment records them. The release-prep PR for the 0.25
+candidate records them here.
+
+1. **Line attribution of #1571: "Count the 85 against W1".** #1571 changed 136 non-test lines
+   outside committed evidence data and the binder ledgers: `src/` 34, `CHANGELOG.md` 32,
+   `website/content/` 56, `docs/cli/feature-check.md` 10, `eng/test-manifest.json` 4. Of those, 51
+   are F1's fix and count against F1's family ceiling (`family-nontest-lines-F1`, 900). With them,
+   F1 sits at exactly 900 of 900. The other 85 are W1 (#1429) page updates and count against W1,
+   which has no family line ceiling. The split into 51 and 85 is the maintainer's. No capacity
+   exception is needed, so `scope.json` is not amended for it.
+2. **P2V-1: "Accept as known residual".** A private base-class member named `@default` makes the
+   converted code fail loudly with `CS0122` (above). It is tracked as #1573 and is not fixed in
+   0.25. It changes no registered case, so `scope.json` is not amended for it either.
 
 Residuals found in PR 2 (pre-existing, not changed here):
 

@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-19
+
+Calor 0.25 is an interoperability release. It changes how the C# → Calor converter
+(`calor convert`, `calor migrate`, the MCP tools and the `CSharpToCalorConverter` library)
+handles six groups of everyday C#: `ref`/`out`/`in` arguments, interpolated strings, local
+functions, iterator properties, array expressions, and the reports of what stays C#. The
+language gains native local functions and two new errors (`Calor0211`, `Calor0212`). The
+website gains a guide to converting C#, and CI now compiles its examples.
+
+**These notes were frozen with the release candidate on 2026-10-19, before the 0.25 acceptance
+review (A1, #1430).** A release can publish only after that review accepts the candidate, and
+the notes cannot change after the freeze. At the freeze:
+
+- **Nothing was released.** There was no v0.25.0 tag, NuGet package or GitHub release. The
+  newest release on NuGet was 0.24.0.
+- **No family was ready.** The 0.25 scope packet is the frozen list of cases that each of the
+  six converter families must pass. It recorded all 6 families as in progress and 0 as ready. A
+  family becomes ready only when its cases pass on the frozen candidate commit and the
+  maintainer approves the record. The results below were measured on `main` before the freeze
+  and must be re-run on the candidate.
+- **0.24's checks had to pass again.** The 0.24 evidence review (#1408) ended
+  `MILESTONE-FAILED` (see the 0.24.0 entry). So before acceptance, this candidate must re-pass
+  0.24's proof, provenance and release checks on its own commit. No 0.24 approval or record is
+  reused.
+- **Three release-process gaps were open.** Code fixes for #1545, #1546 and #1547 had merged
+  (see "Release process" below), but the three issues were not closed, and #1545 still needed
+  repository settings. Acceptance needs all three closed.
+- **Independence is reduced.** OpenAI Codex reviewed each change, and the maintainer approved
+  and merged it. No reviewer independent of the two took part, so every 0.25 evidence claim is
+  at most *bounded*.
+- **Known open defects.** A private base-class member named `@default` makes a converted
+  `out var` fail to compile with `CS0122` (#1573); the failure is loud, not silent. Reading a
+  field of a struct array element still needs `--permissive-effects`.
+
+This release publishes no new benchmark results.
+
 ### Added
 
 - **Native local functions (#847).** A `§F` written inside a `§F` or `§MT` body is a local
@@ -15,7 +51,7 @@ All notable changes to this project will be documented in this file.
   `§E`, contracts, type parameters, refinement types, `§PROOF`, `§YIELD`) are rejected
   with the new diagnostic `Calor0211`. So is a use as a value in a position whose effect
   row Calor does not check, such as inside `??`, an array or a qualified store. See
-  [Local Functions](website/content/syntax-reference/structure-tags.mdx).
+  "Local Functions" on the website's structure-tags syntax reference page.
 
 ### `ref`, `out` and `in` arguments are checked before C# generation (#943)
 
@@ -160,7 +196,7 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
   needed `--permissive-effects` to compile. Now a local function declared directly in a
   method body, without capture, attributes, type parameters, `async`/`unsafe`/`extern`,
   `yield`, nested local functions or `ref`/`out`/`in`/`params`/default parameters,
-  becomes a nested `§F` in the same method. The three R0 witnesses (F3-LOCAL-01 to 03)
+  becomes a nested `§F` in the same method. The three registered cases (F3-LOCAL-01 to 03)
   convert natively on all 8 measured surfaces, compile with default options and print
   the same result as the original. Capturing, generic, async and iterator local
   functions are still preserved as `§CSHARP` and reported as `local-function`. The
@@ -263,7 +299,7 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
 
 ### A task-first guide to converting C# (#1429)
 
-A new website guide, [Converting C#: What Stays C# and Why](website/content/guides/csharp-interoperability.mdx),
+A new website guide, "Converting C#: What Stays C# and Why",
 walks through the C# features the 0.25 converter changes: `ref`/`out`/`in` calls such as
 `TryParse` and `TryGetValue`, interpolated-string target types, local functions, arrays in
 expressions, and iterator properties. For each one it shows real converter output, what stays C#,
@@ -325,6 +361,8 @@ responses captured from the MCP server. The refinement-type pages now say that a
 `calor` compile does not run the obligation solver (the `calor_refine` MCP tool does). New findings use
 `Calor1332`–`Calor1334`.
 
+### C# array expressions (#1132)
+
 - **C# array expressions now convert to native Calor and keep C# evaluation order** (#1132).
   An array created inside an expression (a `return`, a call argument, a `?:` branch, or a field
   or property initializer) now converts to Calor instead of being kept as C#. Before, the
@@ -360,6 +398,21 @@ responses captured from the MCP server. The refinement-type pages now say that a
     with `--permissive-effects`. Two cases resolve through Calor's built-in effect manifests
     instead, as before: a receiver declared as `System.Array`, and an array whose element type
     is in a namespace the manifests give a default (for example `System.Threading.Tasks.ValueTask[]`).
+
+### Release process
+
+These change how Calor is published, not the compiler. The release gate (#1410) lets a release
+publish only with an adjudication identity: the accepted commit plus the hash of its record.
+
+- **#1545, half done.** The publish job now reads the NuGet key from a `main`-only GitHub
+  environment. Older tags can still read the old repository-level key until the maintainer
+  moves it. On 2026-10-19 a read-only check found the old key still in place.
+- **#1546.** The gate checks on every run that this notes section in the candidate hashes to the
+  adjudicated notes (`G014`). So these notes had to be final at the freeze.
+- **#1547.** Publishing a release no longer publishes benchmark results. That needs a separate
+  manual run and an approval in the acceptance record (`G015`).
+- The release jobs install exactly .NET SDK 10.0.401, and the website no longer fetches its fonts
+  from Google Fonts at build time.
 
 ## [0.24.0] - 2026-10-07
 
