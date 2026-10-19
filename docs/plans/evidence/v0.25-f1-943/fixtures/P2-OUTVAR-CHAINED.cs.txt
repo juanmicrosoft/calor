@@ -1,0 +1,16 @@
+// 0.25 F1 PR 2 (#943) fixture: a chained assignment with an out declaration (Codex PR 2 round 2).
+// The converter evaluates the right side once per target, so the out call would run twice; the
+// member is preserved as C# instead (D1 RO-DECL-1, RO-ORD-1).
+public static class Probe
+{
+    static int calls;
+
+    static bool Set(out int n) { n = ++calls; return true; }
+
+    public static string Run()
+    {
+        bool x = false, y = false;
+        x = y = Set(out var n);
+        return calls + ":" + n + ":" + x + ":" + y;
+    }
+}

@@ -25,4 +25,9 @@
 
 Ledgers regenerated from `main`'s baseline (`RoslynSelectedAttempted` 34,311; opaque boundaries 150,
 expressions 7,830; per file in the README), F1 evidence re-run (three P2 rows), T1 amendment 1.0.1
-re-sealed (`97280f1b…`).
+re-sealed (`97280f1b…`; superseded after round 2).
+
+**Superseded in round 2.** Preserving call statements (P2R1-1) did not close the defect class: a
+bare binding before an `§ARR` declaration was still misread. Round 2 replaced it with a parser rule
+(an initializer starts on the binding's line), so call statements convert natively again; the
+`default` initializer stays removed. See `pr2-round-2.md`.

@@ -47,7 +47,8 @@ R0's rule) and its C# run against the original (R0 ProbeRunner). Data: `results.
 | X-INT-05 | native-or-preserved | preserved, matches | F3's converter keeps local functions with parameter modifiers as C#; the language side (native local function with `ref`) is covered by `LocalFunction_ByReferenceArguments_FollowTheContract` (operand refusal, `mut` charge, Unsupported proof) |
 | X-INT-08 | native-or-preserved | preserved, matches | an `out var` in an interpolation hole preserves the member; never inline `§CS{}` |
 | P2-OUTVAR-PLACEMENTS | native | native, matches | PR 2: assignment, declaration, return and `if` placements, no initializer |
-| P2-OUTVAR-CALL-STATEMENT | preserved | preserved, matches | PR 2: a call statement with an out declaration preserves its member (W1 finding 1) |
+| P2-OUTVAR-CALL-STATEMENT | native | native, matches | PR 2: call statements with out declarations and an `§ARR` declaration after a bare binding (W1 finding 1, Codex round 2) |
+| P2-OUTVAR-CHAINED | preserved | preserved, matches | PR 2: a chained assignment with an out declaration (Codex round 2) |
 | P2-REFRETURN-EXPRESSION | preserved | preserved, matches | PR 2: expression-bodied ref returns and a ref property, like a block-bodied ref return (W1 finding 2) |
 | DOC-F1-01 | native | example compiles | `website/content/syntax-reference/calls.mdx` "By-reference arguments", plus a `Calor0212` negative example; `calor self-check docs` clean |
 
@@ -119,44 +120,66 @@ relayed through the agent session, and no GitHub comment records it.
 
 | # | Defect | Fix (D1 rule) | Witnesses |
 |---|---|---|---|
-| 1 | `int.TryParse(s, out var n);` lowered to a bare `§B{~n:i32}`; the parser read the next statement's `§C` as its initializer (CS0029 in the C# round trip, so the CLI rescued the type and MCP and migrate refused) | RO-DECL-1 permits lowering but requires preservation otherwise: an out declaration in an expression statement that is not an assignment now preserves its member (`out-var`) on every surface. Assignments, local declarations, `return` and `if` conditions still lower, with no initializer, as in PR 1. The first draft gave every lowered binding a `default` initializer; Codex round 1 showed it reads a member named `default` (emitted `@default`), so it was replaced | `P2-OUTVAR-CALL-STATEMENT`: preserved, matches, on all 6 surfaces; `P2-OUTVAR-PLACEMENTS` (assignment, declaration, return, condition, a `@default` member that must not be read): native on all 6; `P2-out-var-*` rows in `RefOutImplementationTests` (8 rows x 5 surfaces); `OutDeclaration_IsLoweredWithoutAnInitializer` |
-| 2 | `=> ref a[0]` had its `ref` stripped (`-> ref int` with a value body) and failed the round trip | RO-UNS-1: a `RefExpressionSyntax` reaching expression conversion now escalates, so the member is preserved like a block-bodied ref return (loss `method`/`property`, warning `ref-parameter`). Covers ref-returning expression-bodied methods and properties | `P2-REFRETURN-EXPRESSION`: preserved on all 6 surfaces; `ExpressionBodiedRefReturn_IsPreserved_NotStripped`; `P2-ref-return-*` rows |
-| 3 | FeatureSupport text did not match behavior | Text only, no level changed (`ref-expression`, `multidim-array` and `in-parameter` stay Full; `out-var` and `out-parameter` stay Partial). Each now says what converts and what stays C#; `out-parameter` says `[NotNullWhen]` is copied but inert; `out-var` lists call statements among the preserved forms | `FeatureSupportText_MatchesTheConverter`; `scripts/check-d-s1.5-fixtures.sh origin/main` passes (no promotion) |
-| 4 | `ref a[Next()]` (an operand that runs code) was reported under `in-parameter` | The statement-level loss names the parameter's own feature: `ref-parameter` (also for `ref readonly`), `out-parameter` or `in-parameter`; an omitted `in` stays `in-parameter` | `ByReferenceStatementLoss_IsReportedUnderTheParametersFeature` (3 rows that fail on `origin/main`, 2 `in-parameter` controls that pass on both); D1-CS-04 and D1-CS-19 now report `ref-parameter` |
+| 1 | `int.TryParse(s, out var n);` lowered to a bare `§B{~n:i32}`, and the parser read the next statement's `§C` as the binding's initializer (CS0029 in the C# round trip, so the CLI rescued the type and MCP and migrate refused). Codex round 2 showed the same misread for a following `§ARR` declaration (`int[] a = new[] { Set(out var n) };` compiled to `int[] n = new int[] { Set(out n) };`, returning `1`, not `7`), and a chained assignment (`x = y = Set(out var n);`) ran the out call twice | **Parser** (`ParseBindStatement`): a binding's initializer must start on the binding's line; an expression start on a later line is a sibling statement, the rule `§C` inline arguments already follow (RFC v0.6 §3.2). The converter's RO-DECL-1 lowering is unchanged and now reads correctly in every placement it allows (expression statement, local declaration, `return`, `if` condition). **Converter**: a statement with an out declaration and a nested assignment (`x = y = …`, `int z = y = …`) preserves its member (`out-var`), because the converter evaluates a chained right side once per target (RO-ORD-1; the duplication itself is pre-existing, see residuals) | `P2-OUTVAR-CALL-STATEMENT` (two call statements, then an `§ARR` declaration after a bare binding): native, matches, all 6 surfaces; `P2-OUTVAR-PLACEMENTS` (assignment, declaration, return, condition, and a member named `@default` that must not be read): native, all 6; `P2-OUTVAR-CHAINED`: preserved, all 6; `P2-out-var-*` rows in `RefOutImplementationTests` (10 rows x 5 surfaces); `BareBinding_DoesNotTakeASiblingAsItsInitializer`; `OutDeclaration_IsLoweredWithoutAnInitializer` |
+| 2 | `=> ref a[0]` had its `ref` stripped (`-> ref int` with a value body) and failed the round trip | RO-UNS-1: a `RefExpressionSyntax` reaching expression conversion now escalates, so the member is preserved like a block-bodied ref return (loss `method`/`property`, warning `ref-parameter`). Covers ref-returning expression-bodied methods and properties | `P2-REFRETURN-EXPRESSION`: preserved, all 6 surfaces; `ExpressionBodiedRefReturn_IsPreserved_NotStripped`; `P2-ref-return-*` rows |
+| 3 | FeatureSupport text did not match behavior | Text only, no level changed (`ref-expression`, `multidim-array` and `in-parameter` stay Full; `out-var` and `out-parameter` stay Partial). Each now says what converts and what stays C#: `out-parameter` says `[NotNullWhen]` is copied but inert; `out-var` adds chained assignments to the preserved forms; `in-parameter` names the syntactic operand shapes that keep the statement as `§RAW` (a property-getter operand such as `a[I]` is not one of them) | `FeatureSupportText_MatchesTheConverter`; `scripts/check-d-s1.5-fixtures.sh origin/main` passes (no promotion) |
+| 4 | `ref a[Next()]` (an operand that runs code) was reported under `in-parameter` | The statement-level loss names the parameter's own feature: `ref-parameter` (also for `ref readonly`), `out-parameter` or `in-parameter`; an omitted `in` stays `in-parameter`. A method-generic by-reference argument is reported under its keyword (`ref`/`in`/`out`) instead of always `out-parameter` | `ByReferenceStatementLoss_IsReportedUnderTheParametersFeature` (7 rows; the 2 `in-parameter` rows are controls); D1-CS-04 and D1-CS-19 now report `ref-parameter` |
 
-Regression sensitivity (checked by reverting `src/Calor.Compiler/Migration` to `origin/main`: 19
-failures): the three call-statement rows and the two ref-return rows each fail on 2 of 5 surfaces
-(the other surfaces already reached `preserved` by rescue or passthrough), plus
-`ExpressionBodiedRefReturn_IsPreserved_NotStripped`, 3 of 5 attribution rows and all 5
-FeatureSupport-text rows. The two `in-parameter` attribution rows and the native placement rows
-are controls that pass on both.
+Regression sensitivity (checked by reverting `src/Calor.Compiler/Migration` and `Parser.cs` to
+`origin/main`: 41 failures in `RefOutImplementationTests`): the five call-statement, array-declaration
+and chained-assignment rows fail on all 5 surfaces (on `main`, each either fails to compile or runs
+differently from the C#), the two ref-return rows on 2 of 5 (the others already reached `preserved`
+by rescue or passthrough), plus `BareBinding_DoesNotTakeASiblingAsItsInitializer` (the next-line
+case), `ExpressionBodiedRefReturn_IsPreserved_NotStripped`, 5 of 7 attribution rows and all 5
+FeatureSupport-text rows. The native placement rows and the two `in-parameter` attribution rows are
+controls that pass on both.
+
+The parser rule is a language change for hand-written Calor: a binding followed by an expression
+on the next line at any indentation is now two statements. In the repository, the only committed
+`.calr` that relied on the old reading was the #1104 cycle fixture
+(`tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr`), which
+reproduced exactly this converter output; it now writes its self-referencing call on the binding's
+line, so its cycle test still exercises the cycle. `calor self-check docs` finds no drift. The
+CHANGELOG states the rule.
+
+Draft history (Codex, `reviews/pr2-round-*.md`): the first draft gave every lowered binding a
+`default` initializer (round 1: it reads a member named `default`); the second preserved call
+statements (round 2: an `§ARR` declaration was still misread, and chained assignments ran twice).
 
 Re-run evidence (`reproduce.py`, Release, 2026-10-18): every existing row keeps its outcome and its
 generated `.calr`; the only change is the attribution in item 4 (D1-CS-04, D1-CS-19: `in-parameter`
--> `ref-parameter` on all 6 surfaces), plus the three new rows. D1-CS-16 remains preserved for its
+-> `ref-parameter` on all 6 surfaces), plus the four new rows. D1-CS-16 remains preserved for its
 unrelated `dictionary-initializer`, as before.
 
-Corpus ledgers (`CALOR_UPDATE_BINDER_BASELINE=1`): `RoslynSelectedAttempted` 34,361 -> 34,311,
-opaque boundaries 147 -> 150, opaque expressions 7,742 -> 7,830. Per file
-(`binder-source-coverage.json`):
+Corpus ledgers (`CALOR_UPDATE_BINDER_BASELINE=1`, against `main`'s baseline):
+`RoslynSelectedAttempted` 34,361 -> 34,358, opaque boundaries 147 -> 148, opaque expressions
+7,742 -> 7,746. Per file (`binder-source-coverage.json`):
 
-- FluentValidation `Validators/ChildValidatorAdaptor.cs` (+2 boundaries, +84 opaque expressions,
-  -49 binder attempts, binding errors 4 -> 2): its two members with the call statement
-  `HandleCollectionIndex(context, out object originalIndex, out object currentIndex);` are now
-  preserved. Before, the bare `§B{~currentIndex:object}` was followed by that call.
+- FluentValidation `Validators/ChildValidatorAdaptor.cs` (binder attempts 101 -> 99, binding errors
+  4 -> 2): its two `HandleCollectionIndex(context, out object originalIndex, out object
+  currentIndex);` statements no longer become `currentIndex = HandleCollectionIndex(...)` bindings
+  (the old misread, on the library surface that the ratchet measures).
 - MediatR `Unit.cs` (+1 boundary, +4 opaque expressions, conversion success false -> true):
   `public static ref readonly Unit Value => ref _value;` is now preserved instead of losing its `ref`.
 
-No other ledger changed (`calor0270`/`calor0425` ledgers, scorecard baseline, effect-inferrer
-depth). The T1 shared controls (`SharedInteropControlsTests`, 19 controls x 7 surfaces) reproduce
-their committed results unchanged; the T1 register records the new `results.json` hash as amendment
-1.0.1.
+No other ledger changed (`calor0270`/`calor0425` ledgers, effect-resolver-key and higher-order-demand
+ledgers over committed `.calr`, scorecard baseline, effect-inferrer depth). The T1 shared controls
+(`SharedInteropControlsTests`, 19 controls x 7 surfaces) reproduce their committed results
+unchanged; the T1 register records the new `results.json` hash as amendment 1.0.1.
 
-Residuals found in PR 2 (pre-existing, not changed): the converter writes `int x;` as
-`§B{~x:i32} \`default\``, and the C# emitter turns that `default` into `@default` when a member of
-that name exists (Codex round 1's reproducer, through a plain declaration); the C# emitter writes
-`= default` for any initializer-less mutable binding, so a lowered non-nullable `out string s`
-emits `string s = default;` (CS8600 warning, unchanged since PR 1).
+Residuals found in PR 2 (pre-existing, not changed here):
+
+- A chained assignment `x = y = G()` evaluates `G()` once per target in any converted C#, with or
+  without `out` (`§ASSIGN y §C{G}` then `§B{i32:z} §C{G}`). PR 2 only keeps it away from out
+  declarations.
+- The converter writes `int x;` as `§B{~x:i32} \`default\``, and the C# emitter turns that
+  `default` into `@default` when a member of that name exists (Codex round 1's reproducer, through a
+  plain declaration).
+- The C# emitter writes `= default` for any initializer-less mutable binding, so a lowered
+  non-nullable `out string s` emits `string s = default;` (CS8600 warning, unchanged since PR 1).
+- An `in`/`ref` operand that runs code only through a property getter (`a[I]`) converts natively;
+  its evaluation order is unchanged because no argument is hoisted, but `in-parameter` does not
+  call it "code that runs".
 
 ## What READY still needs (not claimed here)
 
