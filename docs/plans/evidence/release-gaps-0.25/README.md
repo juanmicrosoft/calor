@@ -87,9 +87,13 @@ So:
 - **A branch or tag other than `main`** whose workflow declares `environment: nuget-release` never
   starts the job. GitHub enforces the environment's deployment rule (branch `main` only, admin
   bypass off) before the job runs, so no token with that claim is ever issued.
-- **Any other workflow file**, on any ref, has the wrong file name. A reusable workflow called
-  from another repository has a `job_workflow_ref` under that repository, and the prefix check
-  refuses it.
+- **Any other workflow file**, on any ref, has the wrong file name.
+- **Reusable workflows.** `job_workflow_ref` names the *called* workflow, and `repository` names
+  the *caller's* repository. Another repository that calls a Calor workflow fails the
+  `repository` check. A Calor workflow that calls a workflow in another repository fails the
+  `job_workflow_ref` prefix check (`juanmicrosoft/calor/.github/workflows/`). `publish-nuget.yml`
+  has no `workflow_call` trigger, and `W011` refuses any job-level `uses` that is not a local
+  workflow file.
 - nuget.org does not check the ref. **The environment and its `main`-only rule are therefore
   load-bearing.** If either changes, older tags could get a key again.
   `check_release_credentials.py --live` checks both.
@@ -131,7 +135,7 @@ docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.j
 maintainer attestation replaces the missing read. The output then says **ATTESTED, not read by
 API** (`A001`), with who confirmed it and when. An attestation is used only after a 403. It never
 overrides an answer the API gave, and an invalid one is `U006` (`UNKNOWN`). Tests:
-`scripts/test_check_release_credentials.py` (43 tests, every earlier case kept).
+`scripts/test_check_release_credentials.py` (45 tests, every earlier case kept).
 
 **Interim design (PR A, 2026-10-18; superseded by the section above).**
 

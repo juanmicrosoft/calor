@@ -1,0 +1,31 @@
+VERDICT: REQUEST CHANGES
+
+1. **BLOCKING — [scripts/check_release_credentials.py:568](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-afe3dcd5f7f9443e5/scripts/check_release_credentials.py:568): duplicate inventory entries can hide an environment holding a key.**  
+   An inventory with `total_count: 2` and two entries named `nuget-release` passes `listed()`. The `set()` then silently collapses them. With `NUGET_API_KEY` present in an omitted `staging` environment, the settings checker returns no findings and permits `CLOSED`. Reproduced in memory.
+
+   **Fix:** reject duplicate environment names, compared case-insensitively, before deduplication. Validate uniqueness across paginated inventories. Also require `type(total_count) is int` and a nonnegative value: boolean and float counts currently pass equality checks. Add negative controls for these inputs.
+
+2. **BLOCKING — [scripts/check_release_credentials.py:397](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-afe3dcd5f7f9443e5/scripts/check_release_credentials.py:397): pagination overwrites evidence that the inventory is incomplete.**  
+   Each page replaces `total`. I reproduced page 1 containing 100 safe environments with `total_count: 101`, followed by an empty page with `total_count: 100`. The aggregate passes validation, and a `staging` environment containing `NUGET_API_KEY` is never checked. This can arise when deletion shifts an unvisited environment onto an already-read page.
+
+   **Fix:** preserve the first count and reject any subsequent count change as unreadable, or restart enumeration. Combine this with duplicate detection and tests for changing counts and overlapping pages.
+
+3. **MAJOR — [scripts/check_release_credentials.py:377](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-afe3dcd5f7f9443e5/scripts/check_release_credentials.py:377): arbitrary error text can activate the 403-only attestation fallback.**  
+   Status detection searches combined stdout/stderr for a substring. An actual HTTP 502 whose JSON message mentions `"HTTP 403"` becomes `Forbidden`. Using the committed attestation then produces `A001` with no unknown setting. I reproduced this; it should remain `U005`, regardless of attestation.
+
+   **Fix:** extract the actual HTTP response status from a structured response or response headers. Never infer it from message content. Apply equivalent strict handling to saved `.error` fixtures, and test a non-403 response mentioning 403.
+
+4. **MINOR — [docs/plans/evidence/release-gaps-0.25/README.md:90](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-afe3dcd5f7f9443e5/docs/plans/evidence/release-gaps-0.25/README.md:90): the reusable-workflow explanation confuses caller and callee.**  
+   `job_workflow_ref` identifies the reusable workflow, not necessarily its caller’s repository. An external repository calling a Calor reusable workflow would fail the repository-claim checks; a Calor workflow calling an external reusable workflow would fail the workflow-prefix check. [GitHub’s claim reference](https://docs.github.com/en/actions/reference/security/oidc) documents this distinction.
+
+   **Fix:** describe both directions accurately. The current rejection conclusion remains sound.
+
+What I verified:
+
+- The earlier fixes are present: omitted release environments remain unknown and their secrets are checked; duplicate JSON members and impossible attestation dates are rejected; the policy-broadening wording and workflow comment are corrected.
+- An ordinary unattested 403 yields `V001`. A successful API response overrides the attestation. Boolean/string confusion in the protection and workflow-permission fields fails closed.
+- Workflow changes are confined to publish-job credential handling. Earlier mutation coverage is retained; retiring S006 is appropriate.
+- The [NuGet validator](https://raw.githubusercontent.com/NuGet/NuGetGallery/main/src/NuGetGallery.Services/Authentication/Federated/GitHubTokenPolicyValidator.cs) confirms repository checks, workflow filename matching without ref validation, and rejection of a missing required environment claim.
+- The [pinned login source](https://raw.githubusercontent.com/NuGet/login/8d196754b4036150537f80ac539e15c2f1028841/src/index.ts) accepts `user`, masks the credentials, exposes `NUGET_API_KEY`, and fails on exchange errors. Keys last [one hour](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing); expiration before push fails closed.
+- No direct credential bypass was found under the stated policy and settings. Findings 1–3 concern checker behavior on inconsistent or malformed responses.
+- Four filesystem-independent existing tests and additional in-memory probes passed. The full suite could not run: `/tmp` venv creation was denied and PyYAML is unavailable. The offline command correctly failed with W012. No files were modified, no `--live` check ran, and no workflow was dispatched.

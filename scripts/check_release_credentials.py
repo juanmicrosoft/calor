@@ -364,21 +364,38 @@ def list_field(key: str) -> str | None:
     return "secrets" if key.startswith(ENV_SECRETS) else LISTS.get(key)
 
 
+STATUS_LINE = re.compile(r"HTTP/[0-9.]+ ([1-5][0-9][0-9])(?: [^\r\n]*)?")
+
+
+def split_response(text: str) -> tuple[int | None, str]:
+    """(status, body) from `gh api --include` output: the first line is the HTTP status line, the
+    headers end at the first blank line. No status line means (None, text)."""
+    text = text.replace("\r\n", "\n")
+    head, _, body = text.partition("\n\n")
+    match = STATUS_LINE.fullmatch(head.split("\n", 1)[0])
+    return (int(match.group(1)), body) if match else (None, text)
+
+
 def gh_fetch(repo: str) -> Callable[[str], object]:
     def get(path: str) -> object:
         result = subprocess.run(
-            ["gh", "api", "--method", "GET", "-H", "Accept: application/vnd.github+json", path],
+            ["gh", "api", "--method", "GET", "--include", "-H", "Accept: application/vnd.github+json", path],
             capture_output=True, text=True,
         )
-        if result.returncode != 0:
-            text = result.stdout + result.stderr
-            if "HTTP 404" in text:
-                raise NotFound(path)
-            if "HTTP 403" in text or '"status":"403"' in text:
-                raise Forbidden(f"{path}: {text.strip()[:300]}")
-            raise Unreadable(f"{path}: {text.strip()[:300]}")
+        # Codex trusted-publishing round 3: decide on the response's status line only. Message text
+        # (which a 502 page could fill with "HTTP 403") never selects Forbidden or NotFound.
+        status, body = split_response(result.stdout)
+        detail = f"{path}: {(result.stderr or body).strip()[:300]}"
+        if status is None:
+            raise Unreadable(f"{path}: no HTTP status line (exit {result.returncode}): {result.stderr.strip()[:300]}")
+        if status == 404:
+            raise NotFound(path)
+        if status == 403:
+            raise Forbidden(f"{detail} [status line: 403]")
+        if status != 200 or result.returncode != 0:
+            raise Unreadable(f"{detail} (HTTP {status}, exit {result.returncode})")
         try:
-            return json.loads(result.stdout, object_pairs_hook=unique_members)
+            return json.loads(body, object_pairs_hook=unique_members)
         except ValueError as error:
             raise Unreadable(f"{path}: {error}") from error
 
@@ -389,27 +406,39 @@ def gh_fetch(repo: str) -> Callable[[str], object]:
             return get(path)
         # Every page, 100 at a time, until total_count entries are collected; listed() then
         # refuses any response whose entries do not add up to total_count.
-        items, total = [], None
+        items, first_total = [], None
         for page in range(1, 101):
             body = get(f"{path}?per_page=100&page={page}")
             if not isinstance(body, dict) or not isinstance(body.get(field), list):
                 raise Unreadable(f"{path}: no {field} list")
             total = body.get("total_count")
+            if not count_ok(total):
+                raise Unreadable(f"{path}: total_count is {total!r}, not a non-negative integer")
+            if first_total is None:
+                first_total = total
+            elif total != first_total:
+                # The list changed while it was read (codex round 3): an entry may have shifted
+                # onto a page already read. Never treat that as complete.
+                raise Unreadable(f"{path}: total_count changed between pages ({first_total} -> {total})")
             items += body[field]
-            if not body[field] or not isinstance(total, int) or len(items) >= total:
+            if not body[field] or len(items) >= first_total:
                 break
-        return {"total_count": total, field: items}
+        else:
+            raise Unreadable(f"{path}: more than 100 pages")
+        return {"total_count": first_total, field: items}
     return fetch
 
 
 def dir_fetch(root: Path) -> Callable[[str], object]:
     """Saved responses: <key>.json holds the body (a / in the key is written --); a missing file
-    means 404; <key>.error is unreadable (Forbidden when its text says HTTP 403)."""
+    means 404; <key>.error is unreadable, and Forbidden only when the file starts with the status
+    `HTTP 403` (the saved form of gh's status line; text elsewhere in it never counts)."""
     def fetch(key: str) -> object:
         stem = key.replace("/", "--")
         if (root / f"{stem}.error").exists():
             text = (root / f"{stem}.error").read_text(encoding="utf-8").strip()
-            raise (Forbidden if "HTTP 403" in text else Unreadable)(f"{key}: {text}")
+            forbidden = re.match(r"HTTP 403(?![0-9])", text) is not None
+            raise (Forbidden if forbidden else Unreadable)(f"{key}: {text}")
         path = root / f"{stem}.json"
         if not path.exists():
             raise NotFound(key)
@@ -420,22 +449,33 @@ def dir_fetch(root: Path) -> Callable[[str], object]:
     return fetch
 
 
+def count_ok(value: object) -> bool:
+    """A real non-negative integer: `True` and `2.0` compare equal to 1 and 2, so type is checked."""
+    return type(value) is int and value >= 0
+
+
 def listed(body: object, field: str, what: str) -> list[dict]:
     """The complete list, or Unreadable: a page short of total_count is never read as complete."""
     if not isinstance(body, dict) or not isinstance(body.get(field), list):
         raise Unreadable(f"{what}: no {field} list")
     items = body[field]
-    if body.get("total_count") != len(items) or not all(isinstance(i, dict) for i in items):
+    total = body.get("total_count")
+    if not count_ok(total) or total != len(items) or not all(isinstance(i, dict) for i in items):
         raise Unreadable(f"{what}: {len(items)} entries listed, total_count is {body.get('total_count')!r}")
     return items
 
 
 def names(body: object, what: str, field: str = "secrets") -> list[str]:
-    """Every entry's name. An entry without a non-empty string name makes the list unreadable."""
+    """Every entry's name. An entry without a non-empty string name, or a name listed twice
+    (ignoring case, as GitHub does), makes the list unreadable: a repeated entry can stand in for
+    one that was never listed (codex round 3)."""
     items = listed(body, field, what)
     if not all(isinstance(i.get("name"), str) and i["name"] for i in items):
         raise Unreadable(f"{what}: an entry has no name")
-    return [i["name"] for i in items]
+    found = [i["name"] for i in items]
+    if len({n.casefold() for n in found}) != len(found):
+        raise Unreadable(f"{what}: a name is listed more than once")
+    return found
 
 
 def check_environment(fetch: Callable[[str], object], problems: list[str], unknowns: list[str]) -> bool | None:

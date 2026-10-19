@@ -24,6 +24,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_release_credentials as cred  # noqa: E402
 
+def gh_out(status: int, body: str) -> str:
+    """What `gh api --include` prints: the status line, headers, a blank line, the body."""
+    reason = {200: "OK", 403: "Forbidden", 404: "Not Found", 502: "Bad Gateway"}.get(status, "X")
+    return f"HTTP/2.0 {status} {reason}\r\nContent-Type: application/json\r\n\r\n{body}"
+
+
 def secrets(*names: str) -> dict:
     return {"total_count": len(names), "secrets": [{"name": n} for n in names]}
 
@@ -203,7 +209,7 @@ class CredentialCheckTests(unittest.TestCase):
 
         def fake_run(argv, capture_output, text):
             return subprocess.CompletedProcess(
-                argv, 0, '{"default_workflow_permissions": "write", "default_workflow_permissions": "read"}', "")
+                argv, 0, gh_out(200, '{"default_workflow_permissions": "write", "default_workflow_permissions": "read"}'), "")
 
         with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
             with self.assertRaises(cred.Unreadable):
@@ -238,7 +244,7 @@ class CredentialCheckTests(unittest.TestCase):
         def fake_run(argv, capture_output, text):
             self.assertEqual(["gh", "api", "--method", "GET"], argv[:4])
             paths.append(argv[-1])
-            return subprocess.CompletedProcess(argv, 0, json.dumps(secrets()), "")
+            return subprocess.CompletedProcess(argv, 0, gh_out(200, json.dumps(secrets())), "")
 
         with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
             cred.gh_fetch("o/r")("environment-secrets/nuget-release")
@@ -267,7 +273,7 @@ class CredentialCheckTests(unittest.TestCase):
             calls.append(argv)
             self.assertEqual(["gh", "api", "--method", "GET"], argv[:4])
             page = int(re.search(r"[?&]page=(\d+)", argv[-1]).group(1))
-            return subprocess.CompletedProcess(argv, 0, json.dumps(pages[page]), "")
+            return subprocess.CompletedProcess(argv, 0, gh_out(200, json.dumps(pages[page])), "")
 
         with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
             body = cred.gh_fetch("o/r")("repo-secrets")
@@ -304,8 +310,13 @@ class CredentialCheckTests(unittest.TestCase):
 
     def test_forbidden_workflow_permissions_are_unverifiable_never_closed(self) -> None:
         # The maintainer's gh login gets HTTP 403 on this endpoint (2026-10-19). Never a silent pass.
-        self.f.unreadable("workflow-permissions", 'gh: HTTP 403 {"status":"403"}')
+        self.f.unreadable("workflow-permissions", 'HTTP 403 {"status":"403"}')
         self.assert_codes({"V001"}, verdict="UNVERIFIABLE")
+        # Codex round 3: only a leading status counts; "HTTP 403" inside another error's text does not.
+        for text in ('HTTP 502: {"message": "upstream said HTTP 403"}', 'gh: HTTP 403', "HTTP 4031"):
+            with self.subTest(text=text):
+                self.f.unreadable("workflow-permissions", text)
+                self.assert_codes({"U005"}, verdict="UNKNOWN", extra=self.attest())
         # Any other failure stays UNKNOWN.
         self.f.unreadable("workflow-permissions", "HTTP 502: Bad Gateway")
         self.assert_codes({"U005"}, verdict="UNKNOWN")
@@ -318,11 +329,70 @@ class CredentialCheckTests(unittest.TestCase):
 
     def test_live_403_is_forbidden(self) -> None:
         def fake_run(argv, capture_output, text):
-            return subprocess.CompletedProcess(argv, 1, '{"message":"no","status":"403"}', "gh: no (HTTP 403)")
+            self.assertIn("--include", argv)
+            return subprocess.CompletedProcess(argv, 1, gh_out(403, '{"message":"no","status":"403"}'),
+                                               "gh: no (HTTP 403)")
 
         with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
             with self.assertRaises(cred.Forbidden):
                 cred.gh_fetch("o/r")("workflow-permissions")
+
+    def test_live_status_comes_from_the_status_line_only(self) -> None:
+        # Codex trusted-publishing round 3 (MAJOR): a 502 whose message mentions HTTP 403 was read
+        # as Forbidden, which let an attestation stand in. Only the status line decides.
+        for status, rc, out, err, expected in (
+            (502, 1, None, 'gh: upstream said HTTP 403 (HTTP 502)', cred.Unreadable),
+            (502, 1, '{"message": "HTTP 403", "status": "403"}', "gh: (HTTP 502)", cred.Unreadable),
+            (None, 1, '{"message": "HTTP 403"}', "gh: HTTP 403", cred.Unreadable),
+            (404, 1, '{"message": "Not Found"}', "", cred.NotFound),
+            (200, 1, "{}", "", cred.Unreadable),
+            (500, 0, "{}", "", cred.Unreadable),
+        ):
+            with self.subTest(status=status, out=out, err=err):
+                stdout = gh_out(status, out or "{}") if status is not None else out
+
+                def fake_run(argv, capture_output, text, stdout=stdout, rc=rc, err=err):
+                    return subprocess.CompletedProcess(argv, rc, stdout, err)
+
+                with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
+                    with self.assertRaises(expected) as caught:
+                        cred.gh_fetch("o/r")("workflow-permissions")
+                    if expected is cred.Unreadable:
+                        self.assertNotIsInstance(caught.exception, cred.Forbidden)
+
+    def test_paginated_inventory_must_be_stable_and_unique(self) -> None:
+        # Codex trusted-publishing round 3 (BLOCKING): a count that changes between pages, a name
+        # listed twice, or a non-integer count could hide an environment holding a key.
+        def run_pages(pages: dict) -> object:
+            def fake_run(argv, capture_output, text):
+                page = int(re.search(r"[?&]page=(\d+)", argv[-1]).group(1))
+                return subprocess.CompletedProcess(argv, 0, gh_out(200, json.dumps(pages[page])), "")
+
+            with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
+                return cred.gh_fetch("o/r")("environments")
+
+        safe = [{"name": f"env-{i}"} for i in range(100)]
+        with self.assertRaises(cred.Unreadable):
+            run_pages({1: {"total_count": 101, "environments": safe}, 2: {"total_count": 100, "environments": []}})
+        for total in (True, 2.0, -1, "2", None):
+            with self.subTest(total=total):
+                with self.assertRaises(cred.Unreadable):
+                    run_pages({1: {"total_count": total, "environments": [{"name": "a"}, {"name": "b"}]}})
+        # A repeated name (also under case folding) in a complete-looking inventory is UNKNOWN.
+        for listed_envs in ([{"name": "nuget-release"}, {"name": "nuget-release"}],
+                            [{"name": "nuget-release"}, {"name": "NUGET-RELEASE"}]):
+            with self.subTest(listed=listed_envs):
+                self.f.write("environments", {"total_count": 2, "environments": listed_envs})
+                self.f.write("environment-secrets/staging", secrets("NUGET_API_KEY"))
+                self.assert_codes({"U004"}, verdict="UNKNOWN")
+        for total in (True, 2.0):
+            with self.subTest(saved_total=total):
+                self.f.write("environments", {"total_count": total, "environments": [
+                    {"name": "github-pages"}, {"name": "nuget-release"}]})
+                self.assert_codes({"U004"}, verdict="UNKNOWN")
+        self.f.write("environments", CLOSED["environments"])
+        self.f.write("repo-secrets", {"total_count": True, "secrets": [{"name": "X"}]})
+        self.assert_codes({"U001"}, verdict="UNKNOWN")
 
     def test_committed_attestation_closes_a_forbidden_read_and_is_shown(self) -> None:
         self.f.unreadable("workflow-permissions", "HTTP 403")
