@@ -105,7 +105,7 @@
       "evidence": [
         {
           "path": "docs/plans/evidence/v0.25-f1-943/results.json",
-          "sha256": "c3f6454460e1251c3fefc6eda46e20732572cd2c29ebff26e8e179de7c12a86c"
+          "sha256": "1da935e63e14cf693b58d7b94e92e85638be869ff49adebbf8dd5b1443cb325d"
         }
       ],
       "tests": [
@@ -977,15 +977,15 @@
       "version": "1.0.1",
       "dateUtc": "2026-10-18T00:00:00Z",
       "pr": 1571,
-      "justification": "F1 PR 2 (#943) fixes the four W1 (#1429) findings: an out var call statement now lowers with a default initializer, an expression-bodied ref return is preserved, a by-reference operand that runs code is reported under its parameter's own feature, and the FeatureSupport text matches the converter. F1's re-run results.json adds rows P2-OUTVAR-PLACEMENTS and P2-REFRETURN-EXPRESSION and re-attributes D1-CS-04 and D1-CS-19 from in-parameter to ref-parameter, so its approved hash changes from 7efaf64a7080025f68ad3e0d043227ae91183c9613bcb1dcec525fad2d18afb8 to c3f6454460e1251c3fefc6eda46e20732572cd2c29ebff26e8e179de7c12a86c. The shared controls (controls-results.json), the control fixtures and the corpus counts are unchanged; SharedInteropControlsTests reproduces every committed cell.",
+      "justification": "F1 PR 2 (#943) fixes the four W1 (#1429) findings: an out var call statement now preserves its member instead of failing the round trip, an expression-bodied ref return is preserved, a by-reference operand that runs code is reported under its parameter's own feature, and the FeatureSupport text matches the converter. F1's re-run results.json adds rows P2-OUTVAR-PLACEMENTS, P2-OUTVAR-CALL-STATEMENT and P2-REFRETURN-EXPRESSION and re-attributes D1-CS-04 and D1-CS-19 from in-parameter to ref-parameter, so its approved hash changes from 7efaf64a7080025f68ad3e0d043227ae91183c9613bcb1dcec525fad2d18afb8 to 1da935e63e14cf693b58d7b94e92e85638be869ff49adebbf8dd5b1443cb325d. The shared controls (controls-results.json), the control fixtures and the corpus counts are unchanged; SharedInteropControlsTests reproduces every committed cell.",
       "changedEvidence": [
         {
           "path": "docs/plans/evidence/v0.25-f1-943/results.json",
           "from": "7efaf64a7080025f68ad3e0d043227ae91183c9613bcb1dcec525fad2d18afb8",
-          "to": "c3f6454460e1251c3fefc6eda46e20732572cd2c29ebff26e8e179de7c12a86c"
+          "to": "1da935e63e14cf693b58d7b94e92e85638be869ff49adebbf8dd5b1443cb325d"
         }
       ],
-      "approvalSeal": "b16fe9112ce7cf3cd9c3d3f95d235c84d60314becc425aae6153071500acc62d"
+      "approvalSeal": "97280f1b5bfacfb2982ba248951c6e0e8aa3d356d31578c4830e4399bae84bb4"
     }
   ]
 }
