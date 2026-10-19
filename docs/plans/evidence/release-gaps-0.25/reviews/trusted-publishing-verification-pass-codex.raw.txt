@@ -1,0 +1,13 @@
+VERDICT: APPROVE
+
+1. No remaining BLOCKING or MAJOR findings. Under the stated policy and settings, I found no credential path outside the gated publish job.
+
+Verified:
+
+- **Round 3:** duplicate names, case-folded duplicates, invalid counts, changing pagination totals, and more than 100 pages fail closed. HTTP status comes from the status line; message text cannot enable attestation.
+- **Earlier fixes:** omitted environments, unnamed entries, duplicate JSON members, and invalid attestation dates remain fail-closed. Unattested 403 produces V001; valid attestation is explicitly A001; API answers take precedence.
+- **OIDC reasoning:** NuGet validates repository identity, workflow filename, and the required environment, while ignoring the workflow ref. GitHub’s deployment rule supplies the branch restriction. The corrected reusable-workflow explanation is consistent with this. [NuGet validator](https://raw.githubusercontent.com/NuGet/NuGetGallery/main/src/NuGetGallery.Services/Authentication/Federated/GitHubTokenPolicyValidator.cs), [GitHub environment rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+- **Workflow:** pinned action, `user` input, output name, masking, unconditional guard, and environment-based push are correct. NuGet keys last one hour; expiry fails closed. [Pinned action source](https://raw.githubusercontent.com/NuGet/login/8d196754b4036150537f80ac539e15c2f1028841/src/index.ts), [NuGet lifetime documentation](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing).
+- **Regression review:** release-gate changes are confined to credential handling. The removed S006 test appropriately reflects the retired stored-key design; C# test methods remain intact. Docs and checklist describe the required controls and verification limits.
+
+**Validation limits:** 103 additional in-memory checks passed. The sandbox denied `/tmp` venv creation, and PyYAML was unavailable, so I reviewed YAML cases from source rather than running the full suite. The offline checker correctly failed closed with W012. No files were modified, no live settings check ran, and no workflow was dispatched.
