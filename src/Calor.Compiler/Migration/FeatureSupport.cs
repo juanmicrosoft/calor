@@ -318,8 +318,8 @@ public static class FeatureSupport
             Name = "out-parameter",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-REP-1, RO-NULL-3/4): native out parameters and §A{out} arguments.
-            Description = "out parameters and out arguments convert natively (§A{out}, out _ discards). " +
-                "Method-generic out parameters and parameters with flow attributes such as [NotNullWhen] are preserved as C#",
+            Description = "out parameters and out arguments convert natively (§A{out}, out _ discards). Flow attributes such as " +
+                "[NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
             Workaround = "Keep the preserved member as C# interop; no tuple or Result<T, E> form is equivalent"
         },
         ["pattern-matching-advanced"] = new FeatureInfo
@@ -532,7 +532,7 @@ public static class FeatureSupport
             Support = SupportLevel.Partial,
             // #943 (D1 RO-DECL-1): the bounded lowering.
             Description = "out var x / out T x in an expression statement, local declaration, return or if condition directly " +
-                "in a block lowers to a mutable binding before the statement when the type is expressible and the name collides " +
+                "in a block lowers to a mutable binding (§B{~x:T} default) before the statement when the type is expressible and the name collides " +
                 "with nothing in scope. Loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
                 "initializers and expression-bodied members are preserved as C#",
             Workaround = "Declare the variable before the statement and pass it with out"
@@ -544,8 +544,8 @@ public static class FeatureSupport
             Name = "in-parameter",
             Support = SupportLevel.Full,
             // #943 (D1 RO-LV-3, RO-CALL-3): the parameter form is native; some call sites are preserved.
-            Description = "in parameters convert with ParameterModifier.In and §A{in} arguments (a C# ref argument to an in " +
-                "parameter becomes §A{in}). Call sites that omit in or pass a value to an in parameter, and in indexer parameters, are preserved as C#"
+            Description = "in parameters and §A{in} arguments convert natively (a C# ref argument to an in parameter becomes §A{in}). " +
+                "A call statement that omits in, or whose by-reference operand runs code, stays C# (§RAW); in indexer parameters preserve the member"
         },
         ["checked-block"] = new FeatureInfo
         {
@@ -1092,7 +1092,9 @@ public static class FeatureSupport
         {
             Name = "multidim-array",
             Support = SupportLevel.Full,
-            Description = "Multidimensional arrays (int[,], int[,,]) are fully supported"
+            Description = "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializers (§ROW), element " +
+                "access, and new[,] of a known type. new[,] of an unknown type, and an element that cannot be written in place " +
+                "(a collection initializer or a multi-line element, array-element-block), are preserved as C#"
         },
 
         // Dependent Types
@@ -1193,7 +1195,8 @@ public static class FeatureSupport
         {
             Name = "ref-expression",
             Support = SupportLevel.Full,
-            Description = "ref expressions are stripped during conversion; the referenced value is preserved"
+            Description = "ref expressions never convert natively: members with ref locals, ref returns (block or expression " +
+                "bodied), conditional refs or ref assignments are preserved as C#, reported as ref-parameter"
         },
         ["global-qualified-name"] = new FeatureInfo
         {
