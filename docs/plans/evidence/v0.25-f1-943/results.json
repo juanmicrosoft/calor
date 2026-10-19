@@ -1,7 +1,7 @@
 {
   "schema": "v0.25-f1-943-evidence/1",
-  "measuredCommit": "f573babd2d02bf627f3a5ea933b0f20c538c8640",
-  "srcTree": "7f1edba1fd3bd00317294d490843e13bc76ace8f",
+  "measuredCommit": "06f24f0aa237e2ccfa940588af41d40b950be78f",
+  "srcTree": "507fceeaf5e49ee1846ed1cba09647c16c76ad41",
   "build": "Release",
   "dotnetSdk": "10.0.401",
   "platform": "Darwin arm64",
