@@ -98,9 +98,9 @@ A transfer function where:
 - Balances must be non-negative
 - After a transfer, the balance must remain non-negative
 
-This example writes the refinements inline. Named refinement types (`§RTYPE`) are not
-yet accepted as arithmetic operands: `(- balance amount)` on two `§RTYPE`-typed
-parameters is rejected with `Calor0202` (type mismatch).
+This example writes the refinements inline. Named refinement types (`§RTYPE`) also work as
+arithmetic operands: `(- balance amount)` on two `§RTYPE`-typed parameters has the base type
+`i32`, not the refinement, because the difference can break the predicate.
 
 ```calor
 §M{m001:Banking}
