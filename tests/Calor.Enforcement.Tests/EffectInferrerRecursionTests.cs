@@ -137,9 +137,9 @@ public class EffectInferrerRecursionTests
     public void SerilogFixture_IsTheReducedHoistedOutVarShape()
     {
         // Pins WHAT the fixture is, so a later edit cannot quietly replace it
-        // with something that no longer exercises the cycle: a binding with no
-        // initializer on its own line, followed by a call that names it as an
-        // argument, on a receiver that resolves (the field).
+        // with something that no longer exercises the cycle: a binding whose
+        // initializer is a call that names it as an argument, on a receiver
+        // that resolves (the field). Written on one line since 0.25 F1 PR 2.
         var source = TestHarness.LoadScenario(FixturePath);
         var module = Parse(source);
 

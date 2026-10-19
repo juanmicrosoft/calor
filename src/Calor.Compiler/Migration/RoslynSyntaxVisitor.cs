@@ -10206,7 +10206,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && _semanticModel.GetSymbolInfo(call).Symbol is IMethodSymbol method
                 && DetermineParameter(argument, method)?.OriginalDefinition.Type is ITypeParameterSymbol
                     { TypeParameterKind: TypeParameterKind.Method })
-                throw EscalateExpression(statement, "out-parameter");
+                throw EscalateExpression(statement, argument.RefKindKeyword.ValueText + "-parameter");
         }
         SyntaxNode? scanned = inLambda ? null : statement switch
         {
@@ -10241,8 +10241,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 or { IsAnonymousType: true } || !type.CanBeReferencedByName && type is not IArrayTypeSymbol);
             if (collides || unknownType || type is { IsRefLikeType: true }
                 || declaration.Ancestors().Any(node => node is InterpolationSyntax)
-                // A bare binding before a call statement would take the call as its initializer (W1).
-                || statement is ExpressionStatementSyntax { Expression: not AssignmentExpressionSyntax })
+                // A chained assignment (`x = y = F(out var n)`) is converted by evaluating F twice.
+                || scanned.DescendantNodes().Any(node => node is AssignmentExpressionSyntax { Parent: not ExpressionStatementSyntax }))
                 throw EscalateExpression(statement, "out-var");
             _loweredOutDeclarations.Add(declaration);
             var typeName = declaration.Type.IsVar

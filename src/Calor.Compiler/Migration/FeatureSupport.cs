@@ -531,9 +531,9 @@ public static class FeatureSupport
             Name = "out-var",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-DECL-1): the bounded lowering.
-            Description = "out var x / out T x in an assignment, local declaration, return or if condition directly " +
+            Description = "out var x / out T x in an expression statement, local declaration, return or if condition directly " +
                 "in a block lowers to a mutable binding before the statement when the type is expressible and the name collides " +
-                "with nothing in scope. Call statements, loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
+                "with nothing in scope. Chained assignments, loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
                 "initializers and expression-bodied members are preserved as C#",
             Workaround = "Declare the variable before the statement and pass it with out"
         },
@@ -545,7 +545,8 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             // #943 (D1 RO-LV-3, RO-CALL-3): the parameter form is native; some call sites are preserved.
             Description = "in parameters and §A{in} arguments convert natively (a C# ref argument to an in parameter becomes §A{in}). " +
-                "A call statement that omits in, or whose by-reference operand runs code, stays C# (§RAW); in indexer parameters preserve the member"
+                "A call statement that omits in, or whose by-reference operand contains a call, creation, assignment or ++/-- or " +
+                "indexes a non-array, stays C# (§RAW); in indexer parameters preserve the member"
         },
         ["checked-block"] = new FeatureInfo
         {

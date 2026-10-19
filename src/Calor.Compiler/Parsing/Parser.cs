@@ -6312,7 +6312,8 @@ public sealed class Parser
         // Don't consume a following §IF as the initializer when it's a block IF statement
         // (no → arrow after the condition). Block IFs are separate statements.
         ExpressionNode? initializer = null;
-        if (IsExpressionStart())
+        // An initializer never starts on a later line: that is a sibling statement (as for §C inline args).
+        if (IsExpressionStart() && Current.Span.Line <= startToken.Span.Line)
         {
             if (Check(TokenKind.If) && !IsExpressionIfAhead())
             {
