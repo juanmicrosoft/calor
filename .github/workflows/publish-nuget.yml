@@ -475,10 +475,12 @@ jobs:
     # juanmicrosoft/calor, workflow file publish-nuget.yml, environment nuget-release) exchanges this
     # job's GitHub OIDC token for a one-hour key. nuget.org matches the workflow file NAME and
     # ignores the ref, so the environment is what keeps older tags out: their publish-nuget.yml
-    # names no environment, and `nuget-release` admits `main` alone. Until the maintainer finishes
-    # the GitHub settings (docs/plans/evidence/release-gaps-0.25/README.md), the exchange fails and
-    # the job stops before anything is attested or pushed. scripts/check_release_credentials.py
-    # reports the settings.
+    # names no environment, and `nuget-release` admits `main` alone (admin bypass off). That branch
+    # rule is a required security control, not a fail-safe: an unrestricted (or auto-recreated)
+    # `nuget-release` would still yield a matching environment claim. Only a missing or mismatched
+    # nuget.org policy makes the exchange fail, which stops the job before anything is attested or
+    # pushed. Settings and checklist: docs/plans/evidence/release-gaps-0.25/README.md;
+    # scripts/check_release_credentials.py --live reports them.
     environment: nuget-release
     permissions:
       contents: write

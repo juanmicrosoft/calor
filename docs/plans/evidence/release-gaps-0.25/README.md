@@ -131,7 +131,7 @@ docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.j
 maintainer attestation replaces the missing read. The output then says **ATTESTED, not read by
 API** (`A001`), with who confirmed it and when. An attestation is used only after a 403. It never
 overrides an answer the API gave, and an invalid one is `U006` (`UNKNOWN`). Tests:
-`scripts/test_check_release_credentials.py` (42 tests, every earlier case kept).
+`scripts/test_check_release_credentials.py` (43 tests, every earlier case kept).
 
 **Interim design (PR A, 2026-10-18; superseded by the section above).**
 

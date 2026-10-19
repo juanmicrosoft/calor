@@ -175,6 +175,40 @@ class CredentialCheckTests(unittest.TestCase):
         self.f.remove("environment-secrets/nuget-release")
         self.assert_codes({"S002"})
 
+    def test_api_responses_with_repeated_members_are_unreadable(self) -> None:
+        # Codex trusted-publishing round 2 (BLOCKING): plain json.loads keeps the last of two
+        # repeated members, so "write" then "read" read as CLOSED. Every response now refuses them.
+        for key, raw, code in (
+            ("workflow-permissions",
+             '{"default_workflow_permissions": "write", "default_workflow_permissions": "read", '
+             '"can_approve_pull_request_reviews": false}', "U005"),
+            ("workflow-permissions",
+             '{"default_workflow_permissions": "read", "can_approve_pull_request_reviews": true, '
+             '"can_approve_pull_request_reviews": false}', "U005"),
+            ("repo-secrets",
+             '{"total_count": 1, "secrets": [{"name": "NUGET_API_KEY", "name": "OTHER"}]}', "U001"),
+            ("environment",
+             '{"can_admins_bypass": true, "can_admins_bypass": false, '
+             '"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}', "U002"),
+        ):
+            with self.subTest(key=key, raw=raw):
+                fixture = Fixture()
+                try:
+                    self.f, saved = fixture, self.f
+                    (self.f.responses / f"{key}.json").write_text(raw, encoding="utf-8")
+                    self.assert_codes({code}, verdict="UNKNOWN")
+                finally:
+                    self.f = saved
+                    shutil.rmtree(fixture.base, ignore_errors=True)
+
+        def fake_run(argv, capture_output, text):
+            return subprocess.CompletedProcess(
+                argv, 0, '{"default_workflow_permissions": "write", "default_workflow_permissions": "read"}', "")
+
+        with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
+            with self.assertRaises(cred.Unreadable):
+                cred.gh_fetch("o/r")("workflow-permissions")
+
     def test_unnamed_entries_are_unreadable(self) -> None:
         # Codex trusted-publishing round 1: a missing name is never read as the string "None".
         self.f.write("repo-secrets", {"total_count": 1, "secrets": [{}]})

@@ -378,7 +378,7 @@ def gh_fetch(repo: str) -> Callable[[str], object]:
                 raise Forbidden(f"{path}: {text.strip()[:300]}")
             raise Unreadable(f"{path}: {text.strip()[:300]}")
         try:
-            return json.loads(result.stdout)
+            return json.loads(result.stdout, object_pairs_hook=unique_members)
         except ValueError as error:
             raise Unreadable(f"{path}: {error}") from error
 
@@ -414,7 +414,7 @@ def dir_fetch(root: Path) -> Callable[[str], object]:
         if not path.exists():
             raise NotFound(key)
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_members)
         except ValueError as error:
             raise Unreadable(f"{key}: {error}") from error
     return fetch
@@ -470,7 +470,8 @@ def check_environment(fetch: Callable[[str], object], problems: list[str], unkno
 
 
 def unique_members(pairs: list[tuple[str, object]]) -> dict:
-    """json object_pairs_hook: a repeated member (a later one would silently win) is refused."""
+    """json object_pairs_hook for every API response and the attestation: a repeated member (a later
+    one would silently win) is a ValueError, which the callers turn into Unreadable."""
     body: dict = {}
     for key, value in pairs:
         if key in body:
