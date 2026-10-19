@@ -158,6 +158,34 @@ class CredentialCheckTests(unittest.TestCase):
         self.f.write("environment-secrets/staging", secrets("NUGET_KEY"))
         self.assert_codes({"S007"})
 
+    def test_inventory_that_omits_the_release_environment_is_never_closed(self) -> None:
+        # Codex trusted-publishing round 1 (BLOCKING): an environment list that leaves out
+        # nuget-release skipped its secret check. Its secrets are now always read, and the omission
+        # itself is UNKNOWN.
+        for listed_envs in ([], [{"name": "github-pages"}]):
+            with self.subTest(listed=listed_envs):
+                self.f.write("environments", {"total_count": len(listed_envs), "environments": listed_envs})
+                self.f.write("environment-secrets/nuget-release", secrets("NUGET_API_KEY"))
+                self.assert_codes({"S007", "U004"})
+                self.f.write("environment-secrets/nuget-release", secrets())
+                self.assert_codes({"U004"}, verdict="UNKNOWN")
+        # A missing environment is S002 alone; nothing else is read for it.
+        self.f.write("environments", {"total_count": 1, "environments": [{"name": "github-pages"}]})
+        self.f.remove("environment")
+        self.f.remove("environment-secrets/nuget-release")
+        self.assert_codes({"S002"})
+
+    def test_unnamed_entries_are_unreadable(self) -> None:
+        # Codex trusted-publishing round 1: a missing name is never read as the string "None".
+        self.f.write("repo-secrets", {"total_count": 1, "secrets": [{}]})
+        self.assert_codes({"U001"}, verdict="UNKNOWN")
+        self.f.write("repo-secrets", CLOSED["repo-secrets"])
+        self.f.write("environments", {"total_count": 2, "environments": [{"name": "nuget-release"}, {"name": 7}]})
+        self.assert_codes({"U004"}, verdict="UNKNOWN")
+        self.f.write("environments", CLOSED["environments"])
+        self.f.write("environment-secrets/github-pages", {"total_count": 1, "secrets": [{"name": ""}]})
+        self.assert_codes({"U004"}, verdict="UNKNOWN")
+
     def test_actions_workflow_permissions_must_be_read_only_without_pr_creation(self) -> None:
         for body, codes in (
             ({"default_workflow_permissions": "write", "can_approve_pull_request_reviews": False}, {"S008"}),
@@ -291,6 +319,10 @@ class CredentialCheckTests(unittest.TestCase):
                         {"setting": "actions/permissions"},
                         {"confirmed_by": "juanmicrosoft"},
                         {"confirmed_on": "yesterday"},
+                        # Codex trusted-publishing round 1: impossible dates.
+                        {"confirmed_on": "2026-99-99"},
+                        {"confirmed_on": "2026-02-30"},
+                        {"confirmed_on": "20261019"},
                         {"why_not_read": " "},
                         {"why_not_read": ...},
                         {"extra": 1}):
@@ -298,6 +330,19 @@ class CredentialCheckTests(unittest.TestCase):
                 self.assert_codes({"U006"}, verdict="UNKNOWN", extra=self.attest(**changes))
         missing = ["--attest-workflow-permissions", str(self.f.base / "nope.json")]
         self.assert_codes({"U006"}, verdict="UNKNOWN", extra=missing)
+        # Codex trusted-publishing round 1: a repeated member, where the later value would win.
+        text = self.ATTESTATION.read_text(encoding="utf-8")
+        for old, new in (('"default_workflow_permissions": "read",',
+                          '"default_workflow_permissions": "write",\n  "default_workflow_permissions": "read",'),
+                         ('"can_approve_pull_request_reviews": false,',
+                          '"can_approve_pull_request_reviews": true,\n  "can_approve_pull_request_reviews": false,'),
+                         ('"confirmed_by": "@juanmicrosoft",',
+                          '"confirmed_by": "@juanmicrosoft",\n  "confirmed_by": "@juanmicrosoft",')):
+            with self.subTest(duplicate=old):
+                self.assertIn(old, text)
+                path = self.f.base / "duplicate.json"
+                path.write_text(text.replace(old, new), encoding="utf-8")
+                self.assert_codes({"U006"}, verdict="UNKNOWN", extra=["--attest-workflow-permissions", str(path)])
 
     def test_attestation_needs_a_settings_source(self) -> None:
         code, out = self.f.run(live=False, extra=self.attest())

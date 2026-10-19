@@ -131,7 +131,7 @@ docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.j
 maintainer attestation replaces the missing read. The output then says **ATTESTED, not read by
 API** (`A001`), with who confirmed it and when. An attestation is used only after a 403. It never
 overrides an answer the API gave, and an invalid one is `U006` (`UNKNOWN`). Tests:
-`scripts/test_check_release_credentials.py` (40 tests, every earlier case kept).
+`scripts/test_check_release_credentials.py` (42 tests, every earlier case kept).
 
 **Interim design (PR A, 2026-10-18; superseded by the section above).**
 
@@ -251,8 +251,14 @@ granted one fix plus one verification-only Codex pass.
   that enters `nuget-release` without the #1410 gate. nuget.org would issue that copy a key,
   because the file name and environment match. Older tags stay refused, because their files name
   no environment. This is why `S002`–`S005` matter.
-- If the policy is deleted or changed on nuget.org, the exchange fails at step 1 and nothing is
+- If the policy is deleted on nuget.org, or changed so that it no longer matches (another
+  repository, workflow file, or environment name), the exchange fails at step 1 and nothing is
   published.
+- A change that **broadens** the policy does not fail closed. If its environment field is cleared,
+  nuget.org skips the environment check (NuGetGallery validates the claim only when the policy
+  names an environment). Every older tag's `publish-nuget.yml` would then match by file name and
+  get a key. The policy's environment field must stay `nuget-release`. This script cannot see
+  nuget.org, so it cannot detect such a change.
 
 ### Maintainer checklist (an agent must not do these)
 

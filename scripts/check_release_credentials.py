@@ -54,6 +54,7 @@ Tests: scripts/test_check_release_credentials.py.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import re
 import subprocess
@@ -429,22 +430,27 @@ def listed(body: object, field: str, what: str) -> list[dict]:
     return items
 
 
-def names(body: object, what: str) -> list[str]:
-    return [str(s.get("name")) for s in listed(body, "secrets", what)]
+def names(body: object, what: str, field: str = "secrets") -> list[str]:
+    """Every entry's name. An entry without a non-empty string name makes the list unreadable."""
+    items = listed(body, field, what)
+    if not all(isinstance(i.get("name"), str) and i["name"] for i in items):
+        raise Unreadable(f"{what}: an entry has no name")
+    return [i["name"] for i in items]
 
 
-def check_environment(fetch: Callable[[str], object], problems: list[str], unknowns: list[str]) -> None:
+def check_environment(fetch: Callable[[str], object], problems: list[str], unknowns: list[str]) -> bool | None:
+    """True when the environment exists (whatever its rules), False when it does not, None when unreadable."""
     try:
         env = fetch("environment")
     except NotFound:
         problems.append(f"S002: environment {ENVIRONMENT} does not exist")
-        return
+        return False
     except Unreadable as error:
         unknowns.append(f"U002: cannot read environment {ENVIRONMENT} ({error})")
-        return
+        return None
     if not isinstance(env, dict):
         unknowns.append(f"U002: environment {ENVIRONMENT} response is not an object")
-        return
+        return None
     if env.get("can_admins_bypass") is not False:
         problems.append(f"S003: administrators can bypass {ENVIRONMENT}'s protection rules; turn that off")
     policy = env.get("deployment_branch_policy")
@@ -452,7 +458,7 @@ def check_environment(fetch: Callable[[str], object], problems: list[str], unkno
             or policy.get("protected_branches") is not False:
         problems.append(f"S004: {ENVIRONMENT} must use 'Selected branches and tags' (custom branch policies), "
                         f"got {json.dumps(policy)}")
-        return
+        return True
     try:
         rules = listed(fetch("branch-policies"), "branch_policies", "deployment branch policies")
         found = sorted((str(r.get("name")), str(r.get("type", "branch"))) for r in rules)
@@ -460,13 +466,24 @@ def check_environment(fetch: Callable[[str], object], problems: list[str], unkno
             problems.append(f"S005: {ENVIRONMENT} must admit exactly the branch 'main', got {found}")
     except (Unreadable, NotFound) as error:
         unknowns.append(f"U003: cannot read {ENVIRONMENT}'s deployment branch policies ({error})")
+    return True
+
+
+def unique_members(pairs: list[tuple[str, object]]) -> dict:
+    """json object_pairs_hook: a repeated member (a later one would silently win) is refused."""
+    body: dict = {}
+    for key, value in pairs:
+        if key in body:
+            raise ValueError(f"duplicate member {key!r}")
+        body[key] = value
+    return body
 
 
 def load_attestation(path: Path, repo: str) -> dict:
     """The maintainer's attestation of the workflow permissions, or Unreadable. Every key and value
     is fixed except who confirmed it and when; anything else is refused."""
     try:
-        body = json.loads(path.read_text(encoding="utf-8"))
+        body = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_members)
     except (OSError, ValueError) as error:
         raise Unreadable(f"{path}: {error}") from error
     if not isinstance(body, dict) or set(body) != ATTESTATION_KEYS:
@@ -480,8 +497,12 @@ def load_attestation(path: Path, repo: str) -> dict:
         raise Unreadable(f"{path}: can_approve_pull_request_reviews must be false")
     if not (isinstance(body["confirmed_by"], str) and re.fullmatch(r"@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", body["confirmed_by"])):
         raise Unreadable(f"{path}: confirmed_by must be a GitHub @login")
-    if not (isinstance(body["confirmed_on"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", body["confirmed_on"])):
-        raise Unreadable(f"{path}: confirmed_on must be a YYYY-MM-DD date")
+    try:
+        if not (isinstance(body["confirmed_on"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", body["confirmed_on"])):
+            raise ValueError("not YYYY-MM-DD")
+        datetime.date.fromisoformat(body["confirmed_on"])
+    except ValueError as error:
+        raise Unreadable(f"{path}: confirmed_on must be a real YYYY-MM-DD date ({error})") from error
     if not (isinstance(body["why_not_read"], str) and body["why_not_read"].strip()):
         raise Unreadable(f"{path}: why_not_read must say why the API could not be read")
     return body
@@ -539,15 +560,21 @@ def check_settings(fetch: Callable[[str], object], attestation: Path | None = No
     except (Unreadable, NotFound) as error:
         unknowns.append(f"U001: cannot list repository secrets ({error}); run with the maintainer's admin login")
 
-    check_environment(fetch, problems, unknowns)
+    release_environment = check_environment(fetch, problems, unknowns)
 
     # Trusted Publishing stores no key: a NuGet secret left in any environment is a stale key.
     try:
-        environments = sorted({str(e.get("name")) for e in listed(fetch("environments"), "environments",
-                                                                  "environments")})
+        environments = sorted(set(names(fetch("environments"), "environments", "environments")))
+        inventory_read = True
     except (Unreadable, NotFound) as error:
         unknowns.append(f"U004: cannot list the repository's environments ({error})")
-        environments = []
+        environments, inventory_read = [], False
+    if release_environment is not False and ENVIRONMENT not in environments:
+        if release_environment and inventory_read:
+            unknowns.append(f"U004: the environment list omits {ENVIRONMENT}, which exists; the inventory is "
+                            "inconsistent")
+        # Read its secrets whatever the list says (unless it is known not to exist).
+        environments = sorted(set(environments) | {ENVIRONMENT})
     for name in environments:
         try:
             leftover = [n for n in names(fetch(ENV_SECRETS + name), f"{name} secrets") if "NUGET" in n.upper()]
