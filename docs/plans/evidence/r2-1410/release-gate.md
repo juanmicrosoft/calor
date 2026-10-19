@@ -306,7 +306,10 @@ candidate must contain this code.
 - The T1 register (`v0.25-t1-1428/register.json`, schema `calor.v0.25.t1-register/1`) and W1
   records (`v0.25-w1-1429/records.json`, `calor.v0.25.w1-family-records/1`) cover the six families,
   record reduced independence and consume the scope's version; every T1-approved evidence, fixture
-  and results hash matches, and the approval seal recomputes.
+  and results hash matches, and the approval seal recomputes. Each T1 family lists exactly the
+  scope's cases for that family with their requirement digests recomputed from `scope.json` (T003).
+  Each W1 family's status mirrors scope readiness (never `READY`), lists ready needs, and every
+  transcript, page (with its heading anchor) and shared page exists.
 - The record's `contract` is `{version: scopeVersion, files: {scope.json, register.json,
   records.json: LF SHA-256}}`.
 - The packet directory, the T1 register and the W1 records are identical at the candidate and the
@@ -320,11 +323,11 @@ exactly one row per subject (`G008`), each with `independence = reduced-maintain
 
 | Subject | Outcomes |
 |---|---|
-| `family:F1` … `family:F6` | `READY`, or `PENDING` only in a `PARTIAL_READY` record (which needs at least one `READY`). A `READY` row cites `readyRecord {path, sha256}`: a file under the family's evidence directory's `ready/` (the directory of `readiness.evidence`), committed at the adjudication commit, that is complete under S007: it names its family, a registered scope version and the candidate; every case the T1 register lists for the family has a passed row and a retained result record for this candidate, case, `requirementSha256` and cells; tests, existing website pages, retained review records, an approver with a GitHub approval URL, reduced independence; every family blocker resolved, and each mapped 0.24 repair with its merge commit and a retained passing witness run on the candidate |
+| `family:F1` … `family:F6` | `READY`, or `PENDING` only in a `PARTIAL_READY` record (which needs at least one `READY`). A `READY` row cites `readyRecord {path, sha256}`: a file under the family's evidence directory's `ready/` (the directory of `readiness.evidence`), committed at the adjudication commit, that is complete under S007: it names its family, a registered scope version that no later amendment made stale for the family, and the candidate; every case `scope.json` registers for the family has exactly one passed row and a retained result record for this candidate, case, recomputed `requirementSha256` and cells; tests, existing website pages, retained review records, an approver with a GitHub approval URL, reduced independence; every family blocker resolved, and each mapped 0.24 repair with its merge commit and a retained passing witness run on the candidate |
 | `reproof:<check id>` for each re-proof check | `PASSED` |
 | `gap:#<issue>` for each release gap | `CLOSED` |
 | each claim in the registry | `BOUNDED` |
 
 Every other field (`candidate`, `evidenceManifests`, `claimRegistry`, `publication`) is read as for
-0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 3 positive and 34 negative controls)
+0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 3 positive and 41 negative controls)
 and `ReleaseAdjudicationMapTests`.

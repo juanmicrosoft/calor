@@ -109,6 +109,10 @@ public class ReleaseGateScopePacketTests
     [InlineData("independence", "independence must")]
     [InlineData("blocker unresolved", "blocker #1427")]
     [InlineData("witness run", "mapped blocker R-OBL ")]
+    [InlineData("stale scope version", "is stale")]
+    [InlineData("duplicate case row", "F1-REFOUT-03")]
+    [InlineData("boolean test total", "tests must")]
+    [InlineData("blank reviewer", "reviews must")]
     public void IncompleteReadyRecordsFail(string defect, string message)
     {
         using var repo = Build(readyEdit: (family, ready, files) =>
@@ -128,6 +132,14 @@ public class ReleaseGateScopePacketTests
                 case "independence": ready["independence"] = "independent"; break;
                 case "blocker unresolved": ready["blockersResolved"]!.AsArray().Remove(ready["blockersResolved"]!.AsArray().First(b => b!["issue"]!.GetValue<int>() == 1427)); break;
                 case "witness run": Edit(files, "witness-1496", e => e["result"] = "failed"); break;
+                case "stale scope version": ready["scopeVersion"] = "1.0.0"; break;
+                case "duplicate case row":
+                    var row = ready["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-03")!.DeepClone();
+                    row["result"] = "failed";
+                    ready["cases"]!.AsArray().Insert(0, row);
+                    break;
+                case "boolean test total": ready["tests"]![0]!["total"] = true; break;
+                case "blank reviewer": ready["reviews"]![0]!["reviewer"] = "  "; break;
             }
         });
         AssertOnly(repo.Run(repo.AllSurfaces()), "G008", message);
@@ -136,7 +148,10 @@ public class ReleaseGateScopePacketTests
     [Theory]
     [InlineData("tampered generated output", false, "evidenceSeal")]
     [InlineData("one producer dropped", false, "evidenceSeal")]
-    [InlineData("hollow W1 records", false, "W1 records must be")]
+    [InlineData("W1 records without schema", false, "W1 records must be")]
+    [InlineData("hollow W1 family records", false, "W1 records for")]
+    [InlineData("T1 cases differ from the scope", false, "(T003)")]
+    [InlineData("decision date not a date", false, "a recorded maintainer decision")]
     [InlineData("precondition requirement weakened in both copies", false, "1.3.0's recorded preconditions")]
     [InlineData("precondition copy differs", false, "equal the copy")]
     [InlineData("tampered T1 evidence", false, "approval seal")]
@@ -150,7 +165,18 @@ public class ReleaseGateScopePacketTests
             {
                 case "tampered generated output": Append(r, Directory.GetFiles(Path.Combine(r.Root, ScopeDir, "generated")).Order(StringComparer.Ordinal).First()); break;
                 case "one producer dropped": EditJson(r, Scope, s => s["evidenceSeal"]!["producers"]!.AsObject().Remove($"{ScopeDir}/reproduce/ProbeRunner.cs.txt")); break;
-                case "hollow W1 records": EditJson(r, W1, w => { foreach (var k in w.AsObject().Select(p => p.Key).ToList()) if (k is not ("scopeVersion" or "independence")) w.AsObject().Remove(k); }); break;
+                case "W1 records without schema": EditJson(r, W1, w => w.AsObject().Remove("schema")); break;
+                case "hollow W1 family records":
+                    EditJson(r, W1, w =>
+                    {
+                        foreach (var f in w["families"]!.AsArray())
+                            foreach (var k in f!.AsObject().Select(p => p.Key).ToList()) if (k is not ("family" or "issue")) f.AsObject().Remove(k);
+                    });
+                    break;
+                case "T1 cases differ from the scope": EditJson(r, Register, g => g["families"]![0]!["cases"]!.AsArray().RemoveAt(0)); break;
+                case "decision date not a date":
+                    EditJson(r, Scope, s => s["amendments"]!.AsArray().First(a => a!["version"]!.GetValue<string>() == "1.3.0")!["maintainerDecisions"]![0]!["date"] = "2026-99-99garbage");
+                    break;
                 case "precondition requirement weakened in both copies":
                     EditJson(r, Scope, s =>
                     {
@@ -182,6 +208,9 @@ public class ReleaseGateScopePacketTests
         var registerNode = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Register)))!;
         var cells = scope["cases"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["cells"]?.AsArray().Select(x => x!.GetValue<string>()).ToList() ?? new List<string>());
         var mapped = scope["mappedBlockers"]!["applicable"]!.AsArray();
+        var w1Node = JsonNode.Parse(File.ReadAllText(Path.Combine(root, W1)))!;
+        var w1Pages = w1Node["families"]!.AsArray().SelectMany(f => f!["pages"]!.AsArray()).Concat(w1Node["sharedPages"]!.AsArray())
+            .Select(p => p!.GetValue<string>().Split('#')[0]).ToList();
         var families = scope["families"]!.AsArray().Select(f => (Id: f!["id"]!.GetValue<string>(), Blockers: f["blockers"]!.AsArray().Select(b => b!.GetValue<int>()).ToList(),
             Dir: Path.GetDirectoryName(f["readiness"]!["evidence"]!.GetValue<string>())!.Replace('\\', '/'))).ToList();
         return GateRepo.Build(version: "0.25.0", recordPath: Record025, issue: 1430, registryPath: Registry025,
@@ -195,7 +224,9 @@ public class ReleaseGateScopePacketTests
                         "docs/plans/v0.24-c1-candidate.md", "docs/plans/evidence/c2-1424/regeneration.md", "scripts/determinism_protocol.py",
                         "docs/plans/evidence/r2-1410/release-gate.md" })
                     .Concat(registerNode["families"]!.AsArray().SelectMany(f => f!["evidence"]!.AsArray().Select(e => e!["path"]!.GetValue<string>())))
-                    .Concat(registerNode["controls"]!.AsArray().Select(c => c!["fixture"]!.GetValue<string>()));
+                    .Concat(registerNode["controls"]!.AsArray().Select(c => c!["fixture"]!.GetValue<string>()))
+                    .Concat(Directory.GetFiles(Path.Combine(root, "docs/plans/evidence/v0.25-w1-1429/transcripts")).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')))
+                    .Concat(w1Pages);
                 foreach (var path in paths.Distinct())
                 {
                     var target = Path.Combine(repo.Root, path);

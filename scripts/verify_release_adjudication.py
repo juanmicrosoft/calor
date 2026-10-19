@@ -523,13 +523,14 @@ def json_blob(gate: Gate, commit: str, path: str) -> dict | None:
     return value if isinstance(value, dict) else None
 
 
-def dotnet_json(value: object) -> str:
+def dotnet_json(value: object, relaxed: bool = False) -> str:
     """System.Text.Json's JsonNode.ToJsonString(): compact, with every non-ASCII, control and HTML-sensitive
-    character escaped as uppercase \\uXXXX (the encoding InteropScopeValidator hashes)."""
+    character escaped as uppercase \\uXXXX (the encoding InteropScopeValidator hashes). relaxed is
+    UnsafeRelaxedJsonEscaping: only quotes, backslashes and control characters are escaped."""
     if isinstance(value, dict):
-        return "{" + ",".join(dotnet_json(k) + ":" + dotnet_json(v) for k, v in value.items()) + "}"
+        return "{" + ",".join(dotnet_json(k, relaxed) + ":" + dotnet_json(v, relaxed) for k, v in value.items()) + "}"
     if isinstance(value, list):
-        return "[" + ",".join(dotnet_json(v) for v in value) + "]"
+        return "[" + ",".join(dotnet_json(v, relaxed) for v in value) + "]"
     if value is None or isinstance(value, bool):
         return {None: "null", True: "true", False: "false"}[value]
     if not isinstance(value, str):
@@ -539,14 +540,92 @@ def dotnet_json(value: object) -> str:
         code = ord(ch)
         if ch == "\\":
             out.append("\\\\")
+        elif relaxed and ch == '"':
+            out.append('\\"')
         elif ch in "\n\r\t\b\f":
             out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t", "\b": "\\b", "\f": "\\f"}[ch])
-        elif code < 0x20 or code > 0x7E or ch in "\"&'+<>`":
+        elif code < 0x20 or (not relaxed and (code > 0x7E or ch in "&'+<>`")) or ch == '"' or (relaxed and code == 0x7F):
             units = [code] if code <= 0xFFFF else [0xD800 + ((code - 0x10000) >> 10), 0xDC00 + ((code - 0x10000) & 0x3FF)]
             out.extend(f"\\u{u:04X}" for u in units)
         else:
             out.append(ch)
     return '"' + "".join(out) + '"'
+
+
+def nonblank(value: object) -> bool:
+    return isinstance(value, str) and value.strip() != ""
+
+
+def is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def is_date(value: object) -> bool:
+    """A calendar date, optionally with a UTC time (what DateTime.TryParse accepts in these records)."""
+    import datetime
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d\d-\d\d(T\d\d:\d\d:\d\dZ)?", value):
+        return False
+    try:
+        datetime.date.fromisoformat(value[:10])
+    except ValueError:
+        return False
+    return True
+
+
+def requirement_digest(case: dict) -> str:
+    """InteropScopeValidator.RequirementDigest: the fixture, note, cells, observations (relaxed JSON), families and
+    website example of a case, LF-normalized."""
+    def text(v: object) -> str:
+        return v if isinstance(v, str) else ""
+    body = "\n".join([text(case.get("fixture")), text(case.get("note")), "\n".join(text(c) for c in case.get("cells") or []),
+                      dotnet_json(case.get("observations") if case.get("observations") is not None else [], relaxed=True),
+                      "\n".join(text(f) for f in case.get("families") or []), text(case.get("websiteExample"))])
+    return sha256(body.replace("\r\n", "\n").encode())
+
+
+def family_cases(scope: dict, family: str) -> list[dict]:
+    return [c for c in scope.get("cases", []) if isinstance(c, dict) and c.get("family") == family]
+
+
+def touched_versions(scope: dict, family: str) -> set[str]:
+    """The amendments that added, removed, changed or moved one of the family's cases (S007 staleness)."""
+    registry = {c.get("id"): c.get("family") for c in scope.get("denominatorV1", []) if isinstance(c, dict)}
+    touched = set()
+    for amendment in (a for a in scope.get("amendments", []) if isinstance(a, dict)):
+        version = amendment.get("version")
+        for added in (c for c in amendment.get("addedCases", []) if isinstance(c, dict)):
+            registry[added.get("id")] = added.get("family")
+            if added.get("family") == family:
+                touched.add(version)
+        for removed in amendment.get("removedCases", []):
+            rid = removed.get("id") if isinstance(removed, dict) else removed
+            if registry.get(rid) == family or (isinstance(removed, dict) and removed.get("family") == family):
+                touched.add(version)
+        for change in (c for c in amendment.get("changes", []) if isinstance(c, dict)):
+            cid = change.get("id")
+            if registry.get(cid) == family or (change.get("field") == "family" and family in (change.get("from"), change.get("to"))):
+                touched.add(version)
+            if change.get("field") == "family":
+                registry[cid] = change.get("to")
+    return touched
+
+
+def version_key(value: object) -> tuple:
+    return tuple(int(x) for x in value.split(".")) if isinstance(value, str) and re.fullmatch(r"\d+\.\d+\.\d+", value) else ()
+
+
+def page_exists(gate: Gate, commit: str, page: object) -> bool:
+    """A website page that exists, and whose #anchor (if any) is one of its heading slugs (website/src/lib/headings.ts)."""
+    if not isinstance(page, str):
+        return False
+    path, _, anchor = page.partition("#")
+    blob = gate.blob(commit, path)
+    if blob is None:
+        return False
+    if not anchor:
+        return True
+    headings = re.findall(r"^#{2,4} (.+)$", blob.decode("utf-8", "replace").replace("\r\n", "\n"), re.M)
+    return anchor in {re.sub(r"(^-|-$)", "", re.sub(r"[^a-z0-9]+", "-", h.replace("`", "").lower())) for h in headings}
 
 
 def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tuple[dict, dict] | None:
@@ -576,9 +655,27 @@ def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tu
             or {f.get("id"): f.get("issue") for f in register.get("families", []) if isinstance(f, dict)} != families \
             or (register.get("consumes") or {}).get("scope") != packet["contract"] or (register.get("consumes") or {}).get("scopeVersion") != version:
         gate.fail("G005", f"the T1 register must be {T1_SCHEMA_1426} with reduced independence, cover the six families, and consume scope version {version}")
+    for family in (f for f in register.get("families", []) if isinstance(f, dict)):
+        listed = [(c.get("id"), c.get("requirementSha256")) for c in family.get("cases", []) if isinstance(c, dict)]
+        if sorted(listed, key=str) != sorted(((c.get("id"), requirement_digest(c)) for c in family_cases(scope, family.get("id"))), key=str):
+            gate.fail("G005", f"the T1 register's {family.get('id')} cases differ from the scope's cases and requirement digests (T003)")
+    readiness = {f.get("id"): (f.get("readiness") or {}).get("status") for f in scope.get("families", []) if isinstance(f, dict)}
+    w1_families = [f for f in w1.get("families", []) if isinstance(f, dict)]
     if w1.get("schema") != W1_SCHEMA_1426 or w1.get("independence") != "reduced" or w1.get("scopeVersion") != version \
-            or {f.get("family"): f.get("issue") for f in w1.get("families", []) if isinstance(f, dict)} != families:
+            or {f.get("family"): f.get("issue") for f in w1_families} != families or len(w1_families) != len(families):
         gate.fail("G005", f"the W1 records must be {W1_SCHEMA_1426} with reduced independence, cover the six families, and consume scope version {version}")
+    for family in w1_families:
+        transcripts, pages = family.get("transcripts"), family.get("pages")
+        if family.get("status") == "READY" or family.get("status") != readiness.get(family.get("family")) \
+                or not isinstance(family.get("readyNeeds"), list) or not family["readyNeeds"] \
+                or not isinstance(transcripts, list) or not isinstance(pages, list) or not pages \
+                or any(gate.blob(commit, f"docs/plans/evidence/v0.25-w1-1429/transcripts/{t}.json") is None for t in transcripts) \
+                or any(not page_exists(gate, commit, page) for page in pages):
+            gate.fail("G005", f"W1 records for {family.get('family')}: the status must mirror scope readiness (never READY), with ready needs, "
+                              "and every transcript and page (with its anchor) must exist")
+    shared = w1.get("sharedPages")
+    if not isinstance(shared, list) or not shared or any(not page_exists(gate, commit, page) for page in shared):
+        gate.fail("G005", "W1 records: every shared page must exist")
     lines = []
     for family in register.get("families", []):
         for ev in family.get("evidence", []):
@@ -611,8 +708,8 @@ def preconditions_problems(gate: Gate, commit: str, scope: dict) -> list[str]:
     if recorded is None or not isinstance(pre, dict) or pre != recorded["acceptancePreconditions"]:
         return ["they must equal the copy the latest amendment that records them registered"]
     decision = next((d for d in recorded.get("maintainerDecisions", []) if isinstance(d, dict) and d.get("id") == pre.get("decision")), None)
-    if pre.get("amendment") != recorded.get("version") or not decision or not decision.get("decision") or not decision.get("by") \
-            or not re.match(r"^\d{4}-\d\d-\d\d", str(decision.get("date", ""))):
+    if pre.get("amendment") != recorded.get("version") or not decision or not nonblank(decision.get("decision")) or not nonblank(decision.get("by")) \
+            or not is_date(decision.get("date")):
         problems.append("they must cite their amendment and a recorded maintainer decision")
     replaced = pre.get("replaces") or {}
     terminal = json_blob(gate, commit, str(replaced.get("terminalRecord", ""))) if replaced.get("terminalRecord") else None
@@ -628,7 +725,7 @@ def preconditions_problems(gate: Gate, commit: str, scope: dict) -> list[str]:
     checks = [c for c in reproof.get("checks", []) if isinstance(c, dict)]
     if reproof.get("onCandidate") != "own-sha" or any(
             not any((c.get("id"), c.get("kind"), c.get("gate"), c.get("source")) == required for c in checks) for required in REPROOF_CHECKS_1426) \
-            or any(not c.get("id") or not c.get("requirement") or gate.blob(commit, str(c.get("source", ""))) is None for c in checks):
+            or any(not nonblank(c.get("id")) or not nonblank(c.get("requirement")) or gate.blob(commit, str(c.get("source", ""))) is None for c in checks):
         problems.append("the re-proof must run on the candidate's own SHA with the registered checks, each citing a retained source")
     first = next((a.get("acceptancePreconditions") for a in amendments if a.get("version") == "1.3.0"), None)
     if first is None or sha256(dotnet_json(first).encode()) != PRECONDITIONS_DIGEST_130:
@@ -643,39 +740,45 @@ def ready_problems(gate: Gate, commit: str, candidate: str, family: str, ready: 
     problems = []
     fam = next((f for f in scope.get("families", []) if isinstance(f, dict) and f.get("id") == family), {})
     versions = {"1.0.0"} | {a.get("version") for a in scope.get("amendments", []) if isinstance(a, dict)}
-    if ready.get("family") != family or ready.get("scopeVersion") not in versions:
+    assessed = ready.get("scopeVersion")
+    if ready.get("family") != family or assessed not in versions:
         problems.append("it must name its family and the registered scope version it was assessed under")
+    for stale in sorted(v for v in touched_versions(scope, family) if version_key(v) > version_key(assessed)):
+        problems.append(f"it is stale: amendment {stale} changed this family's cases after {assessed}")
     if (ready.get("candidate") or {}).get("commit") != candidate if isinstance(ready.get("candidate"), dict) else True:
         problems.append("candidate.commit must be the adjudicated candidate")
-    cells = {c.get("id"): c.get("cells") or [] for c in scope.get("cases", []) if isinstance(c, dict)}
-    registered = next((f.get("cases", []) for f in register.get("families", []) if isinstance(f, dict) and f.get("id") == family), [])
-    rows = {r.get("id"): r for r in ready.get("cases", []) if isinstance(r, dict)}
-    for case in (c for c in registered if isinstance(c, dict)):
+    rows: dict = {}
+    for row in ready.get("cases", []) if isinstance(ready.get("cases"), list) else []:
+        cid = row.get("id") if isinstance(row, dict) else None
+        if cid in rows:
+            problems.append(f"case {cid} is listed more than once")
+        rows.setdefault(cid, row)
+    for case in family_cases(scope, family):
         cid, row = case.get("id"), rows.get(case.get("id"))
         record = json_blob(gate, commit, str(row.get("evidence", ""))) if row and str(row.get("evidence", "")).startswith("docs/plans/evidence/") else None
         if not row or row.get("result") != "passed" or not record or record.get("candidate") != candidate or record.get("caseId") != cid \
-                or record.get("requirementSha256") != case.get("requirementSha256") or record.get("result") != "passed" \
-                or any((record.get("cells") or {}).get(cell) != "passed" for cell in cells.get(cid, [])):
+                or record.get("requirementSha256") != requirement_digest(case) or record.get("result") != "passed" \
+                or any(not isinstance(record.get("cells"), dict) or record["cells"].get(cell) != "passed" for cell in case.get("cells") or []):
             problems.append(f"case {cid} needs a passed result and a retained passed result record for this candidate, case, requirement and cells")
     tests = ready.get("tests")
-    if not isinstance(tests, list) or not tests or any(not isinstance(t, dict) or not t.get("project") or not isinstance(t.get("total"), int)
-                                                       or t["total"] <= 0 or t.get("failed") != 0 for t in tests):
+    if not isinstance(tests, list) or not tests or any(not isinstance(t, dict) or not nonblank(t.get("project")) or not is_int(t.get("total"))
+                                                       or t["total"] <= 0 or not is_int(t.get("failed")) or t["failed"] != 0 for t in tests):
         problems.append("tests must name each project with a positive total and zero failed")
     examples = ready.get("websiteExamples")
     if not isinstance(examples, list) or not examples or any(not str(e).startswith("website/content/") or gate.blob(commit, str(e).split("#")[0]) is None for e in examples):
         problems.append("websiteExamples must list website pages that exist")
     reviews = ready.get("reviews")
-    if not isinstance(reviews, list) or not reviews or any(not isinstance(r, dict) or not r.get("reviewer") or "/reviews/" not in str(r.get("record", ""))
+    if not isinstance(reviews, list) or not reviews or any(not isinstance(r, dict) or not nonblank(r.get("reviewer")) or "/reviews/" not in str(r.get("record", ""))
                                                            or not str(r.get("record")).startswith("docs/plans/evidence/") or gate.blob(commit, str(r.get("record"))) is None for r in reviews):
         problems.append("reviews must name each reviewer and a retained review record")
     approver = ready.get("approver") if isinstance(ready.get("approver"), dict) else {}
-    if not approver.get("login") or not APPROVAL_URL_RE.match(str(approver.get("approvalUrl", ""))):
+    if not nonblank(approver.get("login")) or not APPROVAL_URL_RE.match(str(approver.get("approvalUrl", ""))):
         problems.append("approver needs a login and a GitHub approval URL")
     if ready.get("independence") != "reduced":
         problems.append("independence must be 'reduced' while the deviation stands")
     resolved = [b for b in ready.get("blockersResolved", []) if isinstance(b, dict)]
     for blocker in fam.get("blockers", []):
-        if not any(b.get("issue") == blocker and b.get("reference") for b in resolved):
+        if not any(b.get("issue") == blocker and nonblank(b.get("reference")) for b in resolved):
             problems.append(f"blocker #{blocker} has no recorded resolution")
     for mapped in ((scope.get("mappedBlockers") or {}).get("applicable") or []):
         if family not in mapped.get("families", []):
