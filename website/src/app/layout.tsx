@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Raleway, JetBrains_Mono, VT323 } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
@@ -8,28 +7,7 @@ import './globals.css';
 import { themeScript } from '@/lib/theme';
 import { canonicalUrl, publicUrl, siteOrigin } from '@/lib/site';
 import { getBasePath } from '@/lib/utils';
-
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  variable: '--font-body',
-});
-
-const displayFont = Raleway({
-  weight: ['400', '500', '600', '700'],
-  subsets: ['latin'],
-  variable: '--font-display',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-});
-
-const vt323 = VT323({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-terminal',
-});
+import { fontVariables } from './fonts';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
@@ -79,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
-      <body className={`${dmSans.variable} ${displayFont.variable} ${jetbrainsMono.variable} ${vt323.variable} font-body antialiased`}>
+      <body className="font-body antialiased" style={fontVariables}>
         <div className="relative flex min-h-screen flex-col">
           <WhatsNewBanner />
           <Header />

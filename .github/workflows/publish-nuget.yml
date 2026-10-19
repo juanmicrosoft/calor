@@ -158,8 +158,24 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        env:
+          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
+          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.401'
+
+      - name: Require the pinned release SDK (#1548)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet --list-sdks
+          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
+          sdk="$(dotnet --version | tr -d '\r')"
+          if [ "$sdk" != 10.0.401 ]; then
+            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
+            exit 1
+          fi
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -278,8 +294,24 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        env:
+          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
+          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.401'
+
+      - name: Require the pinned release SDK (#1548)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet --list-sdks
+          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
+          sdk="$(dotnet --version | tr -d '\r')"
+          if [ "$sdk" != 10.0.401 ]; then
+            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
+            exit 1
+          fi
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -320,13 +352,33 @@ jobs:
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
+        env:
+          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
+          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.401'
 
       - name: Setup .NET 8 for corpus targets
         uses: actions/setup-dotnet@v4
+        env:
+          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
+          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '8.0.426'
+
+      - name: Require the pinned release SDK (#1548)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet --list-sdks
+          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
+          sdk="$(dotnet --version | tr -d '\r')"
+          if [ "$sdk" != 10.0.401 ]; then
+            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
+            exit 1
+          fi
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -456,8 +508,24 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        env:
+          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
+          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.401'
+
+      - name: Require the pinned release SDK (#1548)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet --list-sdks
+          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
+          sdk="$(dotnet --version | tr -d '\r')"
+          if [ "$sdk" != 10.0.401 ]; then
+            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
+            exit 1
+          fi
 
       # #1420: the packed Z3 bytes come from the same owned bootstrap as every
       # test and consumer job above (checksum-pinned upstream archives, outputs

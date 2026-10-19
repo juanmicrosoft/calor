@@ -1,0 +1,183 @@
+{
+  "schema": "calor.vendored-fonts/1",
+  "issue": 1548,
+  "rule": "Each file is the exact woff2 that next/font/google served for this family, weight range, and subset (fetched with its user agent). Paths are relative to website/. scripts/check_website_fonts.py checks every hash.",
+  "license": "SIL Open Font License 1.1; see OFL.txt beside each family",
+  "files": [
+    {
+      "family": "DM Sans",
+      "subset": "latin",
+      "weights": [
+        "100 1000"
+      ],
+      "file": "src/fonts/dm-sans/dm-sans-latin.woff2",
+      "sha256": "468d56b6b25b05b70190b6c233d773f6f1770e8579827ce022a57f03fa8002fb",
+      "source": "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K6z9mXg.woff2"
+    },
+    {
+      "family": "DM Sans",
+      "subset": "latin-ext",
+      "weights": [
+        "100 1000"
+      ],
+      "file": "src/fonts/dm-sans/dm-sans-latin-ext.woff2",
+      "sha256": "219b02c7d8884817d3d6ad4c8771f2c000ce4c5669a67ef4e2e5617ffa25c4cc",
+      "source": "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu6-K6z9mXgjU0.woff2"
+    },
+    {
+      "family": "Raleway",
+      "subset": "latin",
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "file": "src/fonts/raleway/raleway-latin.woff2",
+      "sha256": "10f1a0ef3f3497901c1c3e9987d0cb97d092a6ce1ff45669a1aed503cf67e6ef",
+      "source": "https://fonts.gstatic.com/s/raleway/v37/1Ptug8zYS_SKggPNyC0IT4ttDfA.woff2"
+    },
+    {
+      "family": "Raleway",
+      "subset": "latin-ext",
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "file": "src/fonts/raleway/raleway-latin-ext.woff2",
+      "sha256": "5730d3e0b43947bf35e7816fdbc1564a3017ba4f9f3e185e91f4095ed6af8838",
+      "source": "https://fonts.gstatic.com/s/raleway/v37/1Ptug8zYS_SKggPNyCMIT4ttDfCmxA.woff2"
+    },
+    {
+      "family": "Raleway",
+      "subset": "vietnamese",
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "file": "src/fonts/raleway/raleway-vietnamese.woff2",
+      "sha256": "97aac100e723d66bf1ec1a2fefa395777d005d047823ee432a258de1c14d127c",
+      "source": "https://fonts.gstatic.com/s/raleway/v37/1Ptug8zYS_SKggPNyCIIT4ttDfCmxA.woff2"
+    },
+    {
+      "family": "Raleway",
+      "subset": "cyrillic",
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "file": "src/fonts/raleway/raleway-cyrillic.woff2",
+      "sha256": "efd187f5d8edf6519c273933dc638bbf16ded674f26c295376c9d6f09685babc",
+      "source": "https://fonts.gstatic.com/s/raleway/v37/1Ptug8zYS_SKggPNyCkIT4ttDfCmxA.woff2"
+    },
+    {
+      "family": "Raleway",
+      "subset": "cyrillic-ext",
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "file": "src/fonts/raleway/raleway-cyrillic-ext.woff2",
+      "sha256": "ae1f0cb889737109badd1ad17e1acf8bb0cbdb80e2fc3c9577ac6fd769335939",
+      "source": "https://fonts.gstatic.com/s/raleway/v37/1Ptug8zYS_SKggPNyCAIT4ttDfCmxA.woff2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "subset": "latin",
+      "weights": [
+        "100 800"
+      ],
+      "file": "src/fonts/jetbrains-mono/jetbrains-mono-latin.woff2",
+      "sha256": "1e06740a02a443fb7f3eeda8fcaa685a0f6c620e3f01e6666e847295469ce3ad",
+      "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD7OwGtT0rU.woff2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "subset": "latin-ext",
+      "weights": [
+        "100 800"
+      ],
+      "file": "src/fonts/jetbrains-mono/jetbrains-mono-latin-ext.woff2",
+      "sha256": "7db7affbce1fdee69c1ffc2641bbca289b049867f524c9d861fe35ab6670bf29",
+      "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD1OwGtT0rU3BE.woff2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "subset": "vietnamese",
+      "weights": [
+        "100 800"
+      ],
+      "file": "src/fonts/jetbrains-mono/jetbrains-mono-vietnamese.woff2",
+      "sha256": "1390e86cc2823e759358918c01c4fcc1b6e4f01bca915bdbeb6d68eb5c244405",
+      "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD0OwGtT0rU3BE.woff2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "subset": "greek",
+      "weights": [
+        "100 800"
+      ],
+      "file": "src/fonts/jetbrains-mono/jetbrains-mono-greek.woff2",
+      "sha256": "3edf363dbf9d5fa0cdc784ae2b431a8a4152f4055a8a8858028c0bd668808273",
+      "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD4OwGtT0rU3BE.woff2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "subset": "cyrillic",
+      "weights": [
+        "100 800"
+      ],
+      "file": "src/fonts/jetbrains-mono/jetbrains-mono-cyrillic.woff2",
+      "sha256": "af7486955880be1c2b972e9c766acffb776768d669b6576ed9a0919ce72e7ca6",
+      "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD_OwGtT0rU3BE.woff2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "subset": "cyrillic-ext",
+      "weights": [
+        "100 800"
+      ],
+      "file": "src/fonts/jetbrains-mono/jetbrains-mono-cyrillic-ext.woff2",
+      "sha256": "992eea2f70210457ddd1196de4df3240919ffe068ad188c79d985fba4565d3bf",
+      "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD2OwGtT0rU3BE.woff2"
+    },
+    {
+      "family": "VT323",
+      "subset": "latin",
+      "weights": [
+        "400"
+      ],
+      "file": "src/fonts/vt323/vt323-latin.woff2",
+      "sha256": "043a60145af2ddbcd0a6452625cb0bfc4e18b222c76dcd1d4a0106715472faba",
+      "source": "https://fonts.gstatic.com/s/vt323/v18/pxiKyp0ihIEF2isfFJXUdVNF.woff2"
+    },
+    {
+      "family": "VT323",
+      "subset": "latin-ext",
+      "weights": [
+        "400"
+      ],
+      "file": "src/fonts/vt323/vt323-latin-ext.woff2",
+      "sha256": "dcbaf698a44537496c6d2774f775af8b6f382d9f1773f1b408bd01fe515ae8bc",
+      "source": "https://fonts.gstatic.com/s/vt323/v18/pxiKyp0ihIEF2isRFJXUdVNFKPY.woff2"
+    },
+    {
+      "family": "VT323",
+      "subset": "vietnamese",
+      "weights": [
+        "400"
+      ],
+      "file": "src/fonts/vt323/vt323-vietnamese.woff2",
+      "sha256": "0ee3d783a89f050280fb48f7fec8602c6922da1716856f75089e4c77d61de9c7",
+      "source": "https://fonts.gstatic.com/s/vt323/v18/pxiKyp0ihIEF2isQFJXUdVNFKPY.woff2"
+    }
+  ]
+}

@@ -60,7 +60,17 @@ jobs:
             fi
           done
       - run: npx playwright install --with-deps chromium
+      # #1548: the fonts are self-hosted, so the build must succeed with Google Fonts unreachable.
+      - name: Make Google Fonts unreachable for the build (#1548)
+        run: |
+          set -euo pipefail
+          printf '0.0.0.0 fonts.googleapis.com fonts.gstatic.com\n:: fonts.googleapis.com fonts.gstatic.com\n' | sudo tee -a /etc/hosts
+          if curl -sS --max-time 10 -o /dev/null https://fonts.googleapis.com/css2?family=VT323; then
+            echo "::error::fonts.googleapis.com is still reachable; the offline-fonts check would prove nothing"; exit 1
+          fi
       - run: npm run build
+      - name: Check the build serves only self-hosted fonts (#1548)
+        run: python3 ../scripts/check_website_fonts.py --out out
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()

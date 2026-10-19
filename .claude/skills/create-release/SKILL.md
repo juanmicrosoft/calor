@@ -51,32 +51,17 @@ Ask the user to confirm the next version or allow them to specify a different on
 
 ### 2. Run Benchmarks
 
-Run the benchmark suite in statistical mode (30 runs with confidence intervals) to generate results for the release:
+Run the benchmark suite in statistical mode (30 runs with confidence intervals) to regenerate the
+website dashboard data:
 
-1. Generate markdown report for release notes:
-   ```bash
-   dotnet run --project tests/Calor.Evaluation -c Release -- run --format markdown --output benchmark-results.md --statistical --runs 30
-   ```
+```bash
+dotnet run --project tests/Calor.Evaluation -c Release -- run --format website --output website/public/data/benchmark-results.json --statistical --runs 30
+```
 
-2. Generate website JSON for the dashboard:
-   ```bash
-   dotnet run --project tests/Calor.Evaluation -c Release -- run --format website --output website/public/data/benchmark-results.json --statistical --runs 30
-   ```
-
-3. Read `benchmark-results.md` and `website/public/data/benchmark-results.json`
-   and extract a summary for the CHANGELOG. Use the Markdown report for ratios,
-   parse counts, source provenance, and interpretation limits. Use each JSON
-   metric's `ci95` field for interval bounds. The summary should include:
-   - Legacy composite direction-normalized ratio
-   - Counts of category ratios favoring each language
-   - Key metric ratios with reported intervals
-   - Number of programs tested
-   - Parse-check counts
-   - Source commit and source-declared compiler version
-   - Interpretation limits: deterministic repetitions, non-equivalent pairs,
-     and no measured language, agent-productivity, correctness, or safety advantage
-
-4. Format the benchmark summary for CHANGELOG (see format below).
+**Release notes carry no benchmark numbers (#1548).** Do not write a benchmark summary, ratio,
+interval, or program count into `CHANGELOG.md`, `website/content/changelog.mdx`, the release PR
+body, or the GitHub release. The notes are adjudicated text (`G014`); benchmark results are
+published, if at all, only through the separate #1547 dispatch that the record must approve.
 
 **Note**: Statistical benchmark runs (30 iterations) add approximately 5-10
 minutes. The reported intervals repeat deterministic observations over a fixed
@@ -92,8 +77,8 @@ Update these files with the new version:
 | `website/package.json` | `"version": "X.Y.Z"` |
 | `website/package-lock.json` | Root and workspace package versions |
 | `website/src/lib/version.ts` | `SITE_VERSION = 'X.Y.Z'` — this is the pill next to "calor" in the site header; if you skip it, the header keeps showing the previous version even after CHANGELOG and banner update |
-| `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add benchmark summary |
-| `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format, no benchmark stats) |
+| `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` (no benchmark numbers) |
+| `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format) |
 | `website/src/components/landing/WhatsNewBanner.tsx` | Update version number and one-line description of the release |
 | `website/public/data/benchmark-provenance.json` | Match the regenerated benchmark source commit (the full 40-hex SHA the generator now writes) and declared source version |
 | `bench/phase0-agent-native/commit-stamp-index.json` | Update the `publicationStamps` entry for every changed benchmark stamp (#1417). A stamp naming a pre-merge branch commit gets a pending phase-1 identity and a post-merge write-back; `LedgerCommitStampTests` fails until the index matches |
@@ -112,11 +97,10 @@ When updating CHANGELOG.md:
 1. Find the line `## [Unreleased]`
 2. Replace it with `## [X.Y.Z] - YYYY-MM-DD` where YYYY-MM-DD is today's date
 3. Add a new `## [Unreleased]` section above the new version header
-4. Insert the benchmark summary section immediately after the version header, before any existing changes
 
 When updating website/content/changelog.mdx:
 1. Add a new `## [X.Y.Z] - YYYY-MM-DD` section after the `---` separator at the top (before the previous version)
-2. Copy the **Added**, **Fixed**, **Removed** sections from CHANGELOG.md (skip benchmark stats — those are in CHANGELOG.md only)
+2. Copy the **Added**, **Fixed**, **Removed** sections from CHANGELOG.md
 3. Convert any doc references to website links (e.g., `[page title](/docs/path/)`)
 
 When updating WhatsNewBanner.tsx:
@@ -124,39 +108,13 @@ When updating WhatsNewBanner.tsx:
 2. Update the one-line description to highlight the most notable feature in this release
 3. Keep the "See what's new" link pointing to `/docs/changelog/`
 
-**Benchmark Summary Format for CHANGELOG:**
-
-```markdown
-## [X.Y.Z] - YYYY-MM-DD
-
-### Benchmark Results (Statistical: 30 runs)
-- **Legacy Composite Direction-Normalized Ratio**: X.XX (not a measured language advantage)
-- **Metrics**: N category ratios favor Calor; M favor C#
-- **Highlights**:
-  - MetricName1: X.XXx [lower, upper]
-  - MetricName2: X.XXx [lower, upper]
-  - MetricName3: X.XXx [lower, upper]
-- **Programs Tested**: NN
-- **Parse Checks**: Calor NN; C# NN
-- **Recorded Source**: `COMMIT` (declares version SOURCE_DECLARED_VERSION)
-- **Interpretation Limits**: Deterministic repetitions are not independent
-  samples; each metric is direction-normalized so values above 1 favor Calor;
-  source pairs are not all behaviorally equivalent; no language, productivity,
-  correctness, or safety advantage is established.
-
-### Changes
-[existing changelog content under ## [Unreleased]]
-```
-
-Extract the key metrics from the benchmark markdown output's Executive Summary section to populate the highlights.
-
 ### 4. Create Release Branch and PR
 
 ```bash
 git checkout -b release/vX.Y.Z
 # Start from a clean release branch. Stage the complete reviewed release diff,
-# including new tests, while leaving the temporary Markdown report untracked.
-git add -A -- . ':(exclude)benchmark-results.md'
+# including new tests.
+git add -A
 git status --short
 git commit -m "chore: bump version to X.Y.Z"
 git push -u origin release/vX.Y.Z
@@ -222,12 +180,6 @@ an explicit dispatch:
 ```bash
 git checkout main
 git pull
-```
-
-Remove the temporary benchmark markdown file:
-
-```bash
-rm -f benchmark-results.md
 ```
 
 The website deploy is dispatched by `publish-nuget`. A re-deploy needs the same
