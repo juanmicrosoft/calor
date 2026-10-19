@@ -22,6 +22,16 @@ the check fails if the compiler reports any other code. Compiler output shown
 on a page is either checked against the real diagnostics or labelled
 illustrative. The changelog is excluded because it records past releases.
 
+Pages quote converted output, too. A converted example that is a complete
+program (it starts with `§M`) is compiled like any other; a fragment is not.
+On the branch for the unreleased 0.25 release, the repository's test suite also compares each converted block that the
+[C# interoperability guide](/docs/guides/csharp-interoperability/) quotes with
+the converter's real output for the same C# input, so a converter change that
+alters the output fails CI until the page changes with it. Output of `calor
+convert`, `calor migrate` and the MCP tools on a page is labelled
+`illustrative` unless it is compiler diagnostics, which `self-check docs` checks
+against the program above it.
+
 `--fix` regenerates supported mirrors such as `AGENTS.md` from their canonical
 source. It does not rewrite arbitrary prose.
 

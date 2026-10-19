@@ -43,15 +43,20 @@ contract in `docs/plans/v0.25-refout-contract.md` (#1427).
 - **`calor convert` keeps by-reference identity.** `Bump(ref pts[0].X)` on an array of
   structs now passes the element's field itself, so the callee's write is kept.
   C# `out var n` becomes a mutable binding declared just before the statement, when it
-  appears in an expression statement, a local declaration, a `return`, or an `if` condition
-  directly in a block, its type is known, and its name clashes with nothing in scope. Other
-  forms keep their statement or member as C#. Before, an `out var` inside `?:` became
+  appears in a local declaration, a `return`, or an `if` condition directly in a block, its
+  type is known, and its name clashes with nothing in scope. Other forms keep their
+  statement or member as C#. A call that is a statement by itself
+  (`int.TryParse(s, out var n);`) also gets the binding, but that output fails the C# round
+  trip, so `calor convert` keeps the type as C# and MCP `calor_convert` and `calor migrate`
+  refuse the file. Before, an `out var` inside `?:` became
   inline `§CS{...}`, and one in a `while` header was declared outside the loop.
-- **Shapes without a native form stay C#.** These are ref locals and returns, conditional
-  refs, `scoped` and `ref readonly` parameters, `this ref`/`this in` extension calls,
-  by-reference delegates and lambdas, by-reference constructor and indexer arguments, calls
-  that omit `in`, method-generic `out T` parameters, and parameters with flow attributes such
-  as `[NotNullWhen]`. A C# `ref` argument to an `in` parameter now converts to `§A{in}`.
+- **Shapes without a native form stay C#.** These are ref locals and block-bodied ref
+  returns, conditional refs, `scoped` and `ref readonly` parameters, `this ref`/`this in`
+  extension calls, by-reference delegates and lambdas, by-reference constructor and indexer
+  arguments, calls that omit `in`, and method-generic `out T` parameters. A flow attribute
+  such as `[NotNullWhen]` on an `out` parameter is copied to the native declaration but has
+  no effect on Calor's null checks. A C# `ref` argument to an `in` parameter now converts to
+  `§A{in}`.
 - **`calor feature-check` changes.** `out-var` is now `Partial`, because only the forms above
   are lowered. The `ref-parameter` and `out-parameter` entries no longer suggest tuples or
   `Result<T, E>`, and `in-parameter` names the call sites that stay C#.
@@ -245,6 +250,32 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
   now says which local and why, for example "local 'm' is mutable". If the proof needs the
   local's definition to finish without integer overflow, it is reported `Assumed`, not
   discharged, and the runtime check stays.
+
+### A task-first guide to converting C# (#1429)
+
+A new website guide, [Converting C#: What Stays C# and Why](website/content/guides/csharp-interoperability.mdx),
+walks through the C# features the 0.25 converter changes: `ref`/`out`/`in` calls such as
+`TryParse` and `TryGetValue`, interpolated-string target types, local functions, arrays in
+expressions, and iterator properties. For each one it shows real converter output, what stays C#,
+and what the report says. Each converted block on the page is checked in CI against the
+converter's actual output, and each complete program among them is also compiled. The `convert`, `migrate`, MCP, `feature-check`, `self-check` and
+structured-output pages now state each surface's defaults (`calor convert` rescues round-trip
+failures by default; MCP `calor_convert` needs `passthroughOnError: true`; project migration
+never rescues them), how to read native and interop counts, and what a partial or refused
+conversion returns.
+
+Corrections found while checking the pages against the converter:
+
+- `out var` in a call statement is not converted natively (see the `#943` entry above, now
+  corrected). An expression-bodied ref return (`=> ref a[0]`) is not preserved either: its
+  Calor fails the C# round trip, so it is rescued or refused. A block-bodied ref return is
+  preserved.
+- `calor feature-check` does not match the converter for five entries: `out-var` (lists the
+  call statement), `ref-expression` ("stripped"), `multidim-array` ("fully supported"),
+  `out-parameter` (says `[NotNullWhen]` parameters stay C#; they convert, with the attribute
+  inert), and `yield-return` (methods only). The feature-check page lists these gaps.
+- `docs/cli/feature-check.md` no longer lists `string-interpolation` as fully supported, and its
+  example now shows current output.
 
 ### Website examples are now checked in CI (#1143)
 

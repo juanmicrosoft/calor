@@ -1,0 +1,140 @@
+{
+  "cli-convert": {
+    "command": "calor convert Report.cs -o Report.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Report.cs:17 [string-interpolation-handler]",
+      "  Preservation paths: 1 by converter interop (unsupported construct)",
+      "Warnings (2):",
+      "  ⚠ Feature 'string-interpolation-formattable' is partially supported. Review preserved hole-free FormattableString calls; they stay C# interop",
+      "  ⚠ Unsupported feature [string-interpolation-handler] escalated to §CSHARP interop preservation: $\"x={x}\"",
+      "Output: <dir>/Report.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Report:overflow=unchecked}\n  §U{System}\n  §U{System.Text}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Report:pub:stat}\n      §MT{m002:Line:pub:stat} (str:item, f64:amount) -> str\n        §R \"${item,-8}|${amount,10:F2}\"\n\n      §MT{m003:Kind:pub:stat} (FormattableString:f) -> str\n        §R (+ \"fs:\" f.Format)\n\n      §MT{m004:Kind:pub:stat} (any:o) -> str\n        §R (+ \"object:\" o)\n\n      §MT{m005:Pick:pub:stat} (i32:x) -> str\n        §R §C{Kind} (cast global::System.FormattableString \"k=${x}\")\n\n      §MT{m006:Build:pub:stat} (i32:x) -> str\n        §B{sb} (sb-new)\n        §RAW\n        sb.Append($\"x={x}\");\n        §/RAW\n        §R (sb-tostring sb)\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Report.cs -o Report.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 9,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "string-interpolation-handler",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false
+    },
+    "diagnosticCodes": [
+      "Calor1343 x2"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Report.calr --output Report.g.cs",
+    "exit": 1,
+    "errorCodes": [
+      "Calor0410 x1"
+    ],
+    "warningCodes": [
+      "Calor0411 x1",
+      "Calor0419 x1"
+    ]
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 9,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "string-interpolation-handler",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+    },
+    "issueCodes": [
+      "warning:Calor1343:string-interpolation-formattable",
+      "warning:Calor1343:string-interpolation-handler"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §U{System}\n  §U{System.Text}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Report:pub:stat}\n      §MT{m002:Line:pub:stat} (str:item, f64:amount) -> str\n        §R \"${item,-8}|${amount,10:F2}\"\n\n      §MT{m003:Kind:pub:stat} (FormattableString:f) -> str\n        §R (+ \"fs:\" f.Format)\n\n      §MT{m004:Kind:pub:stat} (any:o) -> str\n        §R (+ \"object:\" o)\n\n      §MT{m005:Pick:pub:stat} (i32:x) -> str\n        §R §C{Kind} (cast global::System.FormattableString \"k=${x}\")\n\n      §MT{m006:Build:pub:stat} (i32:x) -> str\n        §B{sb} (sb-new)\n        §RAW\n        sb.Append($\"x={x}\");\n        §/RAW\n        §R (sb-tostring sb)\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 9,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "string-interpolation-handler",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true
+    },
+    "issueCodes": [
+      "warning:Calor1343:string-interpolation-formattable",
+      "warning:Calor1343:string-interpolation-handler"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §U{System}\n  §U{System.Text}\n\n  §NS{ns_global:_global:global}\n    §CL{c001:Report:pub:stat}\n      §MT{m002:Line:pub:stat} (str:item, f64:amount) -> str\n        §R \"${item,-8}|${amount,10:F2}\"\n\n      §MT{m003:Kind:pub:stat} (FormattableString:f) -> str\n        §R (+ \"fs:\" f.Format)\n\n      §MT{m004:Kind:pub:stat} (any:o) -> str\n        §R (+ \"object:\" o)\n\n      §MT{m005:Pick:pub:stat} (i32:x) -> str\n        §R §C{Kind} (cast global::System.FormattableString \"k=${x}\")\n\n      §MT{m006:Build:pub:stat} (i32:x) -> str\n        §B{sb} (sb-new)\n        §RAW\n        sb.Append($\"x={x}\");\n        §/RAW\n        §R (sb-tostring sb)\n\n\n\n"
+  }
+}

@@ -118,7 +118,7 @@ runs. `calor convert` keeps that choice:
 |:----------|:-----------|
 | `string`, `object`, or a return of either | Native Calor string with `${...}` holes. Format specifiers, alignment, culture and left-to-right hole order are kept. |
 | `FormattableString` or `IFormattable`, with at least one hole | Native, wrapped in an explicit cast such as `(cast global::System.FormattableString "x=${x}")`. The cast keeps the overload C# selected, for example `Kind(FormattableString)` over `Kind(object)`. |
-| An `[InterpolatedStringHandler]` parameter: custom logging and assertion APIs, and .NET overloads such as `StringBuilder.Append($"...")` and `string.Create(provider, $"...")` | Not representable. The enclosing statement or member is kept as C# interop (`§CSHARP`), so the call still builds its handler. With fallback disabled (`--no-fallback`) the conversion reports `string-interpolation-handler` instead. |
+| An `[InterpolatedStringHandler]` parameter: custom logging and assertion APIs, and .NET overloads such as `StringBuilder.Append($"...")` and `string.Create(provider, $"...")` | Not representable. The enclosing statement (as `§RAW`) or member (as `§CSHARP`) is kept as C# interop, so the call still builds its handler, and the report counts it as `string-interpolation-handler`. With fallback disabled (`--no-fallback`) the conversion fails and names that feature instead. |
 
 A `FormattableString` target with no holes, such as `FormattableString.Invariant($"text")`, has
 no Calor form either, so its statement is kept as C#.

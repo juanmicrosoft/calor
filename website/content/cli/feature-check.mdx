@@ -13,8 +13,55 @@ calor feature-check --list --level partial
 ```
 
 `--level` filters the registry to `full`, `partial`, `notsupported`, or
-`manualrequired`. A support level describes the converter's expected handling;
-conversion can still preserve an unsupported construct as an interop block.
-Use [`calor coverage`](/docs/cli/coverage/) for a source-file-specific report
+`manualrequired`. The command always prints a [schema 2.0 envelope](/docs/cli/envelope-schema/)
+with the answer under `data`: `supportLevel`, `description`, and an `alternative`.
+A name that is not in the registry returns `"found": false`.
+
+A support level describes the converter's expected handling, not a guarantee for
+your file. Conversion can still preserve an unsupported construct as an interop
+block. Use [`calor coverage`](/docs/cli/coverage/) for a source-file-specific report
 and [`calor convert`](/docs/cli/convert/) for the actual conversion and loss
-report.
+report. Most feature names in a conversion report, such as `iterator-accessor`,
+are registry names you can pass to this command. A few are labels for a preservation
+mechanism, not features: `post-validation-fallback` (a rescue or passthrough) returns
+`"found": false`.
+
+## Interop Features in 0.25
+
+These are the registry entries for the C# features the
+[interoperability guide](/docs/guides/csharp-interoperability/) covers, as the
+0.25 converter (not yet released) reports them. `Partial` means some shapes
+convert natively and the rest stay C#; the description lists which.
+
+| Feature | Level | Native | Stays C# |
+|:--------|:------|:-------|:---------|
+| `ref-parameter` | Partial | `ref` parameters and `§A{ref}` arguments | ref locals and returns, conditional refs, `scoped`/`ref readonly`, by-reference delegates, constructor and indexer arguments, method-generic by-reference parameters |
+| `out-parameter` | Partial | `out` parameters and `§A{out}` arguments, `out _`; flow attributes such as `[NotNullWhen]` are copied but inert | method-generic `out T` |
+| `out-var` | Partial | `out var` in a local declaration, `return`, or `if` condition directly in a block (the registry also lists the expression statement; see below) | loop/`using`/`lock` headers, lambdas, queries, holes, filters, initializers, expression-bodied members |
+| `in-parameter` | Full | `in` parameters and `§A{in}` arguments | call sites that omit `in`, pass a value, or pass an operand that runs code (the statement stays C#), and `in` indexer parameters |
+| `string-interpolation` | Partial | `string`/`object` targets; `FormattableString`/`IFormattable` targets with holes | handler targets, hole-free `FormattableString` targets, holes outside the native subset |
+| `string-interpolation-to-string` | Full | `string`/`object` targets | — |
+| `string-interpolation-formattable` | Partial | targets with at least one hole, via an explicit cast | hole-free targets |
+| `string-interpolation-hole` | Partial | names; regular string, `char`, `bool` and `int` literals; plain-digit `double` literals with a fractional part; dotted member access; operators over those (not `as`, `is` or `??`); `nameof`; `typeof`; dotted calls with positional arguments of those kinds (not `null`, and member access only on a name) | other holes, including `decimal`, `long` and whole-number `double` literals and operators with a call operand, keep their C# text as `§CS{...}` |
+| `string-interpolation-handler` | NotSupported | — | the statement or member |
+| `local-function` | Partial | the bounded slice in the [guide](/docs/guides/csharp-interoperability/#keep-a-small-local-helper-function): non-capturing, declared directly in a method body, plain by-value parameters, used only as a call or in a checked value position | any other local function (the whole member stays C#) |
+| `iterator-accessor` | NotSupported | — | the property or indexer (`§CSHARP`) |
+| `partial-property` | NotSupported | — | each declaration (`§CSHARP`) |
+| `array-element-block` | NotSupported | — | the statement holding a collection-initializer element, or a multi-line element in a rectangular array row |
+
+**Known gaps between the registry and 0.25 behavior.** Five entries do not match
+the converter. Trust the conversion report over these entries:
+
+- `out-var` lists the expression statement as native. A call statement such as
+  `int.TryParse(s, out var n);` gets the lowering, but its output fails the C# round
+  trip, so the CLI rescues the type and MCP and `calor migrate` refuse the file.
+- `ref-expression` says "ref expressions are stripped during conversion" (Full).
+  Ref locals and block-bodied ref returns are preserved as C# instead. An
+  expression-bodied ref return (`=> ref a[0]`) fails the C# round trip and is
+  rescued or refused.
+- `multidim-array` says "fully supported" (Full). Rectangular arrays with a
+  collection-initializer or multi-line element are preserved (`array-element-block`).
+- `out-parameter` says parameters with flow attributes such as `[NotNullWhen]` are
+  preserved as C#. They convert natively, with the attribute copied and inert.
+- `yield-return` is Full for iterator *methods* only. Iterator accessors are
+  `iterator-accessor` (NotSupported).

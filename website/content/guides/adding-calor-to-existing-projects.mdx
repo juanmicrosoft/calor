@@ -142,9 +142,37 @@ without `--format json`, inspect the equivalent text loss report. Review:
 
 When a member cannot be converted safely, `calor convert` can preserve the
 original C# inside `§CSHARP` rather than discarding the whole file. That is a
-useful migration boundary, not completed conversion. `--passthrough` widens the
-set of members eligible for preservation; `--no-fallback` asks the command to
-fail instead.
+useful migration boundary, not completed conversion. `--no-fallback` asks the
+command to fail instead.
+
+To tell a fully native file from a partly preserved one, read
+`data.conversionPaths.outcome` in the JSON output: `native`, `preserved`,
+`lossy`, or `refused`. Each loss also names its `path`: `interop` (the
+converter has no Calor form for the construct), `rescue` (its Calor failed to
+parse or to compile back to C#, so the original C# of the type was kept), or
+`passthrough` (kept only because you asked). `calor convert` rescues by
+default. `calor migrate` and the MCP tools do not rescue a round-trip failure
+by default, so the same file can be refused there; see
+[Which mechanism kept the C#](/docs/guides/csharp-interoperability/#which-mechanism-kept-the-c).
+
+### Common C# Features in a Pilot File
+
+The 0.25 converter, not yet released, handles these as follows. The
+[C# interoperability guide](/docs/guides/csharp-interoperability/) shows each
+one with real converter output.
+
+| C# feature | Native in 0.25 | Stays C# |
+|:-----------|:---------------|:---------|
+| `ref`, `out`, `in` arguments | `TryParse`/`TryGetValue` with a declared variable, `out _`, `out var` in a declaration, `return` or `if` condition; `ref`/`in` on locals, fields and array elements | `out var` in a call statement or loop header, ref locals and returns, generic `out T`; `[NotNullWhen]` is kept but does not narrow |
+| Interpolated strings | `string`/`object` targets; `FormattableString`/`IFormattable` targets with holes (explicit cast) | Handler targets such as `StringBuilder.Append($"...")`; holes outside the native subset stay `§CS{...}` |
+| Local functions | Non-capturing, non-generic, synchronous helpers declared in a method body | Capturing, generic, `async` and iterator local functions (the whole member) |
+| Arrays in expressions | 1-D, jagged and rectangular arrays in returns, arguments and `?:` branches | Collection-initializer elements, multi-line elements in rectangular rows, assignments used as elements |
+| Iterator properties and indexers | — | Always: the member stays `§CSHARP` |
+
+In 0.24, more of these stayed C#, often the whole type, through the CLI's
+automatic rescue. Converted output often also needs effect declarations (`§E{...}`)
+before it compiles with default options; until then, compile it with
+`--permissive-effects` (see below).
 
 The converter is continuously exercised against MediatR, Serilog, and
 FluentValidation. All 364 converted modules currently parse, but parse success
@@ -251,5 +279,6 @@ Write a function that validates email addresses with:
 - [Contracts](/docs/syntax-reference/contracts/) - Writing preconditions and postconditions
 - [Effects](/docs/syntax-reference/effects/) - Declaring side effects
 - [calor assess](/docs/cli/analyze/) - Understanding migration scores
+- [Converting C#: What Stays C# and Why](/docs/guides/csharp-interoperability/) - Task-by-task interop guide
 - [calor convert](/docs/cli/convert/) - Conversion losses, validation, and interop rescue
 - [Project Intelligence for Agents](/docs/guides/project-intelligence-for-agents/) - Query callers and impact

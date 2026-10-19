@@ -1,0 +1,549 @@
+---
+title: "Converting C#: What Stays C# and Why"
+section: "guides"
+order: 1.5
+description: "Task-by-task guide to the 0.25 C# converter: by-reference calls, interpolated strings, local functions, arrays, iterator properties, and how to read the conversion report"
+---
+
+This guide walks through the C# features you are most likely to hit when you convert
+existing code with `calor convert`, `calor migrate`, or the MCP tools. For each one it
+shows what becomes native Calor, what stays C#, and how the report tells you which
+happened.
+
+**Version scope.** This page describes the converter on the main branch for the 0.25
+release, which is **not released yet**. Each section says what differs in 0.24, the
+latest release. Every Calor block on this page is real `calor convert` output. CI compiles
+each complete program, and checks each block against the converter's output for the C#
+shown (the interpolation block is a fragment of that output). The C# inputs and the full
+CLI and MCP transcripts are in the repository under `docs/plans/evidence/v0.25-w1-1429/`.
+
+Two terms used throughout:
+
+- **Native** means the converter wrote Calor for the code. The Calor compiler then
+  type-checks it and checks its effects (the `§E{...}` declaration of what a function may
+  do, such as console output or allocation).
+- **Preserved** means the converter kept the original C# text inside the Calor file. A
+  whole member is kept in a `§CSHARP{...}§/CSHARP` block, a single statement in a
+  `§RAW ... §/RAW` block, and a single expression as `§CS{...}`. Preserved C# still
+  builds and runs as before, but the Calor compiler cannot see inside it. It assumes the
+  worst about its effects and warns with `Calor0419` where that matters.
+
+Preserved C# is a migration boundary, not a failure. It is also work that is still to do.
+Every preserved piece is counted in the report.
+
+---
+
+## Before you start: run one file and read the report
+
+```bash
+calor convert Inventory.cs -o Inventory.calr
+```
+
+A fully native conversion prints `✓ Conversion successful`. Anything else prints a
+summary such as:
+
+```text illustrative
+Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:
+  InteropPreserved: 1
+    <dir>/Grid.cs:26 [array-element-block]
+  Preservation paths: 1 by converter interop (unsupported construct)
+```
+
+The bracketed name (`array-element-block`) is the feature that was preserved. Pass it to
+[`calor feature-check`](/docs/cli/feature-check/) to read its support level. The
+"Preservation paths" line says *why* the C# was kept; see
+[Which mechanism kept the C#](#which-mechanism-kept-the-c). For the machine-readable
+version, add `--format json` and read `data.conversionPaths`.
+
+---
+
+## Call TryParse, TryGetValue, and other ref/out/in methods
+
+C# passes `ref`, `out` and `in` arguments by reference: the callee writes the caller's own
+variable. Calor has the same feature. A parameter is declared `(T:name:ref)`, `(T:name:out)`
+or `(T:name:in)`, and the argument is marked `§A{ref} x`, `§A{out} x` or `§A{in} x`. The
+generated C# passes the variable itself, never a copy.
+
+This C#:
+
+{/* w1-source: W1-F1-refout */}
+```csharp
+using System.Collections.Generic;
+
+public static class Inventory
+{
+    public static int ParseOr(string text, int fallback)
+    {
+        if (int.TryParse(text, out var n))
+        {
+            return n;
+        }
+        return fallback;
+    }
+
+    public static int CountOf(Dictionary<string, int> stock, string item)
+    {
+        int count;
+        stock.TryGetValue(item, out count);
+        return count;
+    }
+
+    public static bool IsNumber(string text) => int.TryParse(text, out _);
+
+    public static void Bump(ref int x)
+    {
+        x = x + 1;
+    }
+
+    public static int Twice(in int x) => x * 2;
+
+    public static int Run()
+    {
+        int total = 1;
+        Bump(ref total);
+        return Twice(in total) + ParseOr("40", 0);
+    }
+}
+```
+
+converts natively on every surface (CLI, `calor migrate`, MCP), and the output compiles
+with default options:
+
+{/* w1-transcript: W1-F1-refout */}
+```calor
+§M{m001:Inventory:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Inventory:pub:stat}
+      §MT{m002:ParseOr:pub:stat} (str:text, i32:fallback) -> i32
+        §B{~n:i32}
+        §IF{if003} §C{int.TryParse} §A text §A{out} n §/C
+          §R n
+        §R fallback
+
+      §MT{m004:CountOf:pub:stat} (Dict<str, i32>:stock, str:item) -> i32
+        §B{~count:i32} `default`
+        §C{stock.TryGetValue} §A item §A{out} count §/C
+        §R count
+
+      §MT{m005:IsNumber:pub:stat} (str:text) -> bool
+        §R §C{int.TryParse} §A text §A{out} _ §/C
+
+      §MT{m006:Bump:pub:stat} (i32:x:ref)
+        §ASSIGN x (+ x 1)
+
+      §MT{m007:Twice:pub:stat} (i32:x:in) -> i32
+        §R (* x 2)
+
+      §MT{m008:Run:pub:stat} () -> i32
+        §B{~total:i32} 1
+        §C{Bump} §A{ref} total §/C
+        §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A "40" §A 0 §/C)
+```
+
+(`§NS{ns_global:_global:global}` stands for C#'s global namespace, and
+`overflow=unchecked` keeps C#'s default integer overflow behavior.)
+
+**What converts natively:**
+
+- `TryParse` and `TryGetValue` with a variable declared earlier (`int count;` then
+  `out count`), and the `out _` discard.
+- `out var n` / `out T n` when the call is in a local declaration
+  (`bool ok = int.TryParse(s, out var n);`), a `return`, or an `if` condition directly
+  inside a block. Calor has no inline declaration, so the converter writes a mutable
+  binding (`§B{~n:i32}`) just before the statement.
+- `ref` and `in` arguments that are locals, parameters, fields, array elements, or fields
+  of struct array elements (`Bump(ref pts[0].X)` passes the element's own field), when
+  the operand runs no code of its own. A C# `ref` argument to an `in` parameter becomes
+  `§A{in}`.
+
+**What stays C# in 0.25:**
+
+- **`out var` in a call that is a statement by itself** (`int.TryParse(s, out var n);`).
+  The converter writes the binding, but the result fails the C# round trip, so it is not
+  usable. `calor convert` keeps the whole type as C# (an automatic rescue); MCP
+  `calor_convert` and `calor migrate` refuse the file. Declare the variable first, or use
+  the call's result. The transcript is fixture `W1-F1-outvar-statement`.
+- `out var` in other places: `while`/`for`/`using`/`lock` headers, lambdas, LINQ queries,
+  interpolation holes, `catch` filters, initializers, and expression-bodied members. The
+  expression, statement or member that holds it stays C#.
+- Ref locals (`ref int r = ref a[0];`), block-bodied ref returns, conditional refs,
+  `scoped` and `ref readonly` parameters, `this ref`/`this in` extension calls,
+  by-reference delegates and lambdas, by-reference constructor and indexer arguments,
+  and method-generic `out T` or `ref T` parameters. The member stays `§CSHARP`; the
+  report names feature `method` and warns with the shape, such as `ref-parameter`.
+- Call sites C# allows but Calor cannot write: an `in` argument passed without `in`
+  (`Twice(x)`), or a by-reference operand that runs code (`Bump(ref a[Next()])`). In a
+  block body only that statement stays C#, as `§RAW`, reported as `in-parameter`. In an
+  expression-bodied member (`int Run(int x) => Twice(x);`) the whole member stays
+  `§CSHARP`, reported as `method`.
+- **An expression-bodied ref return** (`ref int First(int[] a) => ref a[0];`) is not
+  recognized in 0.25. Its Calor fails the C# round trip, so the CLI rescues the whole type
+  and MCP `calor_convert` and `calor migrate` refuse the file (fixture
+  `W1-F1-ref-return-expression`). Write it with a block body to get member preservation.
+
+In the tested cases, each shape on this list either keeps its C# or fails with a report.
+
+**Flow attributes are kept but have no effect.** An `out` parameter with
+`[NotNullWhen(true)]` converts natively; the attribute is copied as
+`[@NotNullWhen(true)]` (fixture `W1-F1-notnullwhen`). Calor does not use it to narrow
+the variable after a `true` result, so a caller may still need a null check where C#
+needed none.
+Writing the same
+call by hand in Calor has rules of its own, such as error `Calor0212` for an operand C#
+cannot pass by reference. See [By-reference arguments](/docs/syntax-reference/calls/#by-reference-arguments-ref-out-in).
+
+**Changed since 0.24:** `out var` inside `?:` used to become an inline `§CS{...}`; it is
+now a native binding. Passing an element field of a struct array used to pass a copy.
+Writes through `ref` and `out` are now charged as effects (`mut` for an element or field).
+
+---
+
+## Format strings with interpolation
+
+In C#, the *target type* of `$"..."` (the type it is converted to) decides what is built:
+a `string`, a `FormattableString`, or a call to an interpolated-string handler. The target
+type can also pick a different overload. The converter keeps that choice.
+
+| C# target | Result |
+|:----------|:-------|
+| `string` or `object`, including a `return` | Native: a Calor string with `${...}` holes. Alignment, format specifiers, culture and left-to-right hole order are kept. |
+| `FormattableString` or `IFormattable`, with at least one hole | Native, with an explicit cast, so the same overload is chosen. |
+| `FormattableString` with no holes, such as `FormattableString.Invariant($"text")` | Preserved: the statement or member stays C#. Reported as `string-interpolation-formattable-constant`. |
+| An `[InterpolatedStringHandler]` parameter: custom logging APIs, `StringBuilder.Append($"...")`, `string.Create(provider, $"...")` | Preserved: the statement (`§RAW`) or member (`§CSHARP`) stays C#, so the handler still runs. Reported as `string-interpolation-handler`. |
+
+For this C#:
+
+{/* w1-source: W1-F2-interpolation */}
+```csharp
+using System;
+using System.Text;
+
+public static class Report
+{
+    public static string Line(string item, double amount) => $"{item,-8}|{amount,10:F2}";
+
+    public static string Kind(FormattableString f) => "fs:" + f.Format;
+
+    public static string Kind(object o) => "object:" + o;
+
+    public static string Pick(int x) => Kind($"k={x}");
+
+    public static string Build(int x)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"x={x}");
+        return sb.ToString();
+    }
+}
+```
+
+`Pick` calls `Kind(FormattableString)`, and `Build` passes the string to a handler overload of
+`StringBuilder.Append`. The converter writes these lines (fragments of the full output):
+
+{/* w1-transcript-lines: W1-F2-interpolation */}
+```calor
+        §R "${item,-8}|${amount,10:F2}"
+        §R §C{Kind} (cast global::System.FormattableString "k=${x}")
+        §RAW
+        sb.Append($"x={x}");
+        §/RAW
+```
+
+The report shows one preserved statement, `string-interpolation-handler`, on every
+surface. This output does not compile with default options: the converted functions
+declare no effects, so the compiler reports `Calor0410` (an effect is used but not
+declared). Add the effect declarations, or compile with `--permissive-effects` while you
+migrate.
+
+**Holes.** A hole converts natively when it is a name; a regular (not verbatim) string,
+`char`, `bool` or `int` literal; a `double` literal written as plain digits with a
+fractional part (`1.5`, not `1e-7` or `0.0000001`); dotted member access; `nameof`;
+`typeof`; an operator over those (not `as`, `is` or `??`); or a call with a dotted target
+whose positional arguments are of those kinds or such calls, except `null` and a member
+access whose receiver is not a name (`Pad(typeof(T).Name, 8)` keeps its hole as C#). Any
+other hole keeps its C#
+text as `§CS{...}` inside the hole: for example `{items[i]}`, `{customer?.Name}`, a
+`decimal`, `long` or whole-number `double` literal (`{4.0}`), or an operator with a call
+operand (`{Next() + 1}`). A verbatim or raw interpolated string (`$@"..."`, `$"""..."""`)
+whose format clause contains a backslash keeps its whole statement as C#. It is counted as interop, and its effects are assumed
+(`Calor0419`).
+
+**Limits.** The converter decides the target type from the single file it is converting.
+If a called method comes from an assembly it was not given, the string converts as a
+plain string, and the C# compiler applies target typing again when the generated code
+is built. `calor feature-check string-interpolation` reports **Partial**: interpolation is
+not fully supported, because handler targets have no Calor form.
+
+**Changed since 0.24:** a call whose only overload took a `FormattableString` made the
+converted Calor fail to compile, and the CLI then kept the whole class as C#. MCP
+`calor_convert` turned handler arguments into plain strings that failed to compile
+(`Calor0208`). Details: [Converting C# interpolated strings](/docs/syntax-reference/string-operations/#converting-c-interpolated-strings).
+
+---
+
+## Keep a small local helper function
+
+A C# local function converts natively when it is *bounded*:
+
+- declared directly in a method body (not a constructor, accessor, block or lambda);
+- capturing nothing from the enclosing method (locals, parameters, `this`);
+- no attributes, type parameters, `async`/`unsafe`/`extern`, ref return, `yield`, or
+  nested local function;
+- parameters that are plain, typed and by value: no `ref`/`out`/`in`/`params`, default
+  values or attributes;
+- its name is used only as a call, as a call argument, or (outside lambdas) as a binding
+  initializer, a `return` value or the value of a simple assignment. Any other use, such
+  as `new Func<int, int>[] { Clamp }`, keeps the member as C#.
+
+It becomes a nested `§F`, emitted back as a C# `static` local function.
+
+{/* w1-source: W1-F3-local-functions */}
+```csharp
+public static class Shapes
+{
+    public static int Area(int w, int h)
+    {
+        int Clamp(int v) => v < 0 ? 0 : v;
+        return Clamp(w) * Clamp(h);
+    }
+
+    public static int Scaled(int w, int factor)
+    {
+        int Scale(int v) => v * factor;
+        return Scale(w);
+    }
+}
+```
+
+`Clamp` is bounded, so it converts. `Scale` captures `factor`, so `Scaled` is preserved:
+
+{/* w1-transcript: W1-F3-local-functions */}
+```calor
+§M{m001:Shapes:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Shapes:pub:stat}
+      §MT{m002:Area:pub:stat} (i32:w, i32:h) -> i32
+        §F{f003:Clamp} (i32:v) -> i32
+          §R (? (< v 0) 0 v)
+        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)
+
+      §CSHARP{
+    public static int Scaled(int w, int factor)
+    {
+        int Scale(int v) => v * factor;
+        return Scale(w);
+    }
+      }§/CSHARP
+```
+
+A member with any local function outside the bounded slice is kept whole as `§CSHARP`.
+The report names the member (feature `method`) and warns with `local-function`.
+To convert it, pass the captured value as a parameter (`int Scale(int v, int f) => v * f;`)
+or move the helper to a private method. The language rules for local functions are in
+[Local Functions](/docs/syntax-reference/structure-tags/#local-functions).
+
+**Changed since 0.24:** every member with a local function was preserved, and its callers
+needed `--permissive-effects` to compile.
+
+---
+
+## Build arrays inside expressions
+
+Arrays created inside an expression (a `return`, an argument, a `?:` branch, a field
+initializer) convert natively. Elements run once, left to right, in place, and the
+unselected `?:` branch still never runs.
+
+{/* w1-source: W1-F5-arrays */}
+```csharp
+using System.Collections.Generic;
+
+public static class Grid
+{
+    public static int[,] Pick(bool wide, int v)
+    {
+        return wide
+            ? new int[,] { { v, v + 1 } }
+            : new int[,] { { v } };
+    }
+
+    public static int Sum(int[] xs, int start)
+    {
+        int s = start;
+        foreach (var x in xs)
+        {
+            s = s + x;
+        }
+        return s;
+    }
+
+    public static int Total(int v) => Sum(new int[] { v, v * 2 }, Pick(true, v)[0, 1]);
+
+    public static int Mixed()
+    {
+        object[] items = { new List<int> { 1 }, 2 };
+        return items.Length;
+    }
+}
+```
+
+{/* w1-transcript: W1-F5-arrays */}
+```calor
+§M{m001:Grid:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Grid:pub:stat}
+      §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]
+        §E{alloc}
+        §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}
+
+      §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32
+        §B{~s:i32} start
+        §EACH{each008:x:var} xs
+          §ASSIGN s (+ s x)
+        §R s
+
+      §MT{m009:Total:pub:stat} (i32:v) -> i32
+        §E{alloc}
+        §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+
+      §MT{m011:Mixed:pub:stat} () -> i32
+        §RAW
+        object[] items = { new List<int> { 1 }, 2 };
+        §/RAW
+        §R (len items)
+```
+
+`Mixed` shows a limit: an element that Calor would write as a block, such as a collection
+initializer, keeps its statement as C# (`array-element-block`). So does a multi-line element,
+such as an anonymous object, in a rectangular array row. An assignment used as an element,
+index or size is kept as C# too (`conditional-expression-hoisting`). The compile of this
+output passes with one `Calor0419` warning, for the preserved statement.
+
+Calls to array members, such as `g.GetLength(0)` or `g.Rank`, are unknown calls to the
+effect checker (`Calor0411`). A function that makes one reports `Calor0410` unless it
+declares the effect or is compiled with `--permissive-effects`. The full list of supported
+shapes is in [Array Expressions](/docs/cli/convert/#array-expressions).
+
+**Changed since 0.24:** `return new T[,] { ... }` produced C# that did not compile, and
+arrays in a `?:` branch did not parse. Only the CLI's automatic rescue hid that, by keeping
+the whole type as C#.
+
+---
+
+## Convert a class with iterator properties
+
+A property or indexer getter that uses `yield return` is an *iterator accessor*. Calor has
+none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps that member as
+`§CSHARP` and converts the rest of the class:
+
+{/* w1-transcript: W1-F4-iterator-accessor */}
+```calor
+§M{m001:Countdown:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Countdown:pub}
+      §FLD{i32:Start:pub} = 3
+
+      §MT{m002:First:pub} () -> i32
+        §EACH{each003:s:var} Steps
+          §R s
+        §R 0
+
+      §CSHARP{
+    public IEnumerable<int> Steps
+    {
+        get
+        {
+            for (int i = Start; i > 0; i--)
+            {
+                yield return i;
+            }
+        }
+    }
+      }§/CSHARP
+```
+
+The C# compiler still builds the iterator, so laziness, `finally` on dispose, and the
+timing of exceptions do not change. The result is the same on every surface, with or
+without passthrough, because the converter does it itself (feature `iterator-accessor`).
+`--no-fallback` refuses the file instead. To make the member native, move the loop into an
+iterator method and return its result from the getter; see
+[Iterator Properties and Indexers](/docs/cli/convert/#iterator-properties-and-indexers).
+Iterators in ordinary methods already convert to `§YIELD`.
+
+**Changed since 0.24:** the converter wrote `§YIELD` inside the getter. That fails with
+`Calor0209`; only the CLI's rescue hid it, and MCP `calor_convert` returned Calor that did
+not compile.
+
+---
+
+## What stays C#, and why
+
+| C# you wrote | What you get | Reported feature |
+|:-------------|:-------------|:-----------------|
+| `out var` in a call statement; an expression-bodied ref return | Type rescued (CLI) or file refused (MCP, migrate) | `post-validation-fallback` |
+| `out var` in a loop header, a lambda or a hole | That expression, statement or member kept as C# | varies, for example `conditional-expression-hoisting` |
+| Ref locals, block-bodied ref returns, `scoped`/`ref readonly`, generic `out T` | Member preserved | `method`, with a warning naming the shape |
+| An `in` argument passed without `in`; a by-reference operand that runs code | Statement kept as `§RAW` (whole member in an expression-bodied member) | `in-parameter` (`method`) |
+| Interpolated-string handler targets, hole-free `FormattableString` | Statement or member preserved | `string-interpolation-handler`, `string-interpolation-formattable-constant` |
+| Unsupported interpolation holes | The hole keeps its C# text (`§CS{...}`) | `string-interpolation-hole` |
+| Capturing, generic, async or iterator local functions | Member preserved | `method` with a `local-function` warning |
+| A collection-initializer array element, or a multi-line element in a rectangular array row | Statement preserved | `array-element-block` |
+| An assignment used as an array element, index or size | Statement or member preserved | `conditional-expression-hoisting` |
+| `yield` in a property or indexer getter; partial properties | Member preserved | `iterator-accessor`, `partial-property` |
+
+The reason is the same each time: Calor has no form that keeps the C# meaning exactly, or
+the converter's Calor for it does not survive the C# round trip. So the C# is kept, or the
+file is refused, rather than converted to Calor that would behave differently.
+
+**Reading the counts.** `nativeConversionCount` (CLI JSON) and `nativeConversions` (MCP)
+count constructs the converter wrote as Calor, not members. They still include the
+constructs of a type that a rescue later replaced with its original C#. For example, the
+`W1-F6-rescue` fixture reports 3 native conversions and 1 rescue, yet its output is all
+C#. To know whether a file is fully native, read `conversionPaths.outcome` (`native`,
+`preserved`, `lossy` or `refused`) and the per-path counts next to it.
+
+---
+
+## Which mechanism kept the C#
+
+Three mechanisms can preserve C#. The report names the one that fired as the loss's
+`path`:
+
+| Path | When it fires |
+|:-----|:--------------|
+| `interop` | The converter knows it has no Calor form for the construct. Every surface does this. |
+| `rescue` | The converter wrote Calor, but it did not parse (`parse-failure`) or the C# generated from it did not compile (`round-trip-failure`). The original C# of the whole type is kept. |
+| `passthrough` | Like a rescue, but it happened only because you asked for it (`--passthrough`, or MCP `passthroughOnError: true`). |
+
+Whether a rescue can happen depends on the surface. These are the defaults each surface
+reports in `conversionPaths`:
+
+| Surface | Rescues a round-trip failure by default? | Option that adds passthrough |
+|:--------|:-----------------------------------------|:-----------------------------|
+| `calor convert` | Yes (`rescueUnusableMembers: true`) | `--passthrough` |
+| MCP `calor_convert` | No: the call fails with `isError: true` and `outcome: "refused"` | `passthroughOnError: true` |
+| `calor migrate`, MCP `calor_migrate`, MCP `calor_batch` | No: the file fails | none that rescues it |
+| `CSharpToCalorConverter` (library) | No | `PassthroughOnError` |
+
+A member whose Calor does not parse is rescued on every surface in the default lossless
+mode. The trailing-label example `W1-F6-rescue` shows the difference: `calor convert`
+rescues it and exits 0, MCP `calor_convert` refuses it unless you pass `passthroughOnError`,
+and `calor migrate` refuses the whole one-file project with exit code 1. The
+[`calor convert`](/docs/cli/convert/#which-path-preserved-each-member) and
+[MCP](/docs/cli/mcp/#conversion-paths-in-calor-convert-calor-migrate-and-calor-batch)
+pages show the exact output.
+
+---
+
+## Next steps
+
+- [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) — the full pilot workflow
+- [calor convert](/docs/cli/convert/) — options, report formats and exit codes
+- [calor migrate](/docs/cli/migrate/) — whole-project conversion and partial failures
+- [calor feature-check](/docs/cli/feature-check/) — the support level of each feature
+- [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/) — nullable references at the C# boundary

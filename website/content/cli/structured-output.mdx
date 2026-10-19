@@ -49,6 +49,27 @@ Fields that do not apply are omitted. `diagnostics[].fix.edits[]` carries
 machine-applicable, 1-based, end-exclusive source edits when a diagnostic has a
 fix. Command-specific results live under `data`.
 
+## Conversion Output
+
+The C# → Calor surfaces report in three shapes:
+
+| Surface | Document | Conversion issues | Per-file result |
+|:--------|:---------|:------------------|:----------------|
+| `calor convert --format json` | Envelope on stdout; the text report goes to stderr (but see `--verbose` below) | `diagnostics[]`: `Calor1343`, message prefixed with the feature name | `data.losses[]` and `data.conversionPaths` |
+| `calor migrate --report <file>.json` | Envelope written to the report file | `Calor1343` diagnostics | `data.fileResults[].losses[]` and `.conversionPaths` |
+| MCP `calor_convert` | The tool's own result object | top-level `issues[]` (envelope-form `Calor1343` entries) | `lossSummary.locations[]` and `lossSummary.paths` |
+| MCP `calor_migrate` (`phase: "convert"`) | The tool's own result object | `perFile[].errors[]` and `perFile[].warnings[]` | `perFile[].losses[]` and `perFile[].conversionPaths` |
+| MCP `calor_batch` (`action: "convert"`) | The tool's own result object | `files[].issues[]` | `files[].conversionPaths` |
+
+In 0.25, `calor convert --format json --verbose` also prints progress lines to stdout
+before the envelope, so stdout is not a single JSON document with `--verbose`.
+
+`conversionPaths.outcome` (`native`, `preserved`, `lossy`, `refused`) is the field
+to test. The native construct counts (`nativeConversionCount`,
+`lossSummary.nativeConversions`) also count constructs of a type a rescue later
+replaced with C#. See [Which mechanism kept the C#](/docs/guides/csharp-interoperability/#which-mechanism-kept-the-c)
+for the per-surface defaults.
+
 Exit codes do not change with the output format: tools must inspect both the
 process exit code and the document. See [Envelope Schema](/docs/cli/envelope-schema/)
 for field-level details.

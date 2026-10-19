@@ -1,0 +1,8 @@
+public class Counter
+{
+    public int Next(int x)
+    {
+        done:
+        return x + 1;
+    }
+}

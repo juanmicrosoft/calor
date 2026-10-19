@@ -1,0 +1,26 @@
+using System.Collections.Generic;
+
+public class Countdown
+{
+    public int Start = 3;
+
+    public IEnumerable<int> Steps
+    {
+        get
+        {
+            for (int i = Start; i > 0; i--)
+            {
+                yield return i;
+            }
+        }
+    }
+
+    public int First()
+    {
+        foreach (var s in Steps)
+        {
+            return s;
+        }
+        return 0;
+    }
+}
