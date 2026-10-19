@@ -31,7 +31,11 @@ public static class ReleaseCandidateInvalidation
             "tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidationTests.cs",
             "tests/Calor.Compiler.Tests/EvidenceContract/V025CandidateManifestTests.cs",
         ],
-        ["docs/plans/evidence/v0.25-regeneration/", "docs/plans/evidence/adjudication-1430/"]);
+        // Scope amendment 1.4.0 (D-READY-EVIDENCE-DIRS): each family's READY record and evidence are added under its
+        // evidence directory's ready/ until A1; scope.json and the T1 register are written back after A1.
+        ["docs/plans/evidence/v0.25-regeneration/", "docs/plans/evidence/adjudication-1430/",
+         "docs/plans/evidence/v0.25-f1-943/ready/", "docs/plans/evidence/v0.25-f2-906/ready/", "docs/plans/evidence/v0.25-f3-847/ready/",
+         "docs/plans/evidence/v0.25-f4-1139/ready/", "docs/plans/evidence/v0.25-f5-1132/ready/", "docs/plans/evidence/v0.25-f6-1144/ready/"]);
 
     private static readonly string[] DataExtensions = { ".json", ".jsonl", ".md", ".txt", ".log", ".trx", ".csv", ".gz", ".sha256" };
     private const string RegularFile = "100644";

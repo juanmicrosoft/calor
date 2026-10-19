@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-interop-scope/1",
-  "scopeVersion": "1.3.0",
+  "scopeVersion": "1.4.0",
   "status": "FROZEN",
   "gateStatus": "MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
@@ -354,6 +354,13 @@
         "requirement": "closed before acceptance"
       }
     ]
+  },
+  "readinessRecords": {
+    "amendment": "1.4.0",
+    "decision": "D-READY-EVIDENCE-DIRS",
+    "rule": "From the 0.25 candidate freeze until A1 (#1430) records its outcome, each family's READY record and its per-case and witness-run evidence live in that family's evidence directory, under ready/ (docs/plans/evidence/<family dir>/ready/, the directory of readiness.evidence), as newly added files outside the frozen inputs. A1 cites those records by path and SHA-256. scope.json readiness (and the T1 register's mirror) is written back after A1, in the way post-merge ledger write-backs are, by a later amendment; until then readiness here stays as frozen with the candidate.",
+    "recordFields": "The record has the fields that section 10 lists for a READY readiness record, and it names the frozen candidate commit.",
+    "classifier": "The 0.25 candidate invalidation classifier exempts only newly added data or text files under each family's ready/ directory; any other change to the family evidence, scope.json or the T1 register still invalidates the candidate."
   },
   "capacity": {
     "status": "ACCEPTED",
@@ -3270,6 +3277,54 @@
             "requirement": "closed before acceptance"
           }
         ]
+      }
+    },
+    {
+      "version": "1.4.0",
+      "dateUtc": "2026-10-19T00:00:00Z",
+      "pr": 1576,
+      "afterInspection": true,
+      "justification": "Records the maintainer's three 2026-10-19 decisions on the 0.25 freeze blockers that Codex raised on the release-prep PR #1575: where READY records live until A1 (D-READY-EVIDENCE-DIRS, registered here as readinessRecords), which contract the release gate checks for 0.25.x (D-GATE-SCOPE-PACKET, implemented in scripts/verify_release_adjudication.py and eng/release-adjudication-map.json), and how the G2 determinism protocol re-runs on the 0.25 candidate (D-G2-TWO-RUNS, G2 protocol amendment 1.6.0). No case, family, ceiling, gate condition, readiness record or acceptance precondition changes. D1 records the mechanical consumption bump 1.0.6; the T1 register (1.0.2) and the W1 records consume 1.4.0.",
+      "addedCases": [],
+      "changes": [],
+      "removedCases": [],
+      "maintainerDecisions": [
+        {
+          "id": "D-READY-EVIDENCE-DIRS",
+          "date": "2026-10-19",
+          "by": "@juanmicrosoft",
+          "decision": "Evidence dirs now, scope after A1",
+          "question": "READY can be recorded only in scope.json (S007), mirrored by the T1 register; both are frozen inputs of the 0.25 candidate, so a READY amendment after the freeze would invalidate it.",
+          "relayedDetail": "Each family's READY record lives in its own evidence directory, outside the frozen inputs. A1 cites those records, and scope.json readiness is written back after A1, the same way the post-merge ledger write-backs work.",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-GATE-SCOPE-PACKET",
+          "date": "2026-10-19",
+          "by": "@juanmicrosoft",
+          "decision": "0.25 scope packet",
+          "question": "The release gate (#1410) could not check the 0.25 contract packet format (G016), and the publish workflow runs the gate from the candidate checkout; which contract governs the 0.25 release (#1548)?",
+          "relayedDetail": "Extend scripts/verify_release_adjudication.py so that for the 0.25.x map entry it checks the R0 scope packet format (#1426), including the T1 and W1 registers and the 1.3.0 acceptancePreconditions re-proof. This removes the G016 failure, and 0.24.0 behavior must stay unchanged. Update the 0.25.x map entry's packet format accordingly (still not-yet-adjudicated).",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-G2-TWO-RUNS",
+          "date": "2026-10-19",
+          "by": "@juanmicrosoft",
+          "decision": "Amend: 2 runs for 0.25",
+          "question": "The re-proof (acceptancePreconditions check provenance-determinism) runs the 0.24 G2 protocol on the 0.25 candidate, but protocol 1.5.0's 4 executions are used and later executions are bound to #1537's 0.24 merge.",
+          "relayedDetail": "Add a G2 protocol amendment that allows at most 2 executions, bound to the frozen 0.25 candidate commit named by the 0.25 candidate manifest, with a budget of about 1,600 runner-minutes under the protocol's own worst-case formula. Everything else in the frozen rule stays the same. The candidate SHA isn't known before the freeze, so bind the executions to the manifest rather than a literal SHA.",
+          "recordedAs": "G2 protocol amendment 1.6.0 (docs/plans/evidence/g2-1421/protocol.json budget.releaseEpoch)",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        }
+      ],
+      "capacityExceptions": [],
+      "readinessRecords": {
+        "amendment": "1.4.0",
+        "decision": "D-READY-EVIDENCE-DIRS",
+        "rule": "From the 0.25 candidate freeze until A1 (#1430) records its outcome, each family's READY record and its per-case and witness-run evidence live in that family's evidence directory, under ready/ (docs/plans/evidence/<family dir>/ready/, the directory of readiness.evidence), as newly added files outside the frozen inputs. A1 cites those records by path and SHA-256. scope.json readiness (and the T1 register's mirror) is written back after A1, in the way post-merge ledger write-backs are, by a later amendment; until then readiness here stays as frozen with the candidate.",
+        "recordFields": "The record has the fields that section 10 lists for a READY readiness record, and it names the frozen candidate commit.",
+        "classifier": "The 0.25 candidate invalidation classifier exempts only newly added data or text files under each family's ready/ directory; any other change to the family evidence, scope.json or the T1 register still invalidates the candidate."
       }
     }
   ],

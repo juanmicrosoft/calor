@@ -30,10 +30,12 @@ public class T1RegisterTests
         Assert.Equal(BaselineApprovalSeal, register["approvalSeal"]!.GetValue<string>());
     }
 
-    /// <summary>Each approved amendment's seal, in order. 1.0.1: F1 PR 2 (#943, PR #1571) re-ran F1's results.json.</summary>
+    /// <summary>Each approved amendment's seal, in order. 1.0.1: F1 PR 2 (#943, PR #1571) re-ran F1's results.json.
+    /// 1.0.2: consumes R0 scope 1.4.0 (the 2026-10-19 freeze decisions); no approved hash changes.</summary>
     private static readonly (string Version, string Seal)[] AmendmentSeals =
     [
         ("1.0.1", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
+        ("1.0.2", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
     ];
 
     [Fact]

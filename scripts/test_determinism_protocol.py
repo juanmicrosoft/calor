@@ -157,6 +157,15 @@ class NegativeRegistrationControls(unittest.TestCase):
     def test_d008_budget_over_ceiling(self) -> None:
         self.only("D008", protocol=mutate(lambda p: p["budget"].update(maxExecutions=5)))  # 5 x 795 > 3,200 (amendment 1.5.0)
 
+    def test_d008_release_epoch(self) -> None:
+        # Amendment 1.6.0: 2 x 795 = 1,590 within the epoch's 1,600; no control run; bound to the candidate manifest.
+        self.assertEqual((2, 0, 1600, 1590), tuple(PROTOCOL["budget"]["releaseEpoch"][k] for k in
+                                                   ("maxExecutions", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "worstCaseTotal")))
+        for edit in (lambda e: e.update(maxExecutions=3), lambda e: e.update(worstCaseTotal=1500), lambda e: e.update(maxDispatchedControlRuns=1),
+                     lambda e: e.update(ceilingRunnerMinutes=1589), lambda e: e.update(afterRunNumber=0), lambda e: e.update(amendment="9.9.9"),
+                     lambda e: e.update(candidateManifest="eng/candidate.json"), lambda e: e.pop("maxExecutions")):
+            self.only("D008", protocol=mutate(lambda p, edit=edit: edit(p["budget"]["releaseEpoch"])))
+
     def test_d009_line_ending_normalization(self) -> None:
         self.only("D009", protocol=mutate(lambda p: p["agreement"].update(normalizationRules=["CRLF -> LF"])))
         self.only("D009", protocol=mutate(lambda p: p["agreement"]["projections"][0]["dropped"].append("outcome")))
@@ -508,15 +517,47 @@ def this_run(mode="execution", execution_id="E9") -> dict:
     return past(900, f"determinism {mode} {execution_id}", sha=NEW, status="in_progress", minutes=0, started=False)
 
 
+# The 0.24 rules (before amendment 1.6.0's 0.25 epoch), which the guards below exercise unless a test passes PROTOCOL.
+PRE_EPOCH = mutate(lambda p: p["budget"].pop("releaseEpoch"))
+
+
 class PlanGuards(unittest.TestCase):
     """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
 
     def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",), ledger=None,
-             current=True, merge=None) -> list[str]:
+             current=True, merge=None, protocol=PRE_EPOCH, manifest=None) -> list[str]:
         runs = list(inventory) + ([this_run(mode, execution_id)] if current else [])
-        return dr.plan_problems(PROTOCOL, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
+        return dr.plan_problems(protocol, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
                                 ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths),
-                                pr_merge_commit=lambda pr: merge)
+                                pr_merge_commit=lambda pr: merge, manifest_candidate=lambda path: manifest)
+
+    def test_release_epoch_allows_two_executions_on_the_manifest_candidate(self) -> None:
+        # Amendment 1.6.0: runs 1-6 are the 0.24 history (4 executions, 1,608 minutes); the epoch charges only later runs.
+        history = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=400) for i in (2, 3, 5, 6)]
+        history += [past(1, "determinism control C1", minutes=13, event="pull_request"),
+                    past(4, "determinism execution E4", sha="4" * 40, minutes=2, started=False, conclusion="failure")]
+        epoch = dict(protocol=PROTOCOL, manifest=NEW)
+        self.assertEqual([], self.plan(inventory=history, **epoch))
+        for manifest in (None, OLD, NEW[:12], 7):
+            self.refused("named by docs/plans/evidence/v0.25-candidate/candidate-manifest.json", inventory=history, protocol=PROTOCOL, manifest=manifest)
+        second = history + [past(7, "determinism execution E7", sha=OLD, minutes=795, conclusion="failure")]
+        self.assertEqual([], self.plan(inventory=second, **epoch))  # 795 + 795 = 1,590 <= 1,600, on a re-frozen candidate
+        self.refused("already executed", inventory=history + [past(7, "determinism execution E7", sha=NEW)], **epoch)
+        self.refused("outside docs/", inventory=second, paths=["docs/x.md"], **epoch)
+        third = second + [past(8, "determinism execution E8", sha="8" * 40, minutes=1)]
+        self.refused("limit of 2 execution", inventory=third, **epoch)
+        self.refused("exceeds the 1600", inventory=history + [past(7, "determinism execution E7", sha=OLD, minutes=806)], **epoch)
+        self.refused("exceeds the 1600", inventory=history + [past(7, "unreadable", status="in_progress", minutes=11)], **epoch)
+        self.refused("limit of 0 control", inventory=history, mode="control", execution_id="C9", **epoch)
+        early = dict(this_run(), runNumber=6)
+        problems = dr.plan_problems(PROTOCOL, mode="execution", execution_id="E9", env=dispatch(), inventory=history[:-1] + [early],
+                                    ledger={"entries": []}, changed_paths=lambda o, n: ["src/x"], manifest_candidate=lambda p: NEW)
+        self.assertTrue(any("where the 0.25 epoch starts" in p for p in problems), problems)
+        self.assertNotIn("merge commit", " ".join(self.plan(inventory=history, **epoch)))  # the 1.5.0 binding is 0.24-only
+
+    def test_manifest_candidate_reads_protected_main_and_fails_closed(self) -> None:
+        self.assertIsNone(dr.manifest_candidate("docs/plans/evidence/no-such/candidate-manifest.json"))
+        self.assertIsNone(dr.manifest_candidate("README.md"))  # not JSON
 
     def refused(self, needle: str, **kwargs) -> None:
         problems = self.plan(**kwargs)

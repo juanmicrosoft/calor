@@ -22,6 +22,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("eng/release-adjudication-map.json", "release adjudication map")]
     [InlineData("docs/plans/evidence/v0.25-r0-1426/scope.json", "scope")]
     [InlineData("docs/plans/evidence/v0.25-t1-1428/register.json", "register")]
+    [InlineData("docs/plans/evidence/v0.25-f1-943/results.json", "evidence")]
     [InlineData("docs/plans/evidence/c1-1423/candidate-manifest.json", "documentation")]
     [InlineData("docs/plans/evidence/v0.25-candidatex/candidate-manifest.json", "documentation")]
     [InlineData("docs/plans/evidence/adjudication-1430/gate.py", "downstream evidence")]
@@ -67,6 +68,8 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("docs/plans/evidence/v0.25-regeneration/ledger.json", Phase.AfterLanding)]
     [InlineData("docs/plans/evidence/adjudication-1430/terminal-record.json", Phase.AfterLanding)]
     [InlineData("docs/plans/evidence/adjudication-1430/claim-registry.json", Phase.BeforeLanding)]
+    [InlineData("docs/plans/evidence/v0.25-f1-943/ready/F1.json", Phase.AfterLanding)]
+    [InlineData("docs/plans/evidence/v0.25-f6-1144/ready/cases/F6-REPORT-03.json", Phase.AfterLanding)]
     public void AddedReviewAndDownstreamRecordsAreExempt(string path, Phase phase)
         => Assert.True(Classify(P, new Change("A", path, "000000", Regular, null, Bytes("{}")), phase).Exempt, path);
 
@@ -77,6 +80,20 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     {
         Assert.False(Classify(P, Modify(path), Phase.AfterLanding).Exempt);
         Assert.False(Classify(P, new Change("D", path, Regular, "000000", Bytes("{}"), null), Phase.AfterLanding).Exempt);
+    }
+
+    /// <summary>Only added data or text files are exempt under a family's ready/; added code is not.</summary>
+    [Fact]
+    public void AddedCodeUnderAReadyDirectoryInvalidates()
+    {
+        var added = new Change("A", "docs/plans/evidence/v0.25-f1-943/ready/run.py", "000000", Regular, null, Bytes("print(1)"));
+        foreach (var phase in new[] { Phase.BeforeLanding, Phase.AfterLanding })
+        {
+            var decision = Classify(P, added, phase);
+            Assert.False(decision.Exempt);
+            Assert.Contains("downstream evidence", decision.Reason);
+        }
+        Assert.True(Classify(P, added with { Path = "docs/plans/evidence/v0.25-f1-943/ready/run.json" }, Phase.AfterLanding).Exempt);
     }
 
     [Fact]

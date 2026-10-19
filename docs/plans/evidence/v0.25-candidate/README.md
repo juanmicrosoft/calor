@@ -6,9 +6,9 @@ manifest in the 0.24 C1 form ... frozen for the 0.25 candidate SHA". 0.24's gene
 are tied to 0.24 (contract 1.5.0, S2 closure, G3 execution 2, `c1-1423/` paths), and editing them
 would invalidate the frozen 0.24 record, so 0.25 has its own. Nothing here publishes, tags or releases.
 
-**Two PRs.** (1) Release prep: version 0.25.0, the byte-identical `[0.25.0]` notes in `CHANGELOG.md`
-and `website/content/changelog.mdx`, the generator and the classifier; the candidate is its merge
-commit. (2) Freeze: `inputs.json` (hand-recorded candidate, merge commits, issue states, observed
+**PRs.** (1) Release prep (#1575): version 0.25.0, the byte-identical `[0.25.0]` notes in `CHANGELOG.md`
+and `website/content/changelog.mdx`, the generator and the classifier. (1b) Pre-freeze decisions
+(#1576): see "Freeze blockers"; the candidate is its merge commit. (2) Freeze: `inputs.json` (hand-recorded candidate, merge commits, issue states, observed
 toolchain, decisions, open items), the generated `candidate-manifest.json`, and
 `V025CandidateManifestTests.cs`, which re-verifies the manifest from git, checks the identity
 through P1's `DurableProvenance.Verify`, and runs the scope, T1 and D1 validators on the
@@ -49,38 +49,49 @@ recomputed all four seals equal to their pins; it failed only where expected for
 Default deny; exempt only: this directory and the classifier and manifest test files before the
 landing; added data or text files under `reviews/` at any time; the compiler-test count bump in
 `eng/test-manifest.json` before the landing; added data or text files under
-`docs/plans/evidence/v0.25-regeneration/` and `docs/plans/evidence/adjudication-1430/`. The landing
+`docs/plans/evidence/v0.25-regeneration/`, `docs/plans/evidence/adjudication-1430/` and each family's
+`ready/` (scope amendment 1.4.0). The landing
 is the freeze PR's merge; after it, the profile's own files are frozen (a change returns to #1430).
 Any git failure, including an unreadable landing manifest, gives `UNDECIDED`. As in 0.24, it is not
 a required gate on later merges, and later runs come from a checkout of the landing.
-Controls: `ReleaseCandidateInvalidationTests` (46).
+Controls: `ReleaseCandidateInvalidationTests` (50).
 
-## Open questions for the maintainer
+## Freeze blockers: decided (2026-10-19, @juanmicrosoft)
 
-Codex rated 1 and 2 (round 1) and 4 (round 2) BLOCKING for the freeze: without answers, no candidate
-frozen at this PR's merge can be accepted and published. They need maintainer decisions; if one
-needs a code or protocol change, the freeze moves to the merge of that change.
+Codex rated 1, 2 and 4 BLOCKING on the prep PR #1575. The maintainer decided them, and the pre-freeze
+PR (#1576) implements them, so the freeze is that PR's merge commit. Recorded as scope amendment 1.4.0.
 
-1. **READY write-backs.** READY is recorded only in `scope.json` (`S007`), mirrored by the T1
-   register; both are frozen inputs, so a READY amendment after the freeze invalidates the
-   candidate. Either READY evidence lives downstream and `scope.json` is written back after A1, or
-   the classifier gets a narrow readiness-only exemption.
-2. **The 0.25 contract at the gate.** The gate cannot check the scope packet format (`G016`), and
-   `publish-nuget.yml` runs the gate from the candidate checkout, so the candidate itself must
-   contain a gate that reads the 0.25 contract. Which contract governs 0.25 is the open #1548
-   decision.
-3. **#1545 settings.** On 2026-10-19 `scripts/check_release_credentials.py --live` reported `OPEN`
-   (repository-level `NUGET_API_KEY` present, no `nuget-release` environment).
-4. **No G2 execution left.** The re-proof runs the 0.24 G2 protocol (#1421) on this candidate.
-   Protocol 1.5.0 allows 4 executions, `c2-1424/regeneration-3/ledger.json` records 4 of 4, and
-   `determinism_runner.plan_problems()` binds later executions to #1537's 0.24 merge. A 0.25
-   protocol amendment (allowance and candidate binding) needs approval first.
+1. **READY write-backs: "Evidence dirs now, scope after A1."** A family's READY record lives under its
+   evidence directory's `ready/`, outside the frozen inputs; A1 cites it; `scope.json` and the T1
+   mirror are written back after A1. The classifier exempts newly added data files under the six
+   family `ready/` directories (and nothing else in those directories).
+2. **Gate: "0.25 scope packet."** `scripts/verify_release_adjudication.py` checks format
+   `calor.v0.25-scope-packet/1426` for `0.25.x` (`docs/plans/evidence/r2-1410/release-gate.md` §10);
+   the map entry names it and stays `not-yet-adjudicated`.
+3. **#1545–#1547: closed.** #1577 moved publishing to nuget.org Trusted Publishing, and
+   `scripts/check_release_credentials.py --live --attest-workflow-permissions …` reports `CLOSED`
+   (Actions workflow permissions by maintainer attestation). #1545, #1546 and #1547 closed on
+   2026-10-19 (15:23:15Z, 15:23:17Z, 15:23:19Z). The freeze manifest cites both.
+4. **Determinism: "Amend: 2 runs for 0.25."** G2 protocol amendment 1.6.0 (`budget.releaseEpoch`):
+   at most 2 executions after run 6, ceiling 1,600 (2 × 795 = 1,590), each on the commit that this
+   directory's `candidate-manifest.json` names on protected main.
 
 ## Decisions recorded in the prep PR (2026-10-19, @juanmicrosoft)
 
 In `docs/plans/evidence/v0.25-f1-943/README.md`: "Count the 85 against W1" (F1 at 900 of 900) and
 "Accept as known residual" (P2V-1, #1573). Neither changes a case, ceiling or exception, so
 `scope.json` is not amended.
+
+## Review exception EXC-PREFREEZE-GATE (@juanmicrosoft, 2026-10-19)
+
+The pre-freeze PR (#1576) spent its review budget with two MAJOR findings open (verification pass
+NOT-VERIFIED). The maintainer granted, verbatim: **"Exception: fix + 1 pass"**, relayed in the agent
+session (no GitHub record). Scope: one fix of those two MAJORs (the gate's S004 case-history replay,
+and heading ids for an image inside a link) and the MINOR (the first-of-duplicate-rows control), then
+exactly one Codex verification-only pass. That pass also covers the changes made after the budget: the
+`[0.25.0]` notes on the #1545–#1547 closures and Trusted Publishing, and the no-auto-gc gate-fixture fix.
+A BLOCKING or MAJOR finding in that pass stops the PR for a maintainer decision. Record:
+`reviews/prefreeze-exception-codex.md`.
 
 ## Reviews
 

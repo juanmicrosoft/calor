@@ -125,12 +125,13 @@ public class ReleaseAdjudicationMapTests
         // The committed map: not yet adjudicated, whatever the record says.
         using (var repo = Build025())
             AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
-        // Marking it adjudicated is not enough while its contract packet is a format the gate cannot read.
+        // Marked adjudicated, the gate reads the #1426 scope packet (D-GATE-SCOPE-PACKET); this fixture has none.
+        // ReleaseGateScopePacketTests covers a real packet.
         var map = GateRepo.CommittedMap();
         Entry(map, "0.25.x")["status"] = "adjudicated";
         using (var repo = Build025(map.ToJsonString()))
         {
-            AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
+            AssertCodes(repo.Run(repo.AllSurfaces()), "G005");
             // With no record at the mapped path (the candidate commit), the identity names nothing.
             var identity = $"calor-adjudication:v1:{repo.Candidate}:{repo.RecordSha}";
             AssertCodes(repo.Run(new[] { "--identity", identity }, includeIdentity: false), "G004");

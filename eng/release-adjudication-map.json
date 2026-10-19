@@ -27,14 +27,14 @@
       "terminalRecord": "docs/plans/evidence/adjudication-1430/terminal-record.json",
       "contractPacket": {
         "issue": 1426,
-        "format": "calor.v0.25-interop-scope/1",
+        "format": "calor.v0.25-scope-packet/1426",
         "dir": "docs/plans/evidence/v0.25-r0-1426",
         "contract": "docs/plans/evidence/v0.25-r0-1426/scope.json",
         "inventory": null,
         "seal": "docs/plans/evidence/v0.25-r0-1426/scope.json"
       },
       "claimRegistry": "docs/plans/evidence/adjudication-1430/claim-registry.json",
-      "note": "Future paths. No identity passes until #1430's terminal record lands and a reviewed change sets status to 'adjudicated'. The contract packet named here is the frozen 0.25 R0 scope (#1426, seal: its evidenceSeal block); which contract governs the 0.25 release is the #1548 maintainer decision, and the gate does not yet check this packet format (G016)."
+      "note": "Future paths. No identity passes until #1430's terminal record lands and a reviewed change sets status to 'adjudicated'. The contract packet is the frozen 0.25 R0 scope (#1426; seal: its evidenceSeal block), which the gate checks together with the T1 register and W1 records that consume it and the 1.3.0 acceptancePreconditions re-proof (maintainer decision D-GATE-SCOPE-PACKET, 2026-10-19, scope amendment 1.4.0)."
     }
   ]
 }

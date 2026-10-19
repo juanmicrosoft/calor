@@ -31,9 +31,8 @@ the notes cannot change after the freeze. At the freeze:
 - **0.24's checks had to pass again.** The 0.24 evidence review (#1408) ended `MILESTONE-FAILED`
   (see 0.24.0), so this candidate must re-pass 0.24's proof, provenance and release checks on its
   own commit. No 0.24 approval or record is reused.
-- **Three release-process gaps were open.** Code fixes for #1545, #1546 and #1547 had merged
-  (see "Release process" below), but the three issues were not closed, and #1545 still needed
-  repository settings. Acceptance needs all three closed.
+- **The three release-process gaps from 0.24 were closed.** #1545, #1546 and #1547 closed on
+  2026-10-19, before the freeze (see "Release process" below). Acceptance requires them closed.
 - **Independence is reduced.** OpenAI Codex reviewed each change, and the maintainer approved
   and merged it. No reviewer independent of the two took part, so every 0.25 evidence claim is
   at most *bounded*.
@@ -407,10 +406,13 @@ responses captured from the MCP server. The refinement-type pages now say that a
 These change how Calor is published, not the compiler. The release gate (#1410) lets a release
 publish only with an adjudication identity: the accepted commit plus the hash of its record.
 
-- **#1545.** The publish job now reads the NuGet key from a `main`-only GitHub environment,
-  `nuget-release`. Closing #1545 also needs repository settings: create that environment, store a
-  new key in it, and delete the old repository-level key, which older tags can read. At the freeze
-  on 2026-10-19, a read-only check found that none of these settings had been made yet.
+- **#1545.** Publishing to NuGet now uses nuget.org Trusted Publishing: the publish job exchanges a
+  short-lived GitHub OpenID Connect token for a NuGet key, and no NuGet API key is stored in
+  GitHub. The trusted-publishing policy requires the `nuget-release` environment, which only `main`
+  can use, so the publish workflow kept in an older tag cannot obtain a key. On 2026-10-19 the
+  read-only settings check (`scripts/check_release_credentials.py --live`) reported the gap
+  closed; one setting, the Actions workflow permissions, was confirmed by a recorded maintainer
+  attestation because the API does not expose it to the check.
 - **#1546.** The gate checks on every run that this notes section in the candidate hashes to the
   adjudicated notes (`G014`). So these notes had to be final at the freeze.
 - **#1547.** Publishing a release no longer publishes benchmark results. That needs a separate

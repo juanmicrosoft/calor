@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.5.0",
+  "protocolVersion": "1.6.0",
   "status": "FROZEN-AT-MERGE",
   "freeze": {
     "event": "The merge commit on main of the PR that adds this file. Every execution record names protocolVersion and the SHA-256 of this file; the decider rejects a record made under any other protocol bytes.",
@@ -416,7 +416,18 @@
       "amendment": "1.5.0",
       "rule": "Amendment 1.5.0: after 3 executions (g3-exec-1, g3-exec-2, c2-1424-regen-2), exactly one more may run, and only on the merge commit of the PR that recorded protocol amendment 1.5.0 (its amendmentLog pr): the re-frozen #1423 candidate. The plan step requires the dispatched SHA to equal the merge_commit_sha GitHub records for that PR (merged into main), read from the same API as the run inventory; an unreadable or unmerged PR refuses. Every other guard (one execution per commit, a non-docs change after a failure, the budget) still applies."
     },
-    "amendment150": "Recorded before amendment 1.5.0: 13 (dry run) + 388 (g3-exec-1) + 401 (g3-exec-2) + 2 (c2-1424-regen-1, no attempt) + 403 (c2-1424-regen-2) = 1,207 runner-minutes, every dispatched run counted as the plan step counts it. Windows jobs rise from 75 to 110 minutes, so one execution's worst case is 5 + 10 + 2 x (70 + 50 + 50 + 110 + 110) = 795 and the validator total is 4 x 795 = 3,180, within the 3,200 ceiling of contract amendment 1.5.0. The plan step refuses a run when recorded + unfinished + this run's worst case exceeds the ceiling: 1,207 + 795 = 2,002 <= 3,200. Expected use after the fourth execution is about 1,610 (each real execution has used about 400)."
+    "amendment150": "Recorded before amendment 1.5.0: 13 (dry run) + 388 (g3-exec-1) + 401 (g3-exec-2) + 2 (c2-1424-regen-1, no attempt) + 403 (c2-1424-regen-2) = 1,207 runner-minutes, every dispatched run counted as the plan step counts it. Windows jobs rise from 75 to 110 minutes, so one execution's worst case is 5 + 10 + 2 x (70 + 50 + 50 + 110 + 110) = 795 and the validator total is 4 x 795 = 3,180, within the 3,200 ceiling of contract amendment 1.5.0. The plan step refuses a run when recorded + unfinished + this run's worst case exceeds the ceiling: 1,207 + 795 = 2,002 <= 3,200. Expected use after the fourth execution is about 1,610 (each real execution has used about 400).",
+    "releaseEpoch": {
+      "amendment": "1.6.0",
+      "release": "0.25",
+      "afterRunNumber": 6,
+      "maxExecutions": 2,
+      "maxDispatchedControlRuns": 0,
+      "ceilingRunnerMinutes": 1600,
+      "worstCaseTotal": 1590,
+      "candidateManifest": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json",
+      "rule": "Amendment 1.6.0 (maintainer decision D-G2-TWO-RUNS, 2026-10-19, 'Amend: 2 runs for 0.25'): every run of the protocol workflow numbered after run 6 (c2-1424-regen-3, the last 0.24 execution) belongs to the 0.25 epoch. The epoch allows at most 2 executions and no dispatched control run, and charges only its own runs to its own ceiling of 1,600 runner-minutes; under the protocol's worst-case formula 2 x 795 = 1,590. An execution runs only on the commit that candidate.commit of the 0.25 candidate manifest (candidateManifest, read from protected main by the plan step) names; a missing, unreadable or different manifest refuses. The candidate SHA is not known before the freeze, so the binding is to the manifest, not to a literal SHA. If the candidate is re-frozen, the manifest names the new commit. Everything else in the frozen rule is unchanged: one execution per commit, a non-docs change after a failed execution, no retry or re-run, and the same cases, environments, attempts, agreement rate, decider and record format. The 1.5.0 extraExecution binding applies only to the 0.24 runs."
+    }
   },
   "executions": {
     "ledger": "docs/plans/evidence/g3-1135/ledger.json",
@@ -548,6 +559,13 @@
         "pr": 1537,
         "afterDecisionBearingExecution": true,
         "justification": "Maintainer decision 2026-10-08 ('Amend + 3rd freeze'), after execution c2-1424-regen-2 (run 37826943308, commit 5e52d8ab, protocol 1.4.0, NON-DETERMINISTIC, complete false: 660 AGREE-PASS, 470 DISAGREE, 1,174 INCOMPLETE; 149 completed attempts and 1 invalid). The only cause: win-x64 job 1 ran on a slow runner (verification-full median 233 s against 149.5 s in job 2), the harness's own 75-minute job deadline cut its 15th attempt, and the decider compared that attempt's filled Timeout values (runPlan.harnessCutInconsistency); no two observed values differed. Three changes: (1) harness-cut rule (runPlan.harnessCutRule): only the values the harness filled in for a harness-cut invocation are left out of comparison, every observed value is still compared, and the attempt never counts toward agreement, so a cut gives INCOMPLETE, never DETERMINISTIC, and never DISAGREE through filled values; observed differences are still DISAGREE. (2) win-x64 and win-arm64 jobTimeoutMinutes 75 -> 110, so a runner as slow as that job finishes all 15 attempts. (3) maxExecutions 3 -> 4, the fourth only on the merge commit GitHub records for this PR (budget.extraExecution, checked by the plan step). The runner decides a cut from the bound the invocation was given and records it in the attempt's reason. Budget: worst case per execution 795, total 4 x 795 = 3,180 within the 3,200 determinism-compute ceiling of contract amendment 1.5.0; 1,207 recorded. Changes scripts/determinism_protocol.py (decide), scripts/determinism_runner.py (plan binding), scripts/test_determinism_protocol.py (controls), protocol.json, and the README. No case, cell, artifact, profile, environment, attempt count, determinism row, gate, agreement rate, or record format changes. Per the amendments rule, a complete new execution on a new commit follows: #1424's execution on the re-frozen candidate."
+      },
+      {
+        "version": "1.6.0",
+        "timestampUtc": "2026-10-19T12:00:00Z",
+        "pr": 1576,
+        "afterDecisionBearingExecution": true,
+        "justification": "Maintainer decision 2026-10-19 (@juanmicrosoft, relayed in the agent session; no GitHub record), verbatim: 'Amend: 2 runs for 0.25.' Detail as relayed: add a G2 protocol amendment that allows at most 2 executions, bound to the frozen 0.25 candidate commit named by the 0.25 candidate manifest, with a budget of about 1,600 runner-minutes under the protocol's own worst-case formula; everything else in the frozen rule stays the same; the candidate SHA isn't known before the freeze, so bind the executions to the manifest rather than a literal SHA. Cause: R0 scope amendment 1.3.0 (acceptancePreconditions, check provenance-determinism) requires this protocol to run on the 0.25 candidate's own SHA, but 1.5.0's 4 executions are used (runs 2, 3, 5 and 6; 1,608 runner-minutes recorded) and its fourth was bound to #1537's 0.24 merge. Adds budget.releaseEpoch (afterRunNumber 6, maxExecutions 2, maxDispatchedControlRuns 0, ceiling 1,600, worst case 2 x 795 = 1,590, candidateManifest docs/plans/evidence/v0.25-candidate/candidate-manifest.json), checked by the validator (D008) and the plan step (scripts/determinism_runner.py: epoch accounting and the manifest binding, read from origin/main). Recorded as R0 scope amendment 1.4.0 (D-G2-TWO-RUNS). No case, cell, artifact, profile, environment, attempt count, determinism row, gate, agreement rate, decider, retry rule or record format changes; the 0.24 contract's determinism-compute ceiling and budget values are unchanged. Per the amendments rule, a complete new execution on a new commit follows: the 0.25 candidate's."
       }
     ]
   },

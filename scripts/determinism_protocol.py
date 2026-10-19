@@ -548,6 +548,18 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             or computed is None or (b.get("worstCasePerExecution"), b.get("worstCasePerControlRun"), b.get("worstCaseTotal")) != computed \
             or computed[2] > ceiling["value"]:
         add("D008", f"budget must match the accepted determinism-compute ceiling and the recomputed worst case {computed}")
+    # Amendment 1.6.0: the 0.25 epoch (budget.releaseEpoch) has its own limit and ceiling under the same worst-case formula,
+    # no dispatched control run, and executions bound to the 0.25 candidate manifest.
+    ep = b.get("releaseEpoch")
+    if ep is not None:
+        ints = all(isinstance(ep.get(k), int) and not isinstance(ep.get(k), bool) for k in
+                   ("afterRunNumber", "maxExecutions", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "worstCaseTotal"))
+        if not ints or ep["afterRunNumber"] < 1 or ep["maxExecutions"] < 1 or ep["maxDispatchedControlRuns"] != 0 \
+                or computed is None or ep["worstCaseTotal"] != ep["maxExecutions"] * computed[0] or ep["worstCaseTotal"] > ep["ceilingRunnerMinutes"] \
+                or ep.get("amendment") not in {a.get("version") for a in log} \
+                or not re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/candidate-manifest\.json$", str(ep.get("candidateManifest", ""))):
+            add("D008", "budget.releaseEpoch must name its amendment and candidate manifest, allow no control run, and keep "
+                        "maxExecutions x the worst case per execution within its own ceiling")
 
     # D009 no normalization of compared values.
     ag = protocol.get("agreement", {})
