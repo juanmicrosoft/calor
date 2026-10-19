@@ -68,7 +68,10 @@ PR (#1576) implements them, so the freeze is that PR's merge commit. Recorded as
 2. **Gate: "0.25 scope packet."** `scripts/verify_release_adjudication.py` checks format
    `calor.v0.25-scope-packet/1426` for `0.25.x` (`docs/plans/evidence/r2-1410/release-gate.md` §10);
    the map entry names it and stays `not-yet-adjudicated`.
-3. **#1545 settings** are still the maintainer's (not a freeze blocker; acceptance needs #1545 closed).
+3. **#1545–#1547: closed.** #1577 moved publishing to nuget.org Trusted Publishing, and
+   `scripts/check_release_credentials.py --live --attest-workflow-permissions …` reports `CLOSED`
+   (Actions workflow permissions by maintainer attestation). #1545, #1546 and #1547 closed on
+   2026-10-19 (15:23:15Z, 15:23:17Z, 15:23:19Z). The freeze manifest cites both.
 4. **Determinism: "Amend: 2 runs for 0.25."** G2 protocol amendment 1.6.0 (`budget.releaseEpoch`):
    at most 2 executions after run 6, ceiling 1,600 (2 × 795 = 1,590), each on the commit that this
    directory's `candidate-manifest.json` names on protected main.
