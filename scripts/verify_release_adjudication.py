@@ -48,9 +48,19 @@ from pathlib import Path
 MAP_FILE = "eng/release-adjudication-map.json"
 MAP_SCHEMA = "calor.release-adjudication-map/1"
 ADJUDICATED, NOT_YET_ADJUDICATED = "adjudicated", "not-yet-adjudicated"
-# The only contract-packet format this gate checks: #1407's contract.json, artifact-inventory.json,
-# and sha256.json seal. Another format fails (G016) until a reviewed change teaches the gate to read it.
+# The contract-packet formats this gate checks: #1407's contract.json, artifact-inventory.json, and
+# sha256.json seal (0.24.0); and #1426's frozen R0 scope packet with the T1 register and W1 records
+# (0.25.x, maintainer decision D-GATE-SCOPE-PACKET, scope amendment 1.4.0). Another format fails (G016)
+# until a reviewed change teaches the gate to read it.
 PACKET_FORMAT_1407 = "calor.evidence-contract-packet/1407"
+PACKET_FORMAT_1426 = "calor.v0.25-scope-packet/1426"
+SCOPE_SCHEMA_1426 = "v0.25-interop-scope/1"
+T1_REGISTER_1426 = "docs/plans/evidence/v0.25-t1-1428/register.json"
+W1_RECORDS_1426 = "docs/plans/evidence/v0.25-w1-1429/records.json"
+REPROOF_CHECKS_1426 = {"proof-s2-witnesses", "provenance-candidate-manifest", "provenance-regeneration",
+                       "provenance-determinism", "release-gate"}
+RELEASE_GAPS_1426 = [1545, 1546, 1547]
+OUTCOMES_1426 = ("ACCEPTED", "PARTIAL_READY")
 # The only release the 0.24.0 maintainer override may name (see scripts/verify_maintainer_override.py).
 OVERRIDE_RELEASE = "0.24.0"
 VERSION_KEY_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+|x)$")
@@ -354,9 +364,10 @@ def load_record(gate: Gate, identity: str) -> tuple[str, dict, dict, list[dict]]
                           f"{MAP_FILE}; no identity passes until a reviewed change marks it {ADJUDICATED}")
         return None
     packet = entry["contractPacket"]
-    if packet["format"] != PACKET_FORMAT_1407 or packet["inventory"] is None:
+    if not ((packet["format"] == PACKET_FORMAT_1407 and packet["inventory"] is not None)
+            or (packet["format"] == PACKET_FORMAT_1426 and packet["inventory"] is None and packet["seal"] == packet["contract"])):
         gate.fail("G016", f"release {entry['version']}: the gate cannot check contract packet format "
-                          f"{packet['format']!r}; only {PACKET_FORMAT_1407}")
+                          f"{packet['format']!r}; only {PACKET_FORMAT_1407} and {PACKET_FORMAT_1426}")
         return None
     try:
         record = json.loads(data.decode("utf-8"))
@@ -487,6 +498,141 @@ def check_terminal(gate: Gate, commit: str, record: dict, entry: dict, contract:
         gate.fail("G008", f"{missing}: required subject is not adjudicated")
 
 
+def lf_sha256(blob: bytes | None) -> str | None:
+    return None if blob is None else sha256(blob.replace(b"\r\n", b"\n"))
+
+
+def json_blob(gate: Gate, commit: str, path: str) -> dict | None:
+    blob = gate.blob(commit, path)
+    try:
+        value = json.loads(blob) if blob is not None else None
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> dict | None:
+    """#1426 (0.25.x): the frozen R0 scope packet, its evidence seal, the 1.3.0 re-proof preconditions, and
+    the T1 register and W1 records that consume it, at the adjudication commit (G005)."""
+    packet = entry["contractPacket"]
+    scope = json_blob(gate, commit, packet["contract"])
+    register = json_blob(gate, commit, T1_REGISTER_1426)
+    w1 = json_blob(gate, commit, W1_RECORDS_1426)
+    if scope is None or register is None or w1 is None:
+        gate.fail("G005", f"the #{packet['issue']} scope packet, T1 register or W1 records are missing at the adjudication commit")
+        return None
+    version = scope.get("scopeVersion")
+    if scope.get("schema") != SCOPE_SCHEMA_1426 or scope.get("status") != "FROZEN" or scope.get("gateStatus") != "MET":
+        gate.fail("G005", f"the #{packet['issue']} scope packet is not FROZEN with R0 MET")
+    seal, root = scope.get("evidenceSeal") or {}, packet["dir"].rstrip("/") + "/"
+    producers = seal.get("producers") if isinstance(seal.get("producers"), dict) else {}
+    generated = sorted(p for p in gate.git("ls-tree", "-r", "--name-only", commit, "--", root + "generated/").stdout.decode().splitlines() if p)
+    digest = sha256("\n".join(f"{p} {lf_sha256(gate.blob(commit, p))}" for p in generated).encode())
+    if (not producers or seal.get("baselineResults") != lf_sha256(gate.blob(commit, root + "baseline-results.json"))
+            or any(lf_sha256(gate.blob(commit, p)) != h for p, h in producers.items()) or not generated or seal.get("generated") != digest):
+        gate.fail("G005", "the scope packet's evidenceSeal does not match its baseline results, producers or generated outputs")
+    pre = scope.get("acceptancePreconditions") or {}
+    reproof = pre.get("reproof") or {}
+    checks = {c.get("id") for c in reproof.get("checks", []) if isinstance(c, dict)}
+    if reproof.get("onCandidate") != "own-sha" or not REPROOF_CHECKS_1426 <= checks \
+            or sorted(g.get("issue") for g in pre.get("releaseGaps", []) if isinstance(g, dict)) != RELEASE_GAPS_1426:
+        gate.fail("G005", "the scope packet's acceptancePreconditions do not require the own-SHA re-proof and the three release gaps")
+    if (register.get("consumes") or {}).get("scopeVersion") != version or w1.get("scopeVersion") != version:
+        gate.fail("G005", f"the T1 register or W1 records do not consume scope version {version}")
+    lines = []
+    for family in register.get("families", []):
+        for ev in family.get("evidence", []):
+            lines.append((f"evidence {family.get('id')} {ev.get('path')} {ev.get('sha256')}", ev.get("path"), ev.get("sha256")))
+    for control in register.get("controls", []):
+        lines.append((f"fixture {control.get('id')} {control.get('fixture')} {control.get('fixtureSha256')}", control.get("fixture"), control.get("fixtureSha256")))
+    results, counts = register.get("results") or {}, register.get("corpusCounts") or {}
+    lines.append((f"results {results.get('path')} {results.get('sha256')}", results.get("path"), results.get("sha256")))
+    approved = ((register.get("amendments") or [register])[-1]).get("approvalSeal")
+    corpus = f"corpus {counts.get('source')} {json.dumps(counts.get('counts'), separators=(',', ':'))}"
+    recomputed = sha256("\n".join(sorted([line for line, _, _ in lines] + [corpus])).encode())
+    if any(not isinstance(p, str) or lf_sha256(gate.blob(commit, p)) != h for _, p, h in lines) or recomputed != approved:
+        gate.fail("G005", "the T1 register's approved evidence, fixtures or results differ from its approval seal")
+    if w1.get("independence") != "reduced":
+        gate.fail("G005", "the W1 records must record reduced independence")
+    files = {p: lf_sha256(gate.blob(commit, p)) for p in (packet["contract"], T1_REGISTER_1426, W1_RECORDS_1426)}
+    declared = record.get("contract")
+    if not isinstance(declared, dict):
+        gate.fail("G005", "record has no contract block")
+    elif declared.get("version") != version or declared.get("files") != files:
+        gate.fail("G005", "record contract version or hashes differ from the committed scope packet, T1 register and W1 records")
+    return scope
+
+
+def check_terminal_1426(gate: Gate, commit: str, record: dict, entry: dict, scope: dict) -> None:
+    """#1430's terminal record: ACCEPTED or PARTIAL_READY, reduced independence, and one row per family, re-proof
+    check, release gap and registered claim. A READY family cites its READY record under the family's evidence
+    directory (D-READY-EVIDENCE-DIRS), committed at the adjudication commit and naming the candidate."""
+    a1 = entry["a1Issue"]
+    if record.get("issue") != a1:
+        gate.fail("G006", f"record is not the #{a1} terminal record")
+    outcome = record.get("outcome")
+    if outcome not in OUTCOMES_1426:
+        gate.fail("G006", f"terminal outcome is {outcome!r}, not one of {', '.join(OUTCOMES_1426)}")
+    independence = scope.get("independence") or {}
+    deviation = independence.get("deviation") is not False
+    if deviation:
+        if record.get("adjudicationIndependence") != "reduced":
+            gate.fail("G007", "adjudicationIndependence must be 'reduced' under the independence deviation")
+        if not independence.get("statement") or record.get("limitation") != independence.get("statement"):
+            gate.fail("G007", "record must carry the scope's independence statement verbatim")
+        if record.get("epicIndependentAdjudicationMet") is not False:
+            gate.fail("G007", "record must state epicIndependentAdjudicationMet = false")
+    families = {f.get("id"): (f.get("readiness") or {}).get("evidence") for f in scope.get("families", []) if isinstance(f, dict)}
+    pre = scope.get("acceptancePreconditions") or {}
+    expected = {f"family:{f}": "family" for f in families}
+    expected |= {f"reproof:{c.get('id')}": "reproof" for c in (pre.get("reproof") or {}).get("checks", []) if isinstance(c, dict)}
+    expected |= {f"gap:#{g.get('issue')}": "gap" for g in pre.get("releaseGaps", []) if isinstance(g, dict)}
+    expected |= {claim: "claim" for claim in claim_registry(gate, commit, record, entry)}
+    allowed = {"family": {"READY", "PENDING"}, "reproof": {"PASSED"}, "gap": {"CLOSED"}, "claim": {"BOUNDED"}}
+    rows = record.get("adjudications")
+    if not isinstance(rows, list) or not rows:
+        gate.fail("G008", "record has no adjudication rows")
+        return
+    candidate = (record.get("candidate") or {}).get("commit") if isinstance(record.get("candidate"), dict) else None
+    seen, ready = set(), 0
+    for row in rows:
+        subject = row.get("subject") if isinstance(row, dict) else None
+        name = subject or "?"
+        if not isinstance(subject, str) or subject in seen:
+            gate.fail("G008", f"{name}: missing or duplicate subject")
+            continue
+        seen.add(subject)
+        kind = expected.get(subject)
+        if kind is None:
+            gate.fail("G008", f"{name}: unknown or unregistered subject")
+            continue
+        if row.get("outcome") not in allowed[kind]:
+            gate.fail("G008", f"{name}: outcome {row.get('outcome')!r} is not one of {sorted(allowed[kind])}")
+        if row.get("independence") != ROW_INDEPENDENCE:
+            gate.fail("G008", f"{name}: row must record independence = {ROW_INDEPENDENCE}")
+        if kind == "family" and row.get("outcome") == "PENDING" and outcome != "PARTIAL_READY":
+            gate.fail("G008", f"{name}: PENDING is valid only in a PARTIAL_READY record")
+        if kind == "family" and row.get("outcome") == "READY":
+            ready += 1
+            ref = row.get("readyRecord") if isinstance(row.get("readyRecord"), dict) else {}
+            path, evidence = str(ref.get("path", "")), families.get(subject[len("family:"):])
+            home = (evidence.rsplit("/", 1)[0] + "/ready/") if isinstance(evidence, str) and "/" in evidence else None
+            blob = gate.blob(commit, path) if home and path.startswith(home) and REPO_PATH_RE.match(path) else None
+            try:
+                named = json.loads(blob) if blob is not None else None
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                named = None
+            named = named.get("candidate") if isinstance(named, dict) else None
+            named = named.get("commit") if isinstance(named, dict) else named
+            if blob is None or sha256(blob) != ref.get("sha256") or named != candidate:
+                gate.fail("G008", f"{name}: READY must cite a committed READY record under {home or 'the family evidence directory ready/'} "
+                                  "by path and sha256, naming the candidate")
+    if outcome == "PARTIAL_READY" and ready == 0:
+        gate.fail("G008", "a PARTIAL_READY record needs at least one READY family")
+    for missing in sorted(set(expected) - seen):
+        gate.fail("G008", f"{missing}: required subject is not adjudicated")
+
+
 def check_candidate(gate: Gate, commit: str, record: dict, entry: dict, args: argparse.Namespace) -> str | None:
     candidate = record.get("candidate")
     if not isinstance(candidate, dict):
@@ -514,6 +660,9 @@ def check_candidate(gate: Gate, commit: str, record: dict, entry: dict, args: ar
     packet_at_record = gate.git("rev-parse", f"{commit}:{packet['dir']}", check=False).stdout.strip()
     if not packet_at_candidate or packet_at_candidate != packet_at_record:
         gate.fail("G005", f"the #{packet['issue']} contract packet changed between the candidate and the adjudication")
+    if packet["format"] == PACKET_FORMAT_1426 and any(
+            gate.blob(cand, p) is None or gate.blob(cand, p) != gate.blob(commit, p) for p in (T1_REGISTER_1426, W1_RECORDS_1426)):
+        gate.fail("G005", "the T1 register or W1 records changed between the candidate and the adjudication")
     if args.expect_head and gate.resolve("HEAD") != cand:
         gate.fail("G009", f"checked-out HEAD {gate.resolve('HEAD')} is not the adjudicated candidate {cand}")
     if args.version is not None and args.version != version:
@@ -691,9 +840,14 @@ def run(args: argparse.Namespace) -> int:
             commit, record, entry, entries = loaded
             if args.version is not None and map_entry(entries, args.version) is None:
                 gate.fail("G009", f"requested version {args.version} is not in {MAP_FILE}")
-            packet = check_contract(gate, commit, record, entry)
-            if packet:
-                check_terminal(gate, commit, record, entry, *packet)
+            if entry["contractPacket"]["format"] == PACKET_FORMAT_1426:
+                scope = check_scope_packet(gate, commit, record, entry)
+                if scope:
+                    check_terminal_1426(gate, commit, record, entry, scope)
+            else:
+                packet = check_contract(gate, commit, record, entry)
+                if packet:
+                    check_terminal(gate, commit, record, entry, *packet)
             cand = check_candidate(gate, commit, record, entry, args)
             check_surfaces(gate, args.identity.strip(), record, args)
             if cand:

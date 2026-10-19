@@ -47,7 +47,9 @@ internal sealed class GateRepo : IDisposable
         string recordPath = RecordPath,
         int issue = 1408,
         string registryPath = RegistryPath,
-        string? map = null)
+        string? map = null,
+        Action<GateRepo>? prepare = null,
+        Action<GateRepo, JsonObject>? adjudicate = null)
     {
         var baseDir = Path.Combine(Path.GetTempPath(), "calor-r2-" + Guid.NewGuid().ToString("N")[..12]);
         var repo = new GateRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch"), Version = version };
@@ -86,6 +88,7 @@ internal sealed class GateRepo : IDisposable
         var changelogText = (changelog ?? "# Changelog\n\n## [Unreleased]\n\n{NOTES}\n## [0.22.0] - 2026-09-15\n\nOld.\n")
             .Replace("{NOTES}", notesText);
         repo.Write("CHANGELOG.md", changelogText);
+        prepare?.Invoke(repo);
         repo.Candidate = repo.Commit("candidate");
         var recordedCandidate = repo.Candidate;
         if (sideCandidate)
@@ -159,6 +162,7 @@ internal sealed class GateRepo : IDisposable
             },
         };
         record?.Invoke(recordNode);
+        adjudicate?.Invoke(repo, recordNode);
         repo.Record = recordNode;
         var recordBytes = Encoding.UTF8.GetBytes(recordNode.ToJsonString());
         repo.Write(recordPath, Encoding.UTF8.GetString(recordBytes));
@@ -247,7 +251,7 @@ internal sealed class GateRepo : IDisposable
         return RunGit(Root, "rev-parse", "HEAD");
     }
 
-    private void Write(string relative, string content)
+    internal void Write(string relative, string content)
     {
         var path = Path.Combine(Root, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);

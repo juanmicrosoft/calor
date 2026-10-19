@@ -406,6 +406,36 @@ rows, gates, the agreement rate, and record formats. The result gains the `harne
   It is also refused when that record is unreadable, unmerged, or merged into another branch.
 - The budget controls are updated to 3,200 and 795.
 
+## Amendment 1.6.0: two executions for the 0.25 candidate
+
+**Decision** (@juanmicrosoft, 2026-10-19, relayed in the agent session; no GitHub record): "Amend: 2 runs
+for 0.25." As relayed: at most 2 executions, bound to the frozen 0.25 candidate commit named by the 0.25
+candidate manifest, with a budget of about 1,600 runner-minutes under the protocol's own worst-case
+formula; everything else in the frozen rule stays the same; the binding is to the manifest, not a literal
+SHA, because the SHA is not known before the freeze. Also recorded as R0 scope amendment 1.4.0
+(`D-G2-TWO-RUNS`), PR #1576.
+
+**Why.** R0 scope amendment 1.3.0 requires this protocol to run on the 0.25 candidate's own SHA
+(`acceptancePreconditions`, check `provenance-determinism`). Under 1.5.0 all 4 executions are used (runs 2,
+3, 5 and 6; 1,608 runner-minutes recorded), and the fourth was bound to #1537's 0.24 merge.
+
+**What changes** (`budget.releaseEpoch`):
+
+| Field | Value |
+|---|---|
+| Epoch | every workflow run numbered after run 6 (`c2-1424-regen-3`) |
+| Executions | at most 2; no dispatched control run |
+| Ceiling | 1,600 runner-minutes, charging only the epoch's runs |
+| Worst case | 2 × 795 = 1,590 (the per-execution formula above, unchanged) |
+| Binding | the dispatched commit must equal `candidate.commit` of `docs/plans/evidence/v0.25-candidate/candidate-manifest.json` on protected main |
+
+The plan step reads the manifest from `origin/main`; a missing, unreadable or different manifest refuses.
+If the candidate is re-frozen, the manifest names the new commit, and the second execution may run there.
+The validator checks the block (D008). Unchanged: one execution per commit, a non-docs change after a failed
+execution, no retry or re-run, and every case, environment, attempt, determinism row, gate, agreement rate,
+decider rule and record format. The 0.24 budget values and the 1.5.0 `extraExecution` binding apply only to
+the runs before the epoch.
+
 ## What G2 executed
 
 - `dotnet test --list-tests` for the two projects (names only; no test ran).

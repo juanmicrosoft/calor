@@ -236,7 +236,7 @@ version. Each entry names:
 | `status` | `adjudicated` or `not-yet-adjudicated`; only `adjudicated` can pass |
 | `a1Issue` | the A1 issue whose terminal record governs the release; the record's `issue` must equal it, and its `gate:#<issue>` row is the one not required |
 | `terminalRecord` | the record's path; paths are unique across entries |
-| `contractPacket` | `{issue, format, dir, contract, inventory, seal}`: the frozen contract the record is adjudicated under, and its hash seal. The gate checks format `calor.evidence-contract-packet/1407` only; any other is `G016` until a reviewed change teaches it |
+| `contractPacket` | `{issue, format, dir, contract, inventory, seal}`: the frozen contract the record is adjudicated under, and its hash seal. The gate checks formats `calor.evidence-contract-packet/1407` (0.24.0) and `calor.v0.25-scope-packet/1426` (0.25.x, §10); any other is `G016` until a reviewed change teaches it |
 | `claimRegistry` | the claim-registry path the record must name |
 | `maintainerOverride` | 0.24.0 only (any other entry is rejected): the override record `scripts/verify_maintainer_override.py` reads |
 
@@ -273,10 +273,8 @@ reviewed change to the gate script does. The identity still names immutable reco
 - **0.25.x**: `not-yet-adjudicated`, #1430, record
   `docs/plans/evidence/adjudication-1430/terminal-record.json`, registry
   `docs/plans/evidence/adjudication-1430/claim-registry.json`, and the frozen 0.25 R0 scope packet
-  (#1426, `scope.json`, sealed by its `evidenceSeal` block). Every 0.25 identity fails `G016`.
-  Which contract governs the 0.25 release is the #1548 maintainer decision; the R0 packet is named
-  provisionally. To release 0.25, the PR that lands the #1430 record also sets `status` to
-  `adjudicated` and either names a 1407-format packet or adds a reviewed check for the new format.
+  (#1426, `scope.json`, sealed by its `evidenceSeal` block), format `calor.v0.25-scope-packet/1426`
+  (§10). Every 0.25 identity fails `G016` until a reviewed change sets `status` to `adjudicated`.
 
 Tests: `ReleaseAdjudicationMapTests` (a version missing from the map, an entry pointing at a
 missing record, a record at another release's path, a claim registry other than the map's, 0.24.0
@@ -285,3 +283,43 @@ twelve malformed maps), plus `test_explicit_yaml_tags_are_open` for the credenti
 changes, with no existing assertion changed: the `GateRepo` claim-registry path is now 0.24.0's
 real one, because the map binds it; and `GateRepo` and `OverrideRepo` commit the committed map
 into the throwaway repository's main, because the scripts read it there.
+
+## 10. The 0.25 scope packet (#1426; scope amendment 1.4.0)
+
+**Decision** (@juanmicrosoft, 2026-10-19, `D-GATE-SCOPE-PACKET`): "0.25 scope packet." For the `0.25.x`
+entry the gate checks the R0 scope packet format (#1426), including the T1 and W1 registers and the
+1.3.0 `acceptancePreconditions` re-proof. 0.24.0 behavior is unchanged: a 1407-format entry runs
+exactly the checks above. `publish-nuget.yml` runs the gate from the candidate checkout, so the
+candidate must contain this code.
+
+**Packet checks at the adjudication commit (`G005`).**
+
+- `scope.json`: schema `v0.25-interop-scope/1`, `FROZEN`, gate `MET`; its `evidenceSeal` recomputes
+  (`baseline-results.json`, both producers, and every file under `generated/`, LF-normalized).
+- `acceptancePreconditions`: the re-proof is on the candidate's own SHA, names the five checks
+  (`proof-s2-witnesses`, `provenance-candidate-manifest`, `provenance-regeneration`,
+  `provenance-determinism`, `release-gate`), and the release gaps are exactly #1545, #1546, #1547.
+- The T1 register (`v0.25-t1-1428/register.json`) and W1 records (`v0.25-w1-1429/records.json`)
+  consume the scope's version; every T1-approved evidence, fixture and results hash matches, and
+  the approval seal recomputes; W1 records reduced independence.
+- The record's `contract` is `{version: scopeVersion, files: {scope.json, register.json,
+  records.json: LF SHA-256}}`.
+- The packet directory, the T1 register and the W1 records are identical at the candidate and the
+  adjudication commit. Under `D-READY-EVIDENCE-DIRS`, readiness is written back to `scope.json` and
+  the T1 register only after A1.
+
+**#1430's terminal record.** `issue` 1430; `outcome` `ACCEPTED` or `PARTIAL_READY` (`G006`);
+`adjudicationIndependence` `reduced`, `limitation` equal to `scope.json` `independence.statement`, and
+`epicIndependentAdjudicationMet` `false` while the deviation stands (`G007`). `adjudications` has
+exactly one row per subject (`G008`), each with `independence = reduced-maintainer-adjudicated`:
+
+| Subject | Outcomes |
+|---|---|
+| `family:F1` … `family:F6` | `READY`, or `PENDING` only in a `PARTIAL_READY` record (which needs at least one `READY`). A `READY` row cites `readyRecord {path, sha256}`: a file under the family's evidence directory's `ready/` (the directory of `readiness.evidence`), committed at the adjudication commit, whose `candidate` (or `candidate.commit`) is the record's candidate |
+| `reproof:<check id>` for each re-proof check | `PASSED` |
+| `gap:#<issue>` for each release gap | `CLOSED` |
+| each claim in the registry | `BOUNDED` |
+
+Every other field (`candidate`, `evidenceManifests`, `claimRegistry`, `publication`) is read as for
+0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 3 positive and 19 negative controls)
+and `ReleaseAdjudicationMapTests`.

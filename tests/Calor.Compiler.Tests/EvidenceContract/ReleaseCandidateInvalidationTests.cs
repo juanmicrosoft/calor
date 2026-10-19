@@ -22,6 +22,8 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("eng/release-adjudication-map.json", "release adjudication map")]
     [InlineData("docs/plans/evidence/v0.25-r0-1426/scope.json", "scope")]
     [InlineData("docs/plans/evidence/v0.25-t1-1428/register.json", "register")]
+    [InlineData("docs/plans/evidence/v0.25-f1-943/results.json", "evidence")]
+    [InlineData("docs/plans/evidence/v0.25-f1-943/ready/run.py", "downstream evidence")]
     [InlineData("docs/plans/evidence/c1-1423/candidate-manifest.json", "documentation")]
     [InlineData("docs/plans/evidence/v0.25-candidatex/candidate-manifest.json", "documentation")]
     [InlineData("docs/plans/evidence/adjudication-1430/gate.py", "downstream evidence")]
@@ -67,6 +69,8 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("docs/plans/evidence/v0.25-regeneration/ledger.json", Phase.AfterLanding)]
     [InlineData("docs/plans/evidence/adjudication-1430/terminal-record.json", Phase.AfterLanding)]
     [InlineData("docs/plans/evidence/adjudication-1430/claim-registry.json", Phase.BeforeLanding)]
+    [InlineData("docs/plans/evidence/v0.25-f1-943/ready/F1.json", Phase.AfterLanding)]
+    [InlineData("docs/plans/evidence/v0.25-f6-1144/ready/cases/F6-REPORT-03.json", Phase.AfterLanding)]
     public void AddedReviewAndDownstreamRecordsAreExempt(string path, Phase phase)
         => Assert.True(Classify(P, new Change("A", path, "000000", Regular, null, Bytes("{}")), phase).Exempt, path);
 

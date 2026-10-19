@@ -97,11 +97,13 @@ def classify(run) -> str:
     return match.group(1) if match else "unknown"  # an unreadable title is charged and counted as an execution
 
 
-def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, pr_merge_commit=None) -> list[str]:
+def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, pr_merge_commit=None,
+                  manifest_candidate=None) -> list[str]:
     """Guards before any attempt runs. inventory is every run of the workflow from the GitHub API
     (fetch_inventory); ledger is #1135's ledger (entries with runId, commit, mode, runnerMinutes);
     changed_paths(old, new) lists changed paths, or None if git cannot tell; pr_merge_commit(pr) gives the full SHA
-    GitHub recorded as that PR's merge into main, or None if it cannot tell (amendment 1.5.0)."""
+    GitHub recorded as that PR's merge into main, or None if it cannot tell (amendment 1.5.0); manifest_candidate(path)
+    gives candidate.commit of that manifest on protected main, or None if it cannot tell (amendment 1.6.0)."""
     problems = []
     if env.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
         problems.append(f"event {env.get('GITHUB_EVENT_NAME')}: only a workflow_dispatch run may execute the protocol")
@@ -130,18 +132,38 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
     b = protocol["budget"]
     execution_worst, control_worst, _ = dp.worst_case(protocol)
     worst = {"execution": execution_worst, "control": control_worst, "unknown": execution_worst}
-    recorded = b["dryRunSpent"] + sum(r["minutes"] for r in prior)
-    reserved = sum(worst[classify(r)] for r in prior if r["status"] != "completed")
-    if recorded + reserved + worst[mode] > b["ceilingRunnerMinutes"]:
+    epoch = b.get("releaseEpoch")
+    if epoch:
+        # Amendment 1.6.0 (0.25 re-proof): every run after run number afterRunNumber belongs to the epoch, which has its
+        # own execution limit and ceiling; the 0.24 runs before it are not charged to it. The executed-commit, unfinished-run
+        # and docs-only rules below still read every prior run.
+        if len(current) != 1 or not int(current[0].get("runNumber") or 0) > epoch["afterRunNumber"]:
+            problems.append(f"run {here} is not numbered after run {epoch['afterRunNumber']}, where the 0.25 epoch starts")
+        counted = [r for r in prior if int(r.get("runNumber") or 0) > epoch["afterRunNumber"]]
+        recorded, ceiling, limits = 0, epoch["ceilingRunnerMinutes"], (epoch["maxExecutions"], epoch["maxDispatchedControlRuns"])
+    else:
+        counted = prior
+        recorded, ceiling, limits = b["dryRunSpent"], b["ceilingRunnerMinutes"], (b["maxExecutions"], b["maxDispatchedControlRuns"])
+    recorded += sum(r["minutes"] for r in counted)
+    reserved = sum(worst[classify(r)] for r in counted if r["status"] != "completed")
+    if recorded + reserved + worst[mode] > ceiling:
         problems.append(f"budget: {recorded} recorded + {reserved} reserved for unfinished runs + {worst[mode]} for this run "
-                        f"exceeds the {b['ceilingRunnerMinutes']} runner-minute ceiling (contract stopping rule 1)")
+                        f"exceeds the {ceiling} runner-minute ceiling (contract stopping rule 1)")
     executions = [r for r in prior if classify(r) != "control" and (r["status"] != "completed" or r["attemptsStarted"])]
-    controls = [r for r in prior if classify(r) == "control"]  # every dispatched control run counts, started or not
-    limit, count = (b["maxExecutions"], len(executions)) if mode == "execution" else (b["maxDispatchedControlRuns"], len(controls))
+    counted_executions = [r for r in counted if r in executions]
+    controls = [r for r in counted if classify(r) == "control"]  # every dispatched control run counts, started or not
+    limit, count = (limits[0], len(counted_executions)) if mode == "execution" else (limits[1], len(controls))
     if count >= limit:
         problems.append(f"the limit of {limit} {mode} runs is reached ({count} recorded)")
+    if epoch and mode == "execution":
+        # The executions run only on the candidate commit that the 0.25 candidate manifest on protected main names;
+        # a missing, unreadable or different manifest refuses.
+        named = manifest_candidate(epoch["candidateManifest"]) if manifest_candidate else None
+        if not isinstance(named, str) or not re.match(r"^[0-9a-f]{40}$", named) or named != commit:
+            problems.append(f"a 0.25 execution may run only on the candidate commit named by {epoch['candidateManifest']} on "
+                            f"protected main (protocol amendment {epoch['amendment']}): it names {named}, the dispatched commit is {commit}")
     extra = b.get("extraExecution")
-    if mode == "execution" and extra and count >= extra["afterExecutions"]:
+    if mode == "execution" and extra and not epoch and count >= extra["afterExecutions"]:
         # Amendment 1.5.0: an execution beyond the first afterExecutions runs only on the merge commit of the PR that
         # recorded the named protocol amendment (the re-frozen #1423 candidate): the dispatched SHA must equal the merge
         # commit GitHub recorded for that PR into main. Anything unresolvable refuses.
@@ -254,6 +276,16 @@ def pr_merge_commit(repo: str, token: str, pr: int, get=api):
     return data.get("merge_commit_sha") if merged else None
 
 
+def manifest_candidate(path: str, ref: str = "origin/main"):
+    """Amendment 1.6.0: candidate.commit of the candidate manifest on protected main, or None (fail closed)."""
+    result = subprocess.run(["git", "show", f"{ref}:{path}"], cwd=ROOT, capture_output=True, check=False)
+    try:
+        commit = json.loads(result.stdout)["candidate"]["commit"] if result.returncode == 0 else None
+    except (ValueError, KeyError, TypeError):
+        return None
+    return commit if isinstance(commit, str) else None
+
+
 def load_ledger(protocol) -> dict:
     path = ROOT / protocol["executions"]["ledger"]
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"entries": []}
@@ -269,7 +301,8 @@ def cmd_plan(args, env=os.environ) -> int:
     inventory = fetch_inventory(env["GITHUB_REPOSITORY"], env["GH_TOKEN"])
     problems += plan_problems(protocol, mode=args.mode, execution_id=args.execution_id, env=env, inventory=inventory,
                               ledger=load_ledger(protocol), changed_paths=changed_paths,
-                              pr_merge_commit=lambda pr: pr_merge_commit(env["GITHUB_REPOSITORY"], env["GH_TOKEN"], pr))
+                              pr_merge_commit=lambda pr: pr_merge_commit(env["GITHUB_REPOSITORY"], env["GH_TOKEN"], pr),
+                              manifest_candidate=manifest_candidate)
     print(json.dumps({"inventory": inventory}, indent=1))
     if problems:
         print("\n".join(f"REFUSED: {p}" for p in problems))
