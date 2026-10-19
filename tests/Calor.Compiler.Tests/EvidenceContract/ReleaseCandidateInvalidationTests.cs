@@ -153,6 +153,28 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         Assert.Equal(new[] { path }, report.Invalidating.Select(d => d.Path).Distinct());
     }
 
+    /// <summary>The default target counts a merge (diffed against its first parent), so changes merged into main before the
+    /// freeze PR lands are inside the classified range.</summary>
+    [Fact]
+    public void TheDefaultTargetIsTheMergeThatBringsInTheFreeze()
+    {
+        var candidate = _repo.Candidate();
+        _repo.Branch("freeze");
+        var freeze = _repo.Commit((P.ManifestPath, "{}"));
+        _repo.Checkout("main");
+        _repo.Commit(("src/a.cs", "changed on main before the landing"));
+        _repo.Merge("freeze");
+        var merge = _repo.Git.RevParse("HEAD")!;
+        var errors = new List<string>();
+        Assert.Equal(merge, NewestProfileCommit(_repo.Git, P, candidate, errors));
+        Assert.Empty(errors);
+        Assert.NotEqual(freeze, merge);
+        Assert.Equal(Invalid, ClassifyRange(_repo.Git, P, candidate, merge).Verdict);
+        ReleaseCandidateInvalidation.GitRun failing = args => args[0] == "diff-tree" ? (128, "", "fatal: injected") : _repo.Git.Run(args);
+        Assert.Null(NewestProfileCommit(_repo.Git, P, candidate, errors, failing));
+        Assert.Contains(errors, e => e.Contains("injected", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void ARevertedChangeStillInvalidates()
     {

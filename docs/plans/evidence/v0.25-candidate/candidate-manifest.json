@@ -1,0 +1,1305 @@
+{
+  "schema": "calor.release-candidate-manifest/1",
+  "release": "0.25.0",
+  "issue": 1430,
+  "epic": 1425,
+  "status": "FROZEN-AT-MERGE",
+  "statusNote": "The candidate is the commit below (the merge of #1576). This manifest lands after it, in the freeze PR; the 0.25 classifier decides whether a later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
+  "candidate": {
+    "commit": "48cae911700ceb0dfc358e00933650445d81604f",
+    "committedUtc": "2026-10-19T18:18:59Z",
+    "mergeOf": {
+      "pr": 1576,
+      "title": "0.25 pre-freeze: READY records, the gate's 0.25 scope packet, and G2 amendment 1.6.0 (maintainer decisions 2026-10-19)"
+    },
+    "firstParent": "ebe1c7fe60f968f2722ed935f8a9b3420f472e93",
+    "freezeObservedUtc": "2026-10-19T18:23:52Z",
+    "originMainAtFreeze": "48cae911700ceb0dfc358e00933650445d81604f",
+    "durableIdentity": {
+      "status": "complete",
+      "commit": "48cae911700ceb0dfc358e00933650445d81604f",
+      "resolvedVia": "refs/remotes/origin/main",
+      "treeHashes": {
+        "/": "45d072a911d298b8c802219b206c80b351c32f19",
+        "src": "507fceeaf5e49ee1846ed1cba09647c16c76ad41",
+        "tests": "d5ec554b61b55c33e5ab7b12fc23df16682b14fc",
+        "tools": "bada36343814a4f660e14e15dac3d53e22c9b063",
+        "bench": "337b8e2c98bc84bddf433948ff3b58c39853fec9",
+        "eng": "9e5bc638984e4c64f54e442fdcdca30377fa0b92",
+        "scripts": "b16532803eeb70c473d48c0f85562cd6eada21b9",
+        ".github": "382ea1358b719f3e999bda031eee3883c8d2b02a",
+        ".claude": "551e30271db8ae85df4c11379edb97091433db39",
+        "website": "9131c2d6605681a7004083bdefba955b7c65e484",
+        "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
+        "docs": "4bedae3273fe40a40cf4e14de8fb4aa6eef0f599"
+      },
+      "inputContentHashes": {
+        "global.json": "227cbaa2d0d270b2046476fb1a021c49f8ae144a67843a727e34bcdb8e527d97",
+        "Directory.Build.props": "27fb790ca214cd9fc99ded5e3cd2735fcf69ee3b322fae2051f1f2439fd2d11e",
+        "Directory.Build.targets": "1d77db3cd86330218ef26ab04c7640cb2a907eda505295aea9e44122cedabc46",
+        "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a",
+        ".github/z3-binaries-4.15.7.sha256": "51849255fe9a63dc8f606c1762964c028f493c90f0d98ab61a0ab141b2af23e2",
+        "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256": "31dff6fce97fb568abb7ea3f691321df1e6312a3ea5a61dfb9258ce051a1e749",
+        "eng/z3-consumers.json": "f79a69336939e1183398bdfbfc4147ceee9067b0070dcb60736c2efd8608ade2",
+        "eng/test-manifest.json": "0d1a197b4bf20e2e08fd22e20c9cc8f26fa75b3c3a2a09fc50460b4e7f3ab5ee",
+        "eng/tier2-fixture-expectations.json": "af631574b775030ec34ab568118a919260c195a6e8f1a63ae25f0b9b4ca88e8b",
+        ".github/actions/bootstrap-z3/action.yml": "0c6a297b22a2a2fdb15291fd94e811974117f4bca4e405f632ba9468a859d207",
+        "src/Calor.Compiler/scripts/download-z3.sh": "217e48e279736e4244a48e0df0d5d25433499735851c6aaafb1aecfa32813f23",
+        "src/Calor.Compiler/scripts/download-z3.ps1": "2a661b4f48b21484375ed822108198641f3b1a84e692912b0cd4f10f47db1024",
+        "scripts/verify-z3-assets.py": "33a06f97f633574052661d284556889c34b08b310de22f5cfa343233c0f72d32",
+        "website/package.json": "e03ab5cc222462bd46a5bb7508cd3147ec3959cf6884d4aaa5bf196940ddec22",
+        "website/package-lock.json": "4a4f3182d11e81c9dc073eedcf48c81a1a5abe24895c96dccbad9de461c7c181",
+        "website/src/fonts/fonts.json": "f0bfdce46f2afc02ed825b2264dd087de8242476aa8930b59ffe849c76cd07ff",
+        ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+        ".gitattributes": "5310083823a2929f9eeb27cefb0f98b0d4d8bb66d2326855558dca673cad0d64",
+        "bench/phase0-agent-native/commit-stamp-index.json": "ec6196698a265fdf414cb7292dacb742a3b33c7125d1b5e8d2bb5e831afe0461",
+        "eng/release-adjudication-map.json": "01f2d771ac3d88f5ba4b0d4f9e03f21f738d5bf9ee072faa7e303505ed3cb093"
+      }
+    }
+  },
+  "releasability": {
+    "versionAtCandidate": "0.25.0",
+    "tagAtFreeze": null,
+    "notesSectionSha256": "8ce7a59ea9607f5f57d8f27eee5b6cc5d5a85cefe99f718cc99050560dc761e9",
+    "adjudicationMapEntry": {
+      "version": "0.25.x",
+      "status": "not-yet-adjudicated",
+      "a1Issue": 1430,
+      "terminalRecord": "docs/plans/evidence/adjudication-1430/terminal-record.json",
+      "contractPacket": {
+        "issue": 1426,
+        "format": "calor.v0.25-scope-packet/1426",
+        "dir": "docs/plans/evidence/v0.25-r0-1426",
+        "contract": "docs/plans/evidence/v0.25-r0-1426/scope.json",
+        "inventory": null,
+        "seal": "docs/plans/evidence/v0.25-r0-1426/scope.json"
+      },
+      "claimRegistry": "docs/plans/evidence/adjudication-1430/claim-registry.json",
+      "note": "Future paths. No identity passes until #1430's terminal record lands and a reviewed change sets status to 'adjudicated'. The contract packet is the frozen 0.25 R0 scope (#1426; seal: its evidenceSeal block), which the gate checks together with the T1 register and W1 records that consume it and the 1.3.0 acceptancePreconditions re-proof (maintainer decision D-GATE-SCOPE-PACKET, 2026-10-19, scope amendment 1.4.0)."
+    }
+  },
+  "dependencies": {
+    "submodules": [
+      {
+        "path": "bench/corpus/FluentValidation",
+        "commit": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c"
+      },
+      {
+        "path": "bench/corpus/MediatR",
+        "commit": "fb309026775ef953a64fb5339d074426c1ad2c37"
+      },
+      {
+        "path": "bench/corpus/serilog",
+        "commit": "0597ddfbd4ec594d9c42edd745fe728a2198bad9"
+      }
+    ],
+    "lockfiles": {
+      "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a",
+      "bench/ILAnalysisBench/packages.lock.json": "5bcc5dab9e89d6447f701656ff4f16664623a4bcd01da2d608d0a99f7c997839",
+      "bench/IncrementalBuildBench/packages.lock.json": "425f78b5c2e2257a77b3b658c4c258c30cb5f85fb2576d8feaee214f2f4ab9f7",
+      "bench/corpus/Directory.Packages.props": "5f1c9792be6259e241f1f20c1412cb2e2cc0363e99380055f591fd0d743e4c8c",
+      "bench/mcp/harness/packages.lock.json": "5bcc5dab9e89d6447f701656ff4f16664623a4bcd01da2d608d0a99f7c997839",
+      "bench/phase0-agent-native/Directory.Packages.props": "70904657415f88b02b7430c6370cdfd443279918cf3c71f445a13793453123e9",
+      "bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config": "aec93b5637ab6d62470979a008990a4a336a287ab83a3f2541849ae735674055",
+      "docs/plans/evidence/nominal-policy-1400/historical/pre-t1/reproduce/packages.lock.json": "61b885b18445fb7fc06e68b77c6e141ee19b8295840f7738d86f359dc044d836",
+      "samples/Contracts/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/FizzBuzz/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/Generics/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/HelloWorld/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/PatternMatching/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/SdkSample/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/TypeSystem/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "src/Calor.Compiler/packages.lock.json": "fa4d68cfacfa02420734a9f1c85547dcd3768397e80ad54cf6248ec504019231",
+      "src/Calor.LanguageServer/packages.lock.json": "1ca77977a9c2cda3806a29848854f50cbdeb8c44ea660453530f3ce3b83a6b4f",
+      "src/Calor.Runtime/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "src/Calor.Sdk/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "src/Calor.Tasks/packages.lock.json": "8e5edd7f2d5f1abd971ed56d09a7b5cd920a518b103ae4714badfc105685b165",
+      "tests/Calor.Compiler.Tests/packages.lock.json": "694fac2700f0e1a42a2fbfd15bb3991dc4fd3418dbdf1b98119f2c3825d9f5eb",
+      "tests/Calor.Conversion.Tests/packages.lock.json": "b555535ee028008897ca1a87250b8975ad1f673ef8a373b1022816fd27b77b63",
+      "tests/Calor.Enforcement.Tests/packages.lock.json": "51b576f9b13caa11038c5634358a3c423c7e950953daa040a7fc66015673e79d",
+      "tests/Calor.Evaluation/Analyzers/packages.lock.json": "eb1c8c3a7b815daa0b8dca7364f8d869f142232e79b48d69038c1e6c7f8db24b",
+      "tests/Calor.Evaluation/packages.lock.json": "c75feb61f93d810d5bf701e62895a15bb4b9f3bee74f5c4a7fbca64a95cac14c",
+      "tests/Calor.Experimental.Tests/packages.lock.json": "cfebae63f4f93efee00f31a9707e33137750e2de2d0efbd974f1fa0885f9e04b",
+      "tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.DataAccess/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.Scenarios/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.ILAnalysis.Tests/packages.lock.json": "fd9cc825689014d33f58b1714b2dd0366cd3166907943987eecb19769d454e4e",
+      "tests/Calor.Ids.Tests/packages.lock.json": "fd9cc825689014d33f58b1714b2dd0366cd3166907943987eecb19769d454e4e",
+      "tests/Calor.LanguageServer.Tests/packages.lock.json": "aaecbe8483773e7c4d505346fe89cbe46ae336650a200ff9941724f8405b177c",
+      "tests/Calor.Performance.Tests/packages.lock.json": "ef0ca33293b8a80674ff9b1c1a260e9d50a6b1022bb63bb92c9e09e0f33b2940",
+      "tests/Calor.RoundTrip.Harness.Tests/packages.lock.json": "fa29d5a173739514ce7f850baf5221afa03653e108fadab5631d208922e5b232",
+      "tests/Calor.RoundTrip.Synthetic/SyntheticLib.Tests/packages.lock.json": "8f2db54e5f2980f13f2c9355964c1fe498bdfff29290a13f3ef32cb1950a8a91",
+      "tests/Calor.RoundTrip.Synthetic/SyntheticLib/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.RoundTrip.Synthetic2/GeoLib.Tests/packages.lock.json": "bd98024fa11718c0abfd366d8d5fd170ec6298d079198530ce7c0f32428f1d04",
+      "tests/Calor.RoundTrip.Synthetic2/GeoLib/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.Semantics.Tests/packages.lock.json": "b555535ee028008897ca1a87250b8975ad1f673ef8a373b1022816fd27b77b63",
+      "tests/Calor.Tasks.Tests/packages.lock.json": "45378a918cd9eae988177bd29a1cbb63925a0e0a944a00cae7d848f395b48c14",
+      "tests/Calor.Verification.Tests/packages.lock.json": "ef0ca33293b8a80674ff9b1c1a260e9d50a6b1022bb63bb92c9e09e0f33b2940",
+      "tests/DebugRT/Directory.Packages.props": "a49515ca7e27e69c597e36fe4c55c2e6c79ced668e1ba3200f1759542d83c9ea",
+      "tests/E2E/Directory.Packages.props": "14fad8962f978b1dee14f5f141217bfd00b4eb0d75182f56c841010cf83d11c6",
+      "tests/SdkConsumer/nuget.config": "a8bd41bfa6d4011fc7e6e6beacf19f92be7ed80c0d43b8a8ae7aa03734b44cb6",
+      "tools/Calor.RoundTrip.Harness/packages.lock.json": "4507e2795d290437740e9ca28885f07049231642122e0a1e4643d66581205146",
+      "tools/calor-allowlist-audit/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff"
+    },
+    "node": {
+      "website/package.json": "e03ab5cc222462bd46a5bb7508cd3147ec3959cf6884d4aaa5bf196940ddec22",
+      "website/package-lock.json": "4a4f3182d11e81c9dc073eedcf48c81a1a5abe24895c96dccbad9de461c7c181"
+    }
+  },
+  "toolchain": {
+    "globalJson": {
+      "version": "10.0.100",
+      "rollForward": "latestMinor",
+      "allowPrerelease": false
+    },
+    "releaseSdk": "10.0.401",
+    "releaseWorkflowPins": {
+      "publish-nuget.yml:test": [
+        "10.0.401"
+      ],
+      "publish-nuget.yml:sdk-consumer": [
+        "10.0.401"
+      ],
+      "publish-nuget.yml:release-quality": [
+        "10.0.401",
+        "8.0.426"
+      ],
+      "publish-nuget.yml:publish": [
+        "10.0.401"
+      ],
+      "verify-release.yml:install-and-verify": [
+        "10.0.401"
+      ],
+      "reproducible-builds.yml:packages": [
+        "10.0.401"
+      ],
+      "benchmark.yml:benchmark": [
+        "10.0.401"
+      ],
+      "benchmark.yml:agent-refactoring-benchmark": [
+        "10.0.401"
+      ]
+    },
+    "dotnetSdkBuild": {
+      "value": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+      "os": "Linux x86_64",
+      "source": "reproducible-builds.yml run 39295103845 on #1576 head f8413cc9e (tree 45d072a911d298b8c802219b206c80b351c32f19, equal to the candidate tree): reproducible-packages-hashes packages-1.json and packages-2.json toolchain, both builds",
+      "sameAs": "C2 regeneration 3 Linux CI (docs/plans/evidence/c2-1424/regeneration-3/)",
+      "evidence": [
+        {
+          "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-1.json",
+          "sha256": "30ff65f3ccb792b302a063d99a5e36c798a148f42f591e96f1b9135bb71e7d33"
+        },
+        {
+          "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-2.json",
+          "sha256": "30ff65f3ccb792b302a063d99a5e36c798a148f42f591e96f1b9135bb71e7d33"
+        },
+        {
+          "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages.md",
+          "sha256": "45114a7fa46cfa49c71511fb8c46409de8f569e96067955cf23481f54a547c52"
+        }
+      ],
+      "darwinArm64": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053 (Microsoft SDK 10.0.401 through dotnet-install.sh on macOS arm64, C2 regeneration 2/3 local builds); not re-measured at this freeze"
+    },
+    "runtime": "10.0.12 (the G2 protocol pin; Microsoft.NETCore.App of SDK 10.0.401)",
+    "observedEnvironment": "OBSERVED, NOT PINNED, as in 0.24 (ENVIRONMENT-OBSERVED-NOT-PINNED): hosted runner images cannot be pinned; the regeneration records each job's realized SDK, runtime and image.",
+    "determinismProtocol": {
+      "version": "1.6.0",
+      "environments": [
+        {
+          "id": "linux-x64",
+          "rid": "linux-x64",
+          "runner": "ubuntu-24.04",
+          "runnerOs": "Linux",
+          "runnerArch": "X64",
+          "logicalProcessors": 4,
+          "profiles": [
+            "verification-full",
+            "oracle-isolated",
+            "compiler-verifier"
+          ],
+          "memoryGiB": 16,
+          "jobTimeoutMinutes": 70
+        },
+        {
+          "id": "linux-arm64",
+          "rid": "linux-arm64",
+          "runner": "ubuntu-24.04-arm",
+          "runnerOs": "Linux",
+          "runnerArch": "ARM64",
+          "logicalProcessors": 4,
+          "profiles": [
+            "verification-full",
+            "oracle-isolated"
+          ],
+          "memoryGiB": 16,
+          "jobTimeoutMinutes": 50
+        },
+        {
+          "id": "osx-arm64",
+          "rid": "osx-arm64",
+          "runner": "macos-14",
+          "runnerOs": "macOS",
+          "runnerArch": "ARM64",
+          "logicalProcessors": 3,
+          "profiles": [
+            "verification-full",
+            "oracle-isolated"
+          ],
+          "memoryGiB": 7,
+          "jobTimeoutMinutes": 50
+        },
+        {
+          "id": "win-x64",
+          "rid": "win-x64",
+          "runner": "windows-2025",
+          "runnerOs": "Windows",
+          "runnerArch": "X64",
+          "logicalProcessors": 4,
+          "profiles": [
+            "verification-full",
+            "oracle-isolated"
+          ],
+          "memoryGiB": 16,
+          "jobTimeoutMinutes": 110
+        },
+        {
+          "id": "win-arm64",
+          "rid": "win-arm64",
+          "runner": "windows-11-arm",
+          "runnerOs": "Windows",
+          "runnerArch": "ARM64",
+          "logicalProcessors": 4,
+          "profiles": [
+            "verification-full",
+            "oracle-isolated"
+          ],
+          "memoryGiB": 16,
+          "jobTimeoutMinutes": 110
+        }
+      ],
+      "environmentRule": "Platform (OS and RID) is a determinism dimension (contract rules.platformDeterminism). Every supported RID in eng/z3-consumers.json is a registered environment. compiler-verifier runs on linux-x64 only, the only platform its release gates use; the protocol establishes nothing for it on another platform and says so in every result. Runner labels are pinned (no -latest label). The runner image version cannot be pinned on hosted runners; every attempt records ImageOS and ImageVersion, and a disagreement is never excused by an image change.",
+      "checkout": {
+        "coreAutocrlf": false,
+        "fetchDepth": 1,
+        "submodules": false,
+        "rule": "Every environment checks out the committed bytes (git config --global core.autocrlf false before checkout). Inputs are byte-identical on every platform, so any platform difference comes from the code under test. This is an input pin, not a normalization: no output is ever converted. Tracked files must be unmodified before the first attempt and after every invocation (git status --porcelain --untracked-files=no is empty); otherwise that invocation and every later attempt in the job are invalid."
+      },
+      "sdk": "10.0.401",
+      "runtime": "10.0.12",
+      "globalJson": {
+        "version": "10.0.100",
+        "rollForward": "latestMinor"
+      },
+      "configuration": "Release"
+    },
+    "seeds": [
+      {
+        "id": "z3-random-seed",
+        "value": "42",
+        "source": "tests/Shared/Z3TestSeeding.cs",
+        "applied": false,
+        "note": "G2 protocol 1.2.0: Z3 4.15.7 ignores random_seed, so the constant never reaches the solver."
+      },
+      {
+        "id": "0.25-producers",
+        "value": null,
+        "note": "The 0.25 reproduction drivers and the T1 aggregator take no seed; their inputs are fixed fixtures."
+      }
+    ],
+    "z3": {
+      "version": "4.15.7",
+      "assets": [
+        {
+          "name": "Microsoft.Z3.dll",
+          "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+          "bytes": 260608
+        },
+        {
+          "name": "libz3-linux-arm64.so",
+          "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+          "bytes": 30884960
+        },
+        {
+          "name": "libz3-linux-x64.so",
+          "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+          "bytes": 34714776
+        },
+        {
+          "name": "libz3-osx-arm64.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+          "bytes": 25891768
+        },
+        {
+          "name": "libz3-win-arm64.dll",
+          "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+          "bytes": 17616896
+        },
+        {
+          "name": "libz3-win-x64.dll",
+          "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+          "bytes": 17730560
+        },
+        {
+          "name": "libz3-win-x86.dll",
+          "sha256": "89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9",
+          "bytes": 14245376
+        }
+      ],
+      "upstreamArchives": [
+        {
+          "name": "z3-4.15.7-arm64-glibc-2.38.zip",
+          "sha256": "dabee41164abf080ae3bc312d80d1d8700ef49fbfc593c8d8fa4f3cdaf7d6551",
+          "bytes": 49082602
+        },
+        {
+          "name": "z3-4.15.7-arm64-osx-15.7.3.zip",
+          "sha256": "1f4aefb345bded8b6cd6a5a92b6bb2e34110b373779bfb38145200ceeb4fa626",
+          "bytes": 37715389
+        },
+        {
+          "name": "z3-4.15.7-arm64-win.zip",
+          "sha256": "e6ef5a4f8749c0b3214a1ad72e6c5655bbda2eeebe9177277514df1fa7eed571",
+          "bytes": 61750798
+        },
+        {
+          "name": "z3-4.15.7-x64-glibc-2.39.zip",
+          "sha256": "4436ab6381f0b9c68075a267ab13a5f3ad25f7c25f7626dec959c76805c9f2cb",
+          "bytes": 52404177
+        },
+        {
+          "name": "z3-4.15.7-x64-win.zip",
+          "sha256": "7b01f3987bcdab0d0622c417212ad37e7a486ea233e091a59f646e0118316187",
+          "bytes": 66949332
+        },
+        {
+          "name": "z3-4.15.7-x86-win.zip",
+          "sha256": "40f7cc9e69b51dd77e9131eeea62cf039b560629b76a2e87f27b15f3009f9d9c",
+          "bytes": 60053983
+        }
+      ]
+    }
+  },
+  "packets": {
+    "scope": {
+      "path": "docs/plans/evidence/v0.25-r0-1426/scope.json",
+      "sha256": "f81c93bb1ca64e79d5aa8da4d5eb6d3e87a73b5bf10f8789cbdae484ef3e5faa",
+      "sha256LF": "f81c93bb1ca64e79d5aa8da4d5eb6d3e87a73b5bf10f8789cbdae484ef3e5faa",
+      "scopeVersion": "1.4.0",
+      "status": "FROZEN",
+      "gateStatus": "MET",
+      "evidenceSeal": {
+        "baselineResults": "9892f60b7832b68526143a55a0e39424b4563785c44afbffc5374dd6ffd478bf",
+        "producers": {
+          "docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py": "57f4a663acc202f6ffb06121e3a143869b742d179d304a9ab342b11a4d4a6f38",
+          "docs/plans/evidence/v0.25-r0-1426/reproduce/ProbeRunner.cs.txt": "b5aea9857edcc47133efe92813c1c6798fbc50a39a8d408f9aeef95758cb4d51"
+        },
+        "generated": "e15ae8e61ca9cabab0f3bf02cf70cb5a74e40598931705a9cbe9799bdd9b1fbf",
+        "rule": "baselineResults: SHA-256 of baseline-results.json (LF-normalized). generated: SHA-256 of the sorted lines '<repo path> <file SHA-256>' over generated/. producers: SHA-256 of the two reproduction producers. Changing any of them is an amendment."
+      },
+      "evidenceSealVerified": true,
+      "amendments": [
+        {
+          "version": "1.1.0",
+          "dateUtc": "2026-10-12T02:22:52Z",
+          "pr": 1553,
+          "afterInspection": true
+        },
+        {
+          "version": "1.2.0",
+          "dateUtc": "2026-10-16T00:00:00Z",
+          "pr": 1554,
+          "afterInspection": true
+        },
+        {
+          "version": "1.3.0",
+          "dateUtc": "2026-10-18T00:00:00Z",
+          "pr": 1562,
+          "afterInspection": true
+        },
+        {
+          "version": "1.4.0",
+          "dateUtc": "2026-10-19T00:00:00Z",
+          "pr": 1576,
+          "afterInspection": true
+        }
+      ],
+      "readiness": {
+        "F1": "IN_PROGRESS",
+        "F2": "IN_PROGRESS",
+        "F3": "IN_PROGRESS",
+        "F4": "IN_PROGRESS",
+        "F5": "IN_PROGRESS",
+        "F6": "IN_PROGRESS"
+      },
+      "acceptancePreconditions": {
+        "amendment": "1.3.0",
+        "decision": "D-A1-1408-REPROVE",
+        "replaces": {
+          "issue": 1408,
+          "precondition": "#1408 succeeds",
+          "appliedTo": [
+            "#1430 PARTIAL_READY",
+            "#1430 ACCEPTED",
+            "#1428 partial delivery",
+            "#1430 mechanical requirement: rerun applicable 0.24 proof/provenance/release checks"
+          ],
+          "terminalRecord": "docs/plans/evidence/adjudication-1408/terminal-record.json",
+          "outcome": "MILESTONE-FAILED"
+        },
+        "requires": "Before #1430 records PARTIAL_READY or ACCEPTED, the 0.25 candidate passes 0.24's proof, provenance and release checks re-run on its own SHA, and the 0.24 release gaps below are closed. No 0.24 approval, record or SHA is reused for the 0.25 candidate.",
+        "reproof": {
+          "onCandidate": "own-sha",
+          "checks": [
+            {
+              "id": "proof-s2-witnesses",
+              "kind": "proof",
+              "gate": 1413,
+              "source": "docs/plans/evidence/s2-1413/dispositions.json",
+              "requirement": "Every 0.24 S2 repair's regression witnesses pass on the 0.25 candidate SHA, and no false unconditional proof is unresolved (0.24 contract section 8, condition 4)."
+            },
+            {
+              "id": "provenance-candidate-manifest",
+              "kind": "provenance",
+              "gate": 1423,
+              "source": "docs/plans/v0.24-c1-candidate.md",
+              "requirement": "A candidate manifest in the 0.24 C1 form is frozen for the 0.25 candidate SHA and passes CandidateManifestTests (linear history, every pinned identity)."
+            },
+            {
+              "id": "provenance-regeneration",
+              "kind": "provenance",
+              "gate": 1424,
+              "source": "docs/plans/evidence/c2-1424/regeneration.md",
+              "requirement": "Every authoritative and derived artifact is regenerated on the 0.25 candidate SHA and frozen, as 0.24 C2 did (0.24 contract section 8, condition 6)."
+            },
+            {
+              "id": "provenance-determinism",
+              "kind": "provenance",
+              "gate": 1421,
+              "source": "scripts/determinism_protocol.py",
+              "requirement": "The 0.24 G2 determinism protocol runs on the 0.25 candidate SHA under its registered pins and failure rule."
+            },
+            {
+              "id": "release-gate",
+              "kind": "release",
+              "gate": 1410,
+              "source": "docs/plans/evidence/r2-1410/release-gate.md",
+              "requirement": "The 0.24 R2 release gate (adjudication-gated publish) passes for the 0.25 candidate's own identity, and every release surface consumes that one identity (0.24 contract section 8, condition 7)."
+            }
+          ]
+        },
+        "releaseGaps": [
+          {
+            "issue": 1545,
+            "gap": "ungated publish-nuget.yml on older tags can read NUGET_API_KEY",
+            "requirement": "closed before acceptance"
+          },
+          {
+            "issue": 1546,
+            "gap": "the release PR consumes no adjudication identity",
+            "requirement": "closed before acceptance"
+          },
+          {
+            "issue": 1547,
+            "gap": "benchmark.yml publishes the benchmark headline independently of the release gate",
+            "requirement": "closed before acceptance"
+          }
+        ]
+      }
+    },
+    "t1Register": {
+      "path": "docs/plans/evidence/v0.25-t1-1428/register.json",
+      "sha256": "68f59b9de02334dca2920c19617eccd939b6a99cb8c956c8381c2dfa8383c57f",
+      "sha256LF": "68f59b9de02334dca2920c19617eccd939b6a99cb8c956c8381c2dfa8383c57f",
+      "registerVersion": "1.0.2",
+      "approvalSeal": "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8",
+      "baselineApprovalSeal": "3069326880844b179c73a50cb1ac13448f9caa3a5e8bdb418ccb18635b49da3c",
+      "readiness": {
+        "F1": "IN_PROGRESS",
+        "F2": "IN_PROGRESS",
+        "F3": "IN_PROGRESS",
+        "F4": "IN_PROGRESS",
+        "F5": "IN_PROGRESS",
+        "F6": "IN_PROGRESS"
+      }
+    },
+    "d1Contract": {
+      "path": "docs/plans/evidence/v0.25-d1-1427/contract.json",
+      "sha256": "0b22b221308c51d22b533321755c96056db4c9853aff7e1dcc3d392f5a6067a5",
+      "sha256LF": "0b22b221308c51d22b533321755c96056db4c9853aff7e1dcc3d392f5a6067a5",
+      "contractVersion": "1.0.6",
+      "status": "PROPOSED",
+      "consumes": [
+        {
+          "id": "nullability-0.22",
+          "issue": 1379,
+          "path": "docs/plans/v0.22-nullability-enforcement-scoping.md",
+          "revision": "d0dc0f8bf3ea400b1d7d16780a98d9ff3341abc7",
+          "blob": "cc5fcf955d394bfd20b1321a89cba8a9ba6137ab"
+        },
+        {
+          "id": "r0-scope",
+          "issue": 1426,
+          "path": "docs/plans/evidence/v0.25-r0-1426/scope.json",
+          "scopeVersion": "1.4.0"
+        },
+        {
+          "id": "r-obl",
+          "issue": 1413,
+          "pr": 1496,
+          "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+          "residualsPr": 1503,
+          "residualsMergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3"
+        }
+      ]
+    },
+    "w1Records": {
+      "path": "docs/plans/evidence/v0.25-w1-1429/records.json",
+      "sha256": "4d7825a69bbbf3813b59c3cfde97b52f0017dd1bc89264e69223bc8b127b32e5",
+      "sha256LF": "4d7825a69bbbf3813b59c3cfde97b52f0017dd1bc89264e69223bc8b127b32e5",
+      "scopeVersion": "1.4.0",
+      "registerVersion": "1.0.0"
+    },
+    "seals": {
+      "scope": {
+        "computed": "65307b91a3c57b54c6484219f67fc6bdb285b23858cbe15a7d7293b422ed7ff8",
+        "pinned": "65307b91a3c57b54c6484219f67fc6bdb285b23858cbe15a7d7293b422ed7ff8"
+      },
+      "d1Contract": {
+        "computed": "4c1adc21e41a34548b87a0ab8a2ed894b9fa31205c8e19773caf2e451f5db76c",
+        "pinned": "4c1adc21e41a34548b87a0ab8a2ed894b9fa31205c8e19773caf2e451f5db76c"
+      },
+      "t1Baseline": {
+        "recorded": "3069326880844b179c73a50cb1ac13448f9caa3a5e8bdb418ccb18635b49da3c",
+        "pinned": "3069326880844b179c73a50cb1ac13448f9caa3a5e8bdb418ccb18635b49da3c"
+      },
+      "t1Amendments": {
+        "recorded": [
+          [
+            "1.0.1",
+            "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"
+          ],
+          [
+            "1.0.2",
+            "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"
+          ]
+        ],
+        "pinned": [
+          [
+            "1.0.1",
+            "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"
+          ],
+          [
+            "1.0.2",
+            "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"
+          ]
+        ]
+      }
+    }
+  },
+  "producers": [
+    {
+      "id": "r0-reproduce",
+      "title": "0.25 R0 reproduction driver and execution oracle (#1426)",
+      "files": {
+        "docs/plans/evidence/v0.25-r0-1426/reproduce/ProbeRunner.cs.txt": "b5aea9857edcc47133efe92813c1c6798fbc50a39a8d408f9aeef95758cb4d51",
+        "docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py": "57f4a663acc202f6ffb06121e3a143869b742d179d304a9ab342b11a4d4a6f38"
+      }
+    },
+    {
+      "id": "family-reproduce",
+      "title": "F1, F3, F4, F5 re-run drivers",
+      "files": {
+        "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py": "5ae7225c63862e04ca5e57e6be10e1ece2443d075d4843cb89c2038c7af6017e",
+        "docs/plans/evidence/v0.25-f3-847/reproduce/reproduce.py": "b5f6c8ae23e356c81a2bdfed30ff222e236d140844aab8feee771ee6807c7b11",
+        "docs/plans/evidence/v0.25-f4-1139/reproduce/reproduce.py": "0f6afa51188496a6392b7e7bd1b5c831dad48fad45b55e3636e5c594d2758e50",
+        "docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce.py": "b28a06ee4a8c732646dd137bc25ce062289bf9c2a98659e7b0222dabe6476976",
+        "docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce_pr2.py": "35805e86de6bdd325973ee835b35ac831871f063fa814245a06a3308f88b6562"
+      }
+    },
+    {
+      "id": "t1-aggregate",
+      "title": "T1 register aggregator (#1428)",
+      "files": {
+        "docs/plans/evidence/v0.25-t1-1428/reproduce/aggregate.py": "cfb2d8bcd263555c524e7f54777761e40b19185f1a19c23ae2c52ae1b7fa0a8f"
+      }
+    },
+    {
+      "id": "w1-wording-scan",
+      "title": "W1 wording scan (#1429)",
+      "files": {
+        "docs/plans/evidence/v0.25-w1-1429/reproduce/wording_scan.py": "80b6f30697f58d8619194814540159ea923b72e70142bbaa4b19bb5e27ae68ec"
+      }
+    },
+    {
+      "id": "g2-determinism",
+      "title": "0.24 G2 determinism protocol (#1421), re-run on the candidate",
+      "files": {
+        "docs/plans/evidence/g2-1421/cases.json": "00c8a7153f2502704ffa573b6c7778b07dc18a13c12350d7ca6a8f7368c15b5b",
+        "docs/plans/evidence/g2-1421/protocol.json": "b810bf236fd7ddd3f9cf999b7e184d1c7a527e8c7637dd4fc6ca2c5face6c934",
+        "scripts/determinism_protocol.py": "d994aed2d5516612f07f3089b0c23647073a68bda509b2c45c21a77c6646298e",
+        "scripts/determinism_runner.py": "aa6667834ad4b64905a07c72ee5d57d2a80c3ddca9de4e9efa03b6b53fa0b030"
+      }
+    },
+    {
+      "id": "r2-release-gate",
+      "title": "0.24 R2 release gate (#1410) and the 0.24.0 override check",
+      "files": {
+        "scripts/check_release_credentials.py": "58b4d5bfcaf81f70b805eef3554bd33ddfb239766053775b6fb237c11744ece3",
+        "scripts/render_release_notes.py": "f5ace416c11b10a6ad403a9fa07f9e1edbdfd81f9f9fe5d0c531a4019dc08f90",
+        "scripts/test_reproducible_builds.py": "c24fe8759f5aa561908ad9377642c89cc896129243a6c20b9e734314d2625991",
+        "scripts/verify_maintainer_override.py": "d21cd39ea7aff3418232732e5fe9e988d59b0b37cf3ae1b5c219c8901fdd23ea",
+        "scripts/verify_release_adjudication.py": "8c22fd05116ae1f52f23a6a66b25eb10fa4821e431e4faa104647d795a2711a5"
+      }
+    },
+    {
+      "id": "candidate-generator",
+      "title": "this generator",
+      "files": {
+        "docs/plans/evidence/v0.25-candidate/generate_candidate_manifest.py": "92f69ad95deec36b44119f370de222d80bd1eb086af7b62f4ce8705ad2d270d3"
+      }
+    }
+  ],
+  "s2Witnesses": [
+    {
+      "id": "R-CACHE",
+      "pr": 1494,
+      "mergeCommit": "ef89c027dd933f4991fd3a85db4b1d1fd707c8db",
+      "regressionWitness": [
+        "tests/Calor.Compiler.Tests/S2CacheLiteralWidthTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    },
+    {
+      "id": "R-IMPL",
+      "pr": 1495,
+      "mergeCommit": "eb12fef4122b88a22f3ec62f374de341dc7f4e06",
+      "regressionWitness": [
+        "tests/Calor.Compiler.Tests/S2ImplicationDefinednessTests.cs",
+        "tests/Calor.Verification.Tests/S2ImplicationProverDefinednessTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    },
+    {
+      "id": "R-OBL",
+      "pr": 1496,
+      "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+      "regressionWitness": [
+        "tests/Calor.Compiler.Tests/S2ObligationStateTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    },
+    {
+      "id": "R-TEXT",
+      "pr": 1497,
+      "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+      "regressionWitness": [
+        "tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    },
+    {
+      "id": "R-QNT",
+      "pr": 1498,
+      "mergeCommit": "275902c3c597d049eb74f319ca0ab68805e2cccc",
+      "regressionWitness": [
+        "tests/Calor.Verification.Tests/S2NestedQuantifierTests.cs",
+        "tests/Calor.Compiler.Tests/S2NestedQuantifierChannelTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    },
+    {
+      "id": "R-NUM",
+      "pr": 1502,
+      "mergeCommit": "aa23d58915b1f591a82852391633b5609c9bb2f9",
+      "regressionWitness": [
+        "tests/Calor.Verification.Tests/S2NumericRefusalTests.cs",
+        "tests/Calor.Compiler.Tests/S2NumericDeterminismTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    },
+    {
+      "id": "R-OBL-RESIDUALS",
+      "pr": 1503,
+      "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+      "regressionWitness": [
+        "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
+      ],
+      "presentAtCandidate": true,
+      "run": "not run by the freeze; the re-proof runs them on this SHA"
+    }
+  ],
+  "merged": [
+    {
+      "gate": "R0",
+      "issue": 1426,
+      "prs": [
+        {
+          "pr": 1483,
+          "mergeCommit": "16c1c5f810b042683ef8d8b375f161884fa0b777",
+          "mergedAtUtc": "2026-10-04T00:05:35Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1552,
+          "mergeCommit": "1cadf019f63363d8ba06423b3c7793ad38de1cff",
+          "mergedAtUtc": "2026-10-12T04:17:50Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1553,
+          "mergeCommit": "ed4bc190915ade61a15daeaf61cac6ea53b9bc3d",
+          "mergedAtUtc": "2026-10-12T04:18:07Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-r0-1426/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "D1",
+      "issue": 1427,
+      "prs": [
+        {
+          "pr": 1518,
+          "mergeCommit": "f01f42194c78203082542dbda5d686a6800e46a3",
+          "mergedAtUtc": "2026-10-13T19:18:44Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1559,
+          "mergeCommit": "107d64032335020b8288c0e20d66a103457d441a",
+          "mergedAtUtc": "2026-10-18T16:34:54Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-d1-1427/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "F1",
+      "issue": 943,
+      "prs": [
+        {
+          "pr": 1558,
+          "mergeCommit": "f83b4e5937a55bb1ad04e57ab2e410bf667c6232",
+          "mergedAtUtc": "2026-10-18T14:50:42Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1571,
+          "mergeCommit": "e075f848a42082eeddd6bb4201d8eb08e5afd809",
+          "mergedAtUtc": "2026-10-19T08:58:41Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-f1-943/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "F2",
+      "issue": 906,
+      "prs": [
+        {
+          "pr": 1522,
+          "mergeCommit": "b4a58bc237ecdef9d1792e6c86b2936c1bf5b6ff",
+          "mergedAtUtc": "2026-10-17T19:08:55Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-f2-906/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "F3",
+      "issue": 847,
+      "prs": [
+        {
+          "pr": 1519,
+          "mergeCommit": "bc91fbe388401b676d2aaff647d0520733d14d99",
+          "mergedAtUtc": "2026-10-17T20:57:42Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1531,
+          "mergeCommit": "5bbc15b6a020f88b55a41109b93a7d8322726dfc",
+          "mergedAtUtc": "2026-10-17T21:41:11Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-f3-847/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "F4",
+      "issue": 1139,
+      "prs": [
+        {
+          "pr": 1510,
+          "mergeCommit": "8a39bc8754199672a6c72399012e4412f62aeb88",
+          "mergedAtUtc": "2026-10-13T22:12:03Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-f4-1139/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "F5",
+      "issue": 1132,
+      "prs": [
+        {
+          "pr": 1554,
+          "mergeCommit": "f7510f32e906394e34262552572c065c36d6f772",
+          "mergedAtUtc": "2026-10-17T15:47:15Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-f5-1132/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "F6",
+      "issue": 1144,
+      "prs": [
+        {
+          "pr": 1513,
+          "mergeCommit": "cc54c038a89b1abc638acce134c8fab7898af6eb",
+          "mergedAtUtc": "2026-10-17T00:55:56Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-f6-1144/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "W0",
+      "issue": 1143,
+      "prs": [
+        {
+          "pr": 1512,
+          "mergeCommit": "b851b7df8d6788b30011d531707d02b88ce23556",
+          "mergedAtUtc": "2026-10-13T02:21:33Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-w0-1143/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "T1",
+      "issue": 1428,
+      "prs": [
+        {
+          "pr": 1562,
+          "mergeCommit": "aea06ff8fc89be1760c7ecfc0d07e33c6cf7da79",
+          "mergedAtUtc": "2026-10-18T20:48:10Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-t1-1428/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "W1",
+      "issue": 1429,
+      "prs": [
+        {
+          "pr": 1566,
+          "mergeCommit": "6767014156b0977482f2f3c2eb5d1048d12a50c2",
+          "mergedAtUtc": "2026-10-19T04:01:55Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-w1-1429/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    {
+      "gate": "R2-1545",
+      "issue": 1545,
+      "prs": [
+        {
+          "pr": 1565,
+          "mergeCommit": "0b9568b3f233e436aa38cc4e8f5420d276026434",
+          "mergedAtUtc": "2026-10-18T21:52:00Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1577,
+          "mergeCommit": "ebe1c7fe60f968f2722ed935f8a9b3420f472e93",
+          "mergedAtUtc": "2026-10-19T15:16:36Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/release-gaps-0.25/",
+      "issueStateAtFreeze": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-19T15:23:15Z"
+      }
+    },
+    {
+      "gate": "R2-1546",
+      "issue": 1546,
+      "prs": [
+        {
+          "pr": 1563,
+          "mergeCommit": "01acd188c84a40b6a3d51723cfa0199f861ab48b",
+          "mergedAtUtc": "2026-10-18T18:07:53Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/release-gaps-0.25/",
+      "issueStateAtFreeze": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-19T15:23:17Z"
+      }
+    },
+    {
+      "gate": "R2-1547",
+      "issue": 1547,
+      "prs": [
+        {
+          "pr": 1563,
+          "mergeCommit": "01acd188c84a40b6a3d51723cfa0199f861ab48b",
+          "mergedAtUtc": "2026-10-18T18:07:53Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/release-gaps-0.25/",
+      "issueStateAtFreeze": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-19T15:23:19Z"
+      }
+    },
+    {
+      "gate": "PREP",
+      "issue": 1430,
+      "prs": [
+        {
+          "pr": 1568,
+          "mergeCommit": "eeece8efb8e4b92105f7c88a01bf424807a7e586",
+          "mergedAtUtc": "2026-10-19T00:32:51Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1569,
+          "mergeCommit": "c2bcf82a91e907034be43167655b663575418b90",
+          "mergedAtUtc": "2026-10-19T01:31:25Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1575,
+          "mergeCommit": "a6d5c2f0dabba3db12e8eef6576a8388dd3293b2",
+          "mergedAtUtc": "2026-10-19T11:06:42Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1576,
+          "mergeCommit": "48cae911700ceb0dfc358e00933650445d81604f",
+          "mergedAtUtc": "2026-10-19T18:18:59Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/v0.25-candidate/",
+      "issueStateAtFreeze": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    }
+  ],
+  "issueStatesAtFreeze": {
+    "observedVia": "gh issue view <n> --json state,stateReason,closedAt at 2026-10-19T18:23:52Z",
+    "states": {
+      "1425": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1426": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1427": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1428": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1429": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1430": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "943": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "906": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "847": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1139": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1132": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1144": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1143": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1545": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-19T15:23:15Z"
+      },
+      "1546": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-19T15:23:17Z"
+      },
+      "1547": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-19T15:23:19Z"
+      },
+      "1548": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1573": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      },
+      "1578": {
+        "state": "OPEN",
+        "stateReason": null,
+        "closedAtUtc": null
+      }
+    },
+    "releaseGaps": {
+      "precondition": "scope.json acceptancePreconditions.releaseGaps: #1545, #1546 and #1547 closed before acceptance",
+      "met": true,
+      "closures": [
+        {
+          "issue": 1545,
+          "closedAtUtc": "2026-10-19T15:23:15Z",
+          "stateReason": "COMPLETED"
+        },
+        {
+          "issue": 1546,
+          "closedAtUtc": "2026-10-19T15:23:17Z",
+          "stateReason": "COMPLETED"
+        },
+        {
+          "issue": 1547,
+          "closedAtUtc": "2026-10-19T15:23:19Z",
+          "stateReason": "COMPLETED"
+        }
+      ],
+      "liveCheck": {
+        "command": "python3 scripts/check_release_credentials.py --live --attest-workflow-permissions docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.json",
+        "ranAtUtc": "2026-10-19T18:23:52Z",
+        "treeAtCommit": "48cae911700ceb0dfc358e00933650445d81604f",
+        "exitCode": 0,
+        "verdict": "RELEASE CREDENTIALS: CLOSED (workflows and repository settings; Actions workflow permissions ATTESTED by the maintainer, not read by API (A001 above)). nuget.org itself (the calor-release policy, the old key's revocation) is not visible to this check.",
+        "attestation": "A001: Actions workflow permissions ATTESTED, not read by API (GET repos/juanmicrosoft/calor/actions/permissions/workflow answers 403 to the gh login); confirmed by @juanmicrosoft on 2026-10-19 (docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.json).",
+        "output": {
+          "path": "docs/plans/evidence/v0.25-candidate/release-credentials-live-2026-10-19.txt",
+          "sha256": "fa7b5895d4c4edd02b1b2aa7fbc29b9309b6bffc27347d62fbc71e37e521ee17"
+        },
+        "publishing": "#1577 (ebe1c7fe6): NuGet Trusted Publishing (OIDC) through NuGet/login v1.2.0; no NuGet key stored in GitHub."
+      }
+    }
+  },
+  "maintainerDecisions": [
+    {
+      "id": "D-ACCEPT-FILE-FREEZE",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "Accept, file issue, freeze",
+      "detail": "The MAJOR (gate heading ids for a link whose text is a code span) and the MINOR (S004 parity theory compares only flagged-case sets) left open by the EXC-PREFREEZE-GATE verification pass are accepted as known residuals, tracked in #1578; freeze #1576's merge.",
+      "record": "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md",
+      "issue": 1578,
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    {
+      "id": "EXC-PREFREEZE-GATE",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "Exception: fix + 1 pass",
+      "record": "docs/plans/evidence/v0.25-candidate/README.md",
+      "source": "Relayed in the agent session; no GitHub record."
+    },
+    {
+      "id": "D-READY-EVIDENCE-DIRS",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "Evidence dirs now, scope after A1",
+      "record": "scope.json amendments[1.4.0]"
+    },
+    {
+      "id": "D-GATE-SCOPE-PACKET",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "0.25 scope packet",
+      "record": "scope.json amendments[1.4.0]"
+    },
+    {
+      "id": "D-G2-TWO-RUNS",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "Amend: 2 runs for 0.25",
+      "record": "scope.json amendments[1.4.0]; g2-1421/protocol.json amendment 1.6.0"
+    },
+    {
+      "id": "F1-LINES-85-TO-W1",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "Count the 85 against W1",
+      "record": "docs/plans/evidence/v0.25-f1-943/README.md"
+    },
+    {
+      "id": "F1-P2V-1-RESIDUAL",
+      "date": "2026-10-19",
+      "by": "@juanmicrosoft",
+      "decision": "Accept as known residual",
+      "issue": 1573,
+      "record": "docs/plans/evidence/v0.25-f1-943/README.md"
+    }
+  ],
+  "knownOpenItems": [
+    {
+      "id": "GATE-HEADING-CODE-SPAN-LINK",
+      "issue": 1578,
+      "severity": "MAJOR (accepted residual, D-ACCEPT-FILE-FREEZE)",
+      "item": "The release gate's heading_text gives build-https-example-com for \"## [`Build`](https://example.com)\"; the site gives build. No W1 page uses that form: all 23 W1 references resolve identically.",
+      "record": "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md"
+    },
+    {
+      "id": "GATE-S004-PARITY-COARSE",
+      "issue": 1578,
+      "severity": "MINOR (accepted residual)",
+      "item": "GateReplayMatchesTheValidatorsS004 compares only flagged-case sets, so the active-add guard and the additions-before-changes order are not individually discriminated. The production replay matches S004 (verified).",
+      "record": "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md"
+    },
+    {
+      "id": "NO-FAMILY-READY",
+      "item": "0 of 6 families READY at the freeze; READY records go under each family's evidence ready/ (D-READY-EVIDENCE-DIRS) and are cited by A1."
+    },
+    {
+      "id": "REPROOF-NOT-RUN",
+      "item": "The acceptancePreconditions re-proof (S2 witnesses, regeneration, G2 determinism under protocol 1.6.0, release gate) has not run on this candidate; the regeneration does it."
+    },
+    {
+      "id": "GATE-CONTRACT-1548",
+      "issue": 1548,
+      "item": "#1548 (which contract governs the release) stays open; D-GATE-SCOPE-PACKET decided the gate checks the 0.25 scope packet."
+    },
+    {
+      "id": "NUGET-POLICY-NOT-VISIBLE",
+      "item": "The live credential check cannot see nuget.org itself (the calor-release trusted-publishing policy, the old key's revocation)."
+    },
+    {
+      "id": "CONVERTER-1573",
+      "issue": 1573,
+      "item": "P2V-1: a private base-class @default member makes the converted out var fail loudly with CS0122 (accepted residual)."
+    },
+    {
+      "id": "CLASSIFIER-NOT-A-GATE",
+      "item": "The 0.25 classifier is not a required gate on later merges; the regeneration and A1 classify up to their own commit from a checkout of the landing."
+    }
+  ],
+  "invalidation": {
+    "classifier": "tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs (profile V025)",
+    "tests": [
+      "tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidationTests.cs",
+      "tests/Calor.Compiler.Tests/EvidenceContract/V025CandidateManifestTests.cs"
+    ],
+    "rangeCommand": "From a checkout of the landing commit: CALOR_V025_CLASSIFY_TARGET=<full SHA> dotnet test tests/Calor.Compiler.Tests --filter FullyQualifiedName~V025CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated",
+    "landing": "The first first-parent commit of origin/main after the candidate that holds docs/plans/evidence/v0.25-candidate/candidate-manifest.json: this freeze PR's merge."
+  },
+  "review": "Codex (codex exec -s read-only --ephemeral -c model_reasoning_effort=\"high\"), at most 3 rounds plus 1 verification pass for the freeze PR: docs/plans/evidence/v0.25-candidate/reviews/freeze-*.md. Independence reduced."
+}

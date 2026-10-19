@@ -155,6 +155,36 @@ public static class ReleaseCandidateInvalidation
     }
 
     /// <summary>
+    /// The default target: the newest commit (topological order) in candidate..HEAD that changes one of the profile's
+    /// own files (not a review record), each commit diffed against its first parent, so a merge counts. Any git failure
+    /// is an error, never "none".
+    /// </summary>
+    public static string? NewestProfileCommit(GitRepo git, CandidateProfile profile, string candidate, List<string> errors, GitRun? run = null)
+    {
+        run ??= git.Run;
+        var (exit, log, error) = run("rev-list", "--topo-order", "--parents", $"{candidate}..HEAD");
+        if (exit != 0)
+        {
+            errors.Add($"git rev-list {candidate}..HEAD failed: {error.Trim()}");
+            return null;
+        }
+        foreach (var line in log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var ids = line.Split(' ');
+            var (diffExit, names, diffError) = run("diff-tree", "-r", "--name-only", "-z", "--no-renames", ids.Length > 1 ? ids[1] : EmptyTree, ids[0]);
+            if (diffExit != 0)
+            {
+                errors.Add($"git diff-tree {ids[0]} failed: {diffError.Trim()}");
+                return null;
+            }
+            if (names.Split('\0').Any(p => (p.StartsWith(profile.Directory, StringComparison.Ordinal) && !p.StartsWith(profile.Reviews, StringComparison.Ordinal))
+                    || profile.Files.Contains(p, StringComparer.Ordinal)))
+                return ids[0];
+        }
+        return null;
+    }
+
+    /// <summary>
     /// The first first-parent commit of protected main after the candidate that holds the manifest. A commit's
     /// tree is listed to decide whether the path exists; an existing manifest whose blob cannot be read is an error,
     /// never "absent", so an unreadable landing cannot turn a frozen-file edit into a before-landing one.
