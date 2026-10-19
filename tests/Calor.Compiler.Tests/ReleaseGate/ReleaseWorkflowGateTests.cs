@@ -286,19 +286,41 @@ public class ReleaseWorkflowGateTests
     [Fact]
     public void NugetKeyIsReachableOnlyThroughTheMainOnlyEnvironment()
     {
-        // #1545: older tags read the repository secret NUGET_API_KEY. The full analysis, on parsed
-        // YAML with its mutation controls, is scripts/check_release_credentials.py and
+        // #1545: older tags read the repository secret NUGET_API_KEY. Publishing now uses nuget.org
+        // Trusted Publishing: no key is stored; the publish job, in the main-only nuget-release
+        // environment, exchanges its OIDC token through the pinned NuGet/login action. nuget.org's
+        // policy matches the workflow file name and the environment, not the ref, so the
+        // environment is what keeps older tags out. The full analysis, on parsed YAML with its
+        // mutation controls, is scripts/check_release_credentials.py and
         // scripts/test_check_release_credentials.py; this lane has no PyYAML, so it checks the
         // committed facts directly and that CI runs the parser-based check with the pinned parser.
         var lines = File.ReadAllLines(Path.Combine(WorkflowDir(), "publish-nuget.yml"));
         var publish = Read("publish-nuget.yml").Replace("\r\n", "\n");
         Assert.Contains("  publish:\n    runs-on: ubuntu-latest\n    needs: [adjudication-gate, test, sdk-consumer, release-quality]\n", publish);
         Assert.Single(lines, l => l == "    environment: nuget-release");
+        Assert.Contains("    environment: nuget-release\n    permissions:\n      contents: write\n      id-token: write\n", publish);
         Assert.Contains("    steps:\n      # Fail closed before any work", publish);
-        Assert.Contains("      - name: Require the environment-scoped NuGet key (#1545)\n        env:\n          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}\n", publish);
-        Assert.Contains("--api-key \"$NUGET_RELEASE_API_KEY\"", publish);
+        Assert.Contains(
+            "      - name: Exchange the GitHub OIDC token for a short-lived NuGet key (#1545)\n" +
+            "        id: nuget-login\n" +
+            "        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0\n" +
+            "        with:\n" +
+            "          user: juanmicrosoft\n\n" +
+            "      - name: Require the Trusted Publishing NuGet key (#1545)\n" +
+            "        env:\n" +
+            "          NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n", publish);
+        Assert.Contains("--api-key \"$NUGET_OIDC_KEY\"", publish);
+        // The login action's output is the only place the name NUGET_API_KEY may appear (twice: the
+        // guard and the push), and no workflow may reference any NuGet secret.
+        const string keyRef = "${{ steps.nuget-login.outputs.NUGET_API_KEY }}";
+        Assert.Equal(2, publish.Split(keyRef).Length - 1);
         foreach (var path in Directory.GetFiles(WorkflowDir(), "*.yml"))
-            Assert.DoesNotContain("NUGET_API_KEY", File.ReadAllText(path), StringComparison.OrdinalIgnoreCase);
+        {
+            var text = File.ReadAllText(path).Replace(keyRef, "", StringComparison.Ordinal);
+            Assert.DoesNotContain("NUGET_API_KEY", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("NUGET_RELEASE_API_KEY", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotMatch(new Regex(@"secrets\s*(\.|\[)\s*['""]?[A-Za-z0-9_]*NUGET", RegexOptions.IgnoreCase), text);
+        }
     }
 
     [Fact]

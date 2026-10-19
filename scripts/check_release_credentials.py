@@ -1,31 +1,53 @@
 #!/usr/bin/env python3
-"""Read-only check: can any workflow but the gated publish job reach the NuGet key? (#1545)
+"""Read-only check: can anything but the gated publish job get a NuGet key? (#1545)
 
-Older tags hold an ungated publish-nuget.yml that reads the repository secret NUGET_API_KEY, and
-`workflow_dispatch` or `gh run rerun` can run those files. The fix is a repository setting, which
-only the maintainer may change: the key moves into the `nuget-release` environment, whose
-deployment policy admits `main` only, under a name no older workflow uses (NUGET_RELEASE_API_KEY).
-publish-nuget.yml on main names that environment and that secret.
+Older tags hold an ungated publish-nuget.yml that read the repository secret NUGET_API_KEY, and
+`workflow_dispatch` or `gh run rerun` can run those files. The fix (maintainer decision
+2026-10-19) is nuget.org Trusted Publishing: no NuGet key is stored in GitHub. The `publish` job
+of publish-nuget.yml on main enters the `nuget-release` environment, and the pinned NuGet/login
+action exchanges that job's GitHub OIDC token for a one-hour key.
 
-This script reports whether the gap is closed. It changes nothing: every GitHub API call it makes
-is an explicit `gh api --method GET`.
+Why older refs cannot get a key. nuget.org's policy check (NuGetGallery
+GitHubTokenPolicyValidator.EvaluatePolicyAsync) requires the token's `repository_owner` and
+`repository` to match the policy (and, once the policy has been used, `repository_owner_id` and
+`repository_id`). It takes the workflow FILE NAME from the `job_workflow_ref` claim and ignores
+the ref after `@`. When the policy names an environment, the `environment` claim must equal it
+(compared without case); a token with no environment claim does not match. The policy
+"calor-release" names publish-nuget.yml and nuget-release. So:
+  * an older tag's publish-nuget.yml names no environment; its token has no environment claim and
+    is refused, even though the file name matches;
+  * a ref other than `main` that names the environment is stopped by GitHub before the job starts,
+    because the environment admits branch `main` alone and administrators cannot bypass it;
+  * a workflow with another file name never matches, on any ref.
+The environment and its branch rule are therefore load-bearing; nuget.org does not check the ref.
+
+This script reports whether that holds. It changes nothing: every GitHub API call it makes is an
+explicit `gh api --method GET`. It cannot see nuget.org, so it cannot confirm the policy or that
+the old key was revoked.
 
   * Workflow check (always, offline), on the parsed YAML (PyYAML, pinned in
-    eng/release-credentials-requirements.txt; duplicate keys and parse failures fail closed): no
-    workflow names NUGET_API_KEY; only the `publish` job of publish-nuget.yml names
-    NUGET_RELEASE_API_KEY, that job declares `environment: nuget-release` and starts with the
-    exact empty-key guard, no other job declares an unrecognized environment, and every job-level
-    `uses` is a local workflow file (codes: check_workflows).
+    eng/release-credentials-requirements.txt; duplicate keys, explicit tags, and parse failures
+    fail closed). Codes: check_workflows.
   * Settings check (`--live`, or `--from-dir` with saved API responses for tests):
-      - no repository-level Actions secret whose name contains NUGET;
-      - the environment exists, admins cannot bypass it, and its deployment policy is custom
-        branch policies (not "protected branches") holding exactly one rule: branch `main`;
-      - the environment holds the secret NUGET_RELEASE_API_KEY.
+      - S001: a repository-level Actions secret whose name contains NUGET exists;
+      - S002: the environment is missing; S003: admins can bypass it; S004: its deployment policy
+        is not custom branch policies; S005: its rules are not exactly branch `main`;
+      - S007: an environment, nuget-release or any other, holds a secret whose name contains
+        NUGET;
+      - S008: Actions' default workflow token is not read-only; S009: Actions may create or
+        approve pull requests.
+    (S006, "the environment lacks NUGET_RELEASE_API_KEY", is retired: no key is stored now.)
     Listing secrets needs a token with admin rights on the repository (the maintainer's own
-    `gh` login). A response the script cannot read is UNKNOWN, never CLOSED.
+    `gh` login). A response the script cannot read is UNKNOWN (U001-U005), never CLOSED.
+    Reading the workflow permissions also needs the "Actions policies" permission; a plain login
+    gets HTTP 403. A 403 there is UNVERIFIABLE (V001), never CLOSED, unless
+    --attest-workflow-permissions names a valid maintainer attestation (exact schema:
+    load_attestation). Then the output says ATTESTED, not read (A001), and names who confirmed it
+    and when. An invalid attestation is UNKNOWN (U006). An attestation never overrides an answer
+    the API gave.
 
-Exit 0 only when every check passes (CLOSED). Exit 1 when a check fails (OPEN) or cannot be
-completed (UNKNOWN). Maintainer steps: docs/plans/evidence/release-gaps-0.25/README.md.
+Exit 0 only when every check passes (CLOSED, possibly with A001). Exit 1 when a check fails
+(OPEN), cannot be completed (UNKNOWN), or was refused with no attestation (UNVERIFIABLE). Maintainer steps: docs/plans/evidence/release-gaps-0.25/README.md.
 Tests: scripts/test_check_release_credentials.py.
 """
 
@@ -38,6 +60,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Callable
+from urllib.parse import quote
 
 try:  # pinned in eng/release-credentials-requirements.txt; missing means W012 (fail closed)
     import yaml
@@ -46,39 +69,76 @@ except ImportError:  # pragma: no cover - exercised by the tests through monkeyp
 
 REPO = "juanmicrosoft/calor"
 ENVIRONMENT = "nuget-release"
-SECRET = "NUGET_RELEASE_API_KEY"
+# NUGET_API_KEY: the repository secret older workflows read. NUGET_RELEASE_API_KEY: the
+# environment secret of the interim design. A workflow may name neither, except KEY_REF below.
 OLD_SECRET = "NUGET_API_KEY"
+RETIRED_SECRET = "NUGET_RELEASE_API_KEY"
+KEY_NAMES = (OLD_SECRET, RETIRED_SECRET)
 PUBLISH_WORKFLOW = "publish-nuget.yml"
 PUBLISH_JOB = "publish"
 
-# Relative API paths (after repos/<owner>/<repo>/) and the file names used by --from-dir.
+# The official action, pinned to the commit of release v1.2.0 (tags v1.2.0 and v1 on 2026-10-19).
+LOGIN_ACTION = "NuGet/login@8d196754b4036150537f80ac539e15c2f1028841"
+LOGIN_ID = "nuget-login"
+# The nuget.org account that owns calor and Calor.Sdk and the "calor-release" policy. Not a secret.
+NUGET_USER = "juanmicrosoft"
+# NuGet/login names its output NUGET_API_KEY. This exact expression, in the env of the guard and of
+# the push step, is the only mention of that name any workflow may contain.
+KEY_REF = "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+KEY_ENV = "NUGET_OIDC_KEY"
+
+# Relative API paths (after repos/<owner>/<repo>/); --from-dir reads <key with / as -->.json.
 ENDPOINTS = {
     "repo-secrets": "actions/secrets",
     "environment": f"environments/{ENVIRONMENT}",
     "branch-policies": f"environments/{ENVIRONMENT}/deployment-branch-policies",
-    "environment-secrets": f"environments/{ENVIRONMENT}/secrets",
+    "environments": "environments",
+    "workflow-permissions": "actions/permissions/workflow",
 }
+ENV_SECRETS = "environment-secrets/"  # + environment name
 
 
 class Unreadable(Exception):
     """The API answered with something other than the data (403, network error, bad JSON)."""
 
 
+class Forbidden(Unreadable):
+    """The API answered 403: the token may not read this setting."""
+
+
 class NotFound(Exception):
     """The API answered 404."""
 
 
-GUARD_STEP = "Require the environment-scoped NuGet key (#1545)"
-SECRET_REF = "${{ secrets.NUGET_RELEASE_API_KEY }}"
-# The publish job's first step, as parsed. Only this exact mapping counts as the guard.
+# A maintainer's confirmation of the Actions workflow permissions, for when the API refuses to show
+# them (HTTP 403: reading them needs the "Actions policies" permission, which a plain `gh` login may
+# lack). Used only after a 403, never instead of an answer the API gave. Exact keys and values.
+ATTESTATION_SCHEMA = "calor-release-credentials-attestation/v1"
+ATTESTATION_SETTING = "actions/permissions/workflow"
+ATTESTATION_KEYS = {"schema", "repository", "setting", "default_workflow_permissions",
+                    "can_approve_pull_request_reviews", "confirmed_by", "confirmed_on", "why_not_read"}
+
+
+# The publish job's first two steps, as parsed. Only these exact mappings count.
+LOGIN_STEP = "Exchange the GitHub OIDC token for a short-lived NuGet key (#1545)"
+LOGIN = {
+    "name": LOGIN_STEP,
+    "id": LOGIN_ID,
+    "uses": LOGIN_ACTION,
+    "with": {"user": NUGET_USER},
+}
+GUARD_STEP = "Require the Trusted Publishing NuGet key (#1545)"
 GUARD = {
     "name": GUARD_STEP,
-    "env": {SECRET: SECRET_REF},
-    "run": ('if [ -z "$NUGET_RELEASE_API_KEY" ]; then\n'
-            '  echo "::error::NUGET_RELEASE_API_KEY is not available; create it in the nuget-release environment (#1545)"\n'
+    "env": {KEY_ENV: KEY_REF},
+    "run": (f'if [ -z "${KEY_ENV}" ]; then\n'
+            '  echo "::error::nuget.org Trusted Publishing returned no key; check the calor-release '
+            'policy and the nuget-release environment (#1545)"\n'
             "  exit 1\n"
             "fi\n"),
 }
+# Text that marks the login action or its output, matched without case.
+LOGIN_MARKERS = ("nuget/login", LOGIN_ID)
 # Every other job-level environment on main, as parsed. Anything else is reported.
 OTHER_ENVIRONMENTS = [
     {"name": "github-pages", "url": "${{ steps.deployment.outputs.page_url }}"},
@@ -88,7 +148,6 @@ LOCAL_WORKFLOW = re.compile(r"\./\.github/workflows/[A-Za-z0-9._-]+\.ya?ml")
 
 class ParseFailure(Exception):
     pass
-
 
 
 def strict_loader():
@@ -163,20 +222,48 @@ def keyed(mapping: dict, name: str) -> list[object]:
     return [v for k, v in mapping.items() if isinstance(k, str) and k.casefold() == name]
 
 
+def without(value: object, drop: str) -> object:
+    """A copy of a parsed value in which every string equal to `drop` is replaced by ''."""
+    if isinstance(value, str):
+        return "" if value == drop else value
+    if isinstance(value, dict):
+        return {k: without(v, drop) for k, v in value.items()}
+    if isinstance(value, list):
+        return [without(v, drop) for v in value]
+    return value
+
+
+def mentions_login(value: object) -> bool:
+    return any(mentions(value, marker) for marker in LOGIN_MARKERS)
+
+
 def check_workflows(workflow_dir: Path) -> list[str]:
-    """Decide on the parsed structure (PyYAML, duplicate keys rejected), never on text. Entering
-    an environment is the only way to read an environment secret, so every job-level
-    environment must be the publish job's exact `nuget-release` or one of OTHER_ENVIRONMENTS, and
-    every job-level `uses` must be a local ./.github/workflows/ file with no @ref (its own jobs
-    are checked here too). Codes: W001 publish workflow missing; W002 a workflow names
-    NUGET_API_KEY; W003 another job names the key; W004 another job declares an unrecognized
-    environment; W005 the publish job's push step does not read the key; W006 the publish job's
-    environment is not exactly nuget-release; W007 the publish job's first step is not the guard;
-    W008 the key or environment appears outside a job, or jobs are not mappings; W009 anchors,
-    aliases, or merge keys; W011 a job-level `uses` other than a local workflow file; W012 a
-    workflow cannot be parsed, has a duplicate key, or carries an explicit YAML tag on any node
-    (`!!set` would skip the duplicate-key check, `!!null` would erase a value). (W010, a key split across lines, is retired:
-    the parser decodes those.)"""
+    """Decide on the parsed structure (PyYAML, duplicate keys rejected), never on text.
+
+    nuget.org issues a key only to a job of publish-nuget.yml that runs in nuget-release (module
+    docstring), so every job-level environment must be the publish job's exact `nuget-release`
+    or one of OTHER_ENVIRONMENTS, and every job-level `uses` must be a local
+    ./.github/workflows/ file with no @ref (its own jobs are checked here too). Codes:
+      W001 publish-nuget.yml is missing.
+      W002 a workflow names NUGET_API_KEY or NUGET_RELEASE_API_KEY anywhere other than the exact
+           login-output expression inside the publish job (old workflows read secrets by those
+           names; no secret may be referenced by them again).
+      W003 another job uses NuGet/login or names its output.
+      W004 another job declares an environment the check does not recognize.
+      W005 the publish job has no `dotnet nuget push` step that reads the login output through
+           env (and only that).
+      W006 the publish job's environment is not exactly nuget-release (or the job is missing).
+      W007 the publish job's second step is not exactly the empty-key guard.
+      W008 the environment or the login appears outside a job, or jobs are not mappings.
+      W009 anchors, aliases, or merge keys.
+      W011 a job-level `uses` other than a local workflow file.
+      W012 a workflow cannot be parsed, has a duplicate key, or carries an explicit YAML tag on
+           any node (`!!set` would skip the duplicate-key check, `!!null` would erase a value).
+      W013 the publish job does not grant `id-token: write` (the OIDC exchange needs it).
+      W014 the publish job's first step is not exactly the pinned NuGet/login step.
+      W015 another part of the publish job (job-level keys, or a step other than the login, the
+           guard, and the push) uses NuGet/login or names its output.
+    (W010, a key split across lines, is retired: the parser decodes those.)"""
     problems: list[str] = []
     files = sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))
     if not any(f.name == PUBLISH_WORKFLOW for f in files):
@@ -191,13 +278,22 @@ def check_workflows(workflow_dir: Path) -> list[str]:
             continue
         if anchored:
             problems.append(f"W009: {path.name} uses a YAML anchor, alias, or merge key")
-        if mentions(doc, OLD_SECRET):
-            problems.append(f"W002: {path.name} names {OLD_SECRET}; older workflow versions read that secret")
         jobs_values = keyed(doc, "jobs")
-        outside = {k: v for k, v in doc.items() if not (isinstance(k, str) and k.casefold() == "jobs")}
-        if mentions(outside, SECRET) or mentions(outside, ENVIRONMENT):
-            problems.append(f"W008: {path.name} names {SECRET} or {ENVIRONMENT} outside a job")
         jobs = jobs_values[0] if jobs_values else {}
+        # The login output's exact expression is allowed inside the publish job only; W015 and
+        # W005 decide where in that job.
+        scrubbed = doc
+        if path.name == PUBLISH_WORKFLOW and isinstance(jobs, dict):
+            scrubbed = {k: ({j: (without(b, KEY_REF) if j == PUBLISH_JOB else b) for j, b in v.items()}
+                            if isinstance(k, str) and k.casefold() == "jobs" else v)
+                        for k, v in doc.items()}
+        for name in KEY_NAMES:
+            if mentions(scrubbed, name):
+                problems.append(f"W002: {path.name} names {name}; older workflow versions read a secret by "
+                                "that name, and no workflow may name it again")
+        outside = {k: v for k, v in doc.items() if not (isinstance(k, str) and k.casefold() == "jobs")}
+        if mentions(outside, ENVIRONMENT) or mentions_login(outside):
+            problems.append(f"W008: {path.name} names {ENVIRONMENT} or the NuGet login outside a job")
         if not isinstance(jobs, dict) or not all(isinstance(j, dict) for j in jobs.values()):
             problems.append(f"W008: {path.name} has jobs that are not mappings")
             continue
@@ -211,22 +307,11 @@ def check_workflows(workflow_dir: Path) -> list[str]:
             environments = keyed(body, "environment")
             if is_publish:
                 publish_seen = True
-                if environments != [ENVIRONMENT]:
-                    problems.append(f"W006: {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' must declare exactly "
-                                    f"`environment: {ENVIRONMENT}`")
-                steps = (keyed(body, "steps") or [None])[0]
-                if not isinstance(steps, list) or not steps or steps[0] != GUARD:
-                    problems.append(f"W007: the first step of {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' must be "
-                                    f"exactly the '{GUARD_STEP}' check")
-                pushes = [step for step in (steps or [])[1:] if isinstance(step, dict)
-                          and "dotnet nuget push" in str(step.get("run", ""))
-                          and isinstance(step.get("env"), dict) and SECRET_REF in step["env"].values()]
-                if not pushes:
-                    problems.append(f"W005: {PUBLISH_WORKFLOW} job '{PUBLISH_JOB}' has no `dotnet nuget push` "
-                                    f"step that reads {SECRET} through env")
+                problems += check_publish_job(body, environments)
                 continue
-            if mentions(body, SECRET):
-                problems.append(f"W003: {path.name} job '{job}' names {SECRET}; only the gated publish job may")
+            if mentions_login(body):
+                problems.append(f"W003: {path.name} job '{job}' uses NuGet/login or names its output; only "
+                                "the gated publish job may")
             for environment in environments:
                 if environment not in OTHER_ENVIRONMENTS or mentions(environment, ENVIRONMENT):
                     problems.append(f"W004: {path.name} job '{job}' declares an environment the check does not "
@@ -236,7 +321,46 @@ def check_workflows(workflow_dir: Path) -> list[str]:
     return problems
 
 
-LISTS = {"repo-secrets": "secrets", "environment-secrets": "secrets", "branch-policies": "branch_policies"}
+def check_publish_job(body: dict, environments: list[object]) -> list[str]:
+    where = f"{PUBLISH_WORKFLOW} job '{PUBLISH_JOB}'"
+    problems: list[str] = []
+    if environments != [ENVIRONMENT]:
+        problems.append(f"W006: {where} must declare exactly `environment: {ENVIRONMENT}`")
+    permissions = keyed(body, "permissions")
+    if len(permissions) != 1 or not isinstance(permissions[0], dict) \
+            or keyed(permissions[0], "id-token") != ["write"]:
+        problems.append(f"W013: {where} must grant `id-token: write` in its own permissions")
+    steps = (keyed(body, "steps") or [None])[0]
+    steps = steps if isinstance(steps, list) else []
+    if not steps or steps[0] != LOGIN:
+        problems.append(f"W014: the first step of {where} must be exactly the '{LOGIN_STEP}' step "
+                        f"(uses: {LOGIN_ACTION}, user: {NUGET_USER})")
+    if len(steps) < 2 or steps[1] != GUARD:
+        problems.append(f"W007: the second step of {where} must be exactly the '{GUARD_STEP}' check")
+    pushes = [i for i, step in enumerate(steps) if i >= 2 and isinstance(step, dict)
+              and isinstance(step.get("run"), str) and "dotnet nuget push" in step["run"]
+              and step.get("env") == {KEY_ENV: KEY_REF} and f'--api-key "${KEY_ENV}"' in step["run"]]
+    if not pushes:
+        problems.append(f"W005: {where} has no `dotnet nuget push` step that reads the login output through "
+                        f"env {KEY_ENV} (and nothing else)")
+    rest = [step for i, step in enumerate(steps) if i >= 2 and i not in pushes]
+    job_level = {k: v for k, v in body.items() if not (isinstance(k, str) and k.casefold() == "steps")}
+    if mentions_login(rest) or mentions_login(job_level) or any(mentions(rest + [job_level], n) for n in KEY_NAMES):
+        problems.append(f"W015: {where} uses NuGet/login or its output outside the login, guard, and push steps")
+    return problems
+
+
+LISTS = {"repo-secrets": "secrets", "branch-policies": "branch_policies", "environments": "environments"}
+
+
+def endpoint(key: str) -> str:
+    if key.startswith(ENV_SECRETS):
+        return f"environments/{quote(key[len(ENV_SECRETS):], safe='')}/secrets"
+    return ENDPOINTS[key]
+
+
+def list_field(key: str) -> str | None:
+    return "secrets" if key.startswith(ENV_SECRETS) else LISTS.get(key)
 
 
 def gh_fetch(repo: str) -> Callable[[str], object]:
@@ -249,6 +373,8 @@ def gh_fetch(repo: str) -> Callable[[str], object]:
             text = result.stdout + result.stderr
             if "HTTP 404" in text:
                 raise NotFound(path)
+            if "HTTP 403" in text or '"status":"403"' in text:
+                raise Forbidden(f"{path}: {text.strip()[:300]}")
             raise Unreadable(f"{path}: {text.strip()[:300]}")
         try:
             return json.loads(result.stdout)
@@ -256,12 +382,13 @@ def gh_fetch(repo: str) -> Callable[[str], object]:
             raise Unreadable(f"{path}: {error}") from error
 
     def fetch(key: str) -> object:
-        path = f"repos/{repo}/{ENDPOINTS[key]}"
-        if key not in LISTS:
+        path = f"repos/{repo}/{endpoint(key)}"
+        field = list_field(key)
+        if field is None:
             return get(path)
         # Every page, 100 at a time, until total_count entries are collected; listed() then
         # refuses any response whose entries do not add up to total_count.
-        field, items, total = LISTS[key], [], None
+        items, total = [], None
         for page in range(1, 101):
             body = get(f"{path}?per_page=100&page={page}")
             if not isinstance(body, dict) or not isinstance(body.get(field), list):
@@ -275,11 +402,14 @@ def gh_fetch(repo: str) -> Callable[[str], object]:
 
 
 def dir_fetch(root: Path) -> Callable[[str], object]:
-    """Saved responses: <key>.json holds the body; a missing file means 404; <key>.error is unreadable."""
+    """Saved responses: <key>.json holds the body (a / in the key is written --); a missing file
+    means 404; <key>.error is unreadable (Forbidden when its text says HTTP 403)."""
     def fetch(key: str) -> object:
-        if (root / f"{key}.error").exists():
-            raise Unreadable(f"{key}: {(root / f'{key}.error').read_text(encoding='utf-8').strip()}")
-        path = root / f"{key}.json"
+        stem = key.replace("/", "--")
+        if (root / f"{stem}.error").exists():
+            text = (root / f"{stem}.error").read_text(encoding="utf-8").strip()
+            raise (Forbidden if "HTTP 403" in text else Unreadable)(f"{key}: {text}")
+        path = root / f"{stem}.json"
         if not path.exists():
             raise NotFound(key)
         try:
@@ -303,10 +433,104 @@ def names(body: object, what: str) -> list[str]:
     return [str(s.get("name")) for s in listed(body, "secrets", what)]
 
 
-def check_settings(fetch: Callable[[str], object]) -> tuple[list[str], list[str]]:
-    """(problems, unknowns)"""
-    problems: list[str] = []
-    unknowns: list[str] = []
+def check_environment(fetch: Callable[[str], object], problems: list[str], unknowns: list[str]) -> None:
+    try:
+        env = fetch("environment")
+    except NotFound:
+        problems.append(f"S002: environment {ENVIRONMENT} does not exist")
+        return
+    except Unreadable as error:
+        unknowns.append(f"U002: cannot read environment {ENVIRONMENT} ({error})")
+        return
+    if not isinstance(env, dict):
+        unknowns.append(f"U002: environment {ENVIRONMENT} response is not an object")
+        return
+    if env.get("can_admins_bypass") is not False:
+        problems.append(f"S003: administrators can bypass {ENVIRONMENT}'s protection rules; turn that off")
+    policy = env.get("deployment_branch_policy")
+    if not isinstance(policy, dict) or policy.get("custom_branch_policies") is not True \
+            or policy.get("protected_branches") is not False:
+        problems.append(f"S004: {ENVIRONMENT} must use 'Selected branches and tags' (custom branch policies), "
+                        f"got {json.dumps(policy)}")
+        return
+    try:
+        rules = listed(fetch("branch-policies"), "branch_policies", "deployment branch policies")
+        found = sorted((str(r.get("name")), str(r.get("type", "branch"))) for r in rules)
+        if found != [("main", "branch")]:
+            problems.append(f"S005: {ENVIRONMENT} must admit exactly the branch 'main', got {found}")
+    except (Unreadable, NotFound) as error:
+        unknowns.append(f"U003: cannot read {ENVIRONMENT}'s deployment branch policies ({error})")
+
+
+def load_attestation(path: Path, repo: str) -> dict:
+    """The maintainer's attestation of the workflow permissions, or Unreadable. Every key and value
+    is fixed except who confirmed it and when; anything else is refused."""
+    try:
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise Unreadable(f"{path}: {error}") from error
+    if not isinstance(body, dict) or set(body) != ATTESTATION_KEYS:
+        raise Unreadable(f"{path}: keys must be exactly {sorted(ATTESTATION_KEYS)}")
+    expected = {"schema": ATTESTATION_SCHEMA, "repository": repo, "setting": ATTESTATION_SETTING,
+                "default_workflow_permissions": "read"}
+    for key, value in expected.items():
+        if body[key] != value:
+            raise Unreadable(f"{path}: {key} must be {value!r}, got {body[key]!r}")
+    if body["can_approve_pull_request_reviews"] is not False:
+        raise Unreadable(f"{path}: can_approve_pull_request_reviews must be false")
+    if not (isinstance(body["confirmed_by"], str) and re.fullmatch(r"@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", body["confirmed_by"])):
+        raise Unreadable(f"{path}: confirmed_by must be a GitHub @login")
+    if not (isinstance(body["confirmed_on"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", body["confirmed_on"])):
+        raise Unreadable(f"{path}: confirmed_on must be a YYYY-MM-DD date")
+    if not (isinstance(body["why_not_read"], str) and body["why_not_read"].strip()):
+        raise Unreadable(f"{path}: why_not_read must say why the API could not be read")
+    return body
+
+
+def check_workflow_permissions(fetch: Callable[[str], object], attestation: Path | None, repo: str,
+                               result: dict[str, list[str]]) -> None:
+    """S008/S009 from the API. On HTTP 403 only, the setting is UNVERIFIABLE (V001) unless a valid
+    maintainer attestation is passed; then it is reported as ATTESTED (A001), never as read."""
+    try:
+        workflow = fetch("workflow-permissions")
+        if not isinstance(workflow, dict):
+            raise Unreadable("workflow permissions response is not an object")
+    except Forbidden as error:
+        if attestation is None:
+            result["unverifiable"].append(
+                f"V001: the API refused to show the Actions workflow permissions ({error}); pass "
+                "--attest-workflow-permissions <file> with the maintainer's confirmation, or rerun with a token "
+                "that has the Actions policies permission")
+            return
+        try:
+            body = load_attestation(attestation, repo)
+        except Unreadable as bad:
+            result["unknowns"].append(f"U006: the workflow-permissions attestation is not valid ({bad})")
+            return
+        result["attested"].append(
+            f"A001: Actions workflow permissions ATTESTED, not read by API: default token "
+            f"{body['default_workflow_permissions']}, create/approve pull requests off; confirmed by "
+            f"{body['confirmed_by']} on {body['confirmed_on']} ({attestation}). Why not read: {body['why_not_read']}")
+        return
+    except (Unreadable, NotFound) as error:
+        result["unknowns"].append(f"U005: cannot read the Actions workflow permissions ({error})")
+        return
+    if attestation is not None:
+        result["attested"].append(f"A000: the API answered, so the attestation {attestation} was not used")
+    if workflow.get("default_workflow_permissions") != "read":
+        result["problems"].append("S008: Actions' default GITHUB_TOKEN is not read-only (Settings -> Actions -> "
+                                  f"General -> Workflow permissions), got {workflow.get('default_workflow_permissions')!r}")
+    if workflow.get("can_approve_pull_request_reviews") is not False:
+        result["problems"].append("S009: GitHub Actions may create and approve pull requests; turn that off, got "
+                                  f"{workflow.get('can_approve_pull_request_reviews')!r}")
+
+
+def check_settings(fetch: Callable[[str], object], attestation: Path | None = None,
+                   repo: str = REPO) -> dict[str, list[str]]:
+    """{problems, unknowns, unverifiable, attested}"""
+    result: dict[str, list[str]] = {"problems": [], "unknowns": [], "unverifiable": [], "attested": []}
+    problems = result["problems"]
+    unknowns = result["unknowns"]
     try:
         repo_level = [n for n in names(fetch("repo-secrets"), "repository secrets") if "NUGET" in n.upper()]
         if repo_level:
@@ -315,59 +539,69 @@ def check_settings(fetch: Callable[[str], object]) -> tuple[list[str], list[str]
     except (Unreadable, NotFound) as error:
         unknowns.append(f"U001: cannot list repository secrets ({error}); run with the maintainer's admin login")
 
+    check_environment(fetch, problems, unknowns)
+
+    # Trusted Publishing stores no key: a NuGet secret left in any environment is a stale key.
     try:
-        env = fetch("environment")
-    except NotFound:
-        problems.append(f"S002: environment {ENVIRONMENT} does not exist")
-        return problems, unknowns
-    except Unreadable as error:
-        unknowns.append(f"U002: cannot read environment {ENVIRONMENT} ({error})")
-        return problems, unknowns
-    if not isinstance(env, dict):
-        unknowns.append(f"U002: environment {ENVIRONMENT} response is not an object")
-        return problems, unknowns
-    if env.get("can_admins_bypass") is not False:
-        problems.append(f"S003: administrators can bypass {ENVIRONMENT}'s protection rules; turn that off")
-    policy = env.get("deployment_branch_policy")
-    if not isinstance(policy, dict) or policy.get("custom_branch_policies") is not True \
-            or policy.get("protected_branches") is not False:
-        problems.append(f"S004: {ENVIRONMENT} must use 'Selected branches and tags' (custom branch policies), "
-                        f"got {json.dumps(policy)}")
-    else:
-        try:
-            rules = listed(fetch("branch-policies"), "branch_policies", "deployment branch policies")
-            found = sorted((str(r.get("name")), str(r.get("type", "branch"))) for r in rules)
-            if found != [("main", "branch")]:
-                problems.append(f"S005: {ENVIRONMENT} must admit exactly the branch 'main', got {found}")
-        except (Unreadable, NotFound) as error:
-            unknowns.append(f"U003: cannot read {ENVIRONMENT}'s deployment branch policies ({error})")
-    try:
-        if SECRET not in names(fetch("environment-secrets"), "environment secrets"):
-            problems.append(f"S006: environment {ENVIRONMENT} has no secret {SECRET}")
+        environments = sorted({str(e.get("name")) for e in listed(fetch("environments"), "environments",
+                                                                  "environments")})
     except (Unreadable, NotFound) as error:
-        unknowns.append(f"U004: cannot list {ENVIRONMENT}'s secrets ({error})")
-    return problems, unknowns
+        unknowns.append(f"U004: cannot list the repository's environments ({error})")
+        environments = []
+    for name in environments:
+        try:
+            leftover = [n for n in names(fetch(ENV_SECRETS + name), f"{name} secrets") if "NUGET" in n.upper()]
+            if leftover:
+                problems.append(f"S007: environment {name} holds secret(s) {sorted(leftover)}; Trusted Publishing "
+                                "stores no key, so delete them")
+        except (Unreadable, NotFound) as error:
+            unknowns.append(f"U004: cannot list environment {name}'s secrets ({error})")
+
+    check_workflow_permissions(fetch, attestation, repo, result)
+    return result
 
 
 def run(args: argparse.Namespace) -> int:
     problems = check_workflows(Path(args.repo) / ".github" / "workflows")
     unknowns: list[str] = []
-    if args.from_dir or args.live:
+    unverifiable: list[str] = []
+    attested: list[str] = []
+    settings = bool(args.from_dir or args.live)
+    if args.attest_workflow_permissions and not settings:
+        print("::error::release credentials (#1545) --attest-workflow-permissions needs --live or --from-dir")
+        return 2
+    if settings:
         fetch = dir_fetch(Path(args.from_dir)) if args.from_dir else gh_fetch(args.github_repo)
-        found, unknowns = check_settings(fetch)
-        problems += found
+        attestation = Path(args.attest_workflow_permissions) if args.attest_workflow_permissions else None
+        result = check_settings(fetch, attestation, args.github_repo)
+        problems += result["problems"]
+        unknowns, unverifiable, attested = result["unknowns"], result["unverifiable"], result["attested"]
     for line in problems:
         print(f"::error::release credentials (#1545) {line}")
-    for line in unknowns:
+    for line in unknowns + unverifiable:
         print(f"::warning::release credentials (#1545) {line}")
+    for line in attested:
+        print(f"::notice::release credentials (#1545) {line}")
     if problems:
-        print(f"RELEASE CREDENTIALS: OPEN ({len(problems)} problem(s)); older tags may still reach the NuGet key.")
+        print(f"RELEASE CREDENTIALS: OPEN ({len(problems)} problem(s)); a NuGet key may still be reachable "
+              "outside the gated publish job.")
         return 1
     if unknowns:
         print(f"RELEASE CREDENTIALS: UNKNOWN ({len(unknowns)} setting(s) unreadable).")
         return 1
-    scope = "workflows and repository settings" if (args.from_dir or args.live) else "workflows only (pass --live for settings)"
-    print(f"RELEASE CREDENTIALS: CLOSED ({scope}).")
+    if unverifiable:
+        print(f"RELEASE CREDENTIALS: UNVERIFIABLE ({len(unverifiable)} setting(s) the API refused to show, "
+              "with no attestation); every other check passed.")
+        return 1
+    if not settings:
+        scope = "workflows only (pass --live for settings)"
+    elif any(line.startswith("A001") for line in attested):
+        scope = ("workflows and repository settings; Actions workflow permissions ATTESTED by the maintainer, "
+                 "not read by API (A001 above)")
+    else:
+        scope = "workflows and repository settings"
+    print(f"RELEASE CREDENTIALS: CLOSED ({scope}). nuget.org itself (the calor-release policy, the old key's "
+          "revocation) is not visible to this check.")
     return 0
 
 
@@ -378,6 +612,10 @@ def main(argv: list[str] | None = None) -> int:
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--live", action="store_true", help="also read the settings through `gh api --method GET`")
     source.add_argument("--from-dir", help="also read the settings from saved API responses (tests)")
+    parser.add_argument("--attest-workflow-permissions", metavar="FILE",
+                        help="maintainer attestation of the Actions workflow permissions, used only when the API "
+                             "answers HTTP 403 (docs/plans/evidence/release-gaps-0.25/"
+                             "actions-workflow-permissions-attestation.json)")
     return run(parser.parse_args(argv))
 
 

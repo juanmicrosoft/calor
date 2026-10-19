@@ -37,7 +37,11 @@ CLOSED = {
         "deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True},
     },
     "branch-policies": {"total_count": 1, "branch_policies": [{"name": "main", "type": "branch"}]},
-    "environment-secrets": secrets("NUGET_RELEASE_API_KEY"),
+    # Trusted Publishing: no environment holds a NuGet secret.
+    "environments": {"total_count": 2, "environments": [{"name": "github-pages"}, {"name": "nuget-release"}]},
+    "environment-secrets/nuget-release": secrets(),
+    "environment-secrets/github-pages": secrets("PAGES_TOKEN"),
+    "workflow-permissions": {"default_workflow_permissions": "read", "can_approve_pull_request_reviews": False},
 }
 
 
@@ -52,21 +56,23 @@ class Fixture:
             self.write(key, body)
 
     def write(self, key: str, body: object) -> None:
-        (self.responses / f"{key}.json").write_text(json.dumps(body), encoding="utf-8")
+        (self.responses / f"{key.replace('/', '--')}.error").unlink(missing_ok=True)
+        (self.responses / f"{key.replace('/', '--')}.json").write_text(json.dumps(body), encoding="utf-8")
 
     def remove(self, key: str) -> None:
-        (self.responses / f"{key}.json").unlink()
+        (self.responses / f"{key.replace('/', '--')}.json").unlink(missing_ok=True)
+        (self.responses / f"{key.replace('/', '--')}.error").unlink(missing_ok=True)
 
-    def unreadable(self, key: str) -> None:
+    def unreadable(self, key: str, text: str = "HTTP 403: Resource not accessible") -> None:
         self.remove(key)
-        (self.responses / f"{key}.error").write_text("HTTP 403: Resource not accessible", encoding="utf-8")
+        (self.responses / f"{key.replace('/', '--')}.error").write_text(text, encoding="utf-8")
 
     def workflow(self, name: str) -> Path:
         return self.repo / ".github" / "workflows" / name
 
-    def run(self, live: bool = True) -> tuple[int, str]:
+    def run(self, live: bool = True, extra: list[str] | None = None) -> tuple[int, str]:
         out = io.StringIO()
-        args = ["--repo", str(self.repo)] + (["--from-dir", str(self.responses)] if live else [])
+        args = ["--repo", str(self.repo)] + (["--from-dir", str(self.responses)] if live else []) + (extra or [])
         with contextlib.redirect_stdout(out):
             code = cred.main(args)
         return code, out.getvalue()
@@ -79,9 +85,9 @@ class CredentialCheckTests(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.f.base, ignore_errors=True)
 
-    def assert_codes(self, expected: set[str], verdict: str = "OPEN") -> None:
-        code, out = self.f.run()
-        found = set(re.findall(r"\(#1545\) ([WSU]\d{3}):", out))
+    def assert_codes(self, expected: set[str], verdict: str = "OPEN", extra: list[str] | None = None) -> None:
+        code, out = self.f.run(extra=extra)
+        found = set(re.findall(r"\(#1545\) ([WSUV]\d{3}):", out))
         self.assertEqual(expected, found, out)
         self.assertEqual(1, code, out)
         self.assertIn(f"RELEASE CREDENTIALS: {verdict}", out)
@@ -133,9 +139,50 @@ class CredentialCheckTests(unittest.TestCase):
                 self.f.write("branch-policies", {"total_count": len(rules), "branch_policies": rules})
                 self.assert_codes({"S005"})
 
-    def test_environment_without_the_secret_is_open(self) -> None:
-        self.f.write("environment-secrets", secrets("NUGET_API_KEY"))
-        self.assert_codes({"S006"})
+    def test_leftover_nuget_secret_in_any_environment_is_open(self) -> None:
+        # Trusted Publishing stores no key: the interim design's environment secret, or a NuGet
+        # secret in any other environment, is a stale key (S007). S006 (secret missing) is retired.
+        for key, names in (("environment-secrets/nuget-release", ("NUGET_RELEASE_API_KEY",)),
+                           ("environment-secrets/nuget-release", ("OTHER", "nuget_api_key")),
+                           ("environment-secrets/github-pages", ("NUGET_API_KEY",))):
+            with self.subTest(key=key, names=names):
+                self.f.write(key, secrets(*names))
+                self.assert_codes({"S007"})
+                self.f.write(key, CLOSED[key])
+
+    def test_every_listed_environment_is_read(self) -> None:
+        # A third environment the fixture has no response for is UNKNOWN, never skipped.
+        self.f.write("environments", {"total_count": 3, "environments": [
+            {"name": "github-pages"}, {"name": "nuget-release"}, {"name": "staging"}]})
+        self.assert_codes({"U004"}, verdict="UNKNOWN")
+        self.f.write("environment-secrets/staging", secrets("NUGET_KEY"))
+        self.assert_codes({"S007"})
+
+    def test_actions_workflow_permissions_must_be_read_only_without_pr_creation(self) -> None:
+        for body, codes in (
+            ({"default_workflow_permissions": "write", "can_approve_pull_request_reviews": False}, {"S008"}),
+            ({"default_workflow_permissions": "read", "can_approve_pull_request_reviews": True}, {"S009"}),
+            ({"default_workflow_permissions": "write", "can_approve_pull_request_reviews": True}, {"S008", "S009"}),
+            ({}, {"S008", "S009"}),
+            ({"default_workflow_permissions": "READ", "can_approve_pull_request_reviews": "false"}, {"S008", "S009"}),
+        ):
+            with self.subTest(body=body):
+                self.f.write("workflow-permissions", body)
+                self.assert_codes(codes)
+
+    def test_environment_secrets_are_read_from_each_environment(self) -> None:
+        paths = []
+
+        def fake_run(argv, capture_output, text):
+            self.assertEqual(["gh", "api", "--method", "GET"], argv[:4])
+            paths.append(argv[-1])
+            return subprocess.CompletedProcess(argv, 0, json.dumps(secrets()), "")
+
+        with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
+            cred.gh_fetch("o/r")("environment-secrets/nuget-release")
+            cred.gh_fetch("o/r")("environment-secrets/a b/c")
+        self.assertEqual(["repos/o/r/environments/nuget-release/secrets?per_page=100&page=1",
+                          "repos/o/r/environments/a%20b%2Fc/secrets?per_page=100&page=1"], paths)
 
     def test_listing_short_of_its_total_count_is_unknown(self) -> None:
         # A first page of 30 harmless names with total_count 31: the 31st could be NUGET_API_KEY.
@@ -167,7 +214,8 @@ class CredentialCheckTests(unittest.TestCase):
 
     def test_unreadable_settings_are_unknown_never_closed(self) -> None:
         for key, code in (("repo-secrets", "U001"), ("environment", "U002"),
-                          ("branch-policies", "U003"), ("environment-secrets", "U004")):
+                          ("branch-policies", "U003"), ("environment-secrets/nuget-release", "U004"),
+                          ("environments", "U004")):
             with self.subTest(key=key):
                 fixture = Fixture()
                 try:
@@ -178,14 +226,97 @@ class CredentialCheckTests(unittest.TestCase):
                     self.f = saved
                     shutil.rmtree(fixture.base, ignore_errors=True)
 
+    # -- workflow permissions: 403, attestation ---------------------------------------------
+
+    ATTESTATION = REPO_ROOT / "docs" / "plans" / "evidence" / "release-gaps-0.25" / \
+        "actions-workflow-permissions-attestation.json"
+
+    def attest(self, **changes: object) -> list[str]:
+        body = json.loads(self.ATTESTATION.read_text(encoding="utf-8"))
+        body.update(changes)
+        for key in [k for k, v in changes.items() if v is ...]:
+            del body[key]
+        path = self.f.base / "attestation.json"
+        path.write_text(json.dumps(body), encoding="utf-8")
+        return ["--attest-workflow-permissions", str(path)]
+
+    def test_forbidden_workflow_permissions_are_unverifiable_never_closed(self) -> None:
+        # The maintainer's gh login gets HTTP 403 on this endpoint (2026-10-19). Never a silent pass.
+        self.f.unreadable("workflow-permissions", 'gh: HTTP 403 {"status":"403"}')
+        self.assert_codes({"V001"}, verdict="UNVERIFIABLE")
+        # Any other failure stays UNKNOWN.
+        self.f.unreadable("workflow-permissions", "HTTP 502: Bad Gateway")
+        self.assert_codes({"U005"}, verdict="UNKNOWN")
+        # UNKNOWN and OPEN outrank UNVERIFIABLE.
+        self.f.unreadable("workflow-permissions", "HTTP 403")
+        self.f.unreadable("repo-secrets", "HTTP 500")
+        self.assert_codes({"U001", "V001"}, verdict="UNKNOWN")
+        self.f.write("repo-secrets", secrets("NUGET_API_KEY"))
+        self.assert_codes({"S001", "V001"}, verdict="OPEN")
+
+    def test_live_403_is_forbidden(self) -> None:
+        def fake_run(argv, capture_output, text):
+            return subprocess.CompletedProcess(argv, 1, '{"message":"no","status":"403"}', "gh: no (HTTP 403)")
+
+        with unittest.mock.patch.object(cred.subprocess, "run", fake_run):
+            with self.assertRaises(cred.Forbidden):
+                cred.gh_fetch("o/r")("workflow-permissions")
+
+    def test_committed_attestation_closes_a_forbidden_read_and_is_shown(self) -> None:
+        self.f.unreadable("workflow-permissions", "HTTP 403")
+        code, out = self.f.run(extra=self.attest())
+        self.assertEqual(0, code, out)
+        self.assertIn("A001: Actions workflow permissions ATTESTED, not read by API", out)
+        self.assertIn("confirmed by @juanmicrosoft on 2026-10-19", out)
+        self.assertIn("RELEASE CREDENTIALS: CLOSED (workflows and repository settings; Actions workflow "
+                      "permissions ATTESTED", out)
+
+    def test_attestation_never_overrides_an_api_answer(self) -> None:
+        self.f.write("workflow-permissions", {"default_workflow_permissions": "write",
+                                              "can_approve_pull_request_reviews": True})
+        self.assert_codes({"S008", "S009"}, extra=self.attest())
+        self.f.write("workflow-permissions", CLOSED["workflow-permissions"])
+        code, out = self.f.run(extra=self.attest())
+        self.assertEqual(0, code, out)
+        self.assertIn("A000", out)
+        self.assertNotIn("ATTESTED", out)
+
+    def test_invalid_attestation_is_unknown(self) -> None:
+        self.f.unreadable("workflow-permissions", "HTTP 403")
+        for changes in ({"default_workflow_permissions": "write"},
+                        {"can_approve_pull_request_reviews": True},
+                        {"can_approve_pull_request_reviews": "false"},
+                        {"repository": "someone/else"},
+                        {"schema": "v0"},
+                        {"setting": "actions/permissions"},
+                        {"confirmed_by": "juanmicrosoft"},
+                        {"confirmed_on": "yesterday"},
+                        {"why_not_read": " "},
+                        {"why_not_read": ...},
+                        {"extra": 1}):
+            with self.subTest(changes=changes):
+                self.assert_codes({"U006"}, verdict="UNKNOWN", extra=self.attest(**changes))
+        missing = ["--attest-workflow-permissions", str(self.f.base / "nope.json")]
+        self.assert_codes({"U006"}, verdict="UNKNOWN", extra=missing)
+
+    def test_attestation_needs_a_settings_source(self) -> None:
+        code, out = self.f.run(live=False, extra=self.attest())
+        self.assertEqual(2, code, out)
+        self.assertNotIn("CLOSED", out)
+
     # -- workflows --------------------------------------------------------------------------
 
     def test_workflow_naming_the_old_secret_is_open(self) -> None:
         path = self.f.workflow("publish-nuget.yml")
-        path.write_text(path.read_text(encoding="utf-8").replace(
-            "secrets.NUGET_RELEASE_API_KEY }}\n        run: dotnet nuget push",
-            "secrets.NUGET_API_KEY }}\n        run: dotnet nuget push"), encoding="utf-8")
-        self.assert_codes({"W002", "W005"})
+        text = path.read_text(encoding="utf-8")
+        old = "steps.nuget-login.outputs.NUGET_API_KEY }}\n        run: dotnet nuget push"
+        self.assertIn(old, text)
+        for secret in ("NUGET_API_KEY", "NUGET_RELEASE_API_KEY"):
+            with self.subTest(secret=secret):
+                path.write_text(text.replace(old, f"secrets.{secret} }}}}\n        run: dotnet nuget push"),
+                                encoding="utf-8")
+                # W015: the step that names the secret is no longer the accepted push step.
+                self.assert_codes({"W002", "W005", "W015"})
 
     def test_publish_job_without_the_environment_is_open(self) -> None:
         path = self.f.workflow("publish-nuget.yml")
@@ -201,7 +332,8 @@ class CredentialCheckTests(unittest.TestCase):
         self.assertIn(marker, text)
         path.write_text(text.replace(marker, marker + "    environment: nuget-release\n"
                                      "    env:\n      K: ${{ secrets.NUGET_RELEASE_API_KEY }}\n"), encoding="utf-8")
-        self.assert_codes({"W003", "W004"})
+        # Trusted Publishing: the retired secret name is W002 everywhere (formerly W003).
+        self.assert_codes({"W002", "W004"})
 
     def test_other_syntaxes_for_the_key_or_environment_are_open(self) -> None:
         marker = "  benchmark:\n    runs-on: ubuntu-latest\n"
@@ -211,13 +343,13 @@ class CredentialCheckTests(unittest.TestCase):
             ("    environment: ${{ inputs.env }}\n", {"W004"}),
             ("    environment:\n      name: ${{ format('nuget-{0}', 'release') }}\n", {"W004"}),
             ("    environment:\n      url: https://example.invalid\n", {"W004"}),
-            ("    env:\n      K: ${{ secrets['NUGET_RELEASE_API_KEY'] }}\n", {"W003"}),
+            ("    env:\n      K: ${{ secrets['NUGET_RELEASE_API_KEY'] }}\n", {"W002"}),
             # Round 2: names are case-insensitive in Actions, and YAML escapes decode.
             ("    environment: NUGET-RELEASE\n", {"W004"}),
             ('    environment: "nuget-\\u0072elease"\n', {"W004"}),
             ("    'environment': nuget-release\n", {"W004"}),
-            ("    env:\n      K: ${{ secrets.nuget_release_api_key }}\n", {"W003"}),
-            ('    env:\n      K: "${{ secrets.NUGET_\\u0052ELEASE_API_KEY }}"\n', {"W003"}),
+            ("    env:\n      K: ${{ secrets.nuget_release_api_key }}\n", {"W002"}),
+            ('    env:\n      K: "${{ secrets.NUGET_\\u0052ELEASE_API_KEY }}"\n', {"W002"}),
             # EXC-RELEASE-GAPS-A-YAML: the parser fails closed on an undefined alias (W012); a
             # defined anchor is still reported (W009).
             ("    <<: *defaults\n", {"W012"}),
@@ -242,6 +374,13 @@ class CredentialCheckTests(unittest.TestCase):
             ("    runs-on: ubuntu-22.04\n", {"W012"}),
             ("    Environment: github-pages\n    environment: github-pages\n", {"W012"}),
             ("    uses: ./.github/workflows/test.yml@main\n", {"W011"}),
+            # Trusted Publishing: only the publish job may use NuGet/login or its output. Another
+            # job could not get a key (nuget.org also needs publish-nuget.yml and nuget-release),
+            # but the check refuses it outright.
+            ("    env:\n      K: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n", {"W002", "W003"}),
+            ("    env:\n      K: ${{ steps.nuget-login.outputs.nuget_api_key }}\n", {"W002", "W003"}),
+            ("    env:\n      K: ${{ steps.NUGET-LOGIN.outputs.key }}\n", {"W003"}),
+            ("    env:\n      K: nuget/LOGIN@v1\n", {"W003"}),
         ):
             with self.subTest(injected=injected):
                 fixture = Fixture()
@@ -335,10 +474,20 @@ class CredentialCheckTests(unittest.TestCase):
     def test_push_step_without_the_key_is_open(self) -> None:
         path = self.f.workflow("publish-nuget.yml")
         text = path.read_text(encoding="utf-8")
-        old = ("      - name: Push to NuGet\n        env:\n          NUGET_RELEASE_API_KEY: ${{ secrets.NUGET_RELEASE_API_KEY }}\n")
+        old = ("      - name: Push to NuGet\n        env:\n"
+               "          NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n")
         self.assertIn(old, text)
         path.write_text(text.replace(old, "      - name: Push to NuGet\n"), encoding="utf-8")
         self.assert_codes({"W005"})
+        # The push must read exactly the login output through env, and nothing else.
+        for env, codes in (
+            ("          NUGET_OIDC_KEY: ${{ steps.other.outputs.NUGET_API_KEY }}\n", {"W002", "W005", "W015"}),
+            ("          NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n          X: y\n", {"W005", "W015"}),
+            ("          OTHER: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n", {"W005", "W015"}),
+        ):
+            with self.subTest(env=env):
+                path.write_text(text.replace(old, "      - name: Push to NuGet\n        env:\n" + env), encoding="utf-8")
+                self.assert_codes(codes)
 
     def test_flow_style_reusable_call_is_open(self) -> None:
         path = self.f.workflow("benchmark.yml")
@@ -364,7 +513,7 @@ class CredentialCheckTests(unittest.TestCase):
         self.assertEqual(0, code, out)
 
     def test_suppressed_moved_or_conditional_guard_is_open(self) -> None:
-        guard = "      - name: Require the environment-scoped NuGet key (#1545)\n"
+        guard = "      - name: Require the Trusted Publishing NuGet key (#1545)\n"
         path = self.f.workflow("publish-nuget.yml")
         original = path.read_text(encoding="utf-8")
         self.assertIn(guard, original)
@@ -379,14 +528,95 @@ class CredentialCheckTests(unittest.TestCase):
                        original.replace(guard, guard + "        'continue-on-error': true\n"),
                        original[:start] + original[start:end].replace("exit 1", "exit 0") + original[end:],
                        original[:start] + original[start:end].replace(
-                           '          if [ -z "$NUGET_RELEASE_API_KEY" ]; then',
-                           '          check_key() {\n          if [ -z "$NUGET_RELEASE_API_KEY" ]; then', 1).replace(
+                           '          if [ -z "$NUGET_OIDC_KEY" ]; then',
+                           '          check_key() {\n          if [ -z "$NUGET_OIDC_KEY" ]; then', 1).replace(
                            "            exit 1\n          fi\n", "            exit 1\n          fi\n          }\n", 1)
                        + original[end:],
                        moved):
             with self.subTest(mutant=mutant[start:start + 200]):
                 path.write_text(mutant, encoding="utf-8")
-                self.assert_codes({"W007"})
+                # A moved guard also reads the login output from a step that is not the guard.
+                self.assert_codes({"W007", "W015"} if mutant is moved else {"W007"})
+        path.write_text(original, encoding="utf-8")
+
+    def test_publish_job_must_start_with_the_pinned_login(self) -> None:
+        # Trusted Publishing: the first step is exactly the NuGet/login step, pinned to the v1.2.0
+        # commit, for the package owner, unconditional.
+        login = ("      - name: Exchange the GitHub OIDC token for a short-lived NuGet key (#1545)\n"
+                 "        id: nuget-login\n"
+                 "        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0\n"
+                 "        with:\n"
+                 "          user: juanmicrosoft\n")
+        path = self.f.workflow("publish-nuget.yml")
+        original = path.read_text(encoding="utf-8")
+        self.assertIn(login, original)
+        sha = "8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0"
+        for mutant, codes in (
+            (original.replace(sha, "v1"), {"W014"}),
+            (original.replace(sha, "v1.2.0"), {"W014"}),
+            (original.replace(sha, "0000000000000000000000000000000000000000"), {"W014"}),
+            (original.replace(login, login.replace("NuGet/login@", "someone/login@")), {"W014"}),
+            (original.replace(login, login.replace("user: juanmicrosoft", "user: someone-else")), {"W014"}),
+            (original.replace(login, login.replace("user: juanmicrosoft", "user: ${{ vars.NUGET_USER }}")), {"W014"}),
+            (original.replace(login, login + "          audience: https://example.invalid\n"), {"W014"}),
+            (original.replace(login, login + "        continue-on-error: true\n"), {"W014"}),
+            (original.replace(login, login + "        if: false\n"), {"W014"}),
+            (original.replace(login, login.replace("        id: nuget-login\n", "")), {"W014"}),
+            # Removed: the guard becomes the first step.
+            (original.replace(login + "\n", ""), {"W014", "W007"}),
+        ):
+            with self.subTest(mutant=mutant[mutant.index("    steps:\n"):][:420]):
+                path.write_text(mutant, encoding="utf-8")
+                self.assert_codes(codes)
+        path.write_text(original, encoding="utf-8")
+
+    def test_publish_job_without_id_token_write_is_open(self) -> None:
+        path = self.f.workflow("publish-nuget.yml")
+        original = path.read_text(encoding="utf-8")
+        grant = "      id-token: write\n      attestations: write\n"
+        self.assertIn(grant, original)
+        for mutant in (original.replace(grant, "      attestations: write\n"),
+                       original.replace(grant, "      id-token: read\n      attestations: write\n"),
+                       original.replace(grant, "      id-token: none\n      attestations: write\n")):
+            with self.subTest(mutant=mutant):
+                path.write_text(mutant, encoding="utf-8")
+                self.assert_codes({"W013"})
+        path.write_text(original, encoding="utf-8")
+
+    def test_login_output_used_elsewhere_in_the_publish_job_is_open(self) -> None:
+        # Only the guard and the push may read the key; the build steps run candidate code.
+        path = self.f.workflow("publish-nuget.yml")
+        original = path.read_text(encoding="utf-8")
+        build = "      - name: Build\n        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj"
+        self.assertEqual(1, original.count(build))
+        build = build.split("\n")[0] + "\n"
+        original_split = original.split(build)
+        self.assertEqual(3, len(original_split))  # the test job's Build, then the publish job's
+
+        def at_publish_build(text: str) -> str:
+            return build.join(original_split[:2]) + build + text + original_split[2]
+        for injected, codes in (
+            ("        env:\n          K: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n", {"W015"}),
+            ("        env:\n          K: ${{ steps.nuget-login.outputs.nuget_api_key }}\n", {"W002", "W015"}),
+            ("        env:\n          K: ${{ steps.nuget-login.outputs['NUGET_API_KEY'] }}\n", {"W002", "W015"}),
+        ):
+            with self.subTest(injected=injected):
+                path.write_text(at_publish_build(injected), encoding="utf-8")
+                self.assert_codes(codes)
+        # A second login step, or the output at job level.
+        second = ("      - name: Again\n        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841\n"
+                  "        with:\n          user: juanmicrosoft\n")
+        path.write_text(build.join(original_split[:2]) + second + build + original_split[2], encoding="utf-8")
+        self.assert_codes({"W015"})
+        job = "    environment: nuget-release\n"
+        path.write_text(original.replace(job, job + "    outputs:\n      k: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n"),
+                        encoding="utf-8")
+        self.assert_codes({"W015"})
+        top_env = "\nenv:\n  ADJUDICATION_IDENTITY:"
+        self.assertEqual(1, original.count(top_env))
+        path.write_text(original.replace(top_env, "\nenv:\n  K: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n"
+                                                  "  ADJUDICATION_IDENTITY:"), encoding="utf-8")
+        self.assert_codes({"W002", "W008"})
         path.write_text(original, encoding="utf-8")
 
     def test_commented_environment_does_not_count(self) -> None:
