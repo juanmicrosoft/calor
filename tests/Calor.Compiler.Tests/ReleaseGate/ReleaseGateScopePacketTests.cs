@@ -110,7 +110,8 @@ public class ReleaseGateScopePacketTests
     [InlineData("blocker unresolved", "blocker #1427")]
     [InlineData("witness run", "mapped blocker R-OBL ")]
     [InlineData("stale scope version", "is stale")]
-    [InlineData("duplicate case row", "F1-REFOUT-03")]
+    [InlineData("duplicate passing case row", "listed more than once")]
+    [InlineData("failed first case row with a passing duplicate", "F1-REFOUT-03")]
     [InlineData("boolean test total", "tests must")]
     [InlineData("blank reviewer", "reviews must")]
     public void IncompleteReadyRecordsFail(string defect, string message)
@@ -133,9 +134,9 @@ public class ReleaseGateScopePacketTests
                 case "blocker unresolved": ready["blockersResolved"]!.AsArray().Remove(ready["blockersResolved"]!.AsArray().First(b => b!["issue"]!.GetValue<int>() == 1427)); break;
                 case "witness run": Edit(files, "witness-1496", e => e["result"] = "failed"); break;
                 case "stale scope version": ready["scopeVersion"] = "1.0.0"; break;
-                case "duplicate case row":
+                case "duplicate passing case row" or "failed first case row with a passing duplicate":
                     var row = ready["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-03")!.DeepClone();
-                    row["result"] = "failed";
+                    if (defect.StartsWith("failed", StringComparison.Ordinal)) row["result"] = "failed";
                     ready["cases"]!.AsArray().Insert(0, row);
                     break;
                 case "boolean test total": ready["tests"]![0]!["total"] = true; break;
@@ -147,11 +148,14 @@ public class ReleaseGateScopePacketTests
 
     [Theory]
     [InlineData("tampered generated output", false, "evidenceSeal")]
-    [InlineData("one producer dropped", false, "evidenceSeal")]
+    [InlineData("one producer dropped", false, "evidenceSeal")] // the evidenceSeal check and the pinned denominator seal both cover producers
     [InlineData("W1 records without schema", false, "W1 records must be")]
     [InlineData("hollow W1 family records", false, "W1 records for")]
     [InlineData("T1 cases differ from the scope", false, "(T003)")]
     [InlineData("decision date not a date", false, "a recorded maintainer decision")]
+    [InlineData("decision time not a time", false, "a recorded maintainer decision")]
+    [InlineData("case removed from the scope and T1", false, "case denominator")]
+    [InlineData("W1 anchor to a heading inside fenced code", false, "W1 records for F1")]
     [InlineData("precondition requirement weakened in both copies", false, "1.3.0's recorded preconditions")]
     [InlineData("precondition copy differs", false, "equal the copy")]
     [InlineData("tampered T1 evidence", false, "approval seal")]
@@ -186,12 +190,41 @@ public class ReleaseGateScopePacketTests
                     break;
                 case "precondition copy differs": EditJson(r, Scope, s => s["acceptancePreconditions"]!["reproof"]!["checks"]![0]!["requirement"] = "No rerun needed."); break;
                 case "tampered T1 evidence": Append(r, "docs/plans/evidence/v0.25-f1-943/results.json"); break;
+                case "decision time not a time":
+                    EditJson(r, Scope, s => s["amendments"]!.AsArray().First(a => a!["version"]!.GetValue<string>() == "1.3.0")!["maintainerDecisions"]![0]!["date"] = "2026-10-19T99:99:99Z");
+                    break;
+                case "case removed from the scope and T1":
+                    EditJson(r, Scope, s => s["cases"]!.AsArray().Remove(s["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-01")));
+                    EditJson(r, Register, g => g["families"]![0]!["cases"]!.AsArray().Remove(g["families"]![0]!["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == "F1-REFOUT-01")));
+                    break;
+                case "W1 anchor to a heading inside fenced code": AnchorF1(r, "\n```\n## Phantom Heading\n```\n", "phantom-heading"); break;
                 case "scope directory changed after the candidate": Append(r, $"{ScopeDir}/notes.md"); break;
                 case "register changed after the candidate": EditJson(r, Register, g => g["statusNote"] = "edited after the freeze"); break;
             }
         }
         using var repo = afterCandidate ? Build(atAdjudication: Mutate) : Build(beforeCandidate: Mutate);
         AssertOnly(repo.Run(repo.AllSurfaces()), "G005", message);
+    }
+
+    /// <summary>Anchors follow website/src/lib/headings.ts: a repeated heading's second id is "-1".</summary>
+    [Fact]
+    public void W1AnchorToARepeatedHeadingPasses()
+    {
+        using var repo = Build(beforeCandidate: r => AnchorF1(r, "\n## Repeated Heading\n\n## Repeated Heading\n", "repeated-heading-1"));
+        var (code, output) = repo.Run(repo.AllSurfaces());
+        Assert.True(code == 0, output);
+    }
+
+    /// <summary>Appends text to F1's first W1 page and points that page's anchor at an id.</summary>
+    private static void AnchorF1(GateRepo repo, string append, string anchor)
+    {
+        string page = "";
+        EditJson(repo, W1, w =>
+        {
+            page = w["families"]![0]!["pages"]![0]!.GetValue<string>().Split('#')[0];
+            w["families"]![0]!["pages"]![0] = $"{page}#{anchor}";
+        });
+        File.AppendAllText(Path.Combine(repo.Root, page), append);
     }
 
     // ---- fixture ----

@@ -70,6 +70,10 @@ REPROOF_CHECKS_1426 = (
     ("release-gate", "release", 1410, "docs/plans/evidence/r2-1410/release-gate.md"),
 )
 PRECONDITIONS_DIGEST_130 = "82c07b93a4b9784a9776a41b515d02fb1e34c4017d7b352d103c4b9fa255d89b"
+# InteropScopeTests.FrozenSeal: SHA-256 over denominatorV1 and the evidence seal. It pins the registered case
+# denominator; the gate replays the amendments from it to the current cases (S004).
+SCOPE_FROZEN_SEAL_1426 = "65307b91a3c57b54c6484219f67fc6bdb285b23858cbe15a7d7293b422ed7ff8"
+CASE_FIELDS_1426 = ("family", "role", "expected", "baselineStatus", "fixture", "fixtureSha256")
 APPROVAL_URL_RE = re.compile(r"^https://github\.com/juanmicrosoft/calor/pull/\d+#pullrequestreview-\d+$")
 RELEASE_GAPS_1426 = [1545, 1546, 1547]
 OUTCOMES_1426 = ("ACCEPTED", "PARTIAL_READY")
@@ -563,13 +567,15 @@ def is_int(value: object) -> bool:
 def is_date(value: object) -> bool:
     """A calendar date, optionally with a UTC time (what DateTime.TryParse accepts in these records)."""
     import datetime
-    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d\d-\d\d(T\d\d:\d\d:\d\dZ)?", value):
+    if not isinstance(value, str):
         return False
-    try:
-        datetime.date.fromisoformat(value[:10])
-    except ValueError:
-        return False
-    return True
+    for form in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            datetime.datetime.strptime(value, form)
+            return True
+        except ValueError:
+            pass
+    return False
 
 
 def requirement_digest(case: dict) -> str:
@@ -614,18 +620,83 @@ def version_key(value: object) -> tuple:
     return tuple(int(x) for x in value.split(".")) if isinstance(value, str) and re.fullmatch(r"\d+\.\d+\.\d+", value) else ()
 
 
+def heading_ids(markdown: str) -> list[str]:
+    """The ids website/src/lib/headings.ts gives a page's headings: the heading's text (inline markup contributes its
+    text, not its syntax), lower-cased, non-alphanumeric runs to '-', 'section' when empty, and -1, -2, ... for
+    repeats, in document order over every heading. Fenced code and front matter hold no headings."""
+    lines = markdown.replace("\r\n", "\n").split("\n")
+    start = 0
+    if lines and lines[0].strip() == "---":
+        start = next((i + 1 for i in range(1, len(lines)) if lines[i].strip() == "---"), 0)
+    used, ids, fence, paragraph = set(), [], None, False
+    for i in range(start, len(lines)):
+        line = lines[i]
+        opener = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+        if fence is not None:
+            if opener and opener.group(1)[0] == fence[0] and len(opener.group(1)) >= len(fence) and line.strip() == opener.group(1):
+                fence = None
+            continue
+        if opener:
+            fence, paragraph = opener.group(1), False
+            continue
+        atx = re.match(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$", line)
+        setext = paragraph and re.fullmatch(r" {0,3}(=+|-+)[ \t]*", line)
+        if not atx and not setext:
+            paragraph = bool(line.strip()) and not re.match(r"^ {0,3}([|>*+-]|\d+[.)])", line)
+            continue
+        text = (atx.group(1) or "") if atx else lines[i - 1].strip()
+        paragraph = False
+        text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)
+        text = re.sub(r"\[([^\]]*)\]\[[^\]]*\]", r"\1", text)
+        text = re.sub(r"<[^>]+>", "", text).replace("\\", "")
+        base = re.sub(r"(^-|-$)", "", re.sub(r"[^a-z0-9]+", "-", text.lower())) or "section"
+        hid, suffix = base, 1
+        while hid in used:
+            hid, suffix = f"{base}-{suffix}", suffix + 1
+        used.add(hid)
+        ids.append(hid)
+    return ids
+
+
 def page_exists(gate: Gate, commit: str, page: object) -> bool:
-    """A website page that exists, and whose #anchor (if any) is one of its heading slugs (website/src/lib/headings.ts)."""
+    """A website page that exists, and whose #anchor (if any) is one of its heading ids."""
     if not isinstance(page, str):
         return False
     path, _, anchor = page.partition("#")
     blob = gate.blob(commit, path)
     if blob is None:
         return False
-    if not anchor:
-        return True
-    headings = re.findall(r"^#{2,4} (.+)$", blob.decode("utf-8", "replace").replace("\r\n", "\n"), re.M)
-    return anchor in {re.sub(r"(^-|-$)", "", re.sub(r"[^a-z0-9]+", "-", h.replace("`", "").lower())) for h in headings}
+    return not anchor or anchor in heading_ids(blob.decode("utf-8", "replace"))
+
+
+def denominator_problems(scope: dict) -> list[str]:
+    """S004 for the gate: the pinned denominator seal, then the amendments replayed from denominatorV1 must give
+    exactly the current cases, with the same tracked fields and recomputed requirement digests."""
+    seal = scope.get("evidenceSeal") or {}
+    frozen = sha256("\n".join([dotnet_json(scope.get("denominatorV1")), str(seal.get("baselineResults", "")),
+                               str(seal.get("generated", "")), dotnet_json(seal.get("producers"))]).encode())
+    if frozen != SCOPE_FROZEN_SEAL_1426:
+        return [f"denominatorV1 and the evidenceSeal hash to {frozen}, not the pinned {SCOPE_FROZEN_SEAL_1426}"]
+    registry = {c.get("id"): dict(c) for c in scope.get("denominatorV1", []) if isinstance(c, dict)}
+    for amendment in (a for a in scope.get("amendments", []) if isinstance(a, dict)):
+        for added in (c for c in amendment.get("addedCases", []) if isinstance(c, dict)):
+            registry[added.get("id")] = dict(added)
+        for removed in amendment.get("removedCases", []):
+            registry.pop(removed.get("id") if isinstance(removed, dict) else removed, None)
+        for change in (c for c in amendment.get("changes", []) if isinstance(c, dict)):
+            if change.get("id") in registry:
+                registry[change["id"]][change.get("field")] = change.get("to")
+    cases = [c for c in scope.get("cases", []) if isinstance(c, dict)]
+    ids = [c.get("id") for c in cases]
+    problems = []
+    if len(ids) != len(set(ids)) or set(ids) != set(registry):
+        problems.append("the current cases differ from the denominator replayed through the amendments")
+    for case in cases:
+        registered = registry.get(case.get("id"))
+        if registered and (any(case.get(f) != registered.get(f) for f in CASE_FIELDS_1426)
+                           or requirement_digest(case) != registered.get("requirementSha256")):
+            problems.append(f"case {case.get('id')} differs from its registered fields or requirement digest")
+    return problems
 
 
 def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tuple[dict, dict] | None:
@@ -648,6 +719,8 @@ def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tu
     if (set(producers) != {root + p for p in PRODUCERS_1426} or seal.get("baselineResults") != lf_sha256(gate.blob(commit, root + "baseline-results.json"))
             or any(lf_sha256(gate.blob(commit, p)) != h for p, h in producers.items()) or not generated or seal.get("generated") != digest):
         gate.fail("G005", "the scope packet's evidenceSeal does not match its baseline results, both registered producers or generated outputs")
+    for problem in denominator_problems(scope):
+        gate.fail("G005", f"case denominator: {problem}")
     for problem in preconditions_problems(gate, commit, scope):
         gate.fail("G005", f"acceptancePreconditions: {problem}")
     families = {f.get("id"): f.get("issue") for f in scope.get("families", []) if isinstance(f, dict)}

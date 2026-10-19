@@ -296,7 +296,9 @@ candidate must contain this code.
 
 - `scope.json`: schema `v0.25-interop-scope/1`, `FROZEN`, gate `MET`; its `evidenceSeal` recomputes
   (`baseline-results.json`, exactly the two registered producers, and every file under `generated/`,
-  LF-normalized).
+  LF-normalized); `denominatorV1` with the seal hashes to the pinned `InteropScopeTests.FrozenSeal`,
+  and replaying the amendments from it gives exactly the current cases, with their tracked fields and
+  recomputed requirement digests (S004).
 - `acceptancePreconditions`, as `InteropScopeValidator` S014 checks them: equal to the latest
   amendment copy, citing that amendment and its recorded decision; the replaced #1408 precondition
   cites the retained #1408 record and its outcome; A1 waits on every gap (at least #1545, #1546,
@@ -309,7 +311,9 @@ candidate must contain this code.
   and results hash matches, and the approval seal recomputes. Each T1 family lists exactly the
   scope's cases for that family with their requirement digests recomputed from `scope.json` (T003).
   Each W1 family's status mirrors scope readiness (never `READY`), lists ready needs, and every
-  transcript, page (with its heading anchor) and shared page exists.
+  transcript, page and shared page exists; a page anchor must be a heading id as
+  `website/src/lib/headings.ts` assigns it (no headings in fenced code or front matter, inline markup
+  contributes its text, repeats get `-1`, `-2`).
 - The record's `contract` is `{version: scopeVersion, files: {scope.json, register.json,
   records.json: LF SHA-256}}`.
 - The packet directory, the T1 register and the W1 records are identical at the candidate and the
@@ -329,5 +333,5 @@ exactly one row per subject (`G008`), each with `independence = reduced-maintain
 | each claim in the registry | `BOUNDED` |
 
 Every other field (`candidate`, `evidenceManifests`, `claimRegistry`, `publication`) is read as for
-0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 3 positive and 41 negative controls)
+0.24.0. Tests: `ReleaseGateScopePacketTests` (the real packet; 4 positive and 45 negative controls)
 and `ReleaseAdjudicationMapTests`.
