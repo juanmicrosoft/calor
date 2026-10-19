@@ -170,6 +170,11 @@ ledgers over committed `.calr`, scorecard baseline, effect-inferrer depth). The 
 (`SharedInteropControlsTests`, 19 controls x 7 surfaces) reproduce their committed results
 unchanged; the T1 register records the new `results.json` hash as amendment 1.0.1.
 
+**Open after review (MAJOR, Codex verification pass P2V-1):** the `default` collision check uses
+`LookupSymbols`, which omits inaccessible members, so a private base-class member named `@default`
+lets the lowering proceed and the emitted `int n = @default;` fails with `CS0122` (`Calor1002`; MCP
+refuses). The failure is loud, not silent. The review budget is spent, so it is not fixed here.
+
 Residuals found in PR 2 (pre-existing, not changed here):
 
 - A chained assignment `x = y = G()` evaluates `G()` once per target in any converted C#, with or
