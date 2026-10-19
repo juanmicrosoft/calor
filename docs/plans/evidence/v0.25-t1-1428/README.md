@@ -1,6 +1,6 @@
 # 0.25 T1 (#1428): shared interop controls and readiness register
 
-**Register version:** 1.0.0. **Consumes:** R0 scope 1.3.0. **Status:** register only. No 0.25
+**Register version:** 1.0.1 (see "Amendments"). **Consumes:** R0 scope 1.3.0. **Status:** register only. No 0.25
 candidate is frozen and no READY record exists. Those wait for W1 (#1429) and the 0.24
 release-gap fixes (#1545, #1546, #1547). **Independence:** reduced (R0 §9). Codex reviewed this
 work; no reviewer independent of the maintainer did.
@@ -156,3 +156,9 @@ Family-specific:
 | F6 #1144 | 13 + DOC-F6-01, 02 | the per-surface matrix (F6-REPORT-04..07, 10, 12, 13) re-run on the candidate |
 
 Case counts are from `register.json` (65 registered cases: 49 at 1.0.0 plus 16 rows from 1.1.0).
+
+## Amendments
+
+| Version | Date | PR | Change |
+|---|---|---|---|
+| 1.0.1 | 2026-10-18 | #1571 (F1 PR 2, #943) | F1's re-run `results.json` (two new rows for the W1 findings; D1-CS-04 and D1-CS-19 re-attributed from `in-parameter` to `ref-parameter`) changes F1's approved evidence hash `7efaf64a…` -> `c3f64544…`. Controls, fixtures, `controls-results.json` and the corpus counts are unchanged: `SharedInteropControlsTests` reproduces every committed cell, so nothing was regenerated. New approval seal `b16fe911…`, pinned in `T1RegisterTests.AmendmentApprovalsMatchThePinnedSeals`; the top-level `approvalSeal` stays the 1.0.0 seal |
