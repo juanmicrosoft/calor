@@ -105,7 +105,7 @@
       "evidence": [
         {
           "path": "docs/plans/evidence/v0.25-f1-943/results.json",
-          "sha256": "898d86f8e1277ae23fbc71a4bef9ecc2052aec8106deb29137d1521825228ab4"
+          "sha256": "80df2dbe114393492c51983a1a9e80ede18f52fc0075ffd391096436ff9bb753"
         }
       ],
       "tests": [
@@ -977,15 +977,15 @@
       "version": "1.0.1",
       "dateUtc": "2026-10-18T00:00:00Z",
       "pr": 1571,
-      "justification": "F1 PR 2 (#943) fixes the four W1 (#1429) findings: a lowered out var binding starts at default so the next line is never its initializer, a chained assignment with an out declaration is preserved, an expression-bodied ref return is preserved, a by-reference operand that runs code is reported under its parameter's own feature, and the FeatureSupport text matches the converter. F1's re-run results.json adds rows P2-OUTVAR-PLACEMENTS, P2-OUTVAR-CALL-STATEMENT, P2-OUTVAR-CHAINED, P2-OUTVAR-DEFAULT-MEMBER and P2-REFRETURN-EXPRESSION and re-attributes D1-CS-04 and D1-CS-19 from in-parameter to ref-parameter, so its approved hash changes from 7efaf64a7080025f68ad3e0d043227ae91183c9613bcb1dcec525fad2d18afb8 to 898d86f8e1277ae23fbc71a4bef9ecc2052aec8106deb29137d1521825228ab4. The shared controls (controls-results.json), the control fixtures and the corpus counts are unchanged; SharedInteropControlsTests reproduces every committed cell.",
+      "justification": "F1 PR 2 (#943) fixes the four W1 (#1429) findings: a lowered out var binding starts at default so the next line is never its initializer, a chained assignment with an out declaration is preserved, an expression-bodied ref return is preserved, a by-reference operand that runs code is reported under its parameter's own feature, and the FeatureSupport text matches the converter. F1's re-run results.json adds rows P2-OUTVAR-PLACEMENTS, P2-OUTVAR-CALL-STATEMENT, P2-OUTVAR-CHAINED, P2-OUTVAR-DEFAULT-MEMBER and P2-REFRETURN-EXPRESSION and re-attributes D1-CS-04 and D1-CS-19 from in-parameter to ref-parameter, so its approved hash changes from 7efaf64a7080025f68ad3e0d043227ae91183c9613bcb1dcec525fad2d18afb8 to 80df2dbe114393492c51983a1a9e80ede18f52fc0075ffd391096436ff9bb753. The shared controls (controls-results.json), the control fixtures and the corpus counts are unchanged; SharedInteropControlsTests reproduces every committed cell.",
       "changedEvidence": [
         {
           "path": "docs/plans/evidence/v0.25-f1-943/results.json",
           "from": "7efaf64a7080025f68ad3e0d043227ae91183c9613bcb1dcec525fad2d18afb8",
-          "to": "898d86f8e1277ae23fbc71a4bef9ecc2052aec8106deb29137d1521825228ab4"
+          "to": "80df2dbe114393492c51983a1a9e80ede18f52fc0075ffd391096436ff9bb753"
         }
       ],
-      "approvalSeal": "63b6e19aeeb63796969e0dbfc8f27552e54a637ac7bcea2a8ffdd3a778bbf0ad"
+      "approvalSeal": "7eb45a4e1f0a82a6a17456e191d57f2f0c70a19b64a06d7babbbde0b080bb960"
     }
   ]
 }

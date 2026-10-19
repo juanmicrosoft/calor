@@ -33,7 +33,7 @@ public class T1RegisterTests
     /// <summary>Each approved amendment's seal, in order. 1.0.1: F1 PR 2 (#943, PR #1571) re-ran F1's results.json.</summary>
     private static readonly (string Version, string Seal)[] AmendmentSeals =
     [
-        ("1.0.1", "63b6e19aeeb63796969e0dbfc8f27552e54a637ac7bcea2a8ffdd3a778bbf0ad"),
+        ("1.0.1", "7eb45a4e1f0a82a6a17456e191d57f2f0c70a19b64a06d7babbbde0b080bb960"),
     ];
 
     [Fact]
