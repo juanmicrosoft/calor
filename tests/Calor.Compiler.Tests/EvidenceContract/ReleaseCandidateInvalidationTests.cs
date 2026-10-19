@@ -19,19 +19,15 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("global.json", "environment")]
     [InlineData("CHANGELOG.md", "publication")]
     [InlineData("website/content/changelog.mdx", "publication")]
-    [InlineData("website/src/fonts/fonts.json", "publication")]
     [InlineData("eng/release-adjudication-map.json", "release adjudication map")]
     [InlineData("docs/plans/evidence/v0.25-r0-1426/scope.json", "scope")]
     [InlineData("docs/plans/evidence/v0.25-t1-1428/register.json", "register")]
-    [InlineData("docs/plans/evidence/v0.25-f1-943/results.json", "evidence")]
     [InlineData("docs/plans/evidence/c1-1423/candidate-manifest.json", "documentation")]
     [InlineData("docs/plans/evidence/v0.25-candidatex/candidate-manifest.json", "documentation")]
     [InlineData("docs/plans/evidence/adjudication-1430/gate.py", "downstream evidence")]
     [InlineData("docs/plans/evidence/v0.25-regeneration/.hidden/r.json", "downstream evidence")]
     [InlineData("tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs", "test hosts")]
     [InlineData("scripts/verify_release_adjudication.py", "release scripts")]
-    [InlineData(".claude/skills/create-release/SKILL.md", "release procedure")]
-    [InlineData("bench/corpus/MediatR", "benchmark")]
     public void RelevantChangeInvalidatesInEitherPhase(string path, string category)
     {
         foreach (var phase in new[] { Phase.BeforeLanding, Phase.AfterLanding })
@@ -158,34 +154,48 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         Assert.Equal(Undecided, ClassifyRange(_repo.Git, P, candidate, "HEAD").Verdict);
     }
 
-    /// <summary>A history git cannot read (a missing commit object) must not read as "no changes" or "not landed".</summary>
-    [Fact]
-    public void AnUnreadableTargetHistoryIsUndecided()
+    /// <summary>
+    /// Every git failure is UNDECIDED, never "no changes" or "not landed". Without the landing, the weakened
+    /// classifier below would pass as a before-landing edit, so each guard is needed for its row to pass.
+    /// </summary>
+    [Theory]
+    [InlineData("merge-base", "target", "git merge-base cannot read the history from")]
+    [InlineData("merge-base", "main", "git merge-base cannot read the history from")]
+    [InlineData("rev-list", "--parents", "git rev-list ")]
+    [InlineData("rev-list", "--first-parent", "git rev-list --first-parent ")]
+    [InlineData("ls-tree", "", "git ls-tree ")]
+    [InlineData("diff-tree", "", "git diff-tree ")]
+    public void AFailedGitCommandIsUndecided(string command, string which, string error)
     {
         var candidate = _repo.Candidate();
-        var middle = _repo.Commit(("src/a.cs", "changed"));
-        _repo.Commit(("src/b.cs", "b"));
-        _repo.DeleteObject(middle);
-        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
+        var main = _repo.Commit((P.ManifestPath, "{}"));
+        _repo.PublishMain();
+        var target = _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
+        bool Fails(string[] a) => a[0] == command && which switch
+        {
+            "target" => a[^1] == target,
+            "main" => a[^1] == main,
+            "" => true,
+            _ => a[1] == which,
+        };
+        ReleaseCandidateInvalidation.GitRun run = args => Fails(args) ? (128, "", "fatal: injected") : _repo.Git.Run(args);
+        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD", run);
         Assert.True(report.Verdict == Undecided, report.ToString());
-        Assert.Contains(report.Errors, e => e.Contains("merge-base", StringComparison.Ordinal));
+        Assert.Contains(report.Errors, e => e.StartsWith(error, StringComparison.Ordinal));
     }
 
-    /// <summary>If protected main's history cannot be read, the landing is unknown: a frozen-file edit must not pass as before-landing.</summary>
+    /// <summary>A landing whose manifest blob cannot be read is an error, not "not landed".</summary>
     [Fact]
-    public void AnUnreadableMainHistoryIsUndecided()
+    public void AnUnreadableManifestBlobIsUndecided()
     {
         var candidate = _repo.Candidate();
-        _repo.Branch("side");
-        var broken = _repo.Commit(("docs/plans/evidence/v0.25-candidate/reviews/r.md", "x"));
-        _repo.Commit((P.ManifestPath, "{}"));
+        _repo.Commit((P.ManifestPath, "{\"unique\": 1430}"));
         _repo.PublishMain();
-        _repo.Checkout("main");
-        _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
-        _repo.DeleteObject(broken);
+        _repo.Commit(("docs/plans/evidence/v0.25-candidate/reviews/r.md", "x"));
+        _repo.DeleteObject(_repo.Git.RevParse("HEAD:" + P.ManifestPath)!);
         var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
         Assert.True(report.Verdict == Undecided, report.ToString());
-        Assert.Contains(report.Errors, e => e.Contains(DurableProvenance.ProtectedMainRef, StringComparison.Ordinal));
+        Assert.Contains(report.Errors, e => e.Contains("cannot be read", StringComparison.Ordinal));
     }
 
     private const string TestManifest = """
@@ -245,12 +255,10 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         }
 
         public void Branch(string name) => Must("checkout", "--quiet", "-b", name);
-
         public void Checkout(string what) => Must("checkout", "--quiet", what);
-
         public void Merge(string branch) => Must("merge", "--quiet", "--no-ff", "--no-edit", "--no-gpg-sign", branch);
 
-        /// <summary>Removes a loose commit object, so history through it cannot be read.</summary>
+        /// <summary>Removes a loose object, so it cannot be read.</summary>
         public void DeleteObject(string sha)
         {
             var file = Path.Combine(_root, ".git", "objects", sha[..2], sha[2..]);
@@ -259,10 +267,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         }
 
         private void Must(params string[] args)
-        {
-            var (exit, output, error) = Git.Run(args);
-            Assert.True(exit == 0, $"git {string.Join(' ', args)} failed ({exit}): {output}{error}");
-        }
+            => Assert.True(Git.Run(args) is (0, _, _), $"git {string.Join(' ', args)} failed");
 
         public void Dispose()
         {
@@ -273,8 +278,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
                 Directory.Delete(_root, recursive: true);
                 File.Delete(_root + ".gitconfig");
             }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
     }
 }

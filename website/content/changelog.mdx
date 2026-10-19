@@ -25,15 +25,12 @@ the notes cannot change after the freeze. At the freeze:
 
 - **Nothing was released.** There was no v0.25.0 tag, NuGet package or GitHub release. The
   newest release on NuGet was 0.24.0.
-- **No family was ready.** The 0.25 scope packet is the frozen list of cases that each of the
-  six converter families must pass. It recorded all 6 families as in progress and 0 as ready. A
-  family becomes ready only when its cases pass on the frozen candidate commit and the
-  maintainer approves the record. The results below were measured on `main` before the freeze
-  and must be re-run on the candidate.
-- **0.24's checks had to pass again.** The 0.24 evidence review (#1408) ended
-  `MILESTONE-FAILED` (see the 0.24.0 entry). So before acceptance, this candidate must re-pass
-  0.24's proof, provenance and release checks on its own commit. No 0.24 approval or record is
-  reused.
+- **No family was ready.** The 0.25 scope packet (the frozen cases each of the six converter
+  families must pass) recorded 0 of 6 as ready. A family is ready only when its cases pass on the
+  frozen candidate and the maintainer approves. The results below were measured before the freeze.
+- **0.24's checks had to pass again.** The 0.24 evidence review (#1408) ended `MILESTONE-FAILED`
+  (see 0.24.0), so this candidate must re-pass 0.24's proof, provenance and release checks on its
+  own commit. No 0.24 approval or record is reused.
 - **Three release-process gaps were open.** Code fixes for #1545, #1546 and #1547 had merged
   (see "Release process" below), but the three issues were not closed, and #1545 still needed
   repository settings. Acceptance needs all three closed.

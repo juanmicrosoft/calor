@@ -5,29 +5,17 @@ using static Calor.Compiler.Tests.EvidenceContract.CandidateInvalidation;
 namespace Calor.Compiler.Tests.EvidenceContract;
 
 /// <summary>
-/// The 0.24 C1 (#1423) invalidation classifier, generalized to any release candidate by a
-/// <see cref="CandidateProfile"/>. The 0.24 classifier (<see cref="CandidateInvalidation"/>) stays
-/// byte-for-byte as it landed, because editing it would invalidate the 0.24 freeze; this class
-/// reuses its public pieces (verdicts, phases, change and report records, the test-manifest rule)
-/// and applies the same rules to the profile's paths.
-///
-/// <para><b>Default deny.</b> Every path invalidates except: the candidate PR's own files before
-/// the landing; newly added review records under the profile's reviews directory at any time; the
-/// <c>eng/test-manifest.json</c> compiler-test bump before the landing; and newly added data or text
-/// files in the profile's downstream directories (regeneration and adjudication records). Exempt
-/// files must be plain non-executable files with no dot-segment. <b>Every commit counts:</b> each
-/// commit in <c>candidate..target</c> is diffed against each parent, renames off, so a reverted
-/// change still invalidates. The landing is the first first-parent commit of protected main after
-/// the candidate that holds the profile's manifest; after it, the profile's own files are frozen.</para>
+/// The 0.24 C1 (#1423) classifier generalized by a <see cref="CandidateProfile"/>; the 0.24 one
+/// (<see cref="CandidateInvalidation"/>) stays as it landed, since editing it would invalidate the 0.24
+/// freeze. Same rules: default deny; exempt only the candidate PR's files before the landing, added
+/// review records, the compiler-test count bump before the landing, and added data files in the
+/// downstream directories (plain files, no dot-segment). Every commit in candidate..target is diffed
+/// against each parent, so a reverted change still invalidates. See docs/plans/evidence/v0.25-candidate/.
 /// </summary>
 public static class ReleaseCandidateInvalidation
 {
-    /// <param name="Release">The release the candidate is for, e.g. "0.25.0".</param>
-    /// <param name="Issue">The issue a frozen-file change must return to.</param>
-    /// <param name="ManifestPath">The candidate manifest; its first commit on main is the landing.</param>
-    /// <param name="Directory">The candidate's evidence directory (generator, inputs, manifest, reviews).</param>
-    /// <param name="Files">Other files the candidate PR owns (classifier, its tests, design note).</param>
-    /// <param name="Downstream">Directories that receive records about the candidate after the freeze.</param>
+    /// <summary>A release's candidate: the issue a frozen-file change returns to, the manifest (its first commit on main
+    /// is the landing), the evidence directory and other owned files, and the downstream record directories.</summary>
     public sealed record CandidateProfile(string Release, int Issue, string ManifestPath, string Directory, string[] Files, string[] Downstream)
     {
         public string Reviews => Directory + "reviews/";
@@ -115,53 +103,65 @@ public static class ReleaseCandidateInvalidation
     private static bool IsRegularOrAbsent(Change change)
         => change.NewMode is RegularFile or "000000" && change.OldMode is RegularFile or "000000";
 
-    // ---- Git driver (same contract as the 0.24 classifier) ----
+    // ---- Git driver (same contract as the 0.24 classifier; every git failure gives UNDECIDED) ----
 
     private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.CultureInvariant);
     private const string EmptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
-    /// <summary>Classifies every commit in candidate..target. Fails closed: errors give UNDECIDED.</summary>
-    public static Report ClassifyRange(GitRepo git, CandidateProfile profile, string candidate, string target)
+    /// <summary>Runs one git command: (exit code, stdout, stderr).</summary>
+    public delegate (int ExitCode, string Output, string Error) GitRun(params string[] args);
+
+    /// <summary>
+    /// Classifies every commit in candidate..target. Fails closed: errors give UNDECIDED. <paramref name="run"/>
+    /// replaces <see cref="GitRepo.Run"/> for the history, landing and diff commands (fault-injection controls).
+    /// </summary>
+    public static Report ClassifyRange(GitRepo git, CandidateProfile profile, string candidate, string target, GitRun? run = null)
     {
+        run ??= git.Run;
         var errors = new List<string>();
         if (git.IsShallow() != false) errors.Add("shallow clone or not a git repository: fail, never skip");
         if (!FullSha.IsMatch(candidate) || !git.CommitExists(candidate)) errors.Add($"candidate {candidate} is not a full SHA present here");
         var targetSha = git.RevParse(target + "^{commit}");
         if (targetSha == null) errors.Add($"target {target} does not resolve");
         if (errors.Count > 0) return new Report(Undecided, null, Array.Empty<CommitReport>(), errors);
-        switch (git.Run("merge-base", "--is-ancestor", candidate, targetSha!).ExitCode)
+        switch (run("merge-base", "--is-ancestor", candidate, targetSha!).ExitCode)
         {
             case 0: break;
             case 1: return new Report(Invalid, null, Array.Empty<CommitReport>(), new[] { $"target {targetSha} does not contain the candidate" });
             default: return new Report(Undecided, null, Array.Empty<CommitReport>(), new[] { $"git merge-base cannot read the history from {candidate} to {targetSha}" });
         }
 
-        var landing = FindLanding(git, profile, candidate, errors);
+        var landing = FindLanding(git, profile, candidate, errors, run);
         var reports = new List<CommitReport>();
-        var (revExit, revs, revError) = git.Run("rev-list", "--parents", $"{candidate}..{targetSha}");
+        var (revExit, revs, revError) = run("rev-list", "--parents", $"{candidate}..{targetSha}");
         if (revExit != 0) errors.Add($"git rev-list {candidate}..{targetSha} failed: {revError.Trim()}");
-        foreach (var line in revs.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var line in revExit == 0 ? revs.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : [])
         {
             var ids = line.Split(' ');
             var phase = landing != null && !git.IsAncestor(ids[0], landing) ? Phase.AfterLanding : Phase.BeforeLanding;
             foreach (var parent in ids.Length > 1 ? ids.Skip(1) : new[] { EmptyTree })
                 reports.Add(new CommitReport(ids[0], parent, phase,
-                    Diff(git, parent, ids[0], errors).Select(c => Classify(profile, c, phase)).ToList()));
+                    Diff(git, run, parent, ids[0], errors).Select(c => Classify(profile, c, phase)).ToList()));
         }
         var verdict = errors.Count > 0 ? Undecided
             : reports.Any(r => r.Decisions.Any(d => !d.Exempt)) ? Invalid : NotInvalidated;
         return new Report(verdict, landing, reports, errors);
     }
 
-    /// <summary>The first first-parent commit of protected main after the candidate that holds the manifest.</summary>
-    public static string? FindLanding(GitRepo git, CandidateProfile profile, string candidate, List<string> errors)
+    /// <summary>
+    /// The first first-parent commit of protected main after the candidate that holds the manifest. A commit's
+    /// tree is listed to decide whether the path exists; an existing manifest whose blob cannot be read is an error,
+    /// never "absent", so an unreadable landing cannot turn a frozen-file edit into a before-landing one.
+    /// </summary>
+    public static string? FindLanding(GitRepo git, CandidateProfile profile, string candidate, List<string> errors, GitRun? run = null)
     {
+        run ??= git.Run;
         if (git.RevParse(DurableProvenance.ProtectedMainRef + "^{commit}") is not { } main)
         {
             errors.Add($"{DurableProvenance.ProtectedMainRef} is not fetched");
             return null;
         }
-        switch (git.Run("merge-base", "--is-ancestor", candidate, main).ExitCode)
+        switch (run("merge-base", "--is-ancestor", candidate, main).ExitCode)
         {
             case 0: break;
             case 1: return null;
@@ -169,19 +169,35 @@ public static class ReleaseCandidateInvalidation
                 errors.Add($"git merge-base cannot read the history from {candidate} to {DurableProvenance.ProtectedMainRef}");
                 return null;
         }
-        var (exit, log, error) = git.Run("rev-list", "--first-parent", "--reverse", $"{candidate}..{main}");
+        var (exit, log, error) = run("rev-list", "--first-parent", "--reverse", $"{candidate}..{main}");
         if (exit != 0)
         {
             errors.Add($"git rev-list --first-parent {candidate}..{main} failed: {error.Trim()}");
             return null;
         }
-        return log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .FirstOrDefault(c => git.Run("cat-file", "-e", $"{c}:{profile.ManifestPath}").ExitCode == 0);
+        foreach (var commit in log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var (lsExit, listed, lsError) = run("ls-tree", commit, "--", profile.ManifestPath);
+            if (lsExit != 0)
+            {
+                errors.Add($"git ls-tree {commit} failed while looking for the landing: {lsError.Trim()}");
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(listed)) continue;
+            var blob = listed.Split('\t')[0].Split(' ').Last();
+            if (run("cat-file", "-e", blob).ExitCode != 0)
+            {
+                errors.Add($"the manifest {profile.ManifestPath} at {commit} exists but its blob {blob} cannot be read");
+                return null;
+            }
+            return commit;
+        }
+        return null;
     }
 
-    private static IEnumerable<Change> Diff(GitRepo git, string parent, string commit, List<string> errors)
+    private static IEnumerable<Change> Diff(GitRepo git, GitRun run, string parent, string commit, List<string> errors)
     {
-        var (exit, raw, error) = git.Run("diff-tree", "-r", "-z", "--no-renames", "--raw", "--no-ext-diff", "--ignore-submodules=none", parent, commit);
+        var (exit, raw, error) = run("diff-tree", "-r", "-z", "--no-renames", "--raw", "--no-ext-diff", "--ignore-submodules=none", parent, commit);
         if (exit != 0)
         {
             errors.Add($"git diff-tree {parent} {commit} failed: {error.Trim()}");
@@ -194,6 +210,8 @@ public static class ReleaseCandidateInvalidation
             if (meta.Length < 5) continue;
             var oldBytes = meta[0] is "000000" or "160000" ? null : git.ReadBlob(meta[2]);
             var newBytes = meta[1] is "000000" or "160000" ? null : git.ReadBlob(meta[3]);
+            if ((oldBytes == null && meta[0] is not ("000000" or "160000")) || (newBytes == null && meta[1] is not ("000000" or "160000")))
+                errors.Add($"a blob of {fields[i + 1]} in {commit} cannot be read");
             yield return new Change(meta[4], fields[i + 1], meta[0], meta[1], oldBytes, newBytes);
         }
     }

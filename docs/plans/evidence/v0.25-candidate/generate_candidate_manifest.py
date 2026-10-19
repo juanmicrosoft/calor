@@ -1,15 +1,7 @@
-"""Generate (or with --check, verify) candidate-manifest.json for the 0.25 release candidate (#1430).
-
-The 0.25 form of the 0.24 C1 generator (docs/plans/evidence/c1-1423/generate_candidate_manifest.py), which
-stays frozen with the 0.24 candidate. Run from the repository root in a full clone after `git fetch origin`.
-Values come from git objects at the candidate, never the working tree. Hand-recorded inputs (the candidate,
-merge commits, issue states, the observed toolchain, decisions, open items) come from inputs.json in this
-directory and are re-verified against git where git can verify them. Any failed check exits non-zero.
-
-  python3 docs/plans/evidence/v0.25-candidate/generate_candidate_manifest.py           # write
-  python3 docs/plans/evidence/v0.25-candidate/generate_candidate_manifest.py --check   # verify
-  python3 docs/plans/evidence/v0.25-candidate/generate_candidate_manifest.py --self-test
-"""
+"""Generate (or with --check, verify; --self-test, run only the controls) candidate-manifest.json for the 0.25
+release candidate (#1430): the 0.25 form of 0.24's C1 generator, which stays frozen with 0.24. Run from the
+repository root in a full clone after `git fetch origin`. Values come from git objects at the candidate; the
+hand-recorded inputs.json is re-verified against git where git can. Any failed check exits non-zero. See README.md."""
 import functools, hashlib, json, os, re, subprocess, sys
 
 DIR = 'docs/plans/evidence/v0.25-candidate'
@@ -57,7 +49,6 @@ PRODUCERS = [('r0-reproduce', '0.25 R0 reproduction driver and execution oracle 
              ('candidate-generator', 'this generator', None, [f'{DIR}/generate_candidate_manifest.py'])]
 FAILURES = []
 
-
 def dotnet_json(value):
     """JsonNode.ToJsonString() with System.Text.Json's default encoder: compact, every non-ASCII, control and
     HTML-sensitive character escaped as uppercase \\uXXXX, and numbers written as their original source text."""
@@ -83,14 +74,11 @@ def dotnet_json(value):
             out.append(ch)
     return '"' + ''.join(out) + '"'
 
-
 class RawNumber(str):
     """A JSON number kept as its source text, as JsonNode keeps it."""
 
-
 def jloads(data):
     return json.loads(data, parse_int=RawNumber, parse_float=RawNumber)
-
 
 def git(*args, binary=False, env_utc=False):
     env = dict(os.environ, TZ='UTC') if env_utc else None
@@ -99,22 +87,18 @@ def git(*args, binary=False, env_utc=False):
         return None
     return out.stdout if binary else out.stdout.decode().strip()
 
-
 def check(ok, message):
     if not ok:
         FAILURES.append(message)
     return ok
-
 
 def sha(data, lf=False):
     if lf:
         data = data.decode('utf-8').replace('\r\n', '\n').encode('utf-8')
     return hashlib.sha256(data).hexdigest()
 
-
 def ancestor(commit, of):
     return subprocess.run(['git', 'merge-base', '--is-ancestor', commit, of], capture_output=True).returncode == 0
-
 
 def tag_problems(ref, local_rc, local_commit, remote_rc, remote_out, candidate):
     """Local and remote are judged independently: each must be a confirmed absence or peel to the candidate."""
@@ -132,7 +116,6 @@ def tag_problems(ref, local_rc, local_commit, remote_rc, remote_out, candidate):
         problems.append(f'remote {ref} peels to {peeled}, not the candidate (R2 gate G009)')
     return problems
 
-
 def sdk_pins(wf, text, sdk):
     """Per job: the setup-dotnet versions, and problems unless the first is the release SDK and later ones auxiliary."""
     problems, pins = [], {}
@@ -149,7 +132,6 @@ def sdk_pins(wf, text, sdk):
     if not pins:
         problems.append(f'{wf} has no setup-dotnet job')
     return pins, problems
-
 
 def self_test():
     """The 13 tag-rule controls of the 0.24 generator, plus serializer, seal and SDK-pin controls; run every time."""
@@ -173,7 +155,6 @@ def self_test():
     for args, expected in cases:
         check(bool(tag_problems(r, *args, candidate=c)) == bool(expected), f'tag self-test failed for {args}')
 
-
 class Candidate:
     def __init__(self, inputs):
         self.inputs = inputs
@@ -194,9 +175,7 @@ class Candidate:
 
     def hashes(self, paths, lf=False):
         return {p: sha(self.blob(p), lf) for p in paths if self.blob(p) is not None}
-
     # ---- identity and releasability ----
-
     def identity(self):
         c, cand = self.commit, self.inputs['candidate']
         check(re.fullmatch('[0-9a-f]{40}', c or '') is not None, 'candidate.commit is not a full SHA')
@@ -236,9 +215,7 @@ class Candidate:
               f'{MAP} has no single not-yet-adjudicated 0.25.x entry for #1430')
         return {'versionAtCandidate': version, 'tagAtFreeze': tagged, 'notesSectionSha256': sha((notes or '').encode()),
                 'adjudicationMapEntry': entry[0] if entry else None}
-
     # ---- pins, dependencies, toolchain ----
-
     def dependencies(self):
         everything = (git('ls-tree', '-r', '--name-only', self.commit) or '').splitlines()
         locks = [p for p in everything if p.endswith(('packages.lock.json', 'Directory.Packages.props', 'dotnet-tools.json'))
@@ -274,9 +251,7 @@ class Candidate:
                            'note': 'The 0.25 reproduction drivers and the T1 aggregator take no seed; their inputs are fixed fixtures.'}],
                 'z3': {'version': consumers.get('z3Version'), 'assets': parse('.github/z3-binaries-4.15.7.sha256'),
                        'upstreamArchives': parse('src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256')}}
-
     # ---- the 0.25 packets and their seals ----
-
     def pin(self, which, name):
         m = re.search(rf'{name}\s*=\s*"([0-9a-f]{{64}})"', self.blob(PINNED_TESTS[which]).decode())
         check(m is not None, f'{PINNED_TESTS[which]} pins no {name}')
@@ -420,7 +395,6 @@ class Candidate:
             'knownOpenItems': self.inputs['openItems'], 'invalidation': self.inputs['invalidation'], 'review': self.inputs['notes']['review'],
         }
 
-
 def main():
     self_test()
     if '--self-test' in sys.argv:
@@ -439,7 +413,6 @@ def main():
         print('FAIL', f)
     print('OK' if not FAILURES else f'{len(FAILURES)} failure(s)')
     return 1 if FAILURES else 0
-
 
 if __name__ == '__main__':
     sys.exit(main())
