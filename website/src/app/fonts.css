@@ -1,0 +1,7 @@
+/* #1548: the metric-adjusted Arial fallbacks that next/font's Google loader generated for these
+   families, kept verbatim so text renders the same before the web fonts load and for characters
+   no vendored subset covers. Used by ./fonts.ts. */
+@font-face { font-family: 'DM Sans Fallback'; src: local("Arial"); ascent-override: 94.90%; descent-override: 29.66%; line-gap-override: 0.00%; size-adjust: 104.53%; }
+@font-face { font-family: 'Raleway Fallback'; src: local("Arial"); ascent-override: 90.51%; descent-override: 22.53%; line-gap-override: 0.00%; size-adjust: 103.86%; }
+@font-face { font-family: 'JetBrains Mono Fallback'; src: local("Arial"); ascent-override: 75.79%; descent-override: 22.29%; line-gap-override: 0.00%; size-adjust: 134.59%; }
+@font-face { font-family: 'VT323 Fallback'; src: local("Arial"); ascent-override: 89.16%; descent-override: 22.29%; line-gap-override: 0.00%; size-adjust: 89.73%; }

@@ -120,6 +120,9 @@ jobs:
         working-directory: website
         run: npm run build
 
+      - name: Check the site serves only self-hosted fonts (#1548)
+        run: python3 scripts/check_website_fonts.py --out website/out
+
       - name: Verify the built site against the adjudication (#1410) or the override
         env:
           VER: ${{ steps.gate.outputs.version }}
