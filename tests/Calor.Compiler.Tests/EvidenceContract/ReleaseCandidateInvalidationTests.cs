@@ -158,6 +158,36 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         Assert.Equal(Undecided, ClassifyRange(_repo.Git, P, candidate, "HEAD").Verdict);
     }
 
+    /// <summary>A history git cannot read (a missing commit object) must not read as "no changes" or "not landed".</summary>
+    [Fact]
+    public void AnUnreadableTargetHistoryIsUndecided()
+    {
+        var candidate = _repo.Candidate();
+        var middle = _repo.Commit(("src/a.cs", "changed"));
+        _repo.Commit(("src/b.cs", "b"));
+        _repo.DeleteObject(middle);
+        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
+        Assert.True(report.Verdict == Undecided, report.ToString());
+        Assert.Contains(report.Errors, e => e.Contains("merge-base", StringComparison.Ordinal));
+    }
+
+    /// <summary>If protected main's history cannot be read, the landing is unknown: a frozen-file edit must not pass as before-landing.</summary>
+    [Fact]
+    public void AnUnreadableMainHistoryIsUndecided()
+    {
+        var candidate = _repo.Candidate();
+        _repo.Branch("side");
+        var broken = _repo.Commit(("docs/plans/evidence/v0.25-candidate/reviews/r.md", "x"));
+        _repo.Commit((P.ManifestPath, "{}"));
+        _repo.PublishMain();
+        _repo.Checkout("main");
+        _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
+        _repo.DeleteObject(broken);
+        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
+        Assert.True(report.Verdict == Undecided, report.ToString());
+        Assert.Contains(report.Errors, e => e.Contains(DurableProvenance.ProtectedMainRef, StringComparison.Ordinal));
+    }
+
     private const string TestManifest = """
         {
           "projects": [
@@ -219,6 +249,14 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         public void Checkout(string what) => Must("checkout", "--quiet", what);
 
         public void Merge(string branch) => Must("merge", "--quiet", "--no-ff", "--no-edit", "--no-gpg-sign", branch);
+
+        /// <summary>Removes a loose commit object, so history through it cannot be read.</summary>
+        public void DeleteObject(string sha)
+        {
+            var file = Path.Combine(_root, ".git", "objects", sha[..2], sha[2..]);
+            File.SetAttributes(file, FileAttributes.Normal);
+            File.Delete(file);
+        }
 
         private void Must(params string[] args)
         {

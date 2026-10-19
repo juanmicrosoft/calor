@@ -129,12 +129,17 @@ public static class ReleaseCandidateInvalidation
         var targetSha = git.RevParse(target + "^{commit}");
         if (targetSha == null) errors.Add($"target {target} does not resolve");
         if (errors.Count > 0) return new Report(Undecided, null, Array.Empty<CommitReport>(), errors);
-        if (!git.IsAncestor(candidate, targetSha!))
-            return new Report(Invalid, null, Array.Empty<CommitReport>(), new[] { $"target {targetSha} does not contain the candidate" });
+        switch (git.Run("merge-base", "--is-ancestor", candidate, targetSha!).ExitCode)
+        {
+            case 0: break;
+            case 1: return new Report(Invalid, null, Array.Empty<CommitReport>(), new[] { $"target {targetSha} does not contain the candidate" });
+            default: return new Report(Undecided, null, Array.Empty<CommitReport>(), new[] { $"git merge-base cannot read the history from {candidate} to {targetSha}" });
+        }
 
         var landing = FindLanding(git, profile, candidate, errors);
         var reports = new List<CommitReport>();
-        var (_, revs, _) = git.Run("rev-list", "--parents", $"{candidate}..{targetSha}");
+        var (revExit, revs, revError) = git.Run("rev-list", "--parents", $"{candidate}..{targetSha}");
+        if (revExit != 0) errors.Add($"git rev-list {candidate}..{targetSha} failed: {revError.Trim()}");
         foreach (var line in revs.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var ids = line.Split(' ');
@@ -156,8 +161,20 @@ public static class ReleaseCandidateInvalidation
             errors.Add($"{DurableProvenance.ProtectedMainRef} is not fetched");
             return null;
         }
-        if (!git.IsAncestor(candidate, main)) return null;
-        var (_, log, _) = git.Run("rev-list", "--first-parent", "--reverse", $"{candidate}..{main}");
+        switch (git.Run("merge-base", "--is-ancestor", candidate, main).ExitCode)
+        {
+            case 0: break;
+            case 1: return null;
+            default:
+                errors.Add($"git merge-base cannot read the history from {candidate} to {DurableProvenance.ProtectedMainRef}");
+                return null;
+        }
+        var (exit, log, error) = git.Run("rev-list", "--first-parent", "--reverse", $"{candidate}..{main}");
+        if (exit != 0)
+        {
+            errors.Add($"git rev-list --first-parent {candidate}..{main} failed: {error.Trim()}");
+            return null;
+        }
         return log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .FirstOrDefault(c => git.Run("cat-file", "-e", $"{c}:{profile.ManifestPath}").ExitCode == 0);
     }

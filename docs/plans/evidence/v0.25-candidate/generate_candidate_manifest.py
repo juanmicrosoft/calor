@@ -29,13 +29,67 @@ PIN_FILES = ['global.json', 'Directory.Build.props', 'Directory.Build.targets', 
              'src/Calor.Compiler/scripts/download-z3.ps1', 'scripts/verify-z3-assets.py', 'website/package.json',
              'website/package-lock.json', 'website/src/fonts/fonts.json', '.gitmodules', '.gitattributes',
              'bench/phase0-agent-native/commit-stamp-index.json', MAP]
-# Release workflows whose setup-dotnet steps must request exactly the release SDK (#1548).
+# Release workflows whose setup-dotnet steps must request exactly the release SDK (#1548, ReleaseSdkPinTests): each
+# job's first install is the release SDK; a later install may only be the registered auxiliary SDK.
 RELEASE_WORKFLOWS = ['publish-nuget.yml', 'verify-release.yml', 'reproducible-builds.yml', 'benchmark.yml']
-# Pinned seals in the candidate's own tests: the manifest records them and checks the packets against them.
-PINNED = {'scopeFrozenSeal': ('tests/Calor.Compiler.Tests/InteropScope/InteropScopeTests.cs', 'FrozenSeal'),
-          'd1FrozenSeal': ('tests/Calor.Compiler.Tests/InteropScope/RefOutContractTests.cs', 'FrozenSeal'),
-          't1BaselineApprovalSeal': ('tests/Calor.Compiler.Tests/InteropScope/T1RegisterTests.cs', 'BaselineApprovalSeal')}
+AUX_SDKS = {'8.0.426'}
+# Pinned seals in the candidate's own tests. Each is recomputed here with the validators' serialization.
+PINNED_TESTS = {'scope': 'tests/Calor.Compiler.Tests/InteropScope/InteropScopeTests.cs',
+                'd1': 'tests/Calor.Compiler.Tests/InteropScope/RefOutContractTests.cs',
+                't1': 'tests/Calor.Compiler.Tests/InteropScope/T1RegisterTests.cs'}
+# Every 0.25 gate the candidate must contain, by issue; inputs.json gives each one's merged PRs.
+REQUIRED_GATES = {'R0': 1426, 'D1': 1427, 'F1': 943, 'F2': 906, 'F3': 847, 'F4': 1139, 'F5': 1132, 'F6': 1144,
+                  'W0': 1143, 'T1': 1428, 'W1': 1429, 'R2-1545': 1545, 'R2-1546': 1546, 'R2-1547': 1547, 'PREP': 1430}
+# Evidence producers: (id, title, directory or None, extra files).
+PRODUCERS = [('r0-reproduce', '0.25 R0 reproduction driver and execution oracle (#1426)', 'docs/plans/evidence/v0.25-r0-1426/reproduce/', []),
+             ('family-reproduce', 'F1, F3, F4, F5 re-run drivers', None,
+              ['docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py', 'docs/plans/evidence/v0.25-f3-847/reproduce/reproduce.py',
+               'docs/plans/evidence/v0.25-f4-1139/reproduce/reproduce.py', 'docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce.py',
+               'docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce_pr2.py']),
+             ('t1-aggregate', 'T1 register aggregator (#1428)', 'docs/plans/evidence/v0.25-t1-1428/reproduce/', []),
+             ('w1-wording-scan', 'W1 wording scan (#1429)', 'docs/plans/evidence/v0.25-w1-1429/reproduce/', []),
+             ('g2-determinism', '0.24 G2 determinism protocol (#1421), re-run on the candidate', None,
+              ['scripts/determinism_protocol.py', 'scripts/determinism_runner.py', 'docs/plans/evidence/g2-1421/protocol.json',
+               'docs/plans/evidence/g2-1421/cases.json']),
+             ('r2-release-gate', '0.24 R2 release gate (#1410) and the 0.24.0 override check', None,
+              ['scripts/verify_release_adjudication.py', 'scripts/render_release_notes.py', 'scripts/verify_maintainer_override.py',
+               'scripts/check_release_credentials.py', 'scripts/test_reproducible_builds.py']),
+             ('candidate-generator', 'this generator', None, [f'{DIR}/generate_candidate_manifest.py'])]
 FAILURES = []
+
+
+def dotnet_json(value):
+    """JsonNode.ToJsonString() with System.Text.Json's default encoder: compact, every non-ASCII, control and
+    HTML-sensitive character escaped as uppercase \\uXXXX, and numbers written as their original source text."""
+    if isinstance(value, dict):
+        return '{' + ','.join(dotnet_json(k) + ':' + dotnet_json(v) for k, v in value.items()) + '}'
+    if isinstance(value, list):
+        return '[' + ','.join(dotnet_json(v) for v in value) + ']'
+    if isinstance(value, RawNumber):
+        return str(value)
+    if value is None or isinstance(value, bool):
+        return {None: 'null', True: 'true', False: 'false'}[value]
+    out = []
+    for ch in value:
+        o = ord(ch)
+        if ch == '\\':
+            out.append('\\\\')
+        elif ch in '\n\r\t\b\f':
+            out.append({'\n': '\\n', '\r': '\\r', '\t': '\\t', '\b': '\\b', '\f': '\\f'}[ch])
+        elif o < 0x20 or o > 0x7E or ch in '"&\'+<>`':
+            for unit in ([o] if o <= 0xFFFF else [0xD800 + ((o - 0x10000) >> 10), 0xDC00 + ((o - 0x10000) & 0x3FF)]):
+                out.append(f'\\u{unit:04X}')
+        else:
+            out.append(ch)
+    return '"' + ''.join(out) + '"'
+
+
+class RawNumber(str):
+    """A JSON number kept as its source text, as JsonNode keeps it."""
+
+
+def jloads(data):
+    return json.loads(data, parse_int=RawNumber, parse_float=RawNumber)
 
 
 def git(*args, binary=False, env_utc=False):
@@ -79,8 +133,38 @@ def tag_problems(ref, local_rc, local_commit, remote_rc, remote_out, candidate):
     return problems
 
 
+def sdk_pins(wf, text, sdk):
+    """Per job: the setup-dotnet versions, and problems unless the first is the release SDK and later ones auxiliary."""
+    problems, pins = [], {}
+    if 'global-json-file' in text:
+        problems.append(f'{wf} selects an SDK through global-json-file')
+    jobs = re.split(r'(?m)^  ([A-Za-z0-9_-]+):[ \t]*$', text.split('\njobs:', 1)[-1])
+    for name, body in zip(jobs[1::2], jobs[2::2]):
+        versions = [v.strip('\'"') for v in re.findall(r'dotnet-version:[ \t]*(\S+)', body)]
+        if versions:
+            pins[f'{wf}:{name}'] = versions
+            if versions[0] != sdk or any(v != sdk and v not in AUX_SDKS for v in versions[1:]):
+                problems.append(f'{wf} job {name} does not install exactly the release SDK {sdk} first '
+                                f'(and only {sorted(AUX_SDKS)} after): {versions}')
+    if not pins:
+        problems.append(f'{wf} has no setup-dotnet job')
+    return pins, problems
+
+
 def self_test():
-    """The 13 tag-rule controls of the 0.24 generator, run on every invocation."""
+    """The 13 tag-rule controls of the 0.24 generator, plus serializer, seal and SDK-pin controls; run every time."""
+    check(dotnet_json(jloads('{"a":["§<\'&+`\\"\\\\",1.50,-2,true,null]}')) ==
+          '{"a":["\\u00A7\\u003C\\u0027\\u0026\\u002B\\u0060\\u0022\\\\",1.50,-2,true,null]}', 'dotnet_json self-test failed')
+    check(dotnet_json('\U0001F600\n') == '"\\uD83D\\uDE00\\n"', 'dotnet_json surrogate self-test failed')
+    wf = "on: push\njobs:\n  a:\n    steps:\n      - with:\n          dotnet-version: '10.0.401'\n      - with:\n          dotnet-version: '8.0.426'\n" \
+         "  b:\n    steps:\n      - with:\n          dotnet-version: '10.0.401'\n"
+    check(not sdk_pins('w', wf, '10.0.401')[1], 'SDK-pin control: a valid workflow is rejected')
+    for bad in (wf.replace("'8.0.426'", "'10.0.999'"),
+                wf.replace("b:\n    steps:\n      - with:\n          dotnet-version: '10.0.401'",
+                           "b:\n    steps:\n      - with:\n          dotnet-version: '10.0.x'"),
+                wf.replace("a:\n    steps:\n      - with:\n          dotnet-version: '10.0.401'", "a:\n    steps:\n      - with:\n          dotnet-version: '8.0.426'"),
+                wf + "      - with:\n          global-json-file: global.json\n"):
+        check(bool(sdk_pins('w', bad, '10.0.401')[1]), f'SDK-pin control: a mutated workflow passes: {bad!r}')
     c, o, r = 'c' * 40, 'a' * 40, 'refs/tags/v9.9.9'
     cases = [((0, c, 0, ''), 0), ((1, None, 0, ''), 0), ((0, c, 0, f'{o}\t{r}\n'), 1), ((1, None, 0, f'{o}\t{r}\n{c}\t{r}^{{}}\n'), 0),
              ((1, None, 0, f'{c}\t{r}\n{o}\t{r}^{{}}\n'), 1), ((1, None, 0, f'{c}\t{r}\n'), 0), ((0, o, 0, ''), 1),
@@ -130,7 +214,8 @@ class Candidate:
         return {'commit': c, 'committedUtc': git('show', '-s', '--date=iso-strict-local', '--format=%cd', c, env_utc=True),
                 'mergeOf': cand['mergeOf'], 'firstParent': first_parent, 'freezeObservedUtc': cand['freezeObservedUtc'],
                 'originMainAtFreeze': cand['originMainAtFreeze'],
-                'durableIdentity': {'treeHashes': trees, 'inputContentHashes': self.hashes(PIN_FILES)}}
+                'durableIdentity': {'status': 'complete', 'commit': c, 'resolvedVia': MAIN, 'treeHashes': trees,
+                                    'inputContentHashes': self.hashes(PIN_FILES)}}
 
     def releasability(self):
         version = re.search(rb'<Version>([^<]+)</Version>', self.blob('Directory.Build.props')).group(1).decode()
@@ -169,29 +254,66 @@ class Candidate:
         sdk = observed['releaseSdk']
         pins = {}
         for wf in RELEASE_WORKFLOWS:
-            text = self.blob(f'.github/workflows/{wf}').decode()
-            versions = re.findall(r"dotnet-version:\s*['\"]?([0-9][^'\"\s]*)", text)
-            check(versions and versions[0] == sdk and all(re.fullmatch(r'\d+\.\d+\.\d{3}', v) for v in versions),
-                  f'{wf} does not pin the release SDK {sdk} exactly: {versions}')
-            pins[wf] = versions
+            found, problems = sdk_pins(wf, self.blob(f'.github/workflows/{wf}').decode(), sdk)
+            pins.update(found)
+            for p in problems:
+                check(False, p)
         check(re.fullmatch(r'sha256:[0-9a-f]{64}', observed['dotnetSdkBuild']['value']) is not None, 'dotnetSdkBuild is not a sha256 fingerprint')
         consumers = self.json('eng/z3-consumers.json')
         parse = lambda path: [{'name': p[1], 'sha256': p[0], 'bytes': int(p[2])} for p in
                               (l.split() for l in self.blob(path).decode().splitlines() if not l.startswith('#')) if len(p) == 3]
+        protocol = self.json('docs/plans/evidence/g2-1421/protocol.json')
         return {'globalJson': json.loads(self.blob('global.json'))['sdk'], 'releaseSdk': sdk, 'releaseWorkflowPins': pins,
                 'dotnetSdkBuild': observed['dotnetSdkBuild'], 'runtime': observed['runtime'], 'observedEnvironment': observed.get('environment'),
+                'determinismProtocol': {'version': protocol.get('protocolVersion'), 'environments': protocol.get('environments'),
+                                        'environmentRule': protocol.get('environmentRule'), 'checkout': protocol.get('checkout'),
+                                        **{k: protocol.get('toolchain', {}).get(k) for k in ('sdk', 'runtime', 'globalJson', 'configuration')}},
+                'seeds': [{'id': 'z3-random-seed', **{k: protocol.get('z3', {}).get('randomSeed', {}).get(k) for k in ('value', 'source', 'applied')},
+                           'note': 'G2 protocol 1.2.0: Z3 4.15.7 ignores random_seed, so the constant never reaches the solver.'},
+                          {'id': '0.25-producers', 'value': None,
+                           'note': 'The 0.25 reproduction drivers and the T1 aggregator take no seed; their inputs are fixed fixtures.'}],
                 'z3': {'version': consumers.get('z3Version'), 'assets': parse('.github/z3-binaries-4.15.7.sha256'),
                        'upstreamArchives': parse('src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256')}}
 
     # ---- the 0.25 packets and their seals ----
 
-    def pinned(self):
-        found = {}
-        for key, (path, name) in PINNED.items():
-            m = re.search(rf'{name}\s*=\s*"([0-9a-f]{{64}})"', self.blob(path).decode())
-            check(m is not None, f'{path} pins no {name}')
-            found[key] = m.group(1) if m else None
-        return found
+    def pin(self, which, name):
+        m = re.search(rf'{name}\s*=\s*"([0-9a-f]{{64}})"', self.blob(PINNED_TESTS[which]).decode())
+        check(m is not None, f'{PINNED_TESTS[which]} pins no {name}')
+        return m.group(1) if m else None
+
+    def seals(self):
+        """Recompute each packet seal exactly as its C# validator does, and compare it with the test pin."""
+        scope, d1, reg = jloads(self.blob(SCOPE)), jloads(self.blob(D1)), jloads(self.blob(REGISTER))
+        def scope_seal_of(s):
+            es = s.get('evidenceSeal', {})
+            return sha('\n'.join([dotnet_json(s.get('denominatorV1')), es.get('baselineResults', ''), es.get('generated', ''),
+                                  dotnet_json(es.get('producers'))]).encode(), True)
+
+        def d1_seal_of(c):
+            frozen = {k: c.get(k) for k in ('measuredAt', 'consumes', 'rules', 'preludes', 'requiredShapes', 'diagnostics', 'cases')}
+            frozen['diagnostics'] = [{k: v for k, v in d.items() if k != 'code'} for d in frozen['diagnostics'] or []]
+            frozen['cases'] = [{k: v for k, v in x.items() if k not in ('observed', 'status')} for x in frozen['cases'] or []]
+            return sha(dotnet_json(frozen).encode())
+
+        scope_seal, d1_seal = scope_seal_of(scope), d1_seal_of(d1)
+        # Controls on the real packets: a sealed field must move its seal; an unsealed one must not.
+        for label, mutated_seal, base, sealed in (
+                ('scope denominator emptied', scope_seal_of(dict(scope, denominatorV1=[])), scope_seal, True),
+                ('D1 rules emptied', d1_seal_of(dict(d1, rules=[])), d1_seal, True),
+                ('D1 case status changed', d1_seal_of(dict(d1, cases=[dict(c, status='x') for c in d1.get('cases', [])])), d1_seal, False)):
+            check((mutated_seal != base) == sealed, f'seal control failed: {label}')
+        pinned_amendments = re.findall(r'\("([0-9.]+)",\s*"([0-9a-f]{64})"\)', self.blob(PINNED_TESTS['t1']).decode())
+        recorded = [(a.get('version'), a.get('approvalSeal')) for a in reg.get('amendments', [])]
+        out = {'scope': {'computed': scope_seal, 'pinned': self.pin('scope', 'FrozenSeal')},
+               'd1Contract': {'computed': d1_seal, 'pinned': self.pin('d1', 'FrozenSeal')},
+               't1Baseline': {'recorded': reg.get('approvalSeal'), 'pinned': self.pin('t1', 'BaselineApprovalSeal')},
+               't1Amendments': {'recorded': recorded, 'pinned': pinned_amendments}}
+        check(scope_seal == out['scope']['pinned'], f'scope seal {scope_seal} differs from the pinned FrozenSeal')
+        check(d1_seal == out['d1Contract']['pinned'], f'D1 contract seal {d1_seal} differs from the pinned FrozenSeal')
+        check(reg.get('approvalSeal') == out['t1Baseline']['pinned'], 'T1 baseline approval seal differs from its pin')
+        check([list(r) for r in recorded] == [list(p) for p in pinned_amendments], 'T1 amendment approval seals differ from their pins')
+        return out
 
     def scope(self):
         s = self.json(SCOPE)
@@ -244,7 +366,15 @@ class Candidate:
                 'd1Contract': dict(files(D1), contractVersion=d1.get('contractVersion'), status=d1.get('status'),
                                    consumes=d1.get('consumes')),
                 'w1Records': dict(files(W1), scopeVersion=w1.get('scopeVersion'), registerVersion=w1.get('registerVersion')),
-                'pinnedSeals': self.pinned()}
+                'seals': self.seals()}
+
+    def producers(self):
+        out = []
+        for pid, title, directory, extra in PRODUCERS:
+            paths = sorted(set((self.files(directory) if directory else []) + extra))
+            check(bool(paths), f'producer {pid} has no files at the candidate')
+            out.append({'id': pid, 'title': title, 'files': self.hashes(paths)})
+        return out
 
     def s2_witnesses(self):
         """0.24 S2 repairs (acceptancePreconditions proof-s2-witnesses): present at the candidate; C2-equivalent runs them."""
@@ -258,8 +388,13 @@ class Candidate:
         return out
 
     def merged(self):
-        rows = []
-        for g in self.inputs['gates']:
+        rows, gates = [], self.inputs['gates']
+        check({g['gate']: g['issue'] for g in gates} == REQUIRED_GATES and len(gates) == len(REQUIRED_GATES),
+              f'the recorded gates differ from the required 0.25 set {sorted(REQUIRED_GATES)}')
+        check(all(g['prs'] for g in gates), 'a required gate records no merged PR')
+        prep = next((g for g in gates if g['gate'] == 'PREP'), {})
+        check(prep.get('prs', [None])[-1] == self.inputs['candidate']['mergeOf']['pr'], 'the PREP gate does not end with the candidate PR')
+        for g in gates:
             prs = []
             for pr in g['prs']:
                 rec = self.inputs['pullRequests'][str(pr)]
@@ -279,7 +414,8 @@ class Candidate:
             'schema': 'calor.release-candidate-manifest/1', 'release': self.inputs['candidate']['version'], 'issue': 1430, 'epic': 1425,
             'status': 'FROZEN-AT-MERGE', 'statusNote': self.inputs['notes']['statusNote'],
             'candidate': identity, 'releasability': self.releasability(), 'dependencies': self.dependencies(),
-            'toolchain': self.toolchain(), 'packets': packets, 's2Witnesses': self.s2_witnesses(), 'merged': self.merged(),
+            'toolchain': self.toolchain(), 'packets': packets, 'producers': self.producers(),
+            's2Witnesses': self.s2_witnesses(), 'merged': self.merged(),
             'issueStatesAtFreeze': self.inputs['issueStatesAtFreeze'], 'maintainerDecisions': self.inputs['maintainerDecisions'],
             'knownOpenItems': self.inputs['openItems'], 'invalidation': self.inputs['invalidation'], 'review': self.inputs['notes']['review'],
         }

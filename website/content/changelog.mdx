@@ -355,8 +355,8 @@ The new check found 11 website examples that did not compile. This change fixes 
   and could only be compiled as a pair. They are now one consistent two-file example, and its
   quoted output is checked.
 - 2 refinement-type examples did arithmetic on named refinement types (`§RTYPE`), which the
-  type checker rejects today (`Calor0202`). They now write the refinements inline, and the
-  pages say why.
+  type checker then rejected (`Calor0202`). They were rewritten with inline refinements. A later
+  fix in this release (#1515, under "Fixed") makes that arithmetic type-check.
 
 The 0.25 baseline counted 13 failures; the other 2 were method fragments (`§MT`), which are not
 complete programs. This change also fixes 5 stale keyword references in prose (`§FOREACH` twice,
@@ -410,9 +410,10 @@ responses captured from the MCP server. The refinement-type pages now say that a
 These change how Calor is published, not the compiler. The release gate (#1410) lets a release
 publish only with an adjudication identity: the accepted commit plus the hash of its record.
 
-- **#1545, half done.** The publish job now reads the NuGet key from a `main`-only GitHub
-  environment. Older tags can still read the old repository-level key until the maintainer
-  moves it. On 2026-10-19 a read-only check found the old key still in place.
+- **#1545.** The publish job now reads the NuGet key from a `main`-only GitHub environment,
+  `nuget-release`. Closing #1545 also needs repository settings: create that environment, store a
+  new key in it, and delete the old repository-level key, which older tags can read. At the freeze
+  on 2026-10-19, a read-only check found that none of these settings had been made yet.
 - **#1546.** The gate checks on every run that this notes section in the candidate hashes to the
   adjudicated notes (`G014`). So these notes had to be final at the freeze.
 - **#1547.** Publishing a release no longer publishes benchmark results. That needs a separate
