@@ -204,7 +204,7 @@
       "claimsCorrected": [
         "native counts include constructs of a type a rescue later replaced; pages now say to read conversionPaths.outcome",
         "calor_batch in lossless mode refuses every file when one fails (failedFiles 2 in W1-F6-project); a draft claim that the rest still convert was removed before review",
-        "calor convert --format json --verbose writes progress lines to stdout before the envelope",
+        "calor convert --format json --verbose wrote progress lines to stdout before the envelope (fixed by #1570; W1-F6-rescue cli-convert-json-verbose now records stdoutIsOneJsonDocument true)",
         "MCP diagnostics: calor_convert issues[], calor_migrate perFile[].errors/warnings, calor_batch files[].issues",
         "post-validation-fallback is a mechanism label, not a feature-check registry entry"
       ],

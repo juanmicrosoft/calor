@@ -332,7 +332,7 @@ public sealed class W1GuideTranscriptTests : IDisposable
         };
         if (id == "W1-F6-rescue")
         {
-            // --verbose prints converter progress to stdout, so stdout is not one JSON document (documented on cli/convert).
+            // --format json --verbose: stdout must be one JSON document; the converter's progress goes to stderr (#1570).
             var verboseDir = NewDir("verbose");
             File.WriteAllText(Path.Combine(verboseDir, file), source);
             var (_, verboseOut, _) = CliTestHarness.RunCli(verboseDir, IsolatedHome(), "convert", file, "-o", name + ".calr", "--format", "json", "--verbose");
