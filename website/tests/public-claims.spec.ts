@@ -81,7 +81,7 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
   const article = page.locator('article');
   // Version scope and bounded claims: unreleased behavior is never presented as the current release.
   for (const text of ['which is not released yet', 'Changed since 0.24', 'Preserved C# is a migration boundary',
-    'fails the C# round trip', 'is not recognized in 0.25', 'reports Partial', 'rescueUnusableMembers: true',
+    'ref returns (block or', 'reports Partial', 'rescueUnusableMembers: true',
     'passthroughOnError: true', 'conversionPaths.outcome', 'In the tested cases']) {
     await expect(article).toContainText(text);
   }
