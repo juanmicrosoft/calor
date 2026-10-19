@@ -10242,7 +10242,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (collides || unknownType || type is { IsRefLikeType: true }
                 || declaration.Ancestors().Any(node => node is InterpolationSyntax)
                 // A chained assignment (`x = y = F(out var n)`) is converted by evaluating F twice.
-                || scanned.DescendantNodes().Any(node => node is AssignmentExpressionSyntax { Parent: not ExpressionStatementSyntax }))
+                || scanned.DescendantNodes().Any(node => node is AssignmentExpressionSyntax { Parent: not ExpressionStatementSyntax })
+                || _semanticModel.LookupSymbols(statement.SpanStart, name: "default").Length > 0) // `default` would read it
                 throw EscalateExpression(statement, "out-var");
             _loweredOutDeclarations.Add(declaration);
             var typeName = declaration.Type.IsVar
@@ -10251,8 +10252,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         | SymbolDisplayMiscellaneousOptions.ExpandNullable
                         | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)))
                 : TypeMapper.CSharpToCalor(declaration.Type.ToString());
+            // `default`, as for `int x;`: a bare binding would take a next-line `§C` as its initializer.
             result.Add(new BindStatementNode(GetTextSpan(declaration), name, typeName, isMutable: true,
-                initializer: null, new AttributeCollection()));
+                new ReferenceNode(GetTextSpan(declaration), "default"), new AttributeCollection()));
         }
         return result;
     }

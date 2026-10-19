@@ -533,7 +533,7 @@ public static class FeatureSupport
             // #943 (D1 RO-DECL-1): the bounded lowering.
             Description = "out var x / out T x in an expression statement, local declaration, return or if condition directly " +
                 "in a block lowers to a mutable binding before the statement when the type is expressible and the name collides " +
-                "with nothing in scope. Chained assignments, loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
+                "with nothing in scope (it starts at default). Chained assignments, a visible symbol named default, loop, using and lock headers, lambdas, queries, interpolation holes, filters, " +
                 "initializers and expression-bodied members are preserved as C#",
             Workaround = "Declare the variable before the statement and pass it with out"
         },

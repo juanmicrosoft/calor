@@ -353,7 +353,7 @@ public class RefOutImplementationTests
     public void OutVar_IsLoweredBeforeItsStatement()
     {
         var calor = new CSharpToCalorConverter().Convert(R0Fixture("F1-REFOUT-02")).CalorSource!;
-        Assert.Contains("§B{~n:i32}\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
+        Assert.Contains("§B{~n:i32} `default`\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
         Assert.Contains("§A{out} _ §/C", calor);
     }
 
@@ -436,11 +436,12 @@ public class RefOutImplementationTests
     ];
 
     // F1 PR 2 (W1 findings). A bare §B{~n:i32} took the next sibling statement as its initializer
-    // (a call statement, an §ARR declaration); the parser now reads a later line at the binding's
-    // indentation as a sibling, so every RO-DECL-1 placement converts natively with no synthesized
-    // initializer (Codex PR 2 round 1: a `default` initializer read a member named `default`). A
-    // chained assignment evaluates its right side twice when converted, so it is preserved (round 2).
-    // An expression-bodied ref return is preserved like a block-bodied one.
+    // (a call statement, an §ARR declaration), so a lowered binding starts at `default`, as the
+    // converter already writes `int x;`. That `default` would read a symbol named `default`, so
+    // such code is preserved (Codex PR 2 round 1). A chained assignment evaluates its right side
+    // once per target when converted, so it is preserved too (round 2). The parser is unchanged
+    // (round 3: a next-line initializer is valid Calor). An expression-bodied ref return is
+    // preserved like a block-bodied one.
     private static readonly (string Id, string Source, string Allowed)[] Pr2Witnesses =
     [
         ("P2-out-var-call-statement", "public static class Probe { public static string Run() { int.TryParse(\"5\", out var n); return n.ToString(); } }", "native"),
@@ -452,31 +453,28 @@ public class RefOutImplementationTests
         ("P2-out-var-local-declaration", "public static class Probe { public static string Run() { bool ok = int.TryParse(\"7\", out var n); return ok + \":\" + n; } }", "native"),
         ("P2-out-var-return", "public static class Probe { static int Get(string s) { return int.TryParse(s, out var n) ? n : -1; } public static string Run() => Get(\"8\") + \"|\" + Get(\"x\"); }", "native"),
         ("P2-out-var-if", "public static class Probe { public static string Run() { if (int.TryParse(\"9\", out var n)) { return n.ToString(); } return \"none\"; } }", "native"),
-        ("P2-out-var-member-named-default", "public static class Probe { public static int reads; public static int @default { get { reads++; return 0; } } public static string Run() { bool ok = int.TryParse(\"5\", out var n); return reads + \":\" + n + \":\" + ok; } }", "native"),
+        ("P2-out-var-member-named-default", "public static class Probe { public static int reads; public static int @default { get { reads++; return 0; } } public static string Run() { bool ok = int.TryParse(\"5\", out var n); return reads + \":\" + n + \":\" + ok; } }", "preserved"),
         ("P2-ref-return-expression", "public static class Probe { static ref int First(int[] a) => ref a[0]; public static string Run() { var a = new[] { 1, 2 }; First(a) = 5; return a[0].ToString(); } }", "preserved"),
         ("P2-ref-return-property", "public static class Probe { static int slot = 3; static ref int Slot => ref slot; public static string Run() { Slot = 4; return slot.ToString(); } }", "preserved"),
     ];
 
-    // A later line at the binding's indentation is a sibling statement; a same-line initializer is kept.
-    [Theory]
-    [InlineData("    §B{~n:i32}\n    §C{SetOut} §A{out} n §/C\n    §R n", "7")]
-    [InlineData("    §B{~n:i32} §C{Id} §A 4 §/C\n    §R n", "4")]
-    public void BareBinding_DoesNotTakeASiblingAsItsInitializer(string body, string expected)
+    // Codex PR 2 round 3: hand-written Calor keeps its meaning; a next-line expression is still the
+    // initializer of a bare binding, which is why the converter writes `default` instead.
+    [Fact]
+    public void HandWrittenNextLineInitializer_KeepsItsMeaning()
     {
-        var result = Program.Compile(Prelude + "  §F{f1:Run:pub} () -> i32\n    §E{}\n" + body, "bare.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
+        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n    §R n\n",
+            "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
-        var source = result.GeneratedCode + "\npublic static class Probe { public static string Run() => P.PModule.Run().ToString(); }";
-        Assert.Equal(expected, Run(source));
+        Assert.Equal("7", Run(result.GeneratedCode + "\npublic static class Probe { public static string Run() => P.PModule.Run().ToString(); }"));
     }
 
-    // The converter adds no initializer to a lowered declaration (the C# emitter writes `= default`
-    // for any initializer-less mutable binding, as it did before PR 2; see the F1 README residuals).
+    // The lowered binding carries an explicit `default`, so the next statement is never its initializer.
     [Fact]
-    public void OutDeclaration_IsLoweredWithoutAnInitializer()
+    public void OutDeclaration_IsLoweredWithAnExplicitDefault()
     {
-        var calor = new CSharpToCalorConverter().Convert("public static class Probe { static bool Set(out string value) { value = \"ok\"; return true; } public static string Run() { bool ok = Set(out string value); return value; } }").CalorSource!;
-        Assert.Contains("§B{~value:str}\n        §B{bool:ok} §C{Set} §A{out} value §/C", calor.Replace("\r\n", "\n"));
+        var calor = new CSharpToCalorConverter().Convert("public static class Probe { static bool Set(out string value) { value = \"ok\"; return true; } public static string Run() { Set(out string value); return value; } }").CalorSource!;
+        Assert.Contains("§B{~value:str} `default`\n        §C{Set} §A{out} value §/C", calor.Replace("\r\n", "\n"));
     }
 
     [Theory]
