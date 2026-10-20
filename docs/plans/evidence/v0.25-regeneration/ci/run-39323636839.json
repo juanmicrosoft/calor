@@ -1,0 +1,42 @@
+{
+ "id": 39323636839,
+ "runNumber": 152,
+ "workflow": ".github/workflows/reproducible-builds.yml",
+ "title": "Reproducible publication builds",
+ "event": "workflow_dispatch",
+ "headBranch": "v0.25-reproof/candidate-48cae911",
+ "headSha": "48cae911700ceb0dfc358e00933650445d81604f",
+ "status": "completed",
+ "conclusion": "success",
+ "createdAt": "2026-10-19T20:57:39Z",
+ "updatedAt": "2026-10-19T21:05:32Z",
+ "runAttempt": 1,
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/39323636839",
+ "runnerMinutes": 5,
+ "jobs": [
+  {
+   "id": 118303765141,
+   "name": "website",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T20:57:59Z",
+   "completedAt": "2026-10-19T20:59:15Z",
+   "runnerMinutes": 2,
+   "runner": "GitHub Actions 1000065973",
+   "labels": [
+    "ubuntu-latest"
+   ]
+  },
+  {
+   "id": 118303765859,
+   "name": "packages",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:03:28Z",
+   "completedAt": "2026-10-19T21:05:32Z",
+   "runnerMinutes": 3,
+   "runner": "GitHub Actions 1000065992",
+   "labels": [
+    "ubuntu-latest"
+   ]
+  }
+ ]
+}

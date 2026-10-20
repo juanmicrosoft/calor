@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+C25=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25
+USE_BREW_DOTNET=1 source $C25/tools/env.sh m
+cd $C25/m && test "$(git rev-parse HEAD)" = 48cae911700ceb0dfc358e00933650445d81604f && python3 $C25/tools/f6_aggregates.py $C25/out/measure/f6-aggregates

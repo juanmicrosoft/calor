@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Fresh clone of the candidate at <dest>. usage: fresh.sh <dest>
+set -euo pipefail
+mkdir -p "$(dirname "$1")"
+git clone -q https://github.com/juanmicrosoft/calor.git "$1"
+git -C "$1" checkout -q --detach 48cae911700ceb0dfc358e00933650445d81604f
+git -C "$1" rev-parse HEAD 'HEAD^{tree}'
+git -C "$1" status --porcelain --ignored | head -5

@@ -1,0 +1,208 @@
+[
+ {
+  "project": "Calor.Compiler.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 14606,
+  "expectedSkipped": 3,
+  "ci": {
+   "total": 14606,
+   "executed": 14603,
+   "passed": 14603,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-compiler/compiler-1.trx",
+   "test-39323630837/test-report-compiler/compiler-2.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Conversion.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 475,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 475,
+   "executed": 475,
+   "passed": 475,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-conversion/conversion.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Enforcement.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 695,
+  "expectedSkipped": 1,
+  "ci": {
+   "total": 695,
+   "executed": 694,
+   "passed": 694,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-enforcement/enforcement.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Evaluation",
+  "releaseCritical": true,
+  "expectedTotal": 235,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 235,
+   "executed": 235,
+   "passed": 235,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-evaluation/evaluation.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Experimental.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 25,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 25,
+   "executed": 25,
+   "passed": 25,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-experimental/experimental.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Ids.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 394,
+  "expectedSkipped": 0,
+  "ci": null,
+  "trx": null,
+  "matches": false
+ },
+ {
+  "project": "Calor.ILAnalysis.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 46,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 46,
+   "executed": 46,
+   "passed": 46,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-il-analysis/il-analysis.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.LanguageServer.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 532,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 532,
+   "executed": 532,
+   "passed": 532,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-language-server/language-server.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Performance.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 26,
+  "expectedSkipped": 0,
+  "ci": null,
+  "trx": null,
+  "matches": false
+ },
+ {
+  "project": "Calor.RoundTrip.Harness.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 295,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 295,
+   "executed": 295,
+   "passed": 295,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-roundtrip-harness/roundtrip-harness.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Semantics.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 55,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 55,
+   "executed": 55,
+   "passed": 55,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-semantics/semantics.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Tasks.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 134,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 134,
+   "executed": 134,
+   "passed": 134,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-tasks/tasks.trx"
+  ],
+  "matches": true
+ },
+ {
+  "project": "Calor.Verification.Tests",
+  "releaseCritical": true,
+  "expectedTotal": 473,
+  "expectedSkipped": 0,
+  "ci": {
+   "total": 473,
+   "executed": 473,
+   "passed": 473,
+   "failed": 0,
+   "notExecuted": 0
+  },
+  "trx": [
+   "test-39323630837/test-report-verification/verification.trx"
+  ],
+  "matches": true
+ }
+]

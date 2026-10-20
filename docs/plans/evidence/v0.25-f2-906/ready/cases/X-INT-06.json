@@ -1,0 +1,128 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "caseId": "X-INT-06",
+ "family": "F2",
+ "role": "interaction",
+ "expected": "native-or-preserved",
+ "scopeVersion": "1.4.0",
+ "requirementSha256": "d1a60d46e47ed9c2b333f6f298f17f25654519bed618b7a9e32cdebb7e807502",
+ "result": "passed",
+ "cells": {
+  "cli-default": "passed",
+  "mcp-default": "passed",
+  "hole-binding": "passed",
+  "hole-effects": "passed"
+ },
+ "cellEvidence": {
+  "cli-default": "native",
+  "mcp-default": "native",
+  "hole-binding": "the T1 control's hole binds to the native local function (trace matches); UndefinedHoleName_IsReportedAtTheHole and NativeLocal_ShadowsSameNamedMember_ForResolutionAndEffects pass",
+  "hole-effects": "CallHole_InAPureFunction_IsAnUndeclaredEffect / CallHole_WithTheDeclaredEffect_Compiles and NativeLocal_EffectsAreChargedToTheEnclosingCallable pass"
+ },
+ "judgement": "T1 control X-INT-06: library native, cli-convert native, cli-migrate native, mcp-convert native, mcp-convert-passthroughOnError native, mcp-migrate native, mcp-batch native",
+ "measurements": [
+  {
+   "kind": "t1-control",
+   "control": "X-INT-06",
+   "results": "docs/plans/evidence/v0.25-t1-1428/controls-results.json",
+   "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/measure/regen/controls-results.json",
+   "resultsSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "surfaces": {
+    "library": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "cli-convert": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "cli-migrate": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-convert": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-convert-passthroughOnError": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-migrate": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-batch": {
+     "outcome": "native",
+     "compile": "default",
+     "traceMatches": null
+    }
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f2-interpolation.trx.gz",
+     "match": "CallHole_InAPureFunction_IsAnUndeclaredEffect",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f2-interpolation.trx.gz",
+     "match": "CallHole_WithTheDeclaredEffect_Compiles",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f2-interpolation.trx.gz",
+     "match": "UndefinedHoleName_IsReportedAtTheHole",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f3-local-language.trx.gz",
+     "match": "NativeLocal_ShadowsSameNamedMember_ForResolutionAndEffects",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f3-local-language.trx.gz",
+     "match": "NativeLocal_EffectsAreChargedToTheEnclosingCallable",
+     "count": 2,
+     "passed": 2,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c25/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/measure/"
+ },
+ "independence": "reduced"
+}

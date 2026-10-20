@@ -1,0 +1,540 @@
+#!/usr/bin/env python3
+"""0.25 re-proof: write per-case result records, witness-run records and per-family READY records under each
+family's evidence ready/ directory, from the measurements taken on the candidate in fresh clones.
+
+usage: make_ready.py <worktree>      (reads scratch outputs; writes only under docs/plans/evidence/<family>/ready/)"""
+import hashlib, json, os, re, sys, glob, xml.etree.ElementTree as ET
+
+C25 = "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25"
+W = sys.argv[1]
+CAND = "48cae911700ceb0dfc358e00933650445d81604f"
+REGEN = "docs/plans/evidence/v0.25-regeneration"
+REL_TOOLS = REGEN + "/tools"
+SCHEMA_CASE = "calor.v0.25-ready-case-result/1"
+SCHEMA_WITNESS = "calor.v0.25-ready-witness-run/1"
+SCHEMA_READY = "calor.v0.25-ready-record/1"
+M = f"{C25}/out/measure"
+NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+LANE = {"clone": "fresh clone at the candidate (<scratch>/c25/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+        "platform": "macOS arm64", "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+        "record": f"{REGEN}/measure/"}
+
+scope = json.load(open(f"{W}/docs/plans/evidence/v0.25-r0-1426/scope.json"))
+register = json.load(open(f"{W}/docs/plans/evidence/v0.25-t1-1428/register.json"))
+controls = json.load(open(f"{W}/docs/plans/evidence/v0.25-t1-1428/controls-results.json"))
+f2rows = {r["case"]: r for r in json.load(open(f"{W}/docs/plans/evidence/v0.25-f2-906/rows.json"))["rows"]}
+f6rows = {r["id"]: r for r in json.load(open(f"{W}/docs/plans/evidence/v0.25-f6-1144/surface-matrix.json"))["cases"]}
+w1 = {f["family"]: f for f in json.load(open(f"{W}/docs/plans/evidence/v0.25-w1-1429/records.json"))["families"]}
+
+
+def sha_text(b: bytes) -> str:
+    return hashlib.sha256(b.decode("utf-8").replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
+def requirement_digest(c):
+    obs = json.dumps(c.get("observations") if c.get("observations") is not None else [], separators=(",", ":"), ensure_ascii=False)
+    # Sha256 = SHA-256 of the UTF-8 text after CRLF -> LF; cells/families joined with \n, empty when absent.
+    s = (c.get("fixture") or "") + "\n" + (c.get("note") or "") + "\n" + "\n".join(c.get("cells") or []) + "\n" + obs \
+        + "\n" + "\n".join(c.get("families") or []) + "\n" + (c.get("websiteExample") or "")
+    return sha_text(s.encode("utf-8"))
+
+
+# Every case digest must equal the T1 register's (which T003 pins to the scope); a mismatch stops the run.
+regdig = {c["id"]: c["requirementSha256"] for f in register["families"] for c in f["cases"]}
+for c in scope["cases"]:
+    if requirement_digest(c) != regdig[c["id"]]:
+        sys.exit(f"requirement digest mismatch for {c['id']}")
+
+# ---------------------------------------------------------------- measured inputs
+trx = {}
+for p in sorted(glob.glob(f"{M}/tests/*.trx")):
+    root = ET.parse(p).getroot()
+    lane = os.path.basename(p)[:-4]
+    for r in root.findall("t:Results/t:UnitTestResult", NS):
+        trx.setdefault(lane, {})[r.attrib["testName"]] = r.attrib["outcome"]
+summary = json.load(open(f"{M}/trx-summary.json"))
+
+
+def tests(lane, *patterns):
+    """Every test in a lane's TRX whose name contains one of the patterns; fails closed on none."""
+    out = []
+    for pat in patterns:
+        hits = [(n, o) for n, o in trx.get(lane, {}).items() if pat in n]
+        if not hits:
+            raise SystemExit(f"no test matching {pat!r} in {lane}")
+        out.append({"trx": f"{REGEN}/measure/tests/{lane}.trx.gz", "match": pat, "count": len(hits),
+                    "passed": sum(o == "Passed" for _, o in hits), "outcomes": sorted({o for _, o in hits})})
+    return out
+
+
+def tests_ok(ts):
+    return all(t["outcomes"] == ["Passed"] and t["passed"] == t["count"] for t in ts)
+
+
+def derive(s, original):
+    """InteropScopeValidator.Derive, ported, plus the lossy/drop and refusal reading."""
+    if not s:
+        return None
+    if (s.get("lossySubstitutionCount") or 0) > 0 or (s.get("dropCount") or 0) > 0:
+        return "lossy"
+    e = s.get("execution")
+    if isinstance(e, dict):
+        interop = any((s.get(k) or 0) > 0 for k in ("interopPreservationCount", "interopPreservations", "csharpInteropBlocks", "inlineInteropExpressions", "rawCSharpExpressions"))
+        if "matchesOriginal" in e:
+            match = e.get("compiled") is True and e.get("matchesOriginal") is True
+        else:
+            match = e.get("compiled") is True and (original or {}).get("compiled") is True and e.get("result") == (original or {}).get("result") \
+                and e.get("exception") == (original or {}).get("exception")
+        mode = e.get("compileMode") or s.get("generatedMode")
+        return ("preserved" if interop else "native") + ("-match" if match else "-mismatch") + ("@permissive-effects" if mode == "permissive-effects" else "")
+    if s.get("convertExit") not in (None, 0) or s.get("isError") is True or s.get("success") is False or s.get("migrateExit") not in (None, 0):
+        return "rejected"
+    k = s.get("compile")
+    if isinstance(k, dict) and k.get("exit") not in (0, None):
+        return "compile-error:" + ",".join(k.get("errorCodes") or [])
+    return "no-output"
+
+
+def category(outcome):
+    if outcome is None:
+        return None
+    if outcome.endswith("-mismatch") or "-mismatch@" in outcome or outcome == "lossy":
+        return "mismatch-or-lossy"
+    if outcome.startswith("native-match"):
+        return "native"
+    if outcome.startswith("preserved-match"):
+        return "preserved"
+    if outcome == "rejected":
+        return "rejected"
+    return "invalid-output"
+
+
+def load_driver(path):
+    d = json.load(open(path))
+    cs = d["cases"]
+    return {c.get("case") or c.get("id"): c for c in (cs if isinstance(cs, list) else [dict(v, case=k) for k, v in cs.items()])}
+
+
+R0 = load_driver(f"{M}/drivers/v0.25-r0-1426/baseline-results.json")
+FD = {"F1": load_driver(f"{M}/drivers/v0.25-f1-943/results.json"), "F3": load_driver(f"{M}/drivers/v0.25-f3-847/results.json"),
+      "F4": load_driver(f"{M}/drivers/v0.25-f4-1139/results.json"), "F5": load_driver(f"{M}/drivers/v0.25-f5-1132/results.json")}
+F4CTL = json.load(open(f"{M}/drivers/v0.25-f4-1139/results.json")).get("controls")
+DRIVER_PATH = {"R0": "docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py", "F1": "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py",
+               "F3": "docs/plans/evidence/v0.25-f3-847/reproduce/reproduce.py", "F4": "docs/plans/evidence/v0.25-f4-1139/reproduce/reproduce.py",
+               "F5": "docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce_pr2.py"}
+DRIVER_OUT = {"R0": f"{REGEN}/measure/drivers/v0.25-r0-1426/baseline-results.json", "F1": f"{REGEN}/measure/drivers/v0.25-f1-943/results.json",
+              "F3": f"{REGEN}/measure/drivers/v0.25-f3-847/results.json", "F4": f"{REGEN}/measure/drivers/v0.25-f4-1139/results.json",
+              "F5": f"{REGEN}/measure/drivers/v0.25-f5-1132/results.json"}
+cmp = json.load(open(f"{M}/driver-comparison.json"))
+
+
+def driver_measure(src, case_id, surfaces=None):
+    c = (R0 if src == "R0" else FD[src])[case_id]
+    surf = {}
+    for name, s in c["surfaces"].items():
+        if surfaces and name not in surfaces:
+            continue
+        o = s.get("outcome") if src == "F1" else None
+        d = derive(s, c.get("original"))
+        surf[name] = {"outcome": d, "category": category(d), "driverOutcome": o}
+    m = {"kind": "driver", "driver": DRIVER_PATH[src], "output": DRIVER_OUT[src], "case": case_id, "surfaces": surf}
+    if src != "R0":
+        diffs = [x for x in cmp[src]["behaviorDiffs"] if x.get("case") == case_id]
+        same_refusal = lambda x: x.get("surface") == "cli-no-fallback" and all(x["committed"].get(k) == x["candidate"].get(k) for k in ("convertExit", "success", "errorCodes"))
+        reporting = [x for x in diffs if same_refusal(x)]
+        diffs = [x for x in diffs if not same_refusal(x)]
+        m["vsApprovedEvidence"] = "same behavior on every surface as the family's approved evidence" if not diffs else diffs
+        if reporting:
+            m["reportingOnlyDifferences"] = {"surfaces": [x["surface"] for x in reporting], "note": "the --no-fallback refusal is unchanged (exit, success, error codes); on the candidate its JSON envelope also carries the counts and loss features (F6's reporting, which landed after the F4 branch measured)", "detail": reporting}
+    return m
+
+
+T1_MAP = {"cli-default": "cli-convert", "mcp-default": "mcp-convert", "mcp-passthroughOnError": "mcp-convert-passthroughOnError"}
+
+
+def t1_measure(control):
+    cells = controls["controls"][control]["surfaces"]
+    return {"kind": "t1-control", "control": control, "results": "docs/plans/evidence/v0.25-t1-1428/controls-results.json",
+            "regeneratedOnCandidate": f"{REGEN}/measure/regen/controls-results.json",
+            "resultsSha256": sha_text(open(f"{M}/regen/controls-results.json", "rb").read()),
+            "approvedSha256": register["results"]["sha256"],
+            "surfaces": {k: {"outcome": v["outcome"], "compile": v.get("compile"), "traceMatches": v.get("traceMatches", v.get("matches"))} for k, v in cells.items()}}
+
+
+def allowed(expected):
+    return set(expected.split("-or-"))
+
+
+# ---------------------------------------------------------------- case plans
+W1T = tests("w1-transcripts", "W1GuideTranscriptTests")
+W0T = tests("w0-website-examples", "WebsiteExampleCheckerTests")
+SELF = {"kind": "self-check-docs", "command": "calor self-check docs --root . --format json", "log": f"{REGEN}/measure/w1-self-check-docs.log",
+        "diagnostics": json.load(open(f"{M}/w1-self-check-docs.log"))["summary"]}
+WORD = {"kind": "w1-wording-scan", "command": "python3 docs/plans/evidence/v0.25-w1-1429/reproduce/wording_scan.py", "log": f"{REGEN}/measure/w1-wording-scan.log",
+        "result": open(f"{M}/w1-wording-scan.log").read().strip().splitlines()[-1]}
+selfcheck_ok = SELF["diagnostics"].get("errors") == 0 and SELF["diagnostics"].get("total") == 0 and WORD["result"].endswith("0 finding(s)")
+
+
+W1_REGEN_OK = open(f"{M}/regen-w1-diff.log").read().strip() == "" and "STEP regen-w1-diff exit 0" in open(f"{M}/steps.txt").read()
+NOT_EXPOSED = "the scope note measures both options 'on every surface that exposes them'; this surface does not expose "
+F6_CELLS = {
+ "F6-REPORT-04": {
+  "defaults": {"why": "cli migrate reports rescueUnusableMembers=false and passthroughOnError=false per file (it has no flag for either; T1 register surfaces)", "transcripts": ["W1-F6-project/cli-migrate", "W1-F6-rescue/cli-migrate"]},
+  "rescue-passthrough-precedence": {"why": NOT_EXPOSED + "--passthrough or rescue options; the one path it has, parse-failure rescue enabled by lossless fidelity, is reported with its trigger, and a round-trip failure is refused, not rescued (D3)", "tests": ["F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused", "F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure"]},
+  "member-file-project-aggregation": {"why": "the console prints the project's 'Preservation paths' line, the Markdown report lists each file's losses with path/trigger/enabledBy, and the JSON report carries fileResults[].conversionPaths", "tests": ["F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure", "F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused", "F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths"]},
+  "partial-failure": {"why": "one round-trip failure fails the lossless project: 'Failed: 2', every file refused, rescue still reported", "tests": ["F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure", "F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused"]},
+  "exit-code": {"why": "exit 1 on the partial failure, 0 on the preserved project", "tests": ["F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure", "F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths"]},
+  "schema-version": {"why": "every cli migrate file's conversionPaths carries schemaVersion 1", "transcripts": ["W1-F6-project/cli-migrate", "W1-F6-rescue/cli-migrate"]}},
+ "F6-REPORT-05": {
+  "defaults": {"why": "calor_migrate reports rescueUnusableMembers=false and passthroughOnError=false (MigrateTool fixes PassthroughOnError=false)", "transcripts": ["W1-F6-project/mcp-migrate"]},
+  "rescue-passthrough-precedence": {"why": NOT_EXPOSED + "passthroughOnError (fixed false) or rescue; parse-failure rescue is reported as path=rescue, trigger=parse-failure, enabledBy=lossless-fidelity, and the round-trip failure is refused", "tests": ["F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"]},
+  "aggregation": {"why": "perFile[] carries each file's conversionPaths and losses, and the project totals (totalFiles, successCount, failureCount) agree with them on the candidate: totalFiles equals the perFile count, failureCount equals the files whose conversionPaths say refused, and a preserved-with-rescue file ('partial') counts as neither success nor failure", "measure": True, "tests": ["F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"], "transcripts": ["W1-F6-project/mcp-migrate"]},
+  "partial-failure": {"why": "the round-trip-failure file is refused while the rescued file keeps its path", "tests": ["F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"], "transcripts": ["W1-F6-project/mcp-migrate"]},
+  "protocol-error": {"why": "the partial failure is reported as an MCP tool error (isError true) with the per-file payload, and the clean project as isError false", "measure": True, "transcripts": ["W1-F6-project/mcp-migrate"]},
+  "schema-version": {"why": "perFile[].conversionPaths carries schemaVersion 1", "transcripts": ["W1-F6-project/mcp-migrate"]}},
+ "F6-REPORT-06": {
+  "defaults": {"why": "calor_batch reports rescueUnusableMembers=false and passthroughOnError=false by default", "transcripts": ["W1-F6-project/mcp-batch"]},
+  "rescue-passthrough-precedence": {"why": "with and without passthroughOnError: the parse-failure rescue is reported with the passthroughOnError flag, and passthroughOnError does not rescue the round-trip failure (D3)", "tests": ["F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough"]},
+  "per-file-and-aggregate": {"why": "files[].conversionPaths per file, summary mode's preservationPaths line and failedFiles[].conversionPaths, and summary totals (totalFiles, successfulFiles, partialFiles, failedFiles, skippedFiles, timedOutFiles) that agree with the per-file entries on the candidate", "measure": True, "tests": ["F6_REPORT_06_McpBatch_SuccessfulProject_ReportsRescueAndNative", "F6_REPORT_06_McpBatchSummaryMode_ReportsPaths"]},
+  "partial-failure": {"why": "one failed file: isError, every file refused with its counts kept", "tests": ["F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough"]},
+  "protocol-error": {"why": "skipOnError=false aborts with isError, an error string, preservationPaths and files[].conversionPaths", "tests": ["F6_REPORT_06_McpBatchAbort_KeepsPreservationPaths"]},
+  "schema-version": {"why": "files[].conversionPaths carries schemaVersion 1", "transcripts": ["W1-F6-project/mcp-batch"]}},
+ "F6-REPORT-07": {
+  "library-defaults": {"why": "default ConversionOptions refuse the round-trip failure with RescueUnusableMembers=false and PassthroughOnError=false", "tests": ["F6_REPORT_07_LibraryDefault_RefusesRoundTripFailure_AndSaysRescueWasOff"]},
+  "library-precedence": {"why": "rescue-only, passthrough-only and both are distinguished; both reports rescue under lossless", "tests": ["F6_REPORT_12_Library_RescueOnly_PassthroughOnly_Both_AreDistinguished", "F6_REPORT_12_Precedence_SelectedBranchLossy_BothOptions_IsPassthrough"]},
+  "library-provenance": {"why": "losses carry path/trigger/enabledBy; a missing-file result still reports the configured options", "tests": ["F6_REPORT_07_LibraryMissingFile_ReportsTheConfiguredOptions", "Library_TrailingLabel_DiscriminatesRefusedPassthroughAndRescue"]},
+  "library-schema-version": {"why": "ConversionPaths.SchemaVersion (CurrentSchemaVersion 1) is the value every JSON surface serializes; the serialized value is 1 on every transcript surface", "transcripts": ["W1-F6-rescue/cli-convert-json", "W1-F6-project/mcp-batch"]},
+  "sdk-defaults": {"why": "src/Calor.Sdk has no conversion entry point (F6 decision D4; the maintainer-approved T1 register lists SDK as not measured with the library row standing for it): measured on the library", "tests": ["F6_REPORT_07_LibraryDefault_RefusesRoundTripFailure_AndSaysRescueWasOff"]},
+  "sdk-precedence": {"why": "as sdk-defaults (D4): library precedence", "tests": ["F6_REPORT_12_Library_RescueOnly_PassthroughOnly_Both_AreDistinguished"]},
+  "sdk-provenance": {"why": "as sdk-defaults (D4): library provenance", "tests": ["F6_REPORT_07_LibraryMissingFile_ReportsTheConfiguredOptions"]},
+  "sdk-schema-version": {"why": "as sdk-defaults (D4): library schema version", "transcripts": ["W1-F6-rescue/cli-convert-json"]}},
+ "F6-REPORT-10": {
+  "cli-exit-per-mode": {"why": "refused exits 1 with the refusal line; preserved and native exit 0; a write failure keeps losses and reports refused", "tests": ["F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused", "F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused", "F6_REPORT_01_CliNoFlags_NamesAutomaticRescue_NotPassthrough"]},
+  "mcp-error-per-mode": {"why": "default refusal isError=true with outcome refused; passthroughOnError preserves with isError=false", "tests": ["F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues"]},
+  "lossy": {"why": "--lossy (with or without --passthrough) skips the round trip, so no rescue, passthrough or trigger is reported", "tests": ["F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires"]},
+  "rejected": {"why": "the CLI and MCP refusals report outcome refused", "tests": ["F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused", "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues"]}},
+ "F6-REPORT-12": {
+  "cli-both-enabled": {"why": "calor convert --passthrough (rescue is on by default): rescue reported, conversionPaths.passthroughOnError true", "tests": ["F6_REPORT_02_CliJson_RecordsTheTrigger_ForNoFlagAndPassthroughRuns"]},
+  "cli-rescue-only": {"why": "the no-flag run reports automatic rescue, not passthrough", "tests": ["F6_REPORT_01_CliNoFlags_NamesAutomaticRescue_NotPassthrough", "F6_REPORT_02_CliJson_RecordsTheTrigger_ForNoFlagAndPassthroughRuns", "F6_REPORT_12_CliWebsiteExample_MatchesTheDocumentedOutput"]},
+  "mcp-both-enabled": {"why": NOT_EXPOSED + "rescueUnusableMembers (D1); with everything it exposes enabled (passthroughOnError) it reports path=passthrough, trigger=round-trip-failure", "tests": ["F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues", "F6_REPORT_11_McpPassthroughWithCustomModuleName_Rescues"]},
+  "mcp-disabled": {"why": "default calor_convert refuses and says rescue and passthrough were off", "tests": ["F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues"]},
+  "cli-migrate-both-enabled": {"why": NOT_EXPOSED + "either option; it reports both off and rescues parse failures only (D3)", "tests": ["F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure"], "transcripts": ["W1-F6-project/cli-migrate"]},
+  "cli-migrate-disabled-or-unavailable": {"why": "cli migrate reports rescueUnusableMembers=false and passthroughOnError=false and rescues parse failures through lossless fidelity", "tests": ["F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths"], "transcripts": ["W1-F6-project/cli-migrate"]},
+  "mcp-migrate-both-enabled": {"why": NOT_EXPOSED + "either option (MigrateTool fixes PassthroughOnError=false); it reports both off (D3)", "tests": ["F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"], "transcripts": ["W1-F6-project/mcp-migrate"]},
+  "mcp-migrate-disabled": {"why": "calor_migrate reports both options off; parse-failure rescue via lossless fidelity", "tests": ["F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"], "transcripts": ["W1-F6-project/mcp-migrate"]},
+  "batch-both-enabled": {"why": "calor_batch with passthroughOnError=true (rescue via lossless fidelity): parse-failure rescue reported with passthroughOnError true; the round-trip failure is still refused (D3)", "tests": ["F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough"]},
+  "batch-disabled": {"why": "calor_batch default: parse-failure rescue reported with passthroughOnError false", "tests": ["F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough", "F6_REPORT_06_McpBatch_SuccessfulProject_ReportsRescueAndNative"]},
+  "library-both-enabled": {"why": "RescueUnusableMembers and PassthroughOnError both true: rescue wins under lossless; passthrough under lossy", "tests": ["F6_REPORT_12_Library_RescueOnly_PassthroughOnly_Both_AreDistinguished", "F6_REPORT_12_Precedence_SelectedBranchLossy_BothOptions_IsPassthrough"]},
+  "library-disabled": {"why": "default options refuse the round-trip failure; parse failures are rescued under lossless whatever the flags", "tests": ["Library_TrailingLabel_DiscriminatesRefusedPassthroughAndRescue", "F6_REPORT_12_Library_ParseFailureRescue_IsAutomaticUnderLosslessWhateverTheFlags"]},
+  "sdk-both-enabled": {"why": "no SDK conversion entry point (D4; T1 register): measured on the library", "tests": ["F6_REPORT_12_Library_RescueOnly_PassthroughOnly_Both_AreDistinguished"]},
+  "sdk-disabled": {"why": "no SDK conversion entry point (D4; T1 register): measured on the library", "tests": ["Library_TrailingLabel_DiscriminatesRefusedPassthroughAndRescue"]}},
+ "F6-REPORT-13": {
+  "cli-json-provenance": {"why": "losses[].path/trigger/enabledBy and data.conversionPaths (schemaVersion 1)", "tests": ["F6_REPORT_02_CliJson_RecordsTheTrigger_ForNoFlagAndPassthroughRuns"]},
+  "mcp-dto-provenance": {"why": "lossSummary.paths and per-location path, trigger only when applicable; validate and roundtrip modes carry paths", "tests": ["F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger", "F6_REPORT_13_McpValidateAndRoundtripModes_CarryPaths", "F6_REPORT_13_McpWebsiteExample_MatchesTheDocumentedPayload"]},
+  "cli-migrate-provenance": {"why": "JSON report fileResults[].losses[].path/trigger", "tests": ["F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths"]},
+  "mcp-migrate-dto-provenance": {"why": "perFile[].losses[] path/trigger/enabledBy", "tests": ["F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"]},
+  "batch-dto-provenance": {"why": "files[].conversionPaths with triggers", "tests": ["F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough"]},
+  "library-sdk-provenance": {"why": "library ConversionResult.Paths and losses; SDK as the library (D4)", "tests": ["F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts", "F6_REPORT_13_StaleGateRead_DoesNotLabelALaterLoss", "F6_REPORT_07_LibraryMissingFile_ReportsTheConfiguredOptions"]},
+  "wire-compatibility": {"why": "the fields are additive: the committed W1 transcripts (which carry the pre-existing envelope fields and counts) regenerate byte-identically, and the trigger/enabledBy fields are omitted when null", "tests": ["F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger"], "transcripts": ["W1-F6-rescue", "W1-F6-project"]}},
+}
+
+
+def plan(c):
+    """Returns (measurements, cells{cell: (ok, why)}, overall_ok, judgement)."""
+    cid, fam, exp = c["id"], c["family"], c["expected"]
+    allow = allowed(exp)
+    ms, cells, notes = [], {}, []
+
+    def surfaces_ok(m, names=None):
+        # --no-fallback is the documented strict mode that refuses by design (NoFallback_* tests); it is context, not a case surface.
+        res = {n: v for n, v in m["surfaces"].items() if (names is None or n in names) and n != "cli-no-fallback"}
+        return bool(res) and all((v["category"] in allow) for v in res.values()), res
+
+    # Fixture rows measured by a family driver (conversion outcome, execution oracle) on every surface.
+    if fam in ("F1", "F3", "F4", "F5") and cid in FD[fam] and cid not in ("X-INT-01", "X-INT-02", "X-INT-03"):
+        m = driver_measure(fam, cid); ms.append(m)
+        ok, res = surfaces_ok(m)
+        notes.append(f"{fam} driver: " + ", ".join(f"{k} {v['outcome']}" for k, v in res.items()))
+        for cell in c.get("cells") or []:
+            if cell in m["surfaces"]:
+                cells[cell] = (m["surfaces"][cell]["category"] in allow, m["surfaces"][cell]["outcome"])
+        base_ok = ok and m["vsApprovedEvidence"].startswith("same")
+    else:
+        base_ok = None
+    tl = []
+    if fam == "F1":
+        tl += tests("f1-refout-impl", "RefOutImplementationTests")
+    if fam == "F3":
+        tl += tests("f3-local-conversion", "LocalFunctionConversionTests") + tests("f3-local-language", "LocalFunctionLanguageTests")
+    if fam == "F4":
+        tl += tests("f4-iterator-accessor", "IteratorAccessorConversionTests")
+    if fam == "F5":
+        tl += tests("f5-array-expression", "ArrayExpressionConversionTests")
+    special = None
+    if cid in ("F1-REFOUT-A1", "F1-REFOUT-A2"):
+        tl += tests("f1-refout-impl", "ByReferenceWrite_NeverDischargesAStaleFact" if cid.endswith("A1") else "ReceiverFieldWrite_ChargesLikeAssign")
+        tl += tests("d1-refout-contract", "RefOutContractTests")
+        if cid.endswith("A1"):
+            tl += tests("w-R-OBL", "S2ObligationStateTests")
+        special = ("analysis row: no proof is discharged through a ref/out write (D1-ANA contract cases, R-OBL witnesses)" if cid.endswith("A1")
+                   else "effects row: by-reference mutation is charged (D1-EFF contract cases, Calor0410)")
+    if fam == "F2" and cid.startswith("F2-INTERP-") and cid != "F2-INTERP-09":
+        names = [t.strip() for t in (f2rows[cid].get("test") or "").split(";") if t.strip()]
+        for n in names:
+            if "(" in n:
+                tl += tests("f2-interpolation", n.split("(")[0] + '(row: "' + cid + '"')
+            else:
+                tl += tests("f2-interpolation", n)
+        if c.get("fixture") and cid in R0:
+            m = driver_measure("R0", cid); ms.append(m)
+            ok, res = surfaces_ok(m)
+            notes.append("R0 driver: " + ", ".join(f"{k} {v['outcome']}" for k, v in res.items()))
+            if exp in ("rejected",):
+                ok = True  # native-Calor diagnostic rows: judged by the tests, the driver output is context
+            base_ok = ok
+        if cid == "F2-INTERP-08":
+            ms.append(t1_measure("T1-INTERP-OVERLOADS")); ms.append(t1_measure("T1-INTERP-HANDLER"))
+            tl += tests("f2-interpolation", "HoleAndTargetShapes_KeepTheirCSharpMeaning", "BclHandlerTargets_ArePreservedAndMatch")
+            for cell in c["cells"]:
+                cells[cell] = (True, "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)")
+    if cid == "F2-INTERP-09":
+        base = json.load(open(f"{C25}/m/bench/phase0-agent-native/binder-incomplete-baseline.json"))
+        tl += tests("corpus-binder-ratchet", "BinderIncompleteRatchetTests")
+        ms.append({"kind": "corpus-counts", "instrument": "tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs with corpus submodules at the candidate's gitlinks",
+                   "regeneration": "CALOR_UPDATE_BINDER_BASELINE=1 rewrote bench/phase0-agent-native/ byte-identically (git diff empty)",
+                   "log": f"{REGEN}/measure/regen-binder-diff.log",
+                   "candidate": {"incompleteDiagnostics": base["IncompleteCount"], "conversionIncomplete": base["Conversion"]["Incomplete"],
+                                 "inRepoExpressionsBound": base["ExpressionsBound"], "conversionVisits": base["Conversion"]["RoslynSelectedAttempted"],
+                                 "opaqueBoundaries": base["PreserveCoverage"]["OpaqueBoundaries"], "opaqueExpressions": base["PreserveCoverage"]["OpaqueExpressions"]},
+                   "registerCounts": register["corpusCounts"]["counts"],
+                   "note": "The register's counts were measured on F2's branch base. The candidate also carries F1, F3, F4 and F5, which change the absolute counts; the ratchet's own ledger records F2's delta re-measured on main after #1132 (bound 4827 -> 4828, visits +1, boundaries +8, opaque +50). Incomplete diagnostics are 0 before and after. See regeneration.md, 'For the maintainer'."})
+        notes.append(f"incomplete diagnostics {base['IncompleteCount']} (conversion {base['Conversion']['Incomplete']}); bound {base['ExpressionsBound']}; ratchet regenerates byte-identically")
+        reg = register["corpusCounts"]["counts"]
+        cand = ms[-1]["candidate"]
+        preserved = {"inRepoExpressionsBound": cand["inRepoExpressionsBound"] == reg["inRepoExpressionsBound"]["after"],
+                     "conversionVisits": cand["conversionVisits"] == reg["conversionVisits"]["after"],
+                     "opaqueBoundaries": cand["opaqueBoundaries"] == reg["opaqueBoundaries"]["after"],
+                     "opaqueExpressions": cand["opaqueExpressions"] == reg["opaqueExpressions"]["after"],
+                     "incompleteDiagnostics": cand["incompleteDiagnostics"] == reg["incompleteDiagnostics"]["after"]}
+        ms[-1]["registerAfterPreserved"] = preserved
+        notes.append("the T1 register requires the registered before/after counts to be preserved or changed only by an approved, case-linked amendment (readyNeeds); on the candidate "
+                     + ", ".join(k for k, v in preserved.items() if not v) + " differ from the registered 'after' values and no amendment records the change, so the case is not passed")
+        base_ok = all(preserved.values())
+    if cid == "F3-LOCAL-A1":
+        tl += tests("f3-local-language", "NativeLocal_Verification_ClaimsNoProofFromTheLocalBody", "NativeLocal_EffectsAreChargedToTheEnclosingCallable",
+                    "NativeLocal_OutsideTheShape_IsCalor0211", "NativeLocal_ShadowsSameNamedMember_ForResolutionAndEffects")
+        special = "analysis row: binding, effects and verification visit native local-function bodies or refuse (Calor0211); verification claims no proof from a local body"
+    if cid == "F4-ITER-03":
+        tl += tests("f4-iterator-accessor", "NativeYieldInAnAccessor_IsStillCalor0209")
+        m = driver_measure("R0", cid) if cid in R0 else None
+        ctl = json.dumps(F4CTL)[:2000] if F4CTL else None
+        ms.append({"kind": "driver-control", "driver": DRIVER_PATH["F4"], "output": DRIVER_OUT["F4"], "controls": F4CTL})
+        ok = "Calor0209" in (ctl or "")
+        notes.append("F4 driver control: native §YIELD in an accessor compiles to Calor0209" if ok else "F4 driver control missing Calor0209")
+        base_ok = ok
+    if cid == "F4-ITER-04":
+        f = json.load(open(f"{M}/f4-iter-04/f4-iter-04.json"))
+        mig = {}
+        for p, n in (("FluentValidation.Tests", "EmptyTester"), ("FluentValidation.Tests", "NotEmptyTester"), ("FluentValidation", "ITestValidationContinuation")):
+            r = json.load(open(f"{M}/f4-iter-04/migrate-{p}.json"))
+            fr = next(x for x in r["data"]["fileResults"] if x["sourcePath"].endswith("/" + n + ".cs"))
+            mig[n] = {"project": f"bench/corpus/FluentValidation/src/{p}", "fileStatus": "failed (not written)", "conversionPaths": fr["conversionPaths"],
+                      "ownErrors": [i["message"] for i in fr["issues"] if i["severity"] == 2],
+                      "losses": [{"feature": l["feature"], "path": l["path"], "isSemanticLoss": l["isSemanticLoss"]} for l in fr["losses"]],
+                      "projectSummary": f"{r['data']['summary']}" if isinstance(r["data"].get("summary"), (str, int)) else r["data"].get("summary")}
+        ms.append({"kind": "f4-iter-04", "producer": f"{REGEN}/tools/f4_iter_04.py.txt", "singleFile": {k: {s: v["outcome"] for s, v in m["surfaces"].items()} for k, m in f["modules"].items()},
+                   "singleFileReason": "calor convert and MCP calor_convert refuse each module: the round-trip C# check cannot resolve the modules' references (CS0246: Xunit, FactAttribute, TestValidator, Person ...), so no output is written (Calor1343 roundtrip-csharp-validation)",
+                   "projectMigrate": mig, "projectMigrateCommand": "calor migrate <copy of bench/corpus/FluentValidation/src/{FluentValidation.Tests,FluentValidation}> --skip-verify --skip-analyze",
+                   "projectMigrateReason": "with project references the three modules' own conversion keeps the iterator accessor as §CSHARP member interop (path interop, no semantic loss, no rescue); lossless project migration then writes nothing because 66 of 66 FluentValidation.Tests files and 139 of 139 FluentValidation files are refused (unrelated round-trip failures), so each module's reported outcome is 'refused'",
+                   "corpusLedgers": tests("corpus-calor0425-ledger", "Calor0425CorpusLedgerTests") + tests("corpus-binder-ratchet", "BinderIncompleteRatchetTests")})
+        notes.append("no surface writes preserved output for the three modules: single-file CLI/MCP refuse (unresolved references), project migrate preserves the accessor per file but refuses the project")
+        return ms, {}, False, "failed", "F4-ITER-04 measured on the candidate: the pinned CLI writes no preserved output for the three modules on any surface (single-file convert and MCP refuse on unresolved references; project migrate keeps the accessor as §CSHARP interop in each module but refuses the whole project for unrelated files). The case expects 'preserved'; this is recorded as failed, not passed. The conversion-level preservation is shown; an approved amendment or a maintainer decision is needed."
+    if cid == "F5-ARRAY-06":
+        tl += tests("f5-array-expression", "UnsupportedShapes_ArePreservedWithAReport_AndRunLikeTheOriginal", "BlockElements_ArePreservedWithAReport_AndRunLikeTheOriginal",
+                    "SizedRows_KeepTheirShape_AndAMismatchIsAnError", "DynamicArraySize_IsPreservedWithinItsOperand")
+        special = "decision row: the declared boundary (docs/plans/evidence/v0.25-f5-1132/README.md, 'F5-ARRAY-06: declared boundary (PR 2)') holds on the candidate: supported shapes convert natively and run like the original; shapes outside it are preserved with a report and run like the original, never lossy"
+    if fam == "F6" and cid.startswith("F6-REPORT-"):
+        names = f6rows[cid]["tests"]
+        tl += tests("f6-conversion-paths", *names)
+        for cell in c.get("cells") or []:
+            src = F6_CELLS[cid][cell]
+            ts = tests("f6-conversion-paths", *src.get("tests", [])) if src.get("tests") else []
+            tl += ts
+            ok = tests_ok(ts) and (not src.get("transcripts") or W1_REGEN_OK)
+            if src.get("measure"):
+                agg = json.load(open(f"{M}/f6-aggregates/f6-aggregates.json"))
+                ok = ok and agg["allConsistent"]
+                if not any(x.get("kind") == "f6-aggregates" for x in ms):
+                    ms.append({"kind": "f6-aggregates", "producer": f"{REL_TOOLS}/f6_aggregates.py.txt", "output": f"{REGEN}/measure/f6-aggregates/f6-aggregates.json",
+                               "allConsistent": agg["allConsistent"], "rows": [{k: r[k] for k in r if k not in ("perFile", "files")} for r in agg["rows"]]})
+            cells[cell] = (ok, src["why"] + (f"; candidate measurement: {REGEN}/measure/f6-aggregates/f6-aggregates.json" if src.get("measure") else "") + (f"; tests: {', '.join(src['tests'])}" if src.get("tests") else "")
+                           + (f"; W1 transcripts (regenerated byte-identically on the candidate): {', '.join(src['transcripts'])}" if src.get("transcripts") else ""))
+        if cid in R0 and R0[cid].get("surfaces"):
+            ms.append(driver_measure("R0", cid))
+        special = f"reporting row ({f6rows[cid]['surface']}): {f6rows[cid]['after']}"
+    # Interaction rows.
+    XW = {"X-INT-01": ("F1", "F1-REFOUT-08"), "X-INT-02": ("F5", "F5-ARRAY-01"), "X-INT-03": ("F4", "F4-ITER-01"), "X-INT-04": ("R0", "F2-INTERP-03")}
+    if cid in XW:
+        src, wit = XW[cid]
+        m = driver_measure(src, wit, set(c["cells"])); ms.append(m); ms.append(t1_measure(cid))
+        for cell in c["cells"]:
+            v = m["surfaces"].get(cell)
+            cells[cell] = (bool(v) and v["category"] in allow, (v or {}).get("outcome"))
+        t1ok = all(v["outcome"] in allow for v in ms[-1]["surfaces"].values())
+        notes.append(f"witness {wit} via {src} driver: " + ", ".join(f"{k} {v[1]}" for k, v in cells.items()) + f"; T1 control {cid} on 7 surfaces: {'all allowed' if t1ok else 'NOT allowed'}")
+        if cid == "X-INT-02":
+            rescue = [k for k, v in R0.get(wit, {}).get("surfaces", {}).items() if "post-validation-fallback" in (v.get("lossFeatures") or [])]
+            notes.append(f"no post-validation-fallback on any measured surface: {not rescue}")
+            t1ok = t1ok and not rescue
+        base_ok = all(v[0] for v in cells.values()) and t1ok
+    if cid in ("X-INT-05", "X-INT-08"):
+        m = driver_measure("F1", cid, set(c["cells"])); ms.append(m); ms.append(t1_measure(cid))
+        for cell in c["cells"]:
+            if cell in m["surfaces"]:
+                v = m["surfaces"][cell]; cells[cell] = (v["category"] in allow, v["outcome"])
+        if cid == "X-INT-05":
+            tl += tests("f1-refout-impl", "LocalFunction_ByReferenceArguments_FollowTheContract", "ByReferenceWrite_NeverDischargesAStaleFact") + tests("w-R-OBL", "S2ObligationStateTests")
+            cells["analysis-fact-kill"] = (True, "LocalFunction_ByReferenceArguments_FollowTheContract, ByReferenceWrite_NeverDischargesAStaleFact and the R-OBL witnesses (S2ObligationStateTests) pass on the candidate")
+        base_ok = all(v[0] for v in cells.values())
+        notes.append("F1 driver: " + ", ".join(f"{k} {v[1]}" for k, v in cells.items()))
+    if cid in ("X-INT-06", "X-INT-07"):
+        m = t1_measure(cid); ms.append(m)
+        for cell in ("cli-default", "mcp-default"):
+            v = m["surfaces"][T1_MAP[cell]]; cells[cell] = (v["outcome"] in allow, v["outcome"])
+        if cid == "X-INT-06":
+            tl += tests("f2-interpolation", "CallHole_InAPureFunction_IsAnUndeclaredEffect", "CallHole_WithTheDeclaredEffect_Compiles", "UndefinedHoleName_IsReportedAtTheHole") \
+                + tests("f3-local-language", "NativeLocal_ShadowsSameNamedMember_ForResolutionAndEffects")
+            cells["hole-binding"] = (True, "the T1 control's hole binds to the native local function (trace matches); UndefinedHoleName_IsReportedAtTheHole and NativeLocal_ShadowsSameNamedMember_ForResolutionAndEffects pass")
+            cells["hole-effects"] = (True, "CallHole_InAPureFunction_IsAnUndeclaredEffect / CallHole_WithTheDeclaredEffect_Compiles and NativeLocal_EffectsAreChargedToTheEnclosingCallable pass")
+            tl += tests("f3-local-language", "NativeLocal_EffectsAreChargedToTheEnclosingCallable")
+        else:
+            tl += tests("f5-array-expression", "GeneratedNames_NeverReuseAUserName")
+            cells["name-collision"] = (all(v["outcome"] == "native" for v in m["surfaces"].values()), "the T1 control's fixture declares a _hoist000 user local and compares traces on 7 surfaces; GeneratedNames_NeverReuseAUserName passes")
+            cells["evaluation-order"] = (all(v["outcome"] == "native" for v in m["surfaces"].values()), "the T1 control's trace includes element side-effect logs, equal to the original on every surface")
+        base_ok = all(v[0] for v in cells.values()) and all(v["outcome"] in allow for v in m["surfaces"].values())
+        notes.append(f"T1 control {cid}: " + ", ".join(f"{k} {v['outcome']}" for k, v in m["surfaces"].items()))
+    if cid.startswith("DOC-"):
+        rec = w1[fam]
+        ms.append(SELF); ms.append(WORD)
+        ms.append({"kind": "w1-pages", "page": c["websiteExample"], "w1Record": "docs/plans/evidence/v0.25-w1-1429/records.json", "pages": rec["pages"], "examples": rec["examples"], "transcripts": rec["transcripts"],
+                   "regeneration": "CALOR_REGENERATE_W1_TRANSCRIPTS=1 reproduced every transcript byte-identically on the candidate (git diff empty)"})
+        tl += W1T + W0T
+        if cid == "DOC-F6-01":
+            tl += tests("f6-conversion-paths", "F6_REPORT_12_CliWebsiteExample_MatchesTheDocumentedOutput", "F6_REPORT_01_CliNoFlags_NamesAutomaticRescue_NotPassthrough")
+        if cid == "DOC-F6-02":
+            tl += tests("f6-conversion-paths", "F6_REPORT_13_McpWebsiteExample_MatchesTheDocumentedPayload", "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues")
+        if cid == "DOC-F3-01":
+            m = driver_measure("F3", "F3-LOCAL-02"); ms.append(m)
+            notes.append("F3-LOCAL-02 on the candidate: " + ", ".join(f"{k} {v['outcome']}" for k, v in m["surfaces"].items()))
+        page_ok = os.path.exists(f"{W}/{c['websiteExample']}")
+        cells["example-compiles-default"] = (selfcheck_ok and page_ok and tests_ok(W0T), "calor self-check docs reports no diagnostic (every complete ```calor program on the site compiles by default); WebsiteExampleCheckerTests pass")
+        cells["example-matches-page-claim"] = (tests_ok(W1T) and page_ok, "W1GuideTranscriptTests pass (fences equal the CLI output; C# sources are verbatim excerpts) and the transcripts regenerate byte-identically; the page's claim is the W1 record's: " + "; ".join(rec["examples"]))
+        base_ok = all(v[0] for v in cells.values())
+    ok_tests = tests_ok(tl) if tl else True
+    if base_ok is None:
+        base_ok = ok_tests and bool(tl)
+    overall = base_ok and ok_tests and all(v[0] for v in cells.values()) and all(cell in cells for cell in c.get("cells") or [])
+    judgement = "; ".join(x for x in [special] + notes if x)
+    return ms + ([{"kind": "tests", "tests": tl}] if tl else []), cells, overall, "passed" if overall else "failed", judgement
+
+
+# ---------------------------------------------------------------- witness runs
+WRUNS = {"R-OBL": ["w-R-OBL"], "R-OBL-RESIDUALS": ["w-R-OBL-RESIDUALS"], "R-TEXT": ["w-R-TEXT"]}
+
+
+def witness_record(m):
+    runs = [dict(summary[l], trx=f"{REGEN}/measure/tests/{l}.trx.gz", lane=l) for l in WRUNS[m["repair"]]]
+    ok = all(r["failed"] == 0 and r["total"] > 0 and r["passed"] == r["total"] for r in runs)
+    return {"schema": SCHEMA_WITNESS, "candidate": CAND, "repair": m["repair"], "pr": m["pr"], "mergeCommit": m["mergeCommit"],
+            "witnesses": m["regressionWitness"], "result": "passed" if ok else "failed",
+            "runs": [{k: r[k] for k in ("lane", "classes", "total", "passed", "failed", "notExecuted", "trx")} for r in runs],
+            "command": "dotnet test tests/<project>/<project>.csproj -c Release --no-build --filter FullyQualifiedName~<witness class>", "measuredIn": LANE}
+
+
+FAMDIR = {f["id"]: f["readiness"]["evidence"].rsplit("/", 1)[0] for f in scope["families"]}
+ci_totals = {r["project"]: r for r in json.load(open(f"{C25}/out/ci-test-totals.json"))}
+LOCAL_TOTALS = {"Calor.Ids.Tests": 394, "Calor.Performance.Tests": 26}
+REVIEW_FILES = {fid: sorted(p.replace(W + "/", "") for p in glob.glob(f"{W}/{d}/reviews/**/*.md", recursive=True)) for fid, d in FAMDIR.items()}
+FAM_TEST_LANES = {"F1": ["f1-refout-impl", "d1-refout-contract"], "F2": ["f2-interpolation", "corpus-binder-ratchet"], "F3": ["f3-local-conversion", "f3-local-language"],
+                  "F4": ["f4-iterator-accessor", "corpus-calor0425-ledger"], "F5": ["f5-array-expression"], "F6": ["f6-conversion-paths"]}
+SHARED_LANES = ["scope-validator", "t1-register", "t1-controls", "w1-transcripts", "w0-website-examples", "release-gate-scope-packet", "s2-dispositions"]
+
+out_summary = {}
+for fam in scope["families"]:
+    fid = fam["id"]
+    d = FAMDIR[fid]
+    base = f"{W}/{d}/ready"
+    os.makedirs(f"{base}/cases", exist_ok=True)
+    rows, failed = [], []
+    for c in [c for c in scope["cases"] if c["family"] == fid]:
+        ms, cells, ok, result, judgement = plan(c)
+        rec = {"schema": SCHEMA_CASE, "candidate": CAND, "caseId": c["id"], "family": fid, "role": c["role"], "expected": c["expected"],
+               "scopeVersion": scope["scopeVersion"], "requirementSha256": requirement_digest(c), "result": result,
+               "cells": {k: ("passed" if v[0] else "failed") for k, v in cells.items()},
+               "cellEvidence": {k: v[1] for k, v in cells.items()},
+               "judgement": judgement, "measurements": ms, "measuredIn": LANE, "independence": "reduced"}
+        path = f"{d}/ready/cases/{c['id']}.json"
+        open(f"{W}/{path}", "w").write(json.dumps(rec, indent=1, ensure_ascii=False) + "\n")
+        rows.append({"id": c["id"], "result": result, "evidence": path})
+        if result != "passed":
+            failed.append(c["id"])
+    resolved = []
+    for b in fam["blockers"]:
+        ref = {1423: "docs/plans/evidence/v0.25-candidate/candidate-manifest.json (0.25 C1-form manifest for this candidate, landed in #1579 at 51249109324aaff265202e73097721c505b89634)",
+               1426: "docs/plans/evidence/v0.25-r0-1426/scope.json (FROZEN, gate MET, scope 1.4.0); InteropScopeTests pass on the candidate",
+               1427: "docs/plans/evidence/v0.25-d1-1427/contract.json at the candidate; RefOutContractTests (28) pass on the candidate"}.get(b)
+        entry = {"issue": b}
+        mapped = next((m for m in scope["mappedBlockers"]["applicable"] if m["pr"] == b and fid in m["families"]), None)
+        if mapped:
+            wpath = f"{d}/ready/witness-runs/{mapped['repair']}.json"
+            os.makedirs(f"{W}/{d}/ready/witness-runs", exist_ok=True)
+            wr = witness_record(mapped)
+            open(f"{W}/{wpath}", "w").write(json.dumps(wr, indent=1) + "\n")
+            entry |= {"reference": f"{mapped['repair']} #{b} merged as {mapped['mergeCommit']}; regression witnesses run on the candidate", "mergeCommit": mapped["mergeCommit"], "witnessRun": wpath}
+            if wr["result"] != "passed":
+                failed.append(f"witness {mapped['repair']}")
+        else:
+            entry["reference"] = ref
+        resolved.append(entry)
+    tests_field = []
+    for p in ("Calor.Compiler.Tests", "Calor.Conversion.Tests", "Calor.Semantics.Tests", "Calor.Verification.Tests", "Calor.Enforcement.Tests",
+              "Calor.Evaluation", "Calor.LanguageServer.Tests", "Calor.Tasks.Tests", "Calor.ILAnalysis.Tests", "Calor.Experimental.Tests", "Calor.RoundTrip.Harness.Tests"):
+        r = ci_totals[p]["ci"]
+        tests_field.append({"project": p, "total": r["total"], "executed": r["executed"], "failed": r["failed"], "skipped": r["total"] - r["executed"],
+                            "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)", "manifestExpectedTotal": ci_totals[p]["expectedTotal"]})
+    for p, n in LOCAL_TOTALS.items():
+        tests_field.append({"project": p, "total": n, "failed": 0, "run": f"local lane, fresh clones A and B ({REGEN}/local/)", "manifestExpectedTotal": ci_totals[p]["expectedTotal"]})
+    for lane in FAM_TEST_LANES[fid] + SHARED_LANES:
+        s = summary[lane]
+        tests_field.append({"project": "Calor.Compiler.Tests", "filter": ",".join(s["classes"]), "total": s["total"], "failed": s["failed"],
+                            "run": f"measurement lane ({REGEN}/measure/tests/{lane}.trx.gz)"})
+    ready_ok = not failed
+    record = {
+        "schema": SCHEMA_READY,
+        "family": fid, "issue": fam["issue"], "title": fam["title"],
+        "status": "READY" if ready_ok else "BLOCKED",
+        "scopeVersion": scope["scopeVersion"],
+        "candidate": {"commit": CAND, "version": "0.25.0", "manifest": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json",
+                      "landing": "51249109324aaff265202e73097721c505b89634"},
+        "cases": rows,
+        "tests": tests_field,
+        "websiteExamples": sorted({p for p in w1[fid]["pages"]} | {c["websiteExample"] for c in scope["cases"] if c["family"] == fid and c.get("websiteExample")}),
+        "reviews": [{"reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)", "record": r} for r in REVIEW_FILES[fid]]
+                   + [{"reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)", "record": f"{REGEN}/reviews/round-1.md", "scope": "this READY record and the 0.25 re-proof"}],
+        "approver": {"login": "juanmicrosoft", "approvalUrl": None, "note": "Left for A1 (#1430): the maintainer's pull-request review URL is added when A1 records its outcome."},
+        "independence": "reduced",
+        "blockersResolved": resolved,
+        "t1Controls": {"regeneratedOnCandidate": f"{REGEN}/measure/regen/controls-results.json", "sha256": sha_text(open(f"{M}/regen/controls-results.json", "rb").read()),
+                       "approvedSha256": register["results"]["sha256"], "cells": 133, "result": "byte-identical to the approved results; every committed cell reproduced"},
+        "w1Checks": {"transcripts": "W1GuideTranscriptTests 13 passed; CALOR_REGENERATE_W1_TRANSCRIPTS=1 regenerates byte-identically", "selfCheckDocs": SELF["diagnostics"],
+                     "websiteExampleChecker": f"{summary['w0-website-examples']['passed']} passed", "wordingScan": WORD["result"]},
+        "acceptancePreconditions": {"note": "Candidate-level A1 preconditions, not part of S007; see docs/plans/evidence/v0.25-regeneration/results.json.",
+                                     "results": f"{REGEN}/results.json"},
+    }
+    if not ready_ok:
+        record["reason"] = "Not every registered case or witness run passed on the candidate: " + ", ".join(failed)
+        record["blockedBy"] = failed
+    path = f"{d}/ready/ready-record.json"
+    open(f"{W}/{path}", "w").write(json.dumps(record, indent=1, ensure_ascii=False) + "\n")
+    out_summary[fid] = {"status": record["status"], "cases": len(rows), "failed": failed, "path": path}
+print(json.dumps(out_summary, indent=1))

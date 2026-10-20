@@ -1,0 +1,46 @@
+{
+ "schema": "v0.25-regeneration/plan/1",
+ "issue": 1430,
+ "epic": 1425,
+ "scopeVersion": "1.4.0",
+ "requirement": "scope.json acceptancePreconditions (amendment 1.3.0, decision D-A1-1408-REPROVE): 0.24's proof, provenance and release checks re-run on the 0.25 candidate's own SHA; no 0.24 approval, record or SHA is reused.",
+ "candidate": {
+  "commit": "48cae911700ceb0dfc358e00933650445d81604f",
+  "version": "0.25.0",
+  "tree": "45d072a911d298b8c802219b206c80b351c32f19",
+  "manifest": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json",
+  "landing": "51249109324aaff265202e73097721c505b89634"
+ },
+ "writtenAtUtc": "2026-10-20T13:20:00Z",
+ "writtenNote": "Written after the runs, from the commands they used (the tools/ directory holds every script as .txt). The commands follow 0.24 C2 regeneration 3 (docs/plans/evidence/c2-1424/regeneration-3/plan.json); the changes are listed below. No command was chosen after seeing its own result, except where ledger.json records a re-run and why (the discarded first clone-A run, the runtime-10.0.13 publication rebuild, and the Z3 mirror check's parser fix).",
+ "maintainerRules": [
+  "Fresh-clone rule (2026-10-19, #1580): every classifier run that names a target and every re-proof measurement runs from a fresh clone, never a reused worktree.",
+  "Candidate stays untouched: no frozen input changes; new files only under docs/plans/evidence/v0.25-regeneration/ and the six family ready/ directories (exempt in the V025 classifier profile).",
+  "Files over about 1 MB go to the orphan branch evidence/v0.25-archives; package binaries as hashes only.",
+  "Never publish, tag, release or dispatch a publish workflow."
+ ],
+ "lanes": [
+  {"id": "ci-determinism", "command": "gh workflow run determinism-protocol.yml --ref v0.25-reproof/candidate-48cae911 -f mode=execution -f execution_id=v025-reproof-1", "charge": "determinism-compute, 0.25 epoch (protocol 1.6.0 budget.releaseEpoch: at most 2 executions, 1,600 runner-minutes)", "preguard": "Before dispatch, the candidate's own plan guard (determinism_runner.plan_problems) ran locally against the live run inventory with a simulated run 7; its only problem was the simulation's missing GITHUB_RUN_ATTEMPT (tools/preguard.py.txt)."},
+  {"id": "ci-test", "command": "gh workflow run test.yml --ref v0.25-reproof/candidate-48cae911"},
+  {"id": "ci-tier2", "command": "gh workflow run tier2.yml --ref v0.25-reproof/candidate-48cae911"},
+  {"id": "ci-reproducible-builds", "command": "gh workflow run reproducible-builds.yml --ref v0.25-reproof/candidate-48cae911"},
+  {"id": "local-clone-a", "where": "git clone https://github.com/juanmicrosoft/calor.git <scratch>/c25/a; checkout --detach 48cae911", "script": "tools/local.sh.txt"},
+  {"id": "local-clone-b", "where": "a second fresh clone at <scratch>/c25/second/nested/fresh", "script": "tools/local.sh.txt"},
+  {"id": "local-pub-a, local-pub-b", "where": "two more fresh clones (<scratch>/c25/pa, <scratch>/c25/third/other/path/fresh)", "script": "tools/pub.sh.txt (packages, metadata, website, hashes)"},
+  {"id": "measure", "where": "a fresh clone at <scratch>/c25/m with the corpus submodules", "script": "tools/measure.sh.txt, then tools/f4_iter_04.py.txt and tools/f4migrate.sh.txt; per-case records by tools/make_ready.py.txt"},
+  {"id": "release-quality", "where": "a fresh clone at <scratch>/c25/rq with the corpus submodules", "script": "tools/rq.sh.txt (then tools/z3rel.py.txt)"},
+  {"id": "r2-dry-run", "where": "a fresh scratch clone; synthetic commits never pushed", "script": "r2-dry-run/"},
+  {"id": "classifier", "where": "a fresh clone at the landing 51249109", "script": "classifier.txt"}
+ ],
+ "toolchain": {
+  "publication": "Microsoft SDK 10.0.401 (dotnet-install.sh into <scratch>/c25/dotnet-root) with runtimes 10.0.12, 10.0.13 and 8.0.32; Node 20.20.2 (nodejs.org tarball, SHA-256 verified)",
+  "tests": "Homebrew's dotnet 10.0.401 host for the measurement lane and the release-quality coverage step (the private root's path contains 'calor', which SoundnessRegistrationTests rejects), as 0.24 C2 regeneration 3 did for coverage"
+ },
+ "changesFrom024Regeneration3": [
+  "Determinism protocol 1.6.0, 0.25 epoch (execution id v025-reproof-1); stop after the first DETERMINISTIC execution.",
+  "Records under docs/plans/evidence/v0.25-regeneration/ and the family ready/ directories (scope amendment 1.4.0, D-READY-EVIDENCE-DIRS).",
+  "A measurement lane re-runs every family driver, the T1 controls, W1 transcripts and the binder baseline on the candidate (each must reproduce the approved bytes or behavior), and writes one per-case result record for each of the 65 registered cases.",
+  "Temporary dispatch branch v0.25-reproof/candidate-48cae911."
+ ],
+ "rules": "A BLOCKED or FAILED row is recorded with its exact cause; the candidate is not changed and no src/ file is edited."
+}

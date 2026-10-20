@@ -1,0 +1,114 @@
+{
+ "local": "clone-a (macOS arm64)",
+ "ci": "reproducible-builds run 39323636839 (Linux x86_64, two builds)",
+ "rows": [
+  {
+   "ci": "packages-1",
+   "file": "Calor.Sdk.0.25.0.nupkg",
+   "local": "c2260a5b3486d40929bce832fee543bc3ba60d17507de0e0d7ea6588baa539f0",
+   "ciSha256": "88b93090f6e94fec634da29c69ecc865962b799aaefda162c7b215036b8f3460",
+   "same": false
+  },
+  {
+   "ci": "packages-1",
+   "file": "calor.0.25.0.nupkg",
+   "local": "8acc92c4cd7c74eadca16b9fa2ec70da00d67b5cb20caab8738bb6554749866f",
+   "ciSha256": "a9669d7daf36c3a4c27ed045e28b63f7a9e0a25602638b0ae6d8f1ebf5cacf1e",
+   "same": false
+  },
+  {
+   "ci": "packages-1",
+   "file": "calor-nuget-48cae911700ceb0dfc358e00933650445d81604f.provenance.json",
+   "local": "50bce8a02da815424acd35c9ec1476cec0bcc56f6740695793f7c4d5f7af839a",
+   "ciSha256": "693d4c3531fe652986dddb97db37afb43a22733442672dda41aac3144e9750c8",
+   "same": false
+  },
+  {
+   "ci": "packages-1",
+   "file": "calor-nuget-48cae911700ceb0dfc358e00933650445d81604f.sbom.spdx.json",
+   "local": "99c1b31bc86f480ef2642f8328ebb5d3e65bb62b0493b9d0890671db6033e041",
+   "ciSha256": "ac50e35276ac69954bd606208e723b653e1fd75fd13b63a4a5170b108450493b",
+   "same": false
+  },
+  {
+   "ci": "packages-2",
+   "file": "Calor.Sdk.0.25.0.nupkg",
+   "local": "c2260a5b3486d40929bce832fee543bc3ba60d17507de0e0d7ea6588baa539f0",
+   "ciSha256": "88b93090f6e94fec634da29c69ecc865962b799aaefda162c7b215036b8f3460",
+   "same": false
+  },
+  {
+   "ci": "packages-2",
+   "file": "calor.0.25.0.nupkg",
+   "local": "8acc92c4cd7c74eadca16b9fa2ec70da00d67b5cb20caab8738bb6554749866f",
+   "ciSha256": "a9669d7daf36c3a4c27ed045e28b63f7a9e0a25602638b0ae6d8f1ebf5cacf1e",
+   "same": false
+  },
+  {
+   "ci": "packages-2",
+   "file": "calor-nuget-48cae911700ceb0dfc358e00933650445d81604f.provenance.json",
+   "local": "50bce8a02da815424acd35c9ec1476cec0bcc56f6740695793f7c4d5f7af839a",
+   "ciSha256": "693d4c3531fe652986dddb97db37afb43a22733442672dda41aac3144e9750c8",
+   "same": false
+  },
+  {
+   "ci": "packages-2",
+   "file": "calor-nuget-48cae911700ceb0dfc358e00933650445d81604f.sbom.spdx.json",
+   "local": "99c1b31bc86f480ef2642f8328ebb5d3e65bb62b0493b9d0890671db6033e041",
+   "ciSha256": "ac50e35276ac69954bd606208e723b653e1fd75fd13b63a4a5170b108450493b",
+   "same": false
+  },
+  {
+   "ci": "website-1",
+   "file": "website tree (255 files)",
+   "local": "f1bd80407e075cb7cdae76c8074229115c2d298c4e5699d1c9fb29f1472862ca",
+   "ciSha256": "f1bd80407e075cb7cdae76c8074229115c2d298c4e5699d1c9fb29f1472862ca",
+   "same": true
+  },
+  {
+   "ci": "website-2",
+   "file": "website tree (255 files)",
+   "local": "f1bd80407e075cb7cdae76c8074229115c2d298c4e5699d1c9fb29f1472862ca",
+   "ciSha256": "f1bd80407e075cb7cdae76c8074229115c2d298c4e5699d1c9fb29f1472862ca",
+   "same": true
+  }
+ ],
+ "toolchains": {
+  "packages-1": {
+   "os": "Linux x86_64",
+   "dotnet": "10.0.401",
+   "dotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+   "node": "v22.23.3",
+   "npm": "10.9.9"
+  },
+  "packages-2": {
+   "os": "Linux x86_64",
+   "dotnet": "10.0.401",
+   "dotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+   "node": "v22.23.3",
+   "npm": "10.9.9"
+  },
+  "website-1": {
+   "os": "Linux x86_64",
+   "dotnet": "10.0.401",
+   "dotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+   "node": "v20.20.2",
+   "npm": "10.8.2"
+  },
+  "website-2": {
+   "os": "Linux x86_64",
+   "dotnet": "10.0.401",
+   "dotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+   "node": "v20.20.2",
+   "npm": "10.8.2"
+  }
+ },
+ "localToolchain": {
+  "os": "Darwin arm64",
+  "dotnet": "10.0.401",
+  "dotnetSdkBuild": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053",
+  "node": "v20.20.2",
+  "npm": "10.8.2"
+ },
+ "allSame": false
+}

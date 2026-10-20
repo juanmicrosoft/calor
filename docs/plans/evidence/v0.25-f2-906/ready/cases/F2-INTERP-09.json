@@ -1,0 +1,81 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "caseId": "F2-INTERP-09",
+ "family": "F2",
+ "role": "residual",
+ "expected": "native",
+ "scopeVersion": "1.4.0",
+ "requirementSha256": "4047ac60402e91acc1e1374732f2705b1e76d8b1841c4d33c009eb4cb22e07d6",
+ "result": "failed",
+ "cells": {},
+ "cellEvidence": {},
+ "judgement": "incomplete diagnostics 0 (conversion 0); bound 4828; ratchet regenerates byte-identically; the T1 register requires the registered before/after counts to be preserved or changed only by an approved, case-linked amendment (readyNeeds); on the candidate inRepoExpressionsBound, conversionVisits, opaqueBoundaries, opaqueExpressions differ from the registered 'after' values and no amendment records the change, so the case is not passed",
+ "measurements": [
+  {
+   "kind": "corpus-counts",
+   "instrument": "tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs with corpus submodules at the candidate's gitlinks",
+   "regeneration": "CALOR_UPDATE_BINDER_BASELINE=1 rewrote bench/phase0-agent-native/ byte-identically (git diff empty)",
+   "log": "docs/plans/evidence/v0.25-regeneration/measure/regen-binder-diff.log",
+   "candidate": {
+    "incompleteDiagnostics": 0,
+    "conversionIncomplete": 0,
+    "inRepoExpressionsBound": 4828,
+    "conversionVisits": 34371,
+    "opaqueBoundaries": 148,
+    "opaqueExpressions": 7746
+   },
+   "registerCounts": {
+    "incompleteDiagnostics": {
+     "before": 0,
+     "after": 0
+    },
+    "inRepoExpressionsBound": {
+     "before": 4820,
+     "after": 4827
+    },
+    "conversionVisits": {
+     "before": 35159,
+     "after": 35160
+    },
+    "opaqueBoundaries": {
+     "before": 129,
+     "after": 137
+    },
+    "opaqueExpressions": {
+     "before": 6944,
+     "after": 6994
+    }
+   },
+   "note": "The register's counts were measured on F2's branch base. The candidate also carries F1, F3, F4 and F5, which change the absolute counts; the ratchet's own ledger records F2's delta re-measured on main after #1132 (bound 4827 -> 4828, visits +1, boundaries +8, opaque +50). Incomplete diagnostics are 0 before and after. See regeneration.md, 'For the maintainer'.",
+   "registerAfterPreserved": {
+    "inRepoExpressionsBound": false,
+    "conversionVisits": false,
+    "opaqueBoundaries": false,
+    "opaqueExpressions": false,
+    "incompleteDiagnostics": true
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/corpus-binder-ratchet.trx.gz",
+     "match": "BinderIncompleteRatchetTests",
+     "count": 8,
+     "passed": 8,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c25/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/measure/"
+ },
+ "independence": "reduced"
+}

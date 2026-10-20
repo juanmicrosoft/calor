@@ -1,0 +1,119 @@
+{
+ "schema": "v0.25-regeneration/ledger/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "ci": [
+  {
+   "run": 39323628059,
+   "workflow": ".github/workflows/determinism-protocol.yml",
+   "title": "determinism execution v025-reproof-1",
+   "headSha": "48cae911700ceb0dfc358e00933650445d81604f",
+   "headBranch": "v0.25-reproof/candidate-48cae911",
+   "event": "workflow_dispatch",
+   "conclusion": "failure",
+   "runAttempt": 1,
+   "createdAt": "2026-10-19T20:57:34Z",
+   "runnerMinutes": 397,
+   "charge": "determinism-compute, 0.25 epoch (protocol 1.6.0 budget.releaseEpoch)"
+  },
+  {
+   "run": 39323630837,
+   "workflow": ".github/workflows/test.yml",
+   "title": "Tests",
+   "headSha": "48cae911700ceb0dfc358e00933650445d81604f",
+   "headBranch": "v0.25-reproof/candidate-48cae911",
+   "event": "workflow_dispatch",
+   "conclusion": "success",
+   "runAttempt": 1,
+   "createdAt": "2026-10-19T20:57:36Z",
+   "runnerMinutes": 183,
+   "charge": "ordinary CI on the dispatch branch"
+  },
+  {
+   "run": 39323635472,
+   "workflow": ".github/workflows/tier2.yml",
+   "title": "Tier 2 verification",
+   "headSha": "48cae911700ceb0dfc358e00933650445d81604f",
+   "headBranch": "v0.25-reproof/candidate-48cae911",
+   "event": "workflow_dispatch",
+   "conclusion": "failure",
+   "runAttempt": 1,
+   "createdAt": "2026-10-19T20:57:38Z",
+   "runnerMinutes": 7,
+   "charge": "ordinary CI on the dispatch branch"
+  },
+  {
+   "run": 39323636839,
+   "workflow": ".github/workflows/reproducible-builds.yml",
+   "title": "Reproducible publication builds",
+   "headSha": "48cae911700ceb0dfc358e00933650445d81604f",
+   "headBranch": "v0.25-reproof/candidate-48cae911",
+   "event": "workflow_dispatch",
+   "conclusion": "success",
+   "runAttempt": 1,
+   "createdAt": "2026-10-19T20:57:39Z",
+   "runnerMinutes": 5,
+   "charge": "ordinary CI on the dispatch branch"
+  }
+ ],
+ "ciRunnerMinutesTotal": 592,
+ "determinismEpoch": {
+  "executionsUsed": 1,
+  "executionsAllowed": 2,
+  "ceilingRunnerMinutes": 1600,
+  "minutesUsed": 397,
+  "secondExecution": "refused by the protocol's own plan guard (determinism/determinism-second-execution-preguard.json): the candidate commit was already executed once (retryPolicy), and after a failed execution the next commit must change a path outside docs/; the epoch binds executions to the manifest's candidate. Not dispatched."
+ },
+ "dispatchBranch": {
+  "name": "v0.25-reproof/candidate-48cae911",
+  "pointsAt": "48cae911700ceb0dfc358e00933650445d81604f",
+  "pushedAtUtc": "2026-10-19T20:57:20Z",
+  "note": "Temporary; delete after the PR merges (as 0.24's c2-1424/candidate-* branches)."
+ },
+ "local": [
+  {
+   "lane": "discarded-attempt-1-clone-a",
+   "status": "DISCARDED",
+   "reason": "First clone-A run (2026-10-19T21:00Z) used Homebrew's Node 26 for the website and built the website after the B2 gate had written website/public/data/benchmark-headline.json into the tree, so its website tree held 256 files instead of 255. Discarded before any comparison; the clone was retired and a new fresh clone (clone A) ran the corrected script (Node 20.20.2, publication builds before B2). Its steps are kept in local/discarded-attempt-1-clone-a/."
+  },
+  {
+   "lane": "clone-a",
+   "where": "<scratch>/c25/a",
+   "status": "complete",
+   "record": "docs/plans/evidence/v0.25-regeneration/local/clone-a/steps.txt"
+  },
+  {
+   "lane": "clone-b",
+   "where": "<scratch>/c25/second/nested/fresh",
+   "status": "complete",
+   "record": "docs/plans/evidence/v0.25-regeneration/local/clone-b/steps.txt"
+  },
+  {
+   "lane": "pub-a",
+   "where": "<scratch>/c25/pa",
+   "status": "complete",
+   "record": "docs/plans/evidence/v0.25-regeneration/local/pub-a/steps.txt",
+   "why": "Clone A/B packages differed from Linux CI only in compiled DLL MVIDs and PDB ids: the CI runner image ships runtime 10.0.13, so its compiler host ran on 10.0.13 while the private SDK root had only 10.0.12 (local/compare-clone-a-ci-before-runtime-10.0.13.json). Runtime 10.0.13 was added to the private root and packages, metadata and website were rebuilt in two new fresh clones."
+  },
+  {
+   "lane": "pub-b",
+   "where": "<scratch>/c25/third/other/path/fresh",
+   "status": "complete",
+   "record": "docs/plans/evidence/v0.25-regeneration/local/pub-b/steps.txt"
+  },
+  {
+   "lane": "measure",
+   "where": "<scratch>/c25/m",
+   "status": "complete",
+   "record": "docs/plans/evidence/v0.25-regeneration/measure/steps.txt"
+  },
+  {
+   "lane": "release-quality",
+   "where": "<scratch>/c25/rq",
+   "status": "complete",
+   "record": "docs/plans/evidence/v0.25-regeneration/release-quality/steps.txt",
+   "note": "z3-release first ran with a pin-file parser bug in rq.sh (it read the size column as the asset name and reported MISSING); re-run with tools/z3rel.py: MATCH 7 of 7. Tier 2 exits 1 by registered design (30 known failures)."
+  }
+ ],
+ "isolation": "Every local lane ran with its own HOME, CALOR_HOME, DOTNET_CLI_HOME, NUGET_PACKAGES, npm and XDG caches under <scratch>/c25/iso/<lane> (tools/env.sh); ~/.calor was never read or written.",
+ "spendUsd": 0
+}

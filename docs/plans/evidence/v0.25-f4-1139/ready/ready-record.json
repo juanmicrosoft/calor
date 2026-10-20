@@ -1,0 +1,290 @@
+{
+ "schema": "calor.v0.25-ready-record/1",
+ "family": "F4",
+ "issue": 1139,
+ "title": "iterator accessor preservation",
+ "status": "BLOCKED",
+ "scopeVersion": "1.4.0",
+ "candidate": {
+  "commit": "48cae911700ceb0dfc358e00933650445d81604f",
+  "version": "0.25.0",
+  "manifest": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json",
+  "landing": "51249109324aaff265202e73097721c505b89634"
+ },
+ "cases": [
+  {
+   "id": "F4-ITER-01",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f4-1139/ready/cases/F4-ITER-01.json"
+  },
+  {
+   "id": "F4-ITER-02",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f4-1139/ready/cases/F4-ITER-02.json"
+  },
+  {
+   "id": "F4-ITER-03",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f4-1139/ready/cases/F4-ITER-03.json"
+  },
+  {
+   "id": "F4-ITER-04",
+   "result": "failed",
+   "evidence": "docs/plans/evidence/v0.25-f4-1139/ready/cases/F4-ITER-04.json"
+  },
+  {
+   "id": "X-INT-03",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f4-1139/ready/cases/X-INT-03.json"
+  },
+  {
+   "id": "DOC-F4-01",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f4-1139/ready/cases/DOC-F4-01.json"
+  }
+ ],
+ "tests": [
+  {
+   "project": "Calor.Compiler.Tests",
+   "total": 14606,
+   "executed": 14603,
+   "failed": 0,
+   "skipped": 3,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 14606
+  },
+  {
+   "project": "Calor.Conversion.Tests",
+   "total": 475,
+   "executed": 475,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 475
+  },
+  {
+   "project": "Calor.Semantics.Tests",
+   "total": 55,
+   "executed": 55,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 55
+  },
+  {
+   "project": "Calor.Verification.Tests",
+   "total": 473,
+   "executed": 473,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 473
+  },
+  {
+   "project": "Calor.Enforcement.Tests",
+   "total": 695,
+   "executed": 694,
+   "failed": 0,
+   "skipped": 1,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 695
+  },
+  {
+   "project": "Calor.Evaluation",
+   "total": 235,
+   "executed": 235,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 235
+  },
+  {
+   "project": "Calor.LanguageServer.Tests",
+   "total": 532,
+   "executed": 532,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 532
+  },
+  {
+   "project": "Calor.Tasks.Tests",
+   "total": 134,
+   "executed": 134,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 134
+  },
+  {
+   "project": "Calor.ILAnalysis.Tests",
+   "total": 46,
+   "executed": 46,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 46
+  },
+  {
+   "project": "Calor.Experimental.Tests",
+   "total": 25,
+   "executed": 25,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 25
+  },
+  {
+   "project": "Calor.RoundTrip.Harness.Tests",
+   "total": 295,
+   "executed": 295,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39323630837 on the candidate (ubuntu)",
+   "manifestExpectedTotal": 295
+  },
+  {
+   "project": "Calor.Ids.Tests",
+   "total": 394,
+   "failed": 0,
+   "run": "local lane, fresh clones A and B (docs/plans/evidence/v0.25-regeneration/local/)",
+   "manifestExpectedTotal": 394
+  },
+  {
+   "project": "Calor.Performance.Tests",
+   "total": 26,
+   "failed": 0,
+   "run": "local lane, fresh clones A and B (docs/plans/evidence/v0.25-regeneration/local/)",
+   "manifestExpectedTotal": 26
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "IteratorAccessorConversionTests",
+   "total": 50,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/f4-iterator-accessor.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "Calor0425CorpusLedgerTests",
+   "total": 14,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/corpus-calor0425-ledger.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "InteropScopeTests",
+   "total": 114,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/scope-validator.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "T1RegisterTests",
+   "total": 30,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/t1-register.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "SharedInteropControlsTests",
+   "total": 134,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/t1-controls.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "W1GuideTranscriptTests",
+   "total": 13,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/w1-transcripts.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "WebsiteExampleCheckerTests",
+   "total": 58,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/w0-website-examples.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "ReleaseGateScopePacketTests",
+   "total": 63,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/release-gate-scope-packet.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "DispositionTests",
+   "total": 53,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/measure/tests/s2-dispositions.trx.gz)"
+  }
+ ],
+ "websiteExamples": [
+  "website/content/cli/convert.mdx",
+  "website/content/cli/convert.mdx#iterator-properties-and-indexers",
+  "website/content/guides/csharp-interoperability.mdx#convert-a-class-with-iterator-properties"
+ ],
+ "reviews": [
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f4-1139/reviews/round-1.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f4-1139/reviews/round-2.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f4-1139/reviews/verification.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-regeneration/reviews/round-1.md",
+   "scope": "this READY record and the 0.25 re-proof"
+  }
+ ],
+ "approver": {
+  "login": "juanmicrosoft",
+  "approvalUrl": null,
+  "note": "Left for A1 (#1430): the maintainer's pull-request review URL is added when A1 records its outcome."
+ },
+ "independence": "reduced",
+ "blockersResolved": [
+  {
+   "issue": 1426,
+   "reference": "docs/plans/evidence/v0.25-r0-1426/scope.json (FROZEN, gate MET, scope 1.4.0); InteropScopeTests pass on the candidate"
+  },
+  {
+   "issue": 1423,
+   "reference": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json (0.25 C1-form manifest for this candidate, landed in #1579 at 51249109324aaff265202e73097721c505b89634)"
+  }
+ ],
+ "t1Controls": {
+  "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/measure/regen/controls-results.json",
+  "sha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+  "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+  "cells": 133,
+  "result": "byte-identical to the approved results; every committed cell reproduced"
+ },
+ "w1Checks": {
+  "transcripts": "W1GuideTranscriptTests 13 passed; CALOR_REGENERATE_W1_TRANSCRIPTS=1 regenerates byte-identically",
+  "selfCheckDocs": {
+   "total": 0,
+   "errors": 0,
+   "warnings": 0,
+   "info": 0
+  },
+  "websiteExampleChecker": "58 passed",
+  "wordingScan": "scanned 33 texts; 0 finding(s)"
+ },
+ "acceptancePreconditions": {
+  "note": "Candidate-level A1 preconditions, not part of S007; see docs/plans/evidence/v0.25-regeneration/results.json.",
+  "results": "docs/plans/evidence/v0.25-regeneration/results.json"
+ },
+ "reason": "Not every registered case or witness run passed on the candidate: F4-ITER-04",
+ "blockedBy": [
+  "F4-ITER-04"
+ ]
+}
