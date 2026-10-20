@@ -231,6 +231,10 @@ public class V025CandidateManifestTests
     [InlineData("supersedes.decision.decision", "Re-freeze", "supersedes")]
     [InlineData("supersedes.causes.1", "<remove>", "supersedes")]
     [InlineData("supersedes.reproof.mergeCommit", "51249109324aaff265202e73097721c505b89634", "supersedes")]
+    [InlineData("supersedes.amendments.protocol", "1.6.0", "supersedes")]
+    [InlineData("supersedes.amendments.scope", "1.4.0", "supersedes")]
+    [InlineData("supersedes.amendments.t1Register", "1.0.2", "supersedes")]
+    [InlineData("supersedes.amendments.d1Contract", "1.0.6", "supersedes")]
     [InlineData("toolchain.dotnetSdkBuild.dotnetRuntime", "10.0.13", "fingerprint")]
     [InlineData("toolchain.determinismProtocol.releaseEpoch.jobTimeoutMinutes.osx-arm64", "50", "toolchain")]
     [InlineData("dependencies.lockfiles.src/Calor.Compiler/packages.lock.json", "<remove>", "lockfile")]
@@ -509,7 +513,9 @@ public class V025CandidateManifestTests
             || Str(landedManifest?["candidate"]?["commit"]) != SupersededCandidate || !git.IsAncestor(landed, candidate)
             || !git.Run("log", "-1", "--format=%s", landed).Output.StartsWith($"Merge pull request #{sup["frozenBy"]?["pr"]} from ", StringComparison.Ordinal)
             || Str(sup["decision"]?["id"]) != "D-AMEND-REFREEZE" || Str(sup["decision"]?["decision"]) != "Amend + re-freeze" || Str(sup["decision"]?["by"]) != "@juanmicrosoft"
-            || supersedingRecorded != 1 || Str(sup["amendments"]?["mergeCommit"]) != candidate
+            || supersedingRecorded != 1 || Str(sup["amendments"]?["mergeCommit"]) != candidate || sup["amendments"]?["pr"]?.ToString() != "1610"
+            || Str(sup["amendments"]?["protocol"]) != Str(protocol["protocolVersion"]) || Str(sup["amendments"]?["scope"]) != Str(scope["scopeVersion"])
+            || Str(sup["amendments"]?["t1Register"]) != Str(register["registerVersion"]) || Str(sup["amendments"]?["d1Contract"]) != Str(d1["contractVersion"])
             || !git.CommitExists(reproofMerge) || !git.IsAncestor(reproofMerge, candidate)
             || !git.Run("log", "-1", "--format=%s", reproofMerge).Output.StartsWith($"Merge pull request #{sup["reproof"]?["pr"]} from ", StringComparison.Ordinal)
             || !(sup["causes"]?.AsArray() ?? []).Select(c => Str(c!["id"])).SequenceEqual(["DETERMINISM-INCOMPLETE", "F2-INTERP-09-COUNTS", "F4-ITER-04-UNMEASURABLE"]))

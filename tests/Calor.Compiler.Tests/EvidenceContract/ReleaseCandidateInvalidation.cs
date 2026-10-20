@@ -232,9 +232,10 @@ public static class ReleaseCandidateInvalidation
             string? named;
             try { named = System.Text.Json.Nodes.JsonNode.Parse(text)?["candidate"]?["commit"]?.GetValue<string>(); }
             catch (Exception e) when (e is System.Text.Json.JsonException or InvalidOperationException) { named = null; }
-            if (named is null)
+            // Only a manifest naming a full commit SHA may be skipped as another candidate's; anything else is an error.
+            if (named is null || !System.Text.RegularExpressions.Regex.IsMatch(named, "^[0-9a-f]{40}$"))
             {
-                errors.Add($"the manifest {profile.ManifestPath} at {commit} does not name a candidate.commit");
+                errors.Add($"the manifest {profile.ManifestPath} at {commit} does not name a full candidate.commit");
                 return null;
             }
             if (named == candidate) return commit;

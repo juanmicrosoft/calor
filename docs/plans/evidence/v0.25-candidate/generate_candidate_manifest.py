@@ -398,6 +398,9 @@ class Candidate:
                     if d.get('id') == sup['decision']['id'] and d.get('supersedes') == old and d.get('decision') == sup['decision']['decision']]
         check(len(decision) == 1, f"the candidate's scope packet records no single {sup['decision']['id']} superseding {old}")
         check(sup['amendments']['mergeCommit'] == self.commit, 'the amendment PR of a re-freeze is the candidate itself')
+        versions = {'protocol': self.json('docs/plans/evidence/g2-1421/protocol.json').get('protocolVersion'), 'scope': scope.get('scopeVersion'),
+                    't1Register': self.json(REGISTER).get('registerVersion'), 'd1Contract': self.json('docs/plans/evidence/v0.25-d1-1427/contract.json').get('contractVersion')}
+        check(all(sup['amendments'].get(k) == v for k, v in versions.items()), f'the recorded amendment versions differ from the candidate\'s {versions}')
         return sup
 
     def build(self):

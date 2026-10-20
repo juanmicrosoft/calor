@@ -273,10 +273,27 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         Assert.Equal(secondLanding, FindLanding(_repo.Git, P, second, errors));
         Assert.Empty(errors);
         Assert.Equal(NotInvalidated, ClassifyRange(_repo.Git, P, second, "HEAD").Verdict);
-        _repo.Commit((P.ManifestPath, "{}"));
+    }
+
+    /// <summary>A manifest that names no full candidate SHA is never skipped: a later valid manifest cannot become the
+    /// landing and exempt a classifier edit in between as a before-landing change.</summary>
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"candidate\": {\"commit\": \"\"}}")]
+    [InlineData("{\"candidate\": {\"commit\": \"  \"}}")]
+    [InlineData("{\"candidate\": {\"commit\": \"d1d7afde\"}}")]
+    [InlineData("{\"candidate\": {\"commit\": 7}}")]
+    [InlineData("not json")]
+    public void AManifestNamingNoFullCandidateIsUndecided(string manifest)
+    {
+        var candidate = _repo.Candidate();
+        _repo.Commit((P.ManifestPath, manifest));
+        _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
+        _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
         _repo.PublishMain();
-        Assert.Null(FindLanding(_repo.Git, P, _repo.Git.RevParse("HEAD^")!, errors));
-        Assert.Contains(errors, e => e.Contains("does not name a candidate.commit", StringComparison.Ordinal));
+        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
+        Assert.True(report.Verdict == Undecided, report.ToString());
+        Assert.Contains(report.Errors, e => e.Contains("does not name a full candidate.commit", StringComparison.Ordinal));
     }
 
     private static Change Modify(string path) => new("M", path, Regular, Regular, Bytes("a"), Bytes("b"));
