@@ -1,0 +1,36 @@
+#!/bin/bash
+# R2 release-gate dry run against a SYNTHETIC #1430 terminal record, in a fresh scratch clone only.
+# usage: dryrun025.sh <mode: success|with-blocked> <re-proof commit>
+# The synthetic record is committed only in the scratch clone, on top of the re-proof commit, and
+# refs/remotes/origin/main is moved to it locally so the gate's "on protected main" check can run. Nothing is pushed.
+set -uo pipefail
+C25=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25
+MODE="$1"; BASE="$2"; D=$C25/dry-$MODE; O=$C25/out/r2-dry-run/$MODE; A=$C25/out/pub-a/build; N=$C25/out/clone-a
+CAND=48cae911700ceb0dfc358e00933650445d81604f
+rm -rf "$D" "$O"; mkdir -p "$O"
+git clone -q https://github.com/juanmicrosoft/calor.git "$D"
+cd "$D"
+git fetch -q origin milestone-0.25/reproof-48cae911
+git checkout -q --detach "$BASE"
+python3 "$C25/tools/make_terminal_025.py" "$D" "$MODE" > "$O/make-terminal.txt"
+git add -A docs/plans/evidence eng/release-adjudication-map.json
+git -c user.name=r2-dry-run -c user.email=r2-dry-run@invalid -c commit.gpgsign=false commit -q -m "SYNTHETIC #1430 terminal record for the 0.25 R2 dry run ($MODE); never pushed"
+ADJ=$(git rev-parse HEAD)
+DIG=$(git show "$ADJ:docs/plans/evidence/adjudication-1430/terminal-record.json" | shasum -a 256 | cut -d' ' -f1)
+ID="calor-adjudication:v1:$ADJ:$DIG"
+git update-ref refs/remotes/origin/main "$ADJ"
+cp docs/plans/evidence/adjudication-1430/terminal-record.json "$O/terminal-record.synthetic.json"
+git checkout -q --detach "$CAND"
+echo "identity $ID" > "$O/gate.txt"
+echo "base (re-proof commit) $BASE; synthetic adjudication commit $ADJ (local only)" >> "$O/gate.txt"
+python3 scripts/verify_release_adjudication.py --identity "$ID" --expect-head --version 0.25.0 \
+  --release-notes "$N/release-notes.md" --nuget-dir "$A/nupkg" --metadata-dir "$A/release-metadata" \
+  --website-dir "$A/website" >> "$O/gate.txt" 2>&1
+echo "SURFACES-EXIT=$?" >> "$O/gate.txt"
+mkdir -p "$O/b1"; cp -R "$N/b1-regen/." "$O/b1/"
+python3 scripts/benchmark_publication_gate.py check --commit "$(git rev-parse HEAD)" --regenerated "$O/b1" --report "$O/b2-report.txt" > "$O/b2.txt" 2>&1
+echo "B2-EXIT=$?" >> "$O/gate.txt"
+python3 scripts/verify_release_adjudication.py --identity "$ID" --expect-head --version 0.25.0 --benchmark-worktree >> "$O/gate.txt" 2>&1
+echo "BENCHMARK-WORKTREE-EXIT=$?" >> "$O/gate.txt"
+rm -rf "$O/b1"
+cat "$O/gate.txt"

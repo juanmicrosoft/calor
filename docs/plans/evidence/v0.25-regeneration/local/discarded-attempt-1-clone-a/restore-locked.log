@@ -1,0 +1,26 @@
+  Determining projects to restore...
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/src/Calor.Sdk/Calor.Sdk.csproj (in 45 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tools/calor-allowlist-audit/CalorAllowlistAudit.csproj (in 49 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/src/Calor.Runtime/Calor.Runtime.csproj (in 45 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/samples/SdkSample/SdkSample.csproj (in 49 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/samples/Contracts/Contracts.csproj (in 49 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.Scenarios/TestAssembly.Scenarios.csproj (in 0.8 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.DataAccess/TestAssembly.DataAccess.csproj (in 0.5 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tools/Calor.RoundTrip.Harness/Calor.RoundTrip.Harness.csproj (in 2.49 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/bench/ILAnalysisBench/ILAnalysisBench.csproj (in 2.49 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/bench/mcp/harness/McpBenchHarness.csproj (in 2.49 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/src/Calor.Compiler/Calor.Compiler.csproj (in 2.43 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/src/Calor.Tasks/Calor.Tasks.csproj (in 2.43 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj (in 2.5 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/bench/IncrementalBuildBench/IncrementalBuildBench.csproj (in 2.49 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/src/Calor.LanguageServer/Calor.LanguageServer.csproj (in 2.5 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj (in 2.45 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj (in 2.5 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj (in 2.5 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj (in 2.5 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj (in 2.45 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj (in 2.44 sec).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj (in 6 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj (in 5 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj (in 7 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/a/tests/Calor.Evaluation/Calor.Evaluation.csproj (in 6 ms).

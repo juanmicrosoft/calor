@@ -1,0 +1,162 @@
+{
+ "id": 39323628059,
+ "runNumber": 7,
+ "workflow": ".github/workflows/determinism-protocol.yml",
+ "title": "determinism execution v025-reproof-1",
+ "event": "workflow_dispatch",
+ "headBranch": "v0.25-reproof/candidate-48cae911",
+ "headSha": "48cae911700ceb0dfc358e00933650445d81604f",
+ "status": "completed",
+ "conclusion": "failure",
+ "createdAt": "2026-10-19T20:57:34Z",
+ "updatedAt": "2026-10-19T21:53:56Z",
+ "runAttempt": 1,
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/39323628059",
+ "runnerMinutes": 397,
+ "jobs": [
+  {
+   "id": 118303731436,
+   "name": "plan",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T20:57:38Z",
+   "completedAt": "2026-10-19T20:57:57Z",
+   "runnerMinutes": 1,
+   "runner": "GitHub Actions 1000065963",
+   "labels": [
+    "ubuntu-24.04"
+   ]
+  },
+  {
+   "id": 118303895740,
+   "name": "attempts (linux-arm64 job 2)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:00:31Z",
+   "completedAt": "2026-10-19T21:22:14Z",
+   "runnerMinutes": 22,
+   "runner": "GitHub Actions 1000065983",
+   "labels": [
+    "ubuntu-24.04-arm"
+   ]
+  },
+  {
+   "id": 118303895802,
+   "name": "attempts (linux-x64 job 1)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:00:18Z",
+   "completedAt": "2026-10-19T21:47:10Z",
+   "runnerMinutes": 47,
+   "runner": "GitHub Actions 1000065981",
+   "labels": [
+    "ubuntu-24.04"
+   ]
+  },
+  {
+   "id": 118303895808,
+   "name": "attempts (win-arm64 job 1)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:00:05Z",
+   "completedAt": "2026-10-19T21:45:59Z",
+   "runnerMinutes": 46,
+   "runner": "GitHub Actions 1000065978",
+   "labels": [
+    "windows-11-arm"
+   ]
+  },
+  {
+   "id": 118303895813,
+   "name": "attempts (win-x64 job 1)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T20:59:19Z",
+   "completedAt": "2026-10-19T21:45:58Z",
+   "runnerMinutes": 47,
+   "runner": "GitHub Actions 1000065977",
+   "labels": [
+    "windows-2025"
+   ]
+  },
+  {
+   "id": 118303895829,
+   "name": "attempts (linux-x64 job 2)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T20:59:12Z",
+   "completedAt": "2026-10-19T21:27:17Z",
+   "runnerMinutes": 29,
+   "runner": "GitHub Actions 1000065976",
+   "labels": [
+    "ubuntu-24.04"
+   ]
+  },
+  {
+   "id": 118303895891,
+   "name": "attempts (osx-arm64 job 1)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:03:59Z",
+   "completedAt": "2026-10-19T21:39:20Z",
+   "runnerMinutes": 36,
+   "runner": "GitHub Actions 1000065995",
+   "labels": [
+    "macos-14"
+   ]
+  },
+  {
+   "id": 118303895958,
+   "name": "attempts (osx-arm64 job 2)",
+   "conclusion": "failure",
+   "startedAt": "2026-10-19T21:04:02Z",
+   "completedAt": "2026-10-19T21:49:13Z",
+   "runnerMinutes": 46,
+   "runner": "GitHub Actions 1000065996",
+   "labels": [
+    "macos-14"
+   ]
+  },
+  {
+   "id": 118303895984,
+   "name": "attempts (linux-arm64 job 1)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:02:23Z",
+   "completedAt": "2026-10-19T21:24:53Z",
+   "runnerMinutes": 23,
+   "runner": "GitHub Actions 1000065989",
+   "labels": [
+    "ubuntu-24.04-arm"
+   ]
+  },
+  {
+   "id": 118303896014,
+   "name": "attempts (win-arm64 job 2)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:02:05Z",
+   "completedAt": "2026-10-19T21:46:21Z",
+   "runnerMinutes": 45,
+   "runner": "GitHub Actions 1000065988",
+   "labels": [
+    "windows-11-arm"
+   ]
+  },
+  {
+   "id": 118303896055,
+   "name": "attempts (win-x64 job 2)",
+   "conclusion": "success",
+   "startedAt": "2026-10-19T21:00:19Z",
+   "completedAt": "2026-10-19T21:53:30Z",
+   "runnerMinutes": 54,
+   "runner": "GitHub Actions 1000065982",
+   "labels": [
+    "windows-2025"
+   ]
+  },
+  {
+   "id": 118328776415,
+   "name": "decide",
+   "conclusion": "failure",
+   "startedAt": "2026-10-19T21:53:33Z",
+   "completedAt": "2026-10-19T21:53:56Z",
+   "runnerMinutes": 1,
+   "runner": "GitHub Actions 1000066012",
+   "labels": [
+    "ubuntu-24.04"
+   ]
+  }
+ ]
+}

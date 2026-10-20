@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Fetch run metadata (with per-job timings) and logs of the four CI dispatches; pack artifacts as .tar.gz.
+set -uo pipefail
+C25=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25
+O=$C25/stage/ci; mkdir -p $O
+for id in 39323628059 39323630837 39323635472 39323636839; do
+  gh api repos/juanmicrosoft/calor/actions/runs/$id > $O/run-$id.raw.json
+  gh api "repos/juanmicrosoft/calor/actions/runs/$id/jobs?filter=all&per_page=100" > $O/jobs-$id.raw.json
+  python3 - $O/run-$id.raw.json $O/jobs-$id.raw.json $O/run-$id.json <<'PY'
+import json, sys, math
+from datetime import datetime
+r = json.load(open(sys.argv[1])); j = json.load(open(sys.argv[2]))
+def mins(x):
+    if not x.get("started_at") or not x.get("completed_at"): return 0
+    a, b = (datetime.fromisoformat(x[k].replace("Z", "+00:00")) for k in ("started_at", "completed_at"))
+    return math.ceil((b - a).total_seconds() / 60)
+jobs = [{"id": x["id"], "name": x["name"], "conclusion": x["conclusion"], "startedAt": x["started_at"], "completedAt": x["completed_at"],
+         "runnerMinutes": mins(x), "runner": x.get("runner_name"), "labels": x.get("labels")} for x in j["jobs"]]
+out = {"id": r["id"], "runNumber": r["run_number"], "workflow": r["path"], "title": r["display_title"], "event": r["event"], "headBranch": r["head_branch"],
+       "headSha": r["head_sha"], "status": r["status"], "conclusion": r["conclusion"], "createdAt": r["created_at"], "updatedAt": r["updated_at"],
+       "runAttempt": r["run_attempt"], "url": r["html_url"], "runnerMinutes": sum(x["runnerMinutes"] for x in jobs), "jobs": jobs}
+json.dump(out, open(sys.argv[3], "w"), indent=1)
+print(r["id"], r["path"], r["conclusion"], out["runnerMinutes"], "min", r["head_sha"])
+PY
+  rm -f $O/run-$id.raw.json $O/jobs-$id.raw.json
+  mkdir -p $C25/ci/logs-$id && gh api repos/juanmicrosoft/calor/actions/runs/$id/logs > $C25/ci/logs-$id.zip
+  (cd $C25/ci/logs-$id && rm -rf x && mkdir x && cd x && unzip -q ../../logs-$id.zip && cd .. && tar czf $O/logs-$id.tar.gz -C x . && rm -rf x)
+done
+for d in det-39323628059 test-39323630837 t2-39323635472 rb-39323636839; do
+  id=${d#*-}
+  mkdir -p $O/artifacts-$id
+  for a in $C25/ci/$d/*/; do n=$(basename $a); case "$n" in reproducible-packages-build-*) continue;; esac; tar czf $O/artifacts-$id/$n.tar.gz -C $C25/ci/$d $n; done
+done
+ls -la $O $O/artifacts-* | head -60
