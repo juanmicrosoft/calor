@@ -406,6 +406,42 @@ rows, gates, the agreement rate, and record formats. The result gains the `harne
   It is also refused when that record is unreadable, unmerged, or merged into another branch.
 - The budget controls are updated to 3,200 and 795.
 
+## Amendment 1.7.0: a 70-minute macOS timeout and two runs on the re-frozen candidate
+
+**Decision** (@juanmicrosoft, 2026-10-20, relayed in the agent session; no GitHub record): "Raise cap to
+2,100, 2 runs." As relayed: set the osx-arm64 job timeout to 70 minutes and leave every other timeout as it
+is; raise the 0.25 epoch ceiling to 2,100 runner-minutes; allow up to 2 executions on the new frozen
+candidate, bound through the manifest; record 397 + 2 × 835 = 2,067 ≤ 2,100. Also recorded as R0 scope
+amendment 1.5.0 (`D-G2-RAISE-CAP-2-RUNS`), PR #1610.
+
+**Why.** The epoch's first execution, `v025-reproof-1` (run 39323628059, run number 7, on `48cae911`),
+returned INCOMPLETE: 660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE, 397 runner-minutes. osx-arm64 job 2 ran
+46 of its 50 minutes and the harness cut attempt 15. Its verification-full median was 143.4 s against
+105.9 s for job 1 (about 175 s per attempt against 128 s), so at its medians it needs about 3 + 15 × 175 s
+≈ 47 minutes. A 70-minute timeout leaves the harness 65 minutes, about 1.35 times that. The other
+environments finished: Linux jobs took 22-47 of 50-70 minutes, Windows jobs 45-54 of 110.
+
+**What changes** (`budget.releaseEpoch`, epoch runs only):
+
+| Field | 1.6.0 | 1.7.0 |
+|---|---|---|
+| osx-arm64 job timeout (`jobTimeoutMinutes`) | 50 | 70 |
+| Worst case per execution | 795 | 5 + 10 + 2 × (70 + 50 + 70 + 110 + 110) = 835 |
+| Executions in the epoch | 2 | 3: 1 run (`executionsBeforeAmendment`) + 2 on the re-frozen candidate |
+| Ceiling | 1,600 | 2,100 |
+| Worst case total | 2 × 795 = 1,590 | 397 (`spentBeforeAmendment`) + 2 × 835 = 2,067 |
+| Executions of one commit | 1 | 2 for the manifest's candidate (`maxExecutionsPerCandidate`) |
+
+Both new executions run only on the commit that the candidate manifest on protected main names (the 1.6.0
+binding). For that commit only, the one-execution-per-commit rule and the non-docs-change rule after a
+failed execution are replaced by the limit of 2. A second execution can only resolve an INCOMPLETE first
+one: both are retained and reported, and a NON-DETERMINISTIC or FAILING verdict of either stands for the
+candidate. The validator checks the block (D008): timeouts may only rise for registered environments, and
+the minutes spent plus each remaining execution's worst case must fit the ceiling. The plan step uses the
+epoch timeouts for its job matrix and budget. Unchanged: the 0.24 environment table and budget (runs 1-6),
+no re-run of any attempt, job or run, no control run, and every case, environment, attempt, determinism
+row, gate, agreement rate, decider rule and record format.
+
 ## Amendment 1.6.0: two executions for the 0.25 candidate
 
 **Decision** (@juanmicrosoft, 2026-10-19, relayed in the agent session; no GitHub record): "Amend: 2 runs

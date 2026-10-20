@@ -131,8 +131,10 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
             run["attemptsStarted"] = run["attemptsStarted"] or entry.get("attemptsStarted") is True
     b = protocol["budget"]
     execution_worst, control_worst, _ = dp.worst_case(protocol)
-    worst = {"execution": execution_worst, "control": control_worst, "unknown": execution_worst}
     epoch = b.get("releaseEpoch")
+    if epoch:  # amendment 1.7.0: an epoch execution's worst case uses the epoch's job timeouts
+        execution_worst = dp.epoch_worst_case(protocol)
+    worst = {"execution": execution_worst, "control": control_worst, "unknown": execution_worst}
     if epoch:
         # Amendment 1.6.0 (0.25 re-proof): every run after run number afterRunNumber belongs to the epoch, which has its
         # own execution limit and ceiling; the 0.24 runs before it are not charged to it. The executed-commit, unfinished-run
@@ -177,12 +179,18 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
     if mode == "execution":
         if any(r["status"] != "completed" for r in executions):
             problems.append("another execution is unfinished")
-        if any(r["headSha"] == commit for r in executions):
-            problems.append(f"commit {commit} was already executed; a commit is executed at most once (retryPolicy)")
+        # Amendment 1.7.0: in the epoch, the manifest's candidate (the only commit an epoch execution may run on) may be
+        # executed up to maxExecutionsPerCandidate times; every other commit, and every commit before the epoch, at most once.
+        same = [r for r in executions if r["headSha"] == commit]
+        per_commit = epoch.get("maxExecutionsPerCandidate", 1) if epoch and all(r in counted_executions for r in same) else 1
+        if len(same) >= per_commit:
+            problems.append(f"commit {commit} was already executed {len(same)} time(s); a commit is executed at most "
+                            f"{per_commit} time(s) (retryPolicy; protocol amendment 1.7.0 for the 0.25 candidate)")
         previous = max((r for r in executions if r["status"] == "completed"), key=lambda r: r["runNumber"], default=None)
         # The API does not expose a prior verdict, so every execution run that did not conclude success is
-        # treated as possibly NON-DETERMINISTIC or FAILING (fail closed).
-        if previous is not None and previous["conclusion"] != "success":
+        # treated as possibly NON-DETERMINISTIC or FAILING (fail closed). A re-execution of the same candidate
+        # (amendment 1.7.0) needs no repair: its verdict cannot replace a NON-DETERMINISTIC or FAILING one.
+        if previous is not None and previous["conclusion"] != "success" and previous["headSha"] != commit:
             paths = changed_paths(previous["headSha"], commit)
             if paths is None or not any(not p.startswith("docs/") for p in paths):
                 problems.append(f"after execution run {previous['id']} ({previous['conclusion']}) the next commit must change a "
@@ -194,7 +202,8 @@ def matrix(protocol, mode) -> dict:
     _, jobs, _ = shape(protocol, mode)
     include = []
     for env in protocol["environments"]:
-        timeout = protocol["control"]["jobTimeoutMinutes"] if mode == "control" else env["jobTimeoutMinutes"]
+        overrides = (protocol["budget"].get("releaseEpoch") or {}).get("jobTimeoutMinutes") or {}  # amendment 1.7.0
+        timeout = protocol["control"]["jobTimeoutMinutes"] if mode == "control" else overrides.get(env["id"], env["jobTimeoutMinutes"])
         projects = sorted({p["project"] for p in env_profiles(protocol, mode, env)})
         for job in range(1, jobs + 1):
             include.append({"env": env["id"], "job": job, "runner": env["runner"], "timeout": timeout,
