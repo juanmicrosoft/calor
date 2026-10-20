@@ -161,6 +161,7 @@ public class ReleaseGateScopePacketTests
     [InlineData("re-registration deltas inconsistent", false, "T1 corpus counts")]
     [InlineData("re-registration removed with an edited count", false, "T1 corpus counts")]
     [InlineData("corpus source redirected", false, "T1 corpus counts")]
+    [InlineData("re-registered count is a boolean", false, "T1 corpus counts")]
     [InlineData("scope directory changed after the candidate", true, "contract packet changed between")]
     [InlineData("register changed after the candidate", true, "T1 register or W1 records changed between")]
     public void PacketDefectsFail(string defect, bool afterCandidate, string message)
@@ -197,6 +198,11 @@ public class ReleaseGateScopePacketTests
                 case "re-registration measurement missing": EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["reRegistration"]!["measurement"]!["path"] = "docs/plans/evidence/v0.25-f2-906/ready/cases/no-such.json")); break;
                 case "re-registration removed with an edited count": EditJson(r, Register, g => Reseal(g, () => {
                     ((JsonObject)g["corpusCounts"]!).Remove("reRegistration"); g["corpusCounts"]!["counts"]!["opaqueExpressions"]!["after"] = 1; })); break;
+                case "re-registered count is a boolean":
+                    EditJson(r, Measurement, m => m["measurements"]![0]!["candidate"]!["incompleteDiagnostics"] = false);
+                    EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["reRegistration"]!["measurement"]!["sha256"] =
+                        Sha(Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(r.Root, Measurement)).Replace("\r\n", "\n")))));
+                    break;
                 case "corpus source redirected": EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["source"] = Register)); break;
                 case "re-registration deltas inconsistent": EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["reRegistration"]!["perPr"]![0]!["delta"]!["conversionVisits"] = -8)); break;
                 case "decision time not a time":

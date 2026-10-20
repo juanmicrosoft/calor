@@ -793,7 +793,9 @@ def corpus_problems(gate: Gate, commit: str, register: dict) -> list[str]:
         mine = mine if isinstance(mine, dict) else {}
         theirs = recorded.get(key) if isinstance(recorded.get(key), dict) else {}
         after = theirs.get("after") if rereg is None else (measured or {}).get(key)
-        bad = not is_int(mine.get("before")) or not is_int(mine.get("after")) or mine["before"] != theirs.get("before") or mine["after"] != after
+        # Every count is an integer (never a bool) before it is compared or added.
+        bad = not is_int(mine.get("before")) or not is_int(mine.get("after")) or not is_int(after) or not is_int(theirs.get("before")) \
+            or mine["before"] != theirs.get("before") or mine["after"] != after
         if rereg is not None and not bad:
             deltas = [(p.get("delta") or {}).get(key) if isinstance(p, dict) and isinstance(p.get("delta"), dict) else None for p in per_pr]
             bad = (rereg.get("previousAfter") or {}).get(key) != theirs.get("after") or any(not is_int(d) for d in deltas) \

@@ -110,6 +110,15 @@ public class T1RegisterTests
         ["measurement outside F2's ready records"] = ("T005", (r, _) => { ReRegistration(r)["measurement"]!["path"] = "docs/plans/evidence/v0.25-f2-906/rows.json"; return null; }),
         ["previous after rewritten"] = ("T005", (r, _) => { ReRegistration(r)["previousAfter"]!["opaqueBoundaries"] = 148; return null; }),
         ["re-registration without its amendment"] = ("T005", (r, _) => { ReRegistration(r)["amendment"] = "9.9.9"; return null; }),
+        // Codex Step A round 3: a non-integer count never matches, even when the measurement says the same thing.
+        ["re-registered count not an integer"] = ("T005", (r, _) => {
+            var path = ReRegistration(r)["measurement"]!["path"]!.GetValue<string>();
+            var file = JsonNode.Parse(ReadRepo(path)!)!;
+            file["measurements"]![0]!["candidate"]!["incompleteDiagnostics"] = "x";
+            var edited = Encoding.UTF8.GetBytes(file.ToJsonString());
+            ReRegistration(r)["measurement"]!["sha256"] = InteropScopeValidator.Sha256(edited);
+            r["corpusCounts"]!["counts"]!["incompleteDiagnostics"]!["after"] = "x";
+            return p => p == path ? edited : ReadRepo(p); }),
         ["interaction row without a control"] = ("T006", (r, _) => { Remove(r["controls"]!, "X-INT-07"); return null; }),
         ["interaction control weakened"] = ("T006", (r, _) => { Control(r, "X-INT-07")["expected"] = "native-or-preserved"; return null; }),
         ["mandatory control dropped"] = ("T006", (r, _) => { Remove(r["controls"]!, "T1-INTERP-HANDLER"); return null; }),

@@ -126,10 +126,11 @@ internal static class T1RegisterValidator
             {
                 var mine = corpus!["counts"]?[key];
                 var after = re is null ? recorded[key]?["after"] : candidateCounts?[key];
-                if (mine?["before"] is not JsonValue || mine["after"] is not JsonValue
-                    || !JsonNode.DeepEquals(mine["before"], recorded[key]?["before"]) || !JsonNode.DeepEquals(mine["after"], after)
+                // Every count is a JSON integer before it is compared or added (a string or boolean never matches).
+                if (!IsInteger(mine?["before"]) || !IsInteger(mine?["after"]) || !IsInteger(after)
+                    || !JsonNode.DeepEquals(mine!["before"], recorded[key]?["before"]) || !JsonNode.DeepEquals(mine["after"], after)
                     || (re is not null && (!JsonNode.DeepEquals(re["previousAfter"]?[key], recorded[key]?["after"])
-                        || perPr.Any(p => p["delta"]?[key] is not JsonValue dv || !dv.TryGetValue<int>(out _))
+                        || perPr.Any(p => !IsInteger(p["delta"]?[key]))
                         || Int(mine["before"]) + perPr.Sum(p => Int(p["delta"]?[key])) != Int(mine["after"]))))
                     Add("T005", key, "before/after count differs from F2's recorded count (or, re-registered, from the candidate's measurement and the per-PR deltas) or is missing");
             }
@@ -237,5 +238,7 @@ internal static class T1RegisterValidator
     private static IEnumerable<JsonNode> Arr(JsonNode? n) => n is JsonArray a ? a.OfType<JsonNode>() : [];
     private static string? Str(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : null;
     private static int Int(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<int>(out var i) ? i : 0;
+    private static bool IsInteger(JsonNode? n) => n is JsonValue v && v.GetValueKind() == JsonValueKind.Number && v.TryGetValue<int>(out _);
+
     private static bool NonBlank(JsonNode? n) => !string.IsNullOrWhiteSpace(Str(n));
 }
