@@ -286,6 +286,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("not json")]
     [InlineData("TRAILING-NEWLINE")]  // a full SHA plus "\n": .NET's $ would accept it (Codex re-freeze round 2)
     [InlineData("UPPERCASE")]
+    [InlineData("DUPLICATE-KEYS")]  // Codex re-freeze round 3: JsonNode throws ArgumentException on a duplicate key
     public void AManifestNamingNoFullCandidateIsUndecided(string manifest)
     {
         var candidate = _repo.Candidate();
@@ -293,6 +294,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         {
             "TRAILING-NEWLINE" => $"{{\"candidate\": {{\"commit\": \"{new string('a', 40)}\\n\"}}}}",
             "UPPERCASE" => $"{{\"candidate\": {{\"commit\": \"{new string('A', 40)}\"}}}}",
+            "DUPLICATE-KEYS" => $"{{\"candidate\": {{\"commit\": \"{new string('a', 40)}\"}}, \"candidate\": null}}",
             _ => manifest,
         };
         _repo.Commit((P.ManifestPath, manifest));
