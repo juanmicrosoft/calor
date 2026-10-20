@@ -442,9 +442,10 @@ its job matrix. Both window executions run only on the commit that the candidate
 names (the 1.6.0 binding). For that commit only, the one-execution-per-commit rule and the non-docs-change
 rule after a failed execution are replaced by the limit of 2. The second execution runs only after the
 first was decided INCOMPLETE with no DISAGREE and no AGREE-FAIL, and that decided record is committed on
-protected main at `priorResultPath` (`docs/plans/evidence/g2-1421/epoch-results/<runId>.json`), which the plan
-step reads. A NON-DETERMINISTIC or FAILING first execution, or one without its record, ends the epoch for the
-candidate. Both executions are retained and reported. The validator checks the block (D008): timeouts may only rise for registered
+protected main at `priorResultPath` (`docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/<runId>.json`), which the plan
+step reads. That directory is downstream evidence of the 0.25 candidate classifier, so adding the record does
+not invalidate the candidate. A NON-DETERMINISTIC or FAILING first execution, or one without its record, ends the
+epoch for the candidate. Both executions are retained and reported. The validator checks the block (D008): timeouts may only rise for registered
 environments, and the window's worst case must fit the window ceiling, which is the epoch ceiling minus
 what run 7 spent. Unchanged: the registered environment table and the 0.24 budget (runs 1-6), no re-run of
 any attempt, job or run, no control run, and every case, environment, attempt, determinism row, gate,

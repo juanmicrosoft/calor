@@ -564,7 +564,7 @@ class PlanGuards(unittest.TestCase):
             self.refused("named by docs/plans/evidence/v0.25-candidate/candidate-manifest.json", inventory=history, protocol=PROTOCOL, manifest=manifest)
         self.refused("outside docs/", inventory=history, paths=["docs/x.md"], **epoch)  # the re-frozen candidate still needs a repair
         second = history + [past(8, "determinism execution E8", sha=NEW, minutes=400, conclusion="failure")]
-        path = "docs/plans/evidence/g2-1421/epoch-results/8.json"
+        path = "docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/8.json"
         decided = {"schemaVersion": 1, "mode": "execution", "commit": NEW, "runIds": {"E8": "8"}, "verdict": "INCOMPLETE",
                    "classCounts": {"AGREE-PASS": 660, "DISAGREE": 0, "AGREE-FAIL": 0, "INCOMPLETE": 1644}, "protocolVersion": "1.7.0"}
         epoch["results"] = {path: decided}

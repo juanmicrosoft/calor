@@ -426,7 +426,7 @@
       "afterRunNumber": 7,
       "maxExecutions": 2,
       "maxExecutionsPerCandidate": 2,
-      "priorResultPath": "docs/plans/evidence/g2-1421/epoch-results/{runId}.json",
+      "priorResultPath": "docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/{runId}.json",
       "maxDispatchedControlRuns": 0,
       "ceilingRunnerMinutes": 1703,
       "jobTimeoutMinutes": {

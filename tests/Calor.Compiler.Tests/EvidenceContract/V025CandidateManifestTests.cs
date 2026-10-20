@@ -104,6 +104,20 @@ public class V025CandidateManifestTests
         return problems;
     }
 
+    /// <summary>G2 1.7.0: the decided record that lets the candidate run a second time is committed at priorResultPath,
+    /// which must be downstream evidence of this classifier, so adding it does not invalidate the candidate.</summary>
+    [Fact]
+    public void TheSecondExecutionsPriorResultIsDownstreamEvidence()
+    {
+        var protocol = JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "docs/plans/evidence/g2-1421/protocol.json")))!;
+        var path = Str(protocol["budget"]!["releaseEpoch"]!["priorResultPath"]).Replace("{runId}", "39400000000", StringComparison.Ordinal);
+        Assert.StartsWith("docs/plans/evidence/", path, StringComparison.Ordinal);
+        var added = Classify(V025, new CandidateInvalidation.Change("A", path, "000000", "100644", null, "{}"u8.ToArray()), CandidateInvalidation.Phase.AfterLanding);
+        Assert.True(added.Exempt, added.Reason);
+        var modified = Classify(V025, new CandidateInvalidation.Change("M", path, "100644", "100644", "{}"u8.ToArray(), "{ }"u8.ToArray()), CandidateInvalidation.Phase.AfterLanding);
+        Assert.False(modified.Exempt, modified.Reason);  // a recorded result is never rewritten
+    }
+
     [Fact]
     public void ASupersededCandidateStillFailsOnAnyOtherChange()
     {
