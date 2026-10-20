@@ -315,6 +315,27 @@ class CompareToolTests(unittest.TestCase):
             self.assertNotEqual(prints[0], prints[1])
             self.assertTrue(rb.sdk_fingerprint("", "10.0.401").startswith("unknown:"))
 
+    def test_release_builds_run_the_compiler_on_the_sdks_own_runtime(self) -> None:
+        # 0.25 re-proof: a runner image's newer 10.0 runtime changed every PDB's recorded runtime version and so the MVIDs.
+        with tempfile.TemporaryDirectory() as tmp:
+            sdk = Path(tmp) / "sdk" / "10.0.401"
+            sdk.mkdir(parents=True)
+            (sdk / "Microsoft.NETCoreSdk.BundledVersions.props").write_text(
+                "<Project><PropertyGroup><BundledNETCoreAppPackageVersion>10.0.12</BundledNETCoreAppPackageVersion></PropertyGroup></Project>")
+            sdks = f"10.0.401 [{Path(tmp) / 'sdk'}]\n"
+            own = "Microsoft.AspNetCore.App 10.0.13 [/x]\nMicrosoft.NETCore.App 8.0.32 [/x]\nMicrosoft.NETCore.App 10.0.12 [/x]\n"
+            self.assertEqual([], rb.runtime_problems(sdks, own, "10.0.401"))  # another major or another framework does not matter
+            self.assertEqual("10.0.12", rb.host_runtime(own, "10.0.401"))
+            newer = own + "Microsoft.NETCore.App 10.0.13 [/x]\n"
+            self.assertEqual("10.0.13", rb.host_runtime(newer, "10.0.401"))
+            self.assertTrue(rb.runtime_problems(sdks, newer, "10.0.401"))
+            self.assertTrue(rb.runtime_problems(sdks, "Microsoft.NETCore.App 10.0.13 [/x]\n", "10.0.401"))  # own one missing
+            self.assertTrue(rb.runtime_problems(sdks, own, "10.0.402"))  # SDK not listed
+            self.assertTrue(rb.host_runtime("", "10.0.401").startswith("unknown:"))
+        for wf in ("reproducible-builds.yml", "publish-nuget.yml"):
+            text = (REPO_ROOT / ".github" / "workflows" / wf).read_text(encoding="utf-8")
+            self.assertIn("python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401", text, wf)
+
     def test_tree_digest_is_the_release_gate_digest(self) -> None:
         import verify_release_adjudication as gate
         self.assertIs(gate.tree_digest, rb.tree_digest)
