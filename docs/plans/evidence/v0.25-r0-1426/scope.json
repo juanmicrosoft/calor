@@ -3394,7 +3394,39 @@
           "supersedes": "48cae911700ceb0dfc358e00933650445d81604f",
           "question": "The 0.25 re-proof's determinism execution on 48cae911 (G2 protocol 1.6.0, run 39323628059) returned INCOMPLETE (660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE): a slow osx-arm64 runner hit its job timeout. Protocol 1.6.0 forbids a second execution on the same commit.",
           "relayedDetail": "Amend the G2 protocol so a slow runner finishes, then re-freeze the candidate at this amendment's merge commit and re-run the re-proof there.",
-          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record.",
+          "permittedPaths": [
+            ".github/workflows/publish-nuget.yml",
+            ".github/workflows/reproducible-builds.yml",
+            "CHANGELOG.md",
+            "docs/plans/evidence/g2-1421/README.md",
+            "docs/plans/evidence/g2-1421/protocol.json",
+            "docs/plans/evidence/g2-1421/sha256.json",
+            "docs/plans/evidence/v0.25-d1-1427/contract.json",
+            "docs/plans/evidence/v0.25-r0-1426/scope.json",
+            "docs/plans/evidence/v0.25-t1-1428/README.md",
+            "docs/plans/evidence/v0.25-t1-1428/register.json",
+            "docs/plans/evidence/v0.25-w1-1429/records.json",
+            "docs/plans/v0.25-interop-scope-and-baseline.md",
+            "docs/plans/v0.25-refout-contract.md",
+            "eng/test-manifest.json",
+            "scripts/determinism_protocol.py",
+            "scripts/determinism_runner.py",
+            "scripts/reproducible_builds.py",
+            "scripts/test_determinism_protocol.py",
+            "scripts/test_reproducible_builds.py",
+            "scripts/verify_release_adjudication.py",
+            "tests/Calor.Compiler.Tests/EvidenceContract/V025CandidateManifestTests.cs",
+            "tests/Calor.Compiler.Tests/InteropScope/InteropScopeTests.cs",
+            "tests/Calor.Compiler.Tests/InteropScope/InteropScopeValidator.cs",
+            "tests/Calor.Compiler.Tests/InteropScope/RefOutContractTests.cs",
+            "tests/Calor.Compiler.Tests/InteropScope/T1RegisterTests.cs",
+            "tests/Calor.Compiler.Tests/InteropScope/T1RegisterValidator.cs",
+            "tests/Calor.Compiler.Tests/ReleaseGate/ReleaseGateScopePacketTests.cs",
+            "website/content/changelog.mdx",
+            "website/tests/public-claims.spec.ts"
+          ],
+          "supersessionRule": "Until the re-freeze lands a candidate manifest naming the successor, the classifier test reports 48cae911 as superseded only while every invalidating change is to one of permittedPaths (this amendment PR's files; none under src/). Any other change still fails the test."
         },
         {
           "id": "D-G2-RAISE-CAP-2-RUNS",
@@ -3424,7 +3456,10 @@
           "question": "F4-ITER-04 (the three historical FluentValidation modules with project references) cannot be measured as preserved on any CLI surface on the candidate.",
           "relayedDetail": "Reclassify F4-ITER-04 as not-measured, with the recorded reason (single-file and MCP refuse it on unresolved references; migrate refuses the whole project over unrelated files), and note that F4's other cases prove the behavior.",
           "recordedAs": "notMeasuredCases in this amendment (S004; READY records the case as skipped, S007)",
-          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record.",
+          "notMeasured": [
+            "F4-ITER-04"
+          ]
         },
         {
           "id": "D-ACCEPT-READINGS",

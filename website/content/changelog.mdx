@@ -111,9 +111,10 @@ contract in `docs/plans/v0.25-refout-contract.md` (#1427).
   FluentValidation), 33 more members and types are kept as C#. In 31, an `out var` cannot be
   lowered: the one-file conversion cannot resolve its type, it sits in a lambda, or part of its
   statement already stays C#. The other 2 declare a method-generic `out T` parameter. Before,
-  most of the first group became an untyped binding that failed with `Calor0250`. The native
-  source expressions over the corpora drop from 35,177 to 34,371 (2.3%), and 10 more of 364
-  modules now get through binding to effect checking.
+  most of the first group became an untyped binding that failed with `Calor0250`. The number of
+  expressions the binder visits over the corpora drops from 35,177 to 34,371 (2.3%). That count
+  includes references the converter generates and expressions kept as C#, so it does not measure
+  how much converts natively. 10 more of 364 modules now get through binding to effect checking.
 
 These are checked by tests that compile every case in the contract, and by convert, compile
 and run comparisons on the CLI, `calor migrate` and MCP conversion paths. All 57 Calor cases

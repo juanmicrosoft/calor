@@ -56,6 +56,11 @@ PACKET_FORMAT_1407 = "calor.evidence-contract-packet/1407"
 PACKET_FORMAT_1426 = "calor.v0.25-scope-packet/1426"
 SCOPE_SCHEMA_1426 = "v0.25-interop-scope/1"
 T1_REGISTER_1426 = "docs/plans/evidence/v0.25-t1-1428/register.json"
+# InteropScopeValidator.ApprovedNotMeasured: the approved not-measured markings (scope amendment, decision, case).
+APPROVED_NOT_MEASURED_1426 = {("1.5.0", "D-F4-ITER-04-NOT-MEASURED", "F4-ITER-04")}
+# T1RegisterValidator T005 (register 1.0.3): F2's ready/ records and the corpus count keys.
+F2_READY_1426 = "docs/plans/evidence/v0.25-f2-906/ready/"
+CORPUS_KEYS_1426 = ("incompleteDiagnostics", "inRepoExpressionsBound", "conversionVisits", "opaqueBoundaries", "opaqueExpressions")
 W1_RECORDS_1426 = "docs/plans/evidence/v0.25-w1-1429/records.json"
 T1_SCHEMA_1426 = "calor.v0.25.t1-register/1"
 W1_SCHEMA_1426 = "calor.v0.25.w1-family-records/1"
@@ -717,7 +722,10 @@ def _replay(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, str]], 
             nid = jstr(marked.get("id")) or ""
             family = jstr(registry[nid].get("family")) if nid in active else None
             covered = marked.get("coveredBy") if isinstance(marked.get("coveredBy"), list) else []
-            if family is None or jstr(marked.get("family")) != family or not nonblank(marked.get("reason")) or not nonblank(marked.get("decision")) \
+            decision = jstr(marked.get("decision")) or ""
+            approved = (version, decision, nid) in APPROVED_NOT_MEASURED_1426 and any(
+                isinstance(d, dict) and d.get("id") == decision and nid in (d.get("notMeasured") or []) for d in json_items(amendment.get("maintainerDecisions")))
+            if not approved or family is None or jstr(marked.get("family")) != family or not nonblank(marked.get("reason")) or not nonblank(marked.get("decision")) \
                     or not covered or any(not isinstance(x, str) or x == nid or x not in active or jstr(registry[x].get("family")) != family
                                           or x in not_measured for x in covered) or nid in not_measured:
                 problems.append((nid, f"amendment {version} marks a case not-measured without its family, reason, decision and "
@@ -745,6 +753,42 @@ def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, st
     """A port of InteropScopeValidator S004 (_replay): the (case, problem) pairs and the (family, version) pairs touched."""
     problems, touched, _ = _replay(scope)
     return problems, touched
+
+
+def reregistration_problems(gate: Gate, commit: str, register: dict) -> list[str]:
+    """A port of T1RegisterValidator T005 for a re-registration: the counts equal F2's retained candidate measurement,
+    'before' and the previous 'after' equal F2's rows.json, and before plus every PR's delta gives after."""
+    cc = register.get("corpusCounts") if isinstance(register.get("corpusCounts"), dict) else {}
+    rereg = cc.get("reRegistration") if isinstance(cc.get("reRegistration"), dict) else {}
+    meas = rereg.get("measurement") if isinstance(rereg.get("measurement"), dict) else {}
+    path = meas.get("path")
+    blob = gate.blob(commit, path) if isinstance(path, str) and path.startswith(F2_READY_1426) and ".." not in path.split("/") else None
+    try:
+        record = json.loads(blob) if blob is not None else None
+    except ValueError:
+        record = None
+    record = record if isinstance(record, dict) else {}
+    measured = next((m.get("candidate") for m in record.get("measurements", []) if isinstance(m, dict) and m.get("kind") == "corpus-counts"), None)
+    measured = measured if isinstance(measured, dict) else None
+    per_pr = rereg.get("perPr") if isinstance(rereg.get("perPr"), list) else []
+    versions = {a.get("version") for a in register.get("amendments", []) if isinstance(a, dict)}
+    problems = []
+    if rereg.get("amendment") not in versions or blob is None or lf_sha256(blob) != meas.get("sha256") or record.get("caseId") != "F2-INTERP-09" \
+            or not SHA40.match(str(rereg.get("measuredOn", ""))) or record.get("candidate") != rereg.get("measuredOn") or measured is None \
+            or not per_pr or any(not isinstance(p, dict) or not is_int(p.get("pr")) or p["pr"] <= 0 or not SHA40.match(str(p.get("mergeCommit", ""))) for p in per_pr):
+        problems.append(f"it needs its register amendment, F2's measurement under {F2_READY_1426} at its hash, the candidate and per-PR deltas")
+    source = json_blob(gate, commit, str(cc.get("source", ""))) or {}
+    recorded = source.get("corpusCounts") if isinstance(source.get("corpusCounts"), dict) else {}
+    for key in CORPUS_KEYS_1426:
+        mine = (cc.get("counts") or {}).get(key) if isinstance(cc.get("counts"), dict) else None
+        mine = mine if isinstance(mine, dict) else {}
+        theirs = recorded.get(key) if isinstance(recorded.get(key), dict) else {}
+        deltas = [(p.get("delta") or {}).get(key) if isinstance(p, dict) and isinstance(p.get("delta"), dict) else None for p in per_pr]
+        if not is_int(mine.get("before")) or not is_int(mine.get("after")) or mine["before"] != theirs.get("before") \
+                or measured is None or mine["after"] != measured.get(key) or (rereg.get("previousAfter") or {}).get(key) != theirs.get("after") \
+                or any(not is_int(d) for d in deltas) or mine["before"] + sum(deltas) != mine["after"]:
+            problems.append(f"{key}: the count differs from the candidate's measurement, F2's rows.json or the per-PR deltas")
+    return problems
 
 
 def not_measured_cases(scope: dict) -> set[str]:
@@ -823,6 +867,8 @@ def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tu
     corpus = f"corpus {counts.get('source')} {json.dumps(counts.get('counts'), separators=(',', ':'))}"
     if "reRegistration" in counts:  # T1 register 1.0.3 (D-F2-INTERP-09-RECANDIDATE): T1RegisterValidator.ApprovalSeal seals it too
         corpus += f" reRegistration {dotnet_json(counts['reRegistration'])}"
+        for problem in reregistration_problems(gate, commit, register):
+            gate.fail("G005", f"T1 corpus re-registration (T005): {problem}")
     recomputed = sha256("\n".join(sorted([line for line, _, _ in lines] + [corpus])).encode())
     if any(not isinstance(p, str) or lf_sha256(gate.blob(commit, p)) != h for _, p, h in lines) or recomputed != approved:
         gate.fail("G005", "the T1 register's approved evidence, fixtures or results differ from its approval seal")

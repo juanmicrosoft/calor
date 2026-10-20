@@ -247,7 +247,10 @@ internal static class InteropScopeValidator
                 var nid = Str(nm["id"]) ?? "";
                 var family = active.Contains(nid) ? Str(registry[nid]["family"]) : null;
                 var covered = Arr(nm["coveredBy"]).Select(Str).ToList();
-                if (family is null || Str(nm["family"]) != family || !NonBlank(nm["reason"]) || !NonBlank(nm["decision"]) || covered.Count == 0
+                // The marking must be a pinned, approved decision for exactly this case, recorded in the same amendment.
+                var approved = ApprovedNotMeasured.Contains((version, Str(nm["decision"]) ?? "", nid))
+                    && Arr(a["maintainerDecisions"]).Any(d => Str(d["id"]) == Str(nm["decision"]) && Arr(d["notMeasured"]).Any(x => Str(x) == nid));
+                if (!approved || family is null || Str(nm["family"]) != family || !NonBlank(nm["reason"]) || !NonBlank(nm["decision"]) || covered.Count == 0
                     || covered.Any(x => x is null || x == nid || !active.Contains(x) || Str(registry[x]["family"]) != family || notMeasured.Contains(x))
                     || !notMeasured.Add(nid))
                     v.Add(new("S004", nid, $"amendment {version} marks a case not-measured without its family, reason, decision and measured cases of the family that cover it"));
@@ -612,6 +615,11 @@ internal static class InteropScopeValidator
     private static string Codes(JsonNode? n) => string.Join(",", Arr(n).Select(Str));
     private static bool NonBlank(JsonNode? n) => !string.IsNullOrWhiteSpace(Str(n));
     private static bool IsInt(JsonNode? n) => n is JsonValue jv && jv.GetValueKind() == JsonValueKind.Number && jv.TryGetValue<int>(out _);
+    /// <summary>The maintainer-approved not-measured markings: (scope amendment, decision, case). Amendment 1.5.0:
+    /// D-F4-ITER-04-NOT-MEASURED ("Amend to not-measured", @juanmicrosoft, 2026-10-20).</summary>
+    public static readonly HashSet<(string Version, string Decision, string Case)> ApprovedNotMeasured =
+        [("1.5.0", "D-F4-ITER-04-NOT-MEASURED", "F4-ITER-04")];
+
     internal static bool IsFullSha(string? s) => s is not null && FullSha.IsMatch(s);
     private static IEnumerable<JsonNode> Arr(JsonNode? n) => n is JsonArray a ? a.OfType<JsonNode>() : [];
     private static string? Str(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : null;

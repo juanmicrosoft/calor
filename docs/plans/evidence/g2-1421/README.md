@@ -440,9 +440,11 @@ main's validator also checks; the binding worst case is `worstCaseWithEpochTimeo
 every epoch run to the 2,100 ceiling, reserves 835 for the run it plans, and uses the 70-minute timeout in
 its job matrix. Both window executions run only on the commit that the candidate manifest on protected main
 names (the 1.6.0 binding). For that commit only, the one-execution-per-commit rule and the non-docs-change
-rule after a failed execution are replaced by the limit of 2. A second execution can only resolve an
-INCOMPLETE first one: both are retained and reported, and a NON-DETERMINISTIC or FAILING verdict of either
-stands for the candidate. The validator checks the block (D008): timeouts may only rise for registered
+rule after a failed execution are replaced by the limit of 2. The second execution runs only after the
+first was decided INCOMPLETE with no DISAGREE and no AGREE-FAIL, and that decided record is committed on
+protected main at `priorResultPath` (`docs/plans/evidence/g2-1421/epoch-results/<runId>.json`), which the plan
+step reads. A NON-DETERMINISTIC or FAILING first execution, or one without its record, ends the epoch for the
+candidate. Both executions are retained and reported. The validator checks the block (D008): timeouts may only rise for registered
 environments, and the window's worst case must fit the window ceiling, which is the epoch ceiling minus
 what run 7 spent. Unchanged: the registered environment table and the 0.24 budget (runs 1-6), no re-run of
 any attempt, job or run, no control run, and every case, environment, attempt, determinism row, gate,

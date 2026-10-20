@@ -574,6 +574,7 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             and raised and ep["afterRunNumber"] >= 1 and ep["maxExecutions"] >= 1 and ep["maxDispatchedControlRuns"] == 0 \
             and computed is not None and ep["worstCaseTotal"] == ep["maxExecutions"] * computed[0] and ep["worstCaseTotal"] <= ep["ceilingRunnerMinutes"] \
             and whole(per_candidate) and 1 <= per_candidate <= ep["maxExecutions"] \
+            and (per_candidate == 1 or re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/\{runId\}\.json$", str(ep.get("priorResultPath", "")))) \
             and ep.get("amendment") in {a.get("version") for a in log} \
             and re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/candidate-manifest\.json$", str(ep.get("candidateManifest", ""))) is not None
         window = ("epochAfterRunNumber", "epochCeilingRunnerMinutes", "spentBeforeWindow", "worstCasePerExecution", "worstCaseWithEpochTimeouts")

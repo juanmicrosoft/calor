@@ -175,7 +175,8 @@ class NegativeRegistrationControls(unittest.TestCase):
                      lambda e: e.update(maxExecutionsPerCandidate=3), lambda e: e.update(maxExecutionsPerCandidate=True),
                      lambda e: e.update(worstCasePerExecution=795), lambda e: e.update(worstCaseWithEpochTimeouts=1590),
                      lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 40}), lambda e: e.update(jobTimeoutMinutes={"osx-x64": 70}),
-                     lambda e: e.update(jobTimeoutMinutes={"osx-arm64": "70"}), lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 200})):
+                     lambda e: e.update(jobTimeoutMinutes={"osx-arm64": "70"}), lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 200}),
+                     lambda e: e.pop("priorResultPath"), lambda e: e.update(priorResultPath="docs/plans/evidence/g2-1421/latest.json")):
             self.only("D008", protocol=mutate(lambda p, edit=edit: edit(p["budget"]["releaseEpoch"])))
         # The 1.6.0 shape (no window) is still judged by its own formula.
         legacy = mutate(lambda p: p["budget"].update(releaseEpoch={k: v for k, v in p["budget"]["releaseEpoch"].items() if k in (
@@ -542,11 +543,12 @@ class PlanGuards(unittest.TestCase):
     """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
 
     def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",), ledger=None,
-             current=True, merge=None, protocol=PRE_EPOCH, manifest=None) -> list[str]:
+             current=True, merge=None, protocol=PRE_EPOCH, manifest=None, results=None) -> list[str]:
         runs = list(inventory) + ([this_run(mode, execution_id)] if current else [])
         return dr.plan_problems(protocol, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
                                 ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths),
-                                pr_merge_commit=lambda pr: merge, manifest_candidate=lambda path: manifest)
+                                pr_merge_commit=lambda pr: merge, manifest_candidate=lambda path: manifest,
+                                committed_result=lambda path: (results or {}).get(path))
 
     def test_release_epoch_allows_two_executions_on_the_manifest_candidate(self) -> None:
         # Amendment 1.6.0: runs 1-6 are the 0.24 history (4 executions, 1,608 minutes); the epoch charges only later runs.
@@ -562,7 +564,17 @@ class PlanGuards(unittest.TestCase):
             self.refused("named by docs/plans/evidence/v0.25-candidate/candidate-manifest.json", inventory=history, protocol=PROTOCOL, manifest=manifest)
         self.refused("outside docs/", inventory=history, paths=["docs/x.md"], **epoch)  # the re-frozen candidate still needs a repair
         second = history + [past(8, "determinism execution E8", sha=NEW, minutes=400, conclusion="failure")]
+        path = "docs/plans/evidence/g2-1421/epoch-results/8.json"
+        decided = {"schemaVersion": 1, "mode": "execution", "commit": NEW, "runIds": {"E8": "8"}, "verdict": "INCOMPLETE",
+                   "classCounts": {"AGREE-PASS": 660, "DISAGREE": 0, "AGREE-FAIL": 0, "INCOMPLETE": 1644}, "protocolVersion": "1.7.0"}
+        epoch["results"] = {path: decided}
         self.assertEqual([], self.plan(inventory=second, paths=["docs/x.md"], **epoch))  # the same candidate again: 797 + 835 <= 2,100
+        # Only after a recorded INCOMPLETE first execution with no disagreement or agreed failure.
+        for bad in ({}, {path: dict(decided, verdict="NON-DETERMINISTIC")}, {path: dict(decided, verdict="FAILING")},
+                    {path: dict(decided, classCounts=dict(decided["classCounts"], DISAGREE=1))},
+                    {path: dict(decided, classCounts=dict(decided["classCounts"], **{"AGREE-FAIL": 2}))},
+                    {path: dict(decided, commit=OLD)}, {path: dict(decided, runIds={"E8": "9"})}, {path: dict(decided, protocolVersion="1.6.0")}):
+            self.refused("may run again only after", inventory=second, paths=["docs/x.md"], **dict(epoch, results=bad))
         self.refused("executed at most 1 time", inventory=second, protocol=PRE_EPOCH)  # once per commit outside the epoch
         third = second + [past(9, "determinism execution E9b", sha=NEW, minutes=400)]
         self.refused("already executed 2 time(s)", inventory=third, **epoch)

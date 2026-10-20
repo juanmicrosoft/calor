@@ -261,6 +261,7 @@ for (const width of [1366, 390]) {
       'never reached NuGet',
       'frozen with the release candidate on 2026-10-20, before the 0.25 acceptance',
       'The candidate was re-frozen once',
+      'does not measure',
       'No family was ready',
       'Independence is reduced',
       'at most bounded']) {

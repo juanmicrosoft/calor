@@ -237,6 +237,12 @@ public class InteropScopeTests
         ["not-measured case covered by nothing"] = ("S004", scope => { NotMeasuredEntry(scope)["coveredBy"] = new JsonArray(); return null; }),
         ["not-measured case in the wrong family"] = ("S004", scope => { NotMeasuredEntry(scope)["family"] = "F5"; return null; }),
         ["not-measured unregistered case"] = ("S004", scope => { NotMeasuredEntry(scope)["id"] = "F4-ITER-99"; return null; }),
+        ["not-measured marking retargeted to another case"] = ("S004", scope => {
+            NotMeasuredEntry(scope)["id"] = "F4-ITER-02"; NotMeasuredEntry(scope)["coveredBy"] = new JsonArray("F4-ITER-01"); return null; }),
+        ["not-measured marking under an unapproved decision"] = ("S004", scope => { NotMeasuredEntry(scope)["decision"] = "UNAPPROVED-DECISION"; return null; }),
+        ["approved decision no longer names the case"] = ("S004", scope => {
+            scope["amendments"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.5.0")!["maintainerDecisions"]!.AsArray()
+                .Single(d => d!["id"]!.GetValue<string>() == "D-F4-ITER-04-NOT-MEASURED")!["notMeasured"] = new JsonArray("F4-ITER-02"); return null; }),
         ["READY with README as example"] = ("S007", scope => { Ready(scope)["websiteExamples"] = new JsonArray("README.md"); return null; }),
         ["READY with README as review"] = ("S007", scope => { Ready(scope)["reviews"]![0]!["record"] = "README.md"; return null; }),
         ["READY with a bare approval URL"] = ("S007", scope => { Ready(scope)["approver"]!["approvalUrl"] = "https://github.com/"; return null; }),

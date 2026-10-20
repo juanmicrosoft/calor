@@ -98,12 +98,13 @@ def classify(run) -> str:
 
 
 def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, pr_merge_commit=None,
-                  manifest_candidate=None) -> list[str]:
+                  manifest_candidate=None, committed_result=None) -> list[str]:
     """Guards before any attempt runs. inventory is every run of the workflow from the GitHub API
     (fetch_inventory); ledger is #1135's ledger (entries with runId, commit, mode, runnerMinutes);
     changed_paths(old, new) lists changed paths, or None if git cannot tell; pr_merge_commit(pr) gives the full SHA
     GitHub recorded as that PR's merge into main, or None if it cannot tell (amendment 1.5.0); manifest_candidate(path)
-    gives candidate.commit of that manifest on protected main, or None if it cannot tell (amendment 1.6.0)."""
+    gives candidate.commit of that manifest on protected main, or None if it cannot tell (amendment 1.6.0);
+    committed_result(path) gives that JSON file on protected main, or None (amendment 1.7.0)."""
     problems = []
     if env.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
         problems.append(f"event {env.get('GITHUB_EVENT_NAME')}: only a workflow_dispatch run may execute the protocol")
@@ -190,10 +191,21 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
         if len(same) >= per_commit:
             problems.append(f"commit {commit} was already executed {len(same)} time(s); a commit is executed at most "
                             f"{per_commit} time(s) (retryPolicy; protocol amendment 1.7.0 for the 0.25 candidate)")
+        for r in same if len(same) < per_commit else []:
+            # Amendment 1.7.0: the candidate runs again only after its execution was decided INCOMPLETE with no DISAGREE and
+            # no AGREE-FAIL, as the decided record committed on protected main says; anything else refuses.
+            path = str(epoch.get("priorResultPath", "")).replace("{runId}", str(r["id"]))
+            rec = committed_result(path) if committed_result and path else None
+            counts = rec.get("classCounts") if isinstance(rec, dict) and isinstance(rec.get("classCounts"), dict) else {}
+            if not isinstance(rec, dict) or rec.get("schemaVersion") != 1 or rec.get("mode") != "execution" or rec.get("commit") != commit \
+                    or str(r["id"]) not in [str(v) for v in (rec.get("runIds") or {}).values()] or rec.get("verdict") != "INCOMPLETE" \
+                    or counts.get("DISAGREE") != 0 or counts.get("AGREE-FAIL") != 0 or rec.get("protocolVersion") != protocol["protocolVersion"]:
+                problems.append(f"commit {commit} may run again only after its execution run {r['id']} was decided INCOMPLETE with no "
+                                f"DISAGREE or AGREE-FAIL, recorded at {path or 'priorResultPath'} on protected main (protocol amendment 1.7.0)")
         previous = max((r for r in executions if r["status"] == "completed"), key=lambda r: r["runNumber"], default=None)
         # The API does not expose a prior verdict, so every execution run that did not conclude success is
         # treated as possibly NON-DETERMINISTIC or FAILING (fail closed). A re-execution of the same candidate
-        # (amendment 1.7.0) needs no repair: its verdict cannot replace a NON-DETERMINISTIC or FAILING one.
+        # (amendment 1.7.0) needs no repair: it runs only after an INCOMPLETE first execution (checked above).
         if previous is not None and previous["conclusion"] != "success" and previous["headSha"] != commit:
             paths = changed_paths(previous["headSha"], commit)
             if paths is None or not any(not p.startswith("docs/") for p in paths):
@@ -289,12 +301,21 @@ def pr_merge_commit(repo: str, token: str, pr: int, get=api):
     return data.get("merge_commit_sha") if merged else None
 
 
-def manifest_candidate(path: str, ref: str = "origin/main"):
-    """Amendment 1.6.0: candidate.commit of the candidate manifest on protected main, or None (fail closed)."""
+def committed_result(path: str, ref: str = "origin/main"):
+    """Amendment 1.7.0: a JSON file as committed on protected main, or None (fail closed)."""
     result = subprocess.run(["git", "show", f"{ref}:{path}"], cwd=ROOT, capture_output=True, check=False)
     try:
-        commit = json.loads(result.stdout)["candidate"]["commit"] if result.returncode == 0 else None
-    except (ValueError, KeyError, TypeError):
+        return json.loads(result.stdout) if result.returncode == 0 else None
+    except ValueError:
+        return None
+
+
+def manifest_candidate(path: str, ref: str = "origin/main"):
+    """Amendment 1.6.0: candidate.commit of the candidate manifest on protected main, or None (fail closed)."""
+    data = committed_result(path, ref)
+    try:
+        commit = data["candidate"]["commit"] if data is not None else None
+    except (KeyError, TypeError):
         return None
     return commit if isinstance(commit, str) else None
 
@@ -315,7 +336,7 @@ def cmd_plan(args, env=os.environ) -> int:
     problems += plan_problems(protocol, mode=args.mode, execution_id=args.execution_id, env=env, inventory=inventory,
                               ledger=load_ledger(protocol), changed_paths=changed_paths,
                               pr_merge_commit=lambda pr: pr_merge_commit(env["GITHUB_REPOSITORY"], env["GH_TOKEN"], pr),
-                              manifest_candidate=manifest_candidate)
+                              manifest_candidate=manifest_candidate, committed_result=committed_result)
     print(json.dumps({"inventory": inventory}, indent=1))
     if problems:
         print("\n".join(f"REFUSED: {p}" for p in problems))

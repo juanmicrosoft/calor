@@ -67,8 +67,9 @@ public class V025CandidateManifestTests
         // that instead of claiming NOT-INVALIDATED. A run with an explicit target (the regeneration, A1) is never excused.
         if (string.IsNullOrWhiteSpace(requested) && SupersedingDecision(candidate) is { } superseding)
         {
-            _output.WriteLine($"candidate {candidate} is superseded by {superseding}");
-            Assert.True(report.Verdict == CandidateInvalidation.Invalid, report.ToString());
+            _output.WriteLine($"candidate {candidate} is superseded by {Str(superseding["id"])}");
+            var problems = SupersessionProblems(report, superseding);
+            Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems) + Environment.NewLine + report);
             return;
         }
         if (!string.IsNullOrWhiteSpace(requested))
@@ -82,11 +83,40 @@ public class V025CandidateManifestTests
             Assert.Contains(report.Commits.SelectMany(c => c.Decisions), d => d.Path == V025.ManifestPath);
     }
 
-    /// <summary>The maintainer decision in the R0 scope packet that supersedes this candidate (its <c>supersedes</c>), or null.</summary>
-    private static string? SupersedingDecision(string candidate) =>
+    /// <summary>The approved superseding decision: D-AMEND-REFREEZE ("Amend + re-freeze", @juanmicrosoft, 2026-10-20) in
+    /// R0 scope amendment 1.5.0, when it names this candidate; any other supersedes entry is ignored.</summary>
+    private static JsonNode? SupersedingDecision(string candidate) =>
         JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), ScopeDir, "scope.json")))!["amendments"]!.AsArray()
-            .SelectMany(a => a!["maintainerDecisions"]?.AsArray() ?? [])
-            .Where(d => Str(d!["supersedes"]) == candidate).Select(d => Str(d!["id"])).FirstOrDefault();
+            .Where(a => Str(a!["version"]) == "1.5.0").SelectMany(a => a!["maintainerDecisions"]?.AsArray() ?? [])
+            .FirstOrDefault(d => Str(d!["id"]) == "D-AMEND-REFREEZE" && Str(d["supersedes"]) == candidate);
+
+    /// <summary>While superseded, the range may be invalidated only by the superseding amendment's own files (its
+    /// permittedPaths, none under src/), and the classifier must have read every commit.</summary>
+    internal static List<string> SupersessionProblems(CandidateInvalidation.Report report, JsonNode decision)
+    {
+        var permitted = (decision["permittedPaths"]?.AsArray() ?? []).Select(Str).ToHashSet();
+        var problems = report.Errors.Select(e => $"classifier error: {e}").ToList();
+        if (permitted.Count == 0 || permitted.Any(p => p.StartsWith("src/", StringComparison.Ordinal)))
+            problems.Add("the superseding decision must list its permitted paths, none under src/");
+        foreach (var d in report.Commits.SelectMany(c => c.Decisions.Where(x => !x.Exempt).Select(x => (c.Commit, x.Path))).Distinct())
+            if (!permitted.Contains(d.Path))
+                problems.Add($"{d.Commit[..8]} changes {d.Path}, which the superseding amendment does not permit");
+        return problems;
+    }
+
+    [Fact]
+    public void ASupersededCandidateStillFailsOnAnyOtherChange()
+    {
+        var decision = new JsonObject { ["id"] = "D-AMEND-REFREEZE", ["permittedPaths"] = new JsonArray("scripts/determinism_runner.py") };
+        CandidateInvalidation.Report Range(params string[] paths) => new(CandidateInvalidation.Invalid, new string('1', 40),
+            [new CandidateInvalidation.CommitReport(new string('2', 40), new string('1', 40), CandidateInvalidation.Phase.AfterLanding,
+                paths.Select(p => new CandidateInvalidation.Decision(p, false, "registered input")).ToList())], []);
+        Assert.Empty(SupersessionProblems(Range("scripts/determinism_runner.py"), decision));
+        Assert.Contains(SupersessionProblems(Range("scripts/determinism_runner.py", "src/Calor.Compiler/Program.cs"), decision),
+            p => p.Contains("src/Calor.Compiler/Program.cs", StringComparison.Ordinal));
+        decision["permittedPaths"]!.AsArray().Add("src/Calor.Compiler/Program.cs");
+        Assert.Contains(SupersessionProblems(Range("scripts/determinism_runner.py"), decision), p => p.Contains("none under src/", StringComparison.Ordinal));
+    }
 
     /// <summary>
     /// Trust anchor: an explicit target is judged only by the reviewed classifier, so the running checkout must be the
