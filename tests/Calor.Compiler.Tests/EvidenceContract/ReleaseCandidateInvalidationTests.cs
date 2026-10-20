@@ -284,9 +284,17 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     [InlineData("{\"candidate\": {\"commit\": \"d1d7afde\"}}")]
     [InlineData("{\"candidate\": {\"commit\": 7}}")]
     [InlineData("not json")]
+    [InlineData("TRAILING-NEWLINE")]  // a full SHA plus "\n": .NET's $ would accept it (Codex re-freeze round 2)
+    [InlineData("UPPERCASE")]
     public void AManifestNamingNoFullCandidateIsUndecided(string manifest)
     {
         var candidate = _repo.Candidate();
+        manifest = manifest switch
+        {
+            "TRAILING-NEWLINE" => $"{{\"candidate\": {{\"commit\": \"{new string('a', 40)}\\n\"}}}}",
+            "UPPERCASE" => $"{{\"candidate\": {{\"commit\": \"{new string('A', 40)}\"}}}}",
+            _ => manifest,
+        };
         _repo.Commit((P.ManifestPath, manifest));
         _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
         _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
