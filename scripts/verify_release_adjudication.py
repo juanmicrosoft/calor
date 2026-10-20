@@ -670,7 +670,7 @@ def json_items(value: object) -> list[dict]:
     return [x for x in value if isinstance(x, dict)] if isinstance(value, list) else []
 
 
-def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+def _replay(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, str]], set[str]]:
     """A port of InteropScopeValidator S004, in its order: per amendment, added cases, then changes, then removals;
     then every active case against the current cases. Returns the (case, problem) pairs and the (family, version)
     pairs each step touched, which S007 uses for staleness."""
@@ -683,6 +683,7 @@ def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, st
             problems.append((cid, "the denominator registers the case twice"))
         registry[cid] = dict(case)
     active = set(registry)
+    not_measured: set[str] = set()
     for amendment in json_items(scope.get("amendments")):
         version = jstr(amendment.get("version")) or "?"
 
@@ -711,6 +712,19 @@ def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, st
                 problems.append((rid, f"amendment {version} removes a case that is not registered, or without its last status"))
             else:
                 touch(registry[rid])
+            not_measured.discard(rid)
+        for marked in json_items(amendment.get("notMeasuredCases")):  # 1.5.0: a not-measured case (S007: skipped)
+            nid = jstr(marked.get("id")) or ""
+            family = jstr(registry[nid].get("family")) if nid in active else None
+            covered = marked.get("coveredBy") if isinstance(marked.get("coveredBy"), list) else []
+            if family is None or jstr(marked.get("family")) != family or not nonblank(marked.get("reason")) or not nonblank(marked.get("decision")) \
+                    or not covered or any(not isinstance(x, str) or x == nid or x not in active or jstr(registry[x].get("family")) != family
+                                          or x in not_measured for x in covered) or nid in not_measured:
+                problems.append((nid, f"amendment {version} marks a case not-measured without its family, reason, decision and "
+                                      "measured cases of the family that cover it"))
+            else:
+                not_measured.add(nid)
+                touch(registry[nid])
     cases = json_items(scope.get("cases"))
     for cid in sorted(active):
         current = next((c for c in cases if jstr(c.get("id")) == cid), None)
@@ -724,7 +738,18 @@ def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, st
     for case in cases:
         if (jstr(case.get("id")) or "") not in active:
             problems.append((jstr(case.get("id")) or "?", "case is not registered (or was removed) by the 1.0.0 denominator or an amendment"))
+    return problems, touched, not_measured
+
+
+def replay_cases(scope: dict) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """A port of InteropScopeValidator S004 (_replay): the (case, problem) pairs and the (family, version) pairs touched."""
+    problems, touched, _ = _replay(scope)
     return problems, touched
+
+
+def not_measured_cases(scope: dict) -> set[str]:
+    """The cases an amendment validly marked not-measured (1.5.0), as S004 accepts them; S007 wants them skipped."""
+    return _replay(scope)[2]
 
 
 def denominator_problems(scope: dict) -> list[str]:
@@ -796,6 +821,8 @@ def check_scope_packet(gate: Gate, commit: str, record: dict, entry: dict) -> tu
     lines.append((f"results {results.get('path')} {results.get('sha256')}", results.get("path"), results.get("sha256")))
     approved = ((register.get("amendments") or [register])[-1]).get("approvalSeal")
     corpus = f"corpus {counts.get('source')} {json.dumps(counts.get('counts'), separators=(',', ':'))}"
+    if "reRegistration" in counts:  # T1 register 1.0.3 (D-F2-INTERP-09-RECANDIDATE): T1RegisterValidator.ApprovalSeal seals it too
+        corpus += f" reRegistration {dotnet_json(counts['reRegistration'])}"
     recomputed = sha256("\n".join(sorted([line for line, _, _ in lines] + [corpus])).encode())
     if any(not isinstance(p, str) or lf_sha256(gate.blob(commit, p)) != h for _, p, h in lines) or recomputed != approved:
         gate.fail("G005", "the T1 register's approved evidence, fixtures or results differ from its approval seal")
@@ -864,13 +891,16 @@ def ready_problems(gate: Gate, commit: str, candidate: str, family: str, ready: 
         if cid in rows:
             problems.append(f"case {cid} is listed more than once")
         rows.setdefault(cid, row)
+    skipped = not_measured_cases(scope)
     for case in family_cases(scope, family):
         cid, row = case.get("id"), rows.get(case.get("id"))
+        want = "skipped" if cid in skipped else "passed"  # 1.5.0: a not-measured case is recorded as skipped
         record = json_blob(gate, commit, str(row.get("evidence", ""))) if row and str(row.get("evidence", "")).startswith("docs/plans/evidence/") else None
-        if not row or row.get("result") != "passed" or not record or record.get("candidate") != candidate or record.get("caseId") != cid \
-                or record.get("requirementSha256") != requirement_digest(case) or record.get("result") != "passed" \
-                or any(not isinstance(record.get("cells"), dict) or record["cells"].get(cell) != "passed" for cell in case.get("cells") or []):
-            problems.append(f"case {cid} needs a passed result and a retained passed result record for this candidate, case, requirement and cells")
+        if not row or row.get("result") != want or not record or record.get("candidate") != candidate or record.get("caseId") != cid \
+                or record.get("requirementSha256") != requirement_digest(case) or record.get("result") != want \
+                or (want == "passed" and any(not isinstance(record.get("cells"), dict) or record["cells"].get(cell) != "passed"
+                                             for cell in case.get("cells") or [])):
+            problems.append(f"case {cid} needs a {want} result and a retained {want} result record for this candidate, case, requirement and cells")
     tests = ready.get("tests")
     if not isinstance(tests, list) or not tests or any(not isinstance(t, dict) or not nonblank(t.get("project")) or not is_int(t.get("total"))
                                                        or t["total"] <= 0 or not is_int(t.get("failed")) or t["failed"] != 0 for t in tests):

@@ -2,7 +2,7 @@
   "schema": "calor.v0.25.w1-family-records/1",
   "issue": 1429,
   "epic": 1425,
-  "scopeVersion": "1.4.0",
+  "scopeVersion": "1.5.0",
   "registerVersion": "1.0.0",
   "independence": "reduced",
   "note": "W1 documentation records. Not READY records: no 0.25 candidate is frozen, and READY needs the maintainer's claim approval. Each family's status mirrors scope.json readiness (W1 does not change it). Pages and transcripts were checked against main at the PR's base; they must be re-checked on the frozen candidate.",

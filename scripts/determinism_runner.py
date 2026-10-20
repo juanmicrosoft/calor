@@ -139,15 +139,19 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
         # Amendment 1.6.0 (0.25 re-proof): every run after run number afterRunNumber belongs to the epoch, which has its
         # own execution limit and ceiling; the 0.24 runs before it are not charged to it. The executed-commit, unfinished-run
         # and docs-only rules below still read every prior run.
+        # Amendment 1.7.0: the limits count the window (runs after afterRunNumber); the budget charges every epoch run
+        # (after epochAfterRunNumber) to the epoch ceiling.
         if len(current) != 1 or not int(current[0].get("runNumber") or 0) > epoch["afterRunNumber"]:
             problems.append(f"run {here} is not numbered after run {epoch['afterRunNumber']}, where the 0.25 epoch starts")
         counted = [r for r in prior if int(r.get("runNumber") or 0) > epoch["afterRunNumber"]]
-        recorded, ceiling, limits = 0, epoch["ceilingRunnerMinutes"], (epoch["maxExecutions"], epoch["maxDispatchedControlRuns"])
+        charged = [r for r in prior if int(r.get("runNumber") or 0) > epoch.get("epochAfterRunNumber", epoch["afterRunNumber"])]
+        recorded, limits = 0, (epoch["maxExecutions"], epoch["maxDispatchedControlRuns"])
+        ceiling = epoch.get("epochCeilingRunnerMinutes", epoch["ceilingRunnerMinutes"])
     else:
-        counted = prior
+        counted = charged = prior
         recorded, ceiling, limits = b["dryRunSpent"], b["ceilingRunnerMinutes"], (b["maxExecutions"], b["maxDispatchedControlRuns"])
-    recorded += sum(r["minutes"] for r in counted)
-    reserved = sum(worst[classify(r)] for r in counted if r["status"] != "completed")
+    recorded += sum(r["minutes"] for r in charged)
+    reserved = sum(worst[classify(r)] for r in charged if r["status"] != "completed")
     if recorded + reserved + worst[mode] > ceiling:
         problems.append(f"budget: {recorded} recorded + {reserved} reserved for unfinished runs + {worst[mode]} for this run "
                         f"exceeds the {ceiling} runner-minute ceiling (contract stopping rule 1)")

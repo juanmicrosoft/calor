@@ -1,6 +1,6 @@
 # 0.25 T1 (#1428): shared interop controls and readiness register
 
-**Register version:** 1.0.2 (see "Amendments"). **Consumes:** R0 scope 1.4.0. **Status:** register only. No 0.25
+**Register version:** 1.0.3 (see "Amendments"). **Consumes:** R0 scope 1.5.0. **Status:** register only. No 0.25
 candidate is frozen and no READY record exists. Those wait for W1 (#1429) and the 0.24
 release-gap fixes (#1545, #1546, #1547). **Independence:** reduced (R0 §9). Codex reviewed this
 work; no reviewer independent of the maintainer did.
@@ -112,9 +112,24 @@ outcome is a reviewer decision, not a regeneration.
 | `T008` | The measured surfaces differ from the oracle's; a measured surface has no recorded defaults; an unmeasured one (SDK, MSBuild, LSP must be listed) has no reason |
 | `T009` | `registerVersion` is not the latest amendment (1.0.0 with none); an amendment lacks a version, UTC date, PR or justification; the `approvalSeal` over every approved evidence, fixture and results hash differs from the latest amendment's (with none, the 1.0.0 seal, also pinned in `T1RegisterTests`); independence is not `reduced` |
 
-**F-2/corpus counts** (F2-INTERP-09, from F2's branch; must be re-measured on the candidate):
-incomplete diagnostics 0 -> 0; in-repo expressions bound 4,820 -> 4,827; conversion visits
-35,159 -> 35,160; opaque boundaries 129 -> 137; opaque expressions 6,944 -> 6,994.
+**F-2/corpus counts** (F2-INTERP-09). F2's branch measured incomplete diagnostics 0 -> 0, in-repo expressions
+bound 4,820 -> 4,827, conversion visits 35,159 -> 35,160, opaque boundaries 129 -> 137 and opaque expressions
+6,944 -> 6,994. Amendment 1.0.3 (`D-F2-INTERP-09-RECANDIDATE`) re-registers 'after' to the values measured on the
+0.25 candidate: 0, 4,828, 34,371, 148 and 7,746. `corpusCounts.reRegistration` keeps F2's values, cites the
+re-proof's measurement (`v0.25-f2-906/ready/cases/F2-INTERP-09.json`) by hash, and attributes each change to the
+merge that committed it to `bench/phase0-agent-native/binder-incomplete-baseline.json`:
+
+| PR | Gate | Bound | Visits | Boundaries | Opaque |
+|---|---|---|---|---|---|
+| #1510 | F4 | +6 | −7 | +3 | +15 |
+| #1554 | F5 | +1 | +24 | 0 | 0 |
+| #1522 | F2 | +1 | +1 | +8 | +50 |
+| #1558 | F1 | 0 | −816 | +7 | +733 |
+| #1571 | F1 | 0 | +10 | +1 | +4 |
+
+No other merge from the 0.25 base (`c020de74`, #1520) to the candidate changed the counts (F3 #1519 and #1531,
+F6 #1513, W0 #1512 and the others). `T005` checks that 'after' equals the measurement, 'before' and the previous
+'after' equal F2's `rows.json`, and before plus the deltas gives after.
 
 ## Aggregation
 
@@ -163,3 +178,4 @@ Case counts are from `register.json` (65 registered cases: 49 at 1.0.0 plus 16 r
 |---|---|---|---|
 | 1.0.1 | 2026-10-18 | #1571 (F1 PR 2, #943) | F1's re-run `results.json` (five new rows for the W1 findings; D1-CS-04 and D1-CS-19 re-attributed from `in-parameter` to `ref-parameter`) changes F1's approved evidence hash `7efaf64a…` -> `8d64b186…`. Controls, fixtures, `controls-results.json` and the corpus counts are unchanged: `SharedInteropControlsTests` reproduces every committed cell, so nothing was regenerated. New approval seal `12a33773…`, pinned in `T1RegisterTests.AmendmentApprovalsMatchThePinnedSeals`; the top-level `approvalSeal` stays the 1.0.0 seal |
 | 1.0.2 | 2026-10-19 | #1576 (pre-freeze decisions) | Consumes R0 scope 1.4.0 (T001). No approved hash changes, so the seal stays `12a33773…`. Under `D-READY-EVIDENCE-DIRS` the readiness mirrored here is written back after A1, with `scope.json`'s |
+| 1.0.3 | 2026-10-20 | #1610 (Step A amendment) | Consumes R0 scope 1.5.0. `D-F2-INTERP-09-RECANDIDATE`: the corpus 'after' counts are re-registered to the 0.25 candidate, with `corpusCounts.reRegistration` (sealed with the counts). `D-F4-ITER-04-NOT-MEASURED`: F4's ready needs say the case is recorded as skipped. New approval seal `65330c86…` |

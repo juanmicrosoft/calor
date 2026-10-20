@@ -344,6 +344,24 @@ def runtime_problems(list_sdks: str, list_runtimes: str, sdk: str) -> list[str]:
     return []
 
 
+def prune_runtimes(list_sdks: str, list_runtimes: str, sdk: str, root: str) -> list[Path]:
+    """The other patches of the SDK's major.minor Microsoft.NETCore.App inside the job-private install root, to delete.
+    actions/setup-dotnet also installs the newest LTS runtime there (`--runtime dotnet --channel LTS`), which the
+    compiler host would roll forward to. Anything outside root is never touched (fail closed: an error)."""
+    bundled = bundled_runtime(list_sdks, sdk)
+    line = ".".join(sdk.split(".")[:2]) + "."
+    base = Path(root).resolve()
+    extra = []
+    for entry in list_runtimes.splitlines():
+        parts = entry.strip().split(" ", 2)
+        if len(parts) == 3 and parts[0] == NETCORE and parts[1].startswith(line) and parts[1] != bundled:
+            path = (Path(parts[2].strip("[]")) / parts[1]).resolve()
+            if bundled is None or base not in path.parents:
+                raise ValueError(f"{NETCORE} {parts[1]} at {path} is outside the job-private install {base}; refusing to delete it")
+            extra.append(path)
+    return extra
+
+
 def sdk_fingerprint(list_sdks: str, version: str) -> str:
     """sha256 over the SDK's compiler and NuGet packer assemblies, or why it is unknown."""
     for line in list_sdks.splitlines():
@@ -420,6 +438,8 @@ def main() -> int:
                    help="what both outputs must contain; an empty or partial output fails")
     p = sub.add_parser("check-runtime", help="fail unless the SDK's compiler host can run only on the SDK's own runtime")
     p.add_argument("--sdk", required=True)
+    p.add_argument("--prune", action="store_true",
+                   help="first delete the other patches of the SDK's major.minor runtime from the job-private install ($DOTNET_ROOT)")
     p = sub.add_parser("run")
     p.add_argument("--workdir", required=True)
     p.add_argument("--evidence")
@@ -438,9 +458,24 @@ def main() -> int:
     if args.command == "check-runtime":
         def out(cmd: list[str]) -> str:
             return subprocess.run(cmd, capture_output=True, text=True, check=False).stdout
-        listed = out(["dotnet", "--list-runtimes"])
+        listed, sdks = out(["dotnet", "--list-runtimes"]), out(["dotnet", "--list-sdks"])
         print(listed, end="")
-        problems = runtime_problems(out(["dotnet", "--list-sdks"]), listed, args.sdk)
+        if args.prune:
+            root = os.environ.get("DOTNET_ROOT", "")
+            if not root:
+                print("::error::--prune needs DOTNET_ROOT (the job-private install that setup-dotnet sets)")
+                return 1
+            try:
+                extra = prune_runtimes(sdks, listed, args.sdk, root)
+            except ValueError as error:
+                print(f"::error::{error}")
+                return 1
+            for path in extra:
+                print(f"removing {path} (not the SDK {args.sdk}'s own runtime)")
+                shutil.rmtree(path)
+            listed = out(["dotnet", "--list-runtimes"])
+            print(listed, end="")
+        problems = runtime_problems(sdks, listed, args.sdk)
         for problem in problems:
             print(f"::error::{problem}")
         if not problems:

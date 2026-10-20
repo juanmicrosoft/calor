@@ -62,6 +62,15 @@ public class V025CandidateManifestTests
         Assert.True(target != null, "no commit after the candidate changes a candidate file; is history fetched?");
         var report = ClassifyRange(git, V025, candidate, target!);
         _output.WriteLine(report.ToString());
+        // R0 scope amendment 1.5.0 (D-AMEND-REFREEZE): a recorded maintainer decision can supersede this candidate. Until the
+        // re-freeze lands a manifest naming its successor, the superseding changes invalidate the range, and the test records
+        // that instead of claiming NOT-INVALIDATED. A run with an explicit target (the regeneration, A1) is never excused.
+        if (string.IsNullOrWhiteSpace(requested) && SupersedingDecision(candidate) is { } superseding)
+        {
+            _output.WriteLine($"candidate {candidate} is superseded by {superseding}");
+            Assert.True(report.Verdict == CandidateInvalidation.Invalid, report.ToString());
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(requested))
         {
             Assert.True(report.Landing != null, "the freeze has not landed on origin/main; judge later commits only after it lands");
@@ -72,6 +81,12 @@ public class V025CandidateManifestTests
         if (string.IsNullOrWhiteSpace(requested))
             Assert.Contains(report.Commits.SelectMany(c => c.Decisions), d => d.Path == V025.ManifestPath);
     }
+
+    /// <summary>The maintainer decision in the R0 scope packet that supersedes this candidate (its <c>supersedes</c>), or null.</summary>
+    private static string? SupersedingDecision(string candidate) =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), ScopeDir, "scope.json")))!["amendments"]!.AsArray()
+            .SelectMany(a => a!["maintainerDecisions"]?.AsArray() ?? [])
+            .Where(d => Str(d!["supersedes"]) == candidate).Select(d => Str(d!["id"])).FirstOrDefault();
 
     /// <summary>
     /// Trust anchor: an explicit target is judged only by the reviewed classifier, so the running checkout must be the

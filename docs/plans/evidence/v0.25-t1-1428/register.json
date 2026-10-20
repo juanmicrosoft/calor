@@ -1,12 +1,12 @@
 {
   "schema": "calor.v0.25.t1-register/1",
-  "registerVersion": "1.0.2",
+  "registerVersion": "1.0.3",
   "issue": 1428,
   "epic": 1425,
   "recordedAtUtc": "2026-10-18T00:00:00Z",
   "consumes": {
     "scope": "docs/plans/evidence/v0.25-r0-1426/scope.json",
-    "scopeVersion": "1.4.0"
+    "scopeVersion": "1.5.0"
   },
   "status": "REGISTER",
   "statusNote": "A versioned per-family readiness register and the shared-control registry. It is not a candidate manifest and holds no READY record: no 0.25 candidate is frozen (that waits for W1 #1429 and the release-gap fixes #1545, #1546, #1547). Readiness here mirrors scope.json; READY is recorded only in scope.json under S007.",
@@ -319,7 +319,7 @@
         "reviews: the Codex records for the family PRs and for the READY record; approver @juanmicrosoft with a pull-request review URL; independence 'reduced'.",
         "blockersResolved: a reference for every family blocker, including #1423 (the 0.25 candidate manifest, not 0.24's) and #1426.",
         "The T1 shared controls and every X-INT row the family owns or crosses pass on the candidate (controls-results.json regenerated on the candidate, with an approved hash).",
-        "F2-INTERP-09: corpus counts re-measured on the candidate with the corpus submodules (BinderIncompleteRatchetTests and the binder baselines); before/after counts below must be preserved or changed only by an approved, case-linked amendment.",
+        "F2-INTERP-09: corpus counts re-measured on the candidate with the corpus submodules (BinderIncompleteRatchetTests and the binder baselines) must equal the counts below, re-registered to the 0.25 candidate by amendment 1.0.3; a later change needs an approved, case-linked amendment.",
         "X-INT-06 cells hole-binding and hole-effects: per-case records from the F2 tests.",
         "R-OBL (#1496, merge ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06): a witnessRun record on the candidate running tests/Calor.Compiler.Tests/S2ObligationStateTests.cs with result passed.",
         "R-OBL-RESIDUALS (#1503, merge 9f5dfd763f90aebe16e4e4783f4c1703e464c8d3): a witnessRun record on the candidate running tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs with result passed.",
@@ -468,7 +468,7 @@
         "reviews: the Codex records for the family PRs and for the READY record; approver @juanmicrosoft with a pull-request review URL; independence 'reduced'.",
         "blockersResolved: a reference for every family blocker, including #1423 (the 0.25 candidate manifest, not 0.24's) and #1426.",
         "The T1 shared controls and every X-INT row the family owns or crosses pass on the candidate (controls-results.json regenerated on the candidate, with an approved hash).",
-        "F4-ITER-04: still not-measured (the three historical FluentValidation modules with project references); needs a measurement or an approved amendment."
+        "F4-ITER-04: not-measured by R0 amendment 1.5.0 (D-F4-ITER-04-NOT-MEASURED); its READY row and retained record say skipped. F4-ITER-01, F4-ITER-02, F4-ITER-03, X-INT-03 and DOC-F4-01 prove the behavior."
       ]
     },
     {
@@ -688,22 +688,103 @@
       },
       "inRepoExpressionsBound": {
         "before": 4820,
-        "after": 4827
+        "after": 4828
       },
       "conversionVisits": {
         "before": 35159,
-        "after": 35160
+        "after": 34371
       },
       "opaqueBoundaries": {
         "before": 129,
-        "after": 137
+        "after": 148
       },
       "opaqueExpressions": {
         "before": 6944,
-        "after": 6994
+        "after": 7746
       }
     },
-    "status": "measured on the branch; must be re-measured on the #1423 candidate for READY"
+    "status": "re-registered on the 0.25 candidate by amendment 1.0.3 (D-F2-INTERP-09-RECANDIDATE); F2's branch values are kept in reRegistration.previousAfter",
+    "reRegistration": {
+      "amendment": "1.0.3",
+      "decision": "D-F2-INTERP-09-RECANDIDATE",
+      "scopeAmendment": "1.5.0",
+      "measuredOn": "48cae911700ceb0dfc358e00933650445d81604f",
+      "measurement": {
+        "path": "docs/plans/evidence/v0.25-f2-906/ready/cases/F2-INTERP-09.json",
+        "sha256": "4835ac5613d29ca0ec202c78095c9df118c9531109796a982493d96edc4eb0d0",
+        "instrument": "BinderIncompleteRatchetTests with the corpus submodules at the candidate's gitlinks; CALOR_UPDATE_BINDER_BASELINE=1 regenerated bench/phase0-agent-native/binder-incomplete-baseline.json byte-identically"
+      },
+      "previousAfter": {
+        "incompleteDiagnostics": 0,
+        "inRepoExpressionsBound": 4827,
+        "conversionVisits": 35160,
+        "opaqueBoundaries": 137,
+        "opaqueExpressions": 6994
+      },
+      "attribution": "Per PR, from bench/phase0-agent-native/binder-incomplete-baseline.json as each first-parent merge on main committed it, from the 0.25 base c020de74878b034cd8fc3e18ce598c70c893d6e0 (#1520's merge, whose counts are F2's registered 'before') to the candidate. The re-proof regenerated the candidate's file byte-identically, so the last step equals the measurement. No other merge in the range changed the file: F3 (#1519, #1531), F6 (#1513), W0 (#1512), D1, R0, T1, W1 and the release-gap PRs change no count.",
+      "perPr": [
+        {
+          "gate": "F4",
+          "pr": 1510,
+          "mergeCommit": "8a39bc8754199672a6c72399012e4412f62aeb88",
+          "delta": {
+            "incompleteDiagnostics": 0,
+            "inRepoExpressionsBound": 6,
+            "conversionVisits": -7,
+            "opaqueBoundaries": 3,
+            "opaqueExpressions": 15
+          }
+        },
+        {
+          "gate": "F5",
+          "pr": 1554,
+          "mergeCommit": "f7510f32e906394e34262552572c065c36d6f772",
+          "delta": {
+            "incompleteDiagnostics": 0,
+            "inRepoExpressionsBound": 1,
+            "conversionVisits": 24,
+            "opaqueBoundaries": 0,
+            "opaqueExpressions": 0
+          }
+        },
+        {
+          "gate": "F2",
+          "pr": 1522,
+          "mergeCommit": "b4a58bc237ecdef9d1792e6c86b2936c1bf5b6ff",
+          "delta": {
+            "incompleteDiagnostics": 0,
+            "inRepoExpressionsBound": 1,
+            "conversionVisits": 1,
+            "opaqueBoundaries": 8,
+            "opaqueExpressions": 50
+          }
+        },
+        {
+          "gate": "F1",
+          "pr": 1558,
+          "mergeCommit": "f83b4e5937a55bb1ad04e57ab2e410bf667c6232",
+          "delta": {
+            "incompleteDiagnostics": 0,
+            "inRepoExpressionsBound": 0,
+            "conversionVisits": -816,
+            "opaqueBoundaries": 7,
+            "opaqueExpressions": 733
+          }
+        },
+        {
+          "gate": "F1",
+          "pr": 1571,
+          "mergeCommit": "e075f848a42082eeddd6bb4201d8eb08e5afd809",
+          "delta": {
+            "incompleteDiagnostics": 0,
+            "inRepoExpressionsBound": 0,
+            "conversionVisits": 10,
+            "opaqueBoundaries": 1,
+            "opaqueExpressions": 4
+          }
+        }
+      ]
+    }
   },
   "controls": [
     {
@@ -994,6 +1075,20 @@
       "justification": "Mechanical consumption bump caused by R0 amendment 1.4.0 (the maintainer's 2026-10-19 freeze decisions): consumes scope version 1.4.0 instead of 1.3.0, because T001 requires the consumed version to equal scope.json's. No family evidence, control fixture, results file or corpus count changes, so the approval seal is unchanged. Under D-READY-EVIDENCE-DIRS the readiness mirrored here is written back after A1, with scope.json's.",
       "changedEvidence": [],
       "approvalSeal": "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"
+    },
+    {
+      "version": "1.0.3",
+      "dateUtc": "2026-10-20T00:00:00Z",
+      "pr": 1610,
+      "justification": "Consumes R0 scope 1.5.0 and records two of the maintainer's 2026-10-20 decisions. D-F2-INTERP-09-RECANDIDATE ('Re-register to candidate'): the F2-INTERP-09 'after' counts become the values measured on the 0.25 candidate 48cae911 (bound expressions 4,820 -> 4,828, binder visits 35,159 -> 34,371, opaque boundaries 129 -> 148, opaque expressions 6,944 -> 7,746, incomplete diagnostics 0 -> 0); 'before' and F2's approved rows.json stay as recorded, and corpusCounts.reRegistration attributes each change to its PR (F4 #1510, F5 #1554, F2 #1522, F1 #1558 and #1571) and cites the re-proof's measurement by hash. D-F4-ITER-04-NOT-MEASURED ('Amend to not-measured'): F4's readyNeeds now say the case is recorded as skipped. The corpus counts are part of the approval seal, so the seal is re-pinned.",
+      "changedEvidence": [
+        {
+          "path": "docs/plans/evidence/v0.25-f2-906/ready/cases/F2-INTERP-09.json",
+          "sha256": "4835ac5613d29ca0ec202c78095c9df118c9531109796a982493d96edc4eb0d0",
+          "role": "corpusCounts.reRegistration.measurement"
+        }
+      ],
+      "approvalSeal": "65330c86baba0be8ebc1fb9bff97c6e6c1e77a2abd24502314faf723d5393f15"
     }
   ]
 }

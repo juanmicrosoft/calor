@@ -13,7 +13,7 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
 const currentRelease = '0.25.0';
-const releaseDate = '2026-10-19';
+const releaseDate = '2026-10-20';
 // 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
 const advisoryRelease = '0.24.0';
 // The release that last published static benchmark numbers. 0.24.0 and 0.25.0 publish none: benchmark
@@ -259,7 +259,8 @@ for (const width of [1366, 390]) {
       'recorded maintainer override, not a gated release',
       'MILESTONE-FAILED',
       'never reached NuGet',
-      'frozen with the release candidate on 2026-10-19, before the 0.25 acceptance',
+      'frozen with the release candidate on 2026-10-20, before the 0.25 acceptance',
+      'The candidate was re-frozen once',
       'No family was ready',
       'Independence is reduced',
       'at most bounded']) {

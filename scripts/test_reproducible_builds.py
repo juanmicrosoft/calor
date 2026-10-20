@@ -332,9 +332,17 @@ class CompareToolTests(unittest.TestCase):
             self.assertTrue(rb.runtime_problems(sdks, "Microsoft.NETCore.App 10.0.13 [/x]\n", "10.0.401"))  # own one missing
             self.assertTrue(rb.runtime_problems(sdks, own, "10.0.402"))  # SDK not listed
             self.assertTrue(rb.host_runtime("", "10.0.401").startswith("unknown:"))
+            # setup-dotnet's extra LTS runtime inside the private root is pruned; one outside it is refused.
+            shared = Path(tmp) / "shared" / "Microsoft.NETCore.App"
+            listed = f"Microsoft.NETCore.App 10.0.12 [{shared}]\nMicrosoft.NETCore.App 10.0.13 [{shared}]\nMicrosoft.NETCore.App 8.0.32 [{shared}]\n"
+            self.assertEqual([(shared / "10.0.13").resolve()], rb.prune_runtimes(sdks, listed, "10.0.401", tmp))
+            with tempfile.TemporaryDirectory() as other:
+                with self.assertRaises(ValueError):
+                    rb.prune_runtimes(sdks, listed, "10.0.401", other)
+            self.assertEqual([], rb.prune_runtimes(sdks, own.replace("[/x]", f"[{shared}]"), "10.0.401", tmp))
         for wf in ("reproducible-builds.yml", "publish-nuget.yml"):
             text = (REPO_ROOT / ".github" / "workflows" / wf).read_text(encoding="utf-8")
-            self.assertIn("python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401", text, wf)
+            self.assertIn("python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401 --prune", text, wf)
 
     def test_tree_digest_is_the_release_gate_digest(self) -> None:
         import verify_release_adjudication as gate

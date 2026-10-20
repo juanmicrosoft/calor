@@ -10,7 +10,7 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
-## [0.25.0] - 2026-10-19
+## [0.25.0] - 2026-10-20
 
 Calor 0.25 is an interoperability release. It changes how the C# → Calor converter
 (`calor convert`, `calor migrate`, the MCP tools and the `CSharpToCalorConverter` library)
@@ -19,7 +19,7 @@ functions, iterator properties, array expressions, and the reports of what stays
 language gains native local functions and two new errors (`Calor0211`, `Calor0212`). The
 website gains a guide to converting C#, and CI now compiles its examples.
 
-**These notes were frozen with the release candidate on 2026-10-19, before the 0.25 acceptance
+**These notes were frozen with the release candidate on 2026-10-20, before the 0.25 acceptance
 review (A1, #1430).** A release can publish only after that review accepts the candidate, and
 the notes cannot change after the freeze. At the freeze:
 
@@ -31,6 +31,15 @@ the notes cannot change after the freeze. At the freeze:
 - **0.24's checks had to pass again.** The 0.24 evidence review (#1408) ended `MILESTONE-FAILED`
   (see 0.24.0), so this candidate must re-pass 0.24's proof, provenance and release checks on its
   own commit. No 0.24 approval or record is reused.
+- **The candidate was re-frozen once.** The first candidate, frozen on 2026-10-19, did not pass
+  that re-proof. Its determinism run (the same tests repeated on five platforms, with the results
+  compared) found no disagreement, but one slow macOS runner hit its 50-minute limit, so the run
+  was incomplete. The re-proof also found that one interpolated-string case (F2-INTERP-09) had
+  registered corpus counts measured before the other families merged, and that one iterator case
+  (F4-ITER-04) cannot be measured on any command. The maintainer amended all three: the macOS
+  limit is now 70 minutes, the counts are re-registered to the candidate, and F4-ITER-04 is
+  recorded as not measured. The candidate was re-frozen on 2026-10-20, and the re-proof must pass
+  on it.
 - **The three release-process gaps from 0.24 were closed.** #1545, #1546 and #1547 closed on
   2026-10-19, before the freeze (see "Release process" below). Acceptance requires them closed.
 - **Independence is reduced.** OpenAI Codex reviewed each change, and the maintainer approved
@@ -245,7 +254,10 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
   `calor convert`, `calor migrate`, MCP `calor_convert` and the library, with or without
   passthrough, and it compiles with default options. Laziness, `finally` on dispose, and
   exception timing match the original in 2 of 2 registered fixtures on 6 surfaces (3 CLI, 3
-  MCP). With `--no-fallback` the conversion fails and names the feature. Iterator methods
+  MCP). With `--no-fallback` the conversion fails and names the feature. One registered case is
+  not measured: the three FluentValidation test modules with project references. Single-file
+  conversion refuses them because their references (xUnit, project types) cannot be resolved, and
+  project migration writes nothing because it refuses the whole project over unrelated files. Iterator methods
   still convert natively to `§YIELD`. See "Iterator Properties and Indexers" on the
   `calor convert` docs page.
 - **C# 13 partial properties and indexers are preserved instead of breaking the build.** Calor
@@ -419,6 +431,10 @@ publish only with an adjudication identity: the accepted commit plus the hash of
   manual run and an approval in the acceptance record (`G015`).
 - The release jobs install exactly .NET SDK 10.0.401, and the website no longer fetches its fonts
   from Google Fonts at build time.
+- The release jobs also run the C# compiler on that SDK's own .NET runtime (10.0.12). The compiler
+  records its runtime version in every debug-symbol file, and that changes the compiled assembly's
+  identity, so package bytes depended on which newer runtime the build machine had. The jobs now
+  remove any newer 10.0 runtime from their private install and fail if one remains.
 
 ## [0.24.0] - 2026-10-07
 

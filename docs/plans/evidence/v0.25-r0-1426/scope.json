@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-interop-scope/1",
-  "scopeVersion": "1.4.0",
+  "scopeVersion": "1.5.0",
   "status": "FROZEN",
   "gateStatus": "MET",
   "recordedAtUtc": "2026-10-03T18:30:00Z",
@@ -190,7 +190,7 @@
         "status": "IN_PROGRESS",
         "branch": "milestone-0.25/f4-1139-iterator-accessors",
         "evidence": "docs/plans/evidence/v0.25-f4-1139/README.md",
-        "note": "Converter preserves iterator accessors as §CSHARP on every surface without rescue. READY is left to the maintainer (A1 era): needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references. F4-ITER-04 stays not-measured."
+        "note": "Converter preserves iterator accessors as §CSHARP on every surface without rescue. READY is left to the maintainer (A1 era): needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references. F4-ITER-04 is not-measured by amendment 1.5.0 (D-F4-ITER-04-NOT-MEASURED); READY records it as skipped."
       }
     },
     {
@@ -361,6 +361,38 @@
     "rule": "From the 0.25 candidate freeze until A1 (#1430) records its outcome, each family's READY record and its per-case and witness-run evidence live in that family's evidence directory, under ready/ (docs/plans/evidence/<family dir>/ready/, the directory of readiness.evidence), as newly added files outside the frozen inputs. A1 cites those records by path and SHA-256. scope.json readiness (and the T1 register's mirror) is written back after A1, in the way post-merge ledger write-backs are, by a later amendment; until then readiness here stays as frozen with the candidate.",
     "recordFields": "The record has the fields that section 10 lists for a READY readiness record, and it names the frozen candidate commit.",
     "classifier": "The 0.25 candidate invalidation classifier exempts only newly added data or text files under each family's ready/ directory; any other change to the family evidence, scope.json or the T1 register still invalidates the candidate."
+  },
+  "approvedReadings": {
+    "amendment": "1.5.0",
+    "decision": "D-ACCEPT-READINGS",
+    "rule": "A1 (#1430) applies these readings when it judges the cited cases. A rejected or changed reading needs a later amendment.",
+    "readings": [
+      {
+        "id": "R-F6-FEWER-OPTIONS",
+        "cases": [
+          "F6-REPORT-04",
+          "F6-REPORT-05",
+          "F6-REPORT-06",
+          "F6-REPORT-07",
+          "F6-REPORT-12",
+          "F6-REPORT-13"
+        ],
+        "reading": "(a) A cell that enables both options (RescueUnusableMembers and PassthroughOnError) on a surface that exposes fewer of them (mcp-both-enabled, cli-migrate-both-enabled, mcp-migrate-both-enabled, and the rescue-passthrough-precedence cells of F6-REPORT-04, 05 and 06) is measured with every option that surface exposes, and passes when the surface reports the other options off (F6 decisions D1-cli-vs-mcp-default and D3-project-migration-no-round-trip-rescue). SDK cells (sdk-*, library-sdk-provenance) are measured on the library, which the SDK wraps (F6 decision D4; the T1 register lists the SDK surface as not measured, with the library row standing for it)."
+      },
+      {
+        "id": "R-PERMISSIVE-EFFECTS-NATIVE",
+        "cases": [
+          "F1-REFOUT-08",
+          "X-INT-01",
+          "F2-INTERP-02",
+          "F2-INTERP-07",
+          "F5-ARRAY-01",
+          "F5-ARRAY-05",
+          "X-INT-02"
+        ],
+        "reading": "(b) A row whose converted output compiles only with --permissive-effects, where the sole error without it is Calor0410 (the converted code declares no effect rows, so the default effect check rejects its calls), counts as native. The T1 register and F5's decision already count these rows as native."
+      }
+    ]
   },
   "capacity": {
     "status": "ACCEPTED",
@@ -3325,6 +3357,127 @@
         "rule": "From the 0.25 candidate freeze until A1 (#1430) records its outcome, each family's READY record and its per-case and witness-run evidence live in that family's evidence directory, under ready/ (docs/plans/evidence/<family dir>/ready/, the directory of readiness.evidence), as newly added files outside the frozen inputs. A1 cites those records by path and SHA-256. scope.json readiness (and the T1 register's mirror) is written back after A1, in the way post-merge ledger write-backs are, by a later amendment; until then readiness here stays as frozen with the candidate.",
         "recordFields": "The record has the fields that section 10 lists for a READY readiness record, and it names the frozen candidate commit.",
         "classifier": "The 0.25 candidate invalidation classifier exempts only newly added data or text files under each family's ready/ directory; any other change to the family evidence, scope.json or the T1 register still invalidates the candidate."
+      }
+    },
+    {
+      "version": "1.5.0",
+      "dateUtc": "2026-10-20T00:00:00Z",
+      "pr": 1610,
+      "afterInspection": true,
+      "justification": "Records the maintainer's 2026-10-20 decisions on the three blockers of the 0.25 re-proof on 48cae911 (docs/plans/evidence/v0.25-regeneration/regeneration.md): the INCOMPLETE determinism execution (D-AMEND-REFREEZE, D-G2-RAISE-CAP-2-RUNS: G2 protocol amendment 1.7.0, and the candidate is re-frozen at this amendment's merge), F2-INTERP-09's corpus counts (D-F2-INTERP-09-RECANDIDATE: T1 register amendment 1.0.3 re-registers the 'after' counts to the candidate's, attributed per PR), and F4-ITER-04 (D-F4-ITER-04-NOT-MEASURED: notMeasuredCases, so READY records it as skipped). It also records the two approved readings A1 applies (D-ACCEPT-READINGS: approvedReadings) and D-INCLUDE-1580. No case is added, removed or changed in a tracked field, so the denominator, every requirement digest and the evidence seal are unchanged; no family, ceiling, gate condition, readiness record or acceptance precondition changes. Marking F4-ITER-04 not-measured touches family F4 (S007 staleness). D1 records the mechanical consumption bump 1.0.7; the T1 register (1.0.3) and the W1 records consume 1.5.0.",
+      "addedCases": [],
+      "changes": [],
+      "removedCases": [],
+      "notMeasuredCases": [
+        {
+          "id": "F4-ITER-04",
+          "family": "F4",
+          "decision": "D-F4-ITER-04-NOT-MEASURED",
+          "reason": "No CLI surface can measure it on the candidate. Single-file calor convert and MCP calor_convert refuse each of the three FluentValidation modules (EmptyTester, NotEmptyTester, ITestValidationContinuation) because the round-trip C# check cannot resolve their references (CS0246: Xunit, FactAttribute, project types). Project calor migrate keeps each module's iterator accessor as §CSHARP member interop, then writes nothing, because lossless project migration refuses the whole project over unrelated files (66 of 66 FluentValidation.Tests files, 139 of 139 FluentValidation files). Measured in the 0.25 re-proof on 48cae911700ceb0dfc358e00933650445d81604f (docs/plans/evidence/v0.25-regeneration/regeneration.md, 'F4-ITER-04').",
+          "coveredBy": [
+            "F4-ITER-01",
+            "F4-ITER-02",
+            "F4-ITER-03",
+            "X-INT-03",
+            "DOC-F4-01"
+          ],
+          "coverage": "F4's other cases prove the behavior: F4-ITER-01 (iterator property and indexer preserved on every surface), F4-ITER-02 (disposal and exceptions), F4-ITER-03 (the native control keeps Calor0209), X-INT-03 (F4 x F6) and DOC-F4-01 (the convert page); all five passed on the candidate in the re-proof.",
+          "readyResult": "skipped"
+        }
+      ],
+      "maintainerDecisions": [
+        {
+          "id": "D-AMEND-REFREEZE",
+          "date": "2026-10-20",
+          "by": "@juanmicrosoft",
+          "decision": "Amend + re-freeze",
+          "supersedes": "48cae911700ceb0dfc358e00933650445d81604f",
+          "question": "The 0.25 re-proof's determinism execution on 48cae911 (G2 protocol 1.6.0, run 39323628059) returned INCOMPLETE (660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE): a slow osx-arm64 runner hit its job timeout. Protocol 1.6.0 forbids a second execution on the same commit.",
+          "relayedDetail": "Amend the G2 protocol so a slow runner finishes, then re-freeze the candidate at this amendment's merge commit and re-run the re-proof there.",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-G2-RAISE-CAP-2-RUNS",
+          "date": "2026-10-20",
+          "by": "@juanmicrosoft",
+          "decision": "Raise cap to 2,100, 2 runs",
+          "question": "Two executions with the raised macOS timeout do not fit in the 1,600-minute epoch ceiling: 397 + 2 x 835 = 2,067.",
+          "relayedDetail": "Set the osx-arm64 job timeout to 70 minutes and leave every other timeout as it is. Raise the 0.25 epoch ceiling to 2,100 runner-minutes. Allow up to 2 executions on the new frozen candidate, bound through the manifest. Record the arithmetic: 397 + 2 x 835 = 2,067 <= 2,100.",
+          "recordedAs": "G2 protocol amendment 1.7.0 (docs/plans/evidence/g2-1421/protocol.json budget.releaseEpoch)",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-F2-INTERP-09-RECANDIDATE",
+          "date": "2026-10-20",
+          "by": "@juanmicrosoft",
+          "decision": "Re-register to candidate",
+          "question": "F2-INTERP-09's registered corpus counts were measured on F2's branch; on the candidate, which also carries F1, F4 and F5, four counts differ, and the T1 register allows a change only by an approved, case-linked amendment.",
+          "relayedDetail": "Set the registered 'after' counts to the measured candidate values (bound expressions 4,828, binder visits 34,371, opaque boundaries 148, opaque expressions 7,746, incomplete 0), and attribute each change per PR using the re-proof's measurements.",
+          "recordedAs": "T1 register amendment 1.0.3 (corpusCounts.reRegistration)",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-F4-ITER-04-NOT-MEASURED",
+          "date": "2026-10-20",
+          "by": "@juanmicrosoft",
+          "decision": "Amend to not-measured",
+          "question": "F4-ITER-04 (the three historical FluentValidation modules with project references) cannot be measured as preserved on any CLI surface on the candidate.",
+          "relayedDetail": "Reclassify F4-ITER-04 as not-measured, with the recorded reason (single-file and MCP refuse it on unresolved references; migrate refuses the whole project over unrelated files), and note that F4's other cases prove the behavior.",
+          "recordedAs": "notMeasuredCases in this amendment (S004; READY records the case as skipped, S007)",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-ACCEPT-READINGS",
+          "date": "2026-10-20",
+          "by": "@juanmicrosoft",
+          "decision": "Accept both",
+          "question": "Two readings the re-proof applied need confirmation before A1: (a) F6 cells on surfaces that expose fewer options, and SDK cells measured on the library; (b) rows that compile only with --permissive-effects (sole error Calor0410) counted as native.",
+          "relayedDetail": "Both readings are approved and recorded where A1 will cite them.",
+          "recordedAs": "approvedReadings",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        },
+        {
+          "id": "D-INCLUDE-1580",
+          "date": "2026-10-20",
+          "by": "@juanmicrosoft",
+          "decision": "Include it",
+          "question": "The 0.25 classifier's trust anchor misses ignored files with non-ASCII names (#1580).",
+          "relayedDetail": "Make the trust anchor read git ls-files -z output and split on NUL, add a negative control with a quoted non-ASCII name, and close #1580 in this PR. The fresh-clone rule still applies until this merges.",
+          "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+        }
+      ],
+      "capacityExceptions": [],
+      "approvedReadings": {
+        "amendment": "1.5.0",
+        "decision": "D-ACCEPT-READINGS",
+        "rule": "A1 (#1430) applies these readings when it judges the cited cases. A rejected or changed reading needs a later amendment.",
+        "readings": [
+          {
+            "id": "R-F6-FEWER-OPTIONS",
+            "cases": [
+              "F6-REPORT-04",
+              "F6-REPORT-05",
+              "F6-REPORT-06",
+              "F6-REPORT-07",
+              "F6-REPORT-12",
+              "F6-REPORT-13"
+            ],
+            "reading": "(a) A cell that enables both options (RescueUnusableMembers and PassthroughOnError) on a surface that exposes fewer of them (mcp-both-enabled, cli-migrate-both-enabled, mcp-migrate-both-enabled, and the rescue-passthrough-precedence cells of F6-REPORT-04, 05 and 06) is measured with every option that surface exposes, and passes when the surface reports the other options off (F6 decisions D1-cli-vs-mcp-default and D3-project-migration-no-round-trip-rescue). SDK cells (sdk-*, library-sdk-provenance) are measured on the library, which the SDK wraps (F6 decision D4; the T1 register lists the SDK surface as not measured, with the library row standing for it)."
+          },
+          {
+            "id": "R-PERMISSIVE-EFFECTS-NATIVE",
+            "cases": [
+              "F1-REFOUT-08",
+              "X-INT-01",
+              "F2-INTERP-02",
+              "F2-INTERP-07",
+              "F5-ARRAY-01",
+              "F5-ARRAY-05",
+              "X-INT-02"
+            ],
+            "reading": "(b) A row whose converted output compiles only with --permissive-effects, where the sole error without it is Calor0410 (the converted code declares no effect rows, so the default effect check rejects its calls), counts as native. The T1 register and F5's decision already count these rows as native."
+          }
+        ]
       }
     }
   ],

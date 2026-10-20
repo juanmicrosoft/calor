@@ -421,26 +421,32 @@ returned INCOMPLETE: 660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE, 397 runner-mi
 ≈ 47 minutes. A 70-minute timeout leaves the harness 65 minutes, about 1.35 times that. The other
 environments finished: Linux jobs took 22-47 of 50-70 minutes, Windows jobs 45-54 of 110.
 
-**What changes** (`budget.releaseEpoch`, epoch runs only):
+**What changes** (`budget.releaseEpoch`):
 
-| Field | 1.6.0 | 1.7.0 |
-|---|---|---|
-| osx-arm64 job timeout (`jobTimeoutMinutes`) | 50 | 70 |
-| Worst case per execution | 795 | 5 + 10 + 2 × (70 + 50 + 70 + 110 + 110) = 835 |
-| Executions in the epoch | 2 | 3: 1 run (`executionsBeforeAmendment`) + 2 on the re-frozen candidate |
-| Ceiling | 1,600 | 2,100 |
-| Worst case total | 2 × 795 = 1,590 | 397 (`spentBeforeAmendment`) + 2 × 835 = 2,067 |
-| Executions of one commit | 1 | 2 for the manifest's candidate (`maxExecutionsPerCandidate`) |
+| Field | Value |
+|---|---|
+| Epoch (`epochAfterRunNumber`) | every run after run 6, as in 1.6.0 |
+| Epoch ceiling (`epochCeilingRunnerMinutes`) | 2,100 (1,600 in 1.6.0) |
+| Spent before the window (`spentBeforeWindow`) | 397 (run 7) |
+| Window (`afterRunNumber`) | every run after run 7 |
+| Executions in the window | at most 2 (`maxExecutions`), on the manifest's candidate, which may run twice (`maxExecutionsPerCandidate`) |
+| osx-arm64 job timeout in the window (`jobTimeoutMinutes`) | 70 (50 in the registered table, unchanged) |
+| Worst case per window execution | 5 + 10 + 2 × (70 + 50 + 70 + 110 + 110) = 835 |
+| Window worst case (`worstCaseWithEpochTimeouts`) | 2 × 835 = 1,670; with run 7, 397 + 1,670 = 2,067 ≤ 2,100 |
+| Window ceiling (`ceilingRunnerMinutes`) | 2,100 − 397 = 1,703 |
 
-Both new executions run only on the commit that the candidate manifest on protected main names (the 1.6.0
-binding). For that commit only, the one-execution-per-commit rule and the non-docs-change rule after a
-failed execution are replaced by the limit of 2. A second execution can only resolve an INCOMPLETE first
-one: both are retained and reported, and a NON-DETERMINISTIC or FAILING verdict of either stands for the
-candidate. The validator checks the block (D008): timeouts may only rise for registered environments, and
-the minutes spent plus each remaining execution's worst case must fit the ceiling. The plan step uses the
-epoch timeouts for its job matrix and budget. Unchanged: the 0.24 environment table and budget (runs 1-6),
-no re-run of any attempt, job or run, no control run, and every case, environment, attempt, determinism
-row, gate, agreement rate, decider rule and record format.
+`worstCaseTotal` keeps the 1.6.0 formula over the registered environment table (2 × 795 = 1,590), which
+main's validator also checks; the binding worst case is `worstCaseWithEpochTimeouts`. The plan step charges
+every epoch run to the 2,100 ceiling, reserves 835 for the run it plans, and uses the 70-minute timeout in
+its job matrix. Both window executions run only on the commit that the candidate manifest on protected main
+names (the 1.6.0 binding). For that commit only, the one-execution-per-commit rule and the non-docs-change
+rule after a failed execution are replaced by the limit of 2. A second execution can only resolve an
+INCOMPLETE first one: both are retained and reported, and a NON-DETERMINISTIC or FAILING verdict of either
+stands for the candidate. The validator checks the block (D008): timeouts may only rise for registered
+environments, and the window's worst case must fit the window ceiling, which is the epoch ceiling minus
+what run 7 spent. Unchanged: the registered environment table and the 0.24 budget (runs 1-6), no re-run of
+any attempt, job or run, no control run, and every case, environment, attempt, determinism row, gate,
+agreement rate, decider rule and record format.
 
 ## Amendment 1.6.0: two executions for the 0.25 candidate
 

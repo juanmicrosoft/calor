@@ -55,9 +55,10 @@ jobs:
           fi
 
       - name: Require the SDK's own runtime (byte identity, 0.25 re-proof)
-        # Roslyn records its host's runtime version in every PDB, and the PDB feeds the deterministic MVID:
-        # the private install must hold only the runtime SDK 10.0.401 ships with (10.0.12).
-        run: python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401
+        # Roslyn records its host's runtime version in every PDB, and the PDB feeds the deterministic MVID.
+        # setup-dotnet also installs the newest LTS runtime into the private install; remove it, so the
+        # compiler runs on the runtime SDK 10.0.401 ships with (10.0.12) and nothing newer.
+        run: python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401 --prune
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3

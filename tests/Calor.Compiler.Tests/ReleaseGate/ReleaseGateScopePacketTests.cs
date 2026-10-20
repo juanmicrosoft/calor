@@ -260,6 +260,9 @@ public class ReleaseGateScopePacketTests
     [InlineData("tracked field drifts without a change", true)]
     [InlineData("case dropped without an amendment", true)]
     [InlineData("case added without an amendment", true)]
+    [InlineData("not-measured case without a reason", true)]
+    [InlineData("not-measured case covered by another family", true)]
+    [InlineData("not-measured unregistered case", true)]
     public void GateReplayMatchesTheValidatorsS004(string mutation, bool flagged)
     {
         var root = RepoRoot();
@@ -268,6 +271,7 @@ public class ReleaseGateScopePacketTests
         JsonNode CaseOf(string id) => scope["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == id)!;
         void Change(string id, string field, string? from, string to) => last["changes"]!.AsArray().Add(new JsonObject { ["id"] = id, ["field"] = field, ["from"] = from, ["to"] = to });
         void Drop(string id) => scope["cases"]!.AsArray().Remove(CaseOf(id));
+        JsonNode NotMeasured() => scope["amendments"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.5.0")!["notMeasuredCases"]![0]!;
         switch (mutation)
         {
             case "change from a wrong value": Change("F1-REFOUT-01", "baselineStatus", "wrong", "reproduces"); break;
@@ -288,6 +292,9 @@ public class ReleaseGateScopePacketTests
                 break;
             case "tracked field drifts without a change": CaseOf("F1-REFOUT-01")["expected"] = "preserved"; break;
             case "case dropped without an amendment": Drop("F1-REFOUT-04"); break;
+            case "not-measured case without a reason": NotMeasured()["reason"] = ""; break;
+            case "not-measured case covered by another family": NotMeasured()["coveredBy"]!.AsArray().Add("F5-ARRAY-01"); break;
+            case "not-measured unregistered case": NotMeasured()["id"] = "NO-SUCH-CASE"; break;
             case "case added without an amendment": var extra = CaseOf("F1-REFOUT-01").DeepClone(); extra["id"] = "F1-EXTRA"; scope["cases"]!.AsArray().Add(extra); break;
         }
         var results = JsonNode.Parse(File.ReadAllText(Path.Combine(root, ScopeDir, "baseline-results.json")))!;
@@ -404,9 +411,12 @@ public class ReleaseGateScopePacketTests
                     foreach (var c in registerNode["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!["cases"]!.AsArray())
                     {
                         var cid = c!["id"]!.GetValue<string>();
-                        files[cid] = new JsonObject { ["candidate"] = candidate, ["caseId"] = cid, ["requirementSha256"] = c["requirementSha256"]!.DeepClone(), ["result"] = "passed",
+                        // R0 amendment 1.5.0: a case marked not-measured is recorded as skipped.
+                        var result = scope["amendments"]!.AsArray().SelectMany(a => a!["notMeasuredCases"]?.AsArray() ?? [])
+                            .Any(m => m!["id"]!.GetValue<string>() == cid) ? "skipped" : "passed";
+                        files[cid] = new JsonObject { ["candidate"] = candidate, ["caseId"] = cid, ["requirementSha256"] = c["requirementSha256"]!.DeepClone(), ["result"] = result,
                             ["cells"] = new JsonObject(cells[cid].Select(cell => KeyValuePair.Create(cell, (JsonNode?)"passed"))) };
-                        caseRows.Add(new JsonObject { ["id"] = cid, ["result"] = "passed", ["evidence"] = $"{ready}/cases/{cid}.json" });
+                        caseRows.Add(new JsonObject { ["id"] = cid, ["result"] = result, ["evidence"] = $"{ready}/cases/{cid}.json" });
                     }
                     var resolved = new JsonArray();
                     foreach (var b in blockers)
