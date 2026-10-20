@@ -1,12 +1,12 @@
 {
   "candidate": {
-    "commit": "48cae911700ceb0dfc358e00933650445d81604f",
+    "commit": "d1d7afde672691613f7bb34d253e63401ee423ac",
     "version": "0.25.0",
-    "freezeObservedUtc": "2026-10-19T18:23:52Z",
-    "originMainAtFreeze": "48cae911700ceb0dfc358e00933650445d81604f",
+    "freezeObservedUtc": "2026-10-20T20:39:52Z",
+    "originMainAtFreeze": "d1d7afde672691613f7bb34d253e63401ee423ac",
     "mergeOf": {
-      "pr": 1576,
-      "title": "0.25 pre-freeze: READY records, the gate's 0.25 scope packet, and G2 amendment 1.6.0 (maintainer decisions 2026-10-19)"
+      "pr": 1610,
+      "title": "0.25 Step A: G2 1.7.0, scope 1.5.0, approved readings, runtime check (#1430)"
     }
   },
   "note": "Hand-recorded inputs to generate_candidate_manifest.py (merge commits from the GitHub API at the freeze; the generator re-verifies each against git).",
@@ -102,6 +102,18 @@
     "1576": {
       "mergeCommit": "48cae911700ceb0dfc358e00933650445d81604f",
       "mergedAtUtc": "2026-10-19T18:18:59Z"
+    },
+    "1579": {
+      "mergeCommit": "51249109324aaff265202e73097721c505b89634",
+      "mergedAtUtc": "2026-10-19T20:53:21Z"
+    },
+    "1581": {
+      "mergeCommit": "664fa78d09ec5c3db2ea26617069bfbb8a60e958",
+      "mergedAtUtc": "2026-10-20T16:05:50Z"
+    },
+    "1610": {
+      "mergeCommit": "d1d7afde672691613f7bb34d253e63401ee423ac",
+      "mergedAtUtc": "2026-10-20T20:37:38Z"
     },
     "1520": {
       "mergeCommit": "c020de74878b034cd8fc3e18ce598c70c893d6e0",
@@ -266,13 +278,16 @@
         1568,
         1569,
         1575,
-        1576
+        1576,
+        1579,
+        1581,
+        1610
       ],
       "evidence": "docs/plans/evidence/v0.25-candidate/"
     }
   ],
   "issueStatesAtFreeze": {
-    "observedVia": "gh issue view <n> --json state,stateReason,closedAt at 2026-10-19T18:23:52Z",
+    "observedVia": "gh issue view <n> --json state,stateReason,closedAt at 2026-10-20T20:39:52Z",
     "states": {
       "1425": {
         "state": "OPEN",
@@ -368,6 +383,11 @@
         "state": "OPEN",
         "stateReason": null,
         "closedAtUtc": null
+      },
+      "1580": {
+        "state": "CLOSED",
+        "stateReason": "COMPLETED",
+        "closedAtUtc": "2026-10-20T20:37:40Z"
       }
     },
     "releaseGaps": {
@@ -392,16 +412,17 @@
       ],
       "liveCheck": {
         "command": "python3 scripts/check_release_credentials.py --live --attest-workflow-permissions docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.json",
-        "ranAtUtc": "2026-10-19T18:23:52Z",
-        "treeAtCommit": "48cae911700ceb0dfc358e00933650445d81604f",
+        "ranAtUtc": "2026-10-20T20:39:52Z",
+        "treeAtCommit": "d1d7afde672691613f7bb34d253e63401ee423ac",
         "exitCode": 0,
         "verdict": "RELEASE CREDENTIALS: CLOSED (workflows and repository settings; Actions workflow permissions ATTESTED by the maintainer, not read by API (A001 above)). nuget.org itself (the calor-release policy, the old key's revocation) is not visible to this check.",
         "attestation": "A001: Actions workflow permissions ATTESTED, not read by API (GET repos/juanmicrosoft/calor/actions/permissions/workflow answers 403 to the gh login); confirmed by @juanmicrosoft on 2026-10-19 (docs/plans/evidence/release-gaps-0.25/actions-workflow-permissions-attestation.json).",
         "output": {
-          "path": "docs/plans/evidence/v0.25-candidate/release-credentials-live-2026-10-19.txt",
+          "path": "docs/plans/evidence/v0.25-candidate/release-credentials-live-2026-10-20.txt",
           "sha256": "fa7b5895d4c4edd02b1b2aa7fbc29b9309b6bffc27347d62fbc71e37e521ee17"
         },
-        "publishing": "#1577 (ebe1c7fe6): NuGet Trusted Publishing (OIDC) through NuGet/login v1.2.0; no NuGet key stored in GitHub."
+        "publishing": "#1577 (ebe1c7fe6): NuGet Trusted Publishing (OIDC) through NuGet/login v1.2.0; no NuGet key stored in GitHub.",
+        "ranIn": "a fresh clone of github.com/juanmicrosoft/calor checked out at the candidate"
       }
     }
   },
@@ -410,23 +431,25 @@
     "dotnetSdkBuild": {
       "value": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
       "os": "Linux x86_64",
-      "source": "reproducible-builds.yml run 39295103845 on #1576 head f8413cc9e (tree 45d072a911d298b8c802219b206c80b351c32f19, equal to the candidate tree): reproducible-packages-hashes packages-1.json and packages-2.json toolchain, both builds",
+      "source": "reproducible-builds.yml run 39486340748 on #1610 head 167b8d02d (tree d00b3c43bf1f7a6962354115622e024c80f6f203, equal to the candidate tree): reproducible-packages-hashes packages-1.json and packages-2.json toolchain, both builds",
       "sameAs": "C2 regeneration 3 Linux CI (docs/plans/evidence/c2-1424/regeneration-3/)",
       "evidence": [
         {
           "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-1.json",
-          "sha256": "30ff65f3ccb792b302a063d99a5e36c798a148f42f591e96f1b9135bb71e7d33"
+          "sha256": "0abac1f47ff6aeb973e870b089f1e65009f83ff3dfcef2155f3092665ad802b9"
         },
         {
           "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages-2.json",
-          "sha256": "30ff65f3ccb792b302a063d99a5e36c798a148f42f591e96f1b9135bb71e7d33"
+          "sha256": "0abac1f47ff6aeb973e870b089f1e65009f83ff3dfcef2155f3092665ad802b9"
         },
         {
           "path": "docs/plans/evidence/v0.25-candidate/sdk-fingerprint/packages.md",
-          "sha256": "45114a7fa46cfa49c71511fb8c46409de8f569e96067955cf23481f54a547c52"
+          "sha256": "a2b3af909efbee96b6d0a1c6e4fcb250ae15d9d0f5162e277a611a31b9c0ab10"
         }
       ],
-      "darwinArm64": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053 (Microsoft SDK 10.0.401 through dotnet-install.sh on macOS arm64, C2 regeneration 2/3 local builds); not re-measured at this freeze"
+      "darwinArm64": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053 (Microsoft SDK 10.0.401 through dotnet-install.sh on macOS arm64, C2 regeneration 2/3 local builds); not re-measured at this freeze",
+      "dotnetRuntime": "10.0.12",
+      "runtimeNote": "Both builds ran the compiler on SDK 10.0.401's own runtime 10.0.12: the job pruned the newer LTS runtime actions/setup-dotnet adds to the private install (check-runtime --prune, #1610)."
     },
     "runtime": "10.0.12 (the G2 protocol pin; Microsoft.NETCore.App of SDK 10.0.401)",
     "environment": "OBSERVED, NOT PINNED, as in 0.24 (ENVIRONMENT-OBSERVED-NOT-PINNED): hosted runner images cannot be pinned; the regeneration records each job's realized SDK, runtime and image."
@@ -440,7 +463,8 @@
       "detail": "The MAJOR (gate heading ids for a link whose text is a code span) and the MINOR (S004 parity theory compares only flagged-case sets) left open by the EXC-PREFREEZE-GATE verification pass are accepted as known residuals, tracked in #1578; freeze #1576's merge.",
       "record": "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md",
       "issue": 1578,
-      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record.",
+      "note": "Decided for the first freeze (48cae911, superseded); its two residuals stay open in #1578."
     },
     {
       "id": "EXC-PREFREEZE-GATE",
@@ -485,6 +509,54 @@
       "decision": "Accept as known residual",
       "issue": 1573,
       "record": "docs/plans/evidence/v0.25-f1-943/README.md"
+    },
+    {
+      "id": "D-AMEND-REFREEZE",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Amend + re-freeze",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    {
+      "id": "D-G2-RAISE-CAP-2-RUNS",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Raise cap to 2,100, 2 runs",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    {
+      "id": "D-F2-INTERP-09-RECANDIDATE",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Re-register to candidate",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    {
+      "id": "D-F4-ITER-04-NOT-MEASURED",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Amend to not-measured",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    {
+      "id": "D-ACCEPT-READINGS",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Accept both",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    {
+      "id": "D-INCLUDE-1580",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Include it",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
     }
   ],
   "openItems": [
@@ -503,12 +575,18 @@
       "record": "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md"
     },
     {
+      "id": "GATE-PREVIOUSAFTER-BOOL",
+      "severity": "MINOR (known residual)",
+      "item": "The release gate's T005 port accepts reRegistration.previousAfter.<key> = false where F2's recorded after is 0 (Python False == 0); C# T005 rejects it, and the active and measured counts are protected. The fix is in scripts/verify_release_adjudication.py, a candidate input, so it waits for a later release.",
+      "record": "docs/plans/evidence/v0.25-candidate/reviews/stepA-verification-codex.md"
+    },
+    {
       "id": "NO-FAMILY-READY",
-      "item": "0 of 6 families READY at the freeze; READY records go under each family's evidence ready/ (D-READY-EVIDENCE-DIRS) and are cited by A1."
+      "item": "0 of 6 families READY at the freeze; READY records go under each family's evidence ready/ (D-READY-EVIDENCE-DIRS) and are cited by A1. The READY records of #1581 name 48cae911 and do not count for this candidate."
     },
     {
       "id": "REPROOF-NOT-RUN",
-      "item": "The acceptancePreconditions re-proof (S2 witnesses, regeneration, G2 determinism under protocol 1.6.0, release gate) has not run on this candidate; the regeneration does it."
+      "item": "The acceptancePreconditions re-proof (S2 witnesses, regeneration, G2 determinism under protocol 1.7.0, release gate) has not run on this candidate; the regeneration does it. The re-proof of 48cae911 (#1581) does not carry over."
     },
     {
       "id": "GATE-CONTRACT-1548",
@@ -527,6 +605,10 @@
     {
       "id": "CLASSIFIER-NOT-A-GATE",
       "item": "The 0.25 classifier is not a required gate on later merges; the regeneration and A1 classify up to their own commit from a checkout of the landing."
+    },
+    {
+      "id": "F2-READY-RECORD-PATH",
+      "item": "T1 register 1.0.3 pins docs/plans/evidence/v0.25-f2-906/ready/cases/F2-INTERP-09.json (the 48cae911 measurement) as the re-registration measurement, and an added ready/ file is never rewritten. The re-proof on this candidate writes its F2-INTERP-09 record (and every ready/ record) at a new path, for example ready/d1d7afde/cases/."
     }
   ],
   "invalidation": {
@@ -536,10 +618,10 @@
       "tests/Calor.Compiler.Tests/EvidenceContract/V025CandidateManifestTests.cs"
     ],
     "rangeCommand": "From a checkout of the landing commit: CALOR_V025_CLASSIFY_TARGET=<full SHA> dotnet test tests/Calor.Compiler.Tests --filter FullyQualifiedName~V025CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated",
-    "landing": "The first first-parent commit of origin/main after the candidate that holds docs/plans/evidence/v0.25-candidate/candidate-manifest.json: this freeze PR's merge."
+    "landing": "The first first-parent commit of origin/main after the candidate whose docs/plans/evidence/v0.25-candidate/candidate-manifest.json names this candidate (candidate.commit): this re-freeze PR's merge. The earlier manifest, which named 48cae911, does not count."
   },
   "notes": {
-    "statusNote": "The candidate is the commit below (the merge of #1576). This manifest lands after it, in the freeze PR; the 0.25 classifier decides whether a later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
+    "statusNote": "The candidate is the commit below (the merge of #1610), a re-freeze that supersedes 48cae911 (see supersedes). This manifest lands after it, in the re-freeze PR; the 0.25 classifier decides whether a later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
     "additionalMerged": {
       "1520": {
         "mergeCommit": "c020de74878b034cd8fc3e18ce598c70c893d6e0",
@@ -578,6 +660,52 @@
         "title": "perf: make the binding scaling test cheaper inside the timed suite (#1536)"
       }
     },
-    "review": "Codex (codex exec -s read-only --ephemeral -c model_reasoning_effort=\"high\"), at most 3 rounds plus 1 verification pass for the freeze PR: docs/plans/evidence/v0.25-candidate/reviews/freeze-*.md. Independence reduced."
+    "review": "Codex (codex exec -s read-only --ephemeral -c model_reasoning_effort=\"high\"), at most 3 rounds plus 1 verification pass for the re-freeze PR: docs/plans/evidence/v0.25-candidate/reviews/refreeze-*.md (the first freeze: freeze-*.md). Independence reduced."
+  },
+  "supersedes": {
+    "commit": "48cae911700ceb0dfc358e00933650445d81604f",
+    "frozenBy": {
+      "pr": 1579,
+      "landing": "51249109324aaff265202e73097721c505b89634"
+    },
+    "status": "SUPERSEDED: no acceptance record, adjudication identity or publication may name it",
+    "decision": {
+      "id": "D-AMEND-REFREEZE",
+      "date": "2026-10-20",
+      "by": "@juanmicrosoft",
+      "decision": "Amend + re-freeze",
+      "record": "docs/plans/evidence/v0.25-r0-1426/scope.json amendments[1.5.0]",
+      "source": "Relayed in the agent session by the coordinating session; no GitHub record."
+    },
+    "reproof": {
+      "pr": 1581,
+      "mergeCommit": "664fa78d09ec5c3db2ea26617069bfbb8a60e958",
+      "record": "docs/plans/evidence/v0.25-regeneration/regeneration.md"
+    },
+    "causes": [
+      {
+        "id": "DETERMINISM-INCOMPLETE",
+        "what": "G2 execution v025-reproof-1 (run 39323628059, protocol 1.6.0) returned INCOMPLETE: 660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE. osx-arm64 job 2 ran 46 of its 50 minutes and the harness cut attempt 15; protocol 1.6.0 allowed no second execution on that commit.",
+        "amendedBy": "G2 protocol 1.7.0 (D-G2-RAISE-CAP-2-RUNS, \"Raise cap to 2,100, 2 runs\"): osx-arm64 70 minutes in the 0.25 epoch, epoch ceiling 2,100, up to 2 executions on this candidate (397 + 2 x 835 = 2,067)."
+      },
+      {
+        "id": "F2-INTERP-09-COUNTS",
+        "what": "F2-INTERP-09's registered corpus counts were measured on F2's branch; on the candidate four counts differed, with no case-linked amendment.",
+        "amendedBy": "T1 register 1.0.3 (D-F2-INTERP-09-RECANDIDATE, \"Re-register to candidate\"): after counts 4,828 / 34,371 / 148 / 7,746 / 0, attributed per PR."
+      },
+      {
+        "id": "F4-ITER-04-UNMEASURABLE",
+        "what": "F4-ITER-04 (three FluentValidation modules with project references) cannot be measured as preserved on any CLI surface: single-file and MCP refuse on unresolved references, project migration refuses the whole project.",
+        "amendedBy": "R0 scope 1.5.0 notMeasuredCases (D-F4-ITER-04-NOT-MEASURED, \"Amend to not-measured\"); READY records it as skipped."
+      }
+    ],
+    "amendments": {
+      "pr": 1610,
+      "mergeCommit": "d1d7afde672691613f7bb34d253e63401ee423ac",
+      "protocol": "1.7.0",
+      "scope": "1.5.0",
+      "t1Register": "1.0.3",
+      "d1Contract": "1.0.7"
+    }
   }
 }

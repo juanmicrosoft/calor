@@ -30,11 +30,12 @@ public class V025CandidateManifestTests
     }
 
     [Fact]
-    public void CandidateIsThePreFreezeMergeAndDeclaresTheReleaseVersion()
+    public void CandidateIsTheReFreezeMergeAndDeclaresTheReleaseVersion()
     {
         var manifest = Manifest();
-        Assert.Equal("48cae911700ceb0dfc358e00933650445d81604f", Str(manifest["candidate"]!["commit"]));
-        Assert.Equal(1576, manifest["candidate"]!["mergeOf"]!["pr"]!.GetValue<int>());
+        Assert.Equal("d1d7afde672691613f7bb34d253e63401ee423ac", Str(manifest["candidate"]!["commit"]));
+        Assert.Equal(1610, manifest["candidate"]!["mergeOf"]!["pr"]!.GetValue<int>());
+        Assert.Equal(SupersededCandidate, Str(manifest["supersedes"]!["commit"]));
         Assert.Equal("0.25.0", Str(manifest["releasability"]!["versionAtCandidate"]));
         Assert.Equal("not-yet-adjudicated", Str(manifest["releasability"]!["adjudicationMapEntry"]!["status"]));
         var gaps = manifest["issueStatesAtFreeze"]!["releaseGaps"]!;
@@ -225,6 +226,17 @@ public class V025CandidateManifestTests
     [InlineData("packets.t1Register.registerVersion", "1.0.1", "T1 register")]
     [InlineData("packets.d1Contract.contractVersion", "1.0.5", "D1 contract")]
     [InlineData("packets.w1Records.scopeVersion", "1.3.0", "W1 records")]
+    [InlineData("supersedes.commit", "0000000000000000000000000000000000000006", "supersedes")]
+    [InlineData("supersedes.frozenBy.landing", "664fa78d09ec5c3db2ea26617069bfbb8a60e958", "supersedes")]
+    [InlineData("supersedes.decision.decision", "Re-freeze", "supersedes")]
+    [InlineData("supersedes.causes.1", "<remove>", "supersedes")]
+    [InlineData("supersedes.reproof.mergeCommit", "51249109324aaff265202e73097721c505b89634", "supersedes")]
+    [InlineData("supersedes.amendments.protocol", "1.6.0", "supersedes")]
+    [InlineData("supersedes.amendments.scope", "1.4.0", "supersedes")]
+    [InlineData("supersedes.amendments.t1Register", "1.0.2", "supersedes")]
+    [InlineData("supersedes.amendments.d1Contract", "1.0.6", "supersedes")]
+    [InlineData("toolchain.dotnetSdkBuild.dotnetRuntime", "10.0.13", "fingerprint")]
+    [InlineData("toolchain.determinismProtocol.releaseEpoch.jobTimeoutMinutes.osx-arm64", "50", "toolchain")]
     [InlineData("dependencies.lockfiles.src/Calor.Compiler/packages.lock.json", "<remove>", "lockfile")]
     [InlineData("dependencies.lockfiles", "<clear>", "lockfile")]
     [InlineData("dependencies.node.website/package-lock.json", "<remove>", "lockfile")]
@@ -408,7 +420,8 @@ public class V025CandidateManifestTests
         var protocol = JsonNode.Parse(Blob("docs/plans/evidence/g2-1421/protocol.json")!)!;
         if (!Str(tc["runtime"]).StartsWith(Str(protocol["toolchain"]!["runtime"]) + " ", StringComparison.Ordinal)) Fail("toolchain: runtime differs from the G2 pin");
         var dp = tc["determinismProtocol"]!;
-        if (Str(dp["version"]) != Str(protocol["protocolVersion"]) || dp.AsObject().Count != 8
+        if (Str(dp["version"]) != Str(protocol["protocolVersion"]) || dp.AsObject().Count != 9
+            || !JsonNode.DeepEquals(dp["releaseEpoch"], protocol["budget"]!["releaseEpoch"])
             || new[] { "environments", "environmentRule", "checkout" }.Any(k => !JsonNode.DeepEquals(dp[k], protocol[k]))
             || new[] { "sdk", "runtime", "globalJson", "configuration" }.Any(k => !JsonNode.DeepEquals(dp[k], protocol["toolchain"]![k])))
             Fail("toolchain: determinismProtocol differs from the candidate's G2 protocol");
@@ -428,7 +441,8 @@ public class V025CandidateManifestTests
             if (!File.Exists(path) || DurableProvenance.Sha256(File.ReadAllBytes(path)) != Str(e["sha256"])) { Fail($"fingerprint: {Str(e["path"])} is missing or differs"); continue; }
             if (!path.EndsWith(".json", StringComparison.Ordinal)) continue;
             var hashes = JsonNode.Parse(File.ReadAllText(path))!["toolchain"];
-            if (Str(hashes?["dotnetSdkBuild"]) != Str(fingerprint["value"]) || Str(hashes?["dotnet"]) != Str(tc["releaseSdk"]) || Str(hashes?["os"]) != Str(fingerprint["os"]))
+            if (Str(hashes?["dotnetSdkBuild"]) != Str(fingerprint["value"]) || Str(hashes?["dotnet"]) != Str(tc["releaseSdk"]) || Str(hashes?["os"]) != Str(fingerprint["os"])
+                || Str(hashes?["dotnetRuntime"]) != Str(fingerprint["dotnetRuntime"]))
                 Fail($"fingerprint: {Str(e["path"])} records another SDK build");
         }
 
@@ -486,6 +500,26 @@ public class V025CandidateManifestTests
             || Str(accept[0]!["date"]) != "2026-10-19" || accept[0]!["issue"]?.ToString() != "1578"
             || Str(accept[0]!["record"]) != "docs/plans/evidence/v0.25-candidate/reviews/prefreeze-exception-codex.md" || Blob(Str(accept[0]!["record"])) == null)
             Fail("decision: D-ACCEPT-FILE-FREEZE differs from the maintainer's decision or its review record is missing at the candidate");
+
+        // The re-freeze supersedes the first candidate: its freeze landing named it, it is inside this candidate, and the
+        // candidate's own scope packet records the maintainer's decision; the three causes are the re-proof's blockers.
+        var sup = manifest["supersedes"];
+        var landed = Str(sup?["frozenBy"]?["landing"]);
+        var landedManifest = git.ReadBlob($"{landed}:{V025.ManifestPath}") is { } lm ? JsonNode.Parse(lm) : null;
+        var supersedingRecorded = scope["amendments"]!.AsArray().Where(a => Str(a!["version"]) == "1.5.0").SelectMany(a => a!["maintainerDecisions"]!.AsArray())
+            .Count(d => Str(d!["id"]) == "D-AMEND-REFREEZE" && Str(d["decision"]) == "Amend + re-freeze" && Str(d["supersedes"]) == SupersededCandidate);
+        var reproofMerge = Str(sup?["reproof"]?["mergeCommit"]);
+        if (sup is null || Str(sup["commit"]) != SupersededCandidate || !git.IsAncestor(SupersededCandidate, candidate)
+            || Str(landedManifest?["candidate"]?["commit"]) != SupersededCandidate || !git.IsAncestor(landed, candidate)
+            || !git.Run("log", "-1", "--format=%s", landed).Output.StartsWith($"Merge pull request #{sup["frozenBy"]?["pr"]} from ", StringComparison.Ordinal)
+            || Str(sup["decision"]?["id"]) != "D-AMEND-REFREEZE" || Str(sup["decision"]?["decision"]) != "Amend + re-freeze" || Str(sup["decision"]?["by"]) != "@juanmicrosoft"
+            || supersedingRecorded != 1 || Str(sup["amendments"]?["mergeCommit"]) != candidate || sup["amendments"]?["pr"]?.ToString() != "1610"
+            || Str(sup["amendments"]?["protocol"]) != Str(protocol["protocolVersion"]) || Str(sup["amendments"]?["scope"]) != Str(scope["scopeVersion"])
+            || Str(sup["amendments"]?["t1Register"]) != Str(register["registerVersion"]) || Str(sup["amendments"]?["d1Contract"]) != Str(d1["contractVersion"])
+            || !git.CommitExists(reproofMerge) || !git.IsAncestor(reproofMerge, candidate)
+            || !git.Run("log", "-1", "--format=%s", reproofMerge).Output.StartsWith($"Merge pull request #{sup["reproof"]?["pr"]} from ", StringComparison.Ordinal)
+            || !(sup["causes"]?.AsArray() ?? []).Select(c => Str(c!["id"])).SequenceEqual(["DETERMINISM-INCOMPLETE", "F2-INTERP-09-COUNTS", "F4-ITER-04-UNMEASURABLE"]))
+            Fail("supersedes: the superseded candidate, its freeze, the re-proof, the causes or the recorded decision differ");
         return findings;
     }
 
@@ -497,17 +531,21 @@ public class V025CandidateManifestTests
         ["R0"] = (1426, [1483, 1552, 1553]), ["D1"] = (1427, [1518, 1559]), ["F1"] = (943, [1558, 1571]), ["F2"] = (906, [1522]),
         ["F3"] = (847, [1519, 1531]), ["F4"] = (1139, [1510]), ["F5"] = (1132, [1554]), ["F6"] = (1144, [1513]), ["W0"] = (1143, [1512]),
         ["T1"] = (1428, [1562]), ["W1"] = (1429, [1566]), ["R2-1545"] = (1545, [1565, 1577]), ["R2-1546"] = (1546, [1563]),
-        ["R2-1547"] = (1547, [1563]), ["PREP"] = (1430, [1568, 1569, 1575, 1576]),
+        ["R2-1547"] = (1547, [1563]), ["PREP"] = (1430, [1568, 1569, 1575, 1576, 1579, 1581, 1610]),
     };
 
-    /// <summary>Issue states observed at the freeze (gh issue view at 2026-10-19T18:23:52Z), reviewed with this freeze.</summary>
+    /// <summary>Issue states observed at the re-freeze (gh issue view at 2026-10-20T20:38:53Z), reviewed with this freeze.</summary>
     private static readonly Dictionary<string, string> IssueStates = new()
     {
         ["1425"] = "OPEN||", ["1426"] = "OPEN||", ["1427"] = "OPEN||", ["1428"] = "OPEN||", ["1429"] = "OPEN||", ["1430"] = "OPEN||",
         ["943"] = "OPEN||", ["906"] = "OPEN||", ["847"] = "OPEN||", ["1139"] = "OPEN||", ["1132"] = "OPEN||", ["1144"] = "OPEN||",
         ["1143"] = "OPEN||", ["1545"] = "CLOSED|COMPLETED|2026-10-19T15:23:15Z", ["1546"] = "CLOSED|COMPLETED|2026-10-19T15:23:17Z",
         ["1547"] = "CLOSED|COMPLETED|2026-10-19T15:23:19Z", ["1548"] = "OPEN||", ["1573"] = "OPEN||", ["1578"] = "OPEN||",
+        ["1580"] = "CLOSED|COMPLETED|2026-10-20T20:37:40Z",
     };
+
+    /// <summary>The first 0.25 candidate, superseded by this re-freeze (D-AMEND-REFREEZE, "Amend + re-freeze", 2026-10-20).</summary>
+    private const string SupersededCandidate = "48cae911700ceb0dfc358e00933650445d81604f";
 
     /// <summary>The evidence producers reviewed with this freeze: a directory whose files are all included, plus extra files.</summary>
     private static readonly (string Id, string? Directory, string[]? Extra)[] Producers =

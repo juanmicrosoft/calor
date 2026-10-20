@@ -115,7 +115,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     public void FreezeOnlyCommitsDoNotInvalidateAndLandingIsFound()
     {
         var candidate = _repo.Candidate();
-        var landing = _repo.Commit((P.ManifestPath, "{}"), ("docs/plans/evidence/v0.25-candidate/inputs.json", "{}"),
+        var landing = _repo.Commit((P.ManifestPath, ManifestFor(candidate)), ("docs/plans/evidence/v0.25-candidate/inputs.json", "{}"),
             ("eng/test-manifest.json", TestManifest.Replace("100", "140").Replace("\"base.\"", "\"base. c.\"")));
         _repo.PublishMain();
         _repo.Commit(("docs/plans/evidence/adjudication-1430/terminal-record.json", "{}"));
@@ -128,7 +128,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     public void AfterTheLandingTheClassifierCannotExemptItsOwnEdit()
     {
         var candidate = _repo.Candidate();
-        _repo.Commit((P.ManifestPath, "{}"));
+        _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
         _repo.PublishMain();
         _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
         var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
@@ -146,7 +146,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
         _repo.Branch("feature");
         _repo.Commit((path, "changed"));
         _repo.Checkout("main");
-        _repo.Commit((P.ManifestPath, "{}"));
+        _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
         _repo.Merge("feature");
         var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
         Assert.Equal(Invalid, report.Verdict);
@@ -160,7 +160,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     {
         var candidate = _repo.Candidate();
         _repo.Branch("freeze");
-        var freeze = _repo.Commit((P.ManifestPath, "{}"));
+        var freeze = _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
         _repo.Checkout("main");
         _repo.Commit(("src/a.cs", "changed on main before the landing"));
         _repo.Merge("freeze");
@@ -208,7 +208,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     public void AFailedGitCommandIsUndecided(string command, string which, string error)
     {
         var candidate = _repo.Candidate();
-        var main = _repo.Commit((P.ManifestPath, "{}"));
+        var main = _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
         _repo.PublishMain();
         var target = _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
         bool Fails(string[] a) => a[0] == command && which switch
@@ -232,7 +232,7 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
     public void AnUnreadableBlobIsAnError(bool manifest)
     {
         var candidate = _repo.Candidate();
-        _repo.Commit((P.ManifestPath, "{\"unique\": 1430}"));
+        _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
         _repo.PublishMain();
         var record = "docs/plans/evidence/adjudication-1430/terminal-record.json";
         _repo.Commit((record, "{\"unique\": 1431}"));
@@ -252,6 +252,59 @@ public sealed class ReleaseCandidateInvalidationTests : IDisposable
           "allowedSkippedTests": []
         }
         """;
+
+    /// <summary>A manifest naming its candidate (FindLanding reads candidate.commit).</summary>
+    private static string ManifestFor(string candidate) => $"{{\"candidate\": {{\"commit\": \"{candidate}\"}}}}";
+
+    /// <summary>A re-freeze keeps the manifest path: a commit holding the earlier manifest (naming the superseded candidate)
+    /// is not the new candidate's landing; the first commit whose manifest names it is. A manifest naming no candidate
+    /// is an error, never "absent".</summary>
+    [Fact]
+    public void AReFrozenCandidateLandsWhereItsOwnManifestDoes()
+    {
+        var first = _repo.Candidate();
+        var firstLanding = _repo.Commit((P.ManifestPath, ManifestFor(first)));
+        var second = _repo.Commit(("scripts/determinism_runner.py", "amended"));
+        _repo.Commit(("docs/plans/evidence/v0.25-regeneration/ledger.json", "{}"));  // still holds the first manifest
+        var secondLanding = _repo.Commit((P.ManifestPath, ManifestFor(second)));
+        _repo.PublishMain();
+        var errors = new List<string>();
+        Assert.Equal(firstLanding, FindLanding(_repo.Git, P, first, errors));
+        Assert.Equal(secondLanding, FindLanding(_repo.Git, P, second, errors));
+        Assert.Empty(errors);
+        Assert.Equal(NotInvalidated, ClassifyRange(_repo.Git, P, second, "HEAD").Verdict);
+    }
+
+    /// <summary>A manifest that names no full candidate SHA is never skipped: a later valid manifest cannot become the
+    /// landing and exempt a classifier edit in between as a before-landing change.</summary>
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"candidate\": {\"commit\": \"\"}}")]
+    [InlineData("{\"candidate\": {\"commit\": \"  \"}}")]
+    [InlineData("{\"candidate\": {\"commit\": \"d1d7afde\"}}")]
+    [InlineData("{\"candidate\": {\"commit\": 7}}")]
+    [InlineData("not json")]
+    [InlineData("TRAILING-NEWLINE")]  // a full SHA plus "\n": .NET's $ would accept it (Codex re-freeze round 2)
+    [InlineData("UPPERCASE")]
+    [InlineData("DUPLICATE-KEYS")]  // Codex re-freeze round 3: JsonNode throws ArgumentException on a duplicate key
+    public void AManifestNamingNoFullCandidateIsUndecided(string manifest)
+    {
+        var candidate = _repo.Candidate();
+        manifest = manifest switch
+        {
+            "TRAILING-NEWLINE" => $"{{\"candidate\": {{\"commit\": \"{new string('a', 40)}\\n\"}}}}",
+            "UPPERCASE" => $"{{\"candidate\": {{\"commit\": \"{new string('A', 40)}\"}}}}",
+            "DUPLICATE-KEYS" => $"{{\"candidate\": {{\"commit\": \"{new string('a', 40)}\"}}, \"candidate\": null}}",
+            _ => manifest,
+        };
+        _repo.Commit((P.ManifestPath, manifest));
+        _repo.Commit(("tests/Calor.Compiler.Tests/EvidenceContract/ReleaseCandidateInvalidation.cs", "// weakened"));
+        _repo.Commit((P.ManifestPath, ManifestFor(candidate)));
+        _repo.PublishMain();
+        var report = ClassifyRange(_repo.Git, P, candidate, "HEAD");
+        Assert.True(report.Verdict == Undecided, report.ToString());
+        Assert.Contains(report.Errors, e => e.Contains("does not name a full candidate.commit", StringComparison.Ordinal));
+    }
 
     private static Change Modify(string path) => new("M", path, Regular, Regular, Bytes("a"), Bytes("b"));
 

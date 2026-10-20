@@ -239,7 +239,8 @@ class Candidate:
                 'dotnetSdkBuild': observed['dotnetSdkBuild'], 'runtime': observed['runtime'], 'observedEnvironment': observed.get('environment'),
                 'determinismProtocol': {'version': protocol.get('protocolVersion'), 'environments': protocol.get('environments'),
                                         'environmentRule': protocol.get('environmentRule'), 'checkout': protocol.get('checkout'),
-                                        **{k: protocol.get('toolchain', {}).get(k) for k in ('sdk', 'runtime', 'globalJson', 'configuration')}},
+                                        **{k: protocol.get('toolchain', {}).get(k) for k in ('sdk', 'runtime', 'globalJson', 'configuration')},
+                                        'releaseEpoch': protocol.get('budget', {}).get('releaseEpoch')},
                 'seeds': [{'id': 'z3-random-seed', **{k: protocol.get('z3', {}).get('randomSeed', {}).get(k) for k in ('value', 'source', 'applied')},
                            'note': 'G2 protocol 1.2.0: Z3 4.15.7 ignores random_seed, so the constant never reaches the solver.'},
                           {'id': '0.25-producers', 'value': None,
@@ -318,7 +319,10 @@ class Candidate:
             lines.append(f'fixture {c["id"]} {c["fixture"]} {c["fixtureSha256"]}')
         res, cc = r.get('results', {}), r.get('corpusCounts', {})
         check(sha(self.blob(res['path']), True) == res['sha256'], 'T1 controls-results.json differs from its approved hash')
-        lines += [f'results {res["path"]} {res["sha256"]}', f'corpus {cc.get("source")} {json.dumps(cc.get("counts"), separators=(",", ":"))}']
+        corpus = f'corpus {cc.get("source")} {json.dumps(cc.get("counts"), separators=(",", ":"))}'
+        if 'reRegistration' in cc:  # T1 register 1.0.3 (D-F2-INTERP-09-RECANDIDATE): T1RegisterValidator.ApprovalSeal seals it too
+            corpus += ' reRegistration ' + dotnet_json(jloads(self.blob(REGISTER))['corpusCounts']['reRegistration'])
+        lines += [f'results {res["path"]} {res["sha256"]}', corpus]
         seal = sha('\n'.join(sorted(lines)).encode())
         approved = (r.get('amendments') or [r])[-1].get('approvalSeal')
         check(seal == approved, f'T1 approval seal {seal} differs from the approved {approved}')
@@ -377,6 +381,28 @@ class Candidate:
             rows.append(dict(g, prs=prs, issueStateAtFreeze=self.inputs['issueStatesAtFreeze']['states'].get(str(g['issue']))))
         return rows
 
+    def supersedes(self):
+        """A re-freeze: the superseded candidate, its freeze landing, and the maintainer decision recorded at this candidate."""
+        sup = self.inputs.get('supersedes')
+        if sup is None:
+            return None
+        old, landing = sup['commit'], sup['frozenBy']['landing']
+        check(re.fullmatch('[0-9a-f]{40}', old) is not None and ancestor(old, self.commit), 'the superseded candidate is not an ancestor of this one')
+        frozen = git('show', f'{landing}:{MANIFEST}')
+        check(frozen is not None and json.loads(frozen)['candidate']['commit'] == old and ancestor(landing, self.commit),
+              'the superseded freeze landing does not hold a manifest naming the superseded candidate inside this candidate')
+        subject = git('log', '-1', '--format=%s', landing) or ''
+        check(subject.startswith(f"Merge pull request #{sup['frozenBy']['pr']} from "), 'the superseded freeze landing is not its PR\'s merge')
+        scope = self.json(SCOPE)
+        decision = [d for a in scope.get('amendments', []) for d in a.get('maintainerDecisions', [])
+                    if d.get('id') == sup['decision']['id'] and d.get('supersedes') == old and d.get('decision') == sup['decision']['decision']]
+        check(len(decision) == 1, f"the candidate's scope packet records no single {sup['decision']['id']} superseding {old}")
+        check(sup['amendments']['mergeCommit'] == self.commit, 'the amendment PR of a re-freeze is the candidate itself')
+        versions = {'protocol': self.json('docs/plans/evidence/g2-1421/protocol.json').get('protocolVersion'), 'scope': scope.get('scopeVersion'),
+                    't1Register': self.json(REGISTER).get('registerVersion'), 'd1Contract': self.json('docs/plans/evidence/v0.25-d1-1427/contract.json').get('contractVersion')}
+        check(all(sup['amendments'].get(k) == v for k, v in versions.items()), f'the recorded amendment versions differ from the candidate\'s {versions}')
+        return sup
+
     def build(self):
         identity = self.identity()
         packets = self.packets()
@@ -388,6 +414,7 @@ class Candidate:
             's2Witnesses': self.s2_witnesses(), 'merged': self.merged(),
             'issueStatesAtFreeze': self.inputs['issueStatesAtFreeze'], 'maintainerDecisions': self.inputs['maintainerDecisions'],
             'knownOpenItems': self.inputs['openItems'], 'invalidation': self.inputs['invalidation'], 'review': self.inputs['notes']['review'],
+            **({'supersedes': self.supersedes()} if self.inputs.get('supersedes') else {}),
         }
 
 def main():

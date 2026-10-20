@@ -185,9 +185,11 @@ public static class ReleaseCandidateInvalidation
     }
 
     /// <summary>
-    /// The first first-parent commit of protected main after the candidate that holds the manifest. A commit's
-    /// tree is listed to decide whether the path exists; an existing manifest whose blob cannot be read is an error,
-    /// never "absent", so an unreadable landing cannot turn a frozen-file edit into a before-landing one.
+    /// The first first-parent commit of protected main after the candidate that holds the manifest naming this
+    /// candidate (its candidate.commit). A re-freeze keeps the path, so an earlier manifest naming another (superseded)
+    /// candidate is not this candidate's landing. A commit's tree is listed to decide whether the path exists; an
+    /// existing manifest whose blob cannot be read or parsed is an error, never "absent", so an unreadable landing cannot
+    /// turn a frozen-file edit into a before-landing one.
     /// </summary>
     public static string? FindLanding(GitRepo git, CandidateProfile profile, string candidate, List<string> errors, GitRun? run = null)
     {
@@ -221,12 +223,23 @@ public static class ReleaseCandidateInvalidation
             }
             if (string.IsNullOrWhiteSpace(listed)) continue;
             var blob = listed.Split('\t')[0].Split(' ').Last();
-            if (run("cat-file", "-e", blob).ExitCode != 0)
+            var (catExit, text, _) = run("cat-file", "blob", blob);
+            if (catExit != 0)
             {
                 errors.Add($"the manifest {profile.ManifestPath} at {commit} exists but its blob {blob} cannot be read");
                 return null;
             }
-            return commit;
+            string? named;
+            try { named = System.Text.Json.Nodes.JsonNode.Parse(text)?["candidate"]?["commit"]?.GetValue<string>(); }
+            // A duplicate key makes JsonNode throw ArgumentException on access: also "names no candidate", never a crash.
+            catch (Exception e) when (e is System.Text.Json.JsonException or InvalidOperationException or ArgumentException) { named = null; }
+            // Only a manifest naming a full commit SHA may be skipped as another candidate's; anything else is an error.
+            if (named is null || !System.Text.RegularExpressions.Regex.IsMatch(named, @"\A[0-9a-f]{40}\z"))
+            {
+                errors.Add($"the manifest {profile.ManifestPath} at {commit} does not name a full candidate.commit");
+                return null;
+            }
+            if (named == candidate) return commit;
         }
         return null;
     }
