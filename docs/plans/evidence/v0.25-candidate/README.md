@@ -14,7 +14,44 @@ toolchain, decisions, open items), the generated `candidate-manifest.json`, and
 through P1's `DurableProvenance.Verify`, and runs the scope, T1 and D1 validators on the
 candidate's blobs.
 
-## The freeze (#1430 step 2)
+## The re-freeze (#1430 Step B): `d1d7afde` supersedes `48cae911`
+
+The first candidate, `48cae911`, is **superseded**. The re-proof on it (#1581,
+`docs/plans/evidence/v0.25-regeneration/regeneration.md`) found three blockers, and the maintainer decided
+`D-AMEND-REFREEZE` (@juanmicrosoft, 2026-10-20, "Amend + re-freeze"). #1610 amended all three and its merge
+is the new candidate. No acceptance record, adjudication identity or publication may name `48cae911`.
+
+| Cause | What the re-proof found | Amended by (#1610) |
+|---|---|---|
+| `DETERMINISM-INCOMPLETE` | G2 execution `v025-reproof-1` (run 39323628059) INCOMPLETE: 660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE; osx-arm64 job 2 hit its 50-minute timeout | G2 protocol 1.7.0 (`D-G2-RAISE-CAP-2-RUNS`, "Raise cap to 2,100, 2 runs") |
+| `F2-INTERP-09-COUNTS` | registered corpus counts measured on F2's branch differed on the candidate | T1 register 1.0.3 (`D-F2-INTERP-09-RECANDIDATE`, "Re-register to candidate") |
+| `F4-ITER-04-UNMEASURABLE` | no CLI surface can measure the three FluentValidation modules as preserved | R0 scope 1.5.0 `notMeasuredCases` (`D-F4-ITER-04-NOT-MEASURED`, "Amend to not-measured") |
+
+| Field | Value |
+|---|---|
+| Candidate | `d1d7afde672691613f7bb34d253e63401ee423ac`, the merge of #1610, committed 2026-10-20T20:37:38Z; the tip of `origin/main` at the re-freeze (2026-10-20T20:39:52Z) |
+| Version | 0.25.0; notes dated 2026-10-20; no `v0.25.0` tag, local or remote |
+| Tree | `d00b3c43bf1f7a6962354115622e024c80f6f203` (equal to #1610's head `167b8d02d`) |
+| Release SDK | 10.0.401; `dotnetSdkBuild` `sha256:a5b223b4…` and compiler runtime 10.0.12 (Linux x86_64, reproducible-builds run 39486340748 on that tree, both builds, after `check-runtime --prune`) |
+| Release gaps | #1545, #1546, #1547 closed (unchanged); the live credential check, re-run from a fresh clone at the candidate, reports `CLOSED` (Actions workflow permissions by maintainer attestation): `release-credentials-live-2026-10-20.txt` |
+| Protocol, scope, register | G2 1.7.0, R0 scope 1.5.0, T1 register 1.0.3, D1 contract 1.0.7, all at the candidate |
+| Residuals | #1578's two (`D-ACCEPT-FILE-FREEZE`, unchanged); `GATE-PREVIOUSAFTER-BOOL` (MINOR, `reviews/stepA-verification-codex.md`): the gate's T005 port accepts `previousAfter` = `false` for a recorded 0. The fix is in `scripts/verify_release_adjudication.py`, a candidate input, so it is a known residual of this freeze |
+
+**Landing.** The landing is the first first-parent commit of `origin/main` after the candidate whose
+`candidate-manifest.json` names the candidate (`candidate.commit`): this re-freeze PR's merge. The manifest
+path is the same as the first freeze's, so the classifier skips a commit whose manifest names another
+candidate (`FindLanding`, control `AReFrozenCandidateLandsWhereItsOwnManifestDoes`).
+
+**The re-proof needs new paths for `ready/` records.** T1 register 1.0.3 pins
+`docs/plans/evidence/v0.25-f2-906/ready/cases/F2-INTERP-09.json` (the measurement on `48cae911`) as the
+re-registration's measurement, and the classifier allows only newly added `ready/` files. The re-proof on
+`d1d7afde` therefore writes its F2-INTERP-09 record, and every other family's `ready/` records, under a new
+path, for example `ready/d1d7afde/cases/`. The #1581 records name `48cae911` and do not count for this
+candidate. The second G2 execution's prerequisite record goes to
+`docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/<runId>.json`.
+
+## The first freeze (#1430 step 2, superseded)
+
 
 | Field | Value |
 |---|---|
@@ -27,7 +64,7 @@ candidate's blobs.
 
 `candidate-manifest.json` is generated from `inputs.json`; `V025CandidateManifestTests` re-verifies it from git,
 runs the scope, T1 and D1 validators on the candidate's blobs, and classifies the range from the candidate.
-The landing is this freeze PR's merge.
+The first freeze's landing was #1579's merge (`51249109`).
 
 ## Generator
 

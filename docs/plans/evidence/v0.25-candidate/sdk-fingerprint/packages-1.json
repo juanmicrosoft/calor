@@ -2,8 +2,8 @@
  "schema": "calor/reproducible-build-hashes/2",
  "packages": {
   "Calor.Sdk.0.25.0.nupkg": {
-   "sha256": "88b93090f6e94fec634da29c69ecc865962b799aaefda162c7b215036b8f3460",
-   "size": 59696454,
+   "sha256": "c2260a5b3486d40929bce832fee543bc3ba60d17507de0e0d7ea6588baa539f0",
+   "size": 59696450,
    "entries": {
     "Calor.Sdk.nuspec": {
      "sha256": "de3a24fc296c76848441dca806d0e862a731849c04f9b6d617d7c00ab1027f09",
@@ -90,7 +90,7 @@
      ]
     },
     "tasks/net10.0/Calor.Runtime.dll": {
-     "sha256": "af77588cfb1879ced158a62e1d6cdec20bf48be15c44af9b9fa54edb43a07e67",
+     "sha256": "62436aee568f5cee98196d829e44e0c39636f2f1ee82db87008b8ffc3dc78599",
      "size": 21504,
      "zipDateTime": [
       2000,
@@ -114,7 +114,7 @@
      ]
     },
     "tasks/net10.0/Calor.Tasks.dll": {
-     "sha256": "9567b67f653f7fe0378c5f699e170c91f6a5580871dabfd76e2d36fbe4e30d09",
+     "sha256": "567344341a4774da7ba685bdee25ee831d37b51bcbde7a041cfd0e037d85b977",
      "size": 47104,
      "zipDateTime": [
       2000,
@@ -282,7 +282,7 @@
      ]
     },
     "tasks/net10.0/calor.dll": {
-     "sha256": "4e43f067b42f1abbebefa63f5738434149ae653e0cf35aa83facf2e190aa2c3c",
+     "sha256": "e639f533c16209aafac10366c737fd9cf4c1e7d2c4d757745ec5739be951b0f0",
      "size": 5415424,
      "zipDateTime": [
       2000,
@@ -392,8 +392,8 @@
    }
   },
   "calor.0.25.0.nupkg": {
-   "sha256": "a9669d7daf36c3a4c27ed045e28b63f7a9e0a25602638b0ae6d8f1ebf5cacf1e",
-   "size": 62048884,
+   "sha256": "8acc92c4cd7c74eadca16b9fa2ec70da00d67b5cb20caab8738bb6554749866f",
+   "size": 62048877,
    "entries": {
     "README.md": {
      "sha256": "68f973d959bbe91b5c8a34c42671899b7672f0645f57098cc39a40e57c507a0f",
@@ -468,7 +468,7 @@
      ]
     },
     "tools/net10.0/any/Calor.Runtime.dll": {
-     "sha256": "af77588cfb1879ced158a62e1d6cdec20bf48be15c44af9b9fa54edb43a07e67",
+     "sha256": "62436aee568f5cee98196d829e44e0c39636f2f1ee82db87008b8ffc3dc78599",
      "size": 21504,
      "zipDateTime": [
       2000,
@@ -480,7 +480,7 @@
      ]
     },
     "tools/net10.0/any/Calor.Runtime.pdb": {
-     "sha256": "ae8075340842354b458a234805df73b08e31950d92ca09214a3d0166e81153da",
+     "sha256": "5973cb0db07ff43302bdbecce450f2b9433150dec53cd21015a80dea40b03682",
      "size": 15060,
      "zipDateTime": [
       2000,
@@ -612,7 +612,7 @@
      ]
     },
     "tools/net10.0/any/calor.dll": {
-     "sha256": "4e43f067b42f1abbebefa63f5738434149ae653e0cf35aa83facf2e190aa2c3c",
+     "sha256": "e639f533c16209aafac10366c737fd9cf4c1e7d2c4d757745ec5739be951b0f0",
      "size": 5415424,
      "zipDateTime": [
       2000,
@@ -624,7 +624,7 @@
      ]
     },
     "tools/net10.0/any/calor.pdb": {
-     "sha256": "5cc6bac0a924e75c44a8d58a5ca563172301fee8f5b6dc51f16b445067d7d660",
+     "sha256": "d63e9932133710e3530bfebf76b661d70e75d81f66769cf42c36454c4fcdf545",
      "size": 1399980,
      "zipDateTime": [
       2000,
@@ -1179,14 +1179,15 @@
   }
  },
  "releaseMetadata": {
-  "calor-nuget-467b8a75c48cd2eaaf6afa5b185f1f2e6281c9a7.provenance.json": "325bdd6969b3b448712c815a56b6f186a7d9eb39018a12a3543d32e2bbfef472",
-  "calor-nuget-467b8a75c48cd2eaaf6afa5b185f1f2e6281c9a7.sbom.spdx.json": "72ca2823562bddd22b10ebb071614b6651d090b8f681aea6e3d0a7907615c3b5"
+  "calor-nuget-667fe7bc45b3510df271134bfcc7dc6cc5e8e526.provenance.json": "c35d15a0fe0c534895b52cbe7f428911ab882727ec3e84f8c0c9324e043e844b",
+  "calor-nuget-667fe7bc45b3510df271134bfcc7dc6cc5e8e526.sbom.spdx.json": "6bcb7f4cc863077113fff0f3a3ef425363afa2c180386f231b4d7bbe9e037681"
  },
  "website": null,
  "toolchain": {
   "os": "Linux x86_64",
   "dotnet": "10.0.401",
   "dotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+  "dotnetRuntime": "10.0.12",
   "node": "v22.23.3",
   "npm": "10.9.9"
  }
