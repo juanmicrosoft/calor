@@ -118,6 +118,7 @@ class RegistrationTests(unittest.TestCase):
 
     def test_worst_case_fits_the_accepted_ceiling(self) -> None:
         self.assertEqual((795, 115, 3180), dp.worst_case(PROTOCOL))  # amendment 1.5.0: Windows 110 min, 4 executions, ceiling 3,200
+        self.assertEqual(835, dp.epoch_worst_case(PROTOCOL))  # amendment 1.7.0: osx-arm64 70 min in the 0.25 epoch only
 
 
 class NegativeRegistrationControls(unittest.TestCase):
@@ -158,13 +159,30 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.only("D008", protocol=mutate(lambda p: p["budget"].update(maxExecutions=5)))  # 5 x 795 > 3,200 (amendment 1.5.0)
 
     def test_d008_release_epoch(self) -> None:
-        # Amendment 1.6.0: 2 x 795 = 1,590 within the epoch's 1,600; no control run; bound to the candidate manifest.
-        self.assertEqual((2, 0, 1600, 1590), tuple(PROTOCOL["budget"]["releaseEpoch"][k] for k in
-                                                   ("maxExecutions", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "worstCaseTotal")))
+        # Amendment 1.7.0: the epoch (after run 6) has 2,100 minutes; run 7 spent 397; the window after run 7 allows 2
+        # executions of 835 each with the epoch's 70-minute macOS timeout: 397 + 1,670 = 2,067 <= 2,100.
+        ep = PROTOCOL["budget"]["releaseEpoch"]
+        self.assertEqual((6, 2100, 397, 7, 2, 2, 0, 1703, {"osx-arm64": 70}, 835, 1670, 1590), tuple(ep[k] for k in (
+            "epochAfterRunNumber", "epochCeilingRunnerMinutes", "spentBeforeWindow", "afterRunNumber", "maxExecutions",
+            "maxExecutionsPerCandidate", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "jobTimeoutMinutes",
+            "worstCasePerExecution", "worstCaseWithEpochTimeouts", "worstCaseTotal")))
+        self.assertLessEqual(ep["spentBeforeWindow"] + ep["worstCaseWithEpochTimeouts"], ep["epochCeilingRunnerMinutes"])
         for edit in (lambda e: e.update(maxExecutions=3), lambda e: e.update(worstCaseTotal=1500), lambda e: e.update(maxDispatchedControlRuns=1),
-                     lambda e: e.update(ceilingRunnerMinutes=1589), lambda e: e.update(afterRunNumber=0), lambda e: e.update(amendment="9.9.9"),
-                     lambda e: e.update(candidateManifest="eng/candidate.json"), lambda e: e.pop("maxExecutions")):
+                     lambda e: e.update(ceilingRunnerMinutes=1702), lambda e: e.update(afterRunNumber=0), lambda e: e.update(amendment="9.9.9"),
+                     lambda e: e.update(candidateManifest="eng/candidate.json"), lambda e: e.pop("maxExecutions"),
+                     lambda e: e.update(spentBeforeWindow=300), lambda e: e.update(epochCeilingRunnerMinutes=2000),
+                     lambda e: e.update(epochAfterRunNumber=7), lambda e: e.pop("spentBeforeWindow"),
+                     lambda e: e.update(maxExecutionsPerCandidate=3), lambda e: e.update(maxExecutionsPerCandidate=True),
+                     lambda e: e.update(worstCasePerExecution=795), lambda e: e.update(worstCaseWithEpochTimeouts=1590),
+                     lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 40}), lambda e: e.update(jobTimeoutMinutes={"osx-x64": 70}),
+                     lambda e: e.update(jobTimeoutMinutes={"osx-arm64": "70"}), lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 200}),
+                     lambda e: e.pop("priorResultPath"), lambda e: e.update(priorResultPath="docs/plans/evidence/g2-1421/latest.json")):
             self.only("D008", protocol=mutate(lambda p, edit=edit: edit(p["budget"]["releaseEpoch"])))
+        # The 1.6.0 shape (no window) is still judged by its own formula.
+        legacy = mutate(lambda p: p["budget"].update(releaseEpoch={k: v for k, v in p["budget"]["releaseEpoch"].items() if k in (
+            "amendment", "release", "maxDispatchedControlRuns", "candidateManifest")} | {
+            "afterRunNumber": 6, "maxExecutions": 2, "ceilingRunnerMinutes": 1600, "worstCaseTotal": 1590}))
+        self.assertEqual(set(), codes(protocol=legacy))
 
     def test_d009_line_ending_normalization(self) -> None:
         self.only("D009", protocol=mutate(lambda p: p["agreement"].update(normalizationRules=["CRLF -> LF"])))
@@ -525,29 +543,47 @@ class PlanGuards(unittest.TestCase):
     """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
 
     def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",), ledger=None,
-             current=True, merge=None, protocol=PRE_EPOCH, manifest=None) -> list[str]:
+             current=True, merge=None, protocol=PRE_EPOCH, manifest=None, results=None) -> list[str]:
         runs = list(inventory) + ([this_run(mode, execution_id)] if current else [])
         return dr.plan_problems(protocol, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
                                 ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths),
-                                pr_merge_commit=lambda pr: merge, manifest_candidate=lambda path: manifest)
+                                pr_merge_commit=lambda pr: merge, manifest_candidate=lambda path: manifest,
+                                committed_result=lambda path: (results or {}).get(path))
 
     def test_release_epoch_allows_two_executions_on_the_manifest_candidate(self) -> None:
         # Amendment 1.6.0: runs 1-6 are the 0.24 history (4 executions, 1,608 minutes); the epoch charges only later runs.
+        # Amendment 1.7.0: run 7 (397 minutes, INCOMPLETE on the first candidate) is charged to the 2,100 epoch ceiling;
+        # the window after run 7 allows 2 more executions, both on the re-frozen candidate.
         history = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=400) for i in (2, 3, 5, 6)]
         history += [past(1, "determinism control C1", minutes=13, event="pull_request"),
                     past(4, "determinism execution E4", sha="4" * 40, minutes=2, started=False, conclusion="failure")]
+        history += [past(7, "determinism execution E7", sha=OLD, minutes=397, conclusion="failure")]
         epoch = dict(protocol=PROTOCOL, manifest=NEW)
-        self.assertEqual([], self.plan(inventory=history, **epoch))
+        self.assertEqual([], self.plan(inventory=history, **epoch))  # 397 + 835 <= 2,100
         for manifest in (None, OLD, NEW[:12], 7):
             self.refused("named by docs/plans/evidence/v0.25-candidate/candidate-manifest.json", inventory=history, protocol=PROTOCOL, manifest=manifest)
-        second = history + [past(7, "determinism execution E7", sha=OLD, minutes=795, conclusion="failure")]
-        self.assertEqual([], self.plan(inventory=second, **epoch))  # 795 + 795 = 1,590 <= 1,600, on a re-frozen candidate
-        self.refused("already executed", inventory=history + [past(7, "determinism execution E7", sha=NEW)], **epoch)
-        self.refused("outside docs/", inventory=second, paths=["docs/x.md"], **epoch)
-        third = second + [past(8, "determinism execution E8", sha="8" * 40, minutes=1)]
+        self.refused("outside docs/", inventory=history, paths=["docs/x.md"], **epoch)  # the re-frozen candidate still needs a repair
+        second = history + [past(8, "determinism execution E8", sha=NEW, minutes=400, conclusion="failure")]
+        path = "docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/8.json"
+        decided = {"schemaVersion": 1, "mode": "execution", "commit": NEW, "runIds": {"E8": "8"}, "verdict": "INCOMPLETE",
+                   "classCounts": {"AGREE-PASS": 660, "DISAGREE": 0, "AGREE-FAIL": 0, "INCOMPLETE": 1644}, "protocolVersion": "1.7.0"}
+        epoch["results"] = {path: decided}
+        self.assertEqual([], self.plan(inventory=second, paths=["docs/x.md"], **epoch))  # the same candidate again: 797 + 835 <= 2,100
+        # Only after a recorded INCOMPLETE first execution with no disagreement or agreed failure.
+        for bad in ({}, {path: dict(decided, verdict="NON-DETERMINISTIC")}, {path: dict(decided, verdict="FAILING")},
+                    {path: dict(decided, classCounts=dict(decided["classCounts"], DISAGREE=1))},
+                    {path: dict(decided, classCounts=dict(decided["classCounts"], **{"AGREE-FAIL": 2}))},
+                    {path: dict(decided, commit=OLD)}, {path: dict(decided, runIds={"E8": "9"})}, {path: dict(decided, protocolVersion="1.6.0")}):
+            self.refused("may run again only after", inventory=second, paths=["docs/x.md"], **dict(epoch, results=bad))
+        self.refused("executed at most 1 time", inventory=second, protocol=PRE_EPOCH)  # once per commit outside the epoch
+        third = second + [past(9, "determinism execution E9b", sha=NEW, minutes=400)]
+        self.refused("already executed 2 time(s)", inventory=third, **epoch)
         self.refused("limit of 2 execution", inventory=third, **epoch)
-        self.refused("exceeds the 1600", inventory=history + [past(7, "determinism execution E7", sha=OLD, minutes=806)], **epoch)
-        self.refused("exceeds the 1600", inventory=history + [past(7, "unreadable", status="in_progress", minutes=11)], **epoch)
+        self.refused("exceeds the 2100", inventory=history[:-1] + [past(7, "determinism execution E7", sha=OLD, minutes=1266)], **epoch)
+        self.refused("exceeds the 2100", inventory=history + [past(8, "unreadable", status="in_progress", minutes=50)], **epoch)
+        include = dr.matrix(PROTOCOL, "execution")["include"]
+        self.assertEqual({70}, {c["timeout"] for c in include if c["env"] == "osx-arm64"})  # the epoch's macOS timeout
+        self.assertEqual({50}, {c["timeout"] for c in dr.matrix(PRE_EPOCH, "execution")["include"] if c["env"] == "osx-arm64"})
         self.refused("limit of 0 control", inventory=history, mode="control", execution_id="C9", **epoch)
         early = dict(this_run(), runNumber=6)
         problems = dr.plan_problems(PROTOCOL, mode="execution", execution_id="E9", env=dispatch(), inventory=history[:-1] + [early],
@@ -570,9 +606,10 @@ class PlanGuards(unittest.TestCase):
         include = dr.matrix(PROTOCOL, "execution")["include"]
         envs = dp.env_by_id(PROTOCOL)
         self.assertEqual(10, len(include))
+        overrides = PROTOCOL["budget"]["releaseEpoch"]["jobTimeoutMinutes"]  # amendment 1.7.0
         for cell in include:
             env = envs[cell["env"]]
-            self.assertEqual((env["runner"], env["jobTimeoutMinutes"]), (cell["runner"], cell["timeout"]))
+            self.assertEqual((env["runner"], overrides.get(env["id"], env["jobTimeoutMinutes"])), (cell["runner"], cell["timeout"]))
         self.assertEqual({20}, {c["timeout"] for c in dr.matrix(PROTOCOL, "control")["include"]})
 
     def test_fourth_execution_runs_only_on_the_amendment_merge(self) -> None:

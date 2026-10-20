@@ -32,6 +32,9 @@ internal static class T1RegisterValidator
     /// <summary>Where F2 recorded the F-2/corpus counts; it must also be one of F2's approved evidence files.</summary>
     public const string F2CorpusSource = "docs/plans/evidence/v0.25-f2-906/rows.json";
 
+    /// <summary>Where the 0.25 re-proof keeps F2's per-case candidate records (D-READY-EVIDENCE-DIRS).</summary>
+    public const string F2ReadyDir = "docs/plans/evidence/v0.25-f2-906/ready/";
+
     private static readonly string[] CorpusKeys = ["incompleteDiagnostics", "inRepoExpressionsBound", "conversionVisits", "opaqueBoundaries", "opaqueExpressions"];
 
     public static IReadOnlyList<ContractViolation> Validate(JsonNode register, JsonNode scope, Func<string, byte[]?> read)
@@ -92,7 +95,10 @@ internal static class T1RegisterValidator
                     Add("T004", Str(e["path"]) ?? fid, $"evidence file must be the family's own (under {own}) at its approved hash");
         }
 
-        // T005: the F-2/corpus before and after counts are preserved exactly as F2 recorded them.
+        // T005: the F-2/corpus before and after counts are preserved exactly as F2 recorded them. Amendment 1.0.3
+        // (D-F2-INTERP-09-RECANDIDATE) re-registers 'after' to the 0.25 candidate's measurement: then 'after' equals that
+        // retained measurement (F2's own ready/ record, at its approved hash), 'before' and the recorded previous 'after'
+        // equal F2's, and before plus every PR's delta gives after.
         var corpus = register["corpusCounts"];
         var source = Json(Str(corpus?["source"]));
         var f2Evidence = families.FirstOrDefault(f => Str(f["id"]) == "F2") is { } f2
@@ -101,13 +107,34 @@ internal static class T1RegisterValidator
             || source?["corpusCounts"] is not JsonObject recorded)
             Add("T005", "corpusCounts", $"the F2-INTERP-09 corpus counts must cite F2's approved {F2CorpusSource}");
         else
+        {
+            var re = corpus!["reRegistration"];
+            JsonNode? candidateCounts = null;
+            var perPr = Arr(re?["perPr"]).ToList();
+            if (re is not null)
+            {
+                var path = Str(re["measurement"]?["path"]);
+                var file = path?.StartsWith(F2ReadyDir, StringComparison.Ordinal) == true ? Json(path) : null;
+                candidateCounts = Arr(file?["measurements"]).FirstOrDefault(m => Str(m["kind"]) == "corpus-counts")?["candidate"];
+                if (Str(re["amendment"]) is not { } version || !Arr(register["amendments"]).Any(a => Str(a["version"]) == version)
+                    || Hash(path) is not { } mh || mh != Str(re["measurement"]?["sha256"]) || Str(file?["caseId"]) != "F2-INTERP-09"
+                    || !InteropScopeValidator.IsFullSha(Str(re["measuredOn"])) || Str(file?["candidate"]) != Str(re["measuredOn"]) || candidateCounts is null
+                    || perPr.Count == 0 || perPr.Any(p => Int(p["pr"]) <= 0 || !InteropScopeValidator.IsFullSha(Str(p["mergeCommit"]))))
+                    Add("T005", "reRegistration", $"a re-registration needs its register amendment, F2's measurement under {F2ReadyDir} at its hash, the candidate and per-PR deltas");
+            }
             foreach (var key in CorpusKeys)
             {
                 var mine = corpus!["counts"]?[key];
-                if (mine?["before"] is not JsonValue || mine["after"] is not JsonValue
-                    || !JsonNode.DeepEquals(mine["before"], recorded[key]?["before"]) || !JsonNode.DeepEquals(mine["after"], recorded[key]?["after"]))
-                    Add("T005", key, "before/after count differs from F2's recorded count or is missing");
+                var after = re is null ? recorded[key]?["after"] : candidateCounts?[key];
+                // Every count is a JSON integer before it is compared or added (a string or boolean never matches).
+                if (!IsInteger(mine?["before"]) || !IsInteger(mine?["after"]) || !IsInteger(after)
+                    || !JsonNode.DeepEquals(mine!["before"], recorded[key]?["before"]) || !JsonNode.DeepEquals(mine["after"], after)
+                    || (re is not null && (!JsonNode.DeepEquals(re["previousAfter"]?[key], recorded[key]?["after"])
+                        || perPr.Any(p => !IsInteger(p["delta"]?[key]))
+                        || Int(mine["before"]) + perPr.Sum(p => Int(p["delta"]?[key])) != Int(mine["after"]))))
+                    Add("T005", key, "before/after count differs from F2's recorded count (or, re-registered, from the candidate's measurement and the per-PR deltas) or is missing");
             }
+        }
 
         // T006: controls cover every mandatory shape and every registered interaction row, with approved fixtures.
         var controls = Arr(register["controls"]).ToList();
@@ -202,7 +229,8 @@ internal static class T1RegisterValidator
         var lines = Arr(register["families"]).SelectMany(f => Arr(f["evidence"]).Select(e => $"evidence {Str(f["id"])} {Str(e["path"])} {Str(e["sha256"])}"))
             .Concat(Arr(register["controls"]).Select(c => $"fixture {Str(c["id"])} {Str(c["fixture"])} {Str(c["fixtureSha256"])}"))
             .Append($"results {Str(register["results"]?["path"])} {Str(register["results"]?["sha256"])}")
-            .Append($"corpus {Str(register["corpusCounts"]?["source"])} {register["corpusCounts"]?["counts"]?.ToJsonString()}")
+            .Append($"corpus {Str(register["corpusCounts"]?["source"])} {register["corpusCounts"]?["counts"]?.ToJsonString()}"
+                + (register["corpusCounts"]?["reRegistration"] is { } re ? $" reRegistration {re.ToJsonString()}" : ""))
             .OrderBy(l => l, StringComparer.Ordinal);
         return InteropScopeValidator.Sha256(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", lines)));
     }
@@ -210,5 +238,7 @@ internal static class T1RegisterValidator
     private static IEnumerable<JsonNode> Arr(JsonNode? n) => n is JsonArray a ? a.OfType<JsonNode>() : [];
     private static string? Str(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : null;
     private static int Int(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<int>(out var i) ? i : 0;
+    private static bool IsInteger(JsonNode? n) => n is JsonValue v && v.GetValueKind() == JsonValueKind.Number && v.TryGetValue<int>(out _);
+
     private static bool NonBlank(JsonNode? n) => !string.IsNullOrWhiteSpace(Str(n));
 }

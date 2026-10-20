@@ -406,6 +406,51 @@ rows, gates, the agreement rate, and record formats. The result gains the `harne
   It is also refused when that record is unreadable, unmerged, or merged into another branch.
 - The budget controls are updated to 3,200 and 795.
 
+## Amendment 1.7.0: a 70-minute macOS timeout and two runs on the re-frozen candidate
+
+**Decision** (@juanmicrosoft, 2026-10-20, relayed in the agent session; no GitHub record): "Raise cap to
+2,100, 2 runs." As relayed: set the osx-arm64 job timeout to 70 minutes and leave every other timeout as it
+is; raise the 0.25 epoch ceiling to 2,100 runner-minutes; allow up to 2 executions on the new frozen
+candidate, bound through the manifest; record 397 + 2 × 835 = 2,067 ≤ 2,100. Also recorded as R0 scope
+amendment 1.5.0 (`D-G2-RAISE-CAP-2-RUNS`), PR #1610.
+
+**Why.** The epoch's first execution, `v025-reproof-1` (run 39323628059, run number 7, on `48cae911`),
+returned INCOMPLETE: 660 AGREE-PASS, 0 DISAGREE, 1,644 INCOMPLETE, 397 runner-minutes. osx-arm64 job 2 ran
+46 of its 50 minutes and the harness cut attempt 15. Its verification-full median was 143.4 s against
+105.9 s for job 1 (about 175 s per attempt against 128 s), so at its medians it needs about 3 + 15 × 175 s
+≈ 47 minutes. A 70-minute timeout leaves the harness 65 minutes, about 1.35 times that. The other
+environments finished: Linux jobs took 22-47 of 50-70 minutes, Windows jobs 45-54 of 110.
+
+**What changes** (`budget.releaseEpoch`):
+
+| Field | Value |
+|---|---|
+| Epoch (`epochAfterRunNumber`) | every run after run 6, as in 1.6.0 |
+| Epoch ceiling (`epochCeilingRunnerMinutes`) | 2,100 (1,600 in 1.6.0) |
+| Spent before the window (`spentBeforeWindow`) | 397 (run 7) |
+| Window (`afterRunNumber`) | every run after run 7 |
+| Executions in the window | at most 2 (`maxExecutions`), on the manifest's candidate, which may run twice (`maxExecutionsPerCandidate`) |
+| osx-arm64 job timeout in the window (`jobTimeoutMinutes`) | 70 (50 in the registered table, unchanged) |
+| Worst case per window execution | 5 + 10 + 2 × (70 + 50 + 70 + 110 + 110) = 835 |
+| Window worst case (`worstCaseWithEpochTimeouts`) | 2 × 835 = 1,670; with run 7, 397 + 1,670 = 2,067 ≤ 2,100 |
+| Window ceiling (`ceilingRunnerMinutes`) | 2,100 − 397 = 1,703 |
+
+`worstCaseTotal` keeps the 1.6.0 formula over the registered environment table (2 × 795 = 1,590), which
+main's validator also checks; the binding worst case is `worstCaseWithEpochTimeouts`. The plan step charges
+every epoch run to the 2,100 ceiling, reserves 835 for the run it plans, and uses the 70-minute timeout in
+its job matrix. Both window executions run only on the commit that the candidate manifest on protected main
+names (the 1.6.0 binding). For that commit only, the one-execution-per-commit rule and the non-docs-change
+rule after a failed execution are replaced by the limit of 2. The second execution runs only after the
+first was decided INCOMPLETE with no DISAGREE and no AGREE-FAIL, and that decided record is committed on
+protected main at `priorResultPath` (`docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/<runId>.json`), which the plan
+step reads. That directory is downstream evidence of the 0.25 candidate classifier, so adding the record does
+not invalidate the candidate. A NON-DETERMINISTIC or FAILING first execution, or one without its record, ends the
+epoch for the candidate. Both executions are retained and reported. The validator checks the block (D008): timeouts may only rise for registered
+environments, and the window's worst case must fit the window ceiling, which is the epoch ceiling minus
+what run 7 spent. Unchanged: the registered environment table and the 0.24 budget (runs 1-6), no re-run of
+any attempt, job or run, no control run, and every case, environment, attempt, determinism row, gate,
+agreement rate, decider rule and record format.
+
 ## Amendment 1.6.0: two executions for the 0.25 candidate
 
 **Decision** (@juanmicrosoft, 2026-10-19, relayed in the agent session; no GitHub record): "Amend: 2 runs

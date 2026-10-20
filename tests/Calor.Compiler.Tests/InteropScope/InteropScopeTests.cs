@@ -228,6 +228,21 @@ public class InteropScopeTests
             scope["amendments"]!.AsArray().Add(mv); scope["scopeVersion"] = Last(scope);
             var f4Rows = Family(scope, "F4")["readiness"]!["cases"]!.AsArray();
             f4Rows.Remove(f4Rows.Single(x => x!["id"]!.GetValue<string>() == "F4-ITER-04")); return null; }),
+        // Amendment 1.5.0 (D-F4-ITER-04-NOT-MEASURED): a not-measured case is recorded as skipped, and only such a case.
+        ["READY with a not-measured case recorded passed"] = ("S007", scope => { Row(Ready(scope), "F4-ITER-04")["result"] = "passed"; return null; }),
+        ["READY with a measured case recorded skipped"] = ("S007", scope => { Row(Ready(scope), "F4-ITER-01")["result"] = "skipped"; return null; }),
+        ["not-measured case without a reason"] = ("S004", scope => { NotMeasuredEntry(scope)["reason"] = " "; return null; }),
+        ["not-measured case without a decision"] = ("S004", scope => { NotMeasuredEntry(scope).AsObject().Remove("decision"); return null; }),
+        ["not-measured case covered by another family"] = ("S004", scope => { NotMeasuredEntry(scope)["coveredBy"]!.AsArray().Add("F5-ARRAY-01"); return null; }),
+        ["not-measured case covered by nothing"] = ("S004", scope => { NotMeasuredEntry(scope)["coveredBy"] = new JsonArray(); return null; }),
+        ["not-measured case in the wrong family"] = ("S004", scope => { NotMeasuredEntry(scope)["family"] = "F5"; return null; }),
+        ["not-measured unregistered case"] = ("S004", scope => { NotMeasuredEntry(scope)["id"] = "F4-ITER-99"; return null; }),
+        ["not-measured marking retargeted to another case"] = ("S004", scope => {
+            NotMeasuredEntry(scope)["id"] = "F4-ITER-02"; NotMeasuredEntry(scope)["coveredBy"] = new JsonArray("F4-ITER-01"); return null; }),
+        ["not-measured marking under an unapproved decision"] = ("S004", scope => { NotMeasuredEntry(scope)["decision"] = "UNAPPROVED-DECISION"; return null; }),
+        ["approved decision no longer names the case"] = ("S004", scope => {
+            scope["amendments"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.5.0")!["maintainerDecisions"]!.AsArray()
+                .Single(d => d!["id"]!.GetValue<string>() == "D-F4-ITER-04-NOT-MEASURED")!["notMeasured"] = new JsonArray("F4-ITER-02"); return null; }),
         ["READY with README as example"] = ("S007", scope => { Ready(scope)["websiteExamples"] = new JsonArray("README.md"); return null; }),
         ["READY with README as review"] = ("S007", scope => { Ready(scope)["reviews"]![0]!["record"] = "README.md"; return null; }),
         ["READY with a bare approval URL"] = ("S007", scope => { Ready(scope)["approver"]!["approvalUrl"] = "https://github.com/"; return null; }),
@@ -318,7 +333,7 @@ public class InteropScopeTests
         var c = scope["cases"]!.AsArray().FirstOrDefault(x => x!["id"]!.GetValue<string>() == parts[0]);
         return c is null ? null : Encoding.UTF8.GetBytes(new JsonObject
         {
-            ["candidate"] = parts[1], ["caseId"] = parts[0], ["requirementSha256"] = Requirement(c), ["result"] = "passed",
+            ["candidate"] = parts[1], ["caseId"] = parts[0], ["requirementSha256"] = Requirement(c), ["result"] = ExpectedResult(scope, parts[0]),
             ["cells"] = new JsonObject((c["cells"]?.AsArray() ?? []).Select(x => KeyValuePair.Create(x!.GetValue<string>(), (JsonNode?)"passed"))),
         }.ToJsonString());
     };
@@ -394,6 +409,15 @@ public class InteropScopeTests
         scope["amendments"]!.AsArray().Add(a);
         scope["scopeVersion"] = Last(scope);
     }
+
+    /// <summary>What a READY record says for a case: skipped when an amendment marked it not-measured (1.5.0).</summary>
+    private static string ExpectedResult(JsonNode scope, string id) =>
+        scope["amendments"]!.AsArray().SelectMany(a => a!["notMeasuredCases"]?.AsArray() ?? []).Any(m => m!["id"]!.GetValue<string>() == id) ? "skipped" : "passed";
+
+    private static JsonNode NotMeasuredEntry(JsonNode scope) =>
+        scope["amendments"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.5.0")!["notMeasuredCases"]![0]!;
+
+    private static JsonNode Row(JsonNode ready, string id) => ready["cases"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;
 
     private static string Last(JsonNode scope) => scope["amendments"]!.AsArray().Last()!["version"]!.GetValue<string>();
 
@@ -495,7 +519,7 @@ public class InteropScopeTests
             ["scopeVersion"] = scope["scopeVersion"]!.GetValue<string>(),
             ["candidate"] = new JsonObject { ["commit"] = new string('1', 40) },
             ["cases"] = new JsonArray(scope["cases"]!.AsArray().Where(c => c!["family"]!.GetValue<string>() == family)
-                .Select(c => (JsonNode)new JsonObject { ["id"] = c!["id"]!.GetValue<string>(), ["result"] = "passed",
+                .Select(c => (JsonNode)new JsonObject { ["id"] = c!["id"]!.GetValue<string>(), ["result"] = ExpectedResult(scope, c["id"]!.GetValue<string>()),
                     ["evidence"] = $"{Dir}/ready/{c!["id"]!.GetValue<string>()}.{new string('1', 40)}.json" }).ToArray()),
             ["tests"] = new JsonArray(new JsonObject { ["project"] = "tests/Calor.Conversion.Tests", ["total"] = 12, ["failed"] = 0 }),
             ["websiteExamples"] = new JsonArray("website/content/cli/convert.mdx#what-changed-in-0-16"),

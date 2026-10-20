@@ -156,6 +156,12 @@ public class ReleaseGateScopePacketTests
     [InlineData("precondition requirement weakened in both copies", false, "1.3.0's recorded preconditions")]
     [InlineData("precondition copy differs", false, "equal the copy")]
     [InlineData("tampered T1 evidence", false, "approval seal")]
+    [InlineData("re-registration measurement edited", false, "T1 corpus counts")]
+    [InlineData("re-registration measurement missing", false, "T1 corpus counts")]
+    [InlineData("re-registration deltas inconsistent", false, "T1 corpus counts")]
+    [InlineData("re-registration removed with an edited count", false, "T1 corpus counts")]
+    [InlineData("corpus source redirected", false, "T1 corpus counts")]
+    [InlineData("re-registered count is a boolean", false, "T1 corpus counts")]
     [InlineData("scope directory changed after the candidate", true, "contract packet changed between")]
     [InlineData("register changed after the candidate", true, "T1 register or W1 records changed between")]
     public void PacketDefectsFail(string defect, bool afterCandidate, string message)
@@ -187,6 +193,18 @@ public class ReleaseGateScopePacketTests
                     break;
                 case "precondition copy differs": EditJson(r, Scope, s => s["acceptancePreconditions"]!["reproof"]!["checks"]![0]!["requirement"] = "No rerun needed."); break;
                 case "tampered T1 evidence": Append(r, "docs/plans/evidence/v0.25-f1-943/results.json"); break;
+                // T1 register 1.0.3: the gate ports T005's re-registration checks (each edit re-seals, isolating them).
+                case "re-registration measurement edited": Append(r, Measurement); break;
+                case "re-registration measurement missing": EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["reRegistration"]!["measurement"]!["path"] = "docs/plans/evidence/v0.25-f2-906/ready/cases/no-such.json")); break;
+                case "re-registration removed with an edited count": EditJson(r, Register, g => Reseal(g, () => {
+                    ((JsonObject)g["corpusCounts"]!).Remove("reRegistration"); g["corpusCounts"]!["counts"]!["opaqueExpressions"]!["after"] = 1; })); break;
+                case "re-registered count is a boolean":
+                    EditJson(r, Measurement, m => m["measurements"]![0]!["candidate"]!["incompleteDiagnostics"] = false);
+                    EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["reRegistration"]!["measurement"]!["sha256"] =
+                        Sha(Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(r.Root, Measurement)).Replace("\r\n", "\n")))));
+                    break;
+                case "corpus source redirected": EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["source"] = Register)); break;
+                case "re-registration deltas inconsistent": EditJson(r, Register, g => Reseal(g, () => g["corpusCounts"]!["reRegistration"]!["perPr"]![0]!["delta"]!["conversionVisits"] = -8)); break;
                 case "decision time not a time":
                     EditJson(r, Scope, s => s["amendments"]!.AsArray().First(a => a!["version"]!.GetValue<string>() == "1.3.0")!["maintainerDecisions"]![0]!["date"] = "2026-10-19T99:99:99Z");
                     break;
@@ -260,6 +278,11 @@ public class ReleaseGateScopePacketTests
     [InlineData("tracked field drifts without a change", true)]
     [InlineData("case dropped without an amendment", true)]
     [InlineData("case added without an amendment", true)]
+    [InlineData("not-measured case without a reason", true)]
+    [InlineData("not-measured case covered by another family", true)]
+    [InlineData("not-measured unregistered case", true)]
+    [InlineData("not-measured marking retargeted", true)]
+    [InlineData("not-measured under an unapproved decision", true)]
     public void GateReplayMatchesTheValidatorsS004(string mutation, bool flagged)
     {
         var root = RepoRoot();
@@ -268,6 +291,7 @@ public class ReleaseGateScopePacketTests
         JsonNode CaseOf(string id) => scope["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == id)!;
         void Change(string id, string field, string? from, string to) => last["changes"]!.AsArray().Add(new JsonObject { ["id"] = id, ["field"] = field, ["from"] = from, ["to"] = to });
         void Drop(string id) => scope["cases"]!.AsArray().Remove(CaseOf(id));
+        JsonNode NotMeasured() => scope["amendments"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.5.0")!["notMeasuredCases"]![0]!;
         switch (mutation)
         {
             case "change from a wrong value": Change("F1-REFOUT-01", "baselineStatus", "wrong", "reproduces"); break;
@@ -288,6 +312,11 @@ public class ReleaseGateScopePacketTests
                 break;
             case "tracked field drifts without a change": CaseOf("F1-REFOUT-01")["expected"] = "preserved"; break;
             case "case dropped without an amendment": Drop("F1-REFOUT-04"); break;
+            case "not-measured case without a reason": NotMeasured()["reason"] = ""; break;
+            case "not-measured case covered by another family": NotMeasured()["coveredBy"]!.AsArray().Add("F5-ARRAY-01"); break;
+            case "not-measured unregistered case": NotMeasured()["id"] = "NO-SUCH-CASE"; break;
+            case "not-measured marking retargeted": NotMeasured()["id"] = "F4-ITER-02"; NotMeasured()["coveredBy"] = new JsonArray("F4-ITER-01"); break;
+            case "not-measured under an unapproved decision": NotMeasured()["decision"] = "UNAPPROVED-DECISION"; break;
             case "case added without an amendment": var extra = CaseOf("F1-REFOUT-01").DeepClone(); extra["id"] = "F1-EXTRA"; scope["cases"]!.AsArray().Add(extra); break;
         }
         var results = JsonNode.Parse(File.ReadAllText(Path.Combine(root, ScopeDir, "baseline-results.json")))!;
@@ -343,6 +372,15 @@ public class ReleaseGateScopePacketTests
 
     // ---- fixture ----
 
+    /// <summary>The re-proof's F2-INTERP-09 measurement that T1 register 1.0.3 re-registers the corpus counts to.</summary>
+    private const string Measurement = "docs/plans/evidence/v0.25-f2-906/ready/cases/F2-INTERP-09.json";
+
+    private static void Reseal(JsonNode register, Action edit)
+    {
+        edit();
+        register["amendments"]!.AsArray()[^1]!["approvalSeal"] = Calor.Compiler.Tests.InteropScope.T1RegisterValidator.ApprovalSeal(register);
+    }
+
     private delegate void ReadyEdit(string family, JsonObject ready, Dictionary<string, JsonObject> files);
 
     private static GateRepo Build(Action<JsonObject>? record = null, Action<GateRepo>? beforeCandidate = null, Action<GateRepo>? atAdjudication = null,
@@ -366,7 +404,7 @@ public class ReleaseGateScopePacketTests
             {
                 var paths = Directory.GetFiles(Path.Combine(root, ScopeDir), "*", SearchOption.AllDirectories)
                     .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
-                    .Concat(new[] { Register, W1, registerNode["results"]!["path"]!.GetValue<string>(), Page,
+                    .Concat(new[] { Register, W1, registerNode["results"]!["path"]!.GetValue<string>(), Page, Measurement,
                         "docs/plans/evidence/adjudication-1408/terminal-record.json", "docs/plans/evidence/s2-1413/dispositions.json",
                         "docs/plans/v0.24-c1-candidate.md", "docs/plans/evidence/c2-1424/regeneration.md", "scripts/determinism_protocol.py",
                         "docs/plans/evidence/r2-1410/release-gate.md" })
@@ -404,9 +442,12 @@ public class ReleaseGateScopePacketTests
                     foreach (var c in registerNode["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!["cases"]!.AsArray())
                     {
                         var cid = c!["id"]!.GetValue<string>();
-                        files[cid] = new JsonObject { ["candidate"] = candidate, ["caseId"] = cid, ["requirementSha256"] = c["requirementSha256"]!.DeepClone(), ["result"] = "passed",
+                        // R0 amendment 1.5.0: a case marked not-measured is recorded as skipped.
+                        var result = scope["amendments"]!.AsArray().SelectMany(a => a!["notMeasuredCases"]?.AsArray() ?? [])
+                            .Any(m => m!["id"]!.GetValue<string>() == cid) ? "skipped" : "passed";
+                        files[cid] = new JsonObject { ["candidate"] = candidate, ["caseId"] = cid, ["requirementSha256"] = c["requirementSha256"]!.DeepClone(), ["result"] = result,
                             ["cells"] = new JsonObject(cells[cid].Select(cell => KeyValuePair.Create(cell, (JsonNode?)"passed"))) };
-                        caseRows.Add(new JsonObject { ["id"] = cid, ["result"] = "passed", ["evidence"] = $"{ready}/cases/{cid}.json" });
+                        caseRows.Add(new JsonObject { ["id"] = cid, ["result"] = result, ["evidence"] = $"{ready}/fixture-cases/{cid}.json" });
                     }
                     var resolved = new JsonArray();
                     foreach (var b in blockers)
@@ -416,7 +457,7 @@ public class ReleaseGateScopePacketTests
                         {
                             files[$"witness-{b}"] = new JsonObject { ["candidate"] = candidate, ["repair"] = m["repair"]!.DeepClone(), ["witnesses"] = m["regressionWitness"]!.DeepClone(), ["result"] = "passed" };
                             res["mergeCommit"] = m["mergeCommit"]!.DeepClone();
-                            res["witnessRun"] = $"{ready}/cases/witness-{b}.json";
+                            res["witnessRun"] = $"{ready}/fixture-cases/witness-{b}.json";
                         }
                         resolved.Add(res);
                     }
@@ -430,7 +471,7 @@ public class ReleaseGateScopePacketTests
                         ["independence"] = "reduced", ["blockersResolved"] = resolved,
                     };
                     readyEdit?.Invoke(id, record, files);
-                    foreach (var (name, body) in files) repo.Write($"{ready}/cases/{name}.json", body.ToJsonString());
+                    foreach (var (name, body) in files) repo.Write($"{ready}/fixture-cases/{name}.json", body.ToJsonString());
                     var text = record.ToJsonString();
                     repo.Write($"{ready}/{id}.json", text);
                     Add($"family:{id}", "READY")["readyRecord"] = new JsonObject { ["path"] = $"{ready}/{id}.json", ["sha256"] = Sha(Encoding.UTF8.GetBytes(text)) };

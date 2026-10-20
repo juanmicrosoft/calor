@@ -62,6 +62,16 @@ public class V025CandidateManifestTests
         Assert.True(target != null, "no commit after the candidate changes a candidate file; is history fetched?");
         var report = ClassifyRange(git, V025, candidate, target!);
         _output.WriteLine(report.ToString());
+        // R0 scope amendment 1.5.0 (D-AMEND-REFREEZE): a recorded maintainer decision can supersede this candidate. Until the
+        // re-freeze lands a manifest naming its successor, the superseding changes invalidate the range, and the test records
+        // that instead of claiming NOT-INVALIDATED. A run with an explicit target (the regeneration, A1) is never excused.
+        if (string.IsNullOrWhiteSpace(requested) && SupersedingDecision(candidate) is { } superseding)
+        {
+            _output.WriteLine($"candidate {candidate} is superseded by {Str(superseding["id"])}");
+            var problems = SupersessionProblems(report, superseding);
+            Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems) + Environment.NewLine + report);
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(requested))
         {
             Assert.True(report.Landing != null, "the freeze has not landed on origin/main; judge later commits only after it lands");
@@ -71,6 +81,55 @@ public class V025CandidateManifestTests
         Assert.True(report.Verdict == CandidateInvalidation.NotInvalidated, report.ToString());
         if (string.IsNullOrWhiteSpace(requested))
             Assert.Contains(report.Commits.SelectMany(c => c.Decisions), d => d.Path == V025.ManifestPath);
+    }
+
+    /// <summary>The approved superseding decision: D-AMEND-REFREEZE ("Amend + re-freeze", @juanmicrosoft, 2026-10-20) in
+    /// R0 scope amendment 1.5.0, when it names this candidate; any other supersedes entry is ignored.</summary>
+    private static JsonNode? SupersedingDecision(string candidate) =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), ScopeDir, "scope.json")))!["amendments"]!.AsArray()
+            .Where(a => Str(a!["version"]) == "1.5.0").SelectMany(a => a!["maintainerDecisions"]?.AsArray() ?? [])
+            .FirstOrDefault(d => Str(d!["id"]) == "D-AMEND-REFREEZE" && Str(d["supersedes"]) == candidate);
+
+    /// <summary>While superseded, the range may be invalidated only by the superseding amendment's own files (its
+    /// permittedPaths, none under src/), and the classifier must have read every commit.</summary>
+    internal static List<string> SupersessionProblems(CandidateInvalidation.Report report, JsonNode decision)
+    {
+        var permitted = (decision["permittedPaths"]?.AsArray() ?? []).Select(Str).ToHashSet();
+        var problems = report.Errors.Select(e => $"classifier error: {e}").ToList();
+        if (permitted.Count == 0 || permitted.Any(p => p.StartsWith("src/", StringComparison.Ordinal)))
+            problems.Add("the superseding decision must list its permitted paths, none under src/");
+        foreach (var d in report.Commits.SelectMany(c => c.Decisions.Where(x => !x.Exempt).Select(x => (c.Commit, x.Path))).Distinct())
+            if (!permitted.Contains(d.Path))
+                problems.Add($"{d.Commit[..8]} changes {d.Path}, which the superseding amendment does not permit");
+        return problems;
+    }
+
+    /// <summary>G2 1.7.0: the decided record that lets the candidate run a second time is committed at priorResultPath,
+    /// which must be downstream evidence of this classifier, so adding it does not invalidate the candidate.</summary>
+    [Fact]
+    public void TheSecondExecutionsPriorResultIsDownstreamEvidence()
+    {
+        var protocol = JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "docs/plans/evidence/g2-1421/protocol.json")))!;
+        var path = Str(protocol["budget"]!["releaseEpoch"]!["priorResultPath"]).Replace("{runId}", "39400000000", StringComparison.Ordinal);
+        Assert.StartsWith("docs/plans/evidence/", path, StringComparison.Ordinal);
+        var added = Classify(V025, new CandidateInvalidation.Change("A", path, "000000", "100644", null, "{}"u8.ToArray()), CandidateInvalidation.Phase.AfterLanding);
+        Assert.True(added.Exempt, added.Reason);
+        var modified = Classify(V025, new CandidateInvalidation.Change("M", path, "100644", "100644", "{}"u8.ToArray(), "{ }"u8.ToArray()), CandidateInvalidation.Phase.AfterLanding);
+        Assert.False(modified.Exempt, modified.Reason);  // a recorded result is never rewritten
+    }
+
+    [Fact]
+    public void ASupersededCandidateStillFailsOnAnyOtherChange()
+    {
+        var decision = new JsonObject { ["id"] = "D-AMEND-REFREEZE", ["permittedPaths"] = new JsonArray("scripts/determinism_runner.py") };
+        CandidateInvalidation.Report Range(params string[] paths) => new(CandidateInvalidation.Invalid, new string('1', 40),
+            [new CandidateInvalidation.CommitReport(new string('2', 40), new string('1', 40), CandidateInvalidation.Phase.AfterLanding,
+                paths.Select(p => new CandidateInvalidation.Decision(p, false, "registered input")).ToList())], []);
+        Assert.Empty(SupersessionProblems(Range("scripts/determinism_runner.py"), decision));
+        Assert.Contains(SupersessionProblems(Range("scripts/determinism_runner.py", "src/Calor.Compiler/Program.cs"), decision),
+            p => p.Contains("src/Calor.Compiler/Program.cs", StringComparison.Ordinal));
+        decision["permittedPaths"]!.AsArray().Add("src/Calor.Compiler/Program.cs");
+        Assert.Contains(SupersessionProblems(Range("scripts/determinism_runner.py"), decision), p => p.Contains("none under src/", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -86,9 +145,10 @@ public class V025CandidateManifestTests
         if (exit != 0 || dirty.Trim() != "") problems.Add($"the landing checkout is not clean: {dirty.Trim()}");
         // An ignored file is invisible to status but still compiled by the SDK's default globs (or imported by MSBuild).
         // Build output (bin/, obj/) is regenerated; the ignored Z3 assets are binaries checked by the download script's pins.
-        var (ignoredExit, ignored, _) = git.Run("ls-files", "--others", "--ignored", "--exclude-standard", "--", "src", "tests", "tools",
+        // -z (#1580): NUL-separated raw paths, so git never quotes a non-ASCII name and hides its extension.
+        var (ignoredExit, ignored, _) = git.Run("ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", "src", "tests", "tools",
             ":(glob)*", ":(exclude,glob)**/bin/**", ":(exclude,glob)**/obj/**");
-        var inputs = ignored.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        var inputs = ignored.Split('\0', StringSplitOptions.RemoveEmptyEntries)
             .Where(f => CompileInputExtensions.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) || Path.GetFileName(f).StartsWith("Directory.Build.", StringComparison.Ordinal))
             .ToList();
         if (ignoredExit != 0 || inputs.Count > 0) problems.Add($"the landing checkout has ignored build inputs: {string.Join(", ", inputs)}");
@@ -98,9 +158,12 @@ public class V025CandidateManifestTests
     private static readonly string[] CompileInputExtensions =
         [".cs", ".csproj", ".props", ".targets", ".rsp", ".editorconfig", ".globalconfig", ".resx", ".runsettings"];
 
-    /// <summary>An ignored C# file (which the SDK would compile into the test assembly) is refused.</summary>
-    [Fact]
-    public void TheTrustAnchorRefusesAnIgnoredSourceFile()
+    /// <summary>An ignored C# file (which the SDK would compile into the test assembly) is refused, including one whose
+    /// non-ASCII name git would print quoted without -z (#1580).</summary>
+    [Theory]
+    [InlineData("Injected.cs")]
+    [InlineData("\u00e9.cs")]
+    public void TheTrustAnchorRefusesAnIgnoredSourceFile(string name)
     {
         var dir = Directory.CreateTempSubdirectory("calor-v025-anchor-").FullName;
         try
@@ -111,9 +174,9 @@ public class V025CandidateManifestTests
             Assert.Equal(0, git.Run("add", ".gitignore").ExitCode);
             Assert.Equal(0, git.Run("-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "root").ExitCode);
             Directory.CreateDirectory(Path.Combine(dir, "tests", "tmp"));
-            File.WriteAllText(Path.Combine(dir, "tests", "tmp", "Injected.cs"), "// injected\n");
+            File.WriteAllText(Path.Combine(dir, "tests", "tmp", name), "// injected\n");
             var problems = TrustAnchorProblems(git, git.RevParse("HEAD")!);
-            Assert.Equal(new[] { "the landing checkout has ignored build inputs: tests/tmp/Injected.cs" }, problems);
+            Assert.Equal(new[] { $"the landing checkout has ignored build inputs: tests/tmp/{name}".Normalize() }, problems.Select(p => p.Normalize()));
         }
         finally { Directory.Delete(dir, true); }
     }

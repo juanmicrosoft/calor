@@ -202,6 +202,7 @@ internal static class InteropScopeValidator
         // observations). Each step records the families it affects, for READY staleness (S007).
         var registry = Arr(scope["denominatorV1"]).ToDictionary(d => Str(d["id"])!, d => (JsonNode)d.DeepClone());
         var active = registry.Keys.ToHashSet();
+        var notMeasured = new HashSet<string>();
         var familyTouched = new List<(string Family, string Version)>();
         foreach (var a in amendments)
         {
@@ -236,6 +237,25 @@ internal static class InteropScopeValidator
                     v.Add(new("S004", rid, $"amendment {version} removes a case that is not registered, or without its last status"));
                 else
                     Touch(registry[rid]);
+                notMeasured.Remove(rid);
+            }
+            // 1.5.0 (D-F4-ITER-04-NOT-MEASURED): a maintainer decision marks a registered case not-measured. It stays
+            // registered with every tracked field; READY records it as skipped (S007). The decision names its reason and
+            // the measured cases of the same family that prove the behavior.
+            foreach (var nm in Arr(a["notMeasuredCases"]))
+            {
+                var nid = Str(nm["id"]) ?? "";
+                var family = active.Contains(nid) ? Str(registry[nid]["family"]) : null;
+                var covered = Arr(nm["coveredBy"]).Select(Str).ToList();
+                // The marking must be a pinned, approved decision for exactly this case, recorded in the same amendment.
+                var approved = ApprovedNotMeasured.Contains((version, Str(nm["decision"]) ?? "", nid))
+                    && Arr(a["maintainerDecisions"]).Any(d => Str(d["id"]) == Str(nm["decision"]) && Arr(d["notMeasured"]).Any(x => Str(x) == nid));
+                if (!approved || family is null || Str(nm["family"]) != family || !NonBlank(nm["reason"]) || !NonBlank(nm["decision"]) || covered.Count == 0
+                    || covered.Any(x => x is null || x == nid || !active.Contains(x) || Str(registry[x]["family"]) != family || notMeasured.Contains(x))
+                    || !notMeasured.Add(nid))
+                    v.Add(new("S004", nid, $"amendment {version} marks a case not-measured without its family, reason, decision and measured cases of the family that cover it"));
+                else
+                    Touch(registry[nid]);
             }
         }
         foreach (var id in active)
@@ -270,7 +290,7 @@ internal static class InteropScopeValidator
             if (status == "READY")
             {
                 var familyCases = cases.Where(c => Str(c["family"]) == fid).ToList();
-                ValidateReady(v, fid, r!, f, familyCases, Exists, readRepoFile, recordValue, deviation,
+                ValidateReady(v, fid, r!, f, familyCases, notMeasured, Exists, readRepoFile, recordValue, deviation,
                     Arr(scope["mappedBlockers"]?["applicable"]).ToList());
                 var assessed = Version(Str(r!["scopeVersion"]));
                 var stale = familyTouched.Where(x => x.Family == fid && assessed is not null && Version(x.Version)!.Value.CompareTo(assessed.Value) > 0)
@@ -485,7 +505,7 @@ internal static class InteropScopeValidator
     public const string PreconditionsDigest130 = "82c07b93a4b9784a9776a41b515d02fb1e34c4017d7b352d103c4b9fa255d89b";
 
     private static void ValidateReady(List<ContractViolation> v, string fid, JsonNode r, JsonNode family,
-        List<JsonNode> familyCases, Func<string?, bool> exists, Func<string, byte[]?> read, string? recordValue, bool deviation,
+        List<JsonNode> familyCases, HashSet<string> notMeasured, Func<string?, bool> exists, Func<string, byte[]?> read, string? recordValue, bool deviation,
         List<JsonNode> mapped)
     {
         void Fail(string what) => v.Add(new("S007", fid, $"READY record: {what}"));
@@ -495,10 +515,12 @@ internal static class InteropScopeValidator
         foreach (var c in familyCases)
         {
             var row = recorded.FirstOrDefault(x => Str(x["id"]) == Str(c["id"]));
+            // A case an amendment marked not-measured is recorded as skipped, with a retained skipped record (1.5.0).
+            var want = notMeasured.Contains(Str(c["id"]) ?? "") ? "skipped" : "passed";
             if (row is null || !Vocabularies["caseResult"].Contains(Str(row["result"])))
                 Fail($"case {Str(c["id"])} has no recorded result");
-            else if (Str(row["result"]) != "passed")
-                Fail($"case {Str(c["id"])} is {Str(row["result"])}, not passed");
+            else if (Str(row["result"]) != want)
+                Fail($"case {Str(c["id"])} is {Str(row["result"])}, not {want}");
             else
             {
                 // The retained result record must be for this candidate, this case and its current requirement.
@@ -507,9 +529,9 @@ internal static class InteropScopeValidator
                 try { rec = ev is not null && ev.StartsWith("docs/plans/evidence/", StringComparison.Ordinal) && exists(ev) ? JsonNode.Parse(read(ev)!) : null; }
                 catch (JsonException) { }
                 if (rec is null || Str(rec["candidate"]) != Str(r["candidate"]?["commit"]) || Str(rec["caseId"]) != Str(c["id"])
-                    || Str(rec["requirementSha256"]) != RequirementDigest(c) || Str(rec["result"]) != "passed"
-                    || Arr(c["cells"]).Any(cell => Str(rec["cells"]?[Str(cell)!]) != "passed"))
-                    Fail($"case {Str(c["id"])} needs a retained passed result record for this candidate, case, requirement and cells");
+                    || Str(rec["requirementSha256"]) != RequirementDigest(c) || Str(rec["result"]) != want
+                    || (want == "passed" && Arr(c["cells"]).Any(cell => Str(rec["cells"]?[Str(cell)!]) != "passed")))
+                    Fail($"case {Str(c["id"])} needs a retained {want} result record for this candidate, case, requirement and cells");
             }
         }
         var tests = Arr(r["tests"]).ToList();
@@ -593,7 +615,12 @@ internal static class InteropScopeValidator
     private static string Codes(JsonNode? n) => string.Join(",", Arr(n).Select(Str));
     private static bool NonBlank(JsonNode? n) => !string.IsNullOrWhiteSpace(Str(n));
     private static bool IsInt(JsonNode? n) => n is JsonValue jv && jv.GetValueKind() == JsonValueKind.Number && jv.TryGetValue<int>(out _);
-    private static bool IsFullSha(string? s) => s is not null && FullSha.IsMatch(s);
+    /// <summary>The maintainer-approved not-measured markings: (scope amendment, decision, case). Amendment 1.5.0:
+    /// D-F4-ITER-04-NOT-MEASURED ("Amend to not-measured", @juanmicrosoft, 2026-10-20).</summary>
+    public static readonly HashSet<(string Version, string Decision, string Case)> ApprovedNotMeasured =
+        [("1.5.0", "D-F4-ITER-04-NOT-MEASURED", "F4-ITER-04")];
+
+    internal static bool IsFullSha(string? s) => s is not null && FullSha.IsMatch(s);
     private static IEnumerable<JsonNode> Arr(JsonNode? n) => n is JsonArray a ? a.OfType<JsonNode>() : [];
     private static string? Str(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : null;
     private static int Int(JsonNode? n) => n is JsonValue jv && jv.TryGetValue<int>(out var i) ? i : 0;

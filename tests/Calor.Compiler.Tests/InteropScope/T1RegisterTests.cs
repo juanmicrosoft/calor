@@ -31,11 +31,13 @@ public class T1RegisterTests
     }
 
     /// <summary>Each approved amendment's seal, in order. 1.0.1: F1 PR 2 (#943, PR #1571) re-ran F1's results.json.
-    /// 1.0.2: consumes R0 scope 1.4.0 (the 2026-10-19 freeze decisions); no approved hash changes.</summary>
+    /// 1.0.2: consumes R0 scope 1.4.0 (the 2026-10-19 freeze decisions); no approved hash changes.
+    /// 1.0.3: consumes R0 scope 1.5.0; F2-INTERP-09's counts re-registered to the 0.25 candidate (D-F2-INTERP-09-RECANDIDATE).</summary>
     private static readonly (string Version, string Seal)[] AmendmentSeals =
     [
         ("1.0.1", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
         ("1.0.2", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
+        ("1.0.3", "65330c86baba0be8ebc1fb9bff97c6e6c1e77a2abd24502314faf723d5393f15"),
     ];
 
     [Fact]
@@ -99,6 +101,24 @@ public class T1RegisterTests
                 ? Encoding.UTF8.GetBytes(new JsonObject { ["corpusCounts"] = r["corpusCounts"]!["counts"]!.DeepClone() }.ToJsonString()) : ReadRepo(p); }),
         ["corpus count changed"] = ("T005", (r, _) => { r["corpusCounts"]!["counts"]!["opaqueBoundaries"]!["after"] = 129; return null; }),
         ["corpus before count dropped"] = ("T005", (r, _) => { r["corpusCounts"]!["counts"]!["conversionVisits"]!.AsObject().Remove("before"); return null; }),
+        // Amendment 1.0.3: the re-registered counts are bound to the candidate's measurement and the per-PR deltas.
+        ["re-registered after differs from the measurement"] = ("T005", (r, _) => {
+            r["corpusCounts"]!["counts"]!["opaqueExpressions"]!["after"] = 7747; ReRegistration(r)["perPr"]![0]!["delta"]!["opaqueExpressions"] = 16; return null; }),
+        ["per-PR deltas do not add up"] = ("T005", (r, _) => { ReRegistration(r)["perPr"]![0]!["delta"]!["conversionVisits"] = -8; return null; }),
+        ["per-PR attribution dropped"] = ("T005", (r, _) => { ReRegistration(r)["perPr"] = new JsonArray(); return null; }),
+        ["measurement rehashed"] = ("T005", (r, _) => { ReRegistration(r)["measurement"]!["sha256"] = new string('3', 64); return null; }),
+        ["measurement outside F2's ready records"] = ("T005", (r, _) => { ReRegistration(r)["measurement"]!["path"] = "docs/plans/evidence/v0.25-f2-906/rows.json"; return null; }),
+        ["previous after rewritten"] = ("T005", (r, _) => { ReRegistration(r)["previousAfter"]!["opaqueBoundaries"] = 148; return null; }),
+        ["re-registration without its amendment"] = ("T005", (r, _) => { ReRegistration(r)["amendment"] = "9.9.9"; return null; }),
+        // Codex Step A round 3: a non-integer count never matches, even when the measurement says the same thing.
+        ["re-registered count not an integer"] = ("T005", (r, _) => {
+            var path = ReRegistration(r)["measurement"]!["path"]!.GetValue<string>();
+            var file = JsonNode.Parse(ReadRepo(path)!)!;
+            file["measurements"]![0]!["candidate"]!["incompleteDiagnostics"] = "x";
+            var edited = Encoding.UTF8.GetBytes(file.ToJsonString());
+            ReRegistration(r)["measurement"]!["sha256"] = InteropScopeValidator.Sha256(edited);
+            r["corpusCounts"]!["counts"]!["incompleteDiagnostics"]!["after"] = "x";
+            return p => p == path ? edited : ReadRepo(p); }),
         ["interaction row without a control"] = ("T006", (r, _) => { Remove(r["controls"]!, "X-INT-07"); return null; }),
         ["interaction control weakened"] = ("T006", (r, _) => { Control(r, "X-INT-07")["expected"] = "native-or-preserved"; return null; }),
         ["mandatory control dropped"] = ("T006", (r, _) => { Remove(r["controls"]!, "T1-INTERP-HANDLER"); return null; }),
@@ -111,6 +131,8 @@ public class T1RegisterTests
         ["version without amendment"] = ("T009", (r, _) => { r["registerVersion"] = "1.1.0"; return null; }),
         ["independence overstated"] = ("T009", (r, _) => { r["independence"] = "independent"; return null; }),
     };
+
+    private static JsonNode ReRegistration(JsonNode r) => r["corpusCounts"]!["reRegistration"]!;
 
     private static JsonNode Family(JsonNode r, string id) => r["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!;
     private static JsonNode Case(JsonNode r, string family, string id) => Family(r, family)["cases"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;

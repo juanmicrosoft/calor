@@ -431,6 +431,14 @@ def worst_case(protocol) -> tuple[int, int, int]:
     return execution, control_run, b["maxExecutions"] * execution + b["maxDispatchedControlRuns"] * control_run
 
 
+def epoch_worst_case(protocol) -> int:
+    """Amendment 1.7.0: one execution's worst case in the 0.25 epoch, with its job-timeout overrides (none: worst_case's)."""
+    b = protocol["budget"]
+    overrides = (b.get("releaseEpoch") or {}).get("jobTimeoutMinutes") or {}
+    return b["planJobTimeoutMinutes"] + b["decideJobTimeoutMinutes"] + sum(
+        protocol["runPlan"]["jobsPerEnvironment"] * overrides.get(e["id"], e["jobTimeoutMinutes"]) for e in protocol["environments"])
+
+
 def vkey(version: str) -> tuple:
     return tuple(int(x) for x in version.split("."))
 
@@ -550,16 +558,39 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
         add("D008", f"budget must match the accepted determinism-compute ceiling and the recomputed worst case {computed}")
     # Amendment 1.6.0: the 0.25 epoch (budget.releaseEpoch) has its own limit and ceiling under the same worst-case formula,
     # no dispatched control run, and executions bound to the 0.25 candidate manifest.
+    # Amendment 1.7.0: the epoch (runs after epochAfterRunNumber) gets its own ceiling, and its remaining executions a window
+    # (runs after afterRunNumber) with epoch-only job timeouts (raise only, registered environments) and a per-candidate
+    # limit. worstCaseTotal keeps the registered-table formula above; the window's binding worst case uses the epoch timeouts,
+    # and the minutes spent before the window plus that worst case must fit the epoch ceiling.
     ep = b.get("releaseEpoch")
     if ep is not None:
-        ints = all(isinstance(ep.get(k), int) and not isinstance(ep.get(k), bool) for k in
-                   ("afterRunNumber", "maxExecutions", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "worstCaseTotal"))
-        if not ints or ep["afterRunNumber"] < 1 or ep["maxExecutions"] < 1 or ep["maxDispatchedControlRuns"] != 0 \
-                or computed is None or ep["worstCaseTotal"] != ep["maxExecutions"] * computed[0] or ep["worstCaseTotal"] > ep["ceilingRunnerMinutes"] \
-                or ep.get("amendment") not in {a.get("version") for a in log} \
-                or not re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/candidate-manifest\.json$", str(ep.get("candidateManifest", ""))):
-            add("D008", "budget.releaseEpoch must name its amendment and candidate manifest, allow no control run, and keep "
-                        "maxExecutions x the worst case per execution within its own ceiling")
+        def whole(value):
+            return isinstance(value, int) and not isinstance(value, bool)
+        envs = env_by_id(protocol)
+        overrides = ep.get("jobTimeoutMinutes", {})
+        raised = isinstance(overrides, dict) and all(k in envs and whole(t) and t >= envs[k]["jobTimeoutMinutes"] for k, t in overrides.items())
+        per_candidate = ep.get("maxExecutionsPerCandidate", 1)
+        ok = all(whole(ep.get(k)) for k in ("afterRunNumber", "maxExecutions", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "worstCaseTotal")) \
+            and raised and ep["afterRunNumber"] >= 1 and ep["maxExecutions"] >= 1 and ep["maxDispatchedControlRuns"] == 0 \
+            and computed is not None and ep["worstCaseTotal"] == ep["maxExecutions"] * computed[0] and ep["worstCaseTotal"] <= ep["ceilingRunnerMinutes"] \
+            and whole(per_candidate) and 1 <= per_candidate <= ep["maxExecutions"] \
+            and (per_candidate == 1 or re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/\{runId\}\.json$", str(ep.get("priorResultPath", "")))) \
+            and ep.get("amendment") in {a.get("version") for a in log} \
+            and re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/candidate-manifest\.json$", str(ep.get("candidateManifest", ""))) is not None
+        window = ("epochAfterRunNumber", "epochCeilingRunnerMinutes", "spentBeforeWindow", "worstCasePerExecution", "worstCaseWithEpochTimeouts")
+        if ok and (overrides or "maxExecutionsPerCandidate" in ep or any(k in ep for k in window)):
+            try:
+                epoch_worst = epoch_worst_case(protocol)
+            except (KeyError, TypeError):
+                epoch_worst = None
+            ok = epoch_worst is not None and all(whole(ep.get(k)) for k in window) \
+                and 1 <= ep["epochAfterRunNumber"] < ep["afterRunNumber"] and ep["spentBeforeWindow"] >= 0 \
+                and ep["worstCasePerExecution"] == epoch_worst and ep["worstCaseWithEpochTimeouts"] == ep["maxExecutions"] * epoch_worst \
+                and ep["worstCaseWithEpochTimeouts"] <= ep["ceilingRunnerMinutes"] \
+                and ep["ceilingRunnerMinutes"] == ep["epochCeilingRunnerMinutes"] - ep["spentBeforeWindow"]
+        if not ok:
+            add("D008", "budget.releaseEpoch must name its amendment and candidate manifest, allow no control run, only raise "
+                        "registered job timeouts, and keep the minutes spent plus each remaining execution's worst case within its own ceiling")
 
     # D009 no normalization of compared values.
     ag = protocol.get("agreement", {})

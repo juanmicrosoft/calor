@@ -283,15 +283,83 @@ def tool_versions(env: dict, cwd: Path | None = None) -> dict:
         except (OSError, subprocess.CalledProcessError) as error:
             return f"unavailable: {error}"
     dotnet = out(["dotnet", "--version"])
+    runtimes = out(["dotnet", "--list-runtimes"])
     return {"os": f"{platform.system()} {platform.machine()}", "dotnet": dotnet,
             "dotnetSdkBuild": sdk_fingerprint(out(["dotnet", "--list-sdks"]), dotnet),
-            "node": out(["node", "--version"]), "npm": out(["npm", "--version"])}
+            "dotnetRuntime": host_runtime(runtimes, dotnet), "node": out(["node", "--version"]), "npm": out(["npm", "--version"])}
 
 
 # The version number does not identify the SDK build: Homebrew's source-built 10.0.401
 # and Microsoft's 10.0.401 produce different package bytes (ci-comparison.md). These
 # files carry that difference (the compiler and NuGet's packer).
 SDK_FINGERPRINT_FILES = ("Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll", "NuGet.Packaging.dll")
+
+
+# 0.25 re-proof (#1430): Roslyn records its host's runtime version in every PDB, and the PDB feeds the deterministic
+# MVID, so package bytes also depend on the Microsoft.NETCore.App runtime the SDK runs on: the highest installed patch
+# of the SDK's own major.minor (the SDK's roll-forward). A runner image's newer runtime changed the bytes.
+NETCORE = "Microsoft.NETCore.App"
+
+
+def netcore_runtimes(list_runtimes: str) -> list[str]:
+    """The Microsoft.NETCore.App versions `dotnet --list-runtimes` shows."""
+    return [parts[1] for parts in (line.strip().split(" ", 2) for line in list_runtimes.splitlines())
+            if len(parts) >= 2 and parts[0] == NETCORE]
+
+
+def vkey(version: str) -> tuple:
+    return tuple(int(x) if x.isdigit() else -1 for x in re.split(r"[.-]", version))
+
+
+def host_runtime(list_runtimes: str, sdk: str) -> str:
+    """The runtime the SDK's compiler host runs on: the highest patch of the SDK's major.minor, or why it is unknown."""
+    line = ".".join(sdk.split(".")[:2]) + "."
+    same = sorted((v for v in netcore_runtimes(list_runtimes) if v.startswith(line)), key=vkey)
+    return same[-1] if same else f"unknown: no {NETCORE} {line}x runtime listed"
+
+
+def bundled_runtime(list_sdks: str, version: str) -> str | None:
+    """The runtime version the SDK ships with (BundledNETCoreAppPackageVersion), or None."""
+    for line in list_sdks.splitlines():
+        parts = line.strip().split(" [", 1)
+        if len(parts) == 2 and parts[0] == version:
+            props = Path(parts[1].rstrip("]")) / version / "Microsoft.NETCoreSdk.BundledVersions.props"
+            found = re.search(r"<BundledNETCoreAppPackageVersion>([^<]+)</BundledNETCoreAppPackageVersion>",
+                              props.read_text(encoding="utf-8")) if props.is_file() else None
+            return found.group(1).strip() if found else None
+    return None
+
+
+def runtime_problems(list_sdks: str, list_runtimes: str, sdk: str) -> list[str]:
+    """Release builds run the compiler on the SDK's own runtime only: the job-private install must hold no other
+    patch of the SDK's major.minor, which the host would roll forward to."""
+    bundled = bundled_runtime(list_sdks, sdk)
+    if bundled is None:
+        return [f"SDK {sdk} is not listed or its bundled runtime version cannot be read"]
+    line = ".".join(sdk.split(".")[:2]) + "."
+    same = [v for v in netcore_runtimes(list_runtimes) if v.startswith(line)]
+    if same != [bundled]:
+        return [f"{NETCORE} {line}x runtimes {same or 'none'}: release builds need exactly the SDK {sdk}'s own {bundled}, "
+                f"because the compiler host rolls forward to the highest patch and the PDB records it"]
+    return []
+
+
+def prune_runtimes(list_sdks: str, list_runtimes: str, sdk: str, root: str) -> list[Path]:
+    """The other patches of the SDK's major.minor Microsoft.NETCore.App inside the job-private install root, to delete.
+    actions/setup-dotnet also installs the newest LTS runtime there (`--runtime dotnet --channel LTS`), which the
+    compiler host would roll forward to. Anything outside root is never touched (fail closed: an error)."""
+    bundled = bundled_runtime(list_sdks, sdk)
+    line = ".".join(sdk.split(".")[:2]) + "."
+    base = Path(root).resolve()
+    extra = []
+    for entry in list_runtimes.splitlines():
+        parts = entry.strip().split(" ", 2)
+        if len(parts) == 3 and parts[0] == NETCORE and parts[1].startswith(line) and parts[1] != bundled:
+            path = (Path(parts[2].strip("[]")) / parts[1]).resolve()
+            if bundled is None or base not in path.parents:
+                raise ValueError(f"{NETCORE} {parts[1]} at {path} is outside the job-private install {base}; refusing to delete it")
+            extra.append(path)
+    return extra
 
 
 def sdk_fingerprint(list_sdks: str, version: str) -> str:
@@ -368,6 +436,10 @@ def main() -> int:
     p.add_argument("--markdown")
     p.add_argument("--targets", choices=("all", "packages", "website"), required=True,
                    help="what both outputs must contain; an empty or partial output fails")
+    p = sub.add_parser("check-runtime", help="fail unless the SDK's compiler host can run only on the SDK's own runtime")
+    p.add_argument("--sdk", required=True)
+    p.add_argument("--prune", action="store_true",
+                   help="first delete the other patches of the SDK's major.minor runtime from the job-private install ($DOTNET_ROOT)")
     p = sub.add_parser("run")
     p.add_argument("--workdir", required=True)
     p.add_argument("--evidence")
@@ -383,6 +455,32 @@ def main() -> int:
         hashes = hash_build(Path(args.out), tool_versions(dict(os.environ)))
         Path(args.json).write_text(json.dumps(hashes, indent=1) + "\n", encoding="utf-8")
         return 0
+    if args.command == "check-runtime":
+        def out(cmd: list[str]) -> str:
+            return subprocess.run(cmd, capture_output=True, text=True, check=False).stdout
+        listed, sdks = out(["dotnet", "--list-runtimes"]), out(["dotnet", "--list-sdks"])
+        print(listed, end="")
+        if args.prune:
+            root = os.environ.get("DOTNET_ROOT", "")
+            if not root:
+                print("::error::--prune needs DOTNET_ROOT (the job-private install that setup-dotnet sets)")
+                return 1
+            try:
+                extra = prune_runtimes(sdks, listed, args.sdk, root)
+            except ValueError as error:
+                print(f"::error::{error}")
+                return 1
+            for path in extra:
+                print(f"removing {path} (not the SDK {args.sdk}'s own runtime)")
+                shutil.rmtree(path)
+            listed = out(["dotnet", "--list-runtimes"])
+            print(listed, end="")
+        problems = runtime_problems(sdks, listed, args.sdk)
+        for problem in problems:
+            print(f"::error::{problem}")
+        if not problems:
+            print(f"compiler host runtime: {host_runtime(listed, args.sdk)} (the SDK's own)")
+        return 1 if problems else 0
     if args.command == "compare":
         a = json.loads(Path(args.a).read_text(encoding="utf-8"))
         b = json.loads(Path(args.b).read_text(encoding="utf-8"))
