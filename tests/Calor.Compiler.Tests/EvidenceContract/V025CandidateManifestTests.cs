@@ -86,9 +86,10 @@ public class V025CandidateManifestTests
         if (exit != 0 || dirty.Trim() != "") problems.Add($"the landing checkout is not clean: {dirty.Trim()}");
         // An ignored file is invisible to status but still compiled by the SDK's default globs (or imported by MSBuild).
         // Build output (bin/, obj/) is regenerated; the ignored Z3 assets are binaries checked by the download script's pins.
-        var (ignoredExit, ignored, _) = git.Run("ls-files", "--others", "--ignored", "--exclude-standard", "--", "src", "tests", "tools",
+        // -z (#1580): NUL-separated raw paths, so git never quotes a non-ASCII name and hides its extension.
+        var (ignoredExit, ignored, _) = git.Run("ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", "src", "tests", "tools",
             ":(glob)*", ":(exclude,glob)**/bin/**", ":(exclude,glob)**/obj/**");
-        var inputs = ignored.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        var inputs = ignored.Split('\0', StringSplitOptions.RemoveEmptyEntries)
             .Where(f => CompileInputExtensions.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) || Path.GetFileName(f).StartsWith("Directory.Build.", StringComparison.Ordinal))
             .ToList();
         if (ignoredExit != 0 || inputs.Count > 0) problems.Add($"the landing checkout has ignored build inputs: {string.Join(", ", inputs)}");
@@ -98,9 +99,12 @@ public class V025CandidateManifestTests
     private static readonly string[] CompileInputExtensions =
         [".cs", ".csproj", ".props", ".targets", ".rsp", ".editorconfig", ".globalconfig", ".resx", ".runsettings"];
 
-    /// <summary>An ignored C# file (which the SDK would compile into the test assembly) is refused.</summary>
-    [Fact]
-    public void TheTrustAnchorRefusesAnIgnoredSourceFile()
+    /// <summary>An ignored C# file (which the SDK would compile into the test assembly) is refused, including one whose
+    /// non-ASCII name git would print quoted without -z (#1580).</summary>
+    [Theory]
+    [InlineData("Injected.cs")]
+    [InlineData("\u00e9.cs")]
+    public void TheTrustAnchorRefusesAnIgnoredSourceFile(string name)
     {
         var dir = Directory.CreateTempSubdirectory("calor-v025-anchor-").FullName;
         try
@@ -111,9 +115,9 @@ public class V025CandidateManifestTests
             Assert.Equal(0, git.Run("add", ".gitignore").ExitCode);
             Assert.Equal(0, git.Run("-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "root").ExitCode);
             Directory.CreateDirectory(Path.Combine(dir, "tests", "tmp"));
-            File.WriteAllText(Path.Combine(dir, "tests", "tmp", "Injected.cs"), "// injected\n");
+            File.WriteAllText(Path.Combine(dir, "tests", "tmp", name), "// injected\n");
             var problems = TrustAnchorProblems(git, git.RevParse("HEAD")!);
-            Assert.Equal(new[] { "the landing checkout has ignored build inputs: tests/tmp/Injected.cs" }, problems);
+            Assert.Equal(new[] { $"the landing checkout has ignored build inputs: tests/tmp/{name}".Normalize() }, problems.Select(p => p.Normalize()));
         }
         finally { Directory.Delete(dir, true); }
     }
