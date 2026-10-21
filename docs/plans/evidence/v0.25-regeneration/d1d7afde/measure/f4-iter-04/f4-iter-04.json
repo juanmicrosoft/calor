@@ -1,0 +1,237 @@
+{
+ "schema": "v0.25-reproof/f4-iter-04/1",
+ "modules": {
+  "EmptyTester": {
+   "path": "bench/corpus/FluentValidation/src/FluentValidation.Tests/EmptyTester.cs",
+   "sha256": "fd2b49c5c181d253070a74670b5dfa123d2354124e99591d33aa68d0668dfdd6",
+   "surfaces": {
+    "cli-default": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 41,
+     "interopPreservationCount": 2,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor",
+      "post-validation-fallback"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ],
+     "csharpInteropBlocks": null,
+     "yieldInGetterTokens": null,
+     "outcome": "rejected"
+    },
+    "cli-no-fallback": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 41,
+     "interopPreservationCount": 1,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ],
+     "csharpInteropBlocks": null,
+     "yieldInGetterTokens": null,
+     "outcome": "rejected"
+    },
+    "mcp-default": {
+     "isError": true,
+     "success": false,
+     "interopBlocks": 1,
+     "issueFeatures": [],
+     "stats": {
+      "classesConverted": 1,
+      "interfacesConverted": 0,
+      "methodsConverted": 9,
+      "propertiesConverted": 0,
+      "fieldsConverted": 0,
+      "interopBlocksEmitted": 1,
+      "membersDropped": 0,
+      "durationMs": 797
+     },
+     "conversionPaths": null,
+     "outcome": "rejected"
+    },
+    "mcp-passthroughOnError": {
+     "isError": true,
+     "success": false,
+     "interopBlocks": 1,
+     "issueFeatures": [],
+     "stats": {
+      "classesConverted": 1,
+      "interfacesConverted": 0,
+      "methodsConverted": 9,
+      "propertiesConverted": 0,
+      "fieldsConverted": 0,
+      "interopBlocksEmitted": 2,
+      "membersDropped": 0,
+      "durationMs": 228
+     },
+     "conversionPaths": null,
+     "outcome": "rejected"
+    }
+   }
+  },
+  "NotEmptyTester": {
+   "path": "bench/corpus/FluentValidation/src/FluentValidation.Tests/NotEmptyTester.cs",
+   "sha256": "2df318cde0f59ad3d59427d9d76b41c8c7fd74189b1f981f72df3a0b662e624b",
+   "surfaces": {
+    "cli-default": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 46,
+     "interopPreservationCount": 2,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor",
+      "post-validation-fallback"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ],
+     "csharpInteropBlocks": null,
+     "yieldInGetterTokens": null,
+     "outcome": "rejected"
+    },
+    "cli-no-fallback": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 46,
+     "interopPreservationCount": 1,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ],
+     "csharpInteropBlocks": null,
+     "yieldInGetterTokens": null,
+     "outcome": "rejected"
+    },
+    "mcp-default": {
+     "isError": true,
+     "success": false,
+     "interopBlocks": 1,
+     "issueFeatures": [],
+     "stats": {
+      "classesConverted": 1,
+      "interfacesConverted": 0,
+      "methodsConverted": 10,
+      "propertiesConverted": 0,
+      "fieldsConverted": 0,
+      "interopBlocksEmitted": 1,
+      "membersDropped": 0,
+      "durationMs": 115
+     },
+     "conversionPaths": null,
+     "outcome": "rejected"
+    },
+    "mcp-passthroughOnError": {
+     "isError": true,
+     "success": false,
+     "interopBlocks": 1,
+     "issueFeatures": [],
+     "stats": {
+      "classesConverted": 1,
+      "interfacesConverted": 0,
+      "methodsConverted": 10,
+      "propertiesConverted": 0,
+      "fieldsConverted": 0,
+      "interopBlocksEmitted": 2,
+      "membersDropped": 0,
+      "durationMs": 198
+     },
+     "conversionPaths": null,
+     "outcome": "rejected"
+    }
+   }
+  },
+  "ITestValidationContinuation": {
+   "path": "bench/corpus/FluentValidation/src/FluentValidation/TestHelper/ITestValidationContinuation.cs",
+   "sha256": "6160ed7ef52d0d9cddf4ec44de26ecb26e2f560f811a7733f683a2b35ddf1459",
+   "surfaces": {
+    "cli-default": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 23,
+     "interopPreservationCount": 4,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor",
+      "post-validation-fallback"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ],
+     "csharpInteropBlocks": null,
+     "yieldInGetterTokens": null,
+     "outcome": "rejected"
+    },
+    "cli-no-fallback": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 23,
+     "interopPreservationCount": 1,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ],
+     "csharpInteropBlocks": null,
+     "yieldInGetterTokens": null,
+     "outcome": "rejected"
+    },
+    "mcp-default": {
+     "isError": true,
+     "success": false,
+     "interopBlocks": 1,
+     "issueFeatures": [],
+     "stats": {
+      "classesConverted": 1,
+      "interfacesConverted": 2,
+      "methodsConverted": 3,
+      "propertiesConverted": 4,
+      "fieldsConverted": 2,
+      "interopBlocksEmitted": 1,
+      "membersDropped": 0,
+      "durationMs": 143
+     },
+     "conversionPaths": null,
+     "outcome": "rejected"
+    },
+    "mcp-passthroughOnError": {
+     "isError": true,
+     "success": false,
+     "interopBlocks": 3,
+     "issueFeatures": [],
+     "stats": {
+      "classesConverted": 1,
+      "interfacesConverted": 2,
+      "methodsConverted": 3,
+      "propertiesConverted": 4,
+      "fieldsConverted": 2,
+      "interopBlocksEmitted": 4,
+      "membersDropped": 0,
+      "durationMs": 71
+     },
+     "conversionPaths": null,
+     "outcome": "rejected"
+    }
+   }
+  }
+ },
+ "allPreserved": false
+}

@@ -1,0 +1,25 @@
+import glob, json, os, sys, xml.etree.ElementTree as ET, collections
+C25 = "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c26"
+ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+manifest = json.load(open(f"{C25}/a/eng/test-manifest.json"))
+agg = collections.defaultdict(lambda: collections.Counter())
+files = collections.defaultdict(list)
+for trx in glob.glob(f"{C25}/ci/test-39516188077/test-report-*/**/*.trx", recursive=True):
+    root = ET.parse(trx).getroot()
+    c = root.find("t:ResultSummary/t:Counters", ns).attrib
+    asm = None
+    for u in root.findall("t:TestDefinitions/t:UnitTest", ns):
+        asm = os.path.basename(u.find("t:TestMethod", ns).attrib["codeBase"]).replace(".dll", ""); break
+    for k in ("total", "executed", "passed", "failed", "notExecuted"):
+        agg[asm][k] += int(c.get(k, 0))
+    files[asm].append(os.path.relpath(trx, f"{C25}/ci"))
+rows = []
+for p in manifest["projects"]:
+    name = os.path.basename(p["path"]).replace(".csproj", "")
+    a = agg.get(name)
+    rows.append({"project": name, "releaseCritical": p.get("releaseCritical"), "expectedTotal": p.get("expectedTotal"),
+                 "expectedSkipped": p.get("expectedSkipped"), "ci": dict(a) if a else None, "trx": files.get(name),
+                 "matches": bool(a) and a["total"] == p.get("expectedTotal") and a["failed"] == 0 and a["total"] - a["executed"] == (p.get("expectedSkipped") or 0)})
+for r in rows:
+    print(f"{r['project']:34} rc={r['releaseCritical']!s:5} expected {r['expectedTotal']!s:6} skip {r['expectedSkipped']!s:3} ci {r['ci']} match={r['matches']}")
+json.dump(rows, open(sys.argv[1], "w"), indent=1)

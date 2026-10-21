@@ -1,0 +1,15 @@
+identity calor-adjudication:v1:65ceb12ea9abba22f9570beca1c3bb009dfe2f64:7d853b5ddefaead42821eed26037667f3cc2b6665a9a21f145de8252d1961444
+base (re-proof commit) f629a09a1c3516aea22f4dfa4bcd046ac9e44237; synthetic adjudication commit 65ceb12ea9abba22f9570beca1c3bb009dfe2f64 (local only)
+RELEASE GATE: PASS calor-adjudication:v1:65ceb12ea9abba22f9570beca1c3bb009dfe2f64:7d853b5ddefaead42821eed26037667f3cc2b6665a9a21f145de8252d1961444
+candidate=d1d7afde672691613f7bb34d253e63401ee423ac
+version=0.25.0
+tag=v0.25.0
+prerelease=true
+SURFACES-EXIT=0
+B2-EXIT=0
+RELEASE GATE: PASS calor-adjudication:v1:65ceb12ea9abba22f9570beca1c3bb009dfe2f64:7d853b5ddefaead42821eed26037667f3cc2b6665a9a21f145de8252d1961444
+candidate=d1d7afde672691613f7bb34d253e63401ee423ac
+version=0.25.0
+tag=v0.25.0
+prerelease=true
+BENCHMARK-WORKTREE-EXIT=0

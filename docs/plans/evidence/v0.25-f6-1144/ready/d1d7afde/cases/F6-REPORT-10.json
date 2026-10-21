@@ -1,0 +1,137 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "F6-REPORT-10",
+ "family": "F6",
+ "role": "residual",
+ "expected": "native",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "d04b267712d0901cd328bdcbcf4f97d98c43d0a6c2eee6226eccc60740cffebf",
+ "result": "passed",
+ "cells": {
+  "cli-exit-per-mode": "passed",
+  "mcp-error-per-mode": "passed",
+  "lossy": "passed",
+  "rejected": "passed"
+ },
+ "cellEvidence": {
+  "cli-exit-per-mode": "refused exits 1 with the refusal line; preserved and native exit 0; a write failure keeps losses and reports refused; tests: F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused, F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused, F6_REPORT_01_CliNoFlags_NamesAutomaticRescue_NotPassthrough",
+  "mcp-error-per-mode": "default refusal isError=true with outcome refused; passthroughOnError preserves with isError=false; tests: F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues",
+  "lossy": "--lossy (with or without --passthrough) skips the round trip, so no rescue, passthrough or trigger is reported; tests: F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires",
+  "rejected": "the CLI and MCP refusals report outcome refused; tests: F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused, F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues"
+ },
+ "judgement": "reporting row (cli, mcp): CLI refusal exits 1 and prints 'Conversion refused; no output written (automatic rescue: on, --passthrough: off).' with conversionPaths.outcome=refused; MCP refusal isError=true with outcome=refused; preserved outcomes exit 0 / isError=false; --lossy (with or without --passthrough) skips the round trip, so no rescue fires and the report shows no rescue, passthrough or trigger",
+ "measurements": [
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_01_CliNoFlags_NamesAutomaticRescue_NotPassthrough",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f6-conversion-paths.trx.gz",
+     "match": "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

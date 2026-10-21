@@ -1,0 +1,21 @@
+{
+ "EmptyTester": {
+  "cli-default": "rejected",
+  "cli-no-fallback": "rejected",
+  "mcp-default": "rejected",
+  "mcp-passthroughOnError": "rejected"
+ },
+ "NotEmptyTester": {
+  "cli-default": "rejected",
+  "cli-no-fallback": "rejected",
+  "mcp-default": "rejected",
+  "mcp-passthroughOnError": "rejected"
+ },
+ "ITestValidationContinuation": {
+  "cli-default": "rejected",
+  "cli-no-fallback": "rejected",
+  "mcp-default": "rejected",
+  "mcp-passthroughOnError": "rejected"
+ }
+}
+allPreserved False

@@ -1,0 +1,13 @@
+import zipfile, re
+C25 = "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c26"
+la = zipfile.ZipFile(f"{C25}/out/clone-a/build/nupkg/calor.0.25.0.nupkg")
+ci = zipfile.ZipFile(f"{C25}/ci/rb-39323636839/reproducible-packages-build-1/calor.0.25.0.nupkg")
+name = "tools/net10.0/any/Calor.Runtime.pdb"
+x, y = la.read(name), ci.read(name)
+sx = re.findall(rb"[ -~]{3,}", x); sy = re.findall(rb"[ -~]{3,}", y)
+print([s for s in sx if s not in sy][:40])
+print([s for s in sy if s not in sx][:40])
+# null-separated key/value compilation options
+for b in (x, y):
+    i = b.find(b"compiler-version")
+    print(b[i:i + 400].replace(b"\x00", b"|"))

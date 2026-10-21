@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""0.25 re-proof: F6 project-level aggregate fields on the candidate (Codex round 2, F6-REPORT-05 'aggregation').
+Run from the root of the measurement clone (fresh clone at the candidate, Release build). Builds the project the
+F6 tests build (ConversionPathReportingTests.ProjectWithRoundTripFailure("F5-ARRAY-02"): the parse-failure stand-in
+plus a round-trip failure, and a second project with a native file added), runs MCP calor_migrate (phase convert) and
+calor_batch (convert, dryRun) through `calor mcp --stdio`, and checks that each aggregate count equals the count
+derived from the per-file entries. usage: f6_aggregates.py <out dir>"""
+import json, os, subprocess, sys, tempfile
+
+PARSE = """using System;
+
+public static class ProbeF5ARRAY02
+{
+    public static int Pick(int x)
+    {
+        int[] a = { x switch { 1 => 2, _ => 3 } };
+        return a[0];
+    }
+
+    public static string Run()
+    {
+        return "" + Pick(1) + Pick(5);
+    }
+}
+"""
+TRAILING = "public class G { public int M(int x) { here: return x; } }"
+NATIVE = "public static class Plain { public static int One() => 1; }"
+CALOR = os.path.join("src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll")
+
+
+def project(files):
+    d = tempfile.mkdtemp(prefix="f6agg-")
+    for n, t in files.items():
+        open(os.path.join(d, n), "w").write(t)
+    return d
+
+
+def mcp(calls):
+    msgs = [{"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "f6agg", "version": "1"}}}]
+    for i, (tool, args) in enumerate(calls, 1):
+        msgs.append({"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": tool, "arguments": args}})
+    p = subprocess.run(["dotnet", CALOR, "mcp", "--stdio", "--no-telemetry"], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                       capture_output=True, text=True, env=dict(os.environ, CALOR_TELEMETRY="0"))
+    out = {}
+    for line in p.stdout.splitlines():
+        try:
+            m = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(m.get("id"), int) and m["id"] > 0:
+            r = m.get("result") or {}
+            text = "".join(c.get("text", "") for c in r.get("content", []) if c.get("type") == "text")
+            out[m["id"]] = {"isError": r.get("isError", False), "payload": json.loads(text)}
+    return out
+
+
+def main():
+    outdir = sys.argv[1]; os.makedirs(outdir, exist_ok=True)
+    mixed = project({"F5ARRAY02.cs": PARSE, "RoundTripFailure.cs": TRAILING})
+    clean = project({"F5ARRAY02.cs": PARSE, "F1REFOUT01.cs": NATIVE})
+    calls = [("calor_migrate", {"projectPath": mixed, "phase": "convert"}), ("calor_migrate", {"projectPath": clean, "phase": "convert"}),
+             ("calor_batch", {"action": "convert", "projectPath": mixed, "dryRun": True}), ("calor_batch", {"action": "convert", "projectPath": clean, "dryRun": True})]
+    res = mcp(calls)
+    rows, ok = [], True
+    for i, (tool, args) in enumerate(calls, 1):
+        r = res.get(i)
+        pl = r["payload"] if r else {}
+        if tool == "calor_migrate":
+            per = pl.get("perFile") or []
+            refused = sum(1 for f in per if (f.get("conversionPaths") or {}).get("outcome") == "refused")
+            row = {"tool": tool, "project": "mixed" if args["projectPath"] == mixed else "clean", "isError": r and r["isError"],
+                   "totalFiles": pl.get("totalFiles"), "successCount": pl.get("successCount"), "failureCount": pl.get("failureCount"),
+                   "perFile": [{"path": os.path.basename(f.get("path", "")), "status": f.get("status"), "conversionPaths": f.get("conversionPaths")} for f in per],
+                   "derived": {"files": len(per), "statuses": sorted(f.get("status") for f in per), "refused": refused}}
+            # totalFiles counts perFile; failureCount equals the files whose conversionPaths say refused; successCount
+            # plus failureCount never exceeds the total (a preserved-with-rescue file is neither, by MigrateTool's status sets).
+            row["consistent"] = row["totalFiles"] == len(per) and row["failureCount"] == refused and row["successCount"] + row["failureCount"] <= row["totalFiles"]
+        else:
+            files = pl.get("files") or []
+            row = {"tool": tool, "project": "mixed" if args["projectPath"] == mixed else "clean", "isError": r and r["isError"],
+                   "aggregate": {k: pl.get(k) for k in ("totalFiles", "convertedFiles", "failedFiles", "skippedFiles", "preservationPaths", "summary") if k in pl},
+                   "files": [{"path": os.path.basename(f.get("path", "") or f.get("sourcePath", "")), "status": f.get("status"), "conversionPaths": f.get("conversionPaths")} for f in files]}
+            sm = pl.get("summary") or {}
+            refused = sum(1 for f in files if (f.get("conversionPaths") or {}).get("outcome") == "refused")
+            row["derived"] = {"files": len(files), "statuses": sorted(str(f.get("status")) for f in files), "refused": refused}
+            row["consistent"] = sm.get("totalFiles") == len(files) and sm.get("failedFiles") == refused \
+                and sm.get("successfulFiles", 0) + sm.get("partialFiles", 0) + sm.get("failedFiles", 0) + sm.get("skippedFiles", 0) + sm.get("timedOutFiles", 0) == sm.get("totalFiles")
+        ok &= bool(row["consistent"])
+        rows.append(row)
+    json.dump({"schema": "v0.25-regeneration/f6-aggregates/1", "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac", "rows": rows, "allConsistent": ok},
+              open(os.path.join(outdir, "f6-aggregates.json"), "w"), indent=1)
+    for r in rows:
+        print(json.dumps({k: r[k] for k in r if k not in ("perFile", "files")}))
+    print("allConsistent", ok)
+
+
+if __name__ == "__main__":
+    main()

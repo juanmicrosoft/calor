@@ -1,0 +1,146 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "X-INT-08",
+ "family": "F1",
+ "role": "interaction",
+ "expected": "native-or-preserved",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "de56376cddef951b9e55d58fbdef1eb42e25893aa190813896f78ec1cdcfcd69",
+ "result": "passed",
+ "cells": {
+  "cli-default": "passed",
+  "mcp-default": "passed"
+ },
+ "cellEvidence": {
+  "cli-default": "preserved-match@permissive-effects",
+  "mcp-default": "preserved-match@permissive-effects"
+ },
+ "judgement": "F1 driver: cli-default preserved-match@permissive-effects, cli-passthrough preserved-match@permissive-effects, cli-migrate preserved-match@permissive-effects, mcp-default preserved-match@permissive-effects, mcp-passthroughOnError preserved-match@permissive-effects, mcp-passthroughOnError-moduleName preserved-match@permissive-effects; F1 driver: cli-default preserved-match@permissive-effects, mcp-default preserved-match@permissive-effects",
+ "measurements": [
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f1-943/results.json",
+   "case": "X-INT-08",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "cli-passthrough": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "cli-migrate": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-default": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-passthroughOnError": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-passthroughOnError-moduleName": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence"
+  },
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f1-943/results.json",
+   "case": "X-INT-08",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-default": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence"
+  },
+  {
+   "kind": "t1-control",
+   "control": "X-INT-08",
+   "results": "docs/plans/evidence/v0.25-t1-1428/controls-results.json",
+   "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/regen/controls-results.json",
+   "resultsSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "surfaces": {
+    "library": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "cli-convert": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "cli-migrate": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-convert": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-convert-passthroughOnError": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-migrate": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-batch": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    }
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f1-refout-impl.trx.gz",
+     "match": "RefOutImplementationTests",
+     "count": 371,
+     "passed": 371,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

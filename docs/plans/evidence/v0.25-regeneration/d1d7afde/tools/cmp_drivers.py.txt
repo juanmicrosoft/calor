@@ -1,0 +1,50 @@
+"""Compare each family driver's candidate results with the committed (approved) results, per case and surface."""
+import json, subprocess, sys
+C25 = "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c26"
+M = f"{C25}/m"
+CAND = "d1d7afde672691613f7bb34d253e63401ee423ac"
+FILES = {"F1": "docs/plans/evidence/v0.25-f1-943/results.json", "F3": "docs/plans/evidence/v0.25-f3-847/results.json",
+         "F4": "docs/plans/evidence/v0.25-f4-1139/results.json", "F5": "docs/plans/evidence/v0.25-f5-1132/pr2/results.json"}
+KEYS = ["convertExit", "migrateExit", "success", "isError", "nativeConversionCount", "interopPreservationCount", "lossySubstitutionCount", "dropCount",
+        "lossFeatures", "errorCodes", "csharpInteropBlocks", "outcome", "classification"]
+
+
+def flat(s):
+    out = {k: s.get(k) for k in KEYS if k in s}
+    for k in ("compile", "compilePermissiveEffects"):
+        if isinstance(s.get(k), dict):
+            out[k] = {x: s[k].get(x) for x in ("exit", "errorCodes", "warningCodes")}
+    if isinstance(s.get("execution"), dict):
+        out["execution"] = {x: s["execution"].get(x) for x in ("compiled", "result", "exception", "matchesOriginal")}
+    return out
+
+
+def cases(doc):
+    cs = doc.get("cases")
+    if isinstance(cs, dict):
+        return cs
+    return {c.get("case") or c.get("id"): c for c in cs or []}
+
+
+report = {}
+for fam, path in FILES.items():
+    old = json.loads(subprocess.run(["git", "-C", M, "show", f"{CAND}:{path}"], capture_output=True, text=True).stdout)
+    new = json.load(open(f"{M}/{path}"))
+    top = {k: (old.get(k), new.get(k)) for k in old if k != "cases" and old.get(k) != new.get(k)}
+    diffs = []
+    oc, nc = cases(old), cases(new)
+    for cid in sorted(set(oc) | set(nc)):
+        o, n = oc.get(cid) or {}, nc.get(cid) or {}
+        os_, ns_ = o.get("surfaces") or {}, n.get("surfaces") or {}
+        for s in sorted(set(os_) | set(ns_)):
+            a, b = flat(os_.get(s) or {}), flat(ns_.get(s) or {})
+            if a != b:
+                diffs.append({"case": cid, "surface": s, "committed": a, "candidate": b})
+        other = {k for k in set(o) | set(n) if k not in ("surfaces",) and o.get(k) != n.get(k)}
+        if other:
+            diffs.append({"case": cid, "fields": sorted(other), "committed": {k: o.get(k) for k in other}, "candidate": {k: n.get(k) for k in other}})
+    report[fam] = {"topLevelDiffs": top, "caseCount": len(nc), "behaviorDiffs": diffs}
+    print(fam, "cases", len(nc), "top-level diffs", list(top), "behavior diffs", len(diffs))
+    for d in diffs[:12]:
+        print("   ", json.dumps(d)[:600])
+json.dump(report, open(sys.argv[1], "w"), indent=1, ensure_ascii=False)

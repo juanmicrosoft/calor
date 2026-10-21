@@ -1,0 +1,200 @@
+{
+ "schema": "v0.25-regeneration/determinism-attempt-timing/1",
+ "run": 39516185697,
+ "jobs": [
+  {
+   "environment": "linux-arm64",
+   "job": 1,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 21,
+   "imageVersion": "20261018.154.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "oracle-isolated": 21.8,
+    "verification-full": 55.6
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 24.0,
+    "verification-full": 65.6
+   }
+  },
+  {
+   "environment": "linux-arm64",
+   "job": 2,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 23,
+   "imageVersion": "20261018.154.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "oracle-isolated": 23.4,
+    "verification-full": 61.5
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 24.6,
+    "verification-full": 76.5
+   }
+  },
+  {
+   "environment": "linux-x64",
+   "job": 1,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 25,
+   "imageVersion": "20261012.334.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "compiler-verifier": 48.4,
+    "oracle-isolated": 10.9,
+    "verification-full": 32.4
+   },
+   "profileMaxSeconds": {
+    "compiler-verifier": 49.9,
+    "oracle-isolated": 11.1,
+    "verification-full": 33.8
+   }
+  },
+  {
+   "environment": "linux-x64",
+   "job": 2,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 33,
+   "imageVersion": "20261012.334.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "compiler-verifier": 64.3,
+    "oracle-isolated": 14.3,
+    "verification-full": 43.0
+   },
+   "profileMaxSeconds": {
+    "compiler-verifier": 65.3,
+    "oracle-isolated": 15.0,
+    "verification-full": 45.1
+   }
+  },
+  {
+   "environment": "osx-arm64",
+   "job": 1,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 36,
+   "imageVersion": "20260831.0302.1",
+   "logicalProcessors": 3,
+   "profileMedianSeconds": {
+    "oracle-isolated": 20.6,
+    "verification-full": 109.8
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 30.0,
+    "verification-full": 157.1
+   }
+  },
+  {
+   "environment": "osx-arm64",
+   "job": 2,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 36,
+   "imageVersion": "20260831.0302.1",
+   "logicalProcessors": 3,
+   "profileMedianSeconds": {
+    "oracle-isolated": 22.3,
+    "verification-full": 111.8
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 30.2,
+    "verification-full": 145.6
+   }
+  },
+  {
+   "environment": "win-arm64",
+   "job": 1,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 47,
+   "imageVersion": "20261013.183.4",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "oracle-isolated": 31.2,
+    "verification-full": 142.8
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 33.6,
+    "verification-full": 154.0
+   }
+  },
+  {
+   "environment": "win-arm64",
+   "job": 2,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 44,
+   "imageVersion": "20261018.189.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "oracle-isolated": 30.2,
+    "verification-full": 132.3
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 30.8,
+    "verification-full": 135.2
+   }
+  },
+  {
+   "environment": "win-x64",
+   "job": 1,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 39,
+   "imageVersion": "20261018.275.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "oracle-isolated": 23.4,
+    "verification-full": 125.9
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 24.1,
+    "verification-full": 130.2
+   }
+  },
+  {
+   "environment": "win-x64",
+   "job": 2,
+   "attemptRecords": 15,
+   "attemptStatuses": {
+    "completed": 15
+   },
+   "runnerMinutes": 47,
+   "imageVersion": "20261018.275.1",
+   "logicalProcessors": 4,
+   "profileMedianSeconds": {
+    "oracle-isolated": 31.8,
+    "verification-full": 147.7
+   },
+   "profileMaxSeconds": {
+    "oracle-isolated": 33.2,
+    "verification-full": 154.7
+   }
+  }
+ ]
+}

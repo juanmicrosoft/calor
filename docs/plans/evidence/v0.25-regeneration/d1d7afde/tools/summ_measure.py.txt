@@ -1,0 +1,18 @@
+import glob, os, re, json, xml.etree.ElementTree as ET
+C25 = "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c26"
+M = f"{C25}/out/measure"
+ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+rows = {}
+for trx in sorted(glob.glob(f"{M}/tests/*.trx")):
+    name = os.path.basename(trx)[:-4]
+    root = ET.parse(trx).getroot()
+    c = root.find("t:ResultSummary/t:Counters", ns).attrib
+    outcome = root.find("t:ResultSummary", ns).attrib.get("outcome")
+    classes = sorted({u.find("t:TestMethod", ns).attrib["className"].split(".")[-1] for u in root.findall("t:TestDefinitions/t:UnitTest", ns)})
+    rows[name] = {"total": int(c["total"]), "executed": int(c["executed"]), "passed": int(c["passed"]), "failed": int(c["failed"]),
+                  "notExecuted": int(c.get("notExecuted", 0)), "outcome": outcome, "classes": classes}
+for k, v in rows.items():
+    print(f"{k:32} total {v['total']:5} passed {v['passed']:5} failed {v['failed']} notExec {v['notExecuted']} {v['outcome']} {','.join(v['classes'])[:110]}")
+json.dump(rows, open(f"{M}/trx-summary.json", "w"), indent=1)
+print(open(f"{M}/drivers/git-diff-stat.txt").read()[-3000:])
+print(open(f"{M}/drivers/git-status.txt").read()[:3000])

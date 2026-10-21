@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# All local lanes for the d1d7afde re-proof, sequentially (timing-sensitive steps never overlap).
+C26=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c26
+bash $C26/tools/fresh.sh $C26/a
+bash $C26/tools/local.sh a $C26/a $C26/out/clone-a
+bash $C26/tools/fresh.sh $C26/second/nested/fresh
+bash $C26/tools/local.sh b $C26/second/nested/fresh $C26/out/clone-b
+bash $C26/tools/fresh.sh $C26/m
+USE_BREW_DOTNET=1 bash $C26/tools/measure.sh $C26/m $C26/out/measure
+bash $C26/tools/fresh.sh $C26/rq
+bash $C26/tools/rq.sh $C26/rq $C26/out/release-quality
+echo LANES-DONE

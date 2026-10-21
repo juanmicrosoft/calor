@@ -1,0 +1,76 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "F1-REFOUT-01",
+ "family": "F1",
+ "role": "control",
+ "expected": "native",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "9fc7f78bcca5fb81ff0de95f531974820ecd68c3cb4ae72fae61a817df80726b",
+ "result": "passed",
+ "cells": {},
+ "cellEvidence": {},
+ "judgement": "F1 driver: cli-default native-match, cli-passthrough native-match, cli-migrate native-match, mcp-default native-match, mcp-passthroughOnError native-match, mcp-passthroughOnError-moduleName native-match",
+ "measurements": [
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f1-943/results.json",
+   "case": "F1-REFOUT-01",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "native-match",
+     "category": "native",
+     "driverOutcome": "native"
+    },
+    "cli-passthrough": {
+     "outcome": "native-match",
+     "category": "native",
+     "driverOutcome": "native"
+    },
+    "cli-migrate": {
+     "outcome": "native-match",
+     "category": "native",
+     "driverOutcome": "native"
+    },
+    "mcp-default": {
+     "outcome": "native-match",
+     "category": "native",
+     "driverOutcome": "native"
+    },
+    "mcp-passthroughOnError": {
+     "outcome": "native-match",
+     "category": "native",
+     "driverOutcome": "native"
+    },
+    "mcp-passthroughOnError-moduleName": {
+     "outcome": "native-match",
+     "category": "native",
+     "driverOutcome": "native"
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence"
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f1-refout-impl.trx.gz",
+     "match": "RefOutImplementationTests",
+     "count": 371,
+     "passed": 371,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}
