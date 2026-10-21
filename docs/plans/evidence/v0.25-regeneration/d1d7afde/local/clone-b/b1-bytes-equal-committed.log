@@ -1,0 +1,4 @@
+equal metrics-run-1.json
+equal metrics-run-2.json
+equal pair-manifest.json
+equal results.json

@@ -1,0 +1,44 @@
+{
+ "schema": "v0.25-regeneration/publication-candidates/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "version": "0.25.0",
+ "toolchain": {
+  "os": "Darwin arm64",
+  "dotnet": "10.0.401",
+  "dotnetSdkBuild": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053",
+  "dotnetRuntime": "10.0.12",
+  "node": "v20.20.2",
+  "npm": "10.8.2",
+  "ciLinuxDotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+  "ciLinuxDotnetRuntime": "10.0.12",
+  "note": "Packages and release metadata were produced identically by Microsoft SDK 10.0.401 with the compiler host on runtime 10.0.12 (the SDK's own; check-runtime) on macOS arm64 (fresh clones A and B) and Linux x64 CI (reproducible-builds run 39516192814, packages job, two builds, after check-runtime --prune). The website tree is identical in A, B and both CI website builds; it is built by Node (npm ci, next build) and does not run .NET. The CI website job does not pin .NET, so its recorded toolchain is the runner image's (SDK 10.0.402, runtime 10.0.13), with Node 20.20.2 as locally."
+ },
+ "publication": {
+  "release-notes": {
+   "sha256": "c20087ec6598c2a288a154b712b48f81871ed72acb077ef749d9ea4ca66e2757",
+   "rawSha256": "c20087ec6598c2a288a154b712b48f81871ed72acb077ef749d9ea4ca66e2757"
+  },
+  "nuget-packages": {
+   "files": {
+    "Calor.Sdk.0.25.0.nupkg": "c2260a5b3486d40929bce832fee543bc3ba60d17507de0e0d7ea6588baa539f0",
+    "calor.0.25.0.nupkg": "8acc92c4cd7c74eadca16b9fa2ec70da00d67b5cb20caab8738bb6554749866f"
+   }
+  },
+  "release-metadata": {
+   "files": {
+    "calor-nuget-d1d7afde672691613f7bb34d253e63401ee423ac.provenance.json": "cc5e1af8773a075301df4bd9ff3cdacdcf9934815711ac86ca227a8692f793b8",
+    "calor-nuget-d1d7afde672691613f7bb34d253e63401ee423ac.sbom.spdx.json": "efb88f7638429f2f444f8085a9b1beadc1fbc86877fbf6cfdc1aa9eafac12578"
+   }
+  },
+  "website": {
+   "treeSha256": "92b7d44e77989f83ac585374aa13ad95fb62dc043a0e12d6fe72c9091ef5d99e"
+  },
+  "benchmark-results": {
+   "files": {
+    "website/public/data/benchmark-headline.json": "ee41da6b241cc1644c704ffd304642565c400a16d008a6b175efe49661fe716b",
+    "bench/phase0-agent-native/commit-stamp-index.json": "7257c5429596203c461642bf58ed9cdb5857bb373db2fc59c00a9c09d55fe6df"
+   }
+  }
+ },
+ "note": "In the R2 terminal-record publication format (scripts/verify_release_adjudication.py). Package bytes are not committed (hashes only)."
+}

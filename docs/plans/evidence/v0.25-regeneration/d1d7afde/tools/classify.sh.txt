@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# 0.25 classifier on the re-proof branch, from a FRESH clone of the landing (#1580 fresh-clone rule).
+# usage: classify.sh <target sha> <clone dir> <out dir>
+set -uo pipefail
+TOOLS="$(cd "$(dirname "$0")" && pwd)"
+TARGET="$1"; T="$2"; OUT="$3"; mkdir -p "$OUT"
+LANDING=8f815f9e660d2d6a56ec50cffcb738f6b531d2df
+rm -rf "$T"
+git clone -q https://github.com/juanmicrosoft/calor.git "$T"
+git -C "$T" fetch -q origin milestone-0.25/reproof-d1d7afde
+git -C "$T" checkout -q --detach "$LANDING"
+USE_BREW_DOTNET=1 source "$TOOLS/env.sh" classify
+cd "$T"
+{
+  echo "classifier run $(date -u +%FT%TZ)"
+  echo "clone: fresh clone of https://github.com/juanmicrosoft/calor.git at $T, detached at the landing $(git rev-parse HEAD)"
+  echo "target: $TARGET ($(git log -1 --format=%s "$TARGET"))"
+  echo "status --porcelain --ignored (before build):"; git status --porcelain --ignored | head -20
+  echo "range candidate..target:"; git log --oneline d1d7afde672691613f7bb34d253e63401ee423ac.."$TARGET"
+  echo "files changed in candidate..target by status:"; git diff --name-status d1d7afde672691613f7bb34d253e63401ee423ac "$TARGET" | cut -c1 | sort | uniq -c
+  echo "files outside the exempt paths:"; git diff --name-only d1d7afde672691613f7bb34d253e63401ee423ac "$TARGET" | grep -vE '^docs/plans/evidence/(v0\.25-candidate|v0\.25-regeneration|v0\.25-f[1-6]-[0-9]+/ready)/' | grep -vE '^tests/Calor.Compiler.Tests/EvidenceContract/(ReleaseCandidateInvalidation|ReleaseCandidateInvalidationTests|V025CandidateManifestTests)\.cs$|^eng/test-manifest.json$'
+} > "$OUT/classifier.txt" 2>&1
+bash src/Calor.Compiler/scripts/download-z3.sh > "$OUT/classifier-download-z3.log" 2>&1
+dotnet build tests/Calor.Compiler.Tests -c Release > "$OUT/classifier-build.log" 2>&1; echo "build exit $?" >> "$OUT/classifier.txt"
+CALOR_V025_CLASSIFY_TARGET="$TARGET" dotnet test tests/Calor.Compiler.Tests -c Release --no-build \
+  --filter "FullyQualifiedName~V025CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated" \
+  --logger "console;verbosity=detailed" --logger "trx;LogFileName=classifier-range.trx" --results-directory "$OUT" > "$OUT/classifier-range.log" 2>&1
+echo "range test (CALOR_V025_CLASSIFY_TARGET=$TARGET) exit $?" >> "$OUT/classifier.txt"
+dotnet test tests/Calor.Compiler.Tests -c Release --no-build --filter "FullyQualifiedName~V025CandidateManifestTests|FullyQualifiedName~ReleaseCandidateInvalidationTests" \
+  --logger "trx;LogFileName=v025-manifest.trx" --results-directory "$OUT" > "$OUT/v025-manifest.log" 2>&1
+echo "V025CandidateManifestTests + ReleaseCandidateInvalidationTests (no target) exit $?" >> "$OUT/classifier.txt"
+grep -E "Passed!|Failed!|Total tests|VERDICT|verdict|INVALIDATED|NOT-INVALIDATED|UNDECIDED|exempt" "$OUT/classifier-range.log" | head -40 >> "$OUT/classifier.txt"
+grep -E "Passed!|Failed!" "$OUT/v025-manifest.log" >> "$OUT/classifier.txt"
+git status --porcelain | head >> "$OUT/classifier.txt"
+cat "$OUT/classifier.txt"

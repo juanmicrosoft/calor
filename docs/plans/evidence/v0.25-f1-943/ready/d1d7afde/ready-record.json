@@ -1,0 +1,358 @@
+{
+ "schema": "calor.v0.25-ready-record/1",
+ "family": "F1",
+ "issue": 943,
+ "title": "ref/out call semantics",
+ "status": "READY",
+ "scopeVersion": "1.5.0",
+ "candidate": {
+  "commit": "d1d7afde672691613f7bb34d253e63401ee423ac",
+  "version": "0.25.0",
+  "manifest": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json",
+  "landing": "8f815f9e660d2d6a56ec50cffcb738f6b531d2df"
+ },
+ "cases": [
+  {
+   "id": "F1-REFOUT-01",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-01.json"
+  },
+  {
+   "id": "F1-REFOUT-02",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-02.json"
+  },
+  {
+   "id": "F1-REFOUT-03",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-03.json"
+  },
+  {
+   "id": "F1-REFOUT-04",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-04.json"
+  },
+  {
+   "id": "F1-REFOUT-05",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-05.json"
+  },
+  {
+   "id": "F1-REFOUT-06",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-06.json"
+  },
+  {
+   "id": "F1-REFOUT-07",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-07.json"
+  },
+  {
+   "id": "F1-REFOUT-08",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-08.json"
+  },
+  {
+   "id": "F1-REFOUT-A1",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-A1.json"
+  },
+  {
+   "id": "F1-REFOUT-A2",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-A2.json"
+  },
+  {
+   "id": "X-INT-01",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/X-INT-01.json"
+  },
+  {
+   "id": "X-INT-05",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/X-INT-05.json"
+  },
+  {
+   "id": "X-INT-08",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/X-INT-08.json"
+  },
+  {
+   "id": "DOC-F1-01",
+   "result": "passed",
+   "evidence": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/DOC-F1-01.json"
+  }
+ ],
+ "tests": [
+  {
+   "project": "Calor.Compiler.Tests",
+   "total": 14696,
+   "executed": 14693,
+   "failed": 0,
+   "skipped": 3,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 14696
+  },
+  {
+   "project": "Calor.Conversion.Tests",
+   "total": 475,
+   "executed": 475,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 475
+  },
+  {
+   "project": "Calor.Semantics.Tests",
+   "total": 55,
+   "executed": 55,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 55
+  },
+  {
+   "project": "Calor.Verification.Tests",
+   "total": 473,
+   "executed": 473,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 473
+  },
+  {
+   "project": "Calor.Enforcement.Tests",
+   "total": 695,
+   "executed": 694,
+   "failed": 0,
+   "skipped": 1,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 695
+  },
+  {
+   "project": "Calor.Evaluation",
+   "total": 235,
+   "executed": 235,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 235
+  },
+  {
+   "project": "Calor.LanguageServer.Tests",
+   "total": 532,
+   "executed": 532,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 532
+  },
+  {
+   "project": "Calor.Tasks.Tests",
+   "total": 134,
+   "executed": 134,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 134
+  },
+  {
+   "project": "Calor.ILAnalysis.Tests",
+   "total": 46,
+   "executed": 46,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 46
+  },
+  {
+   "project": "Calor.Experimental.Tests",
+   "total": 25,
+   "executed": 25,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 25
+  },
+  {
+   "project": "Calor.RoundTrip.Harness.Tests",
+   "total": 295,
+   "executed": 295,
+   "failed": 0,
+   "skipped": 0,
+   "run": "test.yml workflow_dispatch run 39516188077 on the candidate d1d7afde (ubuntu; headSha verified in ci/run-39516188077.json)",
+   "manifestExpectedTotal": 295
+  },
+  {
+   "project": "Calor.Ids.Tests",
+   "total": 394,
+   "failed": 0,
+   "run": "local lane, fresh clones A and B (docs/plans/evidence/v0.25-regeneration/d1d7afde/local/)",
+   "manifestExpectedTotal": 394
+  },
+  {
+   "project": "Calor.Performance.Tests",
+   "total": 26,
+   "failed": 0,
+   "run": "local lane, fresh clones A and B (docs/plans/evidence/v0.25-regeneration/d1d7afde/local/)",
+   "manifestExpectedTotal": 26
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "RefOutImplementationTests",
+   "total": 371,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f1-refout-impl.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "RefOutContractTests",
+   "total": 28,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/d1-refout-contract.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "InteropScopeTests",
+   "total": 125,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/scope-validator.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "T1RegisterTests",
+   "total": 38,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/t1-register.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "SharedInteropControlsTests",
+   "total": 134,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/t1-controls.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "W1GuideTranscriptTests",
+   "total": 13,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w1-transcripts.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "WebsiteExampleCheckerTests",
+   "total": 58,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w0-website-examples.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "ReleaseGateScopePacketTests",
+   "total": 74,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/release-gate-scope-packet.trx.gz)"
+  },
+  {
+   "project": "Calor.Compiler.Tests",
+   "filter": "DispositionTests",
+   "total": 53,
+   "failed": 0,
+   "run": "measurement lane (docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/s2-dispositions.trx.gz)"
+  }
+ ],
+ "websiteExamples": [
+  "website/content/guides/csharp-interoperability.mdx#call-tryparse-trygetvalue-and-other-ref-out-in-methods",
+  "website/content/syntax-reference/calls.mdx",
+  "website/content/syntax-reference/calls.mdx#by-reference-arguments-ref-out-in"
+ ],
+ "reviews": [
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/pr2-round-1.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/pr2-round-2.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/pr2-round-3.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/pr2-verification.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/round-1.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/round-2.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/round-3.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-f1-943/reviews/verification.md"
+  },
+  {
+   "reviewer": "OpenAI Codex (codex exec -s read-only, reasoning effort high)",
+   "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/reviews/round-1.md",
+   "scope": "this READY record and the 0.25 re-proof"
+  }
+ ],
+ "approver": {
+  "login": "juanmicrosoft",
+  "approvalUrl": null,
+  "note": "Left for A1 (#1430): the maintainer's pull-request review URL is added when A1 records its outcome."
+ },
+ "independence": "reduced",
+ "blockersResolved": [
+  {
+   "issue": 1427,
+   "reference": "docs/plans/evidence/v0.25-d1-1427/contract.json at the candidate; RefOutContractTests pass on the candidate (D1 contract 1.0.7)"
+  },
+  {
+   "issue": 1423,
+   "reference": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json (0.25 C1-form manifest re-frozen for this candidate, landed in #1611 at 8f815f9e660d2d6a56ec50cffcb738f6b531d2df; it supersedes 48cae911)"
+  },
+  {
+   "issue": 1496,
+   "reference": "R-OBL #1496 merged as ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06; regression witnesses run on the candidate",
+   "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+   "witnessRun": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/witness-runs/R-OBL.json"
+  },
+  {
+   "issue": 1503,
+   "reference": "R-OBL-RESIDUALS #1503 merged as 9f5dfd763f90aebe16e4e4783f4c1703e464c8d3; regression witnesses run on the candidate",
+   "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+   "witnessRun": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/witness-runs/R-OBL-RESIDUALS.json"
+  }
+ ],
+ "t1Controls": {
+  "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/regen/controls-results.json",
+  "sha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+  "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+  "cells": 133,
+  "result": "byte-identical to the approved results; every committed cell reproduced"
+ },
+ "w1Checks": {
+  "transcripts": "W1GuideTranscriptTests 13 passed; CALOR_REGENERATE_W1_TRANSCRIPTS=1 regenerates byte-identically",
+  "selfCheckDocs": {
+   "total": 0,
+   "errors": 0,
+   "warnings": 0,
+   "info": 0
+  },
+  "websiteExampleChecker": "58 passed",
+  "wordingScan": "scanned 33 texts; 0 finding(s)"
+ },
+ "acceptancePreconditions": {
+  "note": "Candidate-level A1 preconditions, not part of S007; see docs/plans/evidence/v0.25-regeneration/results.json.",
+  "results": "docs/plans/evidence/v0.25-regeneration/d1d7afde/results.json"
+ }
+}

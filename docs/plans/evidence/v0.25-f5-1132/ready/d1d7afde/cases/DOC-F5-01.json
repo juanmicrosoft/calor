@@ -1,0 +1,95 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "DOC-F5-01",
+ "family": "F5",
+ "role": "doc-example",
+ "expected": "native",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "e5b91a87a342f323114731a85a5a734d4cf7a2f961e3cd351324adc3958d1a08",
+ "result": "passed",
+ "cells": {
+  "example-compiles-default": "passed",
+  "example-matches-page-claim": "passed"
+ },
+ "cellEvidence": {
+  "example-compiles-default": "calor self-check docs reports no diagnostic (every complete ```calor program on the site compiles by default); WebsiteExampleCheckerTests pass",
+  "example-matches-page-claim": "W1GuideTranscriptTests pass (fences equal the CLI output; C# sources are verbatim excerpts) and the transcripts regenerate byte-identically; the page's claim is the W1 record's: guides/csharp-interoperability.mdx: W1-F5-arrays converted output (native arrays plus one array-element-block statement); cli/convert.mdx: the Grids program"
+ },
+ "judgement": "",
+ "measurements": [
+  {
+   "kind": "self-check-docs",
+   "command": "calor self-check docs --root . --format json",
+   "log": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/w1-self-check-docs.log",
+   "diagnostics": {
+    "total": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0
+   }
+  },
+  {
+   "kind": "w1-wording-scan",
+   "command": "python3 docs/plans/evidence/v0.25-w1-1429/reproduce/wording_scan.py",
+   "log": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/w1-wording-scan.log",
+   "result": "scanned 33 texts; 0 finding(s)"
+  },
+  {
+   "kind": "w1-pages",
+   "page": "website/content/cli/convert.mdx",
+   "w1Record": "docs/plans/evidence/v0.25-w1-1429/records.json",
+   "pages": [
+    "website/content/guides/csharp-interoperability.mdx#build-arrays-inside-expressions",
+    "website/content/cli/convert.mdx#array-expressions"
+   ],
+   "examples": [
+    "guides/csharp-interoperability.mdx: W1-F5-arrays converted output (native arrays plus one array-element-block statement)",
+    "cli/convert.mdx: the Grids program"
+   ],
+   "transcripts": [
+    "W1-F5-arrays"
+   ],
+   "regeneration": "CALOR_REGENERATE_W1_TRANSCRIPTS=1 reproduced every transcript byte-identically on the candidate (git diff empty)"
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f5-array-expression.trx.gz",
+     "match": "ArrayExpressionConversionTests",
+     "count": 111,
+     "passed": 111,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w1-transcripts.trx.gz",
+     "match": "W1GuideTranscriptTests",
+     "count": 13,
+     "passed": 13,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w0-website-examples.trx.gz",
+     "match": "WebsiteExampleCheckerTests",
+     "count": 58,
+     "passed": 58,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

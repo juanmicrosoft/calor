@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# 0.25 re-proof measurement lane: proof witnesses, family tests, T1 controls, W1 checks, family drivers,
+# corpus counts, F4-ITER-04. usage: measure.sh <tree> <out>   (tree = fresh clone at the candidate)
+set -uo pipefail
+TOOLS="$(cd "$(dirname "$0")" && pwd)"
+source "$TOOLS/env.sh" m
+TREE="$1"; OUT="$2"
+mkdir -p "$OUT/tests" "$OUT/drivers" "$OUT/regen"
+cd "$TREE" || exit 2
+CAND=d1d7afde672691613f7bb34d253e63401ee423ac
+[ "$(git rev-parse HEAD)" = "$CAND" ] || { echo "HEAD is not the candidate"; exit 2; }
+echo "start $(date -u +%FT%TZ) tree $TREE head $(git rev-parse HEAD) dotnet $(dotnet --version)" > "$OUT/steps.txt"
+step() { local name="$1"; shift; "$@" > "$OUT/$name.log" 2>&1; local rc=$?; echo "STEP $name exit $rc at $(date -u +%FT%TZ)" >> "$OUT/steps.txt"; return $rc; }
+t() { local name="$1" proj="$2" filt="$3"; step "$name" dotnet test "tests/$proj/$proj.csproj" -c Release --no-build --no-restore ${filt:+--filter "$filt"} --logger "trx;LogFileName=$name.trx" --results-directory "$OUT/tests"; }
+C=Calor.Compiler.Tests; V=Calor.Verification.Tests
+
+step download-z3 bash src/Calor.Compiler/scripts/download-z3.sh
+step submodules git submodule update --init
+git submodule status > "$OUT/submodule-status.txt"
+step restore-locked dotnet restore --locked-mode
+step build-release dotnet build -c Release --no-restore
+git status --porcelain > "$OUT/post-build-git-status.txt"
+
+# Proof: every S2 repair's regression witnesses (scope reproof check proof-s2-witnesses), one run per class.
+t w-R-CACHE $C "FullyQualifiedName~Calor.Compiler.Tests.S2CacheLiteralWidthTests"
+t w-R-IMPL-compiler $C "FullyQualifiedName~S2ImplicationDefinednessTests"
+t w-R-IMPL-verification $V "FullyQualifiedName~S2ImplicationProverDefinednessTests"
+t w-R-OBL $C "FullyQualifiedName~S2ObligationStateTests"
+t w-R-TEXT $V "FullyQualifiedName~S2Z3TextEncodingTests"
+t w-R-QNT-verification $V "FullyQualifiedName~S2NestedQuantifierTests"
+t w-R-QNT-compiler $C "FullyQualifiedName~S2NestedQuantifierChannelTests"
+t w-R-NUM-verification $V "FullyQualifiedName~S2NumericRefusalTests"
+t w-R-NUM-compiler $C "FullyQualifiedName~S2NumericDeterminismTests"
+t w-R-OBL-RESIDUALS $C "FullyQualifiedName~S2ObligationResidualTests"
+t s2-dispositions $C "FullyQualifiedName~SoundnessDisposition"
+
+# Family tests and packet validators.
+t f1-refout-impl $C "FullyQualifiedName~RefOutImplementationTests"
+t d1-refout-contract $C "FullyQualifiedName~RefOutContractTests"
+t f2-interpolation $C "FullyQualifiedName~InterpolationTargetTypingTests"
+t f3-local-conversion $C "FullyQualifiedName~LocalFunctionConversionTests"
+t f3-local-language $C "FullyQualifiedName~LocalFunctionLanguageTests"
+t f3-local-verification $V "FullyQualifiedName~LocalFunction"
+t f4-iterator-accessor $C "FullyQualifiedName~IteratorAccessorConversionTests"
+t f5-array-expression $C "FullyQualifiedName~ArrayExpressionConversionTests|FullyQualifiedName~ArrayMemberEffectParityTests|FullyQualifiedName~ConditionalEvaluationMigrationTests"
+t f6-conversion-paths $C "FullyQualifiedName~ConversionPathReportingTests"
+t scope-validator $C "FullyQualifiedName~InteropScopeTests"
+t t1-register $C "FullyQualifiedName~T1RegisterTests"
+t t1-controls $C "FullyQualifiedName~SharedInteropControlsTests"
+t w1-transcripts $C "FullyQualifiedName~W1GuideTranscriptTests"
+t w0-website-examples $C "FullyQualifiedName~WebsiteExampleCheckerTests"
+t release-gate-scope-packet $C "FullyQualifiedName~ReleaseGateScopePacketTests"
+t corpus-binder-ratchet $C "FullyQualifiedName~BinderIncompleteRatchetTests"
+t corpus-calor0425-ledger $C "FullyQualifiedName~Calor0425CorpusLedgerTests"
+
+# W1 checks on the candidate: self-check docs and the wording scan.
+step w1-self-check-docs dotnet src/Calor.Compiler/bin/Release/net10.0/calor.dll self-check docs --root . --format json
+step w1-wording-scan python3 docs/plans/evidence/v0.25-w1-1429/reproduce/wording_scan.py
+git status --porcelain > "$OUT/pre-regen-git-status.txt"
+
+# Regenerations on the candidate: each must reproduce the committed bytes (git diff empty).
+CALOR_REGENERATE_T1_CONTROLS=1 t regen-t1-controls $C "FullyQualifiedName~SharedInteropControlsTests.Control_"
+step regen-t1-diff git diff --exit-code --stat -- docs/plans/evidence/v0.25-t1-1428/
+cp docs/plans/evidence/v0.25-t1-1428/controls-results.json "$OUT/regen/controls-results.json"
+CALOR_REGENERATE_W1_TRANSCRIPTS=1 t regen-w1-transcripts $C "FullyQualifiedName~W1GuideTranscriptTests"
+step regen-w1-diff git diff --exit-code --stat -- docs/plans/evidence/v0.25-w1-1429/
+CALOR_UPDATE_BINDER_BASELINE=1 t regen-binder-baseline $C "FullyQualifiedName~BinderIncompleteRatchetTests"
+step regen-binder-diff git diff --exit-code --stat -- bench/phase0-agent-native/
+git status --porcelain > "$OUT/post-regen-git-status.txt"
+
+# Family drivers (frozen producers), each run unchanged; outputs compared with the committed evidence.
+step drv-r0 python3 docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py
+step drv-f1 python3 docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py
+step drv-f3 python3 docs/plans/evidence/v0.25-f3-847/reproduce/reproduce.py
+step drv-f4 python3 docs/plans/evidence/v0.25-f4-1139/reproduce/reproduce.py
+step drv-f5 python3 docs/plans/evidence/v0.25-f5-1132/reproduce/reproduce_pr2.py
+git status --porcelain > "$OUT/drivers/git-status.txt"
+git diff --stat > "$OUT/drivers/git-diff-stat.txt"
+git diff > "$OUT/drivers/git-diff.patch"
+for f in docs/plans/evidence/v0.25-r0-1426/baseline-results.json docs/plans/evidence/v0.25-f1-943/results.json \
+         docs/plans/evidence/v0.25-f3-847/results.json docs/plans/evidence/v0.25-f4-1139/results.json \
+         docs/plans/evidence/v0.25-f5-1132/pr2/results.json; do
+  d="$OUT/drivers/$(echo "$f" | cut -d/ -f4)"; mkdir -p "$d"; cp "$f" "$d/"
+done
+step f4-iter-04 python3 "$TOOLS/f4_iter_04.py" "$OUT/f4-iter-04"
+step f6-aggregates python3 "$TOOLS/f6_aggregates.py" "$OUT/f6-aggregates"
+git status --porcelain > "$OUT/final-git-status.txt"
+echo "end $(date -u +%FT%TZ)" >> "$OUT/steps.txt"

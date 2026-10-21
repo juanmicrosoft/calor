@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+C25=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c26
+USE_BREW_DOTNET=1 source $C25/tools/env.sh m
+cd $C25/m
+T=$C25/out/measure/f4probe; mkdir -p $T
+dotnet src/Calor.Compiler/bin/Release/net10.0/calor.dll convert bench/corpus/FluentValidation/src/FluentValidation.Tests/EmptyTester.cs -o $T/EmptyTester.calr --format json > $T/empty.json 2> $T/empty.err
+echo "exit $?"
+python3 -c "
+import json;d=json.load(open('$T/empty.json'))
+for x in d.get('diagnostics',[]): print(x.get('code'), x.get('severity'), str(x.get('message'))[:400])
+print(json.dumps(d.get('data',{}).get('conversionPaths'))[:800])
+"
+head -c 1500 $T/empty.err
+grep -rn "Calor1343" src/Calor.Compiler/Diagnostics/*.cs | head -3
