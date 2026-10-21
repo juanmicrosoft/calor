@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# 0.25 classifier for A1 (#1430), from a FRESH clone detached at the landing 8f815f9e (trust anchor).
+# Targets: T1 = the A1 branch as drafted; T2 = T1 + the post-approval files (placeholder URL);
+# T3 = T2 + the 0.25.x map flip. T2 and T3 exist only in this clone (never pushed).
+set -uo pipefail
+S=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad
+WT=/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-ab21d2d79a33571b3
+T=$S/a1/cls; W=$S/a1/cls-wt; OUT=$S/a1/cls-out
+LANDING=8f815f9e660d2d6a56ec50cffcb738f6b531d2df
+CAND=d1d7afde672691613f7bb34d253e63401ee423ac
+rm -rf "$T" "$W" "$OUT"; mkdir -p "$OUT"
+git clone -q https://github.com/juanmicrosoft/calor.git "$T"
+git -C "$T" fetch -q "$WT" milestone-0.25/a1-1430
+T1=$(git -C "$T" rev-parse FETCH_HEAD)
+git -C "$T" checkout -q --detach "$LANDING"
+git -C "$T" worktree add -q --detach "$W" "$T1"
+python3 /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/synth_closures.py "$W" && python3 "$W/docs/plans/evidence/adjudication-1430/tools/make_a1_records.py.txt" "$W" --approval-url "https://github.com/juanmicrosoft/calor/pull/1#pullrequestreview-1" > "$OUT/make.txt"
+git -C "$W" add -A docs/plans/evidence
+git -C "$W" -c user.name=a1-scratch -c user.email=a1@invalid -c commit.gpgsign=false commit -q -m "SCRATCH T2: post-approval files"
+T2=$(git -C "$W" rev-parse HEAD)
+python3 - "$W/eng/release-adjudication-map.json" <<'EOF'
+import json, sys
+p = sys.argv[1]; m = json.load(open(p))
+for e in m["releases"]:
+    if e["version"] == "0.25.x":
+        e["status"] = "adjudicated"
+open(p, "w").write(json.dumps(m, indent=2, ensure_ascii=False) + "\n")
+EOF
+git -C "$W" add eng/release-adjudication-map.json
+git -C "$W" -c user.name=a1-scratch -c user.email=a1@invalid -c commit.gpgsign=false commit -q -m "SCRATCH T3: map flip"
+T3=$(git -C "$W" rev-parse HEAD)
+git -C "$T" worktree remove --force "$W"
+USE_BREW_DOTNET=1 source "$S/c26/tools/env.sh" a1cls
+cd "$T"
+{
+  echo "classifier run $(date -u +%FT%TZ)"
+  echo "clone: fresh clone of https://github.com/juanmicrosoft/calor.git, detached at the landing $(git rev-parse HEAD)"
+  echo "T1 $T1 (A1 branch as drafted); T2 $T2 (+ post-approval files, scratch); T3 $T3 (+ map flip, scratch)"
+  echo "status --porcelain --ignored (before build):"; git status --porcelain --ignored | head -20
+} > "$OUT/classifier.txt" 2>&1
+bash src/Calor.Compiler/scripts/download-z3.sh > "$OUT/download-z3.log" 2>&1
+dotnet build tests/Calor.Compiler.Tests -c Release > "$OUT/build.log" 2>&1; echo "build exit $?" >> "$OUT/classifier.txt"
+for n in 1 2 3; do
+  eval tgt=\$T$n
+  CALOR_V025_CLASSIFY_TARGET="$tgt" dotnet test tests/Calor.Compiler.Tests -c Release --no-build \
+    --filter "FullyQualifiedName~V025CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated" \
+    --logger "console;verbosity=detailed" > "$OUT/range-T$n.log" 2>&1
+  echo "T$n range test exit $?" >> "$OUT/classifier.txt"
+  grep -E "Passed!|Failed!|NOT-INVALIDATED|INVALIDATED|UNDECIDED" "$OUT/range-T$n.log" | head -5 >> "$OUT/classifier.txt"
+  grep -E "\] (exempt|DENY|not exempt|invalid)|eng/|adjudication-1430|/a1/" "$OUT/range-T$n.log" | grep -v "^ *$" | head -20 >> "$OUT/classifier.txt"
+done
+git status --porcelain | head >> "$OUT/classifier.txt"
+cat "$OUT/classifier.txt"

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Gate-state branch tests on top of a scratch "A1 merged" state (T2: A1 + post-approval files with placeholder URL).
+set -uo pipefail
+S=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad
+WT=/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-ab21d2d79a33571b3
+T=$S/a1/cls; OUT=$S/a1/cls-out; W=$S/a1/gs-wt
+T2=$(grep -o 'T2 [0-9a-f]*' "$OUT/classifier.txt" | head -1 | cut -d' ' -f2)
+USE_BREW_DOTNET=1 source "$S/c26/tools/env.sh" a1cls
+git -C "$T" fetch -q "$WT" milestone-0.25/a1-1430-gate-state
+GS=$(git -C "$T" rev-parse FETCH_HEAD)
+rm -rf "$W"; git -C "$T" worktree add -q --detach "$W" "$T2"
+git -C "$W" -c user.name=s -c user.email=s@invalid -c commit.gpgsign=false cherry-pick "$GS" > /dev/null && echo "cherry-picked $GS onto $T2"
+bash "$W/src/Calor.Compiler/scripts/download-z3.sh" > /dev/null 2>&1
+cd "$W"
+dotnet build tests/Calor.Compiler.Tests -c Release > "$OUT/gs-build.log" 2>&1; echo "build exit $?"
+dotnet test tests/Calor.Compiler.Tests -c Release --no-build --filter "FullyQualifiedName~ReleaseAdjudicationMapTests|FullyQualifiedName~ReleaseGateScopePacketTests|FullyQualifiedName~V025CandidateManifestTests|FullyQualifiedName~ReleaseAdjudicationGateTests|FullyQualifiedName~ReleaseWorkflowGateTests|FullyQualifiedName~MaintainerOverrideTests" > "$OUT/gs-test.log" 2>&1; echo "tests exit $?"
+grep -E "^\s+Failed |Passed!|Failed!" "$OUT/gs-test.log" | head -12
+cd /; git -C "$T" worktree remove --force "$W"
