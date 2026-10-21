@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-disposition-review-index",
+  "subject": "methods-draft-description",
+  "verdict": "REQUEST_CHANGES",
+  "artifact": {
+    "path": "gateway-evidence/methods-description-review-1436-d1396511.json",
+    "sha256": "6d7f03c266ec74f37f4b44aefe5d4ab511774d10e7d0b771169dabc290948c04"
+  }
+}
