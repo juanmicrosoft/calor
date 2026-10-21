@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""0.25 A1 (#1430) completion: write the final records with the approval review on the completion PR.
+
+usage: make_a1_final.py <repo> --approval-url <review URL> [--check]
+
+This wraps make_a1_records.py.txt, which is on main from #1616 and is never modified (adjudication-1430/ files are
+added once). The wrapper changes three things:
+* the terminal record also cites decisions-addendum.json (D-A1-APPROVED-AND-MERGED, D-A1-APPROVAL-ON-COMPLETION-PR)
+  under maintainerDecisionsAddendum;
+* the signature says that the approval review is on the completion PR and that its merge commit is the adjudication
+  commit;
+* each a1 READY record's approver.note names the completion PR's review.
+
+Everything else, including the claim registry bytes, closures.json (required, all nine CLOSED) and the outputs'
+paths, is the original generator's. PENDING is refused, because the pending draft on main must not be rewritten.
+"""
+import hashlib, importlib.machinery, importlib.util, json, sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+loader = importlib.machinery.SourceFileLoader("make_a1_records", str(HERE / "make_a1_records.py.txt"))
+spec = importlib.util.spec_from_loader("make_a1_records", loader)
+m = importlib.util.module_from_spec(spec)
+loader.exec_module(m)
+
+ADDENDUM = f"{m.A1}/decisions-addendum.json"
+_record, _approved_ready = m.record, m.approved_ready
+
+
+def approved_ready(repo, fid, url):
+    rec = json.loads(_approved_ready(repo, fid, url))
+    rec["approver"]["note"] = ("The maintainer's GitHub approval review on the #1430 completion PR "
+                               "(D-A1-APPROVAL-ON-COMPLETION-PR; #1616 was squash-merged without a review).")
+    return json.dumps(rec, indent=1, ensure_ascii=False) + "\n"
+
+
+def record(repo, url, approved_bytes, reg_bytes):
+    rec = _record(repo, url, approved_bytes, reg_bytes)
+    out = {}
+    for k, v in rec.items():
+        out[k] = v
+        if k == "maintainerDecisions":
+            out["maintainerDecisionsAddendum"] = {"path": ADDENDUM, "sha256": m.sha(repo, ADDENDUM),
+                                                  "ids": ["D-A1-APPROVED-AND-MERGED", "D-A1-APPROVAL-ON-COMPLETION-PR"]}
+    out["signature"] = ("The maintainer approved and squash-merged the A1 PR (#1616) without a GitHub review "
+                        "(D-A1-APPROVED-AND-MERGED). The approval review is on the completion PR "
+                        "(D-A1-APPROVAL-ON-COMPLETION-PR), and its URL is in each a1 READY record. That PR adds, mechanically, "
+                        "closures.json, the six approved READY records (the re-proof records with the approver block updated and "
+                        "an a1 provenance block added; all other values preserved) and this record (tools/make_a1_final.py.txt "
+                        "--approval-url <review URL>; --check reproduces it). Its merge commit is the adjudication commit; the "
+                        "identity is calor-adjudication:v1:<merge commit>:<SHA-256 of this file's exact bytes at that commit>.")
+    return out
+
+
+m.approved_ready, m.record = approved_ready, record
+
+
+def main():
+    args = sys.argv[1:]
+    if "--approval-url" not in args or args[args.index("--approval-url") + 1] == "PENDING" or "--snapshot-closures" in args:
+        sys.exit("make_a1_final: pass a real --approval-url (PENDING and --snapshot-closures belong to make_a1_records)")
+    if not (Path(args[0]) / ADDENDUM).is_file():
+        sys.exit(f"missing {ADDENDUM}")
+    sys.argv = [sys.argv[0]] + args
+    return m.main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
