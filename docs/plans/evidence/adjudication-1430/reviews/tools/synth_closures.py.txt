@@ -1,0 +1,9 @@
+"""SCRATCH ONLY: a synthetic closures.json (all nine blockers CLOSED) so the final-mode generator can run in a scratch
+clone before the maintainer closes the issues. Never committed to the A1 branch."""
+import json, sys
+from pathlib import Path
+repo = Path(sys.argv[1])
+issues = [{"number": n, "state": "CLOSED", "closedAt": "2026-10-21T00:00:00Z", "title": "SYNTHETIC"} for n in
+          (943, 906, 847, 1139, 1132, 1144, 1143, 1428, 1429)]
+(repo / "docs/plans/evidence/adjudication-1430/closures.json").write_text(json.dumps(
+    {"schema": "adjudication-1430/closures/1", "SYNTHETIC": "scratch only", "issues": issues}, indent=1) + "\n")

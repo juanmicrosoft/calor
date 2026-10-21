@@ -1,0 +1,72 @@
+Fresh clone at the landing 8f815f9e; T1 = A1 branch head; T2/T3 scratch only. Script: tools/classify.sh.txt.
+
+classifier run 2026-10-21T14:11:13Z
+clone: fresh clone of https://github.com/juanmicrosoft/calor.git, detached at the landing 8f815f9e660d2d6a56ec50cffcb738f6b531d2df
+T1 de8f70fdafa68919657ec22cbc55f02a5c204f0c (A1 branch as drafted); T2 fdb49bdf1a6fb40680c3eae1efd4dc9c7fab593c (+ post-approval files, scratch); T3 fb4fc41a2e418c167e1ca28c9f32359d62eebe04 (+ map flip, scratch)
+status --porcelain --ignored (before build):
+build exit 0
+T1 range test exit 0
+ NOT-INVALIDATED; landing 8f815f9e660d2d6a56ec50cffcb738f6b531d2df; 15 commit diffs
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/cls/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/cls/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/README.md: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/claim-registry.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/decisions.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/draft/terminal-record.pending.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/tools/make_a1_records.py.txt: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/DOC-F1-01.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-01.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-02.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-03.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-04.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-05.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-06.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-07.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-08.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-A1.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-A2.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/X-INT-01.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/X-INT-05.json: downstream evidence about the candidate (data or text)
+T2 range test exit 0
+ NOT-INVALIDATED; landing 8f815f9e660d2d6a56ec50cffcb738f6b531d2df; 16 commit diffs
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/cls/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/cls/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/adjudication-1430/closures.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/adjudication-1430/terminal-record.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f2-906/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f3-847/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f4-1139/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f5-1132/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+ fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f6-1144/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/README.md: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/claim-registry.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/decisions.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/draft/terminal-record.pending.json: downstream evidence about the candidate (data or text)
+ de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/tools/make_a1_records.py.txt: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/DOC-F1-01.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-01.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-02.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-03.json: downstream evidence about the candidate (data or text)
+ a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-04.json: downstream evidence about the candidate (data or text)
+T3 range test exit 1
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/cls/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/a1/cls/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll
+[xUnit.net 00:00:16.86]       fb4fc41a vs fdb49bdf [AfterLanding] INVALID eng/release-adjudication-map.json: registered inventories, manifests, or the release adjudication map
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/adjudication-1430/closures.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/adjudication-1430/terminal-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f2-906/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f3-847/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f4-1139/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f5-1132/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       fdb49bdf vs de8f70fd [AfterLanding] exempt docs/plans/evidence/v0.25-f6-1144/ready/d1d7afde/a1/ready-record.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/README.md: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/claim-registry.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/decisions.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/draft/terminal-record.pending.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       de8f70fd vs a176f49f [AfterLanding] exempt docs/plans/evidence/adjudication-1430/tools/make_a1_records.py.txt: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/DOC-F1-01.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-01.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-02.json: downstream evidence about the candidate (data or text)
+[xUnit.net 00:00:16.86]       a176f49f vs 8f815f9e [AfterLanding] exempt docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/cases/F1-REFOUT-03.json: downstream evidence about the candidate (data or text)

@@ -1,0 +1,8 @@
+The gate-state commit's test changes on a scratch post-A1 state: T2 (A1 + post-approval files, placeholder URL) with the gate-state commit cherry-picked. Filter: ReleaseAdjudicationMapTests, ReleaseGateScopePacketTests, V025CandidateManifestTests, ReleaseAdjudicationGateTests, ReleaseWorkflowGateTests, MaintainerOverrideTests. Script: tools/gstest.sh.txt. The run used the gate-state commit fdde641a5 on A1 head d981ea64c; the commit was then rebased unchanged onto the rebuilt A1 head.
+
+cherry-picked fdde641a5ffe8140fdaeaf385563b83ea44c4af3 onto 06c7f85a343286d4dd09ad387138e9ec09a928b6
+build exit 0
+tests exit 0
+Passed!  - Failed:     0, Passed:   331, Skipped:     0, Total:   331, Duration: 17 m 59 s - Calor.Compiler.Tests.dll (net10.0)
+
+Before the gate-state change, the same post-A1 scratch state fails exactly 1 of 166 release-gate and manifest tests (Release025IsMappedToTheFutureA1PathsAndIsNotYetAdjudicated), and with the map flip alone 4 of 166 (the four D-A1-RELEASE-STATE-FILES tests).
