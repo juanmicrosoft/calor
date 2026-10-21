@@ -9,8 +9,8 @@ namespace Calor.Compiler.Tests.ReleaseGate;
 /// #1567: the release gate reads which A1 issue, terminal record, contract packet, and claim
 /// registry apply to a release from <c>eng/release-adjudication-map.json</c>, keyed by version,
 /// instead of 0.24 constants. 0.24.0 still resolves to its MILESTONE-FAILED #1408 record and its
-/// maintainer override; 0.25.x points at #1430's future paths and fails until a reviewed change
-/// marks it adjudicated. Each negative control asserts the exact set of violation codes.
+/// maintainer override; 0.25.x points at #1430's record and passes only while a reviewed change
+/// marks it adjudicated (set after A1, D-A1-RELEASE-STATE-FILES). Each negative control asserts the exact set of violation codes.
 /// </summary>
 public class ReleaseAdjudicationMapTests
 {
@@ -104,26 +104,34 @@ public class ReleaseAdjudicationMapTests
     }
 
     // ------------------------------------------------------------------
-    // 0.25.x fails until it is adjudicated
+    // 0.25.x: adjudicated by #1430; an unadjudicated map still fails
     // ------------------------------------------------------------------
 
     [Fact]
-    public void Release025IsMappedToTheFutureA1PathsAndIsNotYetAdjudicated()
+    public void Release025IsAdjudicatedByTheA1Record()
     {
+        // D-A1-RELEASE-STATE-FILES (2026-10-21): the map is release state. #1430's record landed ACCEPTED, and the
+        // gate-state PR set 0.25.x to adjudicated.
         var entry = Entry(GateRepo.CommittedMap(), "0.25.x");
-        Assert.Equal("not-yet-adjudicated", entry["status"]!.GetValue<string>());
+        Assert.Equal("adjudicated", entry["status"]!.GetValue<string>());
         Assert.Equal(1430, entry["a1Issue"]!.GetValue<int>());
         Assert.Equal(Record025, entry["terminalRecord"]!.GetValue<string>());
         Assert.Equal(Registry025, entry["claimRegistry"]!.GetValue<string>());
         Assert.False(entry.ContainsKey("maintainerOverride"));
-        Assert.False(File.Exists(Path.Combine(RepoRoot(), Record025)), "a #1430 record landed; update the map and this test");
+        var record = JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), Record025)))!;
+        Assert.Equal(1430, record["issue"]!.GetValue<int>());
+        Assert.Equal("ACCEPTED", record["outcome"]!.GetValue<string>());
+        Assert.Equal(Registry025, record["claimRegistry"]!["path"]!.GetValue<string>());
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), Registry025)));
     }
 
     [Fact]
     public void Release025FailsUntilItIsAdjudicated()
     {
-        // The committed map: not yet adjudicated, whatever the record says.
-        using (var repo = Build025())
+        // A map that does not mark 0.25.x adjudicated: no identity passes, whatever the record says.
+        var pending = GateRepo.CommittedMap();
+        Entry(pending, "0.25.x")["status"] = "not-yet-adjudicated";
+        using (var repo = Build025(pending.ToJsonString()))
             AssertCodes(repo.Run(repo.AllSurfaces()), "G016");
         // Marked adjudicated, the gate reads the #1426 scope packet (D-GATE-SCOPE-PACKET); this fixture has none.
         // ReleaseGateScopePacketTests covers a real packet.

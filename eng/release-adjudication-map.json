@@ -22,7 +22,7 @@
     },
     {
       "version": "0.25.x",
-      "status": "not-yet-adjudicated",
+      "status": "adjudicated",
       "a1Issue": 1430,
       "terminalRecord": "docs/plans/evidence/adjudication-1430/terminal-record.json",
       "contractPacket": {
@@ -34,7 +34,7 @@
         "seal": "docs/plans/evidence/v0.25-r0-1426/scope.json"
       },
       "claimRegistry": "docs/plans/evidence/adjudication-1430/claim-registry.json",
-      "note": "Future paths. No identity passes until #1430's terminal record lands and a reviewed change sets status to 'adjudicated'. The contract packet is the frozen 0.25 R0 scope (#1426; seal: its evidenceSeal block), which the gate checks together with the T1 register and W1 records that consume it and the 1.3.0 acceptancePreconditions re-proof (maintainer decision D-GATE-SCOPE-PACKET, 2026-10-19, scope amendment 1.4.0)."
+      "note": "Adjudicated by #1430 (terminal record ACCEPTED, maintainer decision D-A1-OUTCOME-ACCEPTED, 2026-10-21). Set by the gate-state PR that maintainer decision D-A1-RELEASE-STATE-FILES requires after the A1 record merged: this map and the four tests that asserted the pre-A1 state are release-state files, not candidate inputs (docs/plans/evidence/adjudication-1430/decisions.json). The contract packet is the frozen 0.25 R0 scope (#1426; seal: its evidenceSeal block), which the gate checks together with the T1 register and W1 records that consume it and the 1.3.0 acceptancePreconditions re-proof (D-GATE-SCOPE-PACKET, scope amendment 1.4.0)."
     }
   ]
 }
