@@ -1,0 +1,166 @@
+{
+ "schema": "calor.adjudication-terminal-record/1",
+ "issue": 1430,
+ "SYNTHETIC": "0.25 re-proof R2 dry run (success). Not an adjudication; every outcome is a placeholder.",
+ "outcome": "ACCEPTED",
+ "adjudicationIndependence": "reduced",
+ "limitation": "No reviewer independent of the maintainer and the AI reviewers is available. READY records name the Codex reviews and @juanmicrosoft as approver; no record or public surface may say 'independently reviewed' or 'independently verified'.",
+ "epicIndependentAdjudicationMet": false,
+ "contract": {
+  "version": "1.5.0",
+  "files": {
+   "docs/plans/evidence/v0.25-r0-1426/scope.json": "33c7b20eebc573b3067f501b5c6c196f3fe833ad268c5aa27c1e829f8d21c996",
+   "docs/plans/evidence/v0.25-t1-1428/register.json": "eed6da6e4f744394efe19f7efff5e2402710ee409d33b76b407214c75128c9ae",
+   "docs/plans/evidence/v0.25-w1-1429/records.json": "946142a960964cd8cab7c3e927a5c7f53239381ad69752a77d97238f541a38a6"
+  }
+ },
+ "candidate": {
+  "commit": "d1d7afde672691613f7bb34d253e63401ee423ac",
+  "version": "0.25.0"
+ },
+ "evidenceManifests": [
+  {
+   "role": "candidate-manifest",
+   "path": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json",
+   "sha256": "4bcf478ee9413c6b01e6617029718a8fbf10f0e9a7ba528fa59bda3c52556220"
+  },
+  {
+   "role": "raw-artifact-freeze",
+   "path": "docs/plans/evidence/v0.25-regeneration/d1d7afde/raw-artifact-freeze.json",
+   "sha256": "baf70797c14dd3517b705c547f49a4a34c7d606f0df042878a52d52b7a97db44"
+  }
+ ],
+ "claimRegistry": {
+  "path": "docs/plans/evidence/adjudication-1430/claim-registry.json",
+  "sha256": "d9e2d9ee9fd288717a0746d755b18476d7eb84956fe14bbd7f0d8a56f0891b7e"
+ },
+ "adjudications": [
+  {
+   "subject": "family:F1",
+   "outcome": "READY",
+   "independence": "reduced-maintainer-adjudicated",
+   "readyRecord": {
+    "path": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/ready-record.json",
+    "sha256": "e1fd601f64413fa72a8477a9ded3422a6b84bacfd8f01349afc4dd628692632a"
+   }
+  },
+  {
+   "subject": "family:F2",
+   "outcome": "READY",
+   "independence": "reduced-maintainer-adjudicated",
+   "readyRecord": {
+    "path": "docs/plans/evidence/v0.25-f2-906/ready/d1d7afde/ready-record.json",
+    "sha256": "477ffde3565c3ab5c71bce81cde94cc54c8db1fc3a9413645ae6692ed4905f69"
+   }
+  },
+  {
+   "subject": "family:F3",
+   "outcome": "READY",
+   "independence": "reduced-maintainer-adjudicated",
+   "readyRecord": {
+    "path": "docs/plans/evidence/v0.25-f3-847/ready/d1d7afde/ready-record.json",
+    "sha256": "24d29ec49ec2b80f12aeb82754743bbee0b6353b6ec2dc7e78f2c81ce235a7df"
+   }
+  },
+  {
+   "subject": "family:F4",
+   "outcome": "READY",
+   "independence": "reduced-maintainer-adjudicated",
+   "readyRecord": {
+    "path": "docs/plans/evidence/v0.25-f4-1139/ready/d1d7afde/ready-record.json",
+    "sha256": "be8a985a39fabf3c85c7f81f9471c47a06bdf753de6a9c4c9b4196bb4409e827"
+   }
+  },
+  {
+   "subject": "family:F5",
+   "outcome": "READY",
+   "independence": "reduced-maintainer-adjudicated",
+   "readyRecord": {
+    "path": "docs/plans/evidence/v0.25-f5-1132/ready/d1d7afde/ready-record.json",
+    "sha256": "6dbac1b8df7e476c72cd16d54aedec366e66677e42be7324fb5b66bc2b3aab92"
+   }
+  },
+  {
+   "subject": "family:F6",
+   "outcome": "READY",
+   "independence": "reduced-maintainer-adjudicated",
+   "readyRecord": {
+    "path": "docs/plans/evidence/v0.25-f6-1144/ready/d1d7afde/ready-record.json",
+    "sha256": "2761f4bdef881a15413c94a659a2813c0f1f708c9323d316d0cc3ff5bdc9a81a"
+   }
+  },
+  {
+   "subject": "reproof:proof-s2-witnesses",
+   "outcome": "PASSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "reproof:provenance-candidate-manifest",
+   "outcome": "PASSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "reproof:provenance-regeneration",
+   "outcome": "PASSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "reproof:provenance-determinism",
+   "outcome": "PASSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "reproof:release-gate",
+   "outcome": "PASSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gap:#1545",
+   "outcome": "CLOSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gap:#1546",
+   "outcome": "CLOSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gap:#1547",
+   "outcome": "CLOSED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:synthetic-dry-run",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  }
+ ],
+ "publication": {
+  "release-notes": {
+   "sha256": "c20087ec6598c2a288a154b712b48f81871ed72acb077ef749d9ea4ca66e2757",
+   "rawSha256": "c20087ec6598c2a288a154b712b48f81871ed72acb077ef749d9ea4ca66e2757"
+  },
+  "nuget-packages": {
+   "files": {
+    "Calor.Sdk.0.25.0.nupkg": "c2260a5b3486d40929bce832fee543bc3ba60d17507de0e0d7ea6588baa539f0",
+    "calor.0.25.0.nupkg": "8acc92c4cd7c74eadca16b9fa2ec70da00d67b5cb20caab8738bb6554749866f"
+   }
+  },
+  "release-metadata": {
+   "files": {
+    "calor-nuget-d1d7afde672691613f7bb34d253e63401ee423ac.provenance.json": "cc5e1af8773a075301df4bd9ff3cdacdcf9934815711ac86ca227a8692f793b8",
+    "calor-nuget-d1d7afde672691613f7bb34d253e63401ee423ac.sbom.spdx.json": "efb88f7638429f2f444f8085a9b1beadc1fbc86877fbf6cfdc1aa9eafac12578"
+   }
+  },
+  "website": {
+   "treeSha256": "92b7d44e77989f83ac585374aa13ad95fb62dc043a0e12d6fe72c9091ef5d99e"
+  },
+  "benchmark-results": {
+   "files": {
+    "website/public/data/benchmark-headline.json": "ee41da6b241cc1644c704ffd304642565c400a16d008a6b175efe49661fe716b",
+    "bench/phase0-agent-native/commit-stamp-index.json": "7257c5429596203c461642bf58ed9cdb5857bb373db2fc59c00a9c09d55fe6df"
+   },
+   "approved": true
+  }
+ }
+}
