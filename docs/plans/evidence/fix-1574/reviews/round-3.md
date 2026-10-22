@@ -53,4 +53,4 @@ CHANGES-REQUESTED
 | 1 | A user type named like a Calor alias (`N.Str`) is read back as `string` | `ShadowsMappedTypeName` now requires the simple name to survive `TypeMapper.CSharpToCalor`, `TypeMapper.CalorToCSharp` and `AttributeHelper.ExpandType` unchanged | `R3-type-named-like-calor-alias` (preserved) |
 | 2 | `[AllowNull]` write contract lost by the typed temp | A target carrying `AllowNull`, `DisallowNull`, `MaybeNull` or `NotNull` is not a lowerable target; the statement stays C# | `R3-allow-null-target` (preserved) |
 
-The fixes were checked by the verification pass (`verification.md`).
+The verification pass (`verification.md`) found both fixed for their reproducers but OPEN for a close variant each.
