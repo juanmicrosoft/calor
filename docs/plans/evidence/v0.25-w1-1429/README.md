@@ -30,8 +30,9 @@ changed no `src/`, `website/` or `CHANGELOG.md` file, and the transcripts were r
   marks four complete programs (F1, F3, F4, F5), which `self-check docs` also compiles, and one F2
   fragment; all five markers are required.
 - `FamilyRecords_AreConsistentWithTheScopeAndThePages`: six families in order, status equal to the scope
-  readiness and never READY, every page and anchor present (the site's heading-id rule), every
-  transcript present, a non-empty READY list.
+  readiness (W1 never decides READY; since R0 scope 1.6.0 it mirrors the READY that `scope.json` wrote back
+  after A1 and cites the same A1 READY record), every page and anchor present (the site's heading-id rule), every
+  transcript present, and a non-empty READY list while a family is not READY.
 - `WebsiteExampleCheckerTests` coverage pin: pages 96 -> 97, complete programs 58 -> 62, illustrative 33 -> 34.
 
 ## Pages
@@ -93,7 +94,11 @@ updated with `CALOR_REGENERATE_W1_TRANSCRIPTS=1`. Finding 3 (`--format json --ve
    `multidim-array` (Full, "fully supported"), `out-var` (lists the expression statement), `out-parameter`
    (says `[NotNullWhen]` parameters are preserved), `in-parameter` (Full with preserved call sites). Fixing them is a `src/` change; the feature-check page lists the gaps.
 
-## What READY needs (per family: `records.json` `readyNeeds`)
+## What READY needed (per family: `records.json` `readyNeeds`, until R0 scope 1.6.0)
+
+Since R0 scope amendment 1.6.0 (post-release write-back, `D-READY-EVIDENCE-DIRS`) every family is READY:
+`records.json` cites each family's A1 READY record (`readyRecord`) in place of `readyNeeds`. The list below is
+kept as the record of what READY required.
 
 Every family: the frozen 0.25 candidate in the 0.24 C1 form after W1 and the release-gap fixes, with
 the scope 1.3.0 `acceptancePreconditions` re-proof; per-case records naming the candidate and current

@@ -384,17 +384,44 @@ public class ReleaseGateScopePacketTests
 
     private delegate void ReadyEdit(string family, JsonObject ready, Dictionary<string, JsonObject> files);
 
+    /// <summary>The #1430 adjudication commit (the #1624 merge). For 0.25.x the gate reads the packet there.</summary>
+    private const string AdjudicationCommit = "2efbd7528781b12f47b81a3a74d10620f575ef30";
+
+    /// <summary>
+    /// The scope packet, T1 register and W1 records as A1 adjudicated them: the blobs at the adjudication commit, each
+    /// checked against the hash in #1430's terminal record (contract.files). The gate reads 0.25.x's packet at that commit,
+    /// so the post-release write-back on main (R0 scope 1.6.0: readiness READY, mirrored by T1 1.0.4 and W1) is not a gate
+    /// input. The fixture therefore models the adjudicated packet, not main's.
+    /// </summary>
+    private static Dictionary<string, string> AdjudicatedPacket()
+    {
+        var root = RepoRoot();
+        var git = new Calor.Compiler.Tests.Provenance.GitRepo(root);
+        var contract = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Record025)))!["contract"]!["files"]!;
+        var packet = new Dictionary<string, string>();
+        foreach (var path in new[] { Scope, Register, W1 })
+        {
+            var bytes = git.ReadBlob($"{AdjudicationCommit}:{path}");
+            Assert.True(bytes != null, $"{path} at {AdjudicationCommit} is missing; is history fetched?");
+            var text = Encoding.UTF8.GetString(bytes!).Replace("\r\n", "\n");
+            Assert.Equal(contract[path]!.GetValue<string>(), Sha(Encoding.UTF8.GetBytes(text)));
+            packet[path] = text;
+        }
+        return packet;
+    }
+
     private static GateRepo Build(Action<JsonObject>? record = null, Action<GateRepo>? beforeCandidate = null, Action<GateRepo>? atAdjudication = null,
         ReadyEdit? readyEdit = null, bool adjudicated = true)
     {
         var map = GateRepo.CommittedMap();
         Entry(map, "0.25.x")["status"] = adjudicated ? "adjudicated" : "not-yet-adjudicated";
         var root = RepoRoot();
-        var scope = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Scope)))!;
-        var registerNode = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Register)))!;
+        var packet = AdjudicatedPacket();
+        var scope = JsonNode.Parse(packet[Scope])!;
+        var registerNode = JsonNode.Parse(packet[Register])!;
         var cells = scope["cases"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["cells"]?.AsArray().Select(x => x!.GetValue<string>()).ToList() ?? new List<string>());
         var mapped = scope["mappedBlockers"]!["applicable"]!.AsArray();
-        var w1Node = JsonNode.Parse(File.ReadAllText(Path.Combine(root, W1)))!;
+        var w1Node = JsonNode.Parse(packet[W1])!;
         var w1Pages = w1Node["families"]!.AsArray().SelectMany(f => f!["pages"]!.AsArray()).Concat(w1Node["sharedPages"]!.AsArray())
             .Select(p => p!.GetValue<string>().Split('#')[0]).ToList();
         var families = scope["families"]!.AsArray().Select(f => (Id: f!["id"]!.GetValue<string>(), Blockers: f["blockers"]!.AsArray().Select(b => b!.GetValue<int>()).ToList(),
@@ -419,6 +446,8 @@ public class ReleaseGateScopePacketTests
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     File.Copy(Path.Combine(root, path), target, overwrite: true);
                 }
+                foreach (var (path, text) in packet)
+                    File.WriteAllText(Path.Combine(repo.Root, path), text);
                 beforeCandidate?.Invoke(repo);
             },
             adjudicate: (repo, r) =>

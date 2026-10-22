@@ -32,12 +32,14 @@ public class T1RegisterTests
 
     /// <summary>Each approved amendment's seal, in order. 1.0.1: F1 PR 2 (#943, PR #1571) re-ran F1's results.json.
     /// 1.0.2: consumes R0 scope 1.4.0 (the 2026-10-19 freeze decisions); no approved hash changes.
-    /// 1.0.3: consumes R0 scope 1.5.0; F2-INTERP-09's counts re-registered to the 0.25 candidate (D-F2-INTERP-09-RECANDIDATE).</summary>
+    /// 1.0.3: consumes R0 scope 1.5.0; F2-INTERP-09's counts re-registered to the 0.25 candidate (D-F2-INTERP-09-RECANDIDATE).
+    /// 1.0.4: consumes R0 scope 1.6.0 and mirrors the post-release READY write-back (D-READY-EVIDENCE-DIRS); no approved hash changes.</summary>
     private static readonly (string Version, string Seal)[] AmendmentSeals =
     [
         ("1.0.1", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
         ("1.0.2", "12a33773e2424210a04b7750c2bc3fdeabb74c0281bf6d2dd65e8485a66b27b8"),
         ("1.0.3", "65330c86baba0be8ebc1fb9bff97c6e6c1e77a2abd24502314faf723d5393f15"),
+        ("1.0.4", "65330c86baba0be8ebc1fb9bff97c6e6c1e77a2abd24502314faf723d5393f15"),
     ];
 
     [Fact]
@@ -49,13 +51,42 @@ public class T1RegisterTests
         Assert.Equal(AmendmentSeals[^1].Seal, T1RegisterValidator.ApprovalSeal(register));
     }
 
+    /// <summary>
+    /// D-READY-EVIDENCE-DIRS (R0 scope 1.6.0, T1 register 1.0.4): READY is written back only after A1. Before the write-back
+    /// this test asserted that no family was READY. Now every family's scope readiness and register mirror must cite the
+    /// READY record that #1430's ACCEPTED terminal record cites for that family, at that record's hash, and every S007 field
+    /// in scope.json must equal the record's own value, so the write-back adds nothing A1 did not adjudicate.
+    /// </summary>
     [Fact]
-    public void CommittedRegisterHoldsNoReadyRecord()
+    public void ReadinessIsWrittenBackFromTheA1ReadyRecords()
     {
-        // No 0.25 candidate is frozen yet: READY waits for W1 (#1429) and the release-gap fixes.
-        Assert.All(Register()["families"]!.AsArray(), f => Assert.NotEqual("READY", f!["readiness"]!.GetValue<string>()));
-        Assert.All(Scope()["families"]!.AsArray(), f => Assert.NotEqual("READY", f!["readiness"]!["status"]!.GetValue<string>()));
+        var terminal = JsonNode.Parse(ReadRepo(TerminalRecord)!)!;
+        Assert.Equal(1430, terminal["issue"]!.GetValue<int>());
+        Assert.Equal("ACCEPTED", terminal["outcome"]!.GetValue<string>());
+        var register = Register();
+        foreach (var family in Scope()["families"]!.AsArray())
+        {
+            var id = family!["id"]!.GetValue<string>();
+            var readiness = family["readiness"]!;
+            var row = terminal["adjudications"]!.AsArray().Single(r => r!["subject"]!.GetValue<string>() == $"family:{id}")!;
+            Assert.Equal("READY", row["outcome"]!.GetValue<string>());
+            Assert.Equal("READY", readiness["status"]!.GetValue<string>());
+            Assert.True(JsonNode.DeepEquals(row["readyRecord"], readiness["readyRecord"]), $"{id}: scope cites a READY record A1 did not");
+            Assert.True(JsonNode.DeepEquals(row["readyRecord"], Family(register, id)["readyRecord"]), $"{id}: the register cites a READY record A1 did not");
+            Assert.Equal("READY", Family(register, id)["readiness"]!.GetValue<string>());
+            var path = readiness["readyRecord"]!["path"]!.GetValue<string>();
+            var bytes = ReadRepo(path);
+            Assert.True(bytes != null, $"{id}: {path} is missing");
+            Assert.Equal(readiness["readyRecord"]!["sha256"]!.GetValue<string>(), InteropScopeValidator.Sha256(bytes!));
+            var record = JsonNode.Parse(bytes!)!;
+            foreach (var field in new[] { "scopeVersion", "candidate", "cases", "tests", "websiteExamples", "reviews", "approver", "independence", "blockersResolved" })
+                Assert.True(JsonNode.DeepEquals(record[field], readiness[field]), $"{id}: {field} differs from the A1 READY record");
+            Assert.Equal(TerminalRecord, readiness["terminalRecord"]!["path"]!.GetValue<string>());
+            Assert.Equal(InteropScopeValidator.Sha256(ReadRepo(TerminalRecord)!), readiness["terminalRecord"]!["sha256"]!.GetValue<string>());
+        }
     }
+
+    private const string TerminalRecord = "docs/plans/evidence/adjudication-1430/terminal-record.json";
 
     public static IEnumerable<object[]> Mutations => Controls.Keys.Select(k => new object[] { k });
 
@@ -79,7 +110,10 @@ public class T1RegisterTests
     {
         ["stale scope version"] = ("T001", (r, _) => { r["consumes"]!["scopeVersion"] = "1.2.0"; return null; }),
         ["family dropped"] = ("T002", (r, _) => { r["families"]!.AsArray().RemoveAt(2); return null; }),
-        ["READY claimed in the register only"] = ("T002", (r, _) => { Family(r, "F4")["readiness"] = "READY"; return null; }),
+        // Since the 1.0.4 write-back both say READY; the scope side is reverted so the register alone claims it.
+        ["READY claimed in the register only"] = ("T002", (_, s) => {
+            Family(s, "F4")["readiness"] = new JsonObject { ["status"] = "IN_PROGRESS", ["branch"] = "milestone-0.25/f4-1139-iterator-accessors" }; return null; }),
+        ["register not READY while the scope is"] = ("T002", (r, _) => { Family(r, "F4")["readiness"] = "IN_PROGRESS"; Family(r, "F4")["readyNeeds"] = new JsonArray("x"); return null; }),
         ["mapped blocker dropped"] = ("T002", (r, _) => { Family(r, "F5")["blockers"]!.AsArray().RemoveAt(2); return null; }),
         ["case removed"] = ("T003", (r, _) => { Family(r, "F2")["cases"]!.AsArray().RemoveAt(8); return null; }),
         ["case reclassified"] = ("T003", (r, _) => { Case(r, "F4", "F4-ITER-01")["expected"] = "native"; return null; }),
