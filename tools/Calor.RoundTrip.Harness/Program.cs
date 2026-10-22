@@ -88,6 +88,23 @@ async Task<int> RunCommand(string[] runArgs)
         : (TimeSpan?)null;
     var minimumCoverage = ParseFractionOption(runArgs, "--min-coverage");
     var minimumNative = ParseFractionOption(runArgs, "--min-native");
+    // #1586: which conversion leg to run. `lossy` is the historical harness leg;
+    // `default` converts with exactly the options `calor convert` builds with no
+    // flags. Each leg blocks on its own floors (ProjectConfigs).
+    var modeOption = (GetOption(runArgs, "--mode") ?? "lossy").ToLowerInvariant();
+    HarnessConversionMode conversionMode;
+    switch (modeOption)
+    {
+        case "lossy":
+            conversionMode = HarnessConversionMode.Lossy;
+            break;
+        case "default":
+            conversionMode = HarnessConversionMode.Default;
+            break;
+        default:
+            Console.Error.WriteLine($"Unknown --mode '{modeOption}'. Use one of: lossy, default.");
+            return 2;
+    }
     var attemptsOption = GetOption(runArgs, "--test-attempts");
     var testAttempts = 1;
     if (attemptsOption is not null && (!int.TryParse(attemptsOption, out testAttempts) || testAttempts is < 1 or > 3))
@@ -110,7 +127,7 @@ async Task<int> RunCommand(string[] runArgs)
     var optionsWithValues = new HashSet<string>
     {
         "--projects-dir", "--output", "--dotnet", "--build-timeout",
-        "--min-coverage", "--min-native", "--test-attempts"
+        "--min-coverage", "--min-native", "--test-attempts", "--mode"
     };
     var projectNames = new List<string>();
     if (runAll)
@@ -154,7 +171,9 @@ async Task<int> RunCommand(string[] runArgs)
         // Never hand-copy fields here: a field this derivation drops (the
         // upstream-flake allowlist, once — see RunConfigOverrideTests) silently
         // changes what the gate enforces.
-        config = config.WithRunOverrides(enableBisect, buildTimeout, minimumCoverage, minimumNative);
+        // Select the leg first so its floors apply, then let --min-* override them.
+        config = config.ForMode(conversionMode)
+            .WithRunOverrides(enableBisect, buildTimeout, minimumCoverage, minimumNative);
         config = config with
         {
             CaptureBindingAnalysis = runArgs.Contains("--capture-binding-analysis"),
@@ -163,7 +182,7 @@ async Task<int> RunCommand(string[] runArgs)
 
         Console.WriteLine();
         Console.WriteLine(new string('=', 60));
-        Console.WriteLine($"  Round-Trip Verification: {config.ProjectName}");
+        Console.WriteLine($"  Round-Trip Verification: {config.ProjectName} ({ReportGenerator.ConversionModeName(config.ConversionMode)} mode)");
         Console.WriteLine(new string('=', 60));
         Console.WriteLine();
 
@@ -204,7 +223,7 @@ async Task<int> RunCommand(string[] runArgs)
         var gateFailures = RoundTripExitPolicy.GetFailureReasons(report);
         var verdictEmoji = gateFailures.Count == 0 ? "PASS" : "FAIL";
 
-        Console.WriteLine($"\n{verdictEmoji} {config.ProjectName}: {report.Comparison?.Status}");
+        Console.WriteLine($"\n{verdictEmoji} {config.ProjectName} [{ReportGenerator.ConversionModeName(config.ConversionMode)} mode]: {report.Comparison?.Status}");
         Console.WriteLine($"   Baseline: {report.Baseline?.Passed}/{report.Baseline?.TotalTests} passing");
         Console.WriteLine($"   Round-trip: {report.RoundTripTests?.Passed ?? 0}/{report.RoundTripTests?.TotalTests ?? 0} passing");
         Console.WriteLine($"   Regressions: {report.Comparison?.FormatRegressionCount() ?? "-1"}");
@@ -941,6 +960,9 @@ static void PrintUsage()
           --min-native <0..1>      Override the project's minimum native coverage
           --capture-binding-analysis  Record independent analysis-only reparse/bind diagnostics
           --test-attempts <1..3>   Fixed full-suite attempts on each leg (default 1, no retries)
+          --mode <lossy|default>   Conversion leg (default lossy). 'default' converts with exactly the
+                                   options `calor convert` builds with no flags (Lossless) and blocks
+                                   on the project's default-mode floors.
           --bisect                 Enable regression bisection
 
         Options (compare-evidence):

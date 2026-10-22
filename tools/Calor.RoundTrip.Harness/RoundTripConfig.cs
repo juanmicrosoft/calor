@@ -1,6 +1,27 @@
 namespace Calor.RoundTrip.Harness;
 
 /// <summary>
+/// Which conversion options a harness run uses (#1586). The two legs run as
+/// separate CI matrix entries, and each one blocks on its own floors.
+/// </summary>
+public enum HarnessConversionMode
+{
+    /// <summary>
+    /// The historical harness leg: Lossy fidelity with the active preprocessor
+    /// branch selected per evaluated project context (Lossless only for files whose
+    /// branches diverge), GracefulFallback and PassthroughOnError on.
+    /// </summary>
+    Lossy,
+
+    /// <summary>
+    /// Exactly the options <c>calor convert</c> builds with no flags
+    /// (<c>ConvertCommand.BuildCSharpToCalorOptions</c>): Lossless fidelity, all
+    /// preprocessor branches preserved, GracefulFallback on, PassthroughOnError off.
+    /// </summary>
+    Default,
+}
+
+/// <summary>
 /// Configuration for a round-trip verification run against a target project.
 /// A record so derived configs (CLI overrides, bisect re-runs) are built with
 /// <c>with</c> and carry every field; see <see cref="WithRunOverrides"/>.
@@ -104,6 +125,30 @@ public sealed record RoundTripConfig
 
     /// <summary>Minimum fraction of all candidate files that must be converted natively with zero losses.</summary>
     public double MinimumNativeFraction { get; init; }
+
+    /// <summary>Conversion options this run uses. Defaults to the historical Lossy leg.</summary>
+    public HarnessConversionMode ConversionMode { get; init; } = HarnessConversionMode.Lossy;
+
+    /// <summary>Default-mode (#1586) floor for <see cref="MinimumCoverageFraction"/>.</summary>
+    public double DefaultModeMinimumCoverageFraction { get; init; }
+
+    /// <summary>Default-mode (#1586) floor for <see cref="MinimumNativeFraction"/>.</summary>
+    public double DefaultModeMinimumNativeFraction { get; init; }
+
+    /// <summary>
+    /// Select a conversion leg. The default leg swaps in its own floors so each leg
+    /// blocks on the floors measured for it; CLI <c>--min-*</c> overrides still win
+    /// because <see cref="WithRunOverrides"/> is applied after this.
+    /// </summary>
+    public RoundTripConfig ForMode(HarnessConversionMode mode)
+        => mode == HarnessConversionMode.Default
+            ? this with
+            {
+                ConversionMode = mode,
+                MinimumCoverageFraction = DefaultModeMinimumCoverageFraction,
+                MinimumNativeFraction = DefaultModeMinimumNativeFraction,
+            }
+            : this with { ConversionMode = mode };
 
     /// <summary>
     /// Fully-qualified test names known to be flaky in the upstream corpus

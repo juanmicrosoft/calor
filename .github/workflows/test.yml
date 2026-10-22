@@ -9,7 +9,8 @@ on:
 
 jobs:
   # #1009 (audit R13): the roundtrip-verification job takes ~30 minutes running
-  # `harness run --all` against MediatR/Serilog/FluentValidation. Docs-only PRs
+  # `harness run --all` against MediatR/Serilog/FluentValidation (per leg; the
+  # Lossy and default legs run in parallel, #1586). Docs-only PRs
   # cannot regress round-trip conversion, so we detect the change set here and
   # gate that one job on `has_non_docs_changes`. The filter is negative — it
   # matches any file OUTSIDE the docs paths — so if compiler code is ever
@@ -1010,12 +1011,28 @@ jobs:
     # The `always()` clause is preserved so the job runs even if
     # `conversion-scorecard` fails — but only when there are non-docs
     # changes and the precheck did not explicitly veto.
+    #
+    # #1586: two legs run as parallel matrix entries, never in series, so the
+    # wall clock stays at one leg's ~30 min. `lossy` is the historical harness
+    # leg (Lossy fidelity, active preprocessor branch, passthrough on).
+    # `default` converts with exactly the options `calor convert` builds with no
+    # flags (Lossless). Each leg blocks on its own floors in ProjectConfigs.cs,
+    # and fail-fast is off so one leg failing never cancels the other.
+    name: roundtrip-verification (${{ matrix.mode }})
     if: >-
       always() &&
       needs.detect-changes.outputs.has_non_docs_changes != 'false'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     needs: [detect-changes, conversion-scorecard]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: lossy
+            artifact: roundtrip-reports
+          - mode: default
+            artifact: roundtrip-reports-default
     permissions:
       contents: read
       pull-requests: write
@@ -1054,68 +1071,13 @@ jobs:
         run: |
           dotnet run --project tools/Calor.RoundTrip.Harness/ -c Release -- \
             run --all \
+            --mode ${{ matrix.mode }} \
             --dotnet dotnet \
             --output ./conversion-reports/
 
-      - name: Post round-trip results to PR
-        if: >-
-          always() &&
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const marker = '<!-- calor-roundtrip-verification -->';
-
-            let body = `${marker}\n## Round-Trip Verification\n\n`;
-            body += '| Project | Verdict | Tests | Inventory Δ | Native | Total coverage | Interop | Gaps |\n';
-            body += '|---------|---------|-------|-------------|--------|----------------|---------|------|\n';
-
-            const reportsDir = 'conversion-reports';
-            const files = fs.existsSync(reportsDir)
-              ? fs.readdirSync(reportsDir).filter(f => f.endsWith('-roundtrip.json'))
-              : [];
-
-            if (files.length === 0) {
-              body += ':x: The round-trip job produced no JSON reports. Check the failed workflow logs.\n';
-            }
-
-            for (const file of files) {
-              const data = JSON.parse(fs.readFileSync(`${reportsDir}/${file}`));
-              const emoji = data.verdict === 'pass' ? ':white_check_mark:' : ':x:';
-              const fidelity = data.fidelity;
-
-              body += `| ${data.project} | ${emoji} ${data.verdict} | `;
-              body += `${data.round_trip?.passed ?? '—'}/${data.round_trip?.total ?? '—'} | `;
-              body += `${fidelity?.tests?.inventory_delta ?? '—'} | `;
-              body += `${fidelity ? (100 * fidelity.coverage.native_fraction).toFixed(1) + '%' : '—'} | `;
-              body += `${fidelity ? (100 * fidelity.coverage.coverage_fraction).toFixed(1) + '%' : '—'} | `;
-              body += `${fidelity?.coverage?.total_interop_blocks ?? '—'} | `;
-              body += `${fidelity?.coverage?.distinct_gaps?.length ?? '—'} |\n`;
-              if (data.gate_failures?.length) {
-                body += `\n**${data.project} blockers:** ${data.gate_failures.join('; ')}\n\n`;
-              }
-            }
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(c => c.body?.includes(marker));
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner, repo: context.repo.repo,
-                comment_id: existing.id, body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner, repo: context.repo.repo,
-                issue_number: context.issue.number, body,
-              });
-            }
+      # The per-leg results table is posted by `roundtrip-summary` once both
+      # legs finish, so the two legs share one PR comment instead of racing to
+      # overwrite it.
 
       # Warning-only incremental delta alarm (#1005). Compares the current
       # per-project round-trip pass counts to the committed baseline in
@@ -1125,11 +1087,13 @@ jobs:
       # for merge-blocking. This surfaces drifts the absolute gate does not
       # catch (see the MediatR MinorRegressions signal on PRs #986 / #992 that
       # a maintainer had to interpret manually).
+      # The committed baseline measures the Lossy leg, so the delta alarm runs
+      # only there (#1586); the default leg blocks on its own floors instead.
       - name: Self-test round-trip delta script
         # Verifies the delta-computation logic itself before running it
         # against real reports. Matches the pattern used by check_coverage.py,
         # check_trx.py, and run_mutation_gate.py at earlier CI steps.
-        if: always()
+        if: always() && matrix.mode == 'lossy'
         run: python3 scripts/roundtrip_delta.py --self-test
 
       - name: Compute round-trip delta vs baseline
@@ -1140,7 +1104,7 @@ jobs:
         # silent skip is impossible. If the script crashes (missing
         # baseline, malformed JSON, git surprise), the step still emits
         # `has_delta=false` and the workflow continues.
-        if: always()
+        if: always() && matrix.mode == 'lossy'
         id: rt_delta
         continue-on-error: true
         run: |
@@ -1197,9 +1161,110 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: roundtrip-reports
+          name: ${{ matrix.artifact }}
           path: conversion-reports/*-roundtrip.*
           retention-days: 90
+
+  roundtrip-summary:
+    # #1586: one PR comment that shows both harness legs side by side. It only
+    # reports; each roundtrip-verification leg is what blocks.
+    if: >-
+      always() &&
+      needs.roundtrip-verification.result != 'skipped' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [roundtrip-verification]
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Download Lossy-leg reports
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: roundtrip-reports
+          path: reports/lossy
+
+      - name: Download default-leg reports
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: roundtrip-reports-default
+          path: reports/default
+
+      - name: Post round-trip results to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- calor-roundtrip-verification -->';
+            const legs = [
+              { dir: 'reports/lossy', name: 'Lossy' },
+              { dir: 'reports/default', name: 'Default' },
+            ];
+
+            let body = `${marker}\n## Round-Trip Verification\n\n`;
+            body += 'Two legs, each blocking on its own floors. **Lossy** is the historical harness mode. ';
+            body += '**Default** converts with exactly the options `calor convert` uses with no flags (Lossless).\n\n';
+            body += '| Project | Leg | Verdict | Tests | Inventory Δ | Native | Total coverage | Interop | Gaps |\n';
+            body += '|---------|-----|---------|-------|-------------|--------|----------------|---------|------|\n';
+
+            const rows = [];
+            const blockers = [];
+            for (const leg of legs) {
+              const files = fs.existsSync(leg.dir)
+                ? fs.readdirSync(leg.dir).filter(f => f.endsWith('-roundtrip.json'))
+                : [];
+              if (files.length === 0) {
+                rows.push({ project: '—', leg: leg.name, line: `| — | ${leg.name} | :x: no reports | — | — | — | — | — | — |\n` });
+                blockers.push(`**${leg.name} leg:** produced no JSON reports. Check the failed workflow logs.`);
+                continue;
+              }
+              for (const file of files) {
+                const data = JSON.parse(fs.readFileSync(`${leg.dir}/${file}`));
+                const emoji = data.verdict === 'pass' ? ':white_check_mark:' : ':x:';
+                const fidelity = data.fidelity;
+                let line = `| ${data.project} | ${leg.name} | ${emoji} ${data.verdict} | `;
+                line += `${data.round_trip?.passed ?? '—'}/${data.round_trip?.total ?? '—'} | `;
+                line += `${fidelity?.tests?.inventory_delta ?? '—'} | `;
+                line += `${fidelity ? (100 * fidelity.coverage.native_fraction).toFixed(1) + '%' : '—'} | `;
+                line += `${fidelity ? (100 * fidelity.coverage.coverage_fraction).toFixed(1) + '%' : '—'} | `;
+                line += `${fidelity?.coverage?.total_interop_blocks ?? '—'} | `;
+                line += `${fidelity?.coverage?.distinct_gaps?.length ?? '—'} |\n`;
+                rows.push({ project: data.project, leg: leg.name, line });
+                if (data.gate_failures?.length) {
+                  blockers.push(`**${data.project} (${leg.name}) blockers:** ${data.gate_failures.join('; ')}`);
+                }
+              }
+            }
+            rows.sort((a, b) => a.project.localeCompare(b.project) || b.leg.localeCompare(a.leg));
+            body += rows.map(r => r.line).join('');
+            if (blockers.length) {
+              body += '\n' + blockers.join('\n\n') + '\n';
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              });
+            }
 
   id-validation:
     runs-on: ubuntu-latest

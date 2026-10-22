@@ -102,7 +102,37 @@ git submodule update --init --recursive
 # Run the round-trip harness against the vendored corpus (default --projects-dir)
 dotnet run --project tools/Calor.RoundTrip.Harness -- run --all \
   --dotnet dotnet --output ./conversion-reports/
+
+# Same, with exactly the options `calor convert` uses with no flags (#1586)
+dotnet run --project tools/Calor.RoundTrip.Harness -- run --all --mode default \
+  --dotnet dotnet --output ./conversion-reports-default/
 ```
+
+Both legs write `<Project>-roundtrip.{md,json}`, so give each its own `--output`
+directory. The JSON carries `"conversion_mode": "lossy"` or `"default"`.
+
+## Two harness legs
+
+The harness converts every library file, swaps it into the project, rebuilds,
+and reruns the project's own tests. It runs in one of two conversion modes,
+chosen with `--mode`:
+
+| Leg | `--mode` | Conversion options |
+|-----|----------|--------------------|
+| Lossy | `lossy` (default) | `Fidelity = Lossy`; the active preprocessor branch is selected per evaluated project context (Lossless only for files whose branches diverge); `GracefulFallback` and `PassthroughOnError` on; the project's parse options, defines and nullable context |
+| Default | `default` | Exactly what `calor convert` builds with no flags (`ConvertCommand.BuildCSharpToCalorOptions`): `Fidelity = Lossless`, all preprocessor branches preserved, `GracefulFallback` on, `PassthroughOnError` off, round-trip validation on, no project defines or references |
+
+The default leg measures what a user gets from a plain `calor convert`. Lossless
+conversion refuses any recorded semantic loss, so it keeps fewer files than the
+Lossy leg. `DefaultModeOptionsParityTests` parses a flagless `convert` command
+line and fails if the harness's default-mode options ever differ from it.
+
+CI runs the two legs as parallel matrix entries of `roundtrip-verification`.
+Each leg blocks on its own floors (below). In both legs, a file whose converted
+output does not build keeps its original C#. It stays in the denominator as a
+failure, but its behavior is not tested through Calor. The
+pass-count delta alarm (`scripts/roundtrip_delta.py`) compares only the Lossy
+leg against `eng/roundtrip-baselines.json` and never blocks.
 
 The harness defaults `--projects-dir` to this directory
 (`ProjectConfigs.DefaultCorpusDir`); `--projects-dir <path>` still overrides it.
@@ -114,8 +144,10 @@ without initializing them. Only the CI `roundtrip-verification` job checks out w
 ## Historical first fidelity measurement
 
 The table below predates the failure-safe #776 gate and is retained as historical
-context only. The current harness uses lossless conversion, counts excluded and
-reverted files in the denominator, and enforces the per-project thresholds in
+context only. The current harness runs two legs (see [Two harness legs](#two-harness-legs)):
+the Lossy leg converts with `Fidelity = Lossy`, and the default leg with the
+Lossless options `calor convert` uses. Both count excluded and reverted files in
+the denominator and enforce their own per-project thresholds in
 `ProjectConfigs.cs`; current CI reports are authoritative.
 
 | Project | Baseline | Round-trip | Convertible files | Native | NativeFraction | With-losses | Reverted | Failed-conv |
@@ -128,15 +160,21 @@ These legacy fractions must not be compared directly with current reports becaus
 their conversion mode and denominator differ.
 
 The blocking thresholds are explicit and overridable with `--min-coverage` and
-`--min-native`:
+`--min-native`. Each leg has its own:
 
-| Project | Minimum total | Minimum native |
-|---------|---------------|----------------|
-| Synthetic | 62.5% | 62.5% |
-| Synthetic2 | 25.0% | 25.0% |
-| MediatR | 55.0% | 40.0% |
-| Serilog | 30.0% | 25.0% |
-| FluentValidation | 50.0% | 48.0% |
+| Project | Lossy: minimum total | Lossy: minimum native | Default: minimum total | Default: minimum native |
+|---------|---------------|----------------|----------------|----------------|
+| Synthetic | 62.5% | 62.5% | 100% (5/5) | 100% (5/5) |
+| Synthetic2 | 25.0% | 25.0% | 100% (1/1) | 100% (1/1) |
+| MediatR | 55.0% | 40.0% | 25.0% (8/32) | 15.6% (5/32) |
+| Serilog | 30.0% | 25.0% | 12.5% (14/112) | 8.9% (10/112) |
+| FluentValidation | 50.0% | 48.0% | 46.0% (64/139) | 3.6% (5/139) |
+
+The default-leg floors equal what that leg measured on main when it landed
+(2026-10-22), written as kept files over candidate files, so losing one file
+fails the leg. For comparison, the Lossy leg measured MediatR 71.9% / 53.1%,
+Serilog 59.8% / 48.2% and FluentValidation 71.9% / 67.6% (total / native) on
+the same commit.
 
 Serilog's `Core/Logger.cs` is an explicit conversion exclusion because its
 conversion exceeds the per-file timeout. `Rendering/ReusableStringWriter.cs` is

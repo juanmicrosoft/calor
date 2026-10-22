@@ -31,6 +31,7 @@ public sealed class RoundTripPipeline
         var report = new RoundTripReport
         {
             ProjectName = config.ProjectName,
+            ConversionMode = config.ConversionMode,
             CalorVersion = GetCalorVersion(),
             StartedAt = DateTimeOffset.UtcNow,
             MinimumCoverageFraction = config.MinimumCoverageFraction,
@@ -1612,6 +1613,44 @@ public sealed class RoundTripPipeline
         ProjectFileParseContext? parseContext,
         PreprocessorConversionMode preprocessorMode =
             PreprocessorConversionMode.SelectActiveBranchLossy)
+        => config.ConversionMode == HarnessConversionMode.Default
+            ? CreateDefaultModeConversionOptions()
+            : CreateLossyHarnessConversionOptions(
+                config,
+                parseContext,
+                preprocessorMode);
+
+    /// <summary>
+    /// #1586: the default-mode leg converts with exactly what <c>calor convert</c>
+    /// builds when the user passes no flags. Every argument below is the CLI's
+    /// no-flag value; <c>DefaultModeOptionsParityTests</c> parses a flagless
+    /// <c>convert</c> command line and fails if the two ever differ. Nothing is
+    /// layered on top: no project parse context, defines or references (the CLI
+    /// has none without flags), and round-trip validation stays on.
+    /// </summary>
+    internal static ConversionOptions CreateDefaultModeConversionOptions()
+        => Compiler.Commands.ConvertCommand.BuildCSharpToCalorOptions(
+            benchmark: false,
+            verbose: false,
+            explain: false,
+            noFallback: false,
+            passthrough: false,
+            explicitCallClosers: false,
+            lossy: false,
+            selectActivePreprocessorBranchLossy: false,
+            definedSymbols: [],
+            configuration: null,
+            targetFramework: null,
+            languageVersion: null,
+            documentationMode: "parse",
+            sourceKind: "regular",
+            features: [],
+            references: []);
+
+    private static ConversionOptions CreateLossyHarnessConversionOptions(
+        RoundTripConfig config,
+        ProjectFileParseContext? parseContext,
+        PreprocessorConversionMode preprocessorMode)
         => new()
         {
             Fidelity = preprocessorMode

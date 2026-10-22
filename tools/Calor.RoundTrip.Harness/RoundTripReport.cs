@@ -17,6 +17,9 @@ public sealed class RoundTripReport
         EvaluatedParseResolutions { get; set; } =
             new Dictionary<string, ProjectFileParseResolution>();
     public required string ProjectName { get; init; }
+
+    /// <summary>Which conversion leg produced this report (#1586).</summary>
+    public HarnessConversionMode ConversionMode { get; init; } = HarnessConversionMode.Lossy;
     public string CalorVersion { get; set; } = "";
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset FinishedAt { get; set; }

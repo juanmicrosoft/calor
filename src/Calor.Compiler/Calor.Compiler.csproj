@@ -10,6 +10,10 @@
     <InternalsVisibleTo Include="Calor.Tasks" />
     <InternalsVisibleTo Include="Calor.Tasks.Tests" />
     <InternalsVisibleTo Include="IncrementalBuildBench" />
+    <!-- #1586: the round-trip harness default-mode leg converts with exactly the
+         options `calor convert` builds (ConvertCommand.BuildCSharpToCalorOptions). -->
+    <InternalsVisibleTo Include="Calor.RoundTrip.Harness" />
+    <InternalsVisibleTo Include="Calor.RoundTrip.Harness.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

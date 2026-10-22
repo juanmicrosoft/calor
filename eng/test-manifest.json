@@ -79,9 +79,9 @@
       "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 295,
+      "expectedTotal": 302,
       "expectedSkipped": 0,
-      "note": "#1420: 291 -> 295, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases."
+      "note": "#1420: 291 -> 295, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases. #1586: 295 -> 302, +7 DefaultModeOptionsParityTests cases: the convert command's option set is the reviewed one, the harness default-mode options equal a parsed flagless calor convert, those options are the Lossless CLI defaults, default mode ignores harness-only settings, the Lossy options are unchanged, ForMode swaps in each project's default-mode floors while --min-* still wins, and every known project declares nonzero default-mode floors. No new skipped cases."
     },
     {
       "path": "tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj",
