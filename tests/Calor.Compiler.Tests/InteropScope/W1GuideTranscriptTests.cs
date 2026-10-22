@@ -118,7 +118,8 @@ public sealed class W1GuideTranscriptTests : IDisposable
 
     /// <summary>
     /// The per-family W1 records: the six families in order, status equal to the scope's readiness
-    /// (W1 never records READY), pages and anchors that exist, transcripts that exist, and a non-empty
+    /// (W1 never decides READY; it mirrors one that scope.json wrote back after A1, citing the same READY
+    /// record), pages and anchors that exist, transcripts that exist, and, while not READY, a non-empty
     /// list of what READY still needs.
     /// </summary>
     [Fact]
@@ -134,11 +135,20 @@ public sealed class W1GuideTranscriptTests : IDisposable
         foreach (var family in families)
         {
             var id = family!["family"]!.GetValue<string>();
-            var readiness = scope["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!["readiness"]!["status"]!.GetValue<string>();
+            var scopeReadiness = scope["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!["readiness"]!;
+            var readiness = scopeReadiness["status"]!.GetValue<string>();
             var status = family["status"]!.GetValue<string>();
-            Assert.NotEqual("READY", status);
             Assert.Equal(readiness, status);
-            Assert.NotEmpty(family["readyNeeds"]!.AsArray());
+            if (status == "READY")
+            {
+                // R0 scope 1.6.0 (D-READY-EVIDENCE-DIRS): W1 mirrors a READY that scope.json wrote back after A1, citing the
+                // same A1 READY record; W1 itself never decides READY.
+                Assert.Equal("1.6.0", scopeReadiness["writtenBack"]!["amendment"]!.GetValue<string>());
+                Assert.True(JsonNode.DeepEquals(scopeReadiness["readyRecord"], family["readyRecord"]), $"{id}: W1 cites a different READY record");
+                Assert.Null(family["readyNeeds"]);
+            }
+            else
+                Assert.NotEmpty(family["readyNeeds"]!.AsArray());
             foreach (var transcript in family["transcripts"]!.AsArray())
                 Assert.True(File.Exists(Path.Combine(root, Dir, "transcripts", transcript!.GetValue<string>() + ".json")), $"{id}: {transcript}");
             foreach (var page in family["pages"]!.AsArray().Select(p => p!.GetValue<string>()))

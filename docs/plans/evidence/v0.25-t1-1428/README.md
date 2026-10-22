@@ -1,8 +1,8 @@
 # 0.25 T1 (#1428): shared interop controls and readiness register
 
-**Register version:** 1.0.3 (see "Amendments"). **Consumes:** R0 scope 1.5.0. **Status:** register only. No 0.25
-candidate is frozen and no READY record exists. Those wait for W1 (#1429) and the 0.24
-release-gap fixes (#1545, #1546, #1547). **Independence:** reduced (R0 §9). Codex reviewed this
+**Register version:** 1.0.4 (see "Amendments"). **Consumes:** R0 scope 1.6.0. **Status:** register. Every family is
+READY: A1 (#1430) recorded ACCEPTED on the candidate `d1d7afde`, 0.25.0 shipped from it on 2026-10-22, and amendment
+1.0.4 mirrors the post-release readiness write-back in `scope.json` (R0 scope 1.6.0). **Independence:** reduced (R0 §9). Codex reviewed this
 work; no reviewer independent of the maintainer did.
 
 | File | Content |
@@ -179,3 +179,4 @@ Case counts are from `register.json` (65 registered cases: 49 at 1.0.0 plus 16 r
 | 1.0.1 | 2026-10-18 | #1571 (F1 PR 2, #943) | F1's re-run `results.json` (five new rows for the W1 findings; D1-CS-04 and D1-CS-19 re-attributed from `in-parameter` to `ref-parameter`) changes F1's approved evidence hash `7efaf64a…` -> `8d64b186…`. Controls, fixtures, `controls-results.json` and the corpus counts are unchanged: `SharedInteropControlsTests` reproduces every committed cell, so nothing was regenerated. New approval seal `12a33773…`, pinned in `T1RegisterTests.AmendmentApprovalsMatchThePinnedSeals`; the top-level `approvalSeal` stays the 1.0.0 seal |
 | 1.0.2 | 2026-10-19 | #1576 (pre-freeze decisions) | Consumes R0 scope 1.4.0 (T001). No approved hash changes, so the seal stays `12a33773…`. Under `D-READY-EVIDENCE-DIRS` the readiness mirrored here is written back after A1, with `scope.json`'s |
 | 1.0.3 | 2026-10-20 | #1610 (Step A amendment) | Consumes R0 scope 1.5.0. `D-F2-INTERP-09-RECANDIDATE`: the corpus 'after' counts are re-registered to the 0.25 candidate, with `corpusCounts.reRegistration` (sealed with the counts). `D-F4-ITER-04-NOT-MEASURED`: F4's ready needs say the case is recorded as skipped. New approval seal `65330c86…` |
+| 1.0.4 | 2026-10-22 | #1626 (post-A1 readiness write-back) | Consumes R0 scope 1.6.0. Under `D-READY-EVIDENCE-DIRS` each family's readiness mirrors `scope.json`'s READY and cites the family's A1 READY record (`readyRecord`, path and SHA-256, equal to the record #1430's terminal record cites); `readyNeeds` is empty. No approved hash changes, so the seal stays `65330c86…` |

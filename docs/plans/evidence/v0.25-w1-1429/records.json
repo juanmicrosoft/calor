@@ -2,10 +2,10 @@
   "schema": "calor.v0.25.w1-family-records/1",
   "issue": 1429,
   "epic": 1425,
-  "scopeVersion": "1.5.0",
+  "scopeVersion": "1.6.0",
   "registerVersion": "1.0.0",
   "independence": "reduced",
-  "note": "W1 documentation records. Not READY records: no 0.25 candidate is frozen, and READY needs the maintainer's claim approval. Each family's status mirrors scope.json readiness (W1 does not change it). Pages and transcripts were checked against main at the PR's base; they must be re-checked on the frozen candidate.",
+  "note": "W1 documentation records. Each family's status mirrors scope.json readiness (W1 does not change it). Since R0 scope amendment 1.6.0 (the post-release write-back under D-READY-EVIDENCE-DIRS) every family is READY. readyRecord cites the family's A1 READY record, which re-checked these pages and transcripts on the candidate d1d7afde and carries the maintainer's claim approval; it replaces the earlier readyNeeds list.",
   "sharedPages": [
     "website/content/guides/csharp-interoperability.mdx",
     "website/content/guides/adding-calor-to-existing-projects.mdx",
@@ -19,7 +19,7 @@
     {
       "family": "F1",
       "issue": 943,
-      "status": "IN_PROGRESS",
+      "status": "READY",
       "docCases": [
         "DOC-F1-01"
       ],
@@ -44,19 +44,15 @@
         "[NotNullWhen] on an out parameter: the guide, adding-Calor table and CHANGELOG said it stays C#; it converts natively with the attribute copied and inert (the out-parameter registry description said the same wrong thing; corrected by F1 PR 2, #1571)",
         "omitted-in in an expression-bodied member preserves the whole member (feature method), not only a statement"
       ],
-      "readyNeeds": [
-        "the frozen 0.25 candidate (0.24 C1 form) and the scope 1.3.0 acceptancePreconditions re-proof on it",
-        "per-case result records for F1-REFOUT-01..08, A1, A2, X-INT-01/05/08 and DOC-F1-01 naming the candidate and current requirementSha256",
-        "W1GuideTranscriptTests and self-check docs passing on the candidate; these transcripts regenerated there if they differ",
-        "witness runs of R-OBL #1496 and R-OBL-RESIDUALS #1503 on the candidate; #1427 at its current version",
-        "the maintainer's claim approval (pull-request review URL) for the pages above, with independence reduced",
-        "a decision on the two converter defects above (fix, or keep the documented limitation)"
-      ]
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "e20b11152d1b218a5ea8827e8f4428ab3243da7b9d72649b4ce09750e133626c"
+      }
     },
     {
       "family": "F2",
       "issue": 906,
-      "status": "IN_PROGRESS",
+      "status": "READY",
       "docCases": [
         "DOC-F2-01"
       ],
@@ -77,19 +73,15 @@
         "the native hole subset excludes decimal, long and whole-number double literals and operators with call operands",
         "verbatim string literals and doubles that do not render as plain digits with a fraction (1e-7, 0.0000001) are not native holes"
       ],
-      "readyNeeds": [
-        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
-        "per-case records for F2-INTERP-01..10, X-INT-04/06/08 and DOC-F2-01 on the candidate",
-        "F2-INTERP-09 corpus counts re-measured on the candidate with submodules",
-        "witness runs of R-TEXT #1497, #1496 and #1503 on the candidate",
-        "W1GuideTranscriptTests and self-check docs passing on the candidate",
-        "the maintainer's claim approval, independence reduced"
-      ]
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f2-906/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "a315d753ad04040ea78e416e7369f7fbd3c03b8f18816fecd21feceb50005d1a"
+      }
     },
     {
       "family": "F3",
       "issue": 847,
-      "status": "IN_PROGRESS",
+      "status": "READY",
       "docCases": [
         "DOC-F3-01",
         "DOC-F3-02"
@@ -109,18 +101,15 @@
       "claimsCorrected": [
         "the bounded slice also excludes ref returns, attributed parameters and value uses outside calls, call arguments, binding initializers, returns and simple assignments"
       ],
-      "readyNeeds": [
-        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
-        "per-case records for F3-LOCAL-01..05, A1, DOC-F3-01/02 on the candidate",
-        "witness runs of #1496 and #1503 on the candidate",
-        "W1GuideTranscriptTests and self-check docs passing on the candidate",
-        "the maintainer's claim approval, independence reduced"
-      ]
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f3-847/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "5bab93c8dac95630e25024e82f40aa66e2b4854f6234e39bdb31f59067611338"
+      }
     },
     {
       "family": "F4",
       "issue": 1139,
-      "status": "IN_PROGRESS",
+      "status": "READY",
       "docCases": [
         "DOC-F4-01"
       ],
@@ -138,18 +127,15 @@
       "claimsCorrected": [
         "docs/cli/feature-check.md said yield-return is not supported; iterator methods are Full and iterator accessors are iterator-accessor (NotSupported)"
       ],
-      "readyNeeds": [
-        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
-        "per-case records for F4-ITER-01..04, X-INT-03 and DOC-F4-01 on the candidate",
-        "F4-ITER-04 measured, or an approved amendment",
-        "W1GuideTranscriptTests and self-check docs passing on the candidate",
-        "the maintainer's claim approval, independence reduced"
-      ]
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f4-1139/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "a18ab6fd5a7857b812b7b5f473c1cdee96ab7feac7095a8a94ef18cd7a0359f0"
+      }
     },
     {
       "family": "F5",
       "issue": 1132,
-      "status": "IN_PROGRESS",
+      "status": "READY",
       "docCases": [
         "DOC-F5-01"
       ],
@@ -170,18 +156,15 @@
       "registryGaps": [
         "multidim-array says 'fully supported' (Full) while array-element-block shapes are preserved"
       ],
-      "readyNeeds": [
-        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
-        "per-case records for F5-ARRAY-01..06, X-INT-02/07 and DOC-F5-01 on the candidate",
-        "witness runs of #1496 and #1503 on the candidate, and an F5-ARRAY-06 boundary record",
-        "W1GuideTranscriptTests and self-check docs passing on the candidate",
-        "the maintainer's claim approval, independence reduced"
-      ]
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f5-1132/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "27d6da9fe0e6ca9e2caad28361c8059b909eaed8d829f841a0cbed43a9ebcee2"
+      }
     },
     {
       "family": "F6",
       "issue": 1144,
-      "status": "IN_PROGRESS",
+      "status": "READY",
       "docCases": [
         "DOC-F6-01",
         "DOC-F6-02"
@@ -208,12 +191,10 @@
         "MCP diagnostics: calor_convert issues[], calor_migrate perFile[].errors/warnings, calor_batch files[].issues",
         "post-validation-fallback is a mechanism label, not a feature-check registry entry"
       ],
-      "readyNeeds": [
-        "the frozen 0.25 candidate and the acceptancePreconditions re-proof",
-        "per-case records for F6-REPORT-01..13 and DOC-F6-01/02 on the candidate, including the per-surface matrix re-run",
-        "W1GuideTranscriptTests and self-check docs passing on the candidate",
-        "the maintainer's claim approval, independence reduced"
-      ]
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f6-1144/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "b98afbabb1354525a711c6a9fc4675eee1bc096a07837fdac8582cc0cedf0fe4"
+      }
     }
   ]
 }

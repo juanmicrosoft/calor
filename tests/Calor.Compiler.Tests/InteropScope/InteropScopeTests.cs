@@ -27,7 +27,7 @@ public class InteropScopeTests
     [MemberData(nameof(Positives))]
     public void PositiveControlPasses(string name)
     {
-        var scope = Scope();
+        var scope = name == "committed packet" ? Scope() : Unready(Scope());
         var violations = Run(scope, PositiveSetups[name](scope));
         Assert.True(violations.Count == 0, EvidenceContractTests.Describe(violations));
     }
@@ -66,7 +66,7 @@ public class InteropScopeTests
     [Fact]
     public void AmendmentsThatRetainRemoveRegisterAndChangeCasesPass()
     {
-        var scope = Scope();
+        var scope = Unready(Scope());
         Remove(scope["cases"]!, "F5-ARRAY-02");
         var added = Case(scope, "F6-REPORT-10").DeepClone();
         added["id"] = "F6-REPORT-99";
@@ -90,10 +90,29 @@ public class InteropScopeTests
     [MemberData(nameof(Mutations))]
     public void NegativeControlFailsWithItsCode(string mutation)
     {
-        var scope = Scope();
+        var scope = Unready(Scope());
         var (code, apply) = Controls[mutation];
         var violations = Run(scope, apply(scope) ?? ReadRepo);
         Assert.True(violations.Count > 0 && violations.All(x => x.Code == code), $"{mutation}: {EvidenceContractTests.Describe(violations)}");
+    }
+
+    /// <summary>The written-back READY records (1.6.0) on the committed packet: a later amendment that changes one F4 case
+    /// makes exactly F4's record stale (S007), and nothing else fires.</summary>
+    [Fact]
+    public void WrittenBackReadyGoesStaleOnALaterCaseChange()
+    {
+        var scope = Scope();
+        Assert.All(scope["families"]!.AsArray(), f => Assert.Equal("READY", f!["readiness"]!["status"]!.GetValue<string>()));
+        var from = Case(scope, "F4-ITER-01")["expected"]!.GetValue<string>();
+        var to = from == "rejected" ? "native" : "rejected";
+        Case(scope, "F4-ITER-01")["expected"] = to;
+        var a = Amendment(scope, removed: null);
+        a["changes"] = new JsonArray(Change("F4-ITER-01", "expected", from, to));
+        scope["amendments"]!.AsArray().Add(a);
+        scope["scopeVersion"] = Last(scope);
+        var violations = Run(scope);
+        Assert.True(violations.Count > 0 && violations.All(x => x.Code == "S007" && x.Subject == "F4"), EvidenceContractTests.Describe(violations));
+        Assert.Contains(violations, x => x.Message.Contains("stale", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -342,6 +361,23 @@ public class InteropScopeTests
     {
         var full = Path.Combine(EvidenceContractTests.RepoRoot(), path);
         return File.Exists(full) ? File.ReadAllBytes(full) : null;
+    }
+
+    /// <summary>
+    /// R0 scope 1.6.0 wrote every family's readiness back as READY (D-READY-EVIDENCE-DIRS). A control that adds, changes
+    /// or removes a case also makes those records stale (S007), correctly. To isolate each control's own code, the controls
+    /// run on the packet with readiness as it stood before the write-back (IN_PROGRESS, with a branch);
+    /// <see cref="WrittenBackReadyGoesStaleOnALaterCaseChange"/> covers staleness of the written-back records.
+    /// </summary>
+    private static JsonNode Unready(JsonNode scope)
+    {
+        foreach (var f in scope["families"]!.AsArray())
+            f!["readiness"] = new JsonObject
+            {
+                ["status"] = "IN_PROGRESS", ["branch"] = $"pre-write-back control ({f["id"]!.GetValue<string>()})",
+                ["evidence"] = f["readiness"]!["evidence"]!.DeepClone(),
+            };
+        return scope;
     }
 
     private static JsonNode Scope() =>
