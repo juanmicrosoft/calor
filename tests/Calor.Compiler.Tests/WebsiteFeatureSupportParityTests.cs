@@ -15,10 +15,13 @@ namespace Calor.Compiler.Tests;
 /// first cell;</item>
 /// <item>prose: <c>`calor feature-check X` reports **L**</c>, <c>`X` is L</c>, or <c>`X` (L)</c>;</item>
 /// <item>in a fenced block, a <c>"feature"</c>/<c>"name"</c> value followed by a <c>"supportLevel"</c>
-/// value (the command's JSON output).</item>
+/// value (the command's JSON output);</item>
+/// <item>the converter's warning text, quoted anywhere: <c>Feature 'X' is partially supported</c>
+/// (or <c>fully</c>/<c>not supported</c>, <c>requires manual intervention</c>).</item>
 /// </list>
-/// <para>Guard against unread claims: on any line that names a registry feature in backticks or
-/// mentions <c>feature-check</c>/<c>supportLevel</c>, and on every line of a fence that does, each
+/// <para>Guard against unread claims: on any line that names a registry feature (backticked, quoted,
+/// bracketed, or any hyphenated registry name) or mentions <c>feature-check</c>/<c>supportLevel</c>,
+/// and on every line of a fence that does, each
 /// level word (Full, Partial, NotSupported, ManualRequired, in any case) and each support phrase
 /// ("fully supported", "not supported", "full support", ...) must belong to a claim. Anything else
 /// fails unless listed in <see cref="NotClaims"/>. Per-page claim counts are pinned.</para>
@@ -44,11 +47,15 @@ public sealed class WebsiteFeatureSupportParityTests
     [
         ("cli/feature-check.mdx", "0.25 converter (not yet released) reports them. `Partial` means some shapes",
             "defines the word Partial"),
+        ("guides/csharp-interoperability.mdx",
+            "| `yield` in a property or indexer getter; partial properties | Member preserved | `iterator-accessor`, `partial-property` |",
+            "'partial properties' is the C# construct (partial-property), not a support level"),
     ];
 
     /// <summary>Claims per page. A changed count means a claim was added, removed, or no longer parses.</summary>
     private static readonly IReadOnlyDictionary<string, int> PinnedClaims = new Dictionary<string, int>
     {
+        ["cli/convert.mdx"] = 1,
         ["cli/feature-check.mdx"] = 15,
         ["guides/csharp-interoperability.mdx"] = 1,
         ["syntax-reference/string-operations.mdx"] = 1,
@@ -66,9 +73,18 @@ public sealed class WebsiteFeatureSupportParityTests
     private static readonly Regex LevelWord = new(@"(?<![\w-])(?:" + Levels + @")(?![\w-])");
     private static readonly Regex AnyCaseLevelWord = new(@"(?<![\w-])(?:" + Levels + @")(?![\w-])", RegexOptions.IgnoreCase);
     private static readonly Regex SupportPhrase = new(
-        @"\b(?:fully|partially|not|partly)\s+supported\b|\b(?:full|partial|no)\s+support\b|\bmanual(?:ly)?\s+required\b",
+        @"\b(?:fully|partially|not|partly)\s+supported\b|\b(?:full|partial|no)\s+support\b|\bmanual(?:ly)?\s+required\b" +
+        @"|\brequires\s+manual\s+intervention\b",
+        RegexOptions.IgnoreCase);
+    // The converter's own warning text (ConversionContext): "Feature 'X' is partially supported",
+    // "... is not supported", "... requires manual intervention". A page quoting it states a level.
+    private static readonly Regex Diagnostic = new(
+        @"Feature '(?<f>[a-z0-9-]+)' (?:is (?<p>fully|partially|not) supported|(?<m>requires manual intervention))",
         RegexOptions.IgnoreCase);
     private static readonly Regex Backticked = new("`(?<n>[a-z0-9-]+)`");
+    // A registry name written inside other code or quotes: 'out-var', [out-var], "out-var".
+    private static readonly Regex Quoted = new(@"['\[""](?<n>[a-z0-9-]+)['\]""]");
+    private static readonly Regex HyphenatedToken = new(@"(?<![\w-])(?<n>[a-z0-9]+(?:-[a-z0-9]+)+)(?![\w-])");
     private static readonly Regex LevelOption = new(@"--level\s+\S+");
     private static readonly Regex TableRule = new(@"^\|(?:\s*:?-+:?\s*\|)+$");
 
@@ -115,6 +131,8 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/feature-check.mdx", "| `out-var` | Partial |", "| `out-var` | Mostly |", "out-var")]
     [InlineData("syntax-reference/string-operations.mdx", "reports **Partial**", "reports **Full**", "string-interpolation")]
     [InlineData("guides/csharp-interoperability.mdx", "reports **Partial**", "reports **NotSupported**", "string-interpolation")]
+    [InlineData("cli/convert.mdx", "Feature 'out-var' is partially supported", "Feature 'out-var' is fully supported", "out-var")]
+    [InlineData("cli/convert.mdx", "Feature 'out-var' is partially supported", "Feature 'out-var' requires manual intervention", "out-var")]
     public void AWrongSupportLevelOnAPageFailsTheCheck(string page, string from, string to, string feature)
     {
         var text = File.ReadAllText(PagePath(page));
@@ -148,6 +166,9 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `iterator-accessor` has Full support.")]
     [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `partial-property` is fully supported.")]
     [InlineData("cli/feature-check.mdx", "calor feature-check --list\n", "calor feature-check --list\nSupport level: Full\n")]
+    [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `iterator-accessor` is full.")]
+    [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `iterator-accessor` is FULL.")]
+    [InlineData("cli/convert.mdx", "`[out-var] Feature 'out-var' is partially supported…`", "`[out-var] out-var is Full…`")]
     public void ALevelInAnUnrecognizedShapeFailsTheCheck(string page, string from, string to)
     {
         var text = File.ReadAllText(PagePath(page));
@@ -286,9 +307,19 @@ public sealed class WebsiteFeatureSupportParityTests
                     found++;
                 }
 
+            // A quoted converter warning counts its phrase as the claim's level word.
+            foreach (Match m in Diagnostic.Matches(line))
+            {
+                var level = m.Groups["m"].Success ? "ManualRequired"
+                    : m.Groups["p"].Value.ToLowerInvariant() switch { "fully" => "Full", "partially" => "Partial", _ => "NotSupported" };
+                claims.Add(new Claim(page, i + 1, m.Groups["f"].Value, level, "diagnostic"));
+                found++;
+            }
+
             if (!MentionsFeatures(line))
                 continue;
-            var stated = LevelWord.Matches(LevelOption.Replace(line, "")).Count + SupportPhrase.Matches(line).Count;
+            // Any case: "`x` is full" states a level as much as "`x` is Full" does.
+            var stated = AnyCaseLevelWord.Matches(LevelOption.Replace(line, "")).Count + SupportPhrase.Matches(line).Count;
             if (stated > found && !NotClaims.Any(n => n.Page == page && n.Line == line.Trim()))
                 unattributed.Add($"{page}:{i + 1}: a support level in a form the parity check does not read: {line.Trim()}");
         }
@@ -317,6 +348,13 @@ public sealed class WebsiteFeatureSupportParityTests
                 feature = null;
                 found = 1;
             }
+            foreach (Match m in Diagnostic.Matches(line))
+            {
+                var quoted = m.Groups["m"].Success ? "ManualRequired"
+                    : m.Groups["p"].Value.ToLowerInvariant() switch { "fully" => "Full", "partially" => "Partial", _ => "NotSupported" };
+                claims.Add(new Claim(page, start + k + 1, m.Groups["f"].Value, quoted, "diagnostic"));
+                found++;
+            }
             var stated = AnyCaseLevelWord.Matches(LevelOption.Replace(line, "")).Count + SupportPhrase.Matches(line).Count
                          + (level.Success && found == 0 ? 1 : 0);
             if (stated > found)
@@ -327,7 +365,8 @@ public sealed class WebsiteFeatureSupportParityTests
     private static bool MentionsFeatures(string line) =>
         line.Contains("feature-check", StringComparison.Ordinal)
         || line.Contains("supportLevel", StringComparison.Ordinal)
-        || Backticked.Matches(line).Any(m => FeatureSupport.GetFeatureInfo(m.Groups["n"].Value) is not null)
+        || new[] { Backticked, Quoted, HyphenatedToken }.Any(r =>
+            r.Matches(line).Any(m => FeatureSupport.GetFeatureInfo(m.Groups["n"].Value) is not null))
         || FenceName.Matches(line).Any(m => FeatureSupport.GetFeatureInfo(m.Groups["f"].Value) is not null);
 
     /// <summary>The first backticked name of each bullet under "Known gaps between the registry".</summary>
