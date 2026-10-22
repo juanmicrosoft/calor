@@ -219,12 +219,17 @@ git submodule update --init && dotnet test
 
 ### Round-Trip Harness Lane (~30 min)
 
-Matches the `roundtrip-verification` CI job end-to-end:
+Matches the `roundtrip-verification` CI job end-to-end. CI runs two legs in
+parallel, and each blocks on its own floors (#1586):
 
 ```bash
 git submodule update --init
-dotnet run --project tools/Calor.RoundTrip.Harness -- run --all
+dotnet run --project tools/Calor.RoundTrip.Harness -- run --all                  # Lossy leg
+dotnet run --project tools/Calor.RoundTrip.Harness -- run --all --mode default \
+  --output ./conversion-reports-default/                                          # `calor convert` defaults
 ```
+
+See `bench/corpus/README.md` ("Two harness legs") for what each leg converts with.
 
 `run --all` iterates every project in `ProjectConfigs.KnownProjects` against
 the vendored `bench/corpus/` corpus. Pass a single project name

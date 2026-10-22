@@ -16,6 +16,10 @@ Design notes:
 - Projects present in the baseline but missing from the current run are flagged
   as MISSING (usually means the harness crashed for that corpus). New projects
   in the current run that aren't in the baseline are ignored (no comparison).
+- The committed baseline measures the Lossy harness leg. Reports from the
+  default-mode leg (#1586, `"conversion_mode": "default"`) are skipped so they
+  are never compared against Lossy numbers. Reports without the field predate
+  #1586 and are Lossy.
 
 Usage:
     python3 scripts/roundtrip_delta.py \\
@@ -64,6 +68,8 @@ def load_reports(reports_dir: str) -> dict[str, dict[str, Any]]:
             continue
         project = report.get("project")
         if not project:
+            continue
+        if report.get("conversion_mode", "lossy") != "lossy":
             continue
         rt = report.get("round_trip") or {}
         fidelity = report.get("fidelity") or {}
@@ -280,6 +286,20 @@ def _self_test() -> int:
         md = format_markdown(deltas)
         check("Serilog" in md and "MediatR" in md,
               "case 6: both projects should appear in output")
+
+    # Case 7 (#1586): default-mode reports are never compared with the Lossy
+    # baseline; a missing conversion_mode means a pre-#1586 Lossy report.
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, mode in (("MediatR", None), ("Serilog", "default"), ("FluentValidation", "lossy")):
+            doc = {"project": name, "verdict": "pass",
+                   "round_trip": {"total": 10, "passed": 10}}
+            if mode is not None:
+                doc["conversion_mode"] = mode
+            with open(os.path.join(tmp, f"{name}-roundtrip.json"), "w") as fh:
+                json.dump(doc, fh)
+        loaded = load_reports(tmp)
+        check(sorted(loaded) == ["FluentValidation", "MediatR"],
+              f"case 7: expected only lossy reports, got {sorted(loaded)}")
 
     if failures:
         for f_msg in failures:

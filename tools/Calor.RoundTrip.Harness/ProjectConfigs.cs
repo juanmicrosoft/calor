@@ -16,6 +16,14 @@ namespace Calor.RoundTrip.Harness;
 /// retargeting, so the vendored subjects stay verbatim. The corpus's own
 /// <c>global.json</c> SDK pins are neutralized in the working copy so every subject
 /// builds on Calor's pinned SDK (see <c>RoundTripPipeline</c>).
+///
+/// Floors (#1586): <c>Minimum*Fraction</c> gate the historical Lossy leg;
+/// <c>DefaultModeMinimum*Fraction</c> gate the default-mode leg, which converts with
+/// exactly the options <c>calor convert</c> builds with no flags. The default-mode
+/// floors are written as kept-files / candidate-files and equal what that leg
+/// measured on main when it landed (2026-10-22), so losing a single file fails
+/// the leg. Raise them as the converter improves; lowering one needs a reason in
+/// the PR that does it.
 /// </summary>
 public static class ProjectConfigs
 {
@@ -65,6 +73,8 @@ public static class ProjectConfigs
             TargetFramework = "net10.0",
             MinimumCoverageFraction = 0.625,
             MinimumNativeFraction = 0.625,
+            DefaultModeMinimumCoverageFraction = 5.0 / 5,
+            DefaultModeMinimumNativeFraction = 5.0 / 5,
         };
     }
 
@@ -84,6 +94,8 @@ public static class ProjectConfigs
             TargetFramework = "net10.0",
             MinimumCoverageFraction = 0.25,
             MinimumNativeFraction = 0.25,
+            DefaultModeMinimumCoverageFraction = 1.0 / 1,
+            DefaultModeMinimumNativeFraction = 1.0 / 1,
         };
     }
 
@@ -117,6 +129,8 @@ public static class ProjectConfigs
             + "-p:VSTestCLIRunSettings=xUnit.ParallelizeTestCollections=false",
         MinimumCoverageFraction = 0.55,
         MinimumNativeFraction = 0.40,
+        DefaultModeMinimumCoverageFraction = 8.0 / 32,
+        DefaultModeMinimumNativeFraction = 5.0 / 32,
         // Preserve the historical classification (jobs 96339235881 and 96334195356).
         // #1448 also observed a raced MaxTypesClosing=100 despite this test setting 0.
         // Strict fixed-attempt evidence still rejects every failure, including this name;
@@ -151,6 +165,8 @@ public static class ProjectConfigs
         ],
         MinimumCoverageFraction = 0.30,
         MinimumNativeFraction = 0.25,
+        DefaultModeMinimumCoverageFraction = 14.0 / 112,
+        DefaultModeMinimumNativeFraction = 10.0 / 112,
     };
 
     // FluentValidation — pinned 12.1.1 (71b3c60c), Apache-2.0. Library targets
@@ -168,5 +184,7 @@ public static class ProjectConfigs
         ExtraBuildProperties = "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
         MinimumCoverageFraction = 0.50,
         MinimumNativeFraction = 0.48,
+        DefaultModeMinimumCoverageFraction = 64.0 / 139,
+        DefaultModeMinimumNativeFraction = 5.0 / 139,
     };
 }

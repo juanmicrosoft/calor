@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Testing
+
+- **The round-trip harness now also tests the converter the way `calor convert` runs it.**
+  Before, the harness only converted with Lossy options. Those options allow recorded
+  semantic losses (substitutions or drops the converter reports) and turn on passthrough.
+  A plain `calor convert` uses Lossless options, which refuse such losses. The harness
+  converts each library file, swaps it into the project, and reruns the project's own
+  tests. A new `--mode default` leg does this with exactly the options `calor convert`
+  builds with no flags. A test fails if the harness and the CLI options ever differ. (#1586)
+- **CI runs both legs in parallel, and each one blocks on its own floors.** A floor is
+  the minimum fraction of library files the leg must keep converted. The default leg's
+  floors equal what it measured when it landed: MediatR 8 of 32 files (25.0%), Serilog
+  14 of 112 (12.5%) and FluentValidation 64 of 139 (46.0%). On the same commit, the
+  Lossy leg kept 71.9%, 59.8% and 71.9%. Losing one file from the default leg now fails
+  CI. One PR comment shows both legs side by side.
+- **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
+  now describes both legs and lists each leg's floors.
+
 ## [0.25.0] - 2026-10-20
 
 Calor 0.25 is an interoperability release. It changes how the C# → Calor converter

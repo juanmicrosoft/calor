@@ -13,6 +13,15 @@ namespace Calor.Compiler.Commands;
 /// </summary>
 public static class ConvertCommand
 {
+    /// <summary>
+    /// Test-only observer (#1586): receives the exact <see cref="ConversionOptions"/> a
+    /// C# → Calor <c>convert</c> run hands to the converter, after every handler-side
+    /// adjustment. The round-trip harness's default-mode parity test uses it to compare
+    /// a real flagless CLI run with the options the harness converts with. Async-local,
+    /// so one test's observer never sees another invocation.
+    /// </summary>
+    internal static readonly AsyncLocal<Action<ConversionOptions>?> ConversionOptionsObserver = new();
+
     public static Command Create()
     {
         var inputArgument = new Argument<FileInfo>(
@@ -461,6 +470,7 @@ public static class ConvertCommand
         // with the rest of the human-readable report, so stdout stays one
         // JSON document. Text mode keeps them on stdout.
         conversionOptions.StatusWriter = envelope != null ? Console.Error : null;
+        ConversionOptionsObserver.Value?.Invoke(conversionOptions);
         var converter = new CSharpToCalorConverter(conversionOptions);
 
         using var timeoutCts = timeoutSeconds > 0

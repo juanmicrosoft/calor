@@ -19,6 +19,19 @@ public static class ReportGenerator
         Converters = { new JsonStringEnumConverter() },
     };
 
+    /// <summary>Stable lower-case leg name used in JSON reports, file names and CI (#1586).</summary>
+    public static string ConversionModeName(HarnessConversionMode mode) => mode switch
+    {
+        HarnessConversionMode.Default => "default",
+        _ => "lossy",
+    };
+
+    private static string ConversionModeDescription(HarnessConversionMode mode) => mode switch
+    {
+        HarnessConversionMode.Default => "the options `calor convert` builds with no flags: Lossless, all preprocessor branches preserved, passthrough off",
+        _ => "Lossy, active preprocessor branch per project context, passthrough on",
+    };
+
     public static string GenerateMarkdown(RoundTripReport report)
     {
         var sb = new StringBuilder();
@@ -26,6 +39,7 @@ public static class ReportGenerator
 
         sb.AppendLine($"# {report.ProjectName} — Round-Trip Verification Report");
         sb.AppendLine();
+        sb.AppendLine($"**Conversion mode:** {ConversionModeName(report.ConversionMode)} ({ConversionModeDescription(report.ConversionMode)})");
         sb.AppendLine($"**Calor Version:** {report.CalorVersion}");
         sb.AppendLine($"**Date:** {report.StartedAt:yyyy-MM-dd}");
         sb.AppendLine($"**Duration:** {report.Duration.TotalSeconds:F1}s");
@@ -312,6 +326,7 @@ public static class ReportGenerator
         {
             report_schema_version = 2,
             project = report.ProjectName,
+            conversion_mode = ConversionModeName(report.ConversionMode),
             calor_version = report.CalorVersion,
             timestamp = report.StartedAt.ToString("o"),
             duration_seconds = report.Duration.TotalSeconds,
