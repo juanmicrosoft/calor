@@ -1051,7 +1051,7 @@
     {
       "version": "1.0.4",
       "dateUtc": "2026-10-22T00:00:00Z",
-      "pr": 1626,
+      "pr": 1627,
       "justification": "Post-release readiness write-back under D-READY-EVIDENCE-DIRS (R0 scope amendment 1.6.0). Consumes R0 scope 1.6.0, and each family's readiness mirrors scope.json's READY. readyRecord cites the family's A1 READY record by path and SHA-256, and readyNeeds is empty because that record meets every listed need. No approved evidence, fixture, results file or corpus count changes, so the approval seal stays the 1.0.3 seal.",
       "approvalSeal": "65330c86baba0be8ebc1fb9bff97c6e6c1e77a2abd24502314faf723d5393f15"
     }
