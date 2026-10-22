@@ -35,6 +35,13 @@ public sealed record MemberVerdict
     public int Inputs { get; init; }
     public List<string> Witnesses { get; init; } = [];
 
+    /// <summary>For a difference: a hash of every differing stable input with both observations in full. A baseline
+    /// entry matches only this exact fingerprint, so any additional or changed difference fails.</summary>
+    public string? Fingerprint { get; init; }
+
+    /// <summary>The member was limited to its first <c>LimitedAt</c> inputs because input <c>LimitedAt</c> timed out.</summary>
+    public int? LimitedAt { get; init; }
+
     [JsonIgnore]
     public string Key => Type + "::" + Member;
 }
@@ -51,7 +58,22 @@ public sealed record OracleOptions
     public string SeedKey { get; init; } = "";
 
     public int MaxWitnesses { get; init; } = 3;
+
+    /// <summary>Members limited to their first N inputs, because input N timed out on an earlier attempt.</summary>
+    public IReadOnlyDictionary<string, int> Limits { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>
+    /// Child-process mode: called on the first member timeout with (member key, inputs finished). It must end the
+    /// process, because the abandoned thread cannot be stopped and would disturb every later observation; the
+    /// parent restarts the file with that member limited. When null (in-process use, for example tests), the
+    /// oracle restarts the comparison itself in fresh contexts.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Action<string, int>? OnTimeout { get; init; }
 }
+
+/// <summary>One run of a single input of a member, from clean state, to attribute a timeout.</summary>
+public sealed record ProbeResult(bool Finished, double Seconds, string? Observation);
 
 /// <summary>
 /// One build of a subject: the emitted assembly image plus where its dependencies live. Every

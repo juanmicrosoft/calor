@@ -19,6 +19,9 @@ public sealed class SubjectBuild
 {
     private readonly CSharpCompilation _compilation;
     private readonly ImmutableArray<ISourceGenerator> _generators;
+    private readonly ImmutableArray<ResourceDescription> _resources;
+    private readonly ImmutableArray<AdditionalText> _additionalFiles;
+    private readonly AnalyzerConfigOptionsProvider _generatorOptions;
 
     public string ProjectFile { get; }
     public string TargetFramework { get; }
@@ -26,7 +29,7 @@ public sealed class SubjectBuild
     public IReadOnlyDictionary<string, string> DependencyPaths { get; }
 
     /// <summary>Everything a child process needs to rebuild the same compilation without MSBuild.</summary>
-    public sealed record Spec(string ProjectFile, string TargetFramework, string[] CompilerArguments, Dictionary<string, string> DependencyPaths);
+    public sealed record Spec(string ProjectFile, string TargetFramework, string[] CompilerArguments, Dictionary<string, string> DependencyPaths, string? TargetPath = null);
 
     public Spec BuildSpec { get; }
 
@@ -35,9 +38,13 @@ public sealed class SubjectBuild
 
     public int GeneratorCount => _generators.Length;
 
-    private SubjectBuild(Spec spec, CSharpCompilation compilation, ImmutableArray<ISourceGenerator> generators)
+    private SubjectBuild(Spec spec, CSharpCompilation compilation, ImmutableArray<ISourceGenerator> generators,
+        ImmutableArray<ResourceDescription> resources, ImmutableArray<AdditionalText> additionalFiles, AnalyzerConfigOptionsProvider generatorOptions)
     {
         BuildSpec = spec;
+        _resources = resources;
+        _additionalFiles = additionalFiles;
+        _generatorOptions = generatorOptions;
         ProjectFile = spec.ProjectFile;
         TargetFramework = spec.TargetFramework;
         _compilation = compilation;
@@ -69,9 +76,9 @@ public sealed class SubjectBuild
 
         var neverFile = Path.Combine(projectDir, "obj", ".calor-oracle-1587.never");
         var (exit, stdout, stderr) = await ProcessRunner.RunAsync(config.DotnetPath,
-            $"msbuild \"{projectFile}\" -target:ResolveReferences;CoreCompile {common} -p:BuildProjectReferences=false "
+            $"msbuild \"{projectFile}\" -target:ResolveReferences;PrepareResources;Compile {common} -p:BuildProjectReferences=false "
             + $"-p:SkipCompilerExecution=true -p:ProvideCommandLineArgs=true \"-p:NonExistentFile={neverFile}\" "
-            + "-getItem:CscCommandLineArgs,ReferencePath,RuntimeCopyLocalItems -nodeReuse:false -verbosity:quiet",
+            + "-getItem:CscCommandLineArgs,ReferencePath,RuntimeCopyLocalItems -getProperty:TargetPath -nodeReuse:false -verbosity:quiet",
             projectDir, config.BuildTimeout, env, cancellationToken);
         if (exit != 0)
             throw new InvalidOperationException($"Could not capture the compiler command line ({exit}):\n{Tail(stdout + stderr)}");
@@ -81,7 +88,9 @@ public sealed class SubjectBuild
         var args = Identities(items, "CscCommandLineArgs").ToArray();
         if (args.Length == 0)
             throw new InvalidOperationException("MSBuild reported no compiler arguments.");
-        return FromSpec(new Spec(projectFile, tfm, args, DependencyMap(items, projectDir)), cancellationToken);
+        var targetPath = json.RootElement.TryGetProperty("Properties", out var properties) && properties.TryGetProperty("TargetPath", out var tp)
+            ? tp.GetString() : null;
+        return FromSpec(new Spec(projectFile, tfm, args, DependencyMap(items, projectDir), targetPath), cancellationToken);
     }
 
     /// <summary>Rebuilds the compilation from a captured compiler command line (no MSBuild).</summary>
@@ -120,7 +129,85 @@ public sealed class SubjectBuild
             })
             .SelectMany(r => r.GetGenerators(LanguageNames.CSharp))
             .ToImmutableArray();
-        return new SubjectBuild(spec, compilation, generators) { GeneratorLoadFailures = failures };
+        var additional = parsed.AdditionalFiles.Select(f => (AdditionalText)new FileText(Path.GetFullPath(f.Path, projectDir))).ToImmutableArray();
+        var configs = parsed.AnalyzerConfigPaths.Select(path => AnalyzerConfig.Parse(File.ReadAllText(path), path)).ToList();
+        var provider = new ConfigOptionsProvider(AnalyzerConfigSet.Create(configs));
+        return new SubjectBuild(spec, compilation, generators, parsed.ManifestResources, additional, provider) { GeneratorLoadFailures = failures };
+    }
+
+    /// <summary>
+    /// Checks the in-process original against the assembly <c>dotnet build</c> produced: the same type definitions,
+    /// the same member names per type, and the same manifest resources. Returns a description of the first mismatch,
+    /// or null. (Signing is dropped in-process, so identities are compared by name.)
+    /// </summary>
+    public string? VerifyAgainstRealBuild(ArmImage original)
+    {
+        if (BuildSpec.TargetPath is not { } path || !File.Exists(path))
+            return $"the dotnet build output '{BuildSpec.TargetPath}' was not found";
+        var real = Shape(File.ReadAllBytes(path));
+        var ours = Shape(original.Image);
+        var missing = real.Except(ours).Take(3).ToList();
+        var extra = ours.Except(real).Take(3).ToList();
+        return missing.Count == 0 && extra.Count == 0 ? null
+            : $"only in the dotnet build: [{string.Join("; ", missing)}]; only in-process: [{string.Join("; ", extra)}]";
+    }
+
+    private static HashSet<string> Shape(byte[] image)
+    {
+        using var pe = new System.Reflection.PortableExecutable.PEReader(new MemoryStream(image));
+        var md = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
+        var shape = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var handle in md.TypeDefinitions)
+        {
+            var type = md.GetTypeDefinition(handle);
+            var name = md.GetString(type.Namespace) + "." + md.GetString(type.Name);
+            // Compiler-generated and file-local type names embed hashes of file paths (generated files live elsewhere
+            // in-process), so they are not part of the compared shape; their declaring source types are.
+            if (name.Contains('<'))
+                continue;
+            shape.Add("type " + name);
+            foreach (var m in type.GetMethods())
+                shape.Add($"method {name}::{md.GetString(md.GetMethodDefinition(m).Name)}");
+            foreach (var f in type.GetFields())
+                shape.Add($"field {name}::{md.GetString(md.GetFieldDefinition(f).Name)}");
+        }
+        foreach (var r in md.ManifestResources)
+            shape.Add("resource " + md.GetString(md.GetManifestResource(r).Name));
+        return shape;
+    }
+
+    private sealed class FileText(string path) : AdditionalText
+    {
+        public override string Path { get; } = path;
+
+        public override Microsoft.CodeAnalysis.Text.SourceText? GetText(CancellationToken cancellationToken = default) =>
+            File.Exists(Path) ? Microsoft.CodeAnalysis.Text.SourceText.From(File.ReadAllText(Path), Encoding.UTF8) : null;
+    }
+
+    /// <summary>The project's .editorconfig / .globalconfig options, as the compiler hands them to generators.</summary>
+    private sealed class ConfigOptionsProvider(AnalyzerConfigSet set) : AnalyzerConfigOptionsProvider
+    {
+        private readonly Options _global = new(set.GlobalConfigOptions.AnalyzerOptions);
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => For(tree.FilePath);
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => For(textFile.Path);
+
+        private Options For(string path)
+        {
+            var merged = new Dictionary<string, string>(set.GlobalConfigOptions.AnalyzerOptions, StringComparer.OrdinalIgnoreCase);
+            foreach (var (k, v) in set.GetOptionsForSourcePath(path).AnalyzerOptions)
+                merged[k] = v;
+            return new Options(merged);
+        }
+
+        private sealed class Options(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+        {
+            public override bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? value) =>
+                values.TryGetValue(key, out value);
+        }
     }
 
     /// <summary>The configured target framework when the project declares it, else the newest .NET (Core) one, else the first.</summary>
@@ -187,25 +274,27 @@ public sealed class SubjectBuild
             var old = compilation.SyntaxTrees.Single(t => PathComparer.Equals(Path.GetFullPath(t.FilePath), path));
             compilation = compilation.ReplaceSyntaxTree(old, CSharpSyntaxTree.ParseText(text, ParseOptions, old.FilePath, Encoding.UTF8, cancellationToken));
         }
+        var generatorErrors = new List<string>();
         if (_generators.Length > 0)
         {
-            var driver = CSharpGeneratorDriver.Create(_generators, parseOptions: ParseOptions, optionsProvider: null);
-            driver.RunGeneratorsAndUpdateCompilation(compilation, out var generated, out _, cancellationToken);
+            var driver = CSharpGeneratorDriver.Create(_generators, _additionalFiles, ParseOptions, _generatorOptions);
+            driver.RunGeneratorsAndUpdateCompilation(compilation, out var generated, out var diagnostics, cancellationToken);
             compilation = (CSharpCompilation)generated;
+            generatorErrors.AddRange(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => "generator: " + d));
         }
         using var stream = new MemoryStream();
-        var result = compilation.Emit(stream, cancellationToken: cancellationToken);
-        errors = result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d.ToString()).Take(10).ToList();
-        return result.Success ? new ArmImage(name, stream.ToArray(), DependencyPaths) : null;
+        var result = compilation.Emit(stream, manifestResources: _resources, cancellationToken: cancellationToken);
+        errors = generatorErrors.Concat(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.ToString())).Take(10).ToList();
+        return result.Success && generatorErrors.Count == 0 ? new ArmImage(name, stream.ToArray(), DependencyPaths) : null;
     }
 
     /// <summary>
-    /// The types a swapped file can affect: every type declared in the file (any accessibility, so an
-    /// internal helper reaches the public types that use it), plus the types declared in any other file
-    /// that mentions one of those type names. Names are CLR metadata names.
+    /// The types driven for a swapped file, as CLR metadata names. <c>all</c> (the default): every type of the
+    /// project, because a change reaches behavior through any chain of callers. <c>dependents</c>: the types the file
+    /// declares plus those of every file that mentions one of their names (one textual hop). <c>declared</c>: only
+    /// the file's own types. Types the converted file adds are always included.
     /// </summary>
-    public IReadOnlyList<string> AffectedTypes(string path, string? replacementText, bool includeDependents)
+    public IReadOnlyList<string> AffectedTypes(string path, string? replacementText, string scope)
     {
         var tree = Trees[path];
         var declared = DeclaredTypes(_compilation, tree).ToHashSet(StringComparer.Ordinal);
@@ -214,18 +303,24 @@ public sealed class SubjectBuild
             var swapped = _compilation.ReplaceSyntaxTree(tree, CSharpSyntaxTree.ParseText(replacementText, ParseOptions, tree.FilePath, Encoding.UTF8));
             declared.UnionWith(DeclaredTypes(swapped, swapped.SyntaxTrees.Single(t => t.FilePath == tree.FilePath)));
         }
-        if (!includeDependents)
-            return declared.Order(StringComparer.Ordinal).ToList();
+        switch (scope)
+        {
+            case "declared":
+                return declared.Order(StringComparer.Ordinal).ToList();
+            case "all":
+                declared.UnionWith(_compilation.SyntaxTrees.SelectMany(t => DeclaredTypes(_compilation, t)));
+                return declared.Order(StringComparer.Ordinal).ToList();
+        }
         var simpleNames = declared.Select(n => n.Split('.', '+')[^1].Split('`')[0]).ToHashSet(StringComparer.Ordinal);
-        var scope = new HashSet<string>(declared, StringComparer.Ordinal);
+        var result = new HashSet<string>(declared, StringComparer.Ordinal);
         foreach (var other in _compilation.SyntaxTrees.Where(t => t != tree))
         {
             var mentions = other.GetRoot().DescendantTokens()
                 .Any(t => t.IsKind(SyntaxKind.IdentifierToken) && simpleNames.Contains(t.ValueText) && t.Parent is SimpleNameSyntax);
             if (mentions)
-                scope.UnionWith(DeclaredTypes(_compilation, other));
+                result.UnionWith(DeclaredTypes(_compilation, other));
         }
-        return scope.Order(StringComparer.Ordinal).ToList();
+        return result.Order(StringComparer.Ordinal).ToList();
     }
 
     private static IEnumerable<string> DeclaredTypes(CSharpCompilation compilation, SyntaxTree tree)

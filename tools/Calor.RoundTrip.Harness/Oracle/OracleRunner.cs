@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,8 +12,13 @@ public sealed record OracleFileReport
 {
     public required string File { get; init; }
 
-    /// <summary>exercised, or the step that stopped the file: not-compiled, conversion-failed,
-    /// calor-compile-failed, swap-build-failed, oracle-error.</summary>
+    /// <summary>
+    /// exercised; or why it was not: excluded (a harness exclude pattern), not-compiled, conversion-failed,
+    /// calor-compile-failed, swap-build-failed; or a failure of the file's process: converted-crashed /
+    /// converted-timeout / converted-error (the original compared with itself completes, so the converted build is
+    /// at fault; the gate fails these), oracle-crashed / oracle-timeout / oracle-error (the original fails too, or
+    /// the failure came before the converted build existed).
+    /// </summary>
     public required string Status { get; init; }
     public string? Detail { get; init; }
 
@@ -20,16 +26,17 @@ public sealed record OracleFileReport
     public bool LossRecorded { get; init; }
     public Dictionary<string, int> LossKinds { get; init; } = [];
     public int TypesInScope { get; init; }
+    public int Restarts { get; init; }
     public double Seconds { get; init; }
     public List<MemberVerdict> Members { get; init; } = [];
 }
 
-/// <summary>A gate decision on one differing member.</summary>
+/// <summary>A gate decision on one differing member (or a whole file, member <c>&lt;file&gt;</c>, or the project).</summary>
 public sealed record OracleGateItem(string File, string Member, string Decision, string Detail);
 
 public sealed record OracleProjectReport
 {
-    public string Schema { get; init; } = "calor.member-oracle-report/1";
+    public string Schema { get; init; } = "calor.member-oracle-report/2";
     public required string Project { get; init; }
     public string InputGenerator { get; init; } = MemberOracleInputs.GeneratorId;
     public int Depth { get; init; }
@@ -38,13 +45,22 @@ public sealed record OracleProjectReport
     public string? TargetFramework { get; init; }
     public string? Inconclusive { get; set; }
     public double WallClockSeconds { get; set; }
+    public int MinimumExercisedFiles { get; init; }
+    public int MinimumComparedMembers { get; init; }
     public List<OracleFileReport> Files { get; init; } = [];
 
-    /// <summary>failing (a difference on a file with no recorded loss and no matching baseline entry),
-    /// loss-recorded (tolerated), baselined (tolerated), baseline-changed and baseline-stale (both fail).</summary>
+    /// <summary>failing (a difference with no recorded loss and no matching baseline entry, a converted-build crash
+    /// or hang, or coverage below the floor), loss-recorded and baselined (tolerated), baseline-changed and
+    /// baseline-stale (both fail).</summary>
     public List<OracleGateItem> Gate { get; init; } = [];
 
     public bool Passed => Inconclusive is null && Gate.All(g => g.Decision is "loss-recorded" or "baselined");
+
+    public int ExercisedFiles => Files.Count(f => f.Status == "exercised");
+
+    /// <summary>Members whose inputs were compared: AGREE, DIFFERENT, and TIMEOUT / NONDETERMINISTIC members with a compared prefix.</summary>
+    public int ComparedMembers => Files.SelectMany(f => f.Members).Count(m => m.Status is MemberStatus.Agree or MemberStatus.Different
+        || (m.Status is MemberStatus.Timeout or MemberStatus.Nondeterministic && m.Inputs > 0));
 
     public Dictionary<string, int> MemberTotals => Files.SelectMany(f => f.Members)
         .GroupBy(m => m.Status).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count());
@@ -58,11 +74,17 @@ public sealed record OracleProjectReport
 }
 
 /// <summary>#1587: runs the member oracle over one corpus project.</summary>
-public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, OracleBaseline baseline, bool includeDependents,
+public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, OracleBaseline baseline, string scope,
     int shardIndex = 0, int shardCount = 1, int jobs = 2)
 {
-    /// <summary>Wall-clock limit for one file's child process (conversion, swap build, four runs).</summary>
+    /// <summary>Wall-clock limit for one child process (conversion, swap build, four runs).</summary>
     public static readonly TimeSpan FileTimeout = TimeSpan.FromMinutes(10);
+
+    /// <summary>Restarts of one file after member timeouts before the file is reported unfinished (and fails).</summary>
+    public const int MaxRestarts = 40;
+
+    /// <summary>Exit code of a child that hit a member timeout and wrote <c>.timeout.json</c>.</summary>
+    public const int TimeoutExitCode = 3;
 
     public async Task<OracleProjectReport> RunAsync(CancellationToken cancellationToken = default)
     {
@@ -71,8 +93,10 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
         {
             Project = config.ProjectName,
             Depth = options.Depth,
-            Scope = includeDependents ? "declared+dependents" : "declared",
+            Scope = scope,
             Shard = shardCount > 1 ? $"{shardIndex + 1}/{shardCount}" : null,
+            MinimumExercisedFiles = config.OracleMinimumExercisedFiles,
+            MinimumComparedMembers = config.OracleMinimumComparedMembers,
         };
         var scratch = Directory.CreateTempSubdirectory("calor-oracle-1587-").FullName;
         try
@@ -90,39 +114,56 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
                     + $" (generators loaded: {build.GeneratorCount}; load failures: {string.Join("; ", build.GeneratorLoadFailures.Take(5))})";
                 return report;
             }
+            if (build.VerifyAgainstRealBuild(original) is { } mismatch)
+            {
+                report.Inconclusive = "the in-process build does not match the dotnet build: " + mismatch;
+                return report;
+            }
 
             var libDir = Path.Combine(workDir, config.LibrarySourceRelativePath);
-            var files = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !IsExcluded(Path.GetRelativePath(workDir, f)))
+            var all = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
                 .Select(Path.GetFullPath)
+                .Where(f => !IsBuildOutput(Path.GetRelativePath(workDir, f)))
                 .Order(StringComparer.Ordinal)
                 .Where((_, i) => i % shardCount == shardIndex)
                 .ToList();
             var trees = build.Trees;
-            Console.WriteLine($"  [{config.ProjectName}] {files.Count} file(s), target {build.TargetFramework}, {jobs} job(s)");
+            Console.WriteLine($"  [{config.ProjectName}] {all.Count} file(s), target {build.TargetFramework}, {jobs} job(s), scope {scope}");
 
             // Each file runs in its own process: a member that never returns, overflows the stack or exits the
-            // process takes down only that file, and its abandoned threads die with the process.
+            // process takes down only that process, and abandoned threads die with it.
             var specPath = Path.Combine(scratch, "spec.json");
             var originalPath = Path.Combine(scratch, "original.dll");
             await File.WriteAllTextAsync(specPath, JsonSerializer.Serialize(build.BuildSpec, Json), cancellationToken);
             await File.WriteAllBytesAsync(originalPath, original.Image, cancellationToken);
-            var results = new OracleFileReport[files.Count];
-            await Parallel.ForEachAsync(Enumerable.Range(0, files.Count),
+
+            // Calibration: the original compared with itself over every type finds the members that time out on the
+            // original build. Inputs depend only on the project (not the file), so every file starts from these limits
+            // and restarts only where the converted build hangs earlier.
+            var calibrationFile = all.FirstOrDefault(f => trees.ContainsKey(f) && ExcludedBy(ReportGenerator.RelativePath(workDir, f)) is null);
+            var baseLimits = calibrationFile is null ? new Dictionary<string, int>(StringComparer.Ordinal)
+                : await CalibrateAsync(calibrationFile, ReportGenerator.RelativePath(workDir, calibrationFile), specPath, originalPath,
+                    Path.Combine(scratch, "calibration"), workDir, cancellationToken);
+            Console.WriteLine($"  [{config.ProjectName}] calibration: {baseLimits.Count} member(s) time out on the original build");
+            var results = new OracleFileReport[all.Count];
+            await Parallel.ForEachAsync(Enumerable.Range(0, all.Count),
                 new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, jobs), CancellationToken = cancellationToken },
                 async (i, token) =>
                 {
-                    var file = files[i];
+                    var file = all[i];
                     var relative = ReportGenerator.RelativePath(workDir, file);
-                    results[i] = trees.ContainsKey(file)
-                        ? await RunChildAsync(file, relative, specPath, originalPath, Path.Combine(scratch, $"file-{i}.json"), workDir, token)
-                        : new OracleFileReport { File = relative, Status = "not-compiled", Detail = $"not a compile item for {build.TargetFramework}" };
+                    results[i] = ExcludedBy(relative) is { } pattern
+                        ? new OracleFileReport { File = relative, Status = "excluded", Detail = $"harness exclude pattern {pattern}" }
+                        : !trees.ContainsKey(file)
+                            ? new OracleFileReport { File = relative, Status = "not-compiled", Detail = $"not a compile item for {build.TargetFramework}" }
+                            : await RunChildAsync(file, relative, specPath, originalPath, Path.Combine(scratch, $"file-{i}"), workDir, baseLimits, token);
                     var r = results[i];
                     var counts = string.Join(" ", r.Members.GroupBy(m => m.Status).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}"));
-                    Console.WriteLine($"    {r.File}: {r.Status} {counts} ({r.Seconds:0.0}s)");
+                    Console.WriteLine($"    {r.File}: {r.Status} {counts} ({r.Seconds:0.0}s{(r.Restarts > 0 ? $", {r.Restarts} restart(s)" : "")})");
                 });
             report.Files.AddRange(results);
-            ApplyGate(config.ProjectName, baseline, report, files.Select(f => ReportGenerator.RelativePath(workDir, f)).ToHashSet(StringComparer.Ordinal));
+            ApplyGate(config.ProjectName, baseline, report, all.Select(f => ReportGenerator.RelativePath(workDir, f)).ToHashSet(StringComparer.Ordinal),
+                checkFloors: shardCount == 1);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -145,12 +186,17 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
             : throw new InvalidOperationException($"expected one project in {config.LibrarySourceRelativePath}, found {candidates.Length}");
     }
 
-    private bool IsExcluded(string relativePath)
+    private static bool IsBuildOutput(string relativePath)
+    {
+        var normalized = "/" + relativePath.Replace('\\', '/');
+        return normalized.Contains("/bin/", StringComparison.Ordinal) || normalized.Contains("/obj/", StringComparison.Ordinal);
+    }
+
+    /// <summary>The harness exclude pattern that matches the file, if any (reported, never silently dropped).</summary>
+    private string? ExcludedBy(string relativePath)
     {
         var normalized = relativePath.Replace('\\', '/');
-        if (normalized.Contains("/bin/") || normalized.Contains("/obj/"))
-            return true;
-        return config.ExcludePatterns.Any(p => Glob(normalized, p.Replace('\\', '/')));
+        return config.ExcludePatterns.FirstOrDefault(p => Glob(normalized, p.Replace('\\', '/')));
     }
 
     private static bool Glob(string path, string pattern)
@@ -160,52 +206,219 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
         return System.Text.RegularExpressions.Regex.IsMatch(path, regex);
     }
 
-    private async Task<OracleFileReport> RunChildAsync(string file, string relative, string specPath, string originalPath, string outPath,
+    // ---- Parent side: one file -----------------------------------------------------------------
+
+    private sealed record TimeoutNote(string Member, int Completed);
+
+    /// <summary>
+    /// Runs one file in child processes. A member timeout ends the child (its thread cannot be stopped); the file is
+    /// restarted with that member limited to the inputs before the one that hung, so every run drives the same inputs.
+    /// Each hanging input is then probed from clean state in fresh processes (twice per build) to tell a converted-build
+    /// hang (a difference) from a hang both builds share. A crash or error is attributed by re-running the original
+    /// compared with itself: if that completes, the converted build is at fault.
+    /// </summary>
+    private async Task<Dictionary<string, int>> CalibrateAsync(string file, string relative, string specPath, string originalPath, string stem,
         string workDir, CancellationToken cancellationToken)
     {
-        var clock = Stopwatch.StartNew();
-        var host = Environment.ProcessPath ?? "dotnet";
-        var prefix = Path.GetFileNameWithoutExtension(host).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
-            ? $"\"{typeof(OracleRunner).Assembly.Location}\" " : "";
-        var arguments = $"{prefix}oracle-file --spec \"{specPath}\" --original \"{originalPath}\" --file \"{file}\" --relative \"{relative}\" "
-            + $"--seed \"{config.ProjectName}|{relative}\" --depth {options.Depth} --member-timeout {options.MemberTimeout.TotalSeconds} "
-            + $"--scope {(includeDependents ? "dependents" : "declared")} --out \"{outPath}\"";
-        var (exit, stdout, stderr) = await ProcessRunner.RunAsync(host, arguments, workDir, FileTimeout, cancellationToken: cancellationToken);
-        if (exit == 0 && File.Exists(outPath))
-            return JsonSerializer.Deserialize<OracleFileReport>(await File.ReadAllTextAsync(outPath, cancellationToken), Json)!;
-        var tail = (stderr + stdout).Trim();
-        return new OracleFileReport
+        var limits = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var attempt = 0; attempt <= MaxRestarts; attempt++)
         {
-            File = relative,
-            Status = exit == -1 ? "oracle-timeout" : "oracle-crashed",
-            Detail = $"exit {exit}: " + (tail.Length > 600 ? tail[^600..] : tail),
-            Seconds = Math.Round(clock.Elapsed.TotalSeconds, 2),
+            var (status, _, _) = await SpawnAsync("oracle-file", stem, file, relative, specPath, originalPath, limits, self: true, workDir, cancellationToken, scopeOverride: "all");
+            if (status != "timeout-restart")
+                break;
+            var note = JsonSerializer.Deserialize<TimeoutNote>(await File.ReadAllTextAsync(stem + ".timeout.json", cancellationToken), Json)!;
+            limits[note.Member] = Math.Min(note.Completed, limits.GetValueOrDefault(note.Member, int.MaxValue));
+        }
+        return limits;
+    }
+
+    /// <summary>Clean-state probes of the original build, shared by every file of the project (the original never changes).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string, int), Task<ProbeResult[]>> _originalProbes = new();
+
+    private async Task<OracleFileReport> RunChildAsync(string file, string relative, string specPath, string originalPath, string stem,
+        string workDir, IReadOnlyDictionary<string, int> baseLimits, CancellationToken cancellationToken)
+    {
+        var clock = Stopwatch.StartNew();
+        var limits = new Dictionary<string, int>(baseLimits, StringComparer.Ordinal);
+        var restarts = 0;
+        string status;
+        OracleFileReport? report;
+        string detail;
+        while (true)
+        {
+            (status, report, detail) = await SpawnAsync("oracle-file", stem, file, relative, specPath, originalPath, limits, self: false, workDir, cancellationToken);
+            if (status != "timeout-restart")
+                break;
+            var note = JsonSerializer.Deserialize<TimeoutNote>(await File.ReadAllTextAsync(stem + ".timeout.json", cancellationToken), Json)!;
+            limits[note.Member] = Math.Min(note.Completed, limits.GetValueOrDefault(note.Member, int.MaxValue));
+            if (++restarts > MaxRestarts)
+            {
+                return new OracleFileReport
+                {
+                    File = relative, Status = "converted-unfinished", Restarts = restarts, Seconds = Seconds(clock),
+                    Detail = $"more than {MaxRestarts} member timeouts; the file was never compared to the end",
+                };
+            }
+        }
+
+        if (status == "ok" && report!.Status != "oracle-error")
+        {
+            if (report.Status != "exercised")
+                return report with { Restarts = restarts, Seconds = Seconds(clock) };
+            var members = new List<MemberVerdict>();
+            foreach (var verdict in report.Members)
+                members.Add(verdict.LimitedAt is { } k && verdict.Status != MemberStatus.Different
+                    ? MemberDifferentialOracle.ClassifyTimeout(verdict,
+                        await _originalProbes.GetOrAdd((verdict.Key, k), async _ =>
+                            [await ProbeAsync(stem + ".o", specPath, originalPath, originalPath, relative, verdict.Key, k, workDir, cancellationToken),
+                             await ProbeAsync(stem + ".o", specPath, originalPath, originalPath, relative, verdict.Key, k, workDir, cancellationToken)]),
+                        [await ProbeAsync(stem, specPath, originalPath, stem + ".converted.dll", relative, verdict.Key, k, workDir, cancellationToken),
+                         await ProbeAsync(stem, specPath, originalPath, stem + ".converted.dll", relative, verdict.Key, k, workDir, cancellationToken)],
+                        options)
+                    : verdict);
+            return report with { Members = members, Restarts = restarts, Seconds = Seconds(clock) };
+        }
+
+        if (status == "ok")
+            detail = report!.Detail ?? "";
+        var conversion = File.Exists(stem + ".conversion.json")
+            ? JsonSerializer.Deserialize<OracleFileReport>(await File.ReadAllTextAsync(stem + ".conversion.json", cancellationToken), Json)
+            : null;
+        var failure = status == "ok" ? "error" : status;
+        if (conversion is null)
+        {
+            // The child failed before the converted build existed (in conversion or the swap build): nothing ran.
+            return new OracleFileReport { File = relative, Status = "oracle-" + failure, Detail = detail, Restarts = restarts, Seconds = Seconds(clock) };
+        }
+        var (selfStatus, selfReport, selfDetail) = await SpawnAsync("oracle-file", stem + ".self", file, relative, specPath, originalPath, limits, self: true, workDir, cancellationToken);
+        var originalIsClean = selfStatus == "ok" && selfReport!.Status == "exercised";
+        return conversion with
+        {
+            Status = (originalIsClean ? "converted-" : "oracle-") + failure,
+            Detail = originalIsClean
+                ? $"the converted build failed ({failure}) where the original compared with itself completes: {detail}"
+                : $"the original also fails when compared with itself ({selfStatus}: {selfReport?.Detail ?? selfDetail}): {detail}",
+            Restarts = restarts,
+            Seconds = Seconds(clock),
         };
     }
 
-    /// <summary>The child side of <see cref="RunChildAsync"/>: one file, original image given, report written to <paramref name="outPath"/>.</summary>
+    private static double Seconds(Stopwatch clock) => Math.Round(clock.Elapsed.TotalSeconds, 2);
+
+    private string HostPrefix(out string host)
+    {
+        host = Environment.ProcessPath ?? "dotnet";
+        return Path.GetFileNameWithoutExtension(host).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
+            ? $"\"{typeof(OracleRunner).Assembly.Location}\" " : "";
+    }
+
+    /// <summary>The input seed is the project name, so every file of a project drives the same inputs (calibrated
+    /// limits and original-build probes then apply to every file).</summary>
+    private string CommonArguments(string? scopeOverride = null) =>
+        $"--seed \"{config.ProjectName}\" --depth {options.Depth} "
+        + $"--member-timeout {options.MemberTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} --scope {scopeOverride ?? scope}";
+
+    private async Task<(string Status, OracleFileReport? Report, string Detail)> SpawnAsync(string command, string stem, string file, string relative,
+        string specPath, string originalPath, Dictionary<string, int> limits, bool self, string workDir, CancellationToken cancellationToken,
+        string? scopeOverride = null)
+    {
+        var prefix = HostPrefix(out var host);
+        var limitsPath = stem + ".limits.json";
+        await File.WriteAllTextAsync(limitsPath, JsonSerializer.Serialize(limits, Json), cancellationToken);
+        File.Delete(stem + ".timeout.json");
+        File.Delete(stem + ".json");
+        var arguments = $"{prefix}{command} --spec \"{specPath}\" --original \"{originalPath}\" --file \"{file}\" --relative \"{relative}\" "
+            + CommonArguments(scopeOverride) + $" --limits \"{limitsPath}\" --stem \"{stem}\"" + (self ? " --self" : "");
+        var (exit, stdout, stderr) = await ProcessRunner.RunAsync(host, arguments, workDir, FileTimeout, cancellationToken: cancellationToken);
+        var tail = (stderr + stdout).Trim();
+        var detail = $"exit {exit}: " + (tail.Length > 600 ? tail[^600..] : tail);
+        if (exit == TimeoutExitCode && File.Exists(stem + ".timeout.json"))
+            return ("timeout-restart", null, detail);
+        if (exit == 0 && File.Exists(stem + ".json"))
+            return ("ok", JsonSerializer.Deserialize<OracleFileReport>(await File.ReadAllTextAsync(stem + ".json", cancellationToken), Json)!, detail);
+        return (exit == -1 ? "timeout" : "crashed", null, detail);
+    }
+
+    /// <summary>One clean-state probe in its own process. A probe process that crashes reports that as its observation.</summary>
+    private async Task<ProbeResult> ProbeAsync(string stem, string specPath, string planImage, string runImage, string relative, string member, int input,
+        string workDir, CancellationToken cancellationToken)
+    {
+        var prefix = HostPrefix(out var host);
+        // The member's scope file is written by the file's own child; ".o" probes share the file's stem.
+        var scopeFile = (stem.EndsWith(".o", StringComparison.Ordinal) ? stem[..^2] : stem) + ".scope.json";
+        stem += "." + Guid.NewGuid().ToString("N")[..8];
+        var output = stem + ".probe.json";
+        var memberPath = stem + ".probe-member.txt";
+        await File.WriteAllTextAsync(memberPath, member, cancellationToken);
+        File.Delete(output);
+        var arguments = $"{prefix}oracle-probe --spec \"{specPath}\" --plan-image \"{planImage}\" --run-image \"{runImage}\" --scope-file \"{scopeFile}\" "
+            + $"--member-file \"{memberPath}\" --input {input} {CommonArguments()} --out \"{output}\"";
+        var (exit, _, stderr) = await ProcessRunner.RunAsync(host, arguments, workDir, FileTimeout, cancellationToken: cancellationToken);
+        return exit == 0 && File.Exists(output)
+            ? JsonSerializer.Deserialize<ProbeResult>(await File.ReadAllTextAsync(output, cancellationToken), Json)!
+            : new ProbeResult(true, 0, $"<probe process exit {exit}: {(stderr.Length > 200 ? stderr[^200..] : stderr).Trim()}>");
+    }
+
+    // ---- Child side ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The child side of <see cref="RunChildAsync"/>: one file, report written to <c>{stem}.json</c>. A member timeout
+    /// writes <c>{stem}.timeout.json</c> and exits with <see cref="TimeoutExitCode"/>. With <paramref name="self"/>, the
+    /// original is compared with itself (no conversion), to attribute a failure.
+    /// </summary>
     public static async Task RunFileAsync(string specPath, string originalPath, string file, string relative, OracleOptions options,
-        bool includeDependents, string outPath)
+        string scope, string stem, bool self)
     {
         var clock = Stopwatch.StartNew();
         var spec = JsonSerializer.Deserialize<SubjectBuild.Spec>(await File.ReadAllTextAsync(specPath), Json)!;
         var build = SubjectBuild.FromSpec(spec);
         var original = new ArmImage("original", await File.ReadAllBytesAsync(originalPath), spec.DependencyPaths);
         var manifestRoot = Path.Combine(Path.GetTempPath(), "calor-oracle-1587-empty-manifests-" + Environment.ProcessId);
+        options = options with
+        {
+            OnTimeout = (member, completed) =>
+            {
+                File.WriteAllText(stem + ".timeout.json", JsonSerializer.Serialize(new TimeoutNote(member, completed), Json));
+                Console.Out.Flush();
+                Environment.Exit(TimeoutExitCode);
+            },
+        };
         OracleFileReport report;
         try
         {
-            report = RunFile(file, relative, build, original, options, includeDependents, manifestRoot);
+            report = self
+                ? new OracleFileReport
+                {
+                    File = relative, Status = "exercised",
+                    Members = MemberDifferentialOracle.Compare(original, original, build.AffectedTypes(file, null, scope), options),
+                }
+                : RunFile(file, relative, build, original, options, scope, manifestRoot, (conversion, candidate, types) =>
+                {
+                    File.WriteAllBytes(stem + ".converted.dll", candidate.Image);
+                    File.WriteAllText(stem + ".scope.json", JsonSerializer.Serialize(types, Json));
+                    File.WriteAllText(stem + ".conversion.json", JsonSerializer.Serialize(conversion, Json));
+                });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             report = new OracleFileReport { File = relative, Status = "oracle-error", Detail = $"{ex.GetType().Name}: {ex.Message}" };
         }
-        await File.WriteAllTextAsync(outPath, JsonSerializer.Serialize(report with { Seconds = Math.Round(clock.Elapsed.TotalSeconds, 2) }, Json));
+        await File.WriteAllTextAsync(stem + ".json", JsonSerializer.Serialize(report with { Seconds = Math.Round(clock.Elapsed.TotalSeconds, 2) }, Json));
+    }
+
+    /// <summary>The child side of <see cref="ProbeAsync"/>.</summary>
+    public static async Task ProbeFileAsync(string specPath, string planImage, string runImage, string scopePath, string member, int input,
+        OracleOptions options, string output)
+    {
+        var spec = JsonSerializer.Deserialize<SubjectBuild.Spec>(await File.ReadAllTextAsync(specPath), Json)!;
+        var scope = JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(scopePath), Json)!;
+        var result = MemberDifferentialOracle.Probe(new ArmImage("plan", await File.ReadAllBytesAsync(planImage), spec.DependencyPaths),
+            new ArmImage("probe", await File.ReadAllBytesAsync(runImage), spec.DependencyPaths), scope, member, input, options);
+        await File.WriteAllTextAsync(output, JsonSerializer.Serialize(result, Json));
     }
 
     internal static OracleFileReport RunFile(string file, string relative, SubjectBuild build, ArmImage original, OracleOptions options,
-        bool includeDependents, string manifestRoot)
+        string scope, string manifestRoot, Action<OracleFileReport, ArmImage, IReadOnlyList<string>>? onConverted = null)
     {
         OracleFileReport Stop(string status, string? detail, bool loss = false, Dictionary<string, int>? kinds = null) => new()
         {
@@ -220,12 +433,14 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
         if (candidate is null)
             return Stop("swap-build-failed", string.Join(" | ", errors.Take(3)), converted.LossRecorded, converted.LossKinds);
 
-        var scope = build.AffectedTypes(file, converted.CSharp, includeDependents);
-        var members = MemberDifferentialOracle.Compare(original, candidate, scope, options);
+        var types = build.AffectedTypes(file, converted.CSharp, scope);
+        // Recorded before any member runs, so a crash while driving members still knows the conversion outcome.
+        onConverted?.Invoke(Stop("converted", null, converted.LossRecorded, converted.LossKinds) with { TypesInScope = types.Count }, candidate, types);
+        var members = MemberDifferentialOracle.Compare(original, candidate, types, options);
         return new OracleFileReport
         {
             File = relative, Status = "exercised", LossRecorded = converted.LossRecorded, LossKinds = converted.LossKinds,
-            TypesInScope = scope.Count, Members = members,
+            TypesInScope = types.Count, Members = members,
         };
     }
 
@@ -277,41 +492,57 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
         return new RoundTripResult("converted", RoundTripPipeline.PostProcessEmittedCSharp(compile.GeneratedCode, source), null, lossRecorded, lossKinds);
     }
 
-    /// <summary>Decides every difference, and checks this shard's baseline entries for staleness.</summary>
-    internal static void ApplyGate(string project, OracleBaseline baseline, OracleProjectReport report, HashSet<string> filesInShard)
+    // ---- Gate ------------------------------------------------------------------------------------
+
+    /// <summary>Decides every difference, checks this shard's baseline entries for staleness, and (unsharded) the coverage floors.</summary>
+    internal static void ApplyGate(string project, OracleBaseline baseline, OracleProjectReport report, HashSet<string> filesInShard, bool checkFloors = true)
     {
         var entries = baseline.Entries.Where(e => e.Project == project && filesInShard.Contains(e.File))
             .ToDictionary(e => (e.File, e.Member));
         var used = new HashSet<(string, string)>();
+        void Decide(OracleFileReport file, string member, string? fingerprint, string witness)
+        {
+            if (entries.TryGetValue((file.File, member), out var entry))
+            {
+                used.Add((file.File, member));
+                report.Gate.Add(entry.Fingerprint == fingerprint
+                    ? new OracleGateItem(file.File, member, "baselined", entry.Finding)
+                    : new OracleGateItem(file.File, member, "baseline-changed", $"baseline fingerprint {entry.Fingerprint}, observed {fingerprint}: {witness}"));
+            }
+            else if (file.LossRecorded)
+            {
+                report.Gate.Add(new OracleGateItem(file.File, member, "loss-recorded",
+                    "conversion recorded " + string.Join(", ", file.LossKinds.Select(kv => $"{kv.Key}={kv.Value}")) + "; " + witness));
+            }
+            else
+            {
+                report.Gate.Add(new OracleGateItem(file.File, member, "failing", witness));
+            }
+        }
         foreach (var file in report.Files)
         {
+            // The converted build crashed, hung or broke the oracle where the original did not: a difference for the whole file.
+            if (file.Status.StartsWith("converted-", StringComparison.Ordinal))
+                Decide(file, "<file>", MemberDifferentialOracle.Hash(file.Status), file.Detail ?? file.Status);
             foreach (var member in file.Members.Where(m => m.Status == MemberStatus.Different))
-            {
-                var witness = member.Witnesses.FirstOrDefault() ?? "";
-                if (entries.TryGetValue((file.File, member.Key), out var entry))
-                {
-                    used.Add((file.File, member.Key));
-                    report.Gate.Add(entry.Witness == witness
-                        ? new OracleGateItem(file.File, member.Key, "baselined", entry.Finding)
-                        : new OracleGateItem(file.File, member.Key, "baseline-changed", $"baseline witness: {entry.Witness} | observed: {witness}"));
-                }
-                else if (file.LossRecorded)
-                {
-                    report.Gate.Add(new OracleGateItem(file.File, member.Key, "loss-recorded",
-                        "conversion recorded " + string.Join(", ", file.LossKinds.Select(kv => $"{kv.Key}={kv.Value}")) + "; " + witness));
-                }
-                else
-                {
-                    report.Gate.Add(new OracleGateItem(file.File, member.Key, "failing", witness));
-                }
-            }
+                Decide(file, member.Key, member.Fingerprint, member.Witnesses.FirstOrDefault() ?? "");
         }
         // An entry is stale only when its member ran and agreed; a member skipped this run proves nothing.
         foreach (var ((file, member), entry) in entries.Where(kv => !used.Contains(kv.Key)))
         {
-            var verdict = report.Files.FirstOrDefault(f => f.File == file)?.Members.FirstOrDefault(m => m.Key == member);
-            if (verdict?.Status == MemberStatus.Agree)
+            var fileReport = report.Files.FirstOrDefault(f => f.File == file);
+            var verdict = fileReport?.Members.FirstOrDefault(m => m.Key == member);
+            if (verdict?.Status == MemberStatus.Agree || (member == "<file>" && fileReport?.Status == "exercised"))
                 report.Gate.Add(new OracleGateItem(file, member, "baseline-stale", "the member now agrees; remove the entry (" + entry.Finding + ")"));
+        }
+        if (checkFloors && report.Inconclusive is null)
+        {
+            if (report.ExercisedFiles < report.MinimumExercisedFiles)
+                report.Gate.Add(new OracleGateItem("*", "<coverage>", "failing",
+                    $"{report.ExercisedFiles} files exercised, floor {report.MinimumExercisedFiles} (ProjectConfigs.OracleMinimumExercisedFiles)"));
+            if (report.ComparedMembers < report.MinimumComparedMembers)
+                report.Gate.Add(new OracleGateItem("*", "<coverage>", "failing",
+                    $"{report.ComparedMembers} members compared, floor {report.MinimumComparedMembers} (ProjectConfigs.OracleMinimumComparedMembers)"));
         }
     }
 
@@ -327,17 +558,17 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
     {
         var sb = new StringBuilder();
         sb.AppendLine("## Member differential oracle (#1587)").AppendLine();
-        sb.AppendLine($"Inputs `{MemberOracleInputs.GeneratorId}`, state depth {reports.FirstOrDefault()?.Depth ?? StateRenderer.DefaultDepth}. ")
-          .AppendLine("A member is exercised when it ran on both builds; it is skipped when it could not be driven, disagreed with its own re-run, or ran out of time.").AppendLine();
-        sb.AppendLine("| Project | Verdict | Files exercised | Members agree | Different | Skipped | Wall clock |");
-        sb.AppendLine("|---|---|---|---|---|---|---|");
+        sb.AppendLine($"Inputs `{MemberOracleInputs.GeneratorId}`, state depth {reports.FirstOrDefault()?.Depth ?? StateRenderer.DefaultDepth}, scope `{reports.FirstOrDefault()?.Scope}`. ")
+          .AppendLine("A member is compared when its inputs ran on both builds; it is skipped when it could not be driven, disagreed with its own re-run, or ran out of time.").AppendLine();
+        sb.AppendLine("| Project | Verdict | Files exercised | Members compared | Agree | Different | Skipped | Wall clock |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|");
         foreach (var r in reports)
         {
             var totals = r.MemberTotals;
             var skipped = totals.Where(kv => kv.Key is not (MemberStatus.Agree or MemberStatus.Different)).Sum(kv => kv.Value);
             var verdict = r.Inconclusive is not null ? "inconclusive" : r.Passed ? "pass" : "FAIL";
-            sb.AppendLine($"| {r.Project}{(r.Shard is null ? "" : $" ({r.Shard})")} | {verdict} | {r.Files.Count(f => f.Status == "exercised")}/{r.Files.Count} | "
-                + $"{totals.GetValueOrDefault(MemberStatus.Agree)} | {totals.GetValueOrDefault(MemberStatus.Different)} | {skipped} | {r.WallClockSeconds:0}s |");
+            sb.AppendLine($"| {r.Project}{(r.Shard is null ? "" : $" ({r.Shard})")} | {verdict} | {r.ExercisedFiles}/{r.Files.Count} (floor {r.MinimumExercisedFiles}) | "
+                + $"{r.ComparedMembers} (floor {r.MinimumComparedMembers}) | {totals.GetValueOrDefault(MemberStatus.Agree)} | {totals.GetValueOrDefault(MemberStatus.Different)} | {skipped} | {r.WallClockSeconds:0}s |");
         }
         foreach (var r in reports)
         {
@@ -349,13 +580,11 @@ public sealed class OracleRunner(RoundTripConfig config, OracleOptions options, 
                 foreach (var g in r.Gate)
                     sb.AppendLine($"- **{g.Decision}** `{g.File}` `{g.Member}`: {Truncate(g.Detail, 400)}");
             }
-            if (r.SkipReasons.Count > 0)
-            {
-                sb.AppendLine().AppendLine($"<details><summary>{r.Project}: skip reasons</summary>").AppendLine();
-                foreach (var (reason, count) in r.SkipReasons)
-                    sb.AppendLine($"- {count} × {reason}");
-                sb.AppendLine().AppendLine("Files: " + string.Join(", ", r.FileTotals.Select(kv => $"{kv.Key} {kv.Value}"))).AppendLine().AppendLine("</details>");
-            }
+            sb.AppendLine().AppendLine($"<details><summary>{r.Project}: files and skip reasons</summary>").AppendLine();
+            sb.AppendLine("Files: " + string.Join(", ", r.FileTotals.Select(kv => $"{kv.Key} {kv.Value}"))).AppendLine();
+            foreach (var (reason, count) in r.SkipReasons)
+                sb.AppendLine($"- {count} × {reason}");
+            sb.AppendLine().AppendLine("</details>");
         }
         return sb.ToString();
     }

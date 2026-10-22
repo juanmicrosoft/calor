@@ -10,8 +10,10 @@ namespace Calor.RoundTrip.Harness.Tests;
 /// #1587: the member-level differential oracle. Each fixture compiles an "original" and a "converted"
 /// C# source in memory and checks what the oracle reports. The issue's repro runs through the real
 /// converter; every other miscompilation is injected by hand so the oracle is tested independently of
-/// what the converter does today.
+/// what the converter does today. The oracle redirects the process-wide console and working directory
+/// while it drives members, so this class never runs in parallel with other tests.
 /// </summary>
+[Collection(MemberOracleCollection.Name)]
 public class MemberOracleTests
 {
     private static readonly Lazy<List<MetadataReference>> References = new(() =>
@@ -200,6 +202,19 @@ public class MemberOracleTests
         Assert.Equal(MemberStatus.Nondeterministic, ctor.Status);
     }
 
+    /// <summary>An unstable input never hides a difference on the inputs that are stable on both builds.</summary>
+    [Fact]
+    public void StableInputDifference_IsDifferentEvenWhenAnotherInputIsUnstable()
+    {
+        const string body = "if (b) return System.Guid.NewGuid().ToString();";
+        var verdicts = Compare(
+            "public static class S { public static string F(bool b) { " + body + " return \"x\"; } }",
+            "public static class S { public static string F(bool b) { " + body + " return \"y\"; } }", ["S"]);
+        var f = Single(verdicts, "static F(System.Boolean)->System.String");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Contains("(false)", f.Witnesses[0], StringComparison.Ordinal);
+    }
+
     /// <summary>Each run gets a fresh load context, so deterministic static mutation is not mistaken for nondeterminism.</summary>
     [Fact]
     public void StaticStateMutation_IsDeterministicAcrossRuns()
@@ -258,7 +273,7 @@ public class MemberOracleTests
                 File = "a.cs", Status = "exercised", LossRecorded = lossRecorded,
                 Members =
                 [
-                    new MemberVerdict { Type = "T", Member = "M()", Kind = "instance", Status = MemberStatus.Different, Witnesses = [witness] },
+                    new MemberVerdict { Type = "T", Member = "M()", Kind = "instance", Status = MemberStatus.Different, Witnesses = [witness], Fingerprint = "fp-" + witness },
                     new MemberVerdict { Type = "T", Member = "N()", Kind = "instance", Status = MemberStatus.Agree },
                 ],
             },
@@ -266,7 +281,7 @@ public class MemberOracleTests
     };
 
     private static OracleBaselineEntry Entry(string member, string witness) =>
-        new() { Project = "P", File = "a.cs", Member = member, Finding = "finding", Witness = witness };
+        new() { Project = "P", File = "a.cs", Member = member, Finding = "finding", Fingerprint = "fp-" + witness, Witness = witness };
 
     [Fact]
     public void Gate_UnlistedDifferenceOnALosslessFile_Fails()
@@ -287,7 +302,7 @@ public class MemberOracleTests
     }
 
     [Fact]
-    public void Gate_BaselinedDifference_PassesOnlyWithTheSameWitness()
+    public void Gate_BaselinedDifference_PassesOnlyWithTheSameFingerprint()
     {
         var same = GateReport(lossRecorded: false);
         OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, same, ["a.cs"]);
@@ -308,11 +323,148 @@ public class MemberOracleTests
         Assert.Contains(report.Gate, g => g.Decision == "baseline-stale" && g.Member == "T::N()");
     }
 
+    /// <summary>A converted build that crashes or hangs the file's process (where the original does not) fails like a difference.</summary>
+    [Fact]
+    public void Gate_ConvertedCrash_Fails()
+    {
+        var report = new OracleProjectReport
+        {
+            Project = "P",
+            Files = { new OracleFileReport { File = "a.cs", Status = "converted-crashed", Detail = "exit 134: stack overflow" } },
+        };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        Assert.False(report.Passed);
+        Assert.Equal(("a.cs", "<file>", "failing"), (report.Gate[0].File, report.Gate[0].Member, report.Gate[0].Decision));
+    }
+
     [Fact]
     public void Gate_InconclusiveRun_Fails()
     {
         var report = new OracleProjectReport { Project = "P", Inconclusive = "original does not compile" };
         Assert.False(report.Passed);
+    }
+
+    /// <summary>A baselined member that gains another differing input changes its fingerprint, so the gate fails.</summary>
+    [Fact]
+    public void Fingerprint_CoversEveryDifferingInput()
+    {
+        const string original = "public static class S { public static int F(int x) => x; }";
+        var one = Single(Compare(original, "public static class S { public static int F(int x) => x == 0 ? 9 : x; }", ["S"]), "static F(System.Int32)->System.Int32");
+        var two = Single(Compare(original, "public static class S { public static int F(int x) => x == 0 ? 9 : x == 7 ? 8 : x; }", ["S"]), "static F(System.Int32)->System.Int32");
+        Assert.Equal(one.Witnesses[0], two.Witnesses[0]);
+        Assert.NotEqual(one.Fingerprint, two.Fingerprint);
+    }
+
+    // ---- Codex round 1 false negatives --------------------------------------------------------
+
+    [Fact]
+    public void InternalTypeWithAPublicConstructor_IsExercised()
+    {
+        var verdicts = Compare("internal class C { public int X = 1; }", "internal class C { public int X = 2; }", ["C"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "ctor()").Status);
+    }
+
+    [Fact]
+    public void InheritedMemberAndHierarchyChanges_AreDifferent()
+    {
+        const string bases = "public class B1 { public int F() => 1; } public class B2 { public int F() => 2; } ";
+        var verdicts = Compare(bases + "public class C : B1 { }", bases + "public class C : B2 { }", ["B1", "B2", "C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member == "<hierarchy>" && v.Status == MemberStatus.Different);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member.StartsWith("B1.F", StringComparison.Ordinal) && v.Reason == "SURFACE");
+    }
+
+    [Fact]
+    public void BoxedScalarRuntimeType_IsCompared()
+    {
+        var verdicts = Compare("public static class S { public static object F() => 1; }", "public static class S { public static object F() => 1L; }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F()->System.Object").Status);
+    }
+
+    [Fact]
+    public void HiddenBaseMember_IsPartOfTheState()
+    {
+        const string b = "public class Base { public int X = 1; } ";
+        var verdicts = Compare(b + "public class C : Base { public new int X = 5; public C() { base.X = 1; } }",
+            b + "public class C : Base { public new int X = 5; public C() { base.X = 2; } }", ["Base", "C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member == "ctor()" && v.Status == MemberStatus.Different);
+    }
+
+    [Fact]
+    public void StringBuilderContent_IsCompared()
+    {
+        var verdicts = Compare("public static class S { public static System.Text.StringBuilder F() => new(\"a\"); }",
+            "public static class S { public static System.Text.StringBuilder F() => new(\"b\"); }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F()->System.Text.StringBuilder").Status);
+    }
+
+    [Fact]
+    public void AsyncResult_IsAwaitedBeforeComparison()
+    {
+        const string body = "await System.Threading.Tasks.Task.Delay(1500); return ";
+        var verdicts = Compare("public static class S { public static async System.Threading.Tasks.Task<int> F() { " + body + "1; } }",
+            "public static class S { public static async System.Threading.Tasks.Task<int> F() { " + body + "2; } }", ["S"]);
+        var f = Single(verdicts, "static F()->System.Threading.Tasks.Task<System.Int32>");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Contains("RanToCompletion", f.Witnesses[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThrowingConstructor_StillComparesStaticState()
+    {
+        var verdicts = Compare("public class C { public static int N; public C() { N = 1; throw new System.InvalidOperationException(); } }",
+            "public class C { public static int N; public C() { N = 2; throw new System.InvalidOperationException(); } }", ["C"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "ctor()").Status);
+    }
+
+    /// <summary>The receiver comes from a tuple that actually constructs, not the first generated one.</summary>
+    [Fact]
+    public void Receiver_IsBuiltFromATupleThatConstructs()
+    {
+        const string ctor = "public C(int n) { if (n <= 0) throw new System.ArgumentOutOfRangeException(); }";
+        var verdicts = Compare("public class C { " + ctor + " public int F() => 1; }", "public class C { " + ctor + " public int F() => 2; }", ["C"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "F()->System.Int32").Status);
+    }
+
+    [Fact]
+    public void UnsignedEnumAboveLongMaxValue_IsDrivenAndRendered()
+    {
+        const string e = "public enum E : ulong { Small = 1, Huge = 18446744073709551615 } ";
+        var verdicts = Compare(e + "public static class S { public static ulong F(E v) => (ulong)v; }",
+            e + "public static class S { public static ulong F(E v) => (ulong)v / 2; }", ["E", "S"]);
+        var f = Single(verdicts, "static F(E)->System.UInt64");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Equal(MemberStatus.Agree, Single(verdicts, "<enum-values>").Status);
+    }
+
+    [Fact]
+    public void LongRendering_IsComparedInFull()
+    {
+        // The two observations share a prefix far longer than the stored display length; only the hash can tell them apart.
+        var verdicts = Compare("public static class S { public static string F() => new string('a', 40000) + \"x\"; }",
+            "public static class S { public static string F() => new string('a', 40000) + \"y\"; }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F()->System.String").Status);
+    }
+
+    [Fact]
+    public void TimeoutClassification_FollowsTheCleanStateProbes()
+    {
+        var prefix = new MemberVerdict { Type = "T", Member = "F()", Kind = "static", Status = MemberStatus.Timeout, LimitedAt = 3, Inputs = 3 };
+        var options = new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) };
+        ProbeResult Hang() => new(false, 4, null);
+        ProbeResult Quick(string o = "r") => new(true, 0.1, o);
+        Assert.Equal("HANG", MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick(), Quick()], [Hang(), Hang()], options).Reason);
+        Assert.Equal(MemberStatus.Timeout, MemberDifferentialOracle.ClassifyTimeout(prefix, [Hang(), Hang()], [Hang(), Hang()], options).Status);
+        Assert.Equal(MemberStatus.Nondeterministic, MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick(), Hang()], [Hang(), Hang()], options).Status);
+        Assert.Equal(MemberStatus.Different, MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick("a"), Quick("a")], [Quick("b"), Quick("b")], options).Status);
+        Assert.Equal(MemberStatus.Timeout, MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick(), Quick()], [Quick(), Quick()], options).Status);
+    }
+
+    [Fact]
+    public void Gate_CoverageBelowTheFloor_Fails()
+    {
+        var report = GateReport(lossRecorded: true) with { MinimumExercisedFiles = 2 };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        Assert.Contains(report.Gate, g => g.Member == "<coverage>" && g.Decision == "failing");
     }
 
     // ---- Inputs ---------------------------------------------------------------------------------
@@ -339,4 +491,10 @@ public class MemberOracleTests
             CultureInfo.CurrentCulture = culture;
         }
     }
+}
+
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class MemberOracleCollection
+{
+    public const string Name = "member-oracle (process-wide console and working directory)";
 }

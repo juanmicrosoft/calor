@@ -68,7 +68,7 @@ public static class MemberOracleInputs
         [typeof(List<>), typeof(IList<>), typeof(IReadOnlyList<>), typeof(IEnumerable<>), typeof(ICollection<>), typeof(IReadOnlyCollection<>)];
 
     /// <summary>An enum value, by its underlying value (the enum type may be subject-defined).</summary>
-    public sealed record EnumToken(long Value);
+    public sealed record EnumToken(Int128 Value);
 
     /// <summary>A fresh instance of the parameter type from its public parameterless constructor.</summary>
     public sealed record DefaultInstanceToken
@@ -136,11 +136,12 @@ public static class MemberOracleInputs
         return result;
     }
 
-    /// <summary>Arguments for building a receiver: the first generated tuple with no null value, else the first tuple.</summary>
-    public static object?[] ReceiverArguments(string seedKey, string memberKey, IReadOnlyList<ParameterInfo> parameters)
+    /// <summary>Candidate arguments for building a receiver, in the order they are tried: tuples with no null value
+    /// first, then the rest, at most <paramref name="max"/>.</summary>
+    public static IReadOnlyList<object?[]> ReceiverCandidates(string seedKey, string memberKey, IReadOnlyList<ParameterInfo> parameters, int max = 16)
     {
         var tuples = Generate(seedKey, memberKey, parameters);
-        return tuples.FirstOrDefault(t => t.All(v => v is not null)) ?? tuples[0];
+        return tuples.Where(t => t.All(v => v is not null)).Concat(tuples.Where(t => t.Any(v => v is null))).Take(max).ToList();
     }
 
     public static ulong Seed(string seedKey, string memberKey)
@@ -173,13 +174,43 @@ public static class MemberOracleInputs
         return [null, DefaultInstanceToken.Instance];
     }
 
-    /// <summary>Every declared value (ordered by underlying value) plus one undeclared value.</summary>
+    /// <summary>Every declared value (ordered by underlying value) plus one undeclared value inside the underlying type's range.</summary>
     private static object?[] EnumPool(Type enumType)
     {
-        var values = Enum.GetValuesAsUnderlyingType(enumType).Cast<object>().Select(Convert.ToInt64).Distinct().Order().ToList();
-        var undeclared = values.Count == 0 ? 0 : values[^1] == long.MaxValue ? values[0] - 1 : values[^1] + 1;
-        return [.. values.Select(v => (object?)new EnumToken(v)), new EnumToken(undeclared)];
+        var values = Enum.GetValuesAsUnderlyingType(enumType).Cast<object>().Select(ToInt128).Distinct().Order().ToList();
+        var (min, max) = Range(Enum.GetUnderlyingType(enumType));
+        Int128? undeclared = values.Count == 0 ? 0 : values[^1] < max ? values[^1] + 1 : values[0] > min ? values[0] - 1 : null;
+        return [.. values.Select(v => (object?)new EnumToken(v)), .. undeclared is { } u ? new object?[] { new EnumToken(u) } : []];
     }
+
+    private static Int128 ToInt128(object value) => value switch
+    {
+        ulong u => u,
+        uint u => u,
+        ushort u => u,
+        byte u => u,
+        char c => c,
+        _ => Convert.ToInt64(value, CultureInfo.InvariantCulture),
+    };
+
+    private static (Int128 Min, Int128 Max) Range(Type underlying) => Type.GetTypeCode(underlying) switch
+    {
+        TypeCode.SByte => (sbyte.MinValue, sbyte.MaxValue),
+        TypeCode.Byte => (byte.MinValue, byte.MaxValue),
+        TypeCode.Int16 => (short.MinValue, short.MaxValue),
+        TypeCode.UInt16 => (ushort.MinValue, ushort.MaxValue),
+        TypeCode.Int32 => (int.MinValue, int.MaxValue),
+        TypeCode.UInt32 => (uint.MinValue, uint.MaxValue),
+        TypeCode.UInt64 => (ulong.MinValue, ulong.MaxValue),
+        _ => (long.MinValue, long.MaxValue),
+    };
+
+    /// <summary>An enum value from its underlying value, in the enum's own underlying type (never truncated).</summary>
+    private static object EnumValue(Type enumType, Int128 value) => Type.GetTypeCode(Enum.GetUnderlyingType(enumType)) switch
+    {
+        TypeCode.UInt64 or TypeCode.UInt32 or TypeCode.UInt16 or TypeCode.Byte => Enum.ToObject(enumType, (ulong)value),
+        _ => Enum.ToObject(enumType, (long)value),
+    };
 
     private static object? RandomValue(Type t, SplitMix64 rng)
     {
@@ -237,7 +268,7 @@ public static class MemberOracleInputs
 
     private static object? Materialize(object? value, Type target) => value switch
     {
-        EnumToken token => Enum.ToObject(Nullable.GetUnderlyingType(target) ?? target, token.Value),
+        EnumToken token => EnumValue(Nullable.GetUnderlyingType(target) ?? target, token.Value),
         DefaultInstanceToken => Activator.CreateInstance(target),
         FactoryToken factory => factory.Make(),
         ListSpec list => MakeCollection(target, list.Items),

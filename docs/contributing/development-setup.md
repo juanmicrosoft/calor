@@ -244,7 +244,8 @@ dotnet run --project tools/Calor.RoundTrip.Harness -- oracle Serilog --scope dec
 ```
 
 A behavior difference fails unless the file's conversion records a loss or
-`eng/member-oracle-baseline.json` lists it. See `bench/corpus/README.md`
+`eng/member-oracle-baseline.json` lists it with the same fingerprint. Coverage
+below the floors in `ProjectConfigs` also fails. See `bench/corpus/README.md`
 ("Member-level differential oracle").
 
 ### E2E Tests

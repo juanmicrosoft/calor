@@ -24,6 +24,12 @@ namespace Calor.RoundTrip.Harness;
 /// measured on main when it landed (2026-10-22), so losing a single file fails
 /// the leg. Raise them as the converter improves; lowering one needs a reason in
 /// the PR that does it.
+///
+/// Member-oracle floors (#1587): <c>OracleMinimumExercisedFiles</c> equals the files
+/// the oracle exercised on main when it landed (2026-10-22), so losing one fails the
+/// job. <c>OracleMinimumComparedMembers</c> is 95% of the members it compared then
+/// (rounded down): a slower runner can time a member out before its first input,
+/// which removes it from the count without any change in the code.
 /// </summary>
 public static class ProjectConfigs
 {
@@ -75,6 +81,8 @@ public static class ProjectConfigs
             MinimumNativeFraction = 0.625,
             DefaultModeMinimumCoverageFraction = 5.0 / 5,
             DefaultModeMinimumNativeFraction = 5.0 / 5,
+            OracleMinimumExercisedFiles = 5,
+            OracleMinimumComparedMembers = 194,
         };
     }
 
@@ -96,6 +104,8 @@ public static class ProjectConfigs
             MinimumNativeFraction = 0.25,
             DefaultModeMinimumCoverageFraction = 1.0 / 1,
             DefaultModeMinimumNativeFraction = 1.0 / 1,
+            OracleMinimumExercisedFiles = 1,
+            OracleMinimumComparedMembers = 9,
         };
     }
 
@@ -131,6 +141,8 @@ public static class ProjectConfigs
         MinimumNativeFraction = 0.40,
         DefaultModeMinimumCoverageFraction = 8.0 / 32,
         DefaultModeMinimumNativeFraction = 5.0 / 32,
+        OracleMinimumExercisedFiles = 8,
+        OracleMinimumComparedMembers = 539,
         // Preserve the historical classification (jobs 96339235881 and 96334195356).
         // #1448 also observed a raced MaxTypesClosing=100 despite this test setting 0.
         // Strict fixed-attempt evidence still rejects every failure, including this name;
@@ -167,6 +179,8 @@ public static class ProjectConfigs
         MinimumNativeFraction = 0.25,
         DefaultModeMinimumCoverageFraction = 14.0 / 112,
         DefaultModeMinimumNativeFraction = 10.0 / 112,
+        OracleMinimumExercisedFiles = 14,
+        OracleMinimumComparedMembers = 4508,
     };
 
     // FluentValidation — pinned 12.1.1 (71b3c60c), Apache-2.0. Library targets
@@ -186,5 +200,7 @@ public static class ProjectConfigs
         MinimumNativeFraction = 0.48,
         DefaultModeMinimumCoverageFraction = 64.0 / 139,
         DefaultModeMinimumNativeFraction = 5.0 / 139,
+        OracleMinimumExercisedFiles = 64,
+        OracleMinimumComparedMembers = 26691,
     };
 }

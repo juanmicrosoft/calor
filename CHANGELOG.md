@@ -92,17 +92,19 @@ what a program does.
   list), and `Capacity = 64` was dropped. Both conversions still reported zero losses.
   - For each corpus file that converts with the `calor convert` defaults, the oracle
     builds the project twice: the original, and with only that file swapped for its
-    round-tripped C#. It loads each build into its own assembly load context.
-  - It constructs every public type and compares the state to depth 2, meaning the
-    public fields and properties, and their fields and properties. It also calls methods
-    on generated inputs and compares return values, exception types and the state after
-    the call.
+    round-tripped C#. Each build is loaded into its own assembly load context.
+  - It constructs every type and compares the state to depth 2, meaning the public fields
+    and properties, and their fields and properties. It also calls methods on generated
+    inputs and compares return values, exception types and the state after the call.
   - A member whose two runs on the same build disagree is skipped as nondeterministic.
+    A converted build that hangs or crashes where the original does not is a difference.
   - CI runs it as the `member-oracle` job. A difference fails the job unless the file's
-    conversion records a loss or `eng/member-oracle-baseline.json` lists it.
-  - When it landed, it drove 824 members in 92 of 283 corpus files and found no
-    difference. It skipped 556 members that it cannot drive yet or that timed out.
-    The issue's two-member example is a test fixture, and the oracle flags it.
+    conversion records a loss or `eng/member-oracle-baseline.json` lists it. The job also
+    fails if fewer files or members are checked than the floors in `ProjectConfigs`.
+  - When it landed, it exercised 92 of 289 corpus files and compared 900 distinct members
+    with no difference found. Another 790 members could not be driven yet, mostly
+    because no generated input can construct them. The issue's two-member example is a
+    test fixture, and the oracle flags it.
 
 ### Release process
 

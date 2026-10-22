@@ -145,50 +145,108 @@ dotnet run --project tools/Calor.RoundTrip.Harness -- oracle --all \
   --dotnet dotnet --output ./oracle-reports/
 ```
 
-For every library file, it converts with the default leg's options
-(`ConvertCommand.BuildCSharpToCalorOptions`, Lossless), compiles the Calor back to
-C#, and builds the subject twice in-process with Roslyn from the exact `csc`
-arguments MSBuild computes: the original, and the original with only that file
-swapped. Source generators run on both builds. Each build is loaded into a fresh
-collectible `AssemblyLoadContext` per run, so static state starts clean. It then
-drives every public member of the types the file declares, plus the types of any
-file that mentions one of them (`--scope declared` drops the second set):
+**Builds.** The oracle runs `dotnet build` once on the subject library. It then
+captures the exact `csc` arguments MSBuild computes and rebuilds the library
+in-process with Roslyn. The rebuild includes source generators (with the
+project's additional files and analyzer config) and manifest resources. Before
+any comparison, the in-process original must match the `dotnet build` output:
+the same types, members and resources. Otherwise the project is inconclusive.
 
-- construction: the state right after each public constructor, recursing into
-  public fields and properties to depth 2 (`--depth`);
-- static and instance methods, property setters and indexers: return value,
-  thrown exception type, argument state after the call (including `ref`/`out`),
-  the receiver's state, the type's public static state, and console output;
-- enum values, the type's static state after initialization, and the public
-  surface (a member present in only one build is a difference).
+**Per file.** For every library file, the oracle:
 
-Inputs come from `MemberOracleInputs` (`1587-member-inputs-v1`), a fork of the
-hash-pinned B1 generator with enums, `Type`, `CultureInfo`, dates, exceptions,
-by-ref parameters and subject types that have a usable public constructor.
+1. converts it with the default leg's options
+   (`ConvertCommand.BuildCSharpToCalorOptions`, Lossless);
+2. compiles the Calor back to C#;
+3. emits the library again with only that file swapped.
+
+Each file runs in its own process. Every run loads a build into a fresh
+collectible `AssemblyLoadContext`, so static state starts clean.
+
+**What it compares.** By default (`--scope all`), the oracle drives every type
+of the project for every swapped file, internal types included. A change can
+reach behavior through any chain of callers. `--scope dependents` and
+`--scope declared` narrow this for debugging. For each type, it compares:
+
+- the surface: members, kind, visibility, base chain and interfaces. A member
+  present in only one build is a difference;
+- construction: the state after each public constructor, recursing into public
+  fields and properties to depth 2 (`--depth`). Hidden base members are included.
+  An overridden `ToString()` is included too, which shows text such as a
+  `StringBuilder`'s content;
+- methods, property setters and indexers, declared or inherited from the same
+  assembly. It compares the return value, the thrown exception type, argument
+  state after the call (including `ref`/`out`), the receiver's state, the type's
+  public static state, console output, and files created in a sandbox directory.
+  Tasks are awaited. Instance members run on a fresh receiver for each input,
+  built from a constructor and input that actually construct;
+- enum values, and the type's static state after initialization.
+
+Scalars carry their runtime type (`1` versus `1L`). A long observation is
+compared through a hash of the whole rendering, never a truncated prefix.
+
+**Inputs** come from `MemberOracleInputs` (`1587-member-inputs-v1`), seeded per
+project. It is a fork of the hash-pinned B1 generator, extended with:
+
+- enums, including unsigned 64-bit values;
+- `Type`, `CultureInfo`, dates and exceptions;
+- `ref` and `out` parameters;
+- subject types that have a usable public constructor.
+
 Generic types and methods are closed over `object`, `string` or `int` when the
 constraints allow it.
 
-Each build runs twice. A build that disagrees with its own re-run makes the member
-`NONDETERMINISTIC`, and it is skipped, not failed. A member over its time budget
-(`--member-timeout`, default 5 s) is `TIMEOUT`, but the inputs that finished before
-the timeout are still compared. A build that hangs where the other finishes all
-inputs quickly is a difference (`HANG`). Each file runs in its own process, so a
-hang or a crash costs one file.
+**Nondeterminism and time.** Each build runs twice. An input is compared only
+when both builds reproduce it. A member is `NONDETERMINISTIC` (skipped, not
+failed) only when no stable input differs.
 
-**Gate.** A difference fails, unless the file's conversion ledger records a lossy
-or dropped construct, or `eng/member-oracle-baseline.json` lists the member with
-the same first witness. A baseline entry whose witness changed fails, and so does
-one whose member now agrees, so the baseline only shrinks. Every report lists
-the members exercised and skipped, with skip reasons, in
-`<Project>-member-oracle.json` and a Markdown summary.
+A member over its time budget (`--member-timeout`, default 5 s) ends the
+process. The file restarts with that member limited to the inputs before the
+one that hung. A per-project calibration run (the original compared with itself)
+finds these limits once for all files. The hanging input is then probed from
+clean state, twice per build, in fresh processes:
 
-CI runs it as the `member-oracle` job, one matrix entry per subject. When it
-landed (2026-10-22), it exercised 92 of 283 files: Synthetic 5 of 5, Synthetic2
-1 of 1, MediatR 8 of 32, Serilog 14 of 106 and FluentValidation 64 of 139. The
-other files do not convert with the default options. It drove 824 members, found
-no difference, and skipped 556 (551 that cannot be driven yet, 5 timeouts). The
-whole corpus took about 150 s on a 4-job laptop run. `AGREE` means no
-disagreement on a finite input set, not a proof of equivalence.
+- one build hangs while the other finishes quickly: `HANG`, a difference;
+- both builds hang: `TIMEOUT`, and the earlier inputs are still compared;
+- the probes disagree with each other: `NONDETERMINISTIC`.
+
+A process that crashes is re-run with the original compared with itself. If
+that run completes, the converted build is at fault, and the file fails.
+
+**Gate.** The job fails on any of the following:
+
+- a difference, unless the file's conversion ledger records a lossy or dropped
+  construct, or `eng/member-oracle-baseline.json` lists the member with the same
+  fingerprint. The fingerprint is a hash of every differing input with both full
+  observations;
+- a converted-build crash or hang;
+- a baseline entry whose fingerprint changed, or whose member now agrees;
+- an inconclusive project;
+- coverage below the project's floors (`OracleMinimumExercisedFiles` and
+  `OracleMinimumComparedMembers` in `ProjectConfigs`).
+
+Files matched by a harness exclude pattern are reported as `excluded`, not
+dropped. Each project writes `<Project>-member-oracle.json`, which lists every
+member with its status, skip reason, input count and witnesses, plus a Markdown
+summary.
+
+CI runs this as the `member-oracle` job, one matrix entry per subject.
+When it landed (2026-10-22), it exercised 92 of 289 files:
+
+| Subject | Files exercised | Distinct members compared | Never compared |
+|---------|-----------------|---------------------------|----------------|
+| Synthetic | 5 of 5 | 41 | 0 |
+| Synthetic2 | 1 of 1 | 10 | 0 |
+| MediatR | 8 of 32 | 71 | 51 |
+| Serilog | 14 of 112 (6 excluded) | 339 | 293 |
+| FluentValidation | 64 of 139 | 439 | 446 |
+
+The other files do not convert with the default options. Most members are
+never compared because no generated input can build their receiver or
+arguments: interfaces, delegates and subject types without a usable
+constructor. Across all file swaps, the oracle made 33,625 member comparisons
+and found no difference. The whole corpus took about 5 minutes on a 4-job
+laptop run. `AGREE` means no disagreement on a finite input set, not a proof
+of equivalence.
 
 The harness defaults `--projects-dir` to this directory
 (`ProjectConfigs.DefaultCorpusDir`); `--projects-dir <path>` still overrides it.

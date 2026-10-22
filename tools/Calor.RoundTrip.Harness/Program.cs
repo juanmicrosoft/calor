@@ -39,6 +39,8 @@ switch (command)
         return await OracleCommand(cliArgs.Skip(1).ToArray());
     case "oracle-file":
         return await OracleFileCommand(cliArgs.Skip(1).ToArray());
+    case "oracle-probe":
+        return await OracleProbeCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -61,10 +63,10 @@ async Task<int> OracleCommand(string[] args)
     var jobs = int.TryParse(GetOption(args, "--jobs"), out var j) && j > 0 ? j : Math.Max(1, Math.Min(4, Environment.ProcessorCount));
     var memberTimeout = double.TryParse(GetOption(args, "--member-timeout"), System.Globalization.NumberStyles.Float,
         System.Globalization.CultureInfo.InvariantCulture, out var mt) && mt > 0 ? TimeSpan.FromSeconds(mt) : TimeSpan.FromSeconds(5);
-    var scope = (GetOption(args, "--scope") ?? "dependents").ToLowerInvariant();
-    if (scope is not ("declared" or "dependents"))
+    var scope = (GetOption(args, "--scope") ?? "all").ToLowerInvariant();
+    if (scope is not ("all" or "dependents" or "declared"))
     {
-        Console.Error.WriteLine("--scope must be 'declared' or 'dependents'.");
+        Console.Error.WriteLine("--scope must be 'all', 'dependents' or 'declared'.");
         return 2;
     }
     var (shardIndex, shardCount) = (0, 1);
@@ -124,7 +126,7 @@ async Task<int> OracleCommand(string[] args)
         Console.WriteLine($"Member oracle: {config.ProjectName}");
         var options = new Calor.RoundTrip.Harness.Oracle.OracleOptions { Depth = depth, MemberTimeout = memberTimeout };
         var report = await new Calor.RoundTrip.Harness.Oracle.OracleRunner(
-            config, options, baseline, includeDependents: scope == "dependents", shardIndex, shardCount, jobs).RunAsync();
+            config, options, baseline, scope, shardIndex, shardCount, jobs).RunAsync();
         reports.Add(report);
         var suffix = shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "";
         await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}{suffix}-member-oracle.json"),
@@ -145,20 +147,38 @@ async Task<int> OracleCommand(string[] args)
 // #1587 internal: one file of the member oracle, in its own process (spawned by `oracle`).
 async Task<int> OracleFileCommand(string[] args)
 {
-    string Required(string flag) => GetOption(args, flag) ?? throw new ArgumentException($"oracle-file requires {flag}");
-    var options = new Calor.RoundTrip.Harness.Oracle.OracleOptions
+    var options = OracleChildOptions(args) with
     {
-        Depth = int.Parse(Required("--depth"), System.Globalization.CultureInfo.InvariantCulture),
-        MemberTimeout = TimeSpan.FromSeconds(double.Parse(Required("--member-timeout"), System.Globalization.CultureInfo.InvariantCulture)),
-        SeedKey = Required("--seed"),
+        Limits = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(await File.ReadAllTextAsync(RequiredOption(args, "--limits")))!,
     };
-    await Calor.RoundTrip.Harness.Oracle.OracleRunner.RunFileAsync(Required("--spec"), Required("--original"), Required("--file"),
-        Required("--relative"), options, Required("--scope") == "dependents", Required("--out"));
+    await Calor.RoundTrip.Harness.Oracle.OracleRunner.RunFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--original"),
+        RequiredOption(args, "--file"), RequiredOption(args, "--relative"), options, RequiredOption(args, "--scope"), RequiredOption(args, "--stem"),
+        self: args.Contains("--self"));
     Console.Out.Flush();
     // A member that never returned leaves a thread running; exiting the process is the only way to stop it.
     Environment.Exit(0);
     return 0;
 }
+
+// #1587 internal: one input of one member from clean state, in its own process (spawned by `oracle` after a timeout).
+async Task<int> OracleProbeCommand(string[] args)
+{
+    await Calor.RoundTrip.Harness.Oracle.OracleRunner.ProbeFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--plan-image"),
+        RequiredOption(args, "--run-image"), RequiredOption(args, "--scope-file"), (await File.ReadAllTextAsync(RequiredOption(args, "--member-file"))).Trim(),
+        int.Parse(RequiredOption(args, "--input"), System.Globalization.CultureInfo.InvariantCulture), OracleChildOptions(args), RequiredOption(args, "--out"));
+    Console.Out.Flush();
+    Environment.Exit(0);
+    return 0;
+}
+
+Calor.RoundTrip.Harness.Oracle.OracleOptions OracleChildOptions(string[] args) => new()
+{
+    Depth = int.Parse(RequiredOption(args, "--depth"), System.Globalization.CultureInfo.InvariantCulture),
+    MemberTimeout = TimeSpan.FromSeconds(double.Parse(RequiredOption(args, "--member-timeout"), System.Globalization.CultureInfo.InvariantCulture)),
+    SeedKey = RequiredOption(args, "--seed"),
+};
+
+string RequiredOption(string[] args, string flag) => GetOption(args, flag) ?? throw new ArgumentException($"missing {flag}");
 
 async Task<int> CompareEvidenceCommand(string[] args)
 {
@@ -1069,8 +1089,8 @@ static void PrintUsage()
 
         Options (oracle):
           --depth <n>              State recursion depth (default 2)
-          --scope <dependents|declared>  Types driven per file: those the file declares, plus (default)
-                                   the types of every file that mentions one of them
+          --scope <all|dependents|declared>  Types driven per file: every project type (default), the
+                                   file's types plus those of files that mention them, or only its own
           --shard <i>/<n>          Run every n-th file starting at i (1-based)
           --jobs <n>               Files checked in parallel, one process each (default min(4, cores))
           --member-timeout <sec>   Budget for all inputs of one member on one run (default 5)
