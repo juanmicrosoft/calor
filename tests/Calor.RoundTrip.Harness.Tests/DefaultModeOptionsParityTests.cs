@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Parsing;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Migration;
 using Xunit;
@@ -30,36 +29,37 @@ public class DefaultModeOptionsParityTests
         "--timeout", "--validate", "--verbose",
     ];
 
-    private static ConversionOptions BuildFromFlaglessCommandLine()
+    /// <summary>
+    /// Runs the real <c>convert</c> command (parse, handler and all) on a small C#
+    /// file and returns the exact options it handed to the converter, captured by
+    /// <see cref="ConvertCommand.ConversionOptionsObserver"/>. Anything the handler
+    /// adds or changes after <c>BuildCSharpToCalorOptions</c> shows up here.
+    /// </summary>
+    private static async Task<ConversionOptions> CaptureCliOptionsAsync(params string[] flags)
     {
-        var command = ConvertCommand.Create();
-        var parse = command.Parse("input.cs");
-        Assert.Empty(parse.Errors);
-
-        object? Value(string alias)
-            => parse.GetValueForOption(command.Options.Single(option => option.HasAlias(alias)));
-        bool Flag(string alias) => (bool)Value(alias)!;
-        string[] Many(string alias) => (string[]?)Value(alias) ?? [];
-
-        // Mirrors the ConvertCommand handler's mapping of parsed values (including its
-        // `?? "parse"` / `?? "regular"` / `?? []` fallbacks) into the options builder.
-        return ConvertCommand.BuildCSharpToCalorOptions(
-            benchmark: Flag("--benchmark"),
-            verbose: Flag("--verbose"),
-            explain: Flag("--explain"),
-            noFallback: Flag("--no-fallback"),
-            passthrough: Flag("--passthrough"),
-            explicitCallClosers: Flag("--explicit-call-closers"),
-            lossy: Flag("--lossy"),
-            selectActivePreprocessorBranchLossy: Flag("--select-active-preprocessor-branch-lossy"),
-            definedSymbols: Many("--define"),
-            configuration: (string?)Value("--configuration"),
-            targetFramework: (string?)Value("--framework"),
-            languageVersion: (string?)Value("--language-version"),
-            documentationMode: (string?)Value("--documentation-mode") ?? "parse",
-            sourceKind: (string?)Value("--source-kind") ?? "regular",
-            features: Many("--feature"),
-            references: Many("--reference"));
+        var dir = Directory.CreateTempSubdirectory("calor-1586-parity-");
+        try
+        {
+            var input = Path.Combine(dir.FullName, "Sample.cs");
+            await File.WriteAllTextAsync(input,
+                "namespace Demo;\npublic static class Sample\n{\n    public static int Add(int a, int b) => a + b;\n}\n");
+            ConversionOptions? captured = null;
+            ConvertCommand.ConversionOptionsObserver.Value = options => captured = options;
+            try
+            {
+                await ConvertCommand.Create().InvokeAsync([input, .. flags]);
+            }
+            finally
+            {
+                ConvertCommand.ConversionOptionsObserver.Value = null;
+            }
+            Assert.NotNull(captured);
+            return captured!;
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
     }
 
     private static Dictionary<string, string> Snapshot(ConversionOptions options)
@@ -78,14 +78,32 @@ public class DefaultModeOptionsParityTests
     }
 
     [Fact]
-    public void DefaultModeOptions_EqualFlaglessCalorConvert()
+    public async Task DefaultModeOptions_EqualFlaglessCalorConvert()
     {
-        var cli = Snapshot(BuildFromFlaglessCommandLine());
+        var cli = Snapshot(await CaptureCliOptionsAsync());
         var harness = Snapshot(RoundTripPipeline.CreateDefaultModeConversionOptions());
 
         Assert.Equal(cli.Keys.OrderBy(k => k), harness.Keys.OrderBy(k => k));
         foreach (var (name, value) in cli)
             Assert.True(value == harness[name], $"ConversionOptions.{name}: calor convert={value}, harness={harness[name]}");
+    }
+
+    /// <summary>
+    /// Negative control: the comparison above is sensitive to what the handler does.
+    /// A CLI run with a flag that changes the options must NOT match the harness.
+    /// </summary>
+    [Theory]
+    [InlineData("--lossy", "Fidelity")]
+    [InlineData("--passthrough", "PassthroughOnError")]
+    [InlineData("--no-fallback", "GracefulFallback")]
+    [InlineData("--explicit-call-closers", "UseImplicitCallCloser")]
+    public async Task CliRunWithAFlag_DoesNotMatchDefaultMode(string flag, string changedOption)
+    {
+        var cli = Snapshot(await CaptureCliOptionsAsync(flag));
+        var harness = Snapshot(RoundTripPipeline.CreateDefaultModeConversionOptions());
+
+        Assert.NotEqual(harness[changedOption], cli[changedOption]);
+        Assert.NotEqual(harness, cli);
     }
 
     [Fact]
@@ -155,6 +173,20 @@ public class DefaultModeOptionsParityTests
             Assert.Equal(0.9, overridden.MinimumCoverageFraction);
             Assert.Equal(0.8, overridden.MinimumNativeFraction);
         }
+    }
+
+    [Fact]
+    public void ForMode_RefusesToTurnADefaultModeConfigBackIntoLossy()
+    {
+        // A default-mode config no longer carries the Lossy floors, so switching it
+        // back would gate the Lossy leg on the wrong numbers.
+        var defaults = ProjectConfigs.Get("MediatR", "/corpus", "dotnet")!
+            .ForMode(HarnessConversionMode.Default);
+
+        Assert.Throws<InvalidOperationException>(() => defaults.ForMode(HarnessConversionMode.Lossy));
+        var again = defaults.ForMode(HarnessConversionMode.Default);
+        Assert.Equal(defaults.MinimumCoverageFraction, again.MinimumCoverageFraction);
+        Assert.Equal(defaults.MinimumNativeFraction, again.MinimumNativeFraction);
     }
 
     [Fact]

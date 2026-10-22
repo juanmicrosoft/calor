@@ -140,15 +140,25 @@ public sealed record RoundTripConfig
     /// blocks on the floors measured for it; CLI <c>--min-*</c> overrides still win
     /// because <see cref="WithRunOverrides"/> is applied after this.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The config is already a default-mode config and <paramref name="mode"/> is Lossy:
+    /// its Lossy floors were replaced, so they cannot be restored. Start from the
+    /// canonical <see cref="ProjectConfigs"/> config instead.
+    /// </exception>
     public RoundTripConfig ForMode(HarnessConversionMode mode)
-        => mode == HarnessConversionMode.Default
-            ? this with
+        => (ConversionMode, mode) switch
+        {
+            (_, HarnessConversionMode.Default) => this with
             {
                 ConversionMode = mode,
                 MinimumCoverageFraction = DefaultModeMinimumCoverageFraction,
                 MinimumNativeFraction = DefaultModeMinimumNativeFraction,
-            }
-            : this with { ConversionMode = mode };
+            },
+            (HarnessConversionMode.Lossy, HarnessConversionMode.Lossy) => this,
+            _ => throw new InvalidOperationException(
+                "A default-mode config no longer carries its Lossy floors; " +
+                "derive the Lossy leg from the canonical ProjectConfigs config."),
+        };
 
     /// <summary>
     /// Fully-qualified test names known to be flaky in the upstream corpus
