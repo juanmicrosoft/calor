@@ -7,10 +7,10 @@ namespace Calor.RoundTrip.Harness.Tests;
 
 /// <summary>
 /// #1586: the default-mode harness leg must convert with exactly the options
-/// <c>calor convert</c> builds when the user passes no flags. These tests parse a
-/// flagless <c>convert</c> command line through the real CLI definition, map the
-/// parsed values the way the command handler does, and fail if the result differs
-/// from what the harness uses — so the CLI and the harness cannot drift apart.
+/// <c>calor convert</c> builds when the user passes no flags. These tests run the
+/// real <c>convert</c> command with no flags, capture the options its handler hands
+/// to the converter, and fail if any public option differs from what the harness
+/// uses — so the CLI and the harness cannot drift apart.
 /// </summary>
 public class DefaultModeOptionsParityTests
 {
@@ -62,9 +62,76 @@ public class DefaultModeOptionsParityTests
         }
     }
 
+    /// <summary>
+    /// Every public <see cref="ConversionOptions"/> property as comparable text. The
+    /// report snapshot leaves out two properties; they are added here explicitly so
+    /// the parity comparison covers the whole options surface
+    /// (<see cref="Snapshot_CoversEveryPublicConversionOption"/> enforces this).
+    /// </summary>
     private static Dictionary<string, string> Snapshot(ConversionOptions options)
-        => ReportGenerator.SnapshotOptions(options)
+    {
+        var snapshot = ReportGenerator.SnapshotOptions(options)
             .ToDictionary(pair => pair.Key, pair => pair.Value.GetRawText());
+        snapshot[nameof(ConversionOptions.StatusWriter)] =
+            options.StatusWriter?.GetType().FullName ?? "null";
+        snapshot[nameof(ConversionOptions.AdditionalSemanticSyntaxTrees)] = string.Join("\n---\n",
+            options.AdditionalSemanticSyntaxTrees.Select(tree =>
+                $"{tree.FilePath}\n{System.Text.Json.JsonSerializer.Serialize(ReportGenerator.SnapshotOptions(new { tree.Options }))}\n{tree.GetText()}"));
+        return snapshot;
+    }
+
+    [Fact]
+    public void Snapshot_CoversEveryPublicConversionOption()
+    {
+        var properties = typeof(ConversionOptions)
+            .GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+            .Where(property => property.GetIndexParameters().Length == 0)
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal);
+        var covered = Snapshot(new ConversionOptions()).Keys.OrderBy(name => name, StringComparer.Ordinal);
+
+        Assert.Equal(properties, covered);
+    }
+
+    /// <summary>
+    /// Negative control for the two properties the report snapshot omits: extra
+    /// semantic syntax trees (which change symbol resolution) must break parity.
+    /// </summary>
+    [Fact]
+    public void Snapshot_DetectsDifferentSemanticSyntaxTrees()
+    {
+        var harness = RoundTripPipeline.CreateDefaultModeConversionOptions();
+        var withTree = RoundTripPipeline.CreateDefaultModeConversionOptions();
+        withTree.AdditionalSemanticSyntaxTrees =
+        [
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                "namespace Demo; public sealed class Sibling { }", path: "Sibling.cs"),
+        ];
+
+        Assert.NotEqual(
+            Snapshot(harness)[nameof(ConversionOptions.AdditionalSemanticSyntaxTrees)],
+            Snapshot(withTree)[nameof(ConversionOptions.AdditionalSemanticSyntaxTrees)]);
+    }
+
+    /// <summary>
+    /// The <c>roundtrip-summary</c> CI job flags a leg as incomplete when a project
+    /// is missing from its reports, so its expected project list must match the
+    /// harness's <see cref="ProjectConfigs.KnownProjects"/> (what <c>run --all</c> runs).
+    /// </summary>
+    [Fact]
+    public void RoundTripSummaryJob_ExpectsEveryKnownProject()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Calor.sln")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var workflow = File.ReadAllLines(Path.Combine(dir!.FullName, ".github", "workflows", "test.yml"));
+        var line = Assert.Single(workflow, l => l.TrimStart().StartsWith("ROUNDTRIP_PROJECTS:", StringComparison.Ordinal));
+        var expected = line[(line.IndexOf(':') + 1)..].Trim().Trim('\'', '"')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(ProjectConfigs.KnownProjects, expected);
+    }
 
     [Fact]
     public void ConvertCommand_DefinesOnlyTheReviewedOptions()
