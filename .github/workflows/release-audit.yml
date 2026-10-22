@@ -1,18 +1,20 @@
-name: Release audit (adjudication identity)
+name: Release audit
 
-# #1410 (0.24 R2): GitHub cannot stop a person with write access from running
-# `gh release create` by hand, and a release created that way raises a `release`
-# event (releases created by publish-nuget with GITHUB_TOKEN do not). No publishing
-# workflow listens to `release` events any more, so a hand-made release publishes
-# nothing else. This audit makes such a release visible: it fails, red, unless the
-# release body ends with an adjudication identity that verifies against the release's
-# own tag and notes. It changes nothing; correcting the release is a maintainer action.
-# The 0.24.0 maintainer-override release carries a calor-maintainer-override trailer instead.
-# The audit checks it against the committed override record and reports it as UNGATED.
-# Design: docs/plans/evidence/r2-1410/release-gate.md.
+# #1582: GitHub cannot stop a person with write access from running `gh release create` by hand,
+# and a release created that way raises a `release` event (releases that publish-nuget creates
+# with GITHUB_TOKEN do not). No publishing workflow listens to `release` events, so a hand-made
+# release publishes nothing else. This audit makes a bad one visible: it fails, red, unless the
+# release's tag commit is on main and nuget.org serves both calor and Calor.Sdk at the tag's
+# version. It changes nothing; correcting the release is a maintainer action.
 on:
   release:
     types: [created, published, edited, prereleased, released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to audit (e.g. v0.26.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -27,25 +29,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify the release against its adjudication identity
+      - name: Check the tag commit is on main and nuget.org has both packages
         env:
-          BODY: ${{ github.event.release.body }}
-          TAG: ${{ github.event.release.tag_name }}
-          TITLE: ${{ github.event.release.name }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           set -euo pipefail
-          printf '%s\n' "$BODY" | tr -d '\r' > "$RUNNER_TEMP/release-body.md"
-          IDENTITY="$(sed -n 's/^<!-- calor-adjudication: \([^ ]*\) -->$/\1/p' "$RUNNER_TEMP/release-body.md" | tail -1)"
-          if [ -z "$IDENTITY" ] && grep -q '^<!-- calor-maintainer-override: ' "$RUNNER_TEMP/release-body.md"; then
-            echo "::warning::release $TAG is an UNGATED maintainer-override release, outside the #1410 gate"
-            python3 scripts/verify_maintainer_override.py --override "${TAG#v}" --candidate-tag --require-tag \
-              --release-body "$RUNNER_TEMP/release-body.md" --release-tag "$TAG" --release-title "$TITLE"
-            exit 0
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::release tag '$TAG' is not v<version>"; exit 1; }
+          VER="${TAG#v}"
+          git fetch --force origin '+refs/heads/main:refs/remotes/origin/main' "+refs/tags/$TAG:refs/tags/$TAG"
+          commit="$(git rev-parse --verify "refs/tags/$TAG^{commit}")"
+          if ! git merge-base --is-ancestor "$commit" refs/remotes/origin/main; then
+            echo "::error::release $TAG points at $commit, which is not on main"; exit 1
           fi
-          if [ -z "$IDENTITY" ]; then
-            echo "::error::release $TAG carries no adjudication identity; it did not come through the gated release path (#1410)"
-            exit 1
-          fi
-          python3 scripts/verify_release_adjudication.py --identity "$IDENTITY" \
-            --version "${TAG#v}" --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
-            --release-tag "$TAG" --release-title "$TITLE"
+          for id in calor calor.sdk; do
+            url="https://api.nuget.org/v3-flatcontainer/$id/$VER/$id.$VER.nupkg"
+            code="$(curl -sS -L -o /dev/null -w '%{http_code}' "$url")"
+            if [ "$code" != 200 ]; then
+              echo "::error::nuget.org does not serve $id $VER (HTTP $code); release $TAG did not come through publish-nuget"; exit 1
+            fi
+          done
+          echo "release $TAG: tag commit $commit is on main; nuget.org serves calor and calor.sdk $VER"

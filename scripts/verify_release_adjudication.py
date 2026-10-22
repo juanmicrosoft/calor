@@ -32,8 +32,6 @@ Negative controls: tests/Calor.Compiler.Tests/ReleaseGate/.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import html
 import json
 import os
 import re
@@ -41,6 +39,13 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# #1582: the helpers the release workflow still needs live in release_checks.py.
+from release_checks import (  # noqa: E402,F401
+    FORBIDDEN_RE, NEGATION_RE, TEXT_SUFFIXES, changelog_section, forbidden_wording, json_strings,
+    renderings, sha256, sources, tree_digest, version_headers, wording_hits, zip_entries,
+)
 
 # #1567: the per-release A1 issue, record path, contract packet, and claim registry live in this
 # map. It is read from fetched protected main (MAIN_REF), so the checkout being published, which
@@ -105,14 +110,7 @@ BENCHMARK_PUBLICATION_FILES = (
 )
 MANIFEST_ROLES = ("candidate-manifest", "raw-artifact-freeze")
 ROW_INDEPENDENCE = "reduced-maintainer-adjudicated"
-# The contract (section 9) forbids calling 0.24 evidence independently adjudicated or verified.
-# A phrase is allowed only when it is negated, as in the required limitation text itself.
-FORBIDDEN_RE = re.compile(
-    r"independently\s+(?:adjudicated|verified)|independent\s+(?:adjudication|verification)",
-    re.IGNORECASE,
-)
-NEGATION_RE = re.compile(r"\b(?:not|no|without)\s+$", re.IGNORECASE)
-TEXT_SUFFIXES = {".html", ".htm", ".txt", ".md", ".mdx", ".json", ".xml", ".rss"}
+# FORBIDDEN_RE, NEGATION_RE, and TEXT_SUFFIXES (the G012 wording scan) live in release_checks.py (#1582).
 
 
 class GateError(Exception):
@@ -249,98 +247,14 @@ class Gate:
         return result.stdout.decode().strip() if result.returncode == 0 else None
 
 
-def sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
 def text_digest(text: str) -> str:
     """Hash of release-note text: CRLF -> LF, trailing whitespace trimmed, one final newline."""
     normalized = text.replace("\r\n", "\n").rstrip() + "\n"
     return sha256(normalized.encode("utf-8"))
 
 
-def tree_digest(root: Path) -> str:
-    """SHA-256 over sorted '<file sha256>  <relative posix path>' lines (sha256sum format)."""
-    files = {p.relative_to(root).as_posix(): p for p in root.rglob("*") if p.is_file()}
-    lines = [f"{sha256(files[rel].read_bytes())}  {rel}\n" for rel in sorted(files)]
-    return sha256("".join(lines).encode("utf-8"))
-
-
-def version_headers(changelog: str, version: str) -> int:
-    """How many `## [VERSION]` headers CHANGELOG.md holds (matched literally)."""
-    return sum(1 for line in changelog.replace("\r\n", "\n").split("\n") if line.startswith(f"## [{version}]"))
-
-
-def changelog_section(changelog: str, version: str) -> str:
-    """The `## [VERSION]` section of CHANGELOG.md, the version matched literally. publish-nuget
-    renders the notes with this function (scripts/render_release_notes.py)."""
-    out, inside = [], False
-    for line in changelog.replace("\r\n", "\n").split("\n"):
-        if line.startswith(f"## [{version}]"):
-            inside = True
-        elif inside and line.startswith("## ["):
-            break
-        if inside:
-            out.append(line)
-    return "\n".join(out)
-
-
-def forbidden_wording(text: str) -> tuple[list[str], int]:
-    """Unnegated forbidden phrases, and the number of negated ones."""
-    hits, negated = [], 0
-    for match in FORBIDDEN_RE.finditer(text):
-        if NEGATION_RE.search(text[max(0, match.start() - 12): match.start()]):
-            negated += 1
-        else:
-            hits.append(match.group(0))
-    return hits, negated
-
-
-def json_strings(value: object) -> list[str]:
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, dict):
-        return [s for k, v in value.items() for s in json_strings(k) + json_strings(v)]
-    if isinstance(value, list):
-        return [s for v in value for s in json_strings(v)]
-    return []
-
-
-def sources(label: str, text: str) -> list[str]:
-    """The text as written and, for JSON, its decoded string values."""
-    found = [text]
-    if label.endswith(".json"):
-        try:
-            found.append("\n".join(json_strings(json.loads(text))))
-        except ValueError:
-            pass
-    return found
-
-
-def renderings(source: str) -> list[str]:
-    """One source as written, entity-decoded, with markup replaced by a space and removed, and
-    with Markdown emphasis removed from each of those."""
-    decoded = html.unescape(source)
-    variants = [source, decoded]
-    if "<" in decoded:
-        variants.append(re.sub(r"<[^>]+>", " ", decoded))
-        variants.append(re.sub(r"<[^>]+>", "", decoded))
-    return variants + [re.sub(r"[*_`~]", "", v) for v in variants]
-
-
 def scan_text(gate: Gate, label: str, text: str) -> None:
-    # A negation counts only where it is literal in the source. If removing markup produces a
-    # negated phrase the source does not literally contain (for example a hidden "not "), the
-    # negation came from markup and the rendered page still makes the claim.
-    hits: set[str] = set()
-    for source in sources(label, text):
-        _, literal_negations = forbidden_wording(html.unescape(source))
-        for variant in renderings(source):
-            found, negated = forbidden_wording(variant)
-            hits.update(found)
-            if negated > literal_negations:
-                hits.add("negation supplied by markup")
-    for hit in sorted(hits):
+    for hit in wording_hits(label, text):
         gate.fail("G012", f"{label}: forbidden wording '{hit}'; release evidence is not independently adjudicated")
 
 
@@ -1170,11 +1084,6 @@ def check_publication_schema(gate: Gate, record: dict) -> None:
     if isinstance(benchmark, dict) and benchmark and set(benchmark) != set(BENCHMARK_PUBLICATION_FILES):
         gate.fail("G011", "record must adjudicate exactly the #1422 benchmark outputs "
                   f"{list(BENCHMARK_PUBLICATION_FILES)} under 'benchmark-results', got {sorted(benchmark)}")
-
-
-def zip_entries(path: Path) -> dict[str, str]:
-    with zipfile.ZipFile(path) as archive:
-        return {i.filename: sha256(archive.read(i)) for i in archive.infolist() if not i.is_dir()}
 
 
 def check_files(gate: Gate, name: str, expected: object, actual: dict[str, str]) -> None:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Render the release notes: the `## [VERSION]` section of CHANGELOG.md (#1546).
 
-publish-nuget.yml renders the notes with this script, and scripts/verify_release_adjudication.py
-checks the candidate's section with the same function (changelog_section), so the notes the
-workflow publishes and the section the gate binds to the identity (G014) cannot differ.
+publish-nuget.yml renders the notes with this script. changelog_section and version_headers live
+in scripts/release_checks.py (#1582); scripts/verify_release_adjudication.py imports the same
+functions, so the two cannot disagree while that script remains.
 The version is matched literally. A missing section, or a version header that appears more than
 once, is an error.
 
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_release_adjudication import changelog_section, version_headers  # noqa: E402
+from release_checks import changelog_section, version_headers  # noqa: E402
 
 
 def main(argv: list[str]) -> int:

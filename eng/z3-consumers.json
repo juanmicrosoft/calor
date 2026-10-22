@@ -118,7 +118,7 @@
   "postPublicationProbes": [
     {
       "workflow": ".github/workflows/verify-release.yml",
-      "role": "Manual dispatch after publication: installs the published calor tool from nuget.org and fails on Calor0710. It builds nothing and needs no bootstrap; it is outside the pre-release matrix."
+      "role": "Called by publish-nuget.yml after the push and before the website dispatch (#1582), and dispatchable by hand: installs the published calor tool from nuget.org and fails on Calor0710. It builds nothing and needs no bootstrap; it is outside the pre-release matrix."
     }
   ],
   "matrix": [

@@ -33,26 +33,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
-        with:
-          dotnet-version: '10.0.401'
-
-      - name: Require the pinned release SDK (#1548)
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet --list-sdks
-          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
-          sdk="$(dotnet --version | tr -d '\r')"
-          if [ "$sdk" != 10.0.401 ]; then
-            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
-            exit 1
-          fi
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
 
       - name: Require the SDK's own runtime (byte identity, 0.25 re-proof)
         # Roslyn records its host's runtime version in every PDB, and the PDB feeds the deterministic MVID.

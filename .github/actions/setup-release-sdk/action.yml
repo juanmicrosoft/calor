@@ -1,0 +1,49 @@
+name: Set up the pinned release .NET SDK
+description: >-
+  The single copy of the release SDK pin (#1548, #1582). The byte-reproducibility evidence holds
+  for Microsoft's .NET SDK 10.0.401 only. This installs exactly that SDK into a job-private
+  directory, so the repository global.json (10.0.100, latestMinor) cannot roll forward to a newer
+  SDK on the runner image, and then fails the job unless `dotnet --version` is 10.0.401. Run it
+  after checkout and before any other dotnet command.
+
+inputs:
+  also-install:
+    description: "An extra exact SDK version to install next to the release SDK (e.g. '8.0.426' for corpus targets). Empty for none."
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install the release SDK
+      uses: actions/setup-dotnet@v4
+      env:
+        DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
+      with:
+        dotnet-version: '10.0.401'
+
+    - name: Install the extra SDK
+      if: inputs.also-install != ''
+      uses: actions/setup-dotnet@v4
+      env:
+        DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
+      with:
+        dotnet-version: ${{ inputs.also-install }}
+
+    - name: Require the pinned release SDK (#1548)
+      shell: bash
+      env:
+        EXTRA_SDK: ${{ inputs.also-install }}
+      run: |
+        set -euo pipefail
+        if [ -n "$EXTRA_SDK" ] && ! [[ "$EXTRA_SDK" =~ ^[0-9]+\.[0-9]+\.[0-9]{3}$ ]]; then
+          echo "::error::also-install must be an exact SDK version, got '$EXTRA_SDK'"
+          exit 1
+        fi
+        dotnet --list-sdks
+        # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
+        sdk="$(dotnet --version | tr -d '\r')"
+        if [ "$sdk" != 10.0.401 ]; then
+          echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
+          exit 1
+        fi

@@ -1,32 +1,28 @@
 name: Publish to NuGet
 
-# #1410 (0.24 R2): this workflow is the only release path. It no longer runs on
-# `release: created` and takes no version override. It publishes only the candidate
-# named by one successful #1408 adjudication identity, in this order: adjudication
-# gate -> release test gates -> NuGet push -> GitHub release -> release metadata ->
-# website dispatch. It never dispatches benchmark publication (#1547): that is a separate,
-# explicitly approved dispatch of benchmark.yml. The publishing job re-runs
-# scripts/verify_release_adjudication.py against the bytes it is about to publish.
-# Design: docs/plans/evidence/r2-1410/release-gate.md.
-#
-# Maintainer override (0.24.0 only, authorized 2026-10-10): a dispatch may instead pass
-# `maintainer_override: <version>`. Exactly one of the two inputs is accepted. Override mode is
-# UNGATED: it runs scripts/verify_maintainer_override.py, which needs the committed
-# docs/plans/evidence/adjudication-1408/maintainer-override.json and the MILESTONE-FAILED
-# terminal record it names, and publishes the dispatch commit on main. The release test gates
-# below run unchanged in both modes. Override mode skips the record-hash comparisons (no
-# successful record exists) and never dispatches benchmark publication.
+# The only release path (#1582). A release is a dispatch from main that names the version in
+# Directory.Build.props; CHANGELOG.md must hold its `## [X.Y.Z]` section. Order:
+#   preflight -> test, sdk-consumer, release-quality -> package (pack both, inspect, Z3 pin,
+#   SBOM, notes, wording scan, existing-version compare) -> publish (OIDC exchange in the
+#   main-only nuget-release environment, attest, push, served-package compare, GitHub release,
+#   metadata) -> install-check (installs calor from nuget.org) -> website dispatch.
+# Every step before the push blocks the push; every step after it blocks the GitHub release,
+# its metadata, and the website. `dry_run: true` runs everything up to, not including, the
+# publish job, so it never reaches the OIDC exchange. The workflow creates the tag; there is no
+# tag-push trigger (a `v*` trigger would let any writer push a tag carrying an edited workflow
+# into the publish job, #1545). It never dispatches benchmark publication (#1547).
 on:
   workflow_dispatch:
     inputs:
-      adjudication_identity:
-        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410). Exactly one of this and maintainer_override.'
-        required: false
+      version:
+        description: 'Version to release; must equal <Version> in Directory.Build.props on main'
+        required: true
         type: string
-      maintainer_override:
-        description: 'UNGATED maintainer override: the version named in docs/plans/evidence/adjudication-1408/maintainer-override.json. Leave empty for the gated path.'
+      dry_run:
+        description: 'Run every check and pack, but stop before the publish job (no OIDC exchange, no push)'
         required: false
-        type: string
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -35,70 +31,43 @@ concurrency:
   group: release-publication
   cancel-in-progress: false
 
-env:
-  ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
-  MAINTAINER_OVERRIDE: ${{ inputs.maintainer_override }}
-
 jobs:
-  adjudication-gate:
+  preflight:
     runs-on: ubuntu-latest
     outputs:
-      candidate: ${{ steps.gate.outputs.candidate }}
-      version: ${{ steps.gate.outputs.version }}
-      tag: ${{ steps.gate.outputs.tag }}
-      prerelease: ${{ steps.gate.outputs.prerelease }}
-      mode: ${{ steps.mode.outputs.mode }}
-      override_sha256: ${{ steps.gate.outputs.override_sha256 }}
+      candidate: ${{ steps.release.outputs.candidate }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
     steps:
       - name: Refuse a dispatch from any ref but main
         if: github.ref != 'refs/heads/main'
         run: |
-          echo "::error::publish-nuget runs only from main (got $GITHUB_REF); the candidate comes from the adjudication identity"
+          echo "::error::publish-nuget runs only from main (got $GITHUB_REF)"
           exit 1
 
-      - name: Checkout full history
+      - name: Checkout main with full history and tags
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Choose the release mode (exactly one input)
-        id: mode
-        run: python3 scripts/verify_maintainer_override.py --select-mode --identity "$ADJUDICATION_IDENTITY" --override "$MAINTAINER_OVERRIDE"
-
-      - name: Verify the adjudication identity (#1410) or the maintainer override
-        id: gate
+      # The version must equal Directory.Build.props, CHANGELOG.md must hold one non-empty
+      # section for it, and a tag v<version> must be absent or already at this commit. A dry run
+      # reports an existing tag at another commit as a warning; a release fails on it.
+      - name: Check the version, CHANGELOG section, and tag
+        id: release
         env:
-          RELEASE_MODE: ${{ steps.mode.outputs.mode }}
-        run: |
-          set -euo pipefail
-          case "$RELEASE_MODE" in
-            identity) python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" ;;
-            override) python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
-                        --identity "$ADJUDICATION_IDENTITY" --candidate "$GITHUB_SHA" --expect-head ;;
-            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
-          esac
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python3 scripts/release_checks.py preflight --version "$VERSION" --dry-run "$DRY_RUN"
 
-  # Truthful release gates (#790, W1 Slice 4): publishing is impossible unless
-  # the full test suite and the M-A1 packaged-SDK consumer check pass on the
-  # same commit being published.
   test:
-    # One project per runner, mirroring test.yml's matrix.
-    #
-    # This job previously ran all 13 release-critical projects SEQUENTIALLY on a
-    # single runner, and that is what blocked the v0.13.1 publish twice: the
-    # first attempt died with `terminate called after throwing 'std::system_error'`
-    # (thread/process creation failing under resource exhaustion) and the second
-    # took SIGTERM (exit 143) immediately after Calor.Performance.Tests — i.e.
-    # entering Calor.RoundTrip.Harness.Tests, which drives full builds and test
-    # runs of three external corpus repositories. Neither run came near the
-    # 40-minute timeout; the runner simply gave out.
-    #
-    # test.yml has always sharded these, which is why the same suite passes
-    # there. The gate is unchanged in strength — `publish` still needs every leg
-    # green on the commit being released — only the packing changes.
+    # One project per runner, mirroring test.yml's matrix. A single runner running all 13
+    # projects ran out of resources and blocked the v0.13.1 publish twice. `package` (and so the
+    # push) needs every leg green on the commit being released.
     name: test (${{ matrix.name }})
-    needs: adjudication-gate
+    needs: preflight
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -135,7 +104,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.adjudication-gate.outputs.candidate }}
+          ref: ${{ needs.preflight.outputs.candidate }}
+          persist-credentials: false
           submodules: recursive
           # #1159/#1417: LedgerCommitStampTests needs full history and fetched
           # protected main to decide whether each provenance identity is durable.
@@ -156,26 +126,8 @@ jobs:
           test "$(git rev-parse --is-shallow-repository)" = false
           git rev-parse --verify 'refs/remotes/origin/main^{commit}'
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
-        with:
-          dotnet-version: '10.0.401'
-
-      - name: Require the pinned release SDK (#1548)
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet --list-sdks
-          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
-          sdk="$(dotnet --version | tr -d '\r')"
-          if [ "$sdk" != 10.0.401 ]; then
-            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
-            exit 1
-          fi
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -269,7 +221,7 @@ jobs:
     # M-A1: a template consumer restores/builds/tests green against the
     # packaged Calor.Sdk from a local feed (wedge plan v0.11 D-W1.2, PP-A1).
     name: sdk-consumer (${{ matrix.rid }})
-    needs: adjudication-gate
+    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -290,28 +242,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.adjudication-gate.outputs.candidate }}
+          ref: ${{ needs.preflight.outputs.candidate }}
+          persist-credentials: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
-        with:
-          dotnet-version: '10.0.401'
-
-      - name: Require the pinned release SDK (#1548)
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet --list-sdks
-          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
-          sdk="$(dotnet --version | tr -d '\r')"
-          if [ "$sdk" != 10.0.401 ]; then
-            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
-            exit 1
-          fi
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -319,12 +254,12 @@ jobs:
       - name: Run M-A1 consumer check
         env:
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"
-          CALOR_SDK_VERSION: ${{ needs.adjudication-gate.outputs.version }}
+          CALOR_SDK_VERSION: ${{ needs.preflight.outputs.version }}
           CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
   release-quality:
-    needs: adjudication-gate
+    needs: preflight
     runs-on: ubuntu-latest
     # Main CI allows 50m; this gate also runs 100 flake trials and the full corpus.
     timeout-minutes: 60
@@ -333,7 +268,8 @@ jobs:
       - name: Checkout code and round-trip corpus
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.adjudication-gate.outputs.candidate }}
+          ref: ${{ needs.preflight.outputs.candidate }}
+          persist-credentials: false
           submodules: recursive
           # Keep ledger provenance tests active, as in main CI and release tests
           # (#1159/#1417: they fail in a shallow clone).
@@ -350,35 +286,10 @@ jobs:
           test "$(git rev-parse --is-shallow-repository)" = false
           git rev-parse --verify 'refs/remotes/origin/main^{commit}'
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
+      - name: Set up the pinned release SDK (#1548), plus .NET 8 for corpus targets
+        uses: ./.github/actions/setup-release-sdk
         with:
-          dotnet-version: '10.0.401'
-
-      - name: Setup .NET 8 for corpus targets
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
-        with:
-          dotnet-version: '8.0.426'
-
-      - name: Require the pinned release SDK (#1548)
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet --list-sdks
-          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
-          sdk="$(dotnet --version | tr -d '\r')"
-          if [ "$sdk" != 10.0.401 ]; then
-            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
-            exit 1
-          fi
+          also-install: '8.0.426'
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -391,6 +302,7 @@ jobs:
 
       - name: Run negative gate self-tests
         run: |
+          python3 scripts/test_release_checks.py
           python3 scripts/check_test_quality.py --self-test
           python3 scripts/check_trx.py --self-test
           bash scripts/check_sample_ids.sh --self-test
@@ -468,34 +380,145 @@ jobs:
             artifacts/migration/
           retention-days: 90
 
+  # Builds and checks the exact bytes to publish. No environment and no id-token: nothing here
+  # can obtain a NuGet key. A dry run ends after this job.
+  package:
+    runs-on: ubuntu-latest
+    needs: [preflight, test, sdk-consumer, release-quality]
+    outputs:
+      sums: ${{ steps.bundle.outputs.sums }}
+    steps:
+      - name: Checkout the candidate with full history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
+
+      - name: Require the SDK's own runtime (byte identity, 0.25 re-proof)
+        # Roslyn records its host's runtime version in every PDB, and the PDB feeds the deterministic MVID.
+        # setup-dotnet also installs the newest LTS runtime into the private install; remove it, so the
+        # compiler runs on the runtime SDK 10.0.401 ships with (10.0.12) and nothing newer.
+        run: python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401 --prune
+
+      # #1420: the packed Z3 bytes come from the same owned bootstrap as every test and consumer
+      # job above (checksum-pinned upstream archives, verified against
+      # .github/z3-binaries-4.15.7.sha256), not from a second download path.
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Restore dependencies
+        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode
+
+      - name: Build
+        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-restore
+
+      # Atomic same-version publish (#787): both packages are packed here, in a job that finishes
+      # before any push. The CLI and the SDK ship together or not at all. No version override:
+      # the version is Directory.Build.props, which preflight matched to the dispatch input.
+      - name: Pack CLI + SDK
+        run: |
+          set -euo pipefail
+          dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o ./nupkg
+          dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o ./nupkg /p:CalorSdkRequireAllRids=true
+
+      - name: Inspect Calor.Sdk package contents
+        run: |
+          set -euo pipefail
+          SDK_NUPKG=$(ls ./nupkg/Calor.Sdk.*.nupkg)
+          bash .github/scripts/inspect-sdk-nupkg.sh "$SDK_NUPKG" --all-rids
+
+      - name: Verify packed Z3 assets against the pins
+        run: |
+          set -euo pipefail
+          python3 scripts/check-packaged-z3.py ./nupkg/calor.*.nupkg --prefix tools/net10.0/any --all-rids
+          python3 scripts/check-packaged-z3.py ./nupkg/Calor.Sdk.*.nupkg --prefix tasks/net10.0 --all-rids
+
+      - name: Generate SBOM and provenance
+        env:
+          CANDIDATE: ${{ needs.preflight.outputs.candidate }}
+        run: |
+          python3 scripts/generate-release-metadata.py \
+            --name "calor-nuget-$CANDIDATE" \
+            --artifacts ./nupkg \
+            --output ./release-metadata \
+            --repository "${{ github.server_url }}/${{ github.repository }}" \
+            --commit "$CANDIDATE"
+
+      - name: Render release notes from the candidate CHANGELOG
+        env:
+          VER: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p ./release-notes
+          python3 scripts/render_release_notes.py "$VER" CHANGELOG.md > ./release-notes/notes.md
+          test -s ./release-notes/notes.md
+
+      # Formerly gate code G012: the notes, the package text (nuspec, README), and the metadata
+      # must not claim the release evidence was independently adjudicated or verified.
+      - name: Scan the notes and packages for forbidden wording
+        run: python3 scripts/release_checks.py wording ./release-notes/notes.md ./nupkg/calor.*.nupkg ./nupkg/Calor.Sdk.*.nupkg ./release-metadata
+
+      # --skip-duplicate alone would accept a different package already on nuget.org. An existing
+      # version must match the package built here entry by entry (only .signature.p7s may differ).
+      # A dry run reports a mismatch as a warning; the publish job repeats this check, never as a
+      # warning, immediately before the push.
+      - name: Compare any version already on nuget.org
+        env:
+          VER: ${{ needs.preflight.outputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python3 scripts/release_checks.py registry --mode existing --version "$VER" --nuget-dir ./nupkg --dry-run "$DRY_RUN"
+
+      - name: Record the bundle
+        id: bundle
+        env:
+          VER: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release_checks.py bundle --version "$VER" --nuget-dir ./nupkg
+          sha256sum ./nupkg/*.nupkg ./release-metadata/*.json ./release-notes/notes.md > SHA256SUMS
+          cat SHA256SUMS
+          echo "sums=$(sha256sum SHA256SUMS | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: |
+            ./nupkg/*.nupkg
+            ./release-metadata/*.json
+            ./release-notes/notes.md
+            SHA256SUMS
+          if-no-files-found: error
+          retention-days: 90
+
   publish:
     runs-on: ubuntu-latest
-    needs: [adjudication-gate, test, sdk-consumer, release-quality]
+    needs: [preflight, test, sdk-consumer, release-quality, package]
+    if: ${{ !inputs.dry_run }}
     # #1545: no NuGet key is stored anywhere. nuget.org Trusted Publishing (policy "calor-release":
     # juanmicrosoft/calor, workflow file publish-nuget.yml, environment nuget-release) exchanges this
     # job's GitHub OIDC token for a one-hour key. nuget.org matches the workflow file NAME and
     # ignores the ref, so the environment is what keeps older tags out: their publish-nuget.yml
     # names no environment, and `nuget-release` admits `main` alone (admin bypass off). That branch
     # rule is a required security control, not a fail-safe: an unrestricted (or auto-recreated)
-    # `nuget-release` would still yield a matching environment claim. Only a missing or mismatched
-    # nuget.org policy makes the exchange fail, which stops the job before anything is attested or
-    # pushed. Settings and checklist: docs/plans/evidence/release-gaps-0.25/README.md;
+    # `nuget-release` would still yield a matching environment claim. This is the only job with
+    # `id-token: write`. Settings and checklist: docs/plans/evidence/release-gaps-0.25/README.md;
     # scripts/check_release_credentials.py --live reports them.
     environment: nuget-release
     permissions:
       contents: write
       id-token: write
       attestations: write
-      actions: write
-    env:
-      RELEASE_MODE: ${{ needs.adjudication-gate.outputs.mode }}
-      OVERRIDE_SHA256: ${{ needs.adjudication-gate.outputs.override_sha256 }}
 
     steps:
       # Fail closed before any work: the OIDC exchange runs first, so a missing or mismatched
-      # nuget.org policy, or a run outside `nuget-release`, stops the job before it packs, attests,
-      # or pushes. The key lives one hour; the push follows within this job. Both steps are
-      # unconditional and never continue-on-error (ReleaseWorkflowGateTests and
+      # nuget.org policy, or a run outside `nuget-release`, stops the job before it attests or
+      # pushes. The key lives one hour; the push follows within this job. Both steps are
+      # unconditional and never continue-on-error (ReleaseWorkflowTests and
       # check_release_credentials.py check this). `user` is the nuget.org account that owns
       # calor and Calor.Sdk and the policy (not a secret).
       - name: Exchange the GitHub OIDC token for a short-lived NuGet key (#1545)
@@ -513,119 +536,32 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout the adjudicated candidate with full history
+      - name: Checkout the candidate
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.adjudication-gate.outputs.candidate }}
-          fetch-depth: 0
+          ref: ${{ needs.preflight.outputs.candidate }}
           persist-credentials: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
+
+      - name: Download the release bundle
+        uses: actions/download-artifact@v4
         with:
-          dotnet-version: '10.0.401'
+          name: release-bundle
+          path: .
 
-      - name: Require the pinned release SDK (#1548)
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet --list-sdks
-          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
-          sdk="$(dotnet --version | tr -d '\r')"
-          if [ "$sdk" != 10.0.401 ]; then
-            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
-            exit 1
-          fi
-
-      - name: Require the SDK's own runtime (byte identity, 0.25 re-proof)
-        # Roslyn records its host's runtime version in every PDB, and the PDB feeds the deterministic MVID.
-        # setup-dotnet also installs the newest LTS runtime into the private install; remove it, so the
-        # compiler runs on the runtime SDK 10.0.401 ships with (10.0.12) and nothing newer.
-        run: python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401 --prune
-
-      # #1420: the packed Z3 bytes come from the same owned bootstrap as every
-      # test and consumer job above (checksum-pinned upstream archives, outputs
-      # verified against .github/z3-binaries-4.15.7.sha256), not from a second
-      # download path. The z3-binaries release is a mirror pinned by that same
-      # manifest; nothing packs from it.
-      - name: Bootstrap verified Z3 assets
-        uses: ./.github/actions/bootstrap-z3
-
-      - name: Restore dependencies
-        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode
-
-      - name: Build
-        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-restore
-
-      # Atomic same-version publish (#787): pack BOTH packages first, push only
-      # after both packed successfully — the CLI and the SDK ship together or
-      # not at all.
-      - name: Pack CLI + SDK
-        run: |
-          set -euo pipefail
-          # No version override (#1410): the version is the candidate's Directory.Build.props,
-          # which the gate has already matched to the adjudicated version.
-          dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o ./nupkg
-          dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o ./nupkg /p:CalorSdkRequireAllRids=true
-
-      - name: Inspect Calor.Sdk package contents
-        run: |
-          set -euo pipefail
-          SDK_NUPKG=$(ls ./nupkg/Calor.Sdk.*.nupkg)
-          bash .github/scripts/inspect-sdk-nupkg.sh "$SDK_NUPKG" --all-rids
-
-      - name: Verify packed Z3 assets against the pins
-        run: |
-          set -euo pipefail
-          python3 scripts/check-packaged-z3.py ./nupkg/calor.*.nupkg --prefix tools/net10.0/any --all-rids
-          python3 scripts/check-packaged-z3.py ./nupkg/Calor.Sdk.*.nupkg --prefix tasks/net10.0 --all-rids
-
-      - name: Generate SBOM and provenance
-        run: |
-          python3 scripts/generate-release-metadata.py \
-            --name "calor-nuget-${{ needs.adjudication-gate.outputs.candidate }}" \
-            --artifacts ./nupkg \
-            --output ./release-metadata \
-            --repository "${{ github.server_url }}/${{ github.repository }}" \
-            --commit "${{ needs.adjudication-gate.outputs.candidate }}"
-
-      # The gate re-runs here, in the job that publishes, against the exact packages,
-      # metadata, and notes it is about to publish, before anything is attested or pushed.
-      - name: Render release notes from the candidate CHANGELOG
+      # The bundle must be exactly the bytes the package job checked, and nothing more.
+      - name: Verify the bundle against the package job's record
         env:
-          VER: ${{ needs.adjudication-gate.outputs.version }}
+          SUMS: ${{ needs.package.outputs.sums }}
+          VER: ${{ needs.preflight.outputs.version }}
         run: |
           set -euo pipefail
-          # #1546: the gate's own renderer (literal version match), so the published notes and
-          # the section the gate binds to the identity (G014) are one rendering.
-          python3 scripts/render_release_notes.py "$VER" CHANGELOG.md > "$RUNNER_TEMP/notes.md"
-          test -s "$RUNNER_TEMP/notes.md"
-
-      # Override mode cannot compare hashes with an adjudication (none succeeded). It re-checks
-      # the override record and terminal record at HEAD, that the notes are HEAD's CHANGELOG
-      # section and say the release is an ungated override, that the packages are exactly the two
-      # VERSION packages built from HEAD, that the metadata names them, and the G012 wording scan.
-      - name: Verify packages, metadata, and notes against the adjudication (#1410) or the override
-        env:
-          VER: ${{ needs.adjudication-gate.outputs.version }}
-          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
-        run: |
-          set -euo pipefail
-          case "$RELEASE_MODE" in
-            identity)
-              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-                --expect-head --version "$VER" --nuget-dir ./nupkg --metadata-dir ./release-metadata \
-                --release-notes "$RUNNER_TEMP/notes.md" ;;
-            override)
-              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
-                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
-                --nuget-dir ./nupkg --metadata-dir ./release-metadata --release-notes "$RUNNER_TEMP/notes.md" ;;
-            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
-          esac
+          test "$(sha256sum SHA256SUMS | cut -d' ' -f1)" = "$SUMS"
+          sha256sum --check --strict SHA256SUMS
+          python3 scripts/release_checks.py bundle --version "$VER" --nuget-dir ./nupkg
+          test "$(find ./nupkg ./release-metadata ./release-notes -type f | wc -l)" = "$(wc -l < SHA256SUMS)"
 
       - name: Attest NuGet packages
         uses: actions/attest-build-provenance@v2
@@ -634,71 +570,23 @@ jobs:
             ./nupkg/*.nupkg
             ./release-metadata/*.json
 
-      # --skip-duplicate alone would accept a different package already on nuget.org. An
-      # existing version is downloaded and must match the adjudicated package entry for
-      # entry (only the repository signature may differ).
-      - name: Compare any version already on nuget.org (#1410)
+      - name: Compare any version already on nuget.org
         env:
-          VER: ${{ needs.adjudication-gate.outputs.version }}
-          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/registry"
-          for id in calor calor.sdk; do
-            url="https://api.nuget.org/v3-flatcontainer/$id/$VER/$id.$VER.nupkg"
-            code="$(curl -sS -L -o "$RUNNER_TEMP/registry/$id.$VER.nupkg" -w '%{http_code}' "$url")"
-            case "$code" in
-              200) echo "nuget.org already has $id $VER; comparing" ;;
-              404) rm -f "$RUNNER_TEMP/registry/$id.$VER.nupkg" ;;
-              *) echo "::error::cannot tell whether nuget.org has $id $VER (HTTP $code)"; exit 1 ;;
-            esac
-          done
-          case "$RELEASE_MODE" in
-            identity)
-              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-                --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/registry" ;;
-            override)
-              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
-                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
-                --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/registry" ;;
-            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
-          esac
+          VER: ${{ needs.preflight.outputs.version }}
+        run: python3 scripts/release_checks.py registry --mode existing --version "$VER" --nuget-dir ./nupkg
 
       - name: Push to NuGet
         env:
           NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_OIDC_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
-      # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified
-      # package in place. Wait until nuget.org serves both packages, then compare them with
-      # the adjudicated packages before anything else is published.
-      - name: Verify the packages nuget.org serves (#1410)
+      # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified package
+      # in place. Wait (up to 30 minutes) until nuget.org serves both packages, then compare them
+      # with the packages built here before anything else is published.
+      - name: Verify the packages nuget.org serves
         env:
-          VER: ${{ needs.adjudication-gate.outputs.version }}
-          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
-        run: |
-          set -euo pipefail
-          rm -rf "$RUNNER_TEMP/served" && mkdir -p "$RUNNER_TEMP/served"
-          for id in calor calor.sdk; do
-            url="https://api.nuget.org/v3-flatcontainer/$id/$VER/$id.$VER.nupkg"
-            for attempt in $(seq 1 60); do
-              code="$(curl -sS -L -o "$RUNNER_TEMP/served/$id.$VER.nupkg" -w '%{http_code}' "$url" || echo 000)"
-              [ "$code" = 200 ] && break
-              rm -f "$RUNNER_TEMP/served/$id.$VER.nupkg"
-              sleep 30
-            done
-            test -s "$RUNNER_TEMP/served/$id.$VER.nupkg" || { echo "::error::nuget.org does not serve $id $VER after 30 minutes"; exit 1; }
-          done
-          case "$RELEASE_MODE" in
-            identity)
-              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-                --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served" ;;
-            override)
-              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
-                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
-                --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served" ;;
-            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
-          esac
+          VER: ${{ needs.preflight.outputs.version }}
+        run: python3 scripts/release_checks.py registry --mode served --version "$VER" --nuget-dir ./nupkg
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -708,17 +596,16 @@ jobs:
             ./nupkg/*.nupkg
             ./release-metadata/*.json
 
-      # The GitHub release is created only here: after adjudication and after the packages
-      # are on nuget.org. Its body is the adjudicated notes plus the identity trailer that
-      # every downstream surface checks. The remote tag is checked at this moment, not at
-      # checkout time: it must be absent or already point at the candidate. An existing
-      # release is accepted only if its body verifies; it is never edited.
+      # The GitHub release is created only here, after the packages are on nuget.org. The remote
+      # tag is checked at this moment, not at checkout time: it must be absent or already point at
+      # the candidate. An existing release is accepted only if its title and body are exactly
+      # these notes; it is never edited.
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.adjudication-gate.outputs.tag }}
-          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
-          PRERELEASE: ${{ needs.adjudication-gate.outputs.prerelease }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+          CANDIDATE: ${{ needs.preflight.outputs.candidate }}
+          PRERELEASE: ${{ needs.preflight.outputs.prerelease }}
         run: |
           set -euo pipefail
           shopt -s inherit_errexit
@@ -733,37 +620,30 @@ jobs:
           if [ -n "$existing" ] && [ "$existing" != "$CANDIDATE" ]; then
             echo "::error::tag $TAG already points at $existing, not the candidate $CANDIDATE"; exit 1
           fi
-          case "$RELEASE_MODE" in
-            identity) TRAILER="<!-- calor-adjudication: $ADJUDICATION_IDENTITY -->" ;;
-            override) TRAILER="<!-- calor-maintainer-override: v1:$CANDIDATE:$OVERRIDE_SHA256 -->" ;;
-            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
-          esac
           if gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/existing.md" 2>/dev/null; then
             TITLE="$(gh release view "$TAG" --json name --jq .name)"
-            if [ "$RELEASE_MODE" = identity ]; then
-              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-                --expect-head --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
-            else
-              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
-                --identity "$ADJUDICATION_IDENTITY" --candidate "$CANDIDATE" --expect-head \
-                --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
-            fi
+            [ "$TITLE" = "$TAG" ] || { echo "::error::existing release $TAG has title '$TITLE'"; exit 1; }
+            python3 - "$RUNNER_TEMP/existing.md" ./release-notes/notes.md <<'PY'
+          import sys
+          body, notes = (open(p, encoding="utf-8").read().replace("\r\n", "\n").strip() for p in sys.argv[1:])
+          if body != notes:
+              sys.exit("::error::the existing release has a body other than these notes; a release is never edited")
+          PY
           else
-            { cat "$RUNNER_TEMP/notes.md"; printf '\n%s\n' "$TRAILER"; } > "$RUNNER_TEMP/body.md"
             FLAG=""
             if [ "$PRERELEASE" = "true" ]; then FLAG="--prerelease"; fi
-            gh release create "$TAG" --target "$CANDIDATE" --title "$TAG" --notes-file "$RUNNER_TEMP/body.md" $FLAG
+            gh release create "$TAG" --target "$CANDIDATE" --title "$TAG" --notes-file ./release-notes/notes.md $FLAG
           fi
           if [ "$(remote_tag)" != "$CANDIDATE" ]; then
             echo "::error::after release creation tag $TAG does not point at the candidate $CANDIDATE"; exit 1
           fi
 
-      # No --clobber (#1410): an asset already attached must be byte-identical to the verified
-      # file; a missing one is uploaded; a different one fails. This keeps re-dispatch safe.
+      # No --clobber: an asset already attached must be byte-identical to the verified file; a
+      # missing one is uploaded; a different one fails. This keeps re-dispatch safe.
       - name: Attach release metadata
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.adjudication-gate.outputs.tag }}
+          TAG: ${{ needs.preflight.outputs.tag }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/assets"
@@ -776,21 +656,26 @@ jobs:
             fi
           done
 
-      # Releases created with GITHUB_TOKEN raise no `release` events, so the website is
-      # dispatched explicitly, from main, with the same identity (or override). It re-runs the
-      # gate, checks out the candidate, and checks this release's body.
-      # #1547: no mode dispatches benchmark publication. Publishing benchmark results is a
-      # separate maintainer dispatch of benchmark.yml with publish_results=true, and the gate
-      # also requires the record's explicit approval (G015).
+  # Install calor from nuget.org as a user would, and require `calor verify` to prove the sample
+  # (Proven: 14, Skipped: 0). It runs before the website is dispatched, so a broken package never
+  # reaches the site.
+  install-check:
+    needs: [preflight, publish]
+    uses: ./.github/workflows/verify-release.yml
+    with:
+      version: ${{ needs.preflight.outputs.version }}
+
+  # Releases created with GITHUB_TOKEN raise no `release` events, so the website is dispatched
+  # explicitly, from main, for the release tag. #1547: nothing dispatches benchmark publication;
+  # that is a separate maintainer dispatch of benchmark.yml.
+  website:
+    runs-on: ubuntu-latest
+    needs: [preflight, publish, install-check]
+    permissions:
+      actions: write
+    steps:
       - name: Dispatch the website deployment
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          case "$RELEASE_MODE" in
-            identity)
-              gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY" ;;
-            override)
-              gh workflow run nextjs-gh-pages.yml --ref main -f maintainer_override="$MAINTAINER_OVERRIDE" ;;
-            *) echo "::error::unknown release mode '$RELEASE_MODE'"; exit 1 ;;
-          esac
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: gh workflow run nextjs-gh-pages.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG"

@@ -39,7 +39,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_release_adjudication import tree_digest  # noqa: E402  (the gate's own digest)
+from release_checks import tree_digest  # noqa: E402  (#1582: shared with the release checks)
 
 BUILD_SCRIPT = REPO_ROOT / "scripts/reproducible-build.sh"
 Z3_REGISTRY = REPO_ROOT / "eng/z3-consumers.json"
