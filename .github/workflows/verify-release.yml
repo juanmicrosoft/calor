@@ -2,8 +2,8 @@ name: Verify Release (installed tool)
 
 # End-to-end check of a shipped release: install the `calor` tool from nuget.org as a downstream
 # consumer would, then require the Z3 verifier to prove a known sample (Proven: 14, Skipped: 0).
-# publish-nuget.yml calls this after the push and before it dispatches the website, so a failure
-# here stops the website (#1582). It can also be dispatched by hand for any shipped version, e.g.
+# publish-nuget.yml calls this after the push and before it creates the GitHub release, so a
+# failure here stops the release, its metadata, and the website (#1582). It can also be dispatched by hand for any shipped version, e.g.
 # from environments that cannot reach api.nuget.org directly.
 #
 # Independent of publish-nuget.yml's sdk-consumer matrix: that one exercises Calor.Sdk (MSBuild
@@ -17,12 +17,22 @@ on:
         description: 'Package version to verify (e.g. 0.26.0)'
         required: true
         type: string
+      ref:
+        description: 'Commit or tag to take the sample from (default: v<version>)'
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       version:
         description: 'Package version to verify (e.g. 0.26.0)'
         required: true
         type: string
+      ref:
+        description: 'Commit or tag to take the sample from (default: v<version>)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -49,11 +59,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: .github/actions
 
-      # The sample comes from the release tag. Sparse checkout keeps the runner light.
-      - name: Checkout the sample at the release tag
+      # The sample comes from `ref` (publish-nuget passes the candidate commit) or the release tag.
+      - name: Checkout the sample
         uses: actions/checkout@v4
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ inputs.ref || format('v{0}', inputs.version) }}
           path: release
           persist-credentials: false
           sparse-checkout: samples/Verification

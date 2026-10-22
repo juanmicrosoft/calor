@@ -57,7 +57,7 @@ public class ReleaseWorkflowTests
         var check = Step(Job(text, "preflight"), "Check the version, CHANGELOG section, and tag");
         Assert.Contains("python3 scripts/release_checks.py preflight --version \"$VERSION\"", check);
         // Every job that builds or ships waits for preflight.
-        foreach (var job in new[] { "test", "sdk-consumer", "release-quality", "package", "publish", "install-check", "website" })
+        foreach (var job in new[] { "test", "sdk-consumer", "release-quality", "site", "package", "publish", "install-check", "release", "website" })
             Assert.Matches(new Regex(@"(?m)^    needs: (?:preflight|\[preflight[,\]])"), Job(text, job));
     }
 
@@ -66,7 +66,7 @@ public class ReleaseWorkflowTests
     {
         var text = Read(Publish);
         var checkouts = Steps(text).Where(s => s.Contains("uses: actions/checkout@", StringComparison.Ordinal)).ToList();
-        Assert.Equal(6, checkouts.Count);
+        Assert.Equal(8, checkouts.Count);
         Assert.All(checkouts, c => Assert.Contains("persist-credentials: false", c));
         foreach (var job in new[] { "test", "release-quality" })
         {
@@ -99,7 +99,8 @@ public class ReleaseWorkflowTests
         Assert.DoesNotContain("id-token", text[..text.IndexOf("\njobs:\n", StringComparison.Ordinal)]);
         // Downstream jobs need publish, so a dry run skips them too.
         Assert.Contains("needs: [preflight, publish]", Job(text, "install-check"));
-        Assert.Contains("needs: [preflight, publish, install-check]", Job(text, "website"));
+        Assert.Contains("needs: [preflight, package, publish, install-check]", Job(text, "release"));
+        Assert.Contains("needs: [preflight, release]", Job(text, "website"));
     }
 
     [Fact]
@@ -115,9 +116,9 @@ public class ReleaseWorkflowTests
         // committed facts directly and that CI runs the parser-based check with the pinned parser.
         var lines = File.ReadAllLines(Path.Combine(WorkflowDir(), Publish));
         var publish = Read(Publish);
-        Assert.Contains("  publish:\n    runs-on: ubuntu-latest\n    needs: [preflight, test, sdk-consumer, release-quality, package]\n", publish);
+        Assert.Contains("  publish:\n    runs-on: ubuntu-latest\n    needs: [preflight, test, sdk-consumer, release-quality, site, package]\n", publish);
         Assert.Single(lines, l => l == "    environment: nuget-release");
-        Assert.Contains("    environment: nuget-release\n    permissions:\n      contents: write\n      id-token: write\n", publish);
+        Assert.Contains("    environment: nuget-release\n    permissions:\n      contents: read\n      id-token: write\n", publish);
         Assert.Contains("    steps:\n      # Fail closed before any work", publish);
         Assert.Contains(
             "      - name: Exchange the GitHub OIDC token for a short-lived NuGet key (#1545)\n" +
@@ -217,7 +218,7 @@ public class ReleaseWorkflowTests
     {
         var text = Read(Publish);
         var package = Job(text, "package");
-        Assert.Contains("    needs: [preflight, test, sdk-consumer, release-quality]\n", package);
+        Assert.Contains("    needs: [preflight, test, sdk-consumer, release-quality, site]\n", package);
         var order = new[]
         {
             "uses: ./.github/actions/setup-release-sdk",
@@ -248,9 +249,10 @@ public class ReleaseWorkflowTests
     }
 
     [Fact]
-    public void PublishJobOrdersTheExchangeChecksPushReleaseAndMetadata()
+    public void PublishJobOrdersTheExchangeChecksAndPushAndTheReleaseJobFollowsTheInstallCheck()
     {
-        var publish = Job(Read(Publish), "publish");
+        var text = Read(Publish);
+        var publish = Job(text, "publish");
         AssertInOrder(publish, new[]
         {
             "uses: NuGet/login@",
@@ -263,19 +265,32 @@ public class ReleaseWorkflowTests
             "python3 scripts/release_checks.py registry --mode existing --version \"$VER\" --nuget-dir ./nupkg\n",
             "dotnet nuget push ./nupkg/*.nupkg",
             "python3 scripts/release_checks.py registry --mode served --version \"$VER\" --nuget-dir ./nupkg\n",
+        });
+        Assert.DoesNotContain("--dry-run", publish);
+        Assert.DoesNotContain("gh release", publish);
+        Assert.DoesNotContain("contents: write", publish);
+        // The GitHub release and its metadata come after the served compare (publish) and the
+        // install check, from the bundle the package job checked.
+        var release = Job(text, "release");
+        Assert.Contains("    needs: [preflight, package, publish, install-check]\n", release);
+        AssertInOrder(release, new[]
+        {
+            "name: release-bundle",
+            "test \"$(sha256sum SHA256SUMS | cut -d' ' -f1)\" = \"$SUMS\"",
+            "sha256sum --check --strict SHA256SUMS",
             "gh release create \"$TAG\" --target \"$CANDIDATE\" --title \"$TAG\" --notes-file ./release-notes/notes.md $FLAG",
             "gh release upload \"$TAG\" \"$file\"",
         });
-        Assert.DoesNotContain("--dry-run", publish);
+        Assert.DoesNotContain("id-token", release);
         // The remote tag must be absent or at the candidate, before and after creation.
-        var create = Step(publish, "Create the GitHub release");
+        var create = Step(release, "Create the GitHub release");
         Assert.Contains("if [ -n \"$existing\" ] && [ \"$existing\" != \"$CANDIDATE\" ]; then", create);
         Assert.Contains("if [ \"$(remote_tag)\" != \"$CANDIDATE\" ]; then", create);
         Assert.Contains("PRERELEASE: ${{ needs.preflight.outputs.prerelease }}", create);
-        var text = string.Join("\n", Read(Publish).Split('\n').Where(l => !l.TrimStart().StartsWith('#')));
-        Assert.DoesNotContain("gh release edit", text);
-        Assert.DoesNotContain("--clobber", text);
-        Assert.DoesNotContain("/p:Version=", text);
+        var code = string.Join("\n", text.Split('\n').Where(l => !l.TrimStart().StartsWith('#')));
+        Assert.DoesNotContain("gh release edit", code);
+        Assert.DoesNotContain("--clobber", code);
+        Assert.DoesNotContain("/p:Version=", code);
     }
 
     [Fact]
@@ -319,17 +334,21 @@ public class ReleaseWorkflowTests
     }
 
     [Fact]
-    public void InstallCheckRunsFromPublishBeforeTheWebsiteDispatch()
+    public void InstallCheckRunsFromPublishBeforeTheReleaseAndTheWebsite()
     {
         var text = Read(Publish);
-        Assert.Contains("  install-check:\n    needs: [preflight, publish]\n    uses: ./.github/workflows/verify-release.yml\n    with:\n      version: ${{ needs.preflight.outputs.version }}\n", text);
+        Assert.Contains("  install-check:\n    needs: [preflight, publish]\n    uses: ./.github/workflows/verify-release.yml\n    with:\n"
+                        + "      version: ${{ needs.preflight.outputs.version }}\n      ref: ${{ needs.preflight.outputs.candidate }}\n", text);
+        Assert.Contains("needs: [preflight, package, publish, install-check]", Job(text, "release"));
         var website = Job(text, "website");
-        Assert.Contains("needs: [preflight, publish, install-check]", website);
-        Assert.Contains("gh workflow run nextjs-gh-pages.yml --repo \"$GITHUB_REPOSITORY\" --ref main -f tag=\"$TAG\"", website);
+        Assert.Contains("needs: [preflight, release]", website);
+        Assert.Contains("gh workflow run nextjs-gh-pages.yml --repo \"$GITHUB_REPOSITORY\" --ref main -f tag=\"$TAG\" -f commit=\"$CANDIDATE\"", website);
         Assert.Single(Regex.Matches(text, "gh workflow run"));
-        Assert.True(text.IndexOf("  install-check:", StringComparison.Ordinal) < text.IndexOf("  website:", StringComparison.Ordinal));
+        AssertInOrder(text, new[] { "\n  publish:\n", "\n  install-check:\n", "\n  release:\n", "\n  website:\n" });
         var verify = Read("verify-release.yml");
         Assert.Contains("on:\n  workflow_call:\n    inputs:\n      version:\n", verify);
+        // The sample comes from the candidate commit publish-nuget passes, never a tag that could move.
+        Assert.Contains("ref: ${{ inputs.ref || format('v{0}', inputs.version) }}", verify);
         Assert.Contains("echo \"$OUT\" | grep -Eq \"Proven:\\s+14\\b\"", verify);
         Assert.Contains("echo \"$OUT\" | grep -Eq \"Skipped:\\s+0\\b\"", verify);
         Assert.Contains("--add-source https://api.nuget.org/v3/index.json", verify);
@@ -341,16 +360,33 @@ public class ReleaseWorkflowTests
     [Fact]
     public void WordingScanCoversTheNotesThePackagesAndTheBuiltSite()
     {
-        var site = Read("nextjs-gh-pages.yml");
+        // Before the push: the candidate's site is built and scanned in `site`, which `package`
+        // and `publish` need, so it also runs in a dry run.
+        var text = Read(Publish);
+        var site = Job(text, "site");
+        Assert.Contains("    needs: preflight\n", site);
+        Assert.Contains("ref: ${{ needs.preflight.outputs.candidate }}", site);
         AssertInOrder(site, new[]
         {
+            "run: npm ci",
+            "run: npm run build",
+            "python3 scripts/check_website_fonts.py --out website/out",
+            "run: python3 scripts/release_checks.py wording website/out",
+        });
+        Assert.Contains("site, package]", Job(text, "publish"));
+        // At deployment: the tagged commit must be on main and, when publish-nuget dispatches it,
+        // be exactly the released commit; the deployed build is scanned again.
+        var deploy = Read("nextjs-gh-pages.yml");
+        AssertInOrder(deploy, new[]
+        {
             "git merge-base --is-ancestor \"$commit\" HEAD",
+            "if [ -n \"$EXPECTED\" ] && [ \"$commit\" != \"$EXPECTED\" ]; then",
             "run: npm run build",
             "python3 scripts/check_website_fonts.py --out website/out",
             "run: python3 \"$RUNNER_TEMP/release_checks.py\" wording website/out",
             "uses: actions/upload-pages-artifact@",
         });
-        Assert.Contains("if: github.ref != 'refs/heads/main'", site);
+        Assert.Contains("if: github.ref != 'refs/heads/main'", deploy);
         var checks = File.ReadAllText(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "scripts", "release_checks.py"));
         Assert.Contains("independently\\s+(?:adjudicated|verified)|independent\\s+(?:adjudication|verification)", checks);
     }

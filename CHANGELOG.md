@@ -52,11 +52,11 @@ All notable changes to this project will be documented in this file.
 - **Every check on the shipped packages stays, and each still stops the release when it fails.**
   Before anything is pushed: the 13-project test matrix, the SDK consumer test on 5 platforms,
   the coverage, mutation, performance and flakiness ratchets, the round-trip harness, package
-  inspection, the Z3 pin check, the SBOM, the wording scan of the notes and packages, and a
-  comparison with any copy of this version already on nuget.org. After the push: a comparison
-  with the packages nuget.org serves, then the GitHub release, then an install of `calor` from
-  nuget.org (`calor verify` must report `Proven: 14`, `Skipped: 0`), and only then the website.
-  The install check used to be a manual step after the release.
+  inspection, the Z3 pin check, the SBOM, the wording scan of the notes, packages and website,
+  and a comparison with any copy of this version already on nuget.org. After the push: a
+  comparison with the packages nuget.org serves, then an install of `calor` from nuget.org
+  (`calor verify` must report `Proven: 14`, `Skipped: 0`), then the GitHub release, and only then
+  the website. The install check used to be a manual step after the release.
 - **A dry run is now possible.** `dry_run: true` runs every check and builds both packages, then
   stops before the publish job. It never requests a NuGet key.
 - **Publishing still uses nuget.org Trusted Publishing.** Only the publish job, in the `main`-only

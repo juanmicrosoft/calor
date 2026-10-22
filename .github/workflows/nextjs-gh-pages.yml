@@ -12,6 +12,11 @@ on:
         description: 'Release tag to deploy (e.g. v0.26.0); its commit must be on main'
         required: true
         type: string
+      commit:
+        description: 'The commit the tag must name (publish-nuget passes the released candidate)'
+        required: false
+        type: string
+        default: ''
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -46,11 +51,15 @@ jobs:
       - name: Check out the release tag (its commit must be on main)
         env:
           TAG: ${{ inputs.tag }}
+          EXPECTED: ${{ inputs.commit }}
         run: |
           set -euo pipefail
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::'$TAG' is not a release tag"; exit 1; }
           commit="$(git rev-parse --verify "refs/tags/$TAG^{commit}")"
           git merge-base --is-ancestor "$commit" HEAD || { echo "::error::$TAG ($commit) is not on main"; exit 1; }
+          if [ -n "$EXPECTED" ] && [ "$commit" != "$EXPECTED" ]; then
+            echo "::error::$TAG names $commit, not the released commit $EXPECTED"; exit 1
+          fi
           cp scripts/release_checks.py "$RUNNER_TEMP/release_checks.py"
           git checkout -q --detach "$commit"
 

@@ -173,6 +173,7 @@
     "sdk-consumer",
     "release-quality",
     "preflight",
+    "site",
     "package"
   ]
 }
