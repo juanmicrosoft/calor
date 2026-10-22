@@ -793,8 +793,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertNotIn("refs/heads/main", line)
         inputs = re.findall(r"(?m)^      ([a-z_]+):\n        description:", text)
         # publish_results (#1547) only narrows publication: without it nothing publishes.
-        self.assertLessEqual(set(inputs), {"statistical_runs", "skip_llm", "agent_refactoring", "adjudication_identity",
-                                           "publish_results"})
+        self.assertLessEqual(set(inputs), {"statistical_runs", "skip_llm", "agent_refactoring", "publish_results"})
         self.assertRegex(text, r"(?m)^        if: .*github\.event\.inputs\.publish_results == 'true'$")
         for path in (WORKFLOW, REPO_ROOT / "scripts/check-benchmark-methodology.js"):
             self.assertNotIn("allow_weaker_methodology", path.read_text())

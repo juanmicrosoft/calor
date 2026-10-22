@@ -17,7 +17,7 @@ const releaseDate = '2026-10-20';
 // 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
 const advisoryRelease = '0.24.0';
 // The release that last published static benchmark numbers. 0.24.0 and 0.25.0 publish none: benchmark
-// publication is governed separately (#1276/#1422) and follows adjudication through #1410.
+// publication is governed separately (#1276/#1422), through its own benchmark.yml dispatch.
 const benchmarkRelease = '0.22.0';
 const benchmarkReleaseDate = '2026-09-15';
 const pauseHandoff = 'https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487';

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Prove that Calor's publication artifacts are byte-reproducible.
 
-The release gate (#1410, scripts/verify_release_adjudication.py) rebuilds the NuGet
-packages, the release metadata, and the website at publication and compares their
-SHA-256 with the adjudicated hashes. That only works if two builds of one commit,
-in different directories, produce the same bytes. This script checks exactly that.
+Two builds of one commit, in different directories, must produce the same NuGet
+packages, release metadata, and website bytes, so anyone can rebuild a release and
+compare it with what was published. This script checks exactly that.
 
   clone <dest> [--ref REF] [--z3 download|copy]
         Fresh `git clone --no-local` of this repository at REF into <dest>, with Z3
@@ -13,7 +12,7 @@ in different directories, produce the same bytes. This script checks exactly tha
   hash <build-out> --json FILE
         Hash every published file a reproducible-build.sh output directory holds:
         each .nupkg (and each zip entry with its timestamp), each release-metadata
-        file, and each website file plus the gate's tree digest.
+        file, and each website file plus a tree digest.
   compare A.json B.json --targets all|packages|website [--markdown FILE]
         Exit 1 unless both outputs hold everything the target publishes and every hash
         in A equals the one in B (no file missing on either side).

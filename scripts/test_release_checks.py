@@ -225,12 +225,10 @@ class ChangelogTests(unittest.TestCase):
         self.assertEqual("## [0.26.0] - x\n\nA.\n", rc.changelog_section(text, "0.26.0"))
         self.assertEqual(0, rc.version_headers(text, "0.27.0"))
 
-    def test_the_renderer_and_the_gate_share_these_functions(self) -> None:
+    def test_the_renderer_uses_these_functions(self) -> None:
         import render_release_notes
-        import verify_release_adjudication as gate
         self.assertIs(render_release_notes.changelog_section, rc.changelog_section)
-        self.assertIs(gate.changelog_section, rc.changelog_section)
-        self.assertIs(gate.version_headers, rc.version_headers)
+        self.assertIs(render_release_notes.version_headers, rc.version_headers)
 
 
 class PreflightTests(unittest.TestCase):

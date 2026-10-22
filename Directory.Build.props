@@ -17,10 +17,9 @@
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
 
-  <!-- Reproducible publication builds. The release gate (#1410,
-       scripts/verify_release_adjudication.py) rebuilds the packages at publication
-       and compares their SHA-256 with the adjudicated hashes, so two builds of one
-       commit must produce the same bytes in any checkout directory. Guarded by
+  <!-- Reproducible publication builds. Two builds of one commit must produce the
+       same package bytes in any checkout directory, so anyone can rebuild a release
+       and compare it with what shipped (.github/workflows/reproducible-builds.yml). Guarded by
        scripts/test_reproducible_builds.py; proof in
        docs/plans/evidence/deterministic-builds/. -->
   <PropertyGroup Label="Reproducible builds">

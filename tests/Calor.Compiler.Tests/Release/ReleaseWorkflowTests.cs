@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Xunit;
 
-namespace Calor.Compiler.Tests.ReleaseGate;
+namespace Calor.Compiler.Tests.Release;
 
 /// <summary>
 /// #1582: the release workflows run without the adjudication gate, and every check on the shipped
@@ -38,9 +38,13 @@ public class ReleaseWorkflowTests
     [MemberData(nameof(ReleaseWorkflows))]
     public void NoReleaseWorkflowCallsTheAdjudicationGate(string workflow)
     {
+        // #1583 deleted the gate scripts and its map, so a call to either names a file that no longer exists.
         var text = Read(workflow);
-        foreach (var gone in new[] { "verify_release_adjudication", "verify_maintainer_override", "adjudication_identity",
-                     "maintainer_override", "calor-adjudication", "RELEASE_MODE", "--select-mode" })
+        foreach (Match script in Regex.Matches(text, @"(?<![\w./-])scripts/[\w./-]+\.(?:py|sh|js)\b"))
+            Assert.True(File.Exists(Path.Combine(RepoRoot(), script.Value)), $"{workflow} runs {script.Value}, which does not exist");
+        foreach (Match file in Regex.Matches(text, @"(?<![\w./-])eng/[\w./-]+\.json\b"))
+            Assert.True(File.Exists(Path.Combine(RepoRoot(), file.Value)), $"{workflow} reads {file.Value}, which does not exist");
+        foreach (var gone in new[] { "calor-adjudication", "adjudication-map", "terminal-record", "RELEASE_MODE", "--select-mode" })
             Assert.DoesNotContain(gone, text);
     }
 
@@ -148,7 +152,7 @@ public class ReleaseWorkflowTests
     {
         // EXC-RELEASE-GAPS-A-YAML: the check decides on parsed YAML. CI installs the hash-pinned
         // parser into its own environment and runs both the check's tests and the check with it.
-        var requirements = File.ReadAllText(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "eng", "release-credentials-requirements.txt"));
+        var requirements = File.ReadAllText(Path.Combine(RepoRoot(), "eng", "release-credentials-requirements.txt"));
         Assert.Matches(new Regex(@"(?m)^PyYAML==\d+\.\d+\.\d+ \\$"), requirements);
         Assert.Matches(new Regex(@"--hash=sha256:[0-9a-f]{64}"), requirements);
         var test = Read("test.yml");
@@ -166,7 +170,7 @@ public class ReleaseWorkflowTests
     {
         var job = Job(Read(Publish), "test");
         var matrix = Regex.Matches(job, @"(?m)^            project: (\S+)$").Select(m => m.Groups[1].Value).OrderBy(p => p, StringComparer.Ordinal).ToList();
-        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "eng", "test-manifest.json")))!;
+        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "eng", "test-manifest.json")))!;
         var critical = manifest["projects"]!.AsArray().Where(p => (bool)p!["releaseCritical"]!).Select(p => (string)p!["path"]!)
             .OrderBy(p => p, StringComparer.Ordinal).ToList();
         Assert.Equal(13, matrix.Count);
@@ -300,7 +304,7 @@ public class ReleaseWorkflowTests
     [Fact]
     public void ExistingAndServedComparesIgnoreOnlyTheRepositorySignature()
     {
-        var checks = File.ReadAllText(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "scripts", "release_checks.py"));
+        var checks = File.ReadAllText(Path.Combine(RepoRoot(), "scripts", "release_checks.py"));
         Assert.Contains("SIGNATURE = \".signature.p7s\"", checks);
         Assert.Contains("theirs = {k: v for k, v in zip_entries(served).items() if k != SIGNATURE}", checks);
         Assert.Contains("return zip_entries(local) == theirs", checks);
@@ -391,7 +395,7 @@ public class ReleaseWorkflowTests
             "uses: actions/upload-pages-artifact@",
         });
         Assert.Contains("if: github.ref != 'refs/heads/main'", deploy);
-        var checks = File.ReadAllText(Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), "scripts", "release_checks.py"));
+        var checks = File.ReadAllText(Path.Combine(RepoRoot(), "scripts", "release_checks.py"));
         Assert.Contains("independently\\s+(?:adjudicated|verified)|independent\\s+(?:adjudication|verification)", checks);
     }
 
@@ -481,7 +485,11 @@ public class ReleaseWorkflowTests
         }
     }
 
-    private static string WorkflowDir() => Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), ".github", "workflows");
+    /// <summary>The repository root, from the test assembly's output directory.</summary>
+    internal static string RepoRoot() =>
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+
+    private static string WorkflowDir() => Path.Combine(RepoRoot(), ".github", "workflows");
 
     private static string Read(string workflow) =>
         File.ReadAllText(Path.Combine(WorkflowDir(), workflow)).Replace("\r\n", "\n");
