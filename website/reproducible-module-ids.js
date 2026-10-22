@@ -6,8 +6,8 @@
 // webpack's deterministic module ids hash that identifier, and its contextify step
 // relativizes the resource but not the query, so the same commit built in two
 // directories gets different module ids, different chunk bytes and different chunk file
-// names. The release gate (#1410) compares the built tree's hash with the adjudicated
-// one, so the site must not depend on where it is checked out.
+// names. Two builds of one commit must share a tree hash (reproducible-builds.yml checks
+// it), so the site must not depend on where it is checked out.
 //
 // This plugin runs before webpack's own DeterministicModuleIdsPlugin and assigns the
 // same kind of hash-derived numeric id, computed from a canonical form of the

@@ -25,8 +25,9 @@ What this skill does, and what it does not:
 - It bumps the version, writes the CHANGELOG section, and opens and merges the release PR.
 - It does **not** create the tag or the GitHub release, and it never runs `gh release create`.
   `publish-nuget.yml` creates both, after the packages are on nuget.org and the installed tool
-  passed its check. A release made by hand publishes nothing. `release-audit.yml` runs on every
-  release event and fails unless the tag commit is on `main` and nuget.org already serves both
+  passed its check. A release made by hand publishes nothing. `release-audit.yml` runs when a
+  release is created or published by a person (releases that `publish-nuget.yml` creates with
+  `GITHUB_TOKEN` raise no event) and fails unless the tag commit is on `main` and nuget.org already serves both
   packages at that version; it cannot tell who created the release or check its notes.
 - The **maintainer** dispatches `publish-nuget.yml`. Prepare the commands and wait; do not
   dispatch it, a dry run included, unless the maintainer explicitly asks you to in this session.

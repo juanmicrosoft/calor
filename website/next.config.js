@@ -31,8 +31,8 @@ const nextConfig = {
   trailingSlash: true,
   // Reproducible publication builds: Next.js otherwise generates a random build id per
   // build, which lands in every HTML page and in the _next/static/<id>/ path, so no two
-  // builds of one commit share a tree hash. The release gate (#1410) rebuilds the site and
-  // compares its tree hash with the adjudicated one. The id is the site version plus the
+  // builds of one commit share a tree hash (reproducible-builds.yml requires they do). The
+  // id is the site version plus the
   // commit, so it is fixed for one commit and changes with every deployment of a new one
   // (Next's router uses a changed id to detect a new deployment).
   generateBuildId: async () => `calor-${version}-${sourceCommit()}`,
