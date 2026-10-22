@@ -22,6 +22,26 @@ All notable changes to this project will be documented in this file.
 - **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
   now describes both legs and lists each leg's floors.
 
+### Fixed
+
+- **`calor convert --lossy` no longer reports output that does not compile as clean (#1514).**
+  Lossy mode skipped the round-trip check, which compiles the generated Calor and then the C#
+  it produces. So a file could convert with no recorded loss, print "✓ Conversion successful"
+  and exit `0`, while its C# did not compile. For example, a method whose `return` follows a
+  statement label lost the `return`. Lossy mode now runs the check. When the check fails:
+  - the file is still written, because `--lossy` asked for output;
+  - the text report prints `✗ Round-trip check failed` with the first compiler errors;
+  - `conversionPaths.outcome` is the new value `unverified`, and the command exits `2`;
+  - MCP `calor_convert` with `fidelity: "lossy"` returns the output with `isError: true`.
+
+  The check compiles the file on its own, so a file that uses a type declared in another file
+  of the project is also reported `unverified`. Lossless conversion is unchanged. The
+  round-trip harness, which compiles the output itself, keeps its opt-out.
+- **`conversionPaths` is now schema version 2.** It adds `roundTrip`: `verified`, `failed`,
+  `deferred` (the caller compiles the C# itself, as `calor migrate` and the MCP project tools
+  do for the whole project), or `not-run` (conversion stopped before the check). Code that
+  reads `outcome` should accept `unverified`.
+
 ## [0.25.0] - 2026-10-20
 
 Calor 0.25 is an interoperability release. It changes how the C# → Calor converter

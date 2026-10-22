@@ -602,6 +602,11 @@ public sealed class CSharpToCalorConverter
             // failure: the CLI throws the result away (so it opts in), while a
             // library caller reads `Ast` even when Success is false and must keep
             // the natively converted tree (so it stays opted out by default).
+            // #1514: plain lossy now runs the round-trip check too (below), but only
+            // to REPORT a failure. It deliberately does not open the rescue: a
+            // standalone compile also fails when the file only depends on a sibling
+            // file, and under PassthroughOnError a rescue that cannot recover would
+            // refuse a conversion lossy mode used to complete.
             var roundTripGate = _options.ValidateRoundTripCSharp
                 && (_options.Fidelity == ConversionFidelity.Lossless
                     || _options.PreprocessorMode
@@ -689,21 +694,24 @@ public sealed class CSharpToCalorConverter
                     feature: "generated-calor-validation");
             }
 
-            if (_options.ValidateRoundTripCSharp
-                && (_options.Fidelity == ConversionFidelity.Lossless
+            // #1514: the round trip is checked in every fidelity. Lossless and
+            // selected-branch-lossy conversions are refused when it fails (as
+            // before). Plain lossy keeps its output, because substitutions it was
+            // allowed to make (a statement replaced by a TODO comment) can leave C#
+            // that does not compile, but the failure is recorded as warnings and as
+            // RoundTrip = failed, so the file can never be reported as clean.
+            ValidateLosslessRoundTrip(
+                calorSource,
+                context,
+                _options.ValidateRoundTripCSharp,
+                parseOptions,
+                effectiveOutputKind,
+                _options.NullableContextOptions
+                    ?? NullableContextOptions.Disable,
+                cancellationToken,
+                refuseOnFailure: _options.Fidelity == ConversionFidelity.Lossless
                     || _options.PreprocessorMode
-                        == PreprocessorConversionMode.SelectActiveBranchLossy))
-            {
-                ValidateLosslessRoundTrip(
-                    calorSource,
-                    context,
-                    _options.ValidateRoundTripCSharp,
-                    parseOptions,
-                    effectiveOutputKind,
-                    _options.NullableContextOptions
-                        ?? NullableContextOptions.Disable,
-                    cancellationToken);
-            }
+                        == PreprocessorConversionMode.SelectActiveBranchLossy);
             foreach (var diagnostic in activeErrorDirectives)
             {
                 var span = diagnostic.Location.GetLineSpan().StartLinePosition;
@@ -1691,6 +1699,20 @@ public sealed class CSharpToCalorConverter
         return parseOptions.WithPreprocessorSymbols(symbols);
     }
 
+    /// <summary>
+    /// #1514: the feature name of the summary warning a plain lossy conversion
+    /// records when its output fails the round-trip compile check.
+    /// </summary>
+    internal const string LossyRoundTripUnverifiedFeature = "lossy-roundtrip-unverified";
+
+    /// <summary>
+    /// Compiles the emitted Calor, then the C# it generates, and records the result
+    /// in <see cref="ConversionContext.RoundTrip"/>. With
+    /// <paramref name="refuseOnFailure"/> (lossless and selected-branch lossy) each
+    /// failure is a conversion error, so the conversion is refused. Without it (plain
+    /// lossy, #1514) each failure is a warning, plus one summary warning, and the
+    /// output is kept but reported as unverified.
+    /// </summary>
     private static void ValidateLosslessRoundTrip(
         string calorSource,
         ConversionContext context,
@@ -1698,14 +1720,54 @@ public sealed class CSharpToCalorConverter
         CSharpParseOptions parseOptions,
         OutputKind outputKind,
         NullableContextOptions nullableContextOptions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool refuseOnFailure = true)
     {
-        CompilationResult compileResult;
         if (!validateGeneratedCSharp)
         {
+            // The caller compiles the generated C# itself (project migration, the
+            // round-trip harness); say so rather than leaving the field implying a check.
+            context.RoundTrip = ConversionRoundTrip.Deferred;
             return;
         }
 
+        var failures = 0;
+        void Fail(string message, string feature, int? line = null, int? column = null)
+        {
+            failures++;
+            if (refuseOnFailure)
+                context.AddError(message, feature: feature, line: line, column: column);
+            else
+                context.AddWarning(message, feature: feature, line: line, column: column);
+        }
+
+        RunRoundTripCheck(
+            calorSource, context, parseOptions, outputKind,
+            nullableContextOptions, cancellationToken, Fail);
+
+        context.RoundTrip = failures == 0
+            ? ConversionRoundTrip.Verified
+            : ConversionRoundTrip.Failed;
+        if (failures > 0 && !refuseOnFailure)
+        {
+            context.AddWarning(
+                $"Lossy output is unverified: the round-trip compile check found {failures} error(s), " +
+                "so the generated C# does not compile. The output was kept because lossy mode was requested; " +
+                "fix it by hand, or convert losslessly, which keeps a failing type as C# where it can.",
+                feature: LossyRoundTripUnverifiedFeature);
+        }
+    }
+
+    private static void RunRoundTripCheck(
+        string calorSource,
+        ConversionContext context,
+        CSharpParseOptions parseOptions,
+        OutputKind outputKind,
+        NullableContextOptions nullableContextOptions,
+        CancellationToken cancellationToken,
+        Action<string, string, int?, int?> fail)
+    {
+        CompilationResult compileResult;
         try
         {
             compileResult = global::Calor.Compiler.Program.Compile(
@@ -1725,19 +1787,19 @@ public sealed class CSharpToCalorConverter
         }
         catch (Exception ex)
         {
-            context.AddError(
+            fail(
                 $"Generated Calor validation crashed: {ex.GetType().Name}: {ex.Message}",
-                feature: "roundtrip-calor-validation");
+                "roundtrip-calor-validation", null, null);
             return;
         }
 
         foreach (var diagnostic in compileResult.Diagnostics.Errors)
         {
-            context.AddError(
+            fail(
                 $"Generated Calor failed compilation: {diagnostic.Message}",
-                line: diagnostic.Span.Line,
-                column: diagnostic.Span.Column,
-                feature: "roundtrip-calor-validation");
+                "roundtrip-calor-validation",
+                diagnostic.Span.Line,
+                diagnostic.Span.Column);
         }
 
         if (compileResult.HasErrors)
@@ -1769,11 +1831,11 @@ public sealed class CSharpToCalorConverter
             foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
             {
                 var span = diagnostic.Location.GetLineSpan().StartLinePosition;
-                context.AddError(
+                fail(
                     $"Round-tripped C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
-                    line: span.Line + 1,
-                    column: span.Character + 1,
-                    feature: "roundtrip-csharp-validation");
+                    "roundtrip-csharp-validation",
+                    span.Line + 1,
+                    span.Character + 1);
             }
         }
         catch (OperationCanceledException)
@@ -1782,9 +1844,9 @@ public sealed class CSharpToCalorConverter
         }
         catch (Exception ex)
         {
-            context.AddError(
+            fail(
                 $"Round-tripped C# validation crashed: {ex.GetType().Name}: {ex.Message}",
-                feature: "roundtrip-csharp-validation");
+                "roundtrip-csharp-validation", null, null);
         }
     }
 

@@ -33,7 +33,7 @@
       }
     ],
     "conversionPaths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "preserved",
       "interop": 1,
       "rescue": 0,
@@ -42,7 +42,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": true,
-      "passthroughOnError": false
+      "passthroughOnError": false,
+      "roundTrip": "verified"
     },
     "diagnosticCodes": [
       "Calor1343 x4"
@@ -60,7 +61,7 @@
     "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
     "exit": 0,
     "conversionPaths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "preserved",
       "interop": 1,
       "rescue": 0,
@@ -69,7 +70,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": false,
-      "passthroughOnError": false
+      "passthroughOnError": false,
+      "roundTrip": "deferred"
     }
   },
   "mcp-convert": {
@@ -87,7 +89,7 @@
       }
     ],
     "paths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "preserved",
       "interop": 1,
       "rescue": 0,
@@ -96,7 +98,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": false,
-      "passthroughOnError": false
+      "passthroughOnError": false,
+      "roundTrip": "verified"
     },
     "issueCodes": [
       "warning:Calor1343:array-element-block",
@@ -119,7 +122,7 @@
       }
     ],
     "paths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "preserved",
       "interop": 1,
       "rescue": 0,
@@ -128,7 +131,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": false,
-      "passthroughOnError": true
+      "passthroughOnError": true,
+      "roundTrip": "verified"
     },
     "issueCodes": [
       "warning:Calor1343:array-element-block",

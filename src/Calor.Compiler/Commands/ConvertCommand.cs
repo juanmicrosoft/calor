@@ -22,6 +22,12 @@ public static class ConvertCommand
     /// </summary>
     internal static readonly AsyncLocal<Action<ConversionOptions>?> ConversionOptionsObserver = new();
 
+    /// <summary>
+    /// #1514: exit code for a <c>--lossy</c> conversion whose output was written but
+    /// failed the round-trip compile check (<c>conversionPaths.outcome: "unverified"</c>).
+    /// </summary>
+    internal const int UnverifiedExitCode = 2;
+
     public static Command Create()
     {
         var inputArgument = new Argument<FileInfo>(
@@ -310,7 +316,8 @@ public static class ConvertCommand
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString()
             });
-            if (exitCode != 0)
+            // #1514: exit 2 (written but unverified) is a reported result, not a crash.
+            if (exitCode != 0 && exitCode != UnverifiedExitCode)
             {
                 IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "convert", "Conversion failed");
             }
@@ -622,11 +629,14 @@ public static class ConvertCommand
         // locations is printed instead.
         var losses = result.Context.Losses;
         envelope?.SetConversionSummary(result);
-        if (losses.Count == 0 && validationErrors.Count == 0)
+        // #1514: under --lossy the converter keeps output whose generated C# failed
+        // the round-trip compile check. It is written, but never reported as clean.
+        var unverified = result.Context.RoundTrip == ConversionRoundTrip.Failed;
+        if (losses.Count == 0 && validationErrors.Count == 0 && !unverified)
         {
             statusOut.WriteLine($"✓ Conversion successful");
         }
-        else
+        else if (losses.Count > 0 || validationErrors.Count > 0)
         {
             statusOut.WriteLine(
                 $"Conversion completed with {result.InteropPreservationCount} interop preservation(s), " +
@@ -647,6 +657,21 @@ public static class ConvertCommand
             }
         }
 
+        if (unverified)
+        {
+            var roundTripFailures = result.Issues
+                .Where(i => i.Feature is "roundtrip-calor-validation" or "roundtrip-csharp-validation")
+                .ToList();
+            statusOut.WriteLine(
+                $"✗ Round-trip check failed: the generated C# does not compile ({roundTripFailures.Count} error(s)). " +
+                "The output was written because --lossy was passed; it is unverified (exit 2).");
+            foreach (var failure in roundTripFailures.Take(5))
+                statusOut.WriteLine($"    {failure.Message}");
+            if (roundTripFailures.Count > 5)
+                statusOut.WriteLine($"    ... and {roundTripFailures.Count - 5} more");
+            statusOut.WriteLine("  Fix the output by hand, or rerun without --lossy: lossless mode keeps a failing type as C# where it can.");
+        }
+
         // #736/#717: report §CSHARP interop blocks in the output — members preserved as
         // raw C# that still need migrating. Reported whenever present, NOT gated on
         // --passthrough: a file whose members were wrapped by the visitor (known-
@@ -665,7 +690,11 @@ public static class ConvertCommand
             statusOut.WriteLine($"  {pathLine}");
 
         // Show warnings
-        var warnings = result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning).ToList();
+        // The round-trip failures were listed above (#1514), so they are not repeated here.
+        var warnings = result.Issues
+            .Where(i => i.Severity == ConversionIssueSeverity.Warning)
+            .Where(i => !unverified || i.Feature is not ("roundtrip-calor-validation" or "roundtrip-csharp-validation"))
+            .ToList();
         if (warnings.Count > 0)
         {
             statusOut.WriteLine();
@@ -703,7 +732,8 @@ public static class ConvertCommand
         statusOut.WriteLine();
         statusOut.WriteLine($"Output: {outputPath}");
 
-        return (0, result);
+        // #1514: written but unverified is neither success (0) nor refusal (1).
+        return (unverified ? UnverifiedExitCode : 0, result);
     }
 
     private static async Task<int> ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope)

@@ -496,7 +496,9 @@ count constructs the converter wrote as Calor, not members. They still include t
 constructs of a type that a rescue later replaced with its original C#. For example, the
 `W1-F6-rescue` fixture reports 3 native conversions and 1 rescue, yet its output is all
 C#. To know whether a file is fully native, read `conversionPaths.outcome` (`native`,
-`preserved`, `lossy` or `refused`) and the per-path counts next to it.
+`preserved`, `lossy`, `unverified` or `refused`) and the per-path counts next to it.
+`unverified` appears only with `--lossy`: the file was written, but its C# does not
+compile.
 
 ---
 
