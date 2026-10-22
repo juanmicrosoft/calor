@@ -26,16 +26,44 @@ namespace Calor.Tests.Shared;
 /// </summary>
 internal static class HermeticCalorHome
 {
-    /// <summary>The isolated <c>CALOR_HOME</c> this process uses. Created empty at load.</summary>
-    public static string Root { get; } =
-        Directory.CreateTempSubdirectory("calor-test-home-").FullName;
+    /// <summary>
+    /// Records the root for the whole process. This file is linked into several test assemblies, and
+    /// one test host can load more than one of them (a test assembly that references another), each
+    /// with its own copy of this class. Without the marker every copy would create its own directory
+    /// and the last one loaded would move <c>CALOR_HOME</c> under tests that are already running.
+    /// </summary>
+    private const string MarkerVariable = "CALOR_TEST_HERMETIC_HOME";
+
+    private static readonly bool CreatedHere;
+
+    /// <summary>The isolated <c>CALOR_HOME</c> this process uses. Created empty by the first copy loaded.</summary>
+    public static string Root { get; } = ResolveRoot(out CreatedHere);
 
     /// <summary>The user-level manifest directory under <see cref="Root"/>. It is never created, so it holds no manifests.</summary>
     public static string EmptyManifestRoot { get; } = Path.Combine(Root, "manifests");
 
+    private static string ResolveRoot(out bool created)
+    {
+        var existing = Environment.GetEnvironmentVariable(MarkerVariable);
+        if (!string.IsNullOrEmpty(existing) && Directory.Exists(existing))
+        {
+            created = false;
+            return existing;
+        }
+
+        var root = Directory.CreateTempSubdirectory("calor-test-home-").FullName;
+        Environment.SetEnvironmentVariable(MarkerVariable, root);
+        created = true;
+        return root;
+    }
+
     [ModuleInitializer]
     public static void Initialize()
     {
+        // Only the copy that created the root sets CALOR_HOME, so a later assembly load never
+        // resets a value a serial test changed on purpose.
+        if (!CreatedHere)
+            return;
         Environment.SetEnvironmentVariable("CALOR_HOME", Root);
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
