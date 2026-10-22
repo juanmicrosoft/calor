@@ -1216,14 +1216,15 @@ jobs:
             let body = `${marker}\n## Round-Trip Verification\n\n`;
             body += 'Two legs, each blocking on its own floors. **Lossy** is the historical harness mode. ';
             body += '**Default** converts with exactly the options `calor convert` uses with no flags (Lossless).\n\n';
-            body += '| Project | Leg | Verdict | Tests | Inventory Δ | Native | Total coverage | Interop | Gaps |\n';
-            body += '|---------|-----|---------|-------|-------------|--------|----------------|---------|------|\n';
 
             const expected = process.env.ROUNDTRIP_PROJECTS.split(' ').filter(Boolean);
             const result = process.env.ROUNDTRIP_RESULT;
+            // Before the table header, so the warning never splits the table.
             if (result !== 'success') {
               body += `:x: **roundtrip-verification finished \`${result}\`** (at least one leg failed or was cancelled; see the job logs).\n\n`;
             }
+            body += '| Project | Leg | Verdict | Tests | Inventory Δ | Native | Total coverage | Interop | Gaps |\n';
+            body += '|---------|-----|---------|-------|-------------|--------|----------------|---------|------|\n';
 
             const rows = [];
             const blockers = [];
