@@ -146,8 +146,9 @@ what a program does.
   `calor feature-check` prints. The test reads every page: tables, prose, the command's JSON
   output in code blocks, and quoted converter warnings such as `Feature 'out-var' is partially
   supported`. Today the pages make 18 such claims, and all 18 match. A wrong level or
-  an unknown feature name fails CI. So does a level word or a phrase such as "fully supported" on
-  a line that names a feature, unless it is one of the forms the test reads.
+  an unknown feature name fails CI. So does a level word or a phrase such as "fully supported" in
+  a paragraph, list item or table row that names a feature, unless it is one of the forms the
+  test reads. Three passages that use these words in another sense are listed, each with a reason.
   The page's list of known gaps between the registry and real converter behavior must match the
   test's list, and each gap carries a reason.
 

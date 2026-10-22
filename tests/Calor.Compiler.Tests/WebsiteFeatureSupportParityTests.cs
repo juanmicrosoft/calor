@@ -42,7 +42,8 @@ public sealed class WebsiteFeatureSupportParityTests
                            "or indexer getter is the separate `iterator-accessor` entry (NotSupported) and stays C#.",
     };
 
-    /// <summary>Lines whose level words state no support level for a feature (page, exact trimmed line).</summary>
+    /// <summary>Passages whose level words state no support level for a feature (page, exact text
+    /// within one line). Each excuses only its own level words, not the rest of its paragraph.</summary>
     private static readonly (string Page, string Line, string Why)[] NotClaims =
     [
         ("cli/feature-check.mdx", "0.25 converter (not yet released) reports them. `Partial` means some shapes",
@@ -50,6 +51,8 @@ public sealed class WebsiteFeatureSupportParityTests
         ("guides/csharp-interoperability.mdx",
             "| `yield` in a property or indexer getter; partial properties | Member preserved | `iterator-accessor`, `partial-property` |",
             "'partial properties' is the C# construct (partial-property), not a support level"),
+        ("guides/csharp-interoperability.mdx", "interpolation is not fully supported",
+            "restates, in words, the Partial claim made in the same sentence"),
     ];
 
     /// <summary>Claims per page. A changed count means a claim was added, removed, or no longer parses.</summary>
@@ -86,7 +89,8 @@ public sealed class WebsiteFeatureSupportParityTests
     private static readonly Regex Quoted = new(@"['\[""](?<n>[a-z0-9-]+)['\]""]");
     private static readonly Regex HyphenatedToken = new(@"(?<![\w-])(?<n>[a-z0-9]+(?:-[a-z0-9]+)+)(?![\w-])");
     private static readonly Regex LevelOption = new(@"--level\s+\S+");
-    private static readonly Regex TableRule = new(@"^\|(?:\s*:?-+:?\s*\|)+$");
+    private static readonly Regex ListItem = new(@"^(?:[-*+]|\d+\.)\s");
+    private static readonly Regex TableRule =new(@"^\|(?:\s*:?-+:?\s*\|)+$");
 
     [Fact]
     public void EveryStatedSupportLevelMatchesTheRegistry()
@@ -169,6 +173,11 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `iterator-accessor` is full.")]
     [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `iterator-accessor` is FULL.")]
     [InlineData("cli/convert.mdx", "`[out-var] Feature 'out-var' is partially supported…`", "`[out-var] out-var is Full…`")]
+    // Codex round 3: a claim wrapped across a soft line break is one statement.
+    [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
+        "The converter handles declarations without preserving raw C#: `partial-property` is\nfully supported.\n\n### Counts, Partial Results, and the JSON Envelope\n")]
+    [InlineData("cli/feature-check.mdx", "0.25 converter (not yet released) reports them. `Partial` means some shapes",
+        "0.25 converter (not yet released) reports them. `Partial` means some shapes; `partial-property` is fully supported")]
     public void ALevelInAnUnrecognizedShapeFailsTheCheck(string page, string from, string to)
     {
         var text = File.ReadAllText(PagePath(page));
@@ -254,11 +263,22 @@ public sealed class WebsiteFeatureSupportParityTests
         var unattributed = new List<string>();
         var lines = text.Replace("\r\n", "\n").Split('\n');
         int? levelColumn = null;
+        // Prose is read a paragraph (or list item) at a time, so a claim wrapped across soft line
+        // breaks is one statement: "`x` is" + "fully supported." reads as "`x` is fully supported."
+        var paragraph = new List<string>();
+        var paragraphLine = 0;
+        void Flush()
+        {
+            if (paragraph.Count > 0)
+                CheckStatement(page, paragraphLine, string.Join(" ", paragraph.Select(l => l.Trim())), 0, claims, unattributed);
+            paragraph.Clear();
+        }
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
             if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
             {
+                Flush();
                 var end = Array.FindIndex(lines, i + 1, l => l.TrimStart().StartsWith("```", StringComparison.Ordinal));
                 end = end < 0 ? lines.Length : end;
                 ScanFence(page, lines, i + 1, end, claims, unattributed);
@@ -267,63 +287,96 @@ public sealed class WebsiteFeatureSupportParityTests
                 continue;
             }
 
-            var found = 0;
-            if (line.TrimStart().StartsWith('|'))
-            {
-                var cells = Cells(line);
-                var next = i + 1 < lines.Length ? lines[i + 1].Trim() : "";
-                if (TableRule.IsMatch(next))
-                {
-                    var index = cells.FindIndex(c => c.Equals("Level", StringComparison.OrdinalIgnoreCase));
-                    levelColumn = index >= 0 ? index : null;
-                    continue;
-                }
-                if (TableRule.IsMatch(line.Trim()))
-                    continue;
-                if (levelColumn is int column && column < cells.Count)
-                {
-                    foreach (Match feature in Backticked.Matches(cells[0]))
-                    {
-                        claims.Add(new Claim(page, i + 1, feature.Groups["n"].Value, cells[column], "table"));
-                        found++;
-                    }
-                    // A non-level value in the Level column is itself a claim (and a mismatch).
-                    if (found > 0 && !LevelWord.IsMatch(cells[column]))
-                        found = 0;
-                    else if (found > 0)
-                        found = 1;
-                }
-            }
-            else
+            if (!line.TrimStart().StartsWith('|'))
             {
                 levelColumn = null;
+                var trimmed = line.TrimStart();
+                if (trimmed.Length == 0 || trimmed.StartsWith('#') || ListItem.IsMatch(trimmed))
+                    Flush();
+                if (trimmed.Length == 0)
+                    continue;
+                if (paragraph.Count == 0)
+                    paragraphLine = i + 1;
+                paragraph.Add(line);
+                if (trimmed.StartsWith('#'))
+                    Flush();
+                continue;
             }
 
-            foreach (var regex in new[] { Reports, IsLevel, Parenthesized })
-                foreach (Match m in regex.Matches(line))
+            Flush();
+            var found = 0;
+            var cells = Cells(line);
+            var next = i + 1 < lines.Length ? lines[i + 1].Trim() : "";
+            if (TableRule.IsMatch(next))
+            {
+                var index = cells.FindIndex(c => c.Equals("Level", StringComparison.OrdinalIgnoreCase));
+                levelColumn = index >= 0 ? index : null;
+                continue;
+            }
+            if (TableRule.IsMatch(line.Trim()))
+                continue;
+            if (levelColumn is int column && column < cells.Count)
+            {
+                foreach (Match feature in Backticked.Matches(cells[0]))
                 {
-                    claims.Add(new Claim(page, i + 1, m.Groups["f"].Value, m.Groups["l"].Value,
-                        regex == Reports ? "reports" : regex == IsLevel ? "is" : "parenthesized"));
+                    claims.Add(new Claim(page, i + 1, feature.Groups["n"].Value, cells[column], "table"));
                     found++;
                 }
+                // A non-level value in the Level column is itself a claim (and a mismatch).
+                if (found > 0 && !LevelWord.IsMatch(cells[column]))
+                    found = 0;
+                else if (found > 0)
+                    found = 1;
+            }
+            CheckStatement(page, i + 1, line.Trim(), found, claims, unattributed);
+        }
+        Flush();
+        return (claims, unattributed);
+    }
 
-            // A quoted converter warning counts its phrase as the claim's level word.
-            foreach (Match m in Diagnostic.Matches(line))
+    // A level word in another case is a statement when used predicatively ("`x` is full",
+    // "reports FULL"); "the full list" or "partial members" is ordinary English.
+    private static readonly Regex PredicativeLevel = new(
+        @"\b(?:is|are|was|be|as|reports|level)\s*:?\s+(?:\*\*|`)?(?<l>full|partial|notsupported|manualrequired)(?![\w-])", RegexOptions.IgnoreCase);
+
+    private static int Stated(string text)
+    {
+        text = LevelOption.Replace(text, "");
+        var canonical = LevelWord.Matches(text).Count;
+        var otherCase = PredicativeLevel.Matches(text).Count(m => !LevelWord.IsMatch(m.Groups["l"].Value));
+        return canonical + otherCase + SupportPhrase.Matches(text).Count;
+    }
+
+    /// <summary>Reads the prose claims in one statement (a paragraph, list item, or table row) and
+    /// fails any level word or support phrase in it that no claim accounts for.</summary>
+    private static void CheckStatement(string page, int lineNo, string statement, int found, List<Claim> claims, List<string> unattributed)
+    {
+        foreach (var regex in new[] { Reports, IsLevel, Parenthesized })
+            foreach (Match m in regex.Matches(statement))
             {
-                var level = m.Groups["m"].Success ? "ManualRequired"
-                    : m.Groups["p"].Value.ToLowerInvariant() switch { "fully" => "Full", "partially" => "Partial", _ => "NotSupported" };
-                claims.Add(new Claim(page, i + 1, m.Groups["f"].Value, level, "diagnostic"));
+                claims.Add(new Claim(page, lineNo, m.Groups["f"].Value, m.Groups["l"].Value,
+                    regex == Reports ? "reports" : regex == IsLevel ? "is" : "parenthesized"));
                 found++;
             }
 
-            if (!MentionsFeatures(line))
-                continue;
-            // Any case: "`x` is full" states a level as much as "`x` is Full" does.
-            var stated = AnyCaseLevelWord.Matches(LevelOption.Replace(line, "")).Count + SupportPhrase.Matches(line).Count;
-            if (stated > found && !NotClaims.Any(n => n.Page == page && n.Line == line.Trim()))
-                unattributed.Add($"{page}:{i + 1}: a support level in a form the parity check does not read: {line.Trim()}");
+        // A quoted converter warning counts its phrase as the claim's level word.
+        foreach (Match m in Diagnostic.Matches(statement))
+        {
+            var level = m.Groups["m"].Success ? "ManualRequired"
+                : m.Groups["p"].Value.ToLowerInvariant() switch { "fully" => "Full", "partially" => "Partial", _ => "NotSupported" };
+            claims.Add(new Claim(page, lineNo, m.Groups["f"].Value, level, "diagnostic"));
+            found++;
         }
-        return (claims, unattributed);
+
+        if (!MentionsFeatures(statement))
+            return;
+        // Any case: "`x` is full" states a level as much as "`x` is Full" does.
+        var stated = Stated(statement);
+        // An allowlisted passage excuses only its own level words, not the rest of the paragraph.
+        foreach (var excused in NotClaims.Where(n => n.Page == page && statement.Contains(n.Line, StringComparison.Ordinal)))
+            stated -= Stated(excused.Line);
+        if (stated > found)
+            unattributed.Add($"{page}:{lineNo}: a support level in a form the parity check does not read: {statement}");
     }
 
     /// <summary>Fenced lines [start, end). A fence that mentions a feature or the command is checked
