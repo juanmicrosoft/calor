@@ -1,0 +1,342 @@
+using System.Globalization;
+using Calor.RoundTrip.Harness.Oracle;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Xunit;
+
+namespace Calor.RoundTrip.Harness.Tests;
+
+/// <summary>
+/// #1587: the member-level differential oracle. Each fixture compiles an "original" and a "converted"
+/// C# source in memory and checks what the oracle reports. The issue's repro runs through the real
+/// converter; every other miscompilation is injected by hand so the oracle is tested independently of
+/// what the converter does today.
+/// </summary>
+public class MemberOracleTests
+{
+    private static readonly Lazy<List<MetadataReference>> References = new(() =>
+        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+        .Order(StringComparer.Ordinal).Select(p => (MetadataReference)MetadataReference.CreateFromFile(p)).ToList());
+
+    /// <summary>The issue's two-member repro, verbatim.</summary>
+    public const string HolderSource = """
+        using System.Collections.Generic;
+        using System.Text;
+
+        public class Holder
+        {
+            public List<int> Xs = new List<int> { 5 };
+            public StringBuilder Sb { get; set; } = new StringBuilder { Capacity = 64 };
+        }
+        """;
+
+    /// <summary>What <c>calor convert</c> then <c>calor --input</c> produced for the repro at HEAD 512491093 and 54ae66ee9.</summary>
+    public const string HolderMiscompiled = """
+        using System.Collections.Generic;
+        using System.Text;
+
+        public class Holder
+        {
+            public List<int> Xs = new List<int>(5);
+            public StringBuilder Sb { get; set; } = new System.Text.StringBuilder();
+        }
+        """;
+
+    internal static ArmImage Compile(string name, string source)
+    {
+        var compilation = CSharpCompilation.Create("OracleFixture",
+            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "Fixture.cs")],
+            References.Value,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable, deterministic: true));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)));
+        return new ArmImage(name, stream.ToArray(), new Dictionary<string, string>());
+    }
+
+    private static List<MemberVerdict> Compare(string original, string converted, string[] types, int depth = StateRenderer.DefaultDepth, double timeoutSeconds = 5) =>
+        MemberDifferentialOracle.Compare(Compile("original", original), Compile("converted", converted), types,
+            new OracleOptions { Depth = depth, SeedKey = "fixture", MemberTimeout = TimeSpan.FromSeconds(timeoutSeconds) });
+
+    private static MemberVerdict Single(List<MemberVerdict> verdicts, string member) =>
+        Assert.Single(verdicts, v => v.Member == member);
+
+    // ---- The issue's acceptance criterion -----------------------------------------------------
+
+    [Fact]
+    public void Repro_InjectedMiscompilation_FailsAtConstructionDepth2()
+    {
+        var verdicts = Compare(HolderSource, HolderMiscompiled, ["Holder"]);
+        var ctor = Single(verdicts, "ctor()");
+        Assert.Equal(MemberStatus.Different, ctor.Status);
+        Assert.Contains("Capacity=64", ctor.Witnesses[0], StringComparison.Ordinal);
+        // The element 5 became a capacity argument: the list is empty.
+        Assert.Contains("Xs=System.Collections.Generic.List<System.Int32>[]", ctor.Witnesses[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>The StringBuilder drop alone is invisible to ToString() and to depth 1; depth 2 catches it.</summary>
+    [Fact]
+    public void Repro_CapacityDrop_IsVisibleOnlyAtDepth2()
+    {
+        const string original = "public class Holder { public System.Text.StringBuilder Sb { get; set; } = new System.Text.StringBuilder { Capacity = 64 }; }";
+        const string converted = "public class Holder { public System.Text.StringBuilder Sb { get; set; } = new System.Text.StringBuilder(); }";
+        Assert.Equal(MemberStatus.Agree, Single(Compare(original, converted, ["Holder"], depth: 1), "ctor()").Status);
+        Assert.Equal(MemberStatus.Different, Single(Compare(original, converted, ["Holder"], depth: 2), "ctor()").Status);
+    }
+
+    /// <summary>
+    /// The real converter, with the CLI's default (Lossless) options. While the converter still miscompiles
+    /// the repro (#1541, #1524), the oracle must flag it; once it is fixed, the round-trip must agree.
+    /// </summary>
+    [Fact]
+    public void Repro_RealConverter_IsFlaggedWhileTheConverterStillMiscompilesIt()
+    {
+        var result = OracleRunner.RoundTrip(HolderSource, "Holder.cs", global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot);
+        Assert.Equal("converted", result.Status);
+        Assert.False(result.LossRecorded, "the repro is reported lossless; the oracle is what catches it");
+        var ctor = Single(Compare(HolderSource, result.CSharp!, ["Holder"]), "ctor()");
+        var stillBroken = result.CSharp!.Contains("new List<int>(5)", StringComparison.Ordinal)
+            || !result.CSharp.Contains("Capacity", StringComparison.Ordinal);
+        Assert.Equal(stillBroken ? MemberStatus.Different : MemberStatus.Agree, ctor.Status);
+    }
+
+    // ---- Methods ------------------------------------------------------------------------------
+
+    [Fact]
+    public void InstanceMethod_ReturnValueDifference_IsDifferent()
+    {
+        var verdicts = Compare(
+            "public class C { public int Bump(int x) => x + 1; }",
+            "public class C { public int Bump(int x) => x + 2; }", ["C"]);
+        var bump = Single(verdicts, "Bump(System.Int32)->System.Int32");
+        Assert.Equal(MemberStatus.Different, bump.Status);
+        Assert.Equal("OBSERVATION", bump.Reason);
+        Assert.Equal(3, bump.Witnesses.Count);
+    }
+
+    [Fact]
+    public void StaticMethod_ExceptionTypeDifference_IsDifferent()
+    {
+        var verdicts = Compare(
+            "public static class S { public static int F(string s) => s.Length; }",
+            "public static class S { public static int F(string s) => s?.Length ?? throw new System.ArgumentNullException(); }", ["S"]);
+        var f = Single(verdicts, "static F(System.String)->System.Int32");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Contains("NullReferenceException", f.Witnesses[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Setter_PostCallReceiverState_IsCompared()
+    {
+        var verdicts = Compare(
+            "public class C { private int _v; public int V { get => _v; set => _v = value; } }",
+            "public class C { private int _v; public int V { get => _v; set => _v = -value; } }", ["C"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "set_V(System.Int32)->System.Void").Status);
+    }
+
+    [Fact]
+    public void ArgumentState_AfterTheCall_IsCompared()
+    {
+        var verdicts = Compare(
+            "public static class S { public static void Fill(int[] a) { if (a != null && a.Length > 0) a[0] = 9; } public static void Out(out int x) { x = 1; } }",
+            "public static class S { public static void Fill(int[] a) { } public static void Out(out int x) { x = 2; } }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static Fill(System.Int32[])->System.Void").Status);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static Out(out ref System.Int32)->System.Void").Status);
+    }
+
+    [Fact]
+    public void GenericTypesAndMethods_AreClosedAndDriven()
+    {
+        var verdicts = Compare(
+            "public class Box<T> { public T Value { get; set; } public int Count<U>(U[] items) => items?.Length ?? 0; }",
+            "public class Box<T> { public T Value { get; set; } public int Count<U>(U[] items) => items?.Length ?? 1; }", ["Box`1"]);
+        Assert.Contains(verdicts, v => v.Type == "Box<System.Object>" && v.Member == "ctor()" && v.Status == MemberStatus.Agree);
+        Assert.Contains(verdicts, v => v.Type == "Box<System.Object>" && v.Member.StartsWith("Count<System.Object>", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
+    }
+
+    [Fact]
+    public void EnumValues_AreCompared()
+    {
+        var verdicts = Compare("public enum E { A = 1, B = 2 }", "public enum E { A = 1, B = 3 }", ["E"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "<enum-values>").Status);
+    }
+
+    [Fact]
+    public void SurfaceDifference_IsDifferent()
+    {
+        var verdicts = Compare(
+            "public class C { public int A() => 1; public int B() => 2; }",
+            "public class C { public int A() => 1; }", ["C"]);
+        var b = Single(verdicts, "B()->System.Int32");
+        Assert.Equal(MemberStatus.Different, b.Status);
+        Assert.Equal("SURFACE", b.Reason);
+    }
+
+    [Fact]
+    public void IdenticalBuilds_AllAgree()
+    {
+        const string source = """
+            public class Account
+            {
+                public decimal Balance { get; private set; }
+                public System.Collections.Generic.List<string> Log { get; } = new() { "open" };
+                public void Deposit(decimal amount) { if (amount <= 0) throw new System.ArgumentOutOfRangeException(); Balance += amount; Log.Add("d"); }
+                public static string Describe(Kind k, bool? flag) => k + ":" + flag;
+            }
+            public enum Kind { Cash, Card }
+            """;
+        var verdicts = Compare(source, source, ["Account", "Kind"]);
+        Assert.All(verdicts, v => Assert.Equal(MemberStatus.Agree, v.Status));
+        Assert.Contains(verdicts, v => v.Member.StartsWith("Deposit", StringComparison.Ordinal) && v.Inputs > 1);
+    }
+
+    // ---- Skips, never failures --------------------------------------------------------------
+
+    [Fact]
+    public void NondeterministicMember_IsSkippedNotFailed()
+    {
+        const string source = "public class C { public string Id { get; } = System.Guid.NewGuid().ToString(); }";
+        var ctor = Single(Compare(source, source, ["C"]), "ctor()");
+        Assert.Equal(MemberStatus.Nondeterministic, ctor.Status);
+    }
+
+    /// <summary>Each run gets a fresh load context, so deterministic static mutation is not mistaken for nondeterminism.</summary>
+    [Fact]
+    public void StaticStateMutation_IsDeterministicAcrossRuns()
+    {
+        const string original = "public static class Counter { public static int Count; public static int Next() => ++Count; }";
+        const string converted = "public static class Counter { public static int Count; public static int Next() => Count += 2; }";
+        Assert.Equal(MemberStatus.Agree, Single(Compare(original, original, ["Counter"]), "static Next()->System.Int32").Status);
+        Assert.Equal(MemberStatus.Different, Single(Compare(original, converted, ["Counter"]), "static Next()->System.Int32").Status);
+    }
+
+    [Fact]
+    public void UnsupportedParameters_AreSkippedWithAReason()
+    {
+        const string source = "public static class S { public static int Apply(System.Func<int, int> f) => f(1); }";
+        var apply = Single(Compare(source, source, ["S"]), "static Apply(System.Func<System.Int32,System.Int32>)->System.Int32");
+        Assert.Equal(MemberStatus.Skipped, apply.Status);
+        Assert.StartsWith("unsupported parameter type", apply.Reason, StringComparison.Ordinal);
+    }
+
+    /// <summary>A converted build that hangs where the original returns at once is a difference, not a timeout skip.</summary>
+    [Fact]
+    public void ConvertedHang_IsDifferent()
+    {
+        var verdicts = Compare(
+            "public static class S { public static int F(bool b) => b ? 1 : 0; }",
+            "public static class S { public static int F(bool b) { if (b) System.Threading.Thread.Sleep(4000); return b ? 1 : 0; } }",
+            ["S"], timeoutSeconds: 1);
+        var f = Single(verdicts, "static F(System.Boolean)->System.Int32");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Equal("HANG", f.Reason);
+    }
+
+    /// <summary>When both builds time out, the inputs that finished before the timeout are still compared.</summary>
+    [Fact]
+    public void SharedTimeout_StillComparesTheFinishedPrefix()
+    {
+        const string slow = "if (n == int.MaxValue) System.Threading.Thread.Sleep(4000);";
+        var verdicts = Compare(
+            "public static class S { public static int F(int n) { " + slow + " return n; } }",
+            "public static class S { public static int F(int n) { " + slow + " return n == 7 ? 8 : n; } }",
+            ["S"], timeoutSeconds: 1);
+        var f = Single(verdicts, "static F(System.Int32)->System.Int32");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Contains("(7)", f.Witnesses[0], StringComparison.Ordinal);
+    }
+
+    // ---- Gate ---------------------------------------------------------------------------------
+
+    private static OracleProjectReport GateReport(bool lossRecorded, string witness = "w1") => new()
+    {
+        Project = "P",
+        Files =
+        {
+            new OracleFileReport
+            {
+                File = "a.cs", Status = "exercised", LossRecorded = lossRecorded,
+                Members =
+                [
+                    new MemberVerdict { Type = "T", Member = "M()", Kind = "instance", Status = MemberStatus.Different, Witnesses = [witness] },
+                    new MemberVerdict { Type = "T", Member = "N()", Kind = "instance", Status = MemberStatus.Agree },
+                ],
+            },
+        },
+    };
+
+    private static OracleBaselineEntry Entry(string member, string witness) =>
+        new() { Project = "P", File = "a.cs", Member = member, Finding = "finding", Witness = witness };
+
+    [Fact]
+    public void Gate_UnlistedDifferenceOnALosslessFile_Fails()
+    {
+        var report = GateReport(lossRecorded: false);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        Assert.False(report.Passed);
+        Assert.Equal("failing", Assert.Single(report.Gate).Decision);
+    }
+
+    [Fact]
+    public void Gate_DifferenceOnAFileWithARecordedLoss_IsTolerated()
+    {
+        var report = GateReport(lossRecorded: true);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        Assert.True(report.Passed);
+        Assert.Equal("loss-recorded", Assert.Single(report.Gate).Decision);
+    }
+
+    [Fact]
+    public void Gate_BaselinedDifference_PassesOnlyWithTheSameWitness()
+    {
+        var same = GateReport(lossRecorded: false);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, same, ["a.cs"]);
+        Assert.True(same.Passed);
+
+        var changed = GateReport(lossRecorded: false, witness: "w2");
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, changed, ["a.cs"]);
+        Assert.False(changed.Passed);
+        Assert.Equal("baseline-changed", Assert.Single(changed.Gate).Decision);
+    }
+
+    [Fact]
+    public void Gate_BaselineEntryForAnAgreeingMember_IsStale()
+    {
+        var report = GateReport(lossRecorded: true);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::N()", "w")] }, report, ["a.cs"]);
+        Assert.False(report.Passed);
+        Assert.Contains(report.Gate, g => g.Decision == "baseline-stale" && g.Member == "T::N()");
+    }
+
+    [Fact]
+    public void Gate_InconclusiveRun_Fails()
+    {
+        var report = new OracleProjectReport { Project = "P", Inconclusive = "original does not compile" };
+        Assert.False(report.Passed);
+    }
+
+    // ---- Inputs ---------------------------------------------------------------------------------
+
+    [Fact]
+    public void InputGenerator_IsAForkUnderItsOwnId()
+    {
+        Assert.Equal("1587-member-inputs-v1", MemberOracleInputs.GeneratorId);
+    }
+
+    [Fact]
+    public void Renderer_IsCultureInvariant()
+    {
+        var culture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+            Assert.Equal("1.5d", StateRenderer.Render(1.5, 0));
+            Assert.Equal("2.25m", StateRenderer.Render(2.25m, 0));
+            Assert.Equal("2024-02-29T13:45:30.1230000Z/Utc", StateRenderer.Render(new DateTime(2024, 2, 29, 13, 45, 30, 123, DateTimeKind.Utc), 0));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+        }
+    }
+}

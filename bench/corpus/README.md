@@ -134,6 +134,62 @@ failure, but its behavior is not tested through Calor. The
 pass-count delta alarm (`scripts/roundtrip_delta.py`) compares only the Lossy
 leg against `eng/roundtrip-baselines.json` and never blocks.
 
+## Member-level differential oracle (#1587)
+
+Both harness legs catch a behavior change only when the subject's own tests
+exercise it, and Lossless validation only compiles the round-tripped C#.
+`calor-roundtrip oracle` checks behavior directly:
+
+```bash
+dotnet run --project tools/Calor.RoundTrip.Harness -- oracle --all \
+  --dotnet dotnet --output ./oracle-reports/
+```
+
+For every library file, it converts with the default leg's options
+(`ConvertCommand.BuildCSharpToCalorOptions`, Lossless), compiles the Calor back to
+C#, and builds the subject twice in-process with Roslyn from the exact `csc`
+arguments MSBuild computes: the original, and the original with only that file
+swapped. Source generators run on both builds. Each build is loaded into a fresh
+collectible `AssemblyLoadContext` per run, so static state starts clean. It then
+drives every public member of the types the file declares, plus the types of any
+file that mentions one of them (`--scope declared` drops the second set):
+
+- construction: the state right after each public constructor, recursing into
+  public fields and properties to depth 2 (`--depth`);
+- static and instance methods, property setters and indexers: return value,
+  thrown exception type, argument state after the call (including `ref`/`out`),
+  the receiver's state, the type's public static state, and console output;
+- enum values, the type's static state after initialization, and the public
+  surface (a member present in only one build is a difference).
+
+Inputs come from `MemberOracleInputs` (`1587-member-inputs-v1`), a fork of the
+hash-pinned B1 generator with enums, `Type`, `CultureInfo`, dates, exceptions,
+by-ref parameters and subject types that have a usable public constructor.
+Generic types and methods are closed over `object`, `string` or `int` when the
+constraints allow it.
+
+Each build runs twice. A build that disagrees with its own re-run makes the member
+`NONDETERMINISTIC`, and it is skipped, not failed. A member over its time budget
+(`--member-timeout`, default 5 s) is `TIMEOUT`, but the inputs that finished before
+the timeout are still compared. A build that hangs where the other finishes all
+inputs quickly is a difference (`HANG`). Each file runs in its own process, so a
+hang or a crash costs one file.
+
+**Gate.** A difference fails, unless the file's conversion ledger records a lossy
+or dropped construct, or `eng/member-oracle-baseline.json` lists the member with
+the same first witness. A baseline entry whose witness changed fails, and so does
+one whose member now agrees, so the baseline only shrinks. Every report lists
+the members exercised and skipped, with skip reasons, in
+`<Project>-member-oracle.json` and a Markdown summary.
+
+CI runs it as the `member-oracle` job, one matrix entry per subject. When it
+landed (2026-10-22), it exercised 92 of 283 files: Synthetic 5 of 5, Synthetic2
+1 of 1, MediatR 8 of 32, Serilog 14 of 106 and FluentValidation 64 of 139. The
+other files do not convert with the default options. It drove 824 members, found
+no difference, and skipped 556 (551 that cannot be driven yet, 5 timeouts). The
+whole corpus took about 150 s on a 4-job laptop run. `AGREE` means no
+disagreement on a finite input set, not a proof of equivalence.
+
 The harness defaults `--projects-dir` to this directory
 (`ProjectConfigs.DefaultCorpusDir`); `--projects-dir <path>` still overrides it.
 The **main** Calor build and test suite do **not** depend on the corpus — the
