@@ -27,8 +27,9 @@ public class ReleaseGateScopePacketTests
     [Fact]
     public void CommittedMapNamesTheScopePacketFormat()
     {
+        // D-A1-RELEASE-STATE-FILES: set to adjudicated by the gate-state PR after #1430's record merged.
         var entry = Entry(GateRepo.CommittedMap(), "0.25.x");
-        Assert.Equal("not-yet-adjudicated", entry["status"]!.GetValue<string>());
+        Assert.Equal("adjudicated", entry["status"]!.GetValue<string>());
         Assert.Equal("calor.v0.25-scope-packet/1426", entry["contractPacket"]!["format"]!.GetValue<string>());
         Assert.Equal(Scope, entry["contractPacket"]!["contract"]!.GetValue<string>());
     }
@@ -387,7 +388,7 @@ public class ReleaseGateScopePacketTests
         ReadyEdit? readyEdit = null, bool adjudicated = true)
     {
         var map = GateRepo.CommittedMap();
-        if (adjudicated) Entry(map, "0.25.x")["status"] = "adjudicated";
+        Entry(map, "0.25.x")["status"] = adjudicated ? "adjudicated" : "not-yet-adjudicated";
         var root = RepoRoot();
         var scope = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Scope)))!;
         var registerNode = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Register)))!;
