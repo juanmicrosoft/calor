@@ -162,7 +162,7 @@ Calor, then compiles the C# that Calor produces.
 | `roundTrip` | Meaning |
 |:------------|:--------|
 | `verified` | Both compiles succeeded. |
-| `failed` | A compile failed. A lossless conversion is then refused. A `--lossy` conversion is written with `outcome: "unverified"`. |
+| `failed` | A compile failed. A lossless conversion is then refused, and so is one with `--select-active-preprocessor-branch-lossy`. A plain `--lossy` conversion is written with `outcome: "unverified"`. |
 | `deferred` | The caller compiles the C# itself. `calor migrate` and the MCP project tools do this for the whole project at once; a failure there refuses the file. |
 | `not-run` | Conversion stopped before the check, so the file is refused. |
 
@@ -187,13 +187,13 @@ diagnostic whose message starts with the feature name, for example
 | `conversionPaths` | The per-file outcome and per-path counts above |
 
 So `nativeConversionCount > 0` does not mean the file is native. Read
-`conversionPaths.outcome`. A conversion can be partial in two ways:
+`conversionPaths.outcome`. A conversion can be partial in these ways:
 
 - **Preserved** (`outcome: "preserved"`, exit `0`): the file is written, and some
   members, statements, or holes are still C#.
 - **Refused** (`outcome: "refused"`, exit `1`): nothing is written. This happens when
   `--no-fallback` meets a construct with no Calor form, or when no rescue applies.
-- **Unverified** (`outcome: "unverified"`, exit `2`, `--lossy` only): the file is
+- **Unverified** (`outcome: "unverified"`, exit `2`, plain `--lossy` only): the file is
   written, but its C# does not compile. The report prints
   `✗ Round-trip check failed` with the first compiler errors. Fix the output by hand,
   or rerun without `--lossy`: the default lossless mode keeps a failing type as C#
@@ -555,7 +555,7 @@ assuming it reproduces the website headline.
 |:-----|:--------|
 | `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
 | `1` | Missing input, unsupported construct with `--no-fallback`, timeout, or a refused conversion (`outcome: "refused"`; no file written) |
-| `2` | `--lossy` only: the file was written, but its C# failed the round-trip compile check (`outcome: "unverified"`) |
+| `2` | Plain `--lossy` only: the file was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
 
 ---
 

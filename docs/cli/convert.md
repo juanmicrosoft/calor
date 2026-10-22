@@ -154,6 +154,7 @@ reported with its source location. Lossy output still goes through the same
 round-trip compile check (#1514). When it fails, the file is written but
 `conversionPaths.outcome` is `unverified`, `conversionPaths.roundTrip` is
 `failed`, each compiler error is a warning, and the command exits `2`.
+(`--select-active-preprocessor-branch-lossy` still refuses on a failed check.)
 
 ### Conditional compilation and compiler directives
 
@@ -396,7 +397,7 @@ Review the warnings and manually adjust as needed.
 |:-----|:--------|
 | `0` | Conversion completed; read `conversionPaths.outcome` to tell native from preserved or lossy output |
 | `1` | Missing input, timeout, `--no-fallback` refusal, or any refused conversion (`outcome: "refused"`; nothing written) |
-| `2` | `--lossy` output was written, but its C# failed the round-trip compile check (`outcome: "unverified"`) |
+| `2` | Plain `--lossy` output was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
 
 ---
 
