@@ -121,6 +121,29 @@ what a program does.
   the `## [X.Y.Z]` section, and merges the release PR. The maintainer then dispatches
   `publish-nuget.yml`, first with `dry_run: true`. The skill no longer claims it creates the GitHub
   release; the workflow does that.
+- **The website deploy builds exactly the released commit, and checks it with `main`'s scripts
+  (#1585).** `publish-nuget` still starts the deploy after the release. The deploy fails unless
+  the release tag names the commit that was released and that commit is on `main`. It builds that
+  commit in its own checkout. The font check and the wording scan come from `main`, so redeploying
+  an older tag meets today's checks. The deploy no longer clones the full repository.
+- **Publishing benchmark results needs no release (#1585).** The benchmark headline is computed
+  from the committed B1 results (226 registered Calor/C# program pairs, 17 of them included) at a
+  `main` commit. So
+  the publication branch and pull request are now named after that commit, not the version in
+  `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks. Its inputs
+  moved from `docs/plans/evidence/` to `eng/benchmark-publication/`, byte for byte, so they stay
+  when the evidence directory is archived.
+
+### Documentation
+
+- **A test now checks every converter support level the website states (#1585).** The
+  `calor feature-check` page and the C# interoperability guides say which C# features the
+  converter supports `Full`, `Partial` or `NotSupported`. A new test reads those claims and
+  compares each one with the converter's feature registry, `FeatureSupport`, which is what
+  `calor feature-check` prints. Today the pages make 17 such claims, and all 17 match. A wrong
+  level, an unknown feature name, or a level written in a form the test does not read fails CI.
+  The page's list of known gaps between the registry and real converter behavior must match the
+  test's list, and each gap carries a reason.
 
 ## [0.25.0] - 2026-10-20
 

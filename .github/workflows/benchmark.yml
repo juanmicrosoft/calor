@@ -6,7 +6,8 @@ name: Benchmarks
 # artifacts only. The agent-refactoring job is read-only (#1422) and publishes nothing. The
 # publishing step checks that the changed files are exactly the #1422 outputs
 # (benchmark-headline.json and its commit-stamp-index.json entry). A dispatch runs from main only.
-# #1582 removed the adjudication gate; #1585 finishes de-gating this workflow.
+# Publication needs no release and no release tag (#1585): the headline is a projection of the B1
+# packet at a main commit, so the publication branch and PR are named after that commit.
 on:
   workflow_dispatch:
     inputs:
@@ -72,18 +73,12 @@ jobs:
           # (never skips) in a shallow clone.
           fetch-depth: 0
 
-      - name: Refuse a dispatch from any ref but main; name the release
-        id: gate
+      - name: Refuse a dispatch from any ref but main
         if: github.event_name == 'workflow_dispatch'
         run: |
-          set -euo pipefail
           if [ "$GITHUB_REF" != refs/heads/main ]; then
             echo "::error::benchmark publication is dispatched only from main (got $GITHUB_REF)"; exit 1
           fi
-          version="$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::cannot read the version"; exit 1; }
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up the pinned release SDK (#1548)
         uses: ./.github/actions/setup-release-sdk
@@ -293,8 +288,6 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_results == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.gate.outputs.tag }}
-          VER: ${{ steps.gate.outputs.version }}
           REPORT: ${{ steps.methodology.outputs.report }}
         run: |
           set -euo pipefail
@@ -304,14 +297,14 @@ jobs:
           if [ -n "$changed" ] && [ -n "$(comm -23 <(echo "$changed") <(echo "$allowed"))" ]; then
             echo "::error::the work tree changes files other than the #1422 outputs:"; echo "$changed"; exit 1
           fi
-          BRANCH="benchmark-results-$TAG"
+          CANDIDATE="$(git rev-parse HEAD)"
+          BRANCH="benchmark-results-${CANDIDATE:0:12}"
           git switch -q -c "$BRANCH"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git add -A
           git diff --cached --quiet && { echo "The benchmark files are already on main; nothing to publish."; exit 0; }
           TREE="$(git write-tree)"
-          CANDIDATE="$(git rev-parse HEAD)"
           # A retry reuses a branch pushed earlier only if it is the candidate plus exactly the
           # verified tree; anything else on that branch fails the job.
           if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
@@ -320,14 +313,14 @@ jobs:
               && test "$(git rev-parse "origin/$BRANCH^")" = "$CANDIDATE" \
               || { echo "::error::branch $BRANCH exists with content other than the verified results"; exit 1; }
           else
-            git commit -q -m "chore: publish benchmark results for $TAG"
+            git commit -q -m "chore: publish benchmark results at $CANDIDATE"
             git push origin "HEAD:refs/heads/$BRANCH"
           fi
           if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != 0 ]; then
             echo "PR for $BRANCH already open"; exit 0
           fi
           {
-            echo "Benchmark results for $TAG."
+            echo "Benchmark results at main commit $CANDIDATE."
             echo
             echo "## Gate report (#1422)"
             echo
@@ -348,7 +341,7 @@ jobs:
             echo
             echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } > "$RUNNER_TEMP/pr-body.md"
-          gh pr create --base main --head "$BRANCH" --title "chore: benchmark results for $TAG" --body-file "$RUNNER_TEMP/pr-body.md"
+          gh pr create --base main --head "$BRANCH" --title "chore: benchmark results at ${CANDIDATE:0:12}" --body-file "$RUNNER_TEMP/pr-body.md"
 
       # #1422: last step of the job, so a failure anywhere (gate, regeneration, or publication
       # itself) must not leave an earlier publication PR mergeable. The listing is paginated and

@@ -384,17 +384,26 @@ public class ReleaseWorkflowTests
         Assert.Contains("site, package]", Job(text, "publish"));
         // At deployment: the tagged commit must be on main and, when publish-nuget dispatches it,
         // be exactly the released commit; the deployed build is scanned again.
+        // #1585: the checks run from main's checkout; the site is built from a separate checkout of
+        // exactly the resolved tag commit, and that build is what is uploaded.
         var deploy = Read("nextjs-gh-pages.yml");
         AssertInOrder(deploy, new[]
         {
+            "          path: main\n          fetch-depth: 0\n",
             "git merge-base --is-ancestor \"$commit\" HEAD",
             "if [ -n \"$EXPECTED\" ] && [ \"$commit\" != \"$EXPECTED\" ]; then",
-            "run: npm run build",
-            "python3 scripts/check_website_fonts.py --out website/out",
-            "run: python3 \"$RUNNER_TEMP/release_checks.py\" wording website/out",
+            "echo \"commit=$commit\" >> \"$GITHUB_OUTPUT\"",
+            "          ref: ${{ steps.tag.outputs.commit }}\n          path: release\n",
+            "        working-directory: release/website\n        run: npm run build",
+            "python3 main/scripts/check_website_fonts.py --website release/website --out release/website/out",
+            "run: python3 main/scripts/release_checks.py wording release/website/out",
             "uses: actions/upload-pages-artifact@",
+            "          path: release/website/out\n",
         });
         Assert.Contains("if: github.ref != 'refs/heads/main'", deploy);
+        Assert.Equal(2, Regex.Matches(deploy, "persist-credentials: false").Count);
+        Assert.DoesNotContain("continue-on-error", deploy);
+        Assert.DoesNotContain("RUNNER_TEMP", deploy);
         var checks = File.ReadAllText(Path.Combine(RepoRoot(), "scripts", "release_checks.py"));
         Assert.Contains("independently\\s+(?:adjudicated|verified)|independent\\s+(?:adjudication|verification)", checks);
     }
@@ -423,6 +432,28 @@ public class ReleaseWorkflowTests
         Assert.Contains("\n        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_results == 'true'\n", only);
         Assert.Contains("the work tree changes files other than the #1422 outputs", only);
         Assert.Contains("benchmark publication is dispatched only from main", text);
+        // #1585: publication needs no release; the branch is named after the checked commit.
+        Assert.Contains("BRANCH=\"benchmark-results-${CANDIDATE:0:12}\"", only);
+        Assert.DoesNotContain("Directory.Build.props", text);
+        Assert.DoesNotContain("$TAG", text);
+    }
+
+    [Fact]
+    public void PublicClaimChecksStayInCiWithoutTheReleaseGate()
+    {
+        // #1585: removing the release gate keeps every check on public claims, and each blocks.
+        var selfCheck = Step(Job(Read("test.yml"), "test"), "Check agent-facing docs against the implementation (spec drift)");
+        Assert.Contains("run: dotnet run --project src/Calor.Compiler -c Release --no-build -- self-check docs", selfCheck);
+        Assert.DoesNotContain("continue-on-error", selfCheck);
+        Assert.DoesNotMatch(new Regex(@"(?m)^        if:"), selfCheck);
+
+        var website = Read("website-tests.yml");
+        Assert.Contains("pull_request:", website);
+        foreach (var run in new[] { "run: npm run test:onboarding", "run: python3 ../scripts/check_website_fonts.py --out out", "run: npm run test:e2e" })
+            Assert.Contains(run, website);
+        Assert.DoesNotContain("continue-on-error", website);
+        var claims = File.ReadAllText(Path.Combine(RepoRoot(), "website", "tests", "public-claims.spec.ts"));
+        Assert.Contains("Known gaps between the registry", claims);
     }
 
     [Fact]
