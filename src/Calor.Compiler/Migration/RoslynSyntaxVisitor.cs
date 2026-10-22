@@ -11403,12 +11403,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (!nameOnly)
             return null;
         var symbol = _semanticModel!.GetSymbolInfo(left).Symbol;
-        // #1574 (Codex round 3): a nullability write contract (`[AllowNull] string F`) lets the
-        // target accept what a temp of its declared type would not.
-        if (symbol != null && symbol.GetAttributes().Any(attribute =>
-                attribute.AttributeClass?.ContainingNamespace?.ToDisplayString() == "System.Diagnostics.CodeAnalysis"
-                && attribute.AttributeClass.Name is "AllowNullAttribute" or "DisallowNullAttribute"
-                    or "MaybeNullAttribute" or "NotNullAttribute"))
+        // #1574 (Codex round 3, verification): a nullability contract (`[AllowNull] string F`,
+        // `[param: AllowNull] set`, `[return: MaybeNull] get`) lets the target accept or produce
+        // what a temp of its declared type would not, so such a target is not lowered.
+        if (symbol != null && HasNullabilityContract(symbol))
             return null;
         var type = symbol switch
         {
@@ -11419,6 +11417,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _ => null,
         };
         return type is { IsRefLikeType: false } && IsExpressibleType(type) ? type : null;
+    }
+
+    private static bool HasNullabilityContract(ISymbol symbol)
+    {
+        static bool Any(IEnumerable<AttributeData> attributes) => attributes.Any(attribute =>
+            attribute.AttributeClass is { } type
+            && type.ContainingNamespace?.ToDisplayString() == "System.Diagnostics.CodeAnalysis"
+            && type.Name.Contains("Null", StringComparison.Ordinal));
+        return Any(symbol.GetAttributes()) || symbol switch
+        {
+            IPropertySymbol property => property.SetMethod is { } setter
+                    && (Any(setter.GetAttributes()) || Any(setter.GetReturnTypeAttributes())
+                        || setter.Parameters.Any(parameter => Any(parameter.GetAttributes())))
+                || property.GetMethod is { } getter
+                    && (Any(getter.GetAttributes()) || Any(getter.GetReturnTypeAttributes())),
+            _ => false,
+        };
     }
 
     /// <summary>#1574: whether a type, its element types and its type arguments can all be
@@ -11446,6 +11461,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private string? TempTypeName(ExpressionSyntax left, ITypeSymbol type, int position)
     {
+        // #1574 (verification pass): the minimal display prefers a `using` alias
+        // (`using I32 = N.Widget;` displays `I32`, which Calor reads as `int`). A display that
+        // names any alias, or any identifier a type mapping would rewrite, is not used.
+        var display = type.ToMinimalDisplayString(_semanticModel!, position, SymbolDisplayFormat.MinimallyQualifiedFormat);
+        foreach (System.Text.RegularExpressions.Match identifier in
+                 System.Text.RegularExpressions.Regex.Matches(display, @"@?[A-Za-z_][A-Za-z0-9_]*"))
+        {
+            var token = identifier.Value.TrimStart('@');
+            if (SyntaxFacts.GetKeywordKind(token) != SyntaxKind.None && !identifier.Value.StartsWith('@'))
+                continue; // `int`, `string`, ...: mapped by design
+            if (_semanticModel!.LookupNamespacesAndTypes(position, name: token).Any(symbol => symbol is IAliasSymbol)
+                || _semanticModel.LookupSymbols(position, name: token).Any(symbol => symbol is IAliasSymbol))
+                return null;
+        }
         var name = CalorTypeName(type, position);
         if (!type.IsReferenceType || type.NullableAnnotation != NullableAnnotation.None)
             return name;
