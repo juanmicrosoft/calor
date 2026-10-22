@@ -104,12 +104,11 @@ public sealed class UserManifestRootTests : IDisposable
     [Fact]
     public void WithoutCalorHome_TheRootFollowsHome()
     {
-        // Unix only: on Windows the home comes from USERPROFILE, which UserHome already reads per call.
-        if (OperatingSystem.IsWindows())
-            return;
+        // The home is HOME on Linux and macOS and USERPROFILE on Windows (UserHome.Resolve); set both.
         Environment.SetEnvironmentVariable("CALOR_HOME", null);
         var home = EmptyDirectory("home");
         Environment.SetEnvironmentVariable("HOME", home);
+        Environment.SetEnvironmentVariable("USERPROFILE", home);
         Assert.Equal(Path.Combine(home, ".calor", "manifests"), ManifestLoader.GetUserManifestsDirectory());
         Assert.False(WritesConsole(ConvertRow()));
 
@@ -117,6 +116,7 @@ public sealed class UserManifestRootTests : IDisposable
         Directory.CreateDirectory(Path.Combine(otherHome, ".calor", "manifests"));
         File.WriteAllText(Path.Combine(otherHome, ".calor", "manifests", "math.calor-effects.json"), ConsoleWriteManifest);
         Environment.SetEnvironmentVariable("HOME", otherHome);
+        Environment.SetEnvironmentVariable("USERPROFILE", otherHome);
         Assert.Equal(Path.Combine(otherHome, ".calor", "manifests"), ManifestLoader.GetUserManifestsDirectory());
         Assert.True(WritesConsole(ConvertRow()));
     }

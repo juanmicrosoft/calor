@@ -318,11 +318,12 @@ public sealed class ManifestLoader
     /// <summary>
     /// Gets the user-level manifests directory: <c>$CALOR_HOME/manifests</c> when
     /// <c>CALOR_HOME</c> is set, otherwise <c>~/.calor/manifests</c> under the user's home
-    /// (<see cref="Verification.Z3.Cache.UserHome"/>, which follows <c>HOME</c>).
+    /// (<see cref="Verification.Z3.Cache.UserHome"/>: <c>HOME</c> on Linux and macOS; on
+    /// Windows a fully qualified <c>USERPROFILE</c>, else the account's profile folder).
     /// </summary>
     /// <remarks>
     /// #1564: read from the environment on every call and never cached, so a caller that
-    /// changes <c>CALOR_HOME</c> or <c>HOME</c> between two operations in one process sees
+    /// changes <c>CALOR_HOME</c> or the home variable between two operations in one process sees
     /// the new root on the next one.
     /// </remarks>
     internal static string? GetUserManifestsDirectory()

@@ -20,9 +20,9 @@ namespace Calor.Tests.Shared;
 /// parallelization disabled and restore the value, or it would move the root under
 /// concurrently running tests.</para>
 ///
-/// <para>Linked into the test assemblies that convert or resolve effects in process
-/// (Calor.Compiler.Tests, Calor.Conversion.Tests, Calor.Enforcement.Tests,
-/// Calor.RoundTrip.Harness.Tests) via <c>&lt;Compile Include&gt;</c>.</para>
+/// <para>Linked via <c>&lt;Compile Include&gt;</c> into every registered test host (the same set
+/// that links <c>Z3ConsumerGuardTests.cs</c>), so no test project can read a developer's
+/// manifests when it runs on its own.</para>
 /// </summary>
 internal static class HermeticCalorHome
 {

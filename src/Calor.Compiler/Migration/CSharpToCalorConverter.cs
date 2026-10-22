@@ -298,8 +298,10 @@ public sealed class ConversionOptions
     ///
     /// <para>Null (the default) resolves the directory from the environment when each
     /// conversion starts: <c>$CALOR_HOME/manifests</c> if <c>CALOR_HOME</c> is set,
-    /// otherwise <c>~/.calor/manifests</c> under <c>HOME</c>. It is never cached for the
-    /// process, so changing either variable affects the next conversion. This is the
+    /// otherwise <c>.calor/manifests</c> under the user's home: <c>HOME</c> on Linux and
+    /// macOS, and on Windows a fully qualified <c>USERPROFILE</c>, else the account's profile
+    /// folder. It is never cached for the process, so changing <c>CALOR_HOME</c> or the
+    /// home variable affects the next conversion. This is the
     /// same directory the CLI's compile step reads, so the rows the converter writes
     /// agree with the compile that checks them.</para>
     /// </summary>
