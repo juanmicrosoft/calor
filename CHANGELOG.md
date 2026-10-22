@@ -24,26 +24,6 @@ All notable changes to this project will be documented in this file.
   - Calor's own tests now run with an empty manifest directory, so a manifest in your home
     directory can no longer change their results.
 
-### Testing
-
-- **The round-trip harness now also tests the converter the way `calor convert` runs it.**
-  Before, the harness only converted with Lossy options. Those options allow recorded
-  semantic losses (substitutions or drops the converter reports) and turn on passthrough.
-  A plain `calor convert` uses Lossless options, which refuse such losses. The harness
-  converts each library file, swaps it into the project, and reruns the project's own
-  tests. A new `--mode default` leg does this with exactly the options `calor convert`
-  builds with no flags. A test fails if the harness and the CLI options ever differ. (#1586)
-- **CI runs both legs in parallel, and each one blocks on its own floors.** A floor is
-  the minimum fraction of library files the leg must keep converted. The default leg's
-  floors equal what it measured when it landed: MediatR 8 of 32 files (25.0%), Serilog
-  14 of 112 (12.5%) and FluentValidation 64 of 139 (46.0%). On the same commit, the
-  Lossy leg kept 71.9%, 59.8% and 71.9%. Losing one file from the default leg now fails
-  CI. One PR comment shows both legs side by side.
-- **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
-  now describes both legs and lists each leg's floors.
-
-### Fixed
-
 - **`calor convert --lossy` no longer reports output that does not compile as clean (#1514).**
   Lossy mode skipped the round-trip check, which compiles the generated Calor and then the C#
   it produces. So a file could convert with no recorded loss, print "✓ Conversion successful"
@@ -87,6 +67,24 @@ what a program does.
 - **No more CS8600 warning for a lowered `out string`.** A binding that starts at `default`
   now emits `default!` for types that may be non-nullable references (`string s = default!;`).
   Built-in value types keep `default`.
+
+### Testing
+
+- **The round-trip harness now also tests the converter the way `calor convert` runs it.**
+  Before, the harness only converted with Lossy options. Those options allow recorded
+  semantic losses (substitutions or drops the converter reports) and turn on passthrough.
+  A plain `calor convert` uses Lossless options, which refuse such losses. The harness
+  converts each library file, swaps it into the project, and reruns the project's own
+  tests. A new `--mode default` leg does this with exactly the options `calor convert`
+  builds with no flags. A test fails if the harness and the CLI options ever differ. (#1586)
+- **CI runs both legs in parallel, and each one blocks on its own floors.** A floor is
+  the minimum fraction of library files the leg must keep converted. The default leg's
+  floors equal what it measured when it landed: MediatR 8 of 32 files (25.0%), Serilog
+  14 of 112 (12.5%) and FluentValidation 64 of 139 (46.0%). On the same commit, the
+  Lossy leg kept 71.9%, 59.8% and 71.9%. Losing one file from the default leg now fails
+  CI. One PR comment shows both legs side by side.
+- **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
+  now describes both legs and lists each leg's floors.
 
 ### Release process
 
