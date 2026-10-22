@@ -132,7 +132,7 @@ jobs:
             SOURCE_DATE_EPOCH=1700000000 \
             bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" website
 
-      - name: Compare every website file and the release gate's tree digest
+      - name: Compare every website file and the site's tree digest
         run: |
           set -euo pipefail
           python3 scripts/check_website_fonts.py --out "$RUNNER_TEMP/build-1/website"

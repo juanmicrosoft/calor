@@ -25,7 +25,9 @@ What this skill does, and what it does not:
 - It bumps the version, writes the CHANGELOG section, and opens and merges the release PR.
 - It does **not** create the tag or the GitHub release, and it never runs `gh release create`.
   `publish-nuget.yml` creates both, after the packages are on nuget.org and the installed tool
-  passed its check. A release made by hand publishes nothing and turns `release-audit.yml` red.
+  passed its check. A release made by hand publishes nothing. `release-audit.yml` runs on every
+  release event and fails unless the tag commit is on `main` and nuget.org already serves both
+  packages at that version; it cannot tell who created the release or check its notes.
 - The **maintainer** dispatches `publish-nuget.yml`. Prepare the commands and wait; do not
   dispatch it, a dry run included, unless the maintainer explicitly asks you to in this session.
 
@@ -149,10 +151,11 @@ gh workflow run publish-nuget.yml --ref main -f version=X.Y.Z
    admits only `main`): exchanges the GitHub OIDC token for a one-hour NuGet key
    (`NuGet/login`), and fails if the key is empty. It verifies the bundle against the package
    job's `SHA256SUMS` hash and attests the packages. It repeats the existing-version compare,
-   this time always blocking, then pushes both packages. Finally it polls nuget.org for up to 30
-   minutes and compares the served packages entry by entry.
+   this time always blocking, then pushes both packages. Finally it polls nuget.org (60 attempts,
+   30 seconds apart, per package, one package after the other) and compares the served packages
+   entry by entry.
 5. **`install-check`**: calls `verify-release.yml`. It installs `calor` from nuget.org on
-   linux-x64, osx-arm64, and win-x64, retrying for up to 30 minutes, and requires
+   linux-x64, osx-arm64, and win-x64 (30 attempts, a minute apart), and requires
    `calor verify samples/Verification/proven-contracts.calr` to print `Proven: 14` and
    `Skipped: 0`.
 6. **`release`**: verifies the bundle again. The remote tag must be absent or at the candidate.
@@ -162,8 +165,11 @@ gh workflow run publish-nuget.yml --ref main -f version=X.Y.Z
    `commit=<candidate>`. That workflow checks that the tag names that commit, then rebuilds the
    site, rescans it, and deploys it.
 
-Every step before the push blocks the push. Every step after the push blocks the GitHub release,
-its metadata, and the website. The workflow never dispatches benchmark publication.
+Every step before the push blocks the push. After the push, the served-package compare and the
+install check block the GitHub release. Inside `release`, the release is created before the
+metadata is attached, so a metadata failure leaves the release in place (re-dispatch to finish
+it). The `website` job only dispatches `nextjs-gh-pages.yml` and does not wait for it; check that
+run separately. The workflow never dispatches benchmark publication.
 
 ### What a dry run proves, and what it cannot
 
@@ -207,12 +213,13 @@ If only one is there, say exactly which.
 | `preflight` (real run) | `already released: tag vX.Y.Z already points at ...` | The version was released from another commit. Bump the version; never move a tag. |
 | `test` | `Enforce test inventory` count mismatch | A test count changed without `eng/test-manifest.json`. Fix on main through a PR. |
 | `test` | `terminate called after throwing 'std::system_error'` | A native (Z3) crash took down the test host. Re-dispatch once; if it repeats, investigate. |
-| `test` / `package` | `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted. Republish via `build-z3.yml`, commit the manifest it prints, then re-dispatch. Never rehash the live assets. |
+| any job with `Bootstrap verified Z3 assets` | `download-z3.sh` (or `.ps1`) errors, or the extracted assets fail `.github/z3-binaries-4.15.7.sha256` | The bootstrap downloads the upstream Z3 archives and checks them against `src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256` before extracting. A download error is usually transient: re-dispatch. A checksum mismatch means the upstream bytes changed: stop and investigate. Never update the pins to match unreviewed bytes. |
+| `package` | `check-packaged-z3.py` fails | A packed Z3 asset differs from the pins. Investigate the packaging change on main; do not re-dispatch until it is fixed. |
 | `site` / `package` | `forbidden wording` | The notes, package text, metadata, or site claims independent verification or adjudication. Reword through a PR. |
 | `package` / `publish` | `already released: nuget.org serves ... with content other than the package built here` | nuget.org already has a different package at this version. Bump the version. |
 | `publish` | `NuGet/login` fails, or `Trusted Publishing returned no key` | The nuget.org `calor-release` policy or the `nuget-release` environment is wrong. Run `scripts/check_release_credentials.py --live`; settings are a maintainer action. |
 | `publish` | bundle verification fails | The artifact does not match the package job's record. Re-dispatch; do not edit the bundle. |
-| `publish` | `nuget.org does not serve ... after 60 attempts` | Indexing lag over 30 minutes. Re-dispatch: the push uses `--skip-duplicate` and the compare accepts an identical package. |
+| `publish` | `nuget.org does not serve ... after 60 attempts` | Indexing lag longer than the poll (60 attempts per package). Re-dispatch: the push uses `--skip-duplicate` and the compare accepts an identical package. |
 | `install-check` | `could not be installed ... after 30 attempts`, or no `Proven: 14` / `Skipped: 0` | A broken package (for example Z3 missing, `Calor0710`). Investigate before anything else; the GitHub release was not created. |
 | `release` | `tag vX.Y.Z already points at ...` / `existing release ... has a body other than these notes` | A tag or release was made by hand. Releases are never edited; the maintainer must resolve it. |
 
