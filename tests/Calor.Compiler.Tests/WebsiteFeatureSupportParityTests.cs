@@ -7,11 +7,21 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// #1585: every converter support level the website states equals the <see cref="FeatureSupport"/>
-/// registry. A claim is a table row whose header has a <c>Level</c> column (the feature-check page),
-/// or one of three prose shapes: <c>`calor feature-check X` reports **Level**</c>,
-/// <c>`X` is Level</c>, and <c>`X` (Level)</c>. A level word written in any other strong form
-/// (bold, parenthesized, backticked, a table cell, "is Level") that is not part of a claim fails,
-/// so a new claim shape cannot slip past the comparison. Per-page claim counts are pinned.
+/// registry. The scan reads every published page (<c>website/content/**/*.md</c> and <c>*.mdx</c>,
+/// the changelog excepted as a historical record).
+/// <para>A claim is one of:</para>
+/// <list type="bullet">
+/// <item>a row of a table whose header has a <c>Level</c> column: one claim per backticked name in the
+/// first cell;</item>
+/// <item>prose: <c>`calor feature-check X` reports **L**</c>, <c>`X` is L</c>, or <c>`X` (L)</c>;</item>
+/// <item>in a fenced block, a <c>"feature"</c>/<c>"name"</c> value followed by a <c>"supportLevel"</c>
+/// value (the command's JSON output).</item>
+/// </list>
+/// <para>Guard against unread claims: on any line that names a registry feature in backticks or
+/// mentions <c>feature-check</c>/<c>supportLevel</c>, and on every line of a fence that does, each
+/// level word (Full, Partial, NotSupported, ManualRequired, in any case) and each support phrase
+/// ("fully supported", "not supported", "full support", ...) must belong to a claim. Anything else
+/// fails unless listed in <see cref="NotClaims"/>. Per-page claim counts are pinned.</para>
 /// </summary>
 public sealed class WebsiteFeatureSupportParityTests
 {
@@ -29,10 +39,11 @@ public sealed class WebsiteFeatureSupportParityTests
                            "or indexer getter is the separate `iterator-accessor` entry (NotSupported) and stays C#.",
     };
 
-    /// <summary>Level-word uses that state no support level for a feature (page, exact line text).</summary>
-    private static readonly (string Page, string Line)[] NotClaims =
+    /// <summary>Lines whose level words state no support level for a feature (page, exact trimmed line).</summary>
+    private static readonly (string Page, string Line, string Why)[] NotClaims =
     [
-        ("cli/feature-check.mdx", "0.25 converter (not yet released) reports them. `Partial` means some shapes"),
+        ("cli/feature-check.mdx", "0.25 converter (not yet released) reports them. `Partial` means some shapes",
+            "defines the word Partial"),
     ];
 
     /// <summary>Claims per page. A changed count means a claim was added, removed, or no longer parses.</summary>
@@ -48,13 +59,23 @@ public sealed class WebsiteFeatureSupportParityTests
     private static readonly Regex Reports = new(@"`calor feature-check (?<f>[a-z0-9-]+)` reports \*\*(?<l>" + Levels + @")\*\*");
     private static readonly Regex IsLevel = new(@"`(?<f>[a-z0-9-]+)` is (?<l>" + Levels + @")\b");
     private static readonly Regex Parenthesized = new(@"`(?<f>[a-z0-9-]+)` \((?<l>" + Levels + @")\)");
-    private static readonly Regex Strong = new(@"\*\*(?:" + Levels + @")\*\*|\((?:" + Levels + @")\)|`(?:" + Levels + @")`|\bis (?:" + Levels + @")\b");
-    private static readonly Regex LevelCell = new(@"^(?:" + Levels + @")$");
+    private static readonly Regex FenceName = new(@"""(?:feature|name)""\s*:\s*""(?<f>[^""]+)""");
+    private static readonly Regex FenceLevel = new(@"""supportLevel""\s*:\s*""(?<l>[^""]*)""");
+    // Every way of stating a level that the guard counts. Claims account for the level words.
+    // Prose and tables spell levels as the enum names; the command's JSON output uses lower case.
+    private static readonly Regex LevelWord = new(@"(?<![\w-])(?:" + Levels + @")(?![\w-])");
+    private static readonly Regex AnyCaseLevelWord = new(@"(?<![\w-])(?:" + Levels + @")(?![\w-])", RegexOptions.IgnoreCase);
+    private static readonly Regex SupportPhrase = new(
+        @"\b(?:fully|partially|not|partly)\s+supported\b|\b(?:full|partial|no)\s+support\b|\bmanual(?:ly)?\s+required\b",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex Backticked = new("`(?<n>[a-z0-9-]+)`");
+    private static readonly Regex LevelOption = new(@"--level\s+\S+");
+    private static readonly Regex TableRule = new(@"^\|(?:\s*:?-+:?\s*\|)+$");
 
     [Fact]
     public void EveryStatedSupportLevelMatchesTheRegistry()
     {
-        var (claims, unattributed) = ScanWebsite();
+        var (claims, unattributed) = ScanDirectory(Path.Combine(RepoRoot(), "website", "content"));
         Assert.Empty(unattributed);
         Assert.Empty(Mismatches(claims));
     }
@@ -62,7 +83,7 @@ public sealed class WebsiteFeatureSupportParityTests
     [Fact]
     public void ClaimCoverageIsPinned()
     {
-        var (claims, _) = ScanWebsite();
+        var (claims, _) = ScanDirectory(Path.Combine(RepoRoot(), "website", "content"));
         var counts = claims.GroupBy(c => c.Page).ToDictionary(g => g.Key, g => g.Count());
         Assert.Equal(PinnedClaims.OrderBy(p => p.Key, StringComparer.Ordinal),
             counts.OrderBy(p => p.Key, StringComparer.Ordinal));
@@ -87,6 +108,7 @@ public sealed class WebsiteFeatureSupportParityTests
     [Theory]
     [InlineData("cli/feature-check.mdx", "| `in-parameter` | Full |", "| `in-parameter` | Partial |", "in-parameter")]
     [InlineData("cli/feature-check.mdx", "| `iterator-accessor` | NotSupported |", "| `iterator-accessor` | Full |", "iterator-accessor")]
+    [InlineData("cli/feature-check.mdx", "| `ref-parameter` | Partial |", "| `ref-parameter`, `in-parameter` | Partial |", "in-parameter")]
     [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported)", "`iterator-accessor` (Partial)", "iterator-accessor")]
     [InlineData("cli/feature-check.mdx", "`yield-return` is Full", "`yield-return` is Partial", "yield-return")]
     [InlineData("cli/feature-check.mdx", "| `local-function` | Partial |", "| `local-functions` | Partial |", "local-functions")]
@@ -99,21 +121,61 @@ public sealed class WebsiteFeatureSupportParityTests
         Assert.Contains(from, text);
         var (claims, unattributed) = Scan(page, text.Replace(from, to));
         Assert.Empty(unattributed);
-        var failures = Mismatches(claims);
-        Assert.Contains(failures, f => f.Contains($"`{feature}`", StringComparison.Ordinal));
+        Assert.Contains(Mismatches(claims), f => f.Contains($"`{feature}`", StringComparison.Ordinal));
         // The unmodified page passes, so the failure comes from the edit alone.
         Assert.Empty(Mismatches(Scan(page, text).Claims));
+    }
+
+    [Fact]
+    public void AWrongLevelInFencedFeatureCheckOutputFailsTheCheck()
+    {
+        var text = File.ReadAllText(PagePath("cli/feature-check.mdx"));
+        var fence = "\n```json\n{\n  \"data\": {\n    \"feature\": \"iterator-accessor\",\n    \"found\": true,\n" +
+                    "    \"supportLevel\": \"full\"\n  }\n}\n```\n";
+        var (claims, unattributed) = Scan("cli/feature-check.mdx", text + fence);
+        Assert.Empty(unattributed);
+        Assert.Contains(Mismatches(claims), f => f.Contains("`iterator-accessor` is stated as full", StringComparison.Ordinal));
+        // The same output with the registry's level passes.
+        var right = Scan("cli/feature-check.mdx", text + fence.Replace("\"full\"", "\"notsupported\""));
+        Assert.Empty(right.Unattributed);
+        Assert.Empty(Mismatches(right.Claims));
     }
 
     [Theory]
     [InlineData("syntax-reference/string-operations.mdx", "`calor feature-check string-interpolation` reports **Partial**",
         "`calor feature-check string-interpolation` is reported as **Full**")]
     [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported)", "`iterator-accessor` (**Full**)")]
+    [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `iterator-accessor` has Full support.")]
+    [InlineData("cli/feature-check.mdx", "`iterator-accessor` (NotSupported).", "`iterator-accessor` (NotSupported). `partial-property` is fully supported.")]
+    [InlineData("cli/feature-check.mdx", "calor feature-check --list\n", "calor feature-check --list\nSupport level: Full\n")]
     public void ALevelInAnUnrecognizedShapeFailsTheCheck(string page, string from, string to)
     {
         var text = File.ReadAllText(PagePath(page));
         Assert.Contains(from, text);
         Assert.NotEmpty(Scan(page, text.Replace(from, to)).Unattributed);
+    }
+
+    [Theory]
+    [InlineData("guides/new-page.md")]
+    [InlineData("guides/new-page.mdx")]
+    public void ANewPageWithAWrongLevelFailsTheCheck(string page)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-parity-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "guides"));
+            File.WriteAllText(Path.Combine(root, page), "# New\n\n`calor feature-check record` reports **Full**.\n");
+            File.WriteAllText(Path.Combine(root, "changelog.mdx"), "`record` is Full.\n");
+            var (claims, unattributed) = ScanDirectory(root);
+            Assert.Empty(unattributed);
+            var claim = Assert.Single(claims);
+            Assert.Equal(page, claim.Page);
+            Assert.Contains(Mismatches(claims), f => f.Contains("`record` is stated as Full; the registry says NotSupported", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
@@ -133,10 +195,12 @@ public sealed class WebsiteFeatureSupportParityTests
         {
             var where = $"{claim.Page}:{claim.Line}";
             var info = FeatureSupport.GetFeatureInfo(claim.Feature);
+            // The command's JSON prints the level in lower case; prose and tables use the enum name.
+            var level = Enum.GetValues<SupportLevel>().Cast<SupportLevel?>().FirstOrDefault(l =>
+                claim.Shape == "output" ? l.ToString()!.ToLowerInvariant() == claim.Level : l.ToString() == claim.Level);
             if (info is null)
                 failures.Add($"{where}: `{claim.Feature}` is not a FeatureSupport registry name");
-            else if (!Enum.TryParse<SupportLevel>(claim.Level, ignoreCase: false, out var level)
-                     || !Enum.IsDefined(level) || level.ToString() != claim.Level)
+            else if (level is null)
                 failures.Add($"{where}: `{claim.Feature}` states '{claim.Level}', which is not a support level");
             else if (level != info.Support)
                 failures.Add($"{where}: `{claim.Feature}` is stated as {claim.Level}; the registry says {info.Support}");
@@ -144,12 +208,13 @@ public sealed class WebsiteFeatureSupportParityTests
         return failures;
     }
 
-    private static (List<Claim> Claims, List<string> Unattributed) ScanWebsite()
+    private static (List<Claim> Claims, List<string> Unattributed) ScanDirectory(string content)
     {
-        var content = Path.Combine(RepoRoot(), "website", "content");
         var claims = new List<Claim>();
         var unattributed = new List<string>();
-        foreach (var path in Directory.GetFiles(content, "*.mdx", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+        var pages = Directory.GetFiles(content, "*.*", SearchOption.AllDirectories)
+            .Where(p => p.EndsWith(".md", StringComparison.Ordinal) || p.EndsWith(".mdx", StringComparison.Ordinal));
+        foreach (var path in pages.Order(StringComparer.Ordinal))
         {
             var page = Path.GetRelativePath(content, path).Replace('\\', '/');
             // Historical release records (the changelog) state the levels of past versions.
@@ -167,62 +232,103 @@ public sealed class WebsiteFeatureSupportParityTests
         var claims = new List<Claim>();
         var unattributed = new List<string>();
         var lines = text.Replace("\r\n", "\n").Split('\n');
-        var inFence = false;
         int? levelColumn = null;
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
             if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
             {
-                inFence = !inFence;
+                var end = Array.FindIndex(lines, i + 1, l => l.TrimStart().StartsWith("```", StringComparison.Ordinal));
+                end = end < 0 ? lines.Length : end;
+                ScanFence(page, lines, i + 1, end, claims, unattributed);
+                i = end;
+                levelColumn = null;
                 continue;
             }
-            if (inFence)
-                continue;
 
             var found = 0;
-            var strongInCells = 0;
             if (line.TrimStart().StartsWith('|'))
             {
                 var cells = Cells(line);
                 var next = i + 1 < lines.Length ? lines[i + 1].Trim() : "";
-                if (Regex.IsMatch(next, @"^\|(?:\s*:?-+:?\s*\|)+$"))
+                if (TableRule.IsMatch(next))
                 {
                     var index = cells.FindIndex(c => c.Equals("Level", StringComparison.OrdinalIgnoreCase));
                     levelColumn = index >= 0 ? index : null;
                     continue;
                 }
-                if (Regex.IsMatch(line.Trim(), @"^\|(?:\s*:?-+:?\s*\|)+$"))
+                if (TableRule.IsMatch(line.Trim()))
                     continue;
                 if (levelColumn is int column && column < cells.Count)
                 {
-                    var feature = Regex.Match(cells[0], "`(?<f>[a-z0-9-]+)`");
-                    if (feature.Success)
+                    foreach (Match feature in Backticked.Matches(cells[0]))
                     {
-                        claims.Add(new Claim(page, i + 1, feature.Groups["f"].Value, cells[column], "table"));
+                        claims.Add(new Claim(page, i + 1, feature.Groups["n"].Value, cells[column], "table"));
                         found++;
                     }
+                    // A non-level value in the Level column is itself a claim (and a mismatch).
+                    if (found > 0 && !LevelWord.IsMatch(cells[column]))
+                        found = 0;
+                    else if (found > 0)
+                        found = 1;
                 }
-                strongInCells = cells.Count(c => LevelCell.IsMatch(c));
             }
             else
             {
                 levelColumn = null;
             }
 
-            foreach (var (regex, shape) in new[] { (Reports, "reports"), (IsLevel, "is"), (Parenthesized, "parenthesized") })
+            foreach (var regex in new[] { Reports, IsLevel, Parenthesized })
                 foreach (Match m in regex.Matches(line))
                 {
-                    claims.Add(new Claim(page, i + 1, m.Groups["f"].Value, m.Groups["l"].Value, shape));
+                    claims.Add(new Claim(page, i + 1, m.Groups["f"].Value, m.Groups["l"].Value,
+                        regex == Reports ? "reports" : regex == IsLevel ? "is" : "parenthesized"));
                     found++;
                 }
 
-            var strong = Strong.Matches(line).Count + strongInCells;
-            if (strong > found && !NotClaims.Contains((page, line.Trim())))
+            if (!MentionsFeatures(line))
+                continue;
+            var stated = LevelWord.Matches(LevelOption.Replace(line, "")).Count + SupportPhrase.Matches(line).Count;
+            if (stated > found && !NotClaims.Any(n => n.Page == page && n.Line == line.Trim()))
                 unattributed.Add($"{page}:{i + 1}: a support level in a form the parity check does not read: {line.Trim()}");
         }
         return (claims, unattributed);
     }
+
+    /// <summary>Fenced lines [start, end). A fence that mentions a feature or the command is checked
+    /// line by line: every level word must be a <c>"supportLevel"</c> value paired with a feature.</summary>
+    private static void ScanFence(string page, string[] lines, int start, int end, List<Claim> claims, List<string> unattributed)
+    {
+        var body = lines.Skip(start).Take(end - start).ToArray();
+        if (!body.Any(MentionsFeatures))
+            return;
+        string? feature = null;
+        for (var k = 0; k < body.Length; k++)
+        {
+            var line = body[k];
+            var name = FenceName.Match(line);
+            if (name.Success)
+                feature = name.Groups["f"].Value;
+            var found = 0;
+            var level = FenceLevel.Match(line);
+            if (level.Success && feature is not null)
+            {
+                claims.Add(new Claim(page, start + k + 1, feature, level.Groups["l"].Value, "output"));
+                feature = null;
+                found = 1;
+            }
+            var stated = AnyCaseLevelWord.Matches(LevelOption.Replace(line, "")).Count + SupportPhrase.Matches(line).Count
+                         + (level.Success && found == 0 ? 1 : 0);
+            if (stated > found)
+                unattributed.Add($"{page}:{start + k + 1}: a support level in a fence the parity check does not read: {line.Trim()}");
+        }
+    }
+
+    private static bool MentionsFeatures(string line) =>
+        line.Contains("feature-check", StringComparison.Ordinal)
+        || line.Contains("supportLevel", StringComparison.Ordinal)
+        || Backticked.Matches(line).Any(m => FeatureSupport.GetFeatureInfo(m.Groups["n"].Value) is not null)
+        || FenceName.Matches(line).Any(m => FeatureSupport.GetFeatureInfo(m.Groups["f"].Value) is not null);
 
     /// <summary>The first backticked name of each bullet under "Known gaps between the registry".</summary>
     internal static List<string> ListedGaps(string text)

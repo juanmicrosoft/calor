@@ -449,9 +449,22 @@ public class ReleaseWorkflowTests
 
         var website = Read("website-tests.yml");
         Assert.Contains("pull_request:", website);
-        foreach (var run in new[] { "run: npm run test:onboarding", "run: python3 ../scripts/check_website_fonts.py --out out", "run: npm run test:e2e" })
-            Assert.Contains(run, website);
+        Assert.Contains("run: npm run test:onboarding", website);
+        // The offline-fonts check: Google Fonts is made unreachable (and proven unreachable) before
+        // the build, so the build itself shows the site needs no remote fonts; the output is then
+        // checked, and the Playwright suite (public-claims.spec.ts included) runs on that build.
+        var block = Step(website, "Make Google Fonts unreachable for the build (#1548)");
+        Assert.Contains("0.0.0.0 fonts.googleapis.com fonts.gstatic.com", block);
+        Assert.Contains("echo \"::error::fonts.googleapis.com is still reachable; the offline-fonts check would prove nothing\"; exit 1", block);
+        AssertInOrder(website, new[]
+        {
+            "      - name: Make Google Fonts unreachable for the build (#1548)\n",
+            "      - run: npm run build\n",
+            "run: python3 ../scripts/check_website_fonts.py --out out",
+            "      - run: npm run test:e2e\n",
+        });
         Assert.DoesNotContain("continue-on-error", website);
+        Assert.DoesNotMatch(new Regex(@"(?m)^        if: (?!failure\(\))"), website);
         var claims = File.ReadAllText(Path.Combine(RepoRoot(), "website", "tests", "public-claims.spec.ts"));
         Assert.Contains("Known gaps between the registry", claims);
     }

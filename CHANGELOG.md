@@ -143,8 +143,10 @@ what a program does.
   `calor feature-check` page and the C# interoperability guides say which C# features the
   converter supports `Full`, `Partial` or `NotSupported`. A new test reads those claims and
   compares each one with the converter's feature registry, `FeatureSupport`, which is what
-  `calor feature-check` prints. Today the pages make 17 such claims, and all 17 match. A wrong
-  level, an unknown feature name, or a level written in a form the test does not read fails CI.
+  `calor feature-check` prints. The test reads every page, tables, prose and the command's JSON
+  output in code blocks. Today the pages make 17 such claims, and all 17 match. A wrong level or
+  an unknown feature name fails CI. So does a level word or a phrase such as "fully supported" on
+  a line that names a feature, unless it is one of the forms the test reads.
   The page's list of known gaps between the registry and real converter behavior must match the
   test's list, and each gap carries a reason.
 
