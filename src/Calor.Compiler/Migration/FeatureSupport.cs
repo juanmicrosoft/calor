@@ -896,6 +896,27 @@ public static class FeatureSupport
             Description = "Compound assignment operator (e.g. >>>=) has no Calor mapping; the containing member is preserved as §CSHARP interop (never emitted as a plain assignment)",
             Workaround = "Rewrite as x = x OP y with a supported operator, or keep the member as §CSHARP interop"
         },
+        // #1574: an assignment used as a value is hoisted before its statement only where the
+        // hoist runs it once and in C#'s order; every other position keeps the statement as C#.
+        ["embedded-assignment"] = new FeatureInfo
+        {
+            Name = "embedded-assignment",
+            Support = SupportLevel.NotSupported,
+            Description = "An assignment used as a value (a = b = G(), int z = y = G(), return x = G()) converts natively when it is the whole statement, " +
+                "a single local initializer or a returned value, that statement sits directly in a block, and every target is a variable, field or property of this or a type: " +
+                "the right-hand side runs once into a typed temp. Other positions (conditions, arguments, unbraced bodies, switch sections, lambdas and expression bodies, " +
+                "indexer or member targets) keep the statement as C# interop",
+            Workaround = "Assign to the variable in its own statement, then use the variable"
+        },
+        // #1574 / #1573: Calor writes C#'s `default` and a member named @default the same way.
+        ["default-member-collision"] = new FeatureInfo
+        {
+            Name = "default-member-collision",
+            Support = SupportLevel.NotSupported,
+            Description = "A default value (int x;, default, default(T)) where a symbol named default is in scope, or declared at any accessibility " +
+                "in a containing or base type, keeps its statement as C# interop, because Calor's default would read that member",
+            Workaround = "Rename the member named default, or initialize the variable with an explicit value"
+        },
         ["unsupported-switch-label"] = new FeatureInfo
         {
             Name = "unsupported-switch-label",

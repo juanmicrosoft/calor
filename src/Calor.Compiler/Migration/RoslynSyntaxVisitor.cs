@@ -6747,20 +6747,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     block.SyntaxTree,
                     ppRegion.SourceStart);
 
-                // Convert active (parsed) body statements
-                var activeStatements = new List<StatementNode>();
+                // Convert active (parsed) body statements. #1574: statements hoisted while
+                // converting a statement (`_pendingStatements`) run before it, so they are
+                // flushed and ordered under that statement's start, never dropped.
+                var keyedStatements = new List<(int Start, StatementNode Node)>();
                 for (int bi = ppRegion.ActiveStart; bi < ppRegion.ActiveEnd; bi++)
                 {
+                    _pendingStatements.Clear();
                     var ppConverted = ConvertStatement(block.Statements[bi]);
-                    if (ppConverted != null) activeStatements.Add(ppConverted);
+                    if (ppConverted == null)
+                        continue;
+                    var flushed = new List<StatementNode>();
+                    FlushPendingStatements(flushed);
+                    flushed.Add(ppConverted);
+                    keyedStatements.AddRange(flushed.Select(node => (ppConverted.Span.Start, node)));
                 }
-                activeStatements.AddRange(directCompilerDirectives
+                keyedStatements.AddRange(directCompilerDirectives
                     .Where(directive => directive.IsActive
                         && IsDirectiveInRegion(directive, ppRegion)
                         && ReferenceEquals(GetDirectiveScope(directive), block))
-                    .Select(CreateCompilerDirectiveInterop));
-                activeStatements = activeStatements
-                    .OrderBy(statement => statement.Span.Start)
+                    .Select(directive => (StatementNode)CreateCompilerDirectiveInterop(directive))
+                    .Select(node => (node.Span.Start, node)));
+                var activeStatements = keyedStatements
+                    .OrderBy(entry => entry.Start)
+                    .Select(entry => entry.Node)
                     .ToList();
 
                 statements.Add(BuildPreprocessorNode(span, ppRegion.Branches, activeStatements));
@@ -8241,7 +8251,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // consuming the next statement as the binding's value expression (Calor0104).
         var initializer = variable.Initializer != null
             ? ConvertExpression(variable.Initializer.Value)
-            : new ReferenceNode(GetTextSpan(node), "default");
+            : DefaultValue(node, GetTextSpan(node));
 
         return new BindStatementNode(
             GetTextSpan(node),
@@ -8268,7 +8278,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     variable);
             var initializer = variable.Initializer != null
                 ? ConvertExpression(variable.Initializer.Value)
-                : new ReferenceNode(GetTextSpan(node), "default");
+                : DefaultValue(node, GetTextSpan(node));
 
             results.Add(new BindStatementNode(
                 GetTextSpan(node),
@@ -9824,7 +9834,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.NullLiteralExpression =>
                 new ReferenceNode(GetTextSpan(literal), "null"),
             SyntaxKind.DefaultLiteralExpression =>
-                new ReferenceNode(GetTextSpan(literal), "default"),
+                DefaultValue(literal, GetTextSpan(literal)),
             SyntaxKind.ArgListExpression =>
                 new RawCSharpExpressionNode(GetTextSpan(literal), "__arglist"),
             _ => CreateFallbackExpression(literal, "unknown-literal")
@@ -10241,9 +10251,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 or { IsAnonymousType: true } || !type.CanBeReferencedByName && type is not IArrayTypeSymbol);
             if (collides || unknownType || type is { IsRefLikeType: true }
                 || declaration.Ancestors().Any(node => node is InterpolationSyntax)
-                // A chained assignment (`x = y = F(out var n)`) is converted by evaluating F twice.
+                // A chained assignment (`x = y = F(out var n)`) stays C#: the #1574 single-evaluation
+                // lowering is not certified together with a lowered out declaration.
                 || scanned.DescendantNodes().Any(node => node is AssignmentExpressionSyntax { Parent: not ExpressionStatementSyntax })
-                || _semanticModel.LookupSymbols(statement.SpanStart, name: "default").Length > 0) // `default` would read it
+                || DefaultNameCollides(statement)) // `default` would read it (#1573: also a private base member)
                 throw EscalateExpression(statement, "out-var");
             _loweredOutDeclarations.Add(declaration);
             var typeName = declaration.Type.IsVar
@@ -10745,7 +10756,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
             }
-            return new ReferenceNode(GetTextSpan(implicitNew), "default");
+            return DefaultValue(implicitNew, GetTextSpan(implicitNew));
         }
 
         _context.RecordFeatureUsage("target-typed-new");
@@ -11139,7 +11150,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "decimal" or "Decimal" => new DecimalLiteralNode(GetTextSpan(defaultExpr), 0m),
             "bool" or "Boolean" => new BoolLiteralNode(GetTextSpan(defaultExpr), false),
             "string" or "String" => new ReferenceNode(GetTextSpan(defaultExpr), "null"),
-            _ => new ReferenceNode(GetTextSpan(defaultExpr), "default")
+            _ => DefaultValue(defaultExpr, GetTextSpan(defaultExpr))
         };
     }
 
@@ -11254,34 +11265,248 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // The value of a deconstruction assignment is not its unevaluated RHS.
         if (IsTupleAssignment(assignment))
             throw EscalateExpression(assignment, "tuple-deconstruction");
-        // Handle assignment expressions in expression context (e.g., chained: a = b = value)
-        // Hoist the assignment to _pendingStatements and return the assigned value
+        // #1574: an assignment used as a value (a = b = G(), int z = y = G(), return x = G())
+        // is hoisted before its statement. That is faithful only when nothing in the statement
+        // runs before it and every target of the chain evaluates nothing; otherwise the
+        // statement is kept as C#.
+        var span = GetTextSpan(assignment);
+        if (!IsSingleEvaluationAssignmentSite(assignment))
+            throw EscalateExpression(assignment, "embedded-assignment");
         _context.IncrementConverted();
         var target = ConvertExpression(assignment.Left);
+        var targetType = AssignmentTargetType(assignment.Left)!;
 
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
         {
+            // The right-hand side runs once. C# converts it to the target's type, assigns that
+            // value, and the expression's value is that converted value (never a constant, so
+            // a literal is not reused: constant conversions would apply again). A typed temp
+            // holds it, unless it is an inner assignment's temp of exactly the target's type.
+            var right = Unparen(assignment.Right);
             var value = ConvertExpression(assignment.Right);
-            _pendingStatements.Add(new AssignmentStatementNode(
-                GetTextSpan(assignment), target, value));
-
-            // Return the value so chained assignments work: a = (b = value) → assign b value, then return value for a
+            var reuse = right is AssignmentExpressionSyntax inner
+                && inner.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && SymbolEqualityComparer.Default.Equals(AssignmentTargetType(inner.Left), targetType);
+            if (!reuse)
+            {
+                // The Calor emitter writes a collection or array initializer with its own type,
+                // not the binding's, so the temp would skip the conversion to the target type.
+                if (value is ListCreationNode or DictionaryCreationNode or SetCreationNode
+                        or ArrayCreationNode or MultiDimArrayCreationNode
+                    && !_semanticModel!.GetConversion(right).IsIdentity)
+                    throw EscalateExpression(assignment, "embedded-assignment");
+                // Mutable only for its name-first header (`§B{~t:W}`): the type-first immutable
+                // form `§B{W:t}` reads a user type name as the binding name.
+                var tempType = TempTypeName(assignment.Left, targetType, assignment.SpanStart)
+                    ?? throw EscalateExpression(assignment, "embedded-assignment");
+                var temp = _context.GenerateId("_asg");
+                _pendingStatements.Add(new BindStatementNode(span, temp, tempType, isMutable: true,
+                    value, new AttributeCollection()));
+                value = new ReferenceNode(span, temp);
+            }
+            _pendingStatements.Add(new AssignmentStatementNode(span, target, value));
             return value;
         }
 
         // #774: a compound assignment in expression context must not ignore its
         // operator (the old behavior turned `x += 1` into `x = 1`). Hoist the
         // correctly-mapped compound assignment; the expression's value is the
-        // updated target. Unmapped operators escalate to interop.
+        // updated target, re-read (IsSingleEvaluationAssignmentSite allows only
+        // variables and fields here, whose read has no effect). Unmapped
+        // operators escalate to interop.
         var compOp = MapCompoundAssignmentOperator(assignment.Kind())
             ?? throw EscalateExpression(assignment, "unsupported-compound-assignment");
+        // #1574: `n ??= v` has the underlying type of a nullable value target, so re-reading
+        // `n` would change the expression's type.
+        if (compOp == CompoundAssignmentOperator.NullCoalesce)
+            throw EscalateExpression(assignment, "embedded-assignment");
 
+        // #1574: C# reads the target before the right-hand side runs; anything the right-hand
+        // side hoists would run before that read.
+        var pendingBefore = _pendingStatements.Count;
         var rhs = ConvertExpression(assignment.Right);
-        _pendingStatements.Add(new CompoundAssignmentStatementNode(
-            GetTextSpan(assignment), target, compOp, rhs));
+        if (_pendingStatements.Count != pendingBefore)
+            throw EscalateExpression(assignment, "embedded-assignment");
+        _pendingStatements.Add(new CompoundAssignmentStatementNode(span, target, compOp, rhs));
 
         return ConvertExpression(assignment.Left);
     }
+
+    /// <summary>
+    /// #1574: whether an assignment used as a value can be hoisted before its statement as
+    /// <c>temp = rhs; target = temp</c>. The chain it belongs to (through parentheses and
+    /// enclosing simple assignments whose right side it is) must be a whole expression
+    /// statement, the initializer of a single local declaration, or a returned value, so nothing
+    /// else in the statement runs before it. Every target in the chain must evaluate nothing
+    /// before the right-hand side (a variable, a field or a non-ref property of <c>this</c> or a
+    /// type), so C#'s target-first order is unobservable, and must have an expressible type for
+    /// the temp. A compound assignment's target is re-read, so it must be a variable or field.
+    /// </summary>
+    private bool IsSingleEvaluationAssignmentSite(AssignmentExpressionSyntax assignment)
+    {
+        if (_semanticModel == null || assignment.SyntaxTree != _semanticModel.SyntaxTree)
+            return false;
+        SyntaxNode top = assignment;
+        while (top.Parent is ParenthesizedExpressionSyntax
+               || top.Parent is AssignmentExpressionSyntax outer && outer.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                  && Unparen(outer.Right) == Unparen(top) && !IsTupleAssignment(outer))
+            top = top.Parent;
+        // The statement must sit directly in a block: only a block flushes hoisted statements
+        // in front of it. An unbraced if/else/loop body or a switch section would leave them
+        // in front of the enclosing statement instead.
+        var siteOk = top.Parent switch
+        {
+            ExpressionStatementSyntax { Parent: BlockSyntax } => true,
+            ReturnStatementSyntax { Parent: BlockSyntax } => true,
+            EqualsValueClauseSyntax
+            {
+                Parent: VariableDeclaratorSyntax
+                {
+                    Parent: VariableDeclarationSyntax
+                    {
+                        Variables.Count: 1,
+                        Parent: LocalDeclarationStatementSyntax { Parent: BlockSyntax } local
+                    }
+                }
+            } => local.UsingKeyword.IsKind(SyntaxKind.None) && !local.IsConst,
+            _ => false,
+        };
+        if (!siteOk)
+            return false;
+        // `int x = x = 1;` assigns the local being declared, which the hoist would do before
+        // its declaration.
+        var declared = top.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax declarator }
+            ? _semanticModel.GetDeclaredSymbol(declarator) : null;
+        for (var node = Unparen(top) as AssignmentExpressionSyntax; node != null;
+             node = node == assignment ? null : Unparen(node.Right) as AssignmentExpressionSyntax)
+        {
+            if (AssignmentTargetType(node.Left) == null
+                || declared != null && SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(node.Left).Symbol, declared))
+                return false;
+            if (!node.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && _semanticModel.GetSymbolInfo(node.Left).Symbol is not (ILocalSymbol or IParameterSymbol or IFieldSymbol))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>#1574: the declared type of an assignment target that evaluates nothing before
+    /// the right-hand side, or null when the target is anything else or its type is not
+    /// expressible as a Calor binding type.</summary>
+    private ITypeSymbol? AssignmentTargetType(ExpressionSyntax left)
+    {
+        left = Unparen(left);
+        var nameOnly = left is IdentifierNameSyntax
+            || left is MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression } access
+                && (access.Expression is ThisExpressionSyntax
+                    || _semanticModel!.GetSymbolInfo(access.Expression).Symbol is INamedTypeSymbol);
+        if (!nameOnly)
+            return null;
+        var type = _semanticModel!.GetSymbolInfo(left).Symbol switch
+        {
+            ILocalSymbol local => local.Type,
+            IParameterSymbol parameter => parameter.Type,
+            IFieldSymbol field => field.Type,
+            IPropertySymbol { IsIndexer: false, ReturnsByRef: false, ReturnsByRefReadonly: false } property => property.Type,
+            _ => null,
+        };
+        return type is { IsRefLikeType: false } && IsExpressibleType(type) ? type : null;
+    }
+
+    /// <summary>#1574: whether a type, its element types and its type arguments can all be
+    /// named in a binding header (no anonymous, error, dynamic or pointer types anywhere).</summary>
+    private static bool IsExpressibleType(ITypeSymbol type) => type switch
+    {
+        { TypeKind: TypeKind.Error or TypeKind.Dynamic or TypeKind.Pointer or TypeKind.FunctionPointer } => false,
+        { IsAnonymousType: true } => false,
+        IArrayTypeSymbol array => IsExpressibleType(array.ElementType),
+        INamedTypeSymbol named => named.CanBeReferencedByName
+            && !ShadowsMappedTypeName(named)
+            && named.TypeArguments.All(IsExpressibleType)
+            && (named.ContainingType is null || IsExpressibleType(named.ContainingType)),
+        ITypeParameterSymbol => true,
+        _ => false,
+    };
+
+    /// <summary>
+    /// #1574 (Codex round 2): the Calor type of the temp for a target. An oblivious reference
+    /// target (`string` under `#nullable disable annotations`) accepts null without a warning,
+    /// and the converter declares such a local or field as nullable (MapDeclarationType); the
+    /// temp follows it, so the generated C# gains no CS8600. A target the converter declares
+    /// without the annotation keeps the plain type. Nested oblivious shapes (type arguments,
+    /// arrays) are not modeled, so they return null and the statement stays C#.
+    /// </summary>
+    private string? TempTypeName(ExpressionSyntax left, ITypeSymbol type, int position)
+    {
+        var name = CalorTypeName(type, position);
+        if (!type.IsReferenceType || type.NullableAnnotation != NullableAnnotation.None)
+            return name;
+        var model = _semanticModel!;
+        var declaration = model.GetSymbolInfo(left).Symbol?.DeclaringSyntaxReferences
+            .FirstOrDefault(reference => reference.SyntaxTree == model.SyntaxTree);
+        var annotated = _hasEvaluatedNullableContext || declaration == null
+            || model.GetNullableContext(declaration.Span.Start) is var context
+                && !context.HasFlag(NullableContext.AnnotationsEnabled)
+                && !context.HasFlag(NullableContext.AnnotationsContextInherited);
+        if (!annotated)
+            return name;
+        return HasUnsupportedNestedObliviousShape(type) ? null : TypeMapper.AnnotateNullableReference(name);
+    }
+
+    // #1574 (Codex round 2): a user type named like a mapped C# type (`N.String`) would be
+    // written as the built-in Calor type (`str`) by TypeMapper.
+    private static bool ShadowsMappedTypeName(INamedTypeSymbol named)
+        => named.SpecialType == SpecialType.None
+            && !(named.ContainingNamespace?.ToDisplayString() is { } ns && (ns == "System" || ns.StartsWith("System.", StringComparison.Ordinal)))
+            && TypeMapper.CSharpToCalor(named.Name) != named.Name;
+
+    /// <summary>
+    /// #1574 item 2: Calor's `default` is also how a member named <c>@default</c> is written, and the
+    /// C# emitter writes it as <c>@default</c> when such a member exists. A converted <c>default</c>
+    /// (an uninitialized local, a default literal or <c>default(T)</c>) is therefore emitted only when
+    /// no symbol named <c>default</c> is visible at <paramref name="at"/> or declared, at any
+    /// accessibility, in a containing type or its base types (#1573); otherwise the statement is
+    /// kept as C#.
+    /// </summary>
+    private ReferenceNode DefaultValue(SyntaxNode at, TextSpan span)
+    {
+        if (DefaultNameCollides(at))
+            throw EscalateExpression(at, "default-member-collision");
+        return new ReferenceNode(span, "default");
+    }
+
+    private bool DefaultNameCollides(SyntaxNode at)
+    {
+        if (_semanticModel == null || at.SyntaxTree != _semanticModel.SyntaxTree)
+            return false;
+        if (_semanticModel.LookupSymbols(at.SpanStart, name: "default").Length > 0)
+            return true;
+        var enclosing = _semanticModel.GetEnclosingSymbol(at.SpanStart);
+        for (var type = enclosing as INamedTypeSymbol ?? enclosing?.ContainingType; type != null; type = type.ContainingType)
+        {
+            for (var current = type; current != null; current = current.BaseType)
+            {
+                if (!current.GetMembers("default").IsEmpty)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private static ExpressionSyntax Unparen(ExpressionSyntax node) => (ExpressionSyntax)Unparen((SyntaxNode)node);
+
+    private static SyntaxNode Unparen(SyntaxNode node)
+    {
+        while (node is ParenthesizedExpressionSyntax paren)
+            node = paren.Expression;
+        return node;
+    }
+
+    // The type as the source could spell it at that position (`W`, `List<int>`, `string?`).
+    private string CalorTypeName(ITypeSymbol type, int position)
+        => TypeMapper.CSharpToCalor(type.ToMinimalDisplayString(_semanticModel!, position,
+            SymbolDisplayFormat.MinimallyQualifiedFormat.AddMiscellaneousOptions(
+                SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)));
 
     private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
     {
@@ -13192,7 +13417,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     .Select(ConvertExpression)
                     .ToList();
                 if (items.Count == 0)
-                    return new ReferenceNode(GetTextSpan(initExpr), "default");
+                    return DefaultValue(initExpr, GetTextSpan(initExpr));
                 // Wrap in an array node as a collection of property assignments
                 var id = _context.GenerateId("init");
                 return new ArrayCreationNode(GetTextSpan(initExpr), id, id, "object", null, items, new AttributeCollection());

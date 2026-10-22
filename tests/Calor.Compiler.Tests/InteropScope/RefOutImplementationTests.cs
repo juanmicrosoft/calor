@@ -523,7 +523,7 @@ public class RefOutImplementationTests
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
         EvidenceContractTests.RepoRoot(), "docs/plans/evidence/v0.25-r0-1426/fixtures", id + ".cs.txt"));
 
-    private static async Task<(string Calor, List<string> Losses)> ConvertAsync(string source, Surface surface)
+    internal static async Task<(string Calor, List<string> Losses)> ConvertAsync(string source, Surface surface)
     {
         if (surface is Surface.McpDefault or Surface.McpPassthroughOnError)
         {
@@ -545,7 +545,7 @@ public class RefOutImplementationTests
         return (result.CalorSource ?? "", result.Losses.Select(loss => loss.Feature).ToList());
     }
 
-    private static string Run(string csharp)
+    internal static string Run(string csharp)
     {
         var compilation = CSharpCompilation.Create("F1_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(csharp, new CSharpParseOptions(LanguageVersion.Preview))],

@@ -4013,6 +4013,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Initializer != null)
         {
             var initExpr = node.Initializer.Accept(this);
+            if (initExpr == "default")
+                initExpr = DefaultFor(typeName);
             return $"{typeName} {varName} = {initExpr};";
         }
 
@@ -4021,8 +4023,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             typeName = "int"; // Default to int
         }
-        return $"{typeName} {varName} = default;";
+        return $"{typeName} {varName} = {DefaultFor(typeName)};";
     }
+
+    /// <summary>
+    /// #1574 item 4: a binding that starts at <c>default</c> (an uninitialized local, a lowered
+    /// <c>out string s</c>) has no value yet, as in the original C#. For a type that may be a
+    /// non-nullable reference type, <c>default!</c> states that, so the generated C# does not
+    /// raise CS8600. Built-in value types and nullable types keep a plain <c>default</c>.
+    /// </summary>
+    private static string DefaultFor(string csharpType)
+        => csharpType.EndsWith('?') || csharpType is "var" or "int" or "long" or "short" or "byte" or "sbyte"
+            or "uint" or "ulong" or "ushort" or "char" or "bool" or "float" or "double" or "decimal"
+            or "nint" or "nuint"
+            ? "default" : "default!";
 
     private static bool ExpressionReferencesName(
         ExpressionNode expression,

@@ -94,6 +94,14 @@ public static class DiagnosticCode
     public const string InvalidTypeParameterVariance = "Calor0119";
     public const string InvalidDefaultConstraintOwner = "Calor0120";
 
+    /// <summary>
+    /// Warning (#1574): a bare binding (<c>§B{~n:i32}</c> with nothing after its header on
+    /// that line) takes an expression that starts on a later line at the binding's own
+    /// indent as its initializer. The meaning is unchanged; the warning makes that reading
+    /// visible, because the next line usually looks like a separate statement.
+    /// </summary>
+    public const string BareBindingNextLineInitializer = "Calor0121";
+
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 
     /// <summary>

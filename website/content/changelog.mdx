@@ -30,6 +30,32 @@ All notable changes to Calor, organized by release.
   do for the whole project), or `not-run` (conversion stopped before the check). Code that
   reads `outcome` should accept `unverified`.
 
+Four C# → Calor converter defects found during 0.25 (#1574). The first one silently changed
+what a program does.
+
+- **A chained assignment now runs its right-hand side once.** `x = y = G()` used to call `G()`
+  once per target. The converter now stores the value in a typed temporary and assigns it to
+  each target, so the value and its type conversions match C#. This applies when the chain is
+  a whole statement, a single local initializer, or a `return` value, the statement sits
+  directly in a `{ }` block, and every target is a variable, a field, or a property of `this`
+  or of a type. In any other position, such as an `if` or `while` condition, a call argument,
+  an unbraced `if` body, or an indexer or member target, the statement now stays as C# and is
+  reported as an `embedded-assignment` loss. Before, these positions could
+  run the call twice, run it in the wrong order, or drop the assignment entirely.
+- **`default` no longer reads a member named `@default`.** Calor writes the `default` keyword
+  and a member named `default` the same way. When such a member is visible, or declared in a
+  containing or base class at any accessibility, an uninitialized local (`int x;`), a `default`
+  literal or `default(T)` now keeps its statement as C# (`default-member-collision`). This also
+  fixes #1573: an `out var` next to a *private* base-class `@default` member no longer fails
+  to compile.
+- **New warning `Calor0121` for a bare binding's next-line initializer.** In hand-written
+  Calor, `§B{~n:i32}` with nothing after it takes an expression on the next line, at the same
+  indent, as its initializer. That reading is unchanged, because changing it would change valid
+  programs. The compiler now warns so the reading is visible.
+- **No more CS8600 warning for a lowered `out string`.** A binding that starts at `default`
+  now emits `default!` for types that may be non-nullable references (`string s = default!;`).
+  Built-in value types keep `default`.
+
 ## [0.25.0] - 2026-10-20
 
 Calor 0.25 is an interoperability release. It changes how the C# → Calor converter
