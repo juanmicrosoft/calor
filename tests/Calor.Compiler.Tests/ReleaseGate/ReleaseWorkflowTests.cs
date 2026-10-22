@@ -17,6 +17,7 @@ public class ReleaseWorkflowTests
 {
     private const string Publish = "publish-nuget.yml";
     private const string KeyRef = "${{ steps.nuget-login.outputs.NUGET_API_KEY }}";
+    private const string Verify = "python3 scripts/release_checks.py verify-bundle --version \"$VER\" --dir \"$RUNNER_TEMP/bundle\" --sums-sha256 \"$SUMS\"";
 
     public static TheoryData<string> ReleaseWorkflows => new()
     {
@@ -257,17 +258,19 @@ public class ReleaseWorkflowTests
         {
             "uses: NuGet/login@",
             "name: Require the Trusted Publishing NuGet key (#1545)",
-            "name: release-bundle",
-            "test \"$(sha256sum SHA256SUMS | cut -d' ' -f1)\" = \"$SUMS\"",
-            "sha256sum --check --strict SHA256SUMS",
+            "name: release-bundle\n          path: ${{ runner.temp }}/bundle\n",
+            Verify,
             "uses: actions/attest-build-provenance@",
             // The existing-version compare, again, immediately before the push, never advisory.
-            "python3 scripts/release_checks.py registry --mode existing --version \"$VER\" --nuget-dir ./nupkg\n",
-            "dotnet nuget push ./nupkg/*.nupkg",
-            "python3 scripts/release_checks.py registry --mode served --version \"$VER\" --nuget-dir ./nupkg\n",
+            "python3 scripts/release_checks.py registry --mode existing --version \"$VER\" --nuget-dir \"$RUNNER_TEMP/bundle/nupkg\"\n",
+            "dotnet nuget push \"$RUNNER_TEMP\"/bundle/nupkg/*.nupkg",
+            "python3 scripts/release_checks.py registry --mode served --version \"$VER\" --nuget-dir \"$RUNNER_TEMP/bundle/nupkg\"\n",
         });
         Assert.DoesNotContain("--dry-run", publish);
         Assert.DoesNotContain("gh release", publish);
+        // The bundle never lands in the checkout, where it could replace a script these jobs run.
+        Assert.DoesNotContain("./nupkg", publish);
+        Assert.Equal(2, Regex.Matches(text, @"name: release-bundle\n          path: \$\{\{ runner\.temp \}\}/bundle\n").Count);
         Assert.DoesNotContain("contents: write", publish);
         // The GitHub release and its metadata come after the served compare (publish) and the
         // install check, from the bundle the package job checked.
@@ -275,13 +278,14 @@ public class ReleaseWorkflowTests
         Assert.Contains("    needs: [preflight, package, publish, install-check]\n", release);
         AssertInOrder(release, new[]
         {
-            "name: release-bundle",
-            "test \"$(sha256sum SHA256SUMS | cut -d' ' -f1)\" = \"$SUMS\"",
-            "sha256sum --check --strict SHA256SUMS",
-            "gh release create \"$TAG\" --target \"$CANDIDATE\" --title \"$TAG\" --notes-file ./release-notes/notes.md $FLAG",
+            "name: release-bundle\n          path: ${{ runner.temp }}/bundle\n",
+            Verify,
+            "gh release create \"$TAG\" --target \"$CANDIDATE\" --title \"$TAG\" --notes-file \"$RUNNER_TEMP/bundle/release-notes/notes.md\" $FLAG",
             "gh release upload \"$TAG\" \"$file\"",
         });
         Assert.DoesNotContain("id-token", release);
+        Assert.DoesNotContain("./release-notes", release);
+        Assert.DoesNotContain("./release-metadata", release);
         // The remote tag must be absent or at the candidate, before and after creation.
         var create = Step(release, "Create the GitHub release");
         Assert.Contains("if [ -n \"$existing\" ] && [ \"$existing\" != \"$CANDIDATE\" ]; then", create);

@@ -8,6 +8,9 @@ exits nonzero on any problem, and the workflow never masks that exit.
                            at HEAD. Writes candidate, version, tag, prerelease to $GITHUB_OUTPUT.
   bundle --version V --nuget-dir D
                            D holds exactly calor.V.nupkg and Calor.Sdk.V.nupkg.
+  verify-bundle --version V --dir D --sums-sha256 H
+                           The downloaded bundle D is exactly the package job's: SHA256SUMS hashes
+                           to H, each listed file matches, and nothing else is there.
   wording PATH...          The forbidden-wording scan (formerly gate code G012): release notes,
                            package text entries, or a built site must not claim the release
                            evidence was independently adjudicated or verified.
@@ -200,6 +203,49 @@ def bundle_problems(nuget_dir: Path, version: str) -> list[str]:
     return []
 
 
+BUNDLE_SUMS = "SHA256SUMS"
+BUNDLE_PATH_RE = re.compile(r"^(?:nupkg/[A-Za-z0-9._-]+\.nupkg|release-metadata/[A-Za-z0-9._-]+\.json|release-notes/notes\.md)$")
+
+
+def bundle_inventory_problems(root: Path, version: str, sums_sha256: str) -> list[str]:
+    """The downloaded release bundle is exactly what the package job recorded: SHA256SUMS hashes to
+    the package job's output, every listed file has its listed hash, and no other file, directory
+    entry, or symlink exists. The bundle lives outside the checkout, so it can never replace a
+    script the release jobs run (Codex round 2)."""
+    sums = root / BUNDLE_SUMS
+    if not sums.is_file() or sums.is_symlink():
+        return [f"{sums} is missing"]
+    if sha256(sums.read_bytes()) != sums_sha256:
+        return [f"{BUNDLE_SUMS} does not hash to the package job's record {sums_sha256}"]
+    problems: list[str] = []
+    listed: dict[str, str] = {}
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  (?:\./)?(\S+)", line)
+        if not match or not BUNDLE_PATH_RE.fullmatch(match.group(2)) or match.group(2) in listed:
+            problems.append(f"{BUNDLE_SUMS} has an unexpected line: {line!r}")
+            continue
+        listed[match.group(2)] = match.group(1)
+    present = {}
+    for path in root.rglob("*"):
+        rel = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            problems.append(f"bundle holds a symlink: {rel}")
+        elif path.is_file() and rel != BUNDLE_SUMS:
+            present[rel] = path
+    for rel in sorted(set(listed) | set(present)):
+        if rel not in present:
+            problems.append(f"bundle lacks the recorded {rel}")
+        elif rel not in listed:
+            problems.append(f"bundle holds {rel}, which the package job did not record")
+        elif sha256(present[rel].read_bytes()) != listed[rel]:
+            problems.append(f"bundle file {rel} differs from the package job's record")
+    if not problems:
+        problems += bundle_problems(root / "nupkg", version)
+        if "release-notes/notes.md" not in listed:
+            problems.append("bundle lacks the release notes")
+    return problems
+
+
 def local_package(nuget_dir: Path, package_id: str, version: str) -> Path:
     wanted = f"{package_id}.{version}.nupkg".lower()
     matches = [p for p in nuget_dir.glob("*.nupkg") if p.name.lower() == wanted]
@@ -328,6 +374,10 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("bundle")
     b.add_argument("--version", required=True)
     b.add_argument("--nuget-dir", required=True)
+    v = sub.add_parser("verify-bundle")
+    v.add_argument("--version", required=True)
+    v.add_argument("--dir", required=True)
+    v.add_argument("--sums-sha256", required=True)
     w = sub.add_parser("wording")
     w.add_argument("paths", nargs="+")
     r = sub.add_parser("registry")
@@ -352,6 +402,8 @@ def main(argv: list[str] | None = None) -> int:
             return report(problems, "release preflight", dry)
         if args.command == "bundle":
             return report(bundle_problems(Path(args.nuget_dir), args.version), "release bundle")
+        if args.command == "verify-bundle":
+            return report(bundle_inventory_problems(Path(args.dir), args.version, args.sums_sha256), "release bundle")
         if args.command == "wording":
             return report(scan_paths([Path(p) for p in args.paths]), "release wording")
         work = Path(args.work_dir or os.environ.get("RUNNER_TEMP", ".")) / f"registry-{args.mode}"

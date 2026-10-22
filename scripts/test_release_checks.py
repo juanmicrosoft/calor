@@ -131,6 +131,57 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(1, len(rc.bundle_problems(self.root / "missing", VERSION)))
 
 
+class BundleInventoryTests(unittest.TestCase):
+    """Codex round 2: a bundle with any file the package job did not record must fail, so an
+    injected scripts/release_checks.py can never reach a job that holds a key or a write token."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "bundle"
+        packages(self.root / "nupkg")
+        (self.root / "release-metadata").mkdir()
+        (self.root / "release-metadata" / "sbom.json").write_text("{}", encoding="utf-8")
+        (self.root / "release-notes").mkdir()
+        (self.root / "release-notes" / "notes.md").write_text("## [0.26.0]\n\nNotes.\n", encoding="utf-8")
+        files = sorted(p for p in self.root.rglob("*") if p.is_file())
+        lines = "".join(f"{rc.sha256(p.read_bytes())}  ./{p.relative_to(self.root).as_posix()}\n" for p in files)
+        (self.root / "SHA256SUMS").write_text(lines, encoding="utf-8")
+        self.sums = rc.sha256((self.root / "SHA256SUMS").read_bytes())
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def problems(self) -> list[str]:
+        return rc.bundle_inventory_problems(self.root, VERSION, self.sums)
+
+    def test_the_recorded_bundle_passes(self) -> None:
+        self.assertEqual([], self.problems())
+
+    def test_an_unrecorded_script_fails(self) -> None:
+        (self.root / "scripts").mkdir()
+        (self.root / "scripts" / "release_checks.py").write_text("print('pwned')\n", encoding="utf-8")
+        self.assertEqual(1, len(self.problems()))
+        self.assertIn("scripts/release_checks.py", self.problems()[0])
+
+    def test_a_changed_or_missing_file_or_a_symlink_fails(self) -> None:
+        notes = self.root / "release-notes" / "notes.md"
+        notes.write_text("changed\n", encoding="utf-8")
+        self.assertTrue(self.problems())
+        notes.unlink()
+        self.assertTrue(self.problems())
+        notes.symlink_to(self.root / "SHA256SUMS")
+        self.assertTrue(any("symlink" in p for p in self.problems()))
+
+    def test_a_different_manifest_fails(self) -> None:
+        self.sums = "0" * 64
+        self.assertEqual(1, len(self.problems()))
+        self.sums = rc.sha256((self.root / "SHA256SUMS").read_bytes())
+        with open(self.root / "SHA256SUMS", "a", encoding="utf-8") as handle:
+            handle.write(f"{'0' * 64}  ./scripts/release_checks.py\n")
+        self.sums = rc.sha256((self.root / "SHA256SUMS").read_bytes())
+        self.assertTrue(any("unexpected line" in p for p in self.problems()))
+
+
 class WordingTests(unittest.TestCase):
     def test_claims_fail_and_negations_pass(self) -> None:
         self.assertEqual(["independently verified"], rc.wording_hits("a.md", "The results were independently verified."))

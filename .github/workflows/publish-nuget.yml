@@ -580,40 +580,36 @@ jobs:
       - name: Set up the pinned release SDK (#1548)
         uses: ./.github/actions/setup-release-sdk
 
+      # Outside the checkout: nothing in the bundle can replace a script these jobs run.
       - name: Download the release bundle
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
-          path: .
+          path: ${{ runner.temp }}/bundle
 
-      # The bundle must be exactly the bytes the package job checked, and nothing more.
+      # The bundle must be exactly the files the package job recorded, and nothing more.
       - name: Verify the bundle against the package job's record
         env:
           SUMS: ${{ needs.package.outputs.sums }}
           VER: ${{ needs.preflight.outputs.version }}
-        run: |
-          set -euo pipefail
-          test "$(sha256sum SHA256SUMS | cut -d' ' -f1)" = "$SUMS"
-          sha256sum --check --strict SHA256SUMS
-          python3 scripts/release_checks.py bundle --version "$VER" --nuget-dir ./nupkg
-          test "$(find ./nupkg ./release-metadata ./release-notes -type f | wc -l)" = "$(wc -l < SHA256SUMS)"
+        run: python3 scripts/release_checks.py verify-bundle --version "$VER" --dir "$RUNNER_TEMP/bundle" --sums-sha256 "$SUMS"
 
       - name: Attest NuGet packages
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            ./nupkg/*.nupkg
-            ./release-metadata/*.json
+            ${{ runner.temp }}/bundle/nupkg/*.nupkg
+            ${{ runner.temp }}/bundle/release-metadata/*.json
 
       - name: Compare any version already on nuget.org
         env:
           VER: ${{ needs.preflight.outputs.version }}
-        run: python3 scripts/release_checks.py registry --mode existing --version "$VER" --nuget-dir ./nupkg
+        run: python3 scripts/release_checks.py registry --mode existing --version "$VER" --nuget-dir "$RUNNER_TEMP/bundle/nupkg"
 
       - name: Push to NuGet
         env:
           NUGET_OIDC_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_OIDC_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "$RUNNER_TEMP"/bundle/nupkg/*.nupkg --api-key "$NUGET_OIDC_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified package
       # in place. Wait (up to 30 minutes) until nuget.org serves both packages, then compare them
@@ -621,15 +617,15 @@ jobs:
       - name: Verify the packages nuget.org serves
         env:
           VER: ${{ needs.preflight.outputs.version }}
-        run: python3 scripts/release_checks.py registry --mode served --version "$VER" --nuget-dir ./nupkg
+        run: python3 scripts/release_checks.py registry --mode served --version "$VER" --nuget-dir "$RUNNER_TEMP/bundle/nupkg"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
           name: nuget-package
           path: |
-            ./nupkg/*.nupkg
-            ./release-metadata/*.json
+            ${{ runner.temp }}/bundle/nupkg/*.nupkg
+            ${{ runner.temp }}/bundle/release-metadata/*.json
 
   # Install calor from nuget.org as a user would, and require `calor verify` to prove the sample
   # (Proven: 14, Skipped: 0). The sample comes from the candidate commit, not a tag. A failure
@@ -655,22 +651,18 @@ jobs:
           ref: ${{ needs.preflight.outputs.candidate }}
           persist-credentials: false
 
+      # Outside the checkout: nothing in the bundle can replace a script these jobs run.
       - name: Download the release bundle
         uses: actions/download-artifact@v4
         with:
           name: release-bundle
-          path: .
+          path: ${{ runner.temp }}/bundle
 
       - name: Verify the bundle against the package job's record
         env:
           SUMS: ${{ needs.package.outputs.sums }}
           VER: ${{ needs.preflight.outputs.version }}
-        run: |
-          set -euo pipefail
-          test "$(sha256sum SHA256SUMS | cut -d' ' -f1)" = "$SUMS"
-          sha256sum --check --strict SHA256SUMS
-          python3 scripts/release_checks.py bundle --version "$VER" --nuget-dir ./nupkg
-          test "$(find ./nupkg ./release-metadata ./release-notes -type f | wc -l)" = "$(wc -l < SHA256SUMS)"
+        run: python3 scripts/release_checks.py verify-bundle --version "$VER" --dir "$RUNNER_TEMP/bundle" --sums-sha256 "$SUMS"
 
       # The remote tag is checked at this moment, not at checkout time: it must be absent or
       # already point at the candidate. An existing release is accepted only if its title and body
@@ -698,7 +690,7 @@ jobs:
           if gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/existing.md" 2>/dev/null; then
             TITLE="$(gh release view "$TAG" --json name --jq .name)"
             [ "$TITLE" = "$TAG" ] || { echo "::error::existing release $TAG has title '$TITLE'"; exit 1; }
-            python3 - "$RUNNER_TEMP/existing.md" ./release-notes/notes.md <<'PY'
+            python3 - "$RUNNER_TEMP/existing.md" "$RUNNER_TEMP/bundle/release-notes/notes.md" <<'PY'
           import sys
           body, notes = (open(p, encoding="utf-8").read().replace("\r\n", "\n").strip() for p in sys.argv[1:])
           if body != notes:
@@ -707,7 +699,7 @@ jobs:
           else
             FLAG=""
             if [ "$PRERELEASE" = "true" ]; then FLAG="--prerelease"; fi
-            gh release create "$TAG" --target "$CANDIDATE" --title "$TAG" --notes-file ./release-notes/notes.md $FLAG
+            gh release create "$TAG" --target "$CANDIDATE" --title "$TAG" --notes-file "$RUNNER_TEMP/bundle/release-notes/notes.md" $FLAG
           fi
           if [ "$(remote_tag)" != "$CANDIDATE" ]; then
             echo "::error::after release creation tag $TAG does not point at the candidate $CANDIDATE"; exit 1
@@ -722,7 +714,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/assets"
-          for file in ./release-metadata/*.json; do
+          for file in "$RUNNER_TEMP"/bundle/release-metadata/*.json; do
             name="$(basename "$file")"
             if gh release download "$TAG" -p "$name" -D "$RUNNER_TEMP/assets" 2>/dev/null; then
               cmp -s "$file" "$RUNNER_TEMP/assets/$name" || { echo "::error::release asset $name differs from the verified file"; exit 1; }
