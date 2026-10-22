@@ -360,7 +360,8 @@ class Z3HermeticTests(unittest.TestCase):
             self.assertIn(control["step"], [step_name(step) for step in job_steps(job)])
 
     def test_publish_packs_the_bootstrapped_assets(self) -> None:
-        job = workflow_jobs((REPO_ROOT / ".github/workflows/publish-nuget.yml").read_text(encoding="utf-8"))["publish"]
+        # #1582: the package job packs; the publish job only pushes what it packed.
+        job = workflow_jobs((REPO_ROOT / ".github/workflows/publish-nuget.yml").read_text(encoding="utf-8"))["package"]
         self.assertIn(ACTION_USE, job)
         self.assertIn("check-packaged-z3.py ./nupkg/calor.*.nupkg --prefix tools/net10.0/any --all-rids", job)
         self.assertIn("check-packaged-z3.py ./nupkg/Calor.Sdk.*.nupkg --prefix tasks/net10.0 --all-rids", job)

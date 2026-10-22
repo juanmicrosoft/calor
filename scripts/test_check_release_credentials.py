@@ -666,11 +666,11 @@ class CredentialCheckTests(unittest.TestCase):
         path = self.f.workflow("publish-nuget.yml")
         original = path.read_text(encoding="utf-8")
         self.assertIn(guard, original)
-        checkout = "      - name: Checkout the adjudicated candidate with full history\n"
+        checkout = "      - name: Checkout the candidate\n"
         start = original.index(guard)
         end = original.index(checkout)
-        moved = original[:start] + original[end:].replace(
-            "      - name: Setup .NET\n", original[start:end] + "      - name: Setup .NET\n", 1)
+        later = "      - name: Download the release bundle\n"
+        moved = original[:start] + original[end:].replace(later, original[start:end] + later, 1)
         for mutant in (original.replace(guard, guard + "        continue-on-error: true\n"),
                        original.replace(guard, guard + "        if: false\n"),
                        original.replace(guard, guard + '        "if": false\n'),
@@ -736,14 +736,13 @@ class CredentialCheckTests(unittest.TestCase):
         # Only the guard and the push may read the key; the build steps run candidate code.
         path = self.f.workflow("publish-nuget.yml")
         original = path.read_text(encoding="utf-8")
-        build = "      - name: Build\n        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj"
-        self.assertEqual(1, original.count(build))
-        build = build.split("\n")[0] + "\n"
+        # #1582: the publish job pushes what the package job built; inject into one of its steps.
+        build = "      - name: Upload package artifact\n"
         original_split = original.split(build)
-        self.assertEqual(3, len(original_split))  # the test job's Build, then the publish job's
+        self.assertEqual(2, len(original_split))
 
         def at_publish_build(text: str) -> str:
-            return build.join(original_split[:2]) + build + text + original_split[2]
+            return original_split[0] + build + text + original_split[1]
         for injected, codes in (
             ("        env:\n          K: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n", {"W015"}),
             ("        env:\n          K: ${{ steps.nuget-login.outputs.nuget_api_key }}\n", {"W002", "W015"}),
@@ -755,16 +754,16 @@ class CredentialCheckTests(unittest.TestCase):
         # A second login step, or the output at job level.
         second = ("      - name: Again\n        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841\n"
                   "        with:\n          user: juanmicrosoft\n")
-        path.write_text(build.join(original_split[:2]) + second + build + original_split[2], encoding="utf-8")
+        path.write_text(original_split[0] + second + build + original_split[1], encoding="utf-8")
         self.assert_codes({"W015"})
         job = "    environment: nuget-release\n"
         path.write_text(original.replace(job, job + "    outputs:\n      k: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n"),
                         encoding="utf-8")
         self.assert_codes({"W015"})
-        top_env = "\nenv:\n  ADJUDICATION_IDENTITY:"
-        self.assertEqual(1, original.count(top_env))
-        path.write_text(original.replace(top_env, "\nenv:\n  K: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n"
-                                                  "  ADJUDICATION_IDENTITY:"), encoding="utf-8")
+        jobs = "\njobs:\n"
+        self.assertEqual(1, original.count(jobs))
+        path.write_text(original.replace(jobs, "\nenv:\n  K: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}\n" + jobs),
+                        encoding="utf-8")
         self.assert_codes({"W002", "W008"})
         path.write_text(original, encoding="utf-8")
 

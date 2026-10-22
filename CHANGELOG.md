@@ -42,6 +42,32 @@ All notable changes to this project will be documented in this file.
   do for the whole project), or `not-run` (conversion stopped before the check). Code that
   reads `outcome` should accept `unverified`.
 
+### Release process
+
+- **Releases no longer need an adjudication record (#1582).** Until now, `publish-nuget.yml`
+  published only after a gate script matched the packages against a committed review record.
+  That gate is gone from the release, website, installed-tool, audit and benchmark workflows. A
+  release is now a manual dispatch from `main` that names the version. The version must equal
+  `Directory.Build.props`, and `CHANGELOG.md` must have a `## [X.Y.Z]` section for it.
+- **Every check on the shipped packages stays, and each still stops the release when it fails.**
+  Before anything is pushed: the 13-project test matrix, the SDK consumer test on 5 platforms,
+  the coverage, mutation, performance and flakiness ratchets, the round-trip harness, package
+  inspection, the Z3 pin check, the SBOM, the wording scan of the notes, packages and website,
+  and a comparison with any copy of this version already on nuget.org. After the push: a
+  comparison with the packages nuget.org serves, then an install of `calor` from nuget.org
+  (`calor verify` must report `Proven: 14`, `Skipped: 0`), then the GitHub release, and only then
+  the website. The install check used to be a manual step after the release.
+- **A dry run is now possible.** `dry_run: true` runs every check and builds both packages, then
+  stops before the publish job. It never requests a NuGet key.
+- **Publishing still uses nuget.org Trusted Publishing.** Only the publish job, in the `main`-only
+  `nuget-release` environment, can exchange its GitHub token for a short-lived NuGet key. No API
+  key is stored.
+- **The release audit checks something simpler.** A release created by hand now fails the audit
+  unless its tag commit is on `main` and nuget.org serves both `calor` and `Calor.Sdk` at its
+  version.
+- **The .NET SDK pin (10.0.401) now lives in one shared action** instead of 8 copies across the
+  release workflows.
+
 ## [0.25.0] - 2026-10-20
 
 Calor 0.25 is an interoperability release. It changes how the C# → Calor converter

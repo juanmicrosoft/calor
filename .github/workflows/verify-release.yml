@@ -1,83 +1,44 @@
 name: Verify Release (installed tool)
 
-# On-demand end-to-end verification of a shipped release: install the `calor`
-# tool from nuget.org as a downstream consumer would, then exercise the Z3
-# verifier against a known-proven sample. Mirrors the manual check the
-# create-release skill spells out ("dotnet tool install --tool-path
-# /tmp/calorcheck calor --version $VER && calor verify …"), so releases can be
-# formally verified from environments where developers cannot reach
-# api.nuget.org directly (e.g. corporate proxies that mirror nuget.org with
-# lag and reject non-mirrored source overrides).
+# End-to-end check of a shipped release: install the `calor` tool from nuget.org as a downstream
+# consumer would, then require the Z3 verifier to prove a known sample (Proven: 14, Skipped: 0).
+# publish-nuget.yml calls this after the push and before it creates the GitHub release, so a
+# failure here stops the release, its metadata, and the website (#1582). It can also be dispatched by hand for any shipped version, e.g.
+# from environments that cannot reach api.nuget.org directly.
 #
-# Independent of publish-nuget.yml's sdk-consumer matrix: that one exercises
-# Calor.Sdk (MSBuild integration) via a local feed built during the publish
-# run. This one exercises the `calor` global tool via the public nuget.org
-# feed, which is what a user actually types after a release lands.
+# Independent of publish-nuget.yml's sdk-consumer matrix: that one exercises Calor.Sdk (MSBuild
+# integration) through a local feed built during the publish run. This one exercises the `calor`
+# global tool through the public nuget.org feed, which is what a user actually types.
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Package version to verify (e.g. 0.26.0)'
+        required: true
+        type: string
+      ref:
+        description: 'Commit or tag to take the sample from (default: v<version>)'
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       version:
-        description: 'Package version to verify (e.g. 0.14.0)'
+        description: 'Package version to verify (e.g. 0.26.0)'
         required: true
         type: string
-      adjudication_identity:
-        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410). Exactly one of this and maintainer_override.'
+      ref:
+        description: 'Commit or tag to take the sample from (default: v<version>)'
         required: false
         type: string
-      maintainer_override:
-        description: 'For the UNGATED 0.24.0 maintainer-override release only: the same version as above'
-        required: false
-        type: string
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
-  # #1410 (0.24 R2): the installed-tool check is a release-path surface, so it also
-  # consumes the one adjudication identity. It verifies only the adjudicated version,
-  # and only after the GitHub release carrying that identity exists. A maintainer-override
-  # release (0.24.0) carries no identity; it is checked against its override record instead.
-  adjudication-gate:
-    runs-on: ubuntu-latest
-    outputs:
-      candidate: ${{ steps.gate.outputs.candidate }}
-    steps:
-      - name: Checkout full history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Verify the adjudication identity and the GitHub release (#1410)
-        id: gate
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
-          MAINTAINER_OVERRIDE: ${{ inputs.maintainer_override }}
-          VER: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_REF" != refs/heads/main ]; then echo "::error::dispatch from main only (got $GITHUB_REF)"; exit 1; fi
-          gh release view "v$VER" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
-          TITLE="$(gh release view "v$VER" --json name --jq .name)"
-          MODE="$(python3 scripts/verify_maintainer_override.py --select-mode --github-output '' \
-            --identity "$ADJUDICATION_IDENTITY" --override "$MAINTAINER_OVERRIDE" | sed -n 's/^mode=//p')"
-          case "$MODE" in
-            identity)
-              python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-                --version "$VER" --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
-                --release-tag "v$VER" --release-title "$TITLE" ;;
-            override)
-              if [ "$MAINTAINER_OVERRIDE" != "$VER" ]; then echo "::error::maintainer_override must equal version"; exit 1; fi
-              python3 scripts/verify_maintainer_override.py --override "$MAINTAINER_OVERRIDE" \
-                --identity "$ADJUDICATION_IDENTITY" --candidate-tag --require-tag \
-                --release-body "$RUNNER_TEMP/release-body.md" --release-tag "v$VER" --release-title "$TITLE" ;;
-            *) echo "::error::release mode could not be chosen"; exit 1 ;;
-          esac
-
   install-and-verify:
-    needs: adjudication-gate
     strategy:
       fail-fast: false
       matrix:
@@ -92,54 +53,47 @@ jobs:
     name: install-and-verify (${{ matrix.rid }})
 
     steps:
-      - name: Checkout sample
+      - name: Checkout the workflow's actions
         uses: actions/checkout@v4
         with:
-          # Only need samples/Verification/proven-contracts.calr for the check.
-          # Sparse-checkout keeps the runner light and avoids submodule cost.
-          # The sample comes from the adjudicated candidate, not the dispatch ref (#1410).
-          ref: ${{ needs.adjudication-gate.outputs.candidate }}
-          sparse-checkout: |
-            samples/Verification
+          persist-credentials: false
+          sparse-checkout: .github/actions
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        env:
-          # #1548: a job-private install holds only the pinned SDK, so the repository global.json
-          # (10.0.100, latestMinor) cannot roll forward to a newer SDK on the runner image.
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-release
+      # The sample comes from `ref` (publish-nuget passes the candidate commit) or the release tag.
+      - name: Checkout the sample
+        uses: actions/checkout@v4
         with:
-          dotnet-version: '10.0.401'
+          ref: ${{ inputs.ref || format('v{0}', inputs.version) }}
+          path: release
+          persist-credentials: false
+          sparse-checkout: samples/Verification
 
-      - name: Require the pinned release SDK (#1548)
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet --list-sdks
-          # Strip CR: on Windows the CLI ends the line with CRLF, and $(...) keeps the CR.
-          sdk="$(dotnet --version | tr -d '\r')"
-          if [ "$sdk" != 10.0.401 ]; then
-            echo "::error::release jobs build with .NET SDK 10.0.401 only (#1548); this job resolved $sdk"
-            exit 1
-          fi
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
 
+      # nuget.org can serve the package file before every endpoint `dotnet tool install` reads
+      # has caught up, so the install is retried for up to 30 minutes.
       - name: Install calor ${{ inputs.version }} from nuget.org
         shell: bash
         env:
           VER: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          # Explicit --add-source pins the install to nuget.org and bypasses
-          # any user/machine nuget.config that would route through a mirror.
-          # Fresh --tool-path per run so a stale install can't mask a real
-          # 'not found' — matches the create-release skill's guidance.
-          rm -rf "$RUNNER_TEMP/calorcheck"
           [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
-          dotnet tool install \
-            --tool-path "$RUNNER_TEMP/calorcheck" \
-            calor \
-            --version "$VER" \
-            --add-source https://api.nuget.org/v3/index.json
+          # Explicit --add-source pins the install to nuget.org and bypasses any user/machine
+          # nuget.config that would route through a mirror. A fresh --tool-path per attempt, so
+          # a stale install can't mask a real 'not found'.
+          for attempt in $(seq 1 30); do
+            rm -rf "$RUNNER_TEMP/calorcheck"
+            if dotnet tool install --tool-path "$RUNNER_TEMP/calorcheck" calor --version "$VER" \
+                --add-source https://api.nuget.org/v3/index.json; then
+              exit 0
+            fi
+            echo "attempt $attempt: calor $VER is not installable yet"
+            sleep 60
+          done
+          echo "::error::calor $VER could not be installed from nuget.org after 30 attempts"
+          exit 1
 
       - name: Print installed version
         shell: bash
@@ -151,13 +105,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          OUT="$("$RUNNER_TEMP/calorcheck/calor" verify samples/Verification/proven-contracts.calr)"
+          OUT="$("$RUNNER_TEMP/calorcheck/calor" verify release/samples/Verification/proven-contracts.calr)"
           echo "$OUT"
-          # Guard against a shipped-but-broken Z3 that reports Calor0710
-          # ("Static contract verification skipped: Z3 SMT solver is not
-          # available") — those cases print Skipped>0 and non-zero exit.
-          # The proven sample must land Proven: 14, Skipped: 0.
-          # Use \s+ (any whitespace run) in the pattern because the CLI
-          # aligns numbers with padding, e.g. "  Proven:      14".
+          # Guard against a shipped-but-broken Z3 that reports Calor0710 ("Static contract
+          # verification skipped: Z3 SMT solver is not available"): those cases print Skipped>0
+          # and exit nonzero. The proven sample must land Proven: 14, Skipped: 0. \s+ because
+          # the CLI aligns numbers with padding, e.g. "  Proven:      14".
           echo "$OUT" | grep -Eq "Proven:\s+14\b"
           echo "$OUT" | grep -Eq "Skipped:\s+0\b"
