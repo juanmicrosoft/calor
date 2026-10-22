@@ -59,6 +59,16 @@ binding is immutable (cannot be reassigned).
    named type.** Writing `§B{x} INT:0` produces `var x = 0;`; writing
    `§B{x:i32} INT:0` produces `int x = 0;`. Both compile to the same
    IL, but the source-level distinction is preserved end-to-end.
+6. **A bare binding takes a next-line expression as its initializer.**
+   A binding with nothing after its header on its line, such as
+   `§B{~n:i32}`, reads an expression that starts on the next line as
+   its initializer, even at the same indent, where it looks like a
+   separate statement. Changing this would change the meaning of valid
+   programs, so the reading stays and the compiler warns with
+   `Calor0121` when the expression starts at the binding's own indent.
+   Put the initializer on the `§B` line, or write an explicit one such
+   as `` `default` `` when the next line is a separate statement. The
+   C# converter always writes an explicit initializer.
 
 ---
 

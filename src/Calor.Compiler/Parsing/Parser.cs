@@ -6320,6 +6320,17 @@ public sealed class Parser
             }
             else
             {
+                // #1574: a next-line expression at the binding's own indent is still the
+                // initializer (changing that would silently change valid code), but it reads
+                // like a separate statement, so say so.
+                if (_position > 0 && Current.Span.Line > PreviousToken.Span.Line
+                    && Current.Span.Column <= startToken.Span.Column)
+                {
+                    _diagnostics.ReportWarning(Current.Span, DiagnosticCode.BareBindingNextLineInitializer,
+                        $"Binding '{name}' has nothing after its header on its line, so the expression on line {Current.Span.Line}, " +
+                        "at the same indent, is its initializer. Move the initializer onto the §B line, or give the binding an " +
+                        "explicit initializer such as `default` if that line is a separate statement.");
+                }
                 initializer = ParseExpression();
                 // If the initializer is a dotted reference followed by ( -- this is raw C# method
                 // call syntax the converter couldn't decompose. The lexer includes dots in
