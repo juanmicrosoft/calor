@@ -58,12 +58,10 @@ public sealed class SharedInteropControlsTests : IDisposable
     [MemberData(nameof(Cells))]
     public async Task Control_BehavesLikeTheOriginal_OnEverySurface(string id, string surface)
     {
-        // In-process conversion resolves effects with the default manifests, which include ~/.calor/manifests;
-        // the converter offers no switch to exclude them. Fail closed instead of depending on a user's overrides.
-        var userManifests = Effects.Manifests.ManifestLoader.GetUserManifestsDirectory();
-        Assert.False(userManifests is not null && Directory.Exists(userManifests)
-            && Directory.EnumerateFiles(userManifests, "*.calor-effects.json").Any(),
-            $"user effect manifests under {userManifests} would change in-process conversion; run with an isolated HOME");
+        // #1564: in-process surfaces are hermetic. The library surface injects an empty manifest root; the MCP
+        // surfaces resolve theirs from CALOR_HOME when each conversion starts, and the test assembly pins that
+        // to an empty directory (tests/Shared/HermeticCalorHome.cs). A user's ~/.calor/manifests never applies.
+        Assert.Equal(global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot, Effects.Manifests.ManifestLoader.GetUserManifestsDirectory());
         var control = Register()["controls"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;
         var source = File.ReadAllText(Path.Combine(EvidenceContractTests.RepoRoot(), control["fixture"]!.GetValue<string>()));
         var original = Run(source);
@@ -127,7 +125,7 @@ public sealed class SharedInteropControlsTests : IDisposable
         {
             case "library":
             {
-                var result = new CSharpToCalorConverter().Convert(source);
+                var result = new CSharpToCalorConverter(new ConversionOptions { UserManifestRoot = global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot }).Convert(source);
                 return (result.CalorSource, JsonSerializer.SerializeToNode(result.Paths), !result.Success);
             }
             case "cli-convert":
@@ -169,7 +167,7 @@ public sealed class SharedInteropControlsTests : IDisposable
     {
         var home = Path.Combine(_temp, "home");
         Directory.CreateDirectory(home);
-        return new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home };
+        return new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home, ["CALOR_HOME"] = Path.Combine(home, ".calor") };
     }
 
     private static bool Refused(JsonNode? paths) => paths?["outcome"]?.GetValue<string>() is null or "refused";

@@ -457,16 +457,14 @@ public sealed class W1GuideTranscriptTests : IDisposable
     {
         var home = Path.Combine(_temp, "home");
         Directory.CreateDirectory(home);
-        return new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home };
+        return new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home, ["CALOR_HOME"] = Path.Combine(home, ".calor") };
     }
 
     private static async Task<(bool IsError, JsonNode Payload)> Mcp(string tool, object arguments)
     {
-        // In-process conversion reads ~/.calor/manifests; fail closed rather than depend on a user's overrides.
-        var userManifests = Effects.Manifests.ManifestLoader.GetUserManifestsDirectory();
-        Assert.False(userManifests is not null && Directory.Exists(userManifests)
-            && Directory.EnumerateFiles(userManifests, "*.calor-effects.json").Any(),
-            $"user effect manifests under {userManifests} would change in-process conversion; run with an isolated HOME");
+        // #1564: in-process MCP conversion resolves its manifest root from CALOR_HOME when each conversion starts,
+        // and the test assembly pins that to an empty directory, so a user's ~/.calor/manifests never applies.
+        Assert.Equal(global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot, Effects.Manifests.ManifestLoader.GetUserManifestsDirectory());
         var request = new JsonRpcRequest
         {
             Id = JsonDocument.Parse("1").RootElement,

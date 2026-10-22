@@ -123,7 +123,7 @@ When resolving effects for a method call, the resolver checks these sources in o
 Manifests are loaded from multiple locations (later sources override earlier):
 
 1. **Built-in** (lowest priority) - Embedded BCL manifests
-2. **User-level** - `~/.calor/manifests/*.calor-effects.json`
+2. **User-level** - `~/.calor/manifests/*.calor-effects.json`, or `$CALOR_HOME/manifests/*.calor-effects.json` when `CALOR_HOME` is set. The directory is resolved each time manifests are loaded; library callers can set `ConversionOptions.UserManifestRoot` instead.
 3. **Solution-level** - `{solution}/.calor-effects/*.calor-effects.json`
 4. **Project-local** (highest priority) - `.calor-effects.json` in project root
 

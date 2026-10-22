@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The C# → Calor converter no longer fixes `~/.calor/manifests` for the whole process
+  (#1564).** User-level effect manifests are JSON files that tell Calor which effects a
+  library method has, such as console output or file access. The converter uses them to write
+  each function's `§E` row (its declared effects). Before this fix, the in-process converter
+  (the `CSharpToCalorConverter` library, the MCP tools, and test harnesses) read
+  `~/.calor/manifests` on its first conversion and kept using it until the process exited.
+  Changing `HOME` had no effect, so library output and test results depended on the
+  developer's machine.
+  - Each conversion now picks the directory when it starts: `$CALOR_HOME/manifests` if the
+    new `CALOR_HOME` variable is set, otherwise `~/.calor/manifests`. `calor effects` and
+    the compiler's effect check read the same directory. `CALOR_HOME` moves only the
+    manifest directory; the verification cache stays under your home directory.
+  - The new `ConversionOptions.UserManifestRoot` option sets the directory directly. Point it
+    at an empty directory, or set it to `""`, to convert without any user-level manifest.
+  - If you set neither, nothing changes: the CLI still reads `~/.calor/manifests`.
+  - Calor's own tests now run with an empty manifest directory, so a manifest in your home
+    directory can no longer change their results.
+
 ### Testing
 
 - **The round-trip harness now also tests the converter the way `calor convert` runs it.**

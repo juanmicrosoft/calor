@@ -22,16 +22,31 @@ public sealed class ManifestLoader
     private readonly List<string> _loadErrors = new();
     private readonly List<(EffectManifest Manifest, ManifestSource Source)> _loadedManifests = new();
     private readonly bool _loadUserLevelManifests;
+    private readonly string? _userManifestsDirectory;
 
     /// <summary>
     /// Creates a loader. <paramref name="loadUserLevelManifests"/> controls whether
-    /// <c>~/.calor/manifests/</c> is consulted by <see cref="LoadAll"/>; pass
-    /// <c>false</c> for hermetic measurements that must not depend on the machine
-    /// they run on (built-in manifests are always loaded).
+    /// the user-level manifest directory (<see cref="GetUserManifestsDirectory"/>,
+    /// resolved when <see cref="LoadAll"/> runs) is consulted; pass <c>false</c> for
+    /// hermetic measurements that must not depend on the machine they run on
+    /// (built-in manifests are always loaded).
     /// </summary>
     public ManifestLoader(bool loadUserLevelManifests = true)
     {
         _loadUserLevelManifests = loadUserLevelManifests;
+    }
+
+    /// <summary>
+    /// #1564: creates a loader whose user-level manifests come from
+    /// <paramref name="userManifestsDirectory"/> instead of the environment. A directory
+    /// that does not exist contributes nothing, so an empty or missing directory is the
+    /// hermetic choice; built-in manifests are always loaded.
+    /// </summary>
+    public ManifestLoader(string userManifestsDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(userManifestsDirectory);
+        _loadUserLevelManifests = true;
+        _userManifestsDirectory = userManifestsDirectory;
     }
 
     /// <summary>
@@ -117,7 +132,7 @@ public sealed class ManifestLoader
     /// </summary>
     private void LoadUserLevelManifests()
     {
-        var userDir = GetUserManifestsDirectory();
+        var userDir = _userManifestsDirectory ?? GetUserManifestsDirectory();
         if (string.IsNullOrEmpty(userDir) || !Directory.Exists(userDir))
             return;
 
@@ -297,13 +312,27 @@ public sealed class ManifestLoader
     private static bool IsValidEffectCode(string code)
         => EffectCodes.IsKnownCompactCode(code);
 
+    /// <summary>The variable that relocates Calor's user-level directory (normally <c>~/.calor</c>).</summary>
+    internal const string CalorHomeVariable = "CALOR_HOME";
+
     /// <summary>
-    /// Gets the user-level manifests directory (~/.calor/manifests/).
+    /// Gets the user-level manifests directory: <c>$CALOR_HOME/manifests</c> when
+    /// <c>CALOR_HOME</c> is set, otherwise <c>~/.calor/manifests</c> under the user's home
+    /// (<see cref="Verification.Z3.Cache.UserHome"/>, which follows <c>HOME</c>).
     /// </summary>
+    /// <remarks>
+    /// #1564: read from the environment on every call and never cached, so a caller that
+    /// changes <c>CALOR_HOME</c> or <c>HOME</c> between two operations in one process sees
+    /// the new root on the next one.
+    /// </remarks>
     internal static string? GetUserManifestsDirectory()
     {
         try
         {
+            var calorHome = Environment.GetEnvironmentVariable(CalorHomeVariable);
+            if (!string.IsNullOrWhiteSpace(calorHome))
+                return Path.Combine(Path.GetFullPath(calorHome), "manifests");
+
             var home = Verification.Z3.Cache.UserHome.Resolve();
             if (string.IsNullOrEmpty(home))
                 return null;

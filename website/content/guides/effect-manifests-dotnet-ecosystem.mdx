@@ -97,7 +97,7 @@ Manifests are loaded in priority order (higher overrides lower):
 | Priority | Source | Example |
 |----------|--------|---------|
 | 0 | **Built-in** (embedded in compiler) | All 15 shipped manifests |
-| 100 | **User-level** (`~/.calor/manifests/`) | Personal overrides |
+| 100 | **User-level** (`~/.calor/manifests/`, or `$CALOR_HOME/manifests/` when `CALOR_HOME` is set) | Personal overrides |
 | 200 | **Solution-level** (`{solution}/.calor-effects/`) | Team-shared manifests |
 | 300 | **Project-local** (`.calor-effects.json`) | Project-specific types |
 
