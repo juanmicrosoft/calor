@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Calor.Tests.Shared;
 
@@ -44,30 +45,44 @@ internal static class HermeticCalorHome
 
     private static string ResolveRoot(out bool created)
     {
-        var existing = Environment.GetEnvironmentVariable(MarkerVariable);
-        if (!string.IsNullOrEmpty(existing) && Directory.Exists(existing))
+        // Two linked copies can initialize on different threads at once. A mutex named for this
+        // process (the copies share no type, so a lock object cannot be shared) makes the check,
+        // the creation and the CALOR_HOME assignment one step.
+        using var gate = new Mutex(initiallyOwned: false, "calor-test-hermetic-home-" + Environment.ProcessId);
+        gate.WaitOne();
+        try
         {
-            created = false;
-            return existing;
-        }
+            var existing = Environment.GetEnvironmentVariable(MarkerVariable);
+            if (!string.IsNullOrEmpty(existing) && Directory.Exists(existing))
+            {
+                created = false;
+                return existing;
+            }
 
-        var root = Directory.CreateTempSubdirectory("calor-test-home-").FullName;
-        Environment.SetEnvironmentVariable(MarkerVariable, root);
-        created = true;
-        return root;
+            var root = Directory.CreateTempSubdirectory("calor-test-home-").FullName;
+            // Only the copy that creates the root sets CALOR_HOME, so a later assembly load never
+            // resets a value a serial test changed on purpose.
+            Environment.SetEnvironmentVariable("CALOR_HOME", root);
+            Environment.SetEnvironmentVariable(MarkerVariable, root);
+            created = true;
+            return root;
+        }
+        finally
+        {
+            gate.ReleaseMutex();
+        }
     }
 
     [ModuleInitializer]
     public static void Initialize()
     {
-        // Only the copy that created the root sets CALOR_HOME, so a later assembly load never
-        // resets a value a serial test changed on purpose.
+        // Touching Root runs ResolveRoot, which sets CALOR_HOME in the copy that creates the root.
         if (!CreatedHere)
             return;
-        Environment.SetEnvironmentVariable("CALOR_HOME", Root);
+        var root = Root;
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
-            try { Directory.Delete(Root, recursive: true); }
+            try { Directory.Delete(root, recursive: true); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         };
     }
