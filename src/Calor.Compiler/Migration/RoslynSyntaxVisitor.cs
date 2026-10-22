@@ -11402,7 +11402,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     || _semanticModel!.GetSymbolInfo(access.Expression).Symbol is INamedTypeSymbol);
         if (!nameOnly)
             return null;
-        var type = _semanticModel!.GetSymbolInfo(left).Symbol switch
+        var symbol = _semanticModel!.GetSymbolInfo(left).Symbol;
+        // #1574 (Codex round 3): a nullability write contract (`[AllowNull] string F`) lets the
+        // target accept what a temp of its declared type would not.
+        if (symbol != null && symbol.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ContainingNamespace?.ToDisplayString() == "System.Diagnostics.CodeAnalysis"
+                && attribute.AttributeClass.Name is "AllowNullAttribute" or "DisallowNullAttribute"
+                    or "MaybeNullAttribute" or "NotNullAttribute"))
+            return null;
+        var type = symbol switch
         {
             ILocalSymbol local => local.Type,
             IParameterSymbol parameter => parameter.Type,
@@ -11453,12 +11461,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return HasUnsupportedNestedObliviousShape(type) ? null : TypeMapper.AnnotateNullableReference(name);
     }
 
-    // #1574 (Codex round 2): a user type named like a mapped C# type (`N.String`) would be
-    // written as the built-in Calor type (`str`) by TypeMapper.
+    // #1574 (Codex rounds 2, 3): a user type named like a mapped C# or Calor type (`N.String`,
+    // `N.Str`) would be read back as the built-in type, so its simple name must survive every
+    // mapping the binding header goes through unchanged.
     private static bool ShadowsMappedTypeName(INamedTypeSymbol named)
         => named.SpecialType == SpecialType.None
             && !(named.ContainingNamespace?.ToDisplayString() is { } ns && (ns == "System" || ns.StartsWith("System.", StringComparison.Ordinal)))
-            && TypeMapper.CSharpToCalor(named.Name) != named.Name;
+            && (TypeMapper.CSharpToCalor(named.Name) != named.Name
+                || TypeMapper.CalorToCSharp(named.Name) != named.Name
+                || Parsing.AttributeHelper.ExpandType(named.Name) != named.Name);
 
     /// <summary>
     /// #1574 item 2: Calor's `default` is also how a member named <c>@default</c> is written, and the

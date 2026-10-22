@@ -72,6 +72,9 @@ public class ConverterDefect1574Tests
         ("R2-self-initializer", "public static class Probe { public static string Run() { int x = x = 1; return x.ToString(); } }", "preserved"),
         ("R2-type-named-like-builtin", "namespace N { public sealed class String { } public static class Probe { public static string Run() { N.String a; N.String b; a = b = new N.String(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "preserved"),
         ("R2-oblivious-target", "#nullable enable\npublic static class Probe {\n#nullable disable annotations\n    static string value;\n#nullable enable annotations\n    public static string Run() { object? r = value = null; return r == null ? \"null\" : \"set\"; } }", "native"),
+        // Codex review round 3 reproducers.
+        ("R3-type-named-like-calor-alias", "namespace N { public sealed class Str { } public static class Probe { public static string Run() { N.Str a; N.Str b; a = b = new N.Str(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "preserved"),
+        ("R3-allow-null-target", "#nullable enable\nusing System.Diagnostics.CodeAnalysis;\npublic static class Probe { [AllowNull] public static string Value = \"\"; static string? F() { return Value = null; } public static string Run() => F() == null ? \"null\" : \"set\"; }", "preserved"),
         // Negative controls: one assignment per statement converts as before.
         ("CH-control-plain", "public static class Probe { " + Log + "public static string Run() { int x, y; y = G(); x = y; return log + x + y; } }", "native"),
         ("CH-control-declaration", "public static class Probe { " + Log + "public static string Run() { int z = G(); return log + z; } }", "native"),
