@@ -4,25 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Testing
-
-- **The round-trip harness now also tests the converter the way `calor convert` runs it.**
-  Before, the harness only converted with Lossy options. Those options allow recorded
-  semantic losses (substitutions or drops the converter reports) and turn on passthrough.
-  A plain `calor convert` uses Lossless options, which refuse such losses. The harness
-  converts each library file, swaps it into the project, and reruns the project's own
-  tests. A new `--mode default` leg does this with exactly the options `calor convert`
-  builds with no flags. A test fails if the harness and the CLI options ever differ. (#1586)
-- **CI runs both legs in parallel, and each one blocks on its own floors.** A floor is
-  the minimum fraction of library files the leg must keep converted. The default leg's
-  floors equal what it measured when it landed: MediatR 8 of 32 files (25.0%), Serilog
-  14 of 112 (12.5%) and FluentValidation 64 of 139 (46.0%). On the same commit, the
-  Lossy leg kept 71.9%, 59.8% and 71.9%. Losing one file from the default leg now fails
-  CI. One PR comment shows both legs side by side.
-- **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
-  now describes both legs and lists each leg's floors.
-
 ### Fixed
+
+- **The C# → Calor converter no longer fixes `~/.calor/manifests` for the whole process
+  (#1564).** User-level effect manifests are JSON files that tell Calor which effects a
+  library method has, such as console output or file access. The converter uses them to write
+  each function's `§E` row (its declared effects). Before this fix, the in-process converter
+  (the `CSharpToCalorConverter` library, the MCP tools, and test harnesses) read
+  `~/.calor/manifests` on its first conversion and kept using it until the process exited.
+  Changing `HOME` had no effect, so library output and test results depended on the
+  developer's machine.
+  - Each conversion now picks the directory when it starts: `$CALOR_HOME/manifests` if the
+    new `CALOR_HOME` variable is set, otherwise `~/.calor/manifests`. `calor effects` and
+    the compiler's effect check read the same directory. `CALOR_HOME` moves only the
+    manifest directory; the verification cache stays under your home directory.
+  - The new `ConversionOptions.UserManifestRoot` option sets the directory directly. Point it
+    at an empty directory, or set it to `""`, to convert without any user-level manifest.
+  - If you set neither, nothing changes: the CLI still reads `~/.calor/manifests`.
+  - Calor's own tests now run with an empty manifest directory, so a manifest in your home
+    directory can no longer change their results.
 
 - **`calor convert --lossy` no longer reports output that does not compile as clean (#1514).**
   Lossy mode skipped the round-trip check, which compiles the generated Calor and then the C#
@@ -67,6 +67,24 @@ what a program does.
 - **No more CS8600 warning for a lowered `out string`.** A binding that starts at `default`
   now emits `default!` for types that may be non-nullable references (`string s = default!;`).
   Built-in value types keep `default`.
+
+### Testing
+
+- **The round-trip harness now also tests the converter the way `calor convert` runs it.**
+  Before, the harness only converted with Lossy options. Those options allow recorded
+  semantic losses (substitutions or drops the converter reports) and turn on passthrough.
+  A plain `calor convert` uses Lossless options, which refuse such losses. The harness
+  converts each library file, swaps it into the project, and reruns the project's own
+  tests. A new `--mode default` leg does this with exactly the options `calor convert`
+  builds with no flags. A test fails if the harness and the CLI options ever differ. (#1586)
+- **CI runs both legs in parallel, and each one blocks on its own floors.** A floor is
+  the minimum fraction of library files the leg must keep converted. The default leg's
+  floors equal what it measured when it landed: MediatR 8 of 32 files (25.0%), Serilog
+  14 of 112 (12.5%) and FluentValidation 64 of 139 (46.0%). On the same commit, the
+  Lossy leg kept 71.9%, 59.8% and 71.9%. Losing one file from the default leg now fails
+  CI. One PR comment shows both legs side by side.
+- **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
+  now describes both legs and lists each leg's floors.
 
 ### Release process
 

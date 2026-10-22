@@ -290,6 +290,13 @@ public sealed class ConversionContext
     private int _idCounter = 0;
 
     /// <summary>
+    /// #1564: the user-level effect manifest directory this conversion resolves with,
+    /// fixed when the conversion starts (<see cref="ConversionOptions.UserManifestRoot"/>,
+    /// else <c>CALOR_HOME</c> or <c>HOME</c>). Empty means no user-level manifests.
+    /// </summary>
+    internal string UserManifestRoot { get; set; } = "";
+
+    /// <summary>
     /// The source file being converted.
     /// </summary>
     public string? SourceFile { get; set; }

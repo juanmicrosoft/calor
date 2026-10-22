@@ -6,6 +6,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 
 namespace Calor.Compiler.Migration;
 
@@ -288,6 +289,23 @@ public sealed class ConversionOptions
     /// reason as <see cref="ProjectDirectory"/>.
     /// </summary>
     public string? SolutionDirectory { get; set; }
+
+    /// <summary>
+    /// #1564: the directory user-level effect manifests are read from when this
+    /// conversion writes <c>§E</c> rows. Set it to make conversion hermetic: point it at
+    /// an empty directory, or set it to <see cref="string.Empty"/>, and no user-level
+    /// manifest applies.
+    ///
+    /// <para>Null (the default) resolves the directory from the environment when each
+    /// conversion starts: <c>$CALOR_HOME/manifests</c> if <c>CALOR_HOME</c> is set,
+    /// otherwise <c>.calor/manifests</c> under the user's home: <c>HOME</c> on Linux and
+    /// macOS, and on Windows a fully qualified <c>USERPROFILE</c>, else the account's profile
+    /// folder. It is never cached for the process, so changing <c>CALOR_HOME</c> or the
+    /// home variable affects the next conversion. This is the
+    /// same directory the CLI's compile step reads, so the rows the converter writes
+    /// agree with the compile that checks them.</para>
+    /// </summary>
+    public string? UserManifestRoot { get; set; }
 }
 
 /// <summary>
@@ -322,6 +340,7 @@ public sealed class CSharpToCalorConverter
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
+        context.UserManifestRoot = ResolveUserManifestRoot();
         context.OriginalSource = csharpSource;
         context.ReserveNamesFrom(_options.AdditionalSemanticSyntaxTrees);
 
@@ -865,17 +884,50 @@ public sealed class CSharpToCalorConverter
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<
         string, System.Collections.Concurrent.ConcurrentBag<EffectResolver>> SynthesisResolvers = new(StringComparer.Ordinal);
 
-    private static string ManifestScopeKey(string? projectDirectory, string? solutionDirectory)
-        => (projectDirectory ?? "") + "\u0000" + (solutionDirectory ?? "");
+    /// <para>#1564: the scope includes the user-level manifest root. Before, a pooled
+    /// resolver kept whatever <c>~/.calor/manifests</c> it saw when it was first built, so
+    /// the root was effectively fixed for the life of the process and a caller could not
+    /// isolate a conversion by changing <c>HOME</c>. Each conversion now resolves its root
+    /// when it starts (<see cref="ResolveUserManifestRoot"/>) and rents from that root's
+    /// pool. Like the project and solution manifests, a root's files are read once per
+    /// pooled resolver; it is the choice of root that is never cached.</para>
+    private static string ManifestScopeKey(string? projectDirectory, string? solutionDirectory, string userManifestRoot)
+        => (projectDirectory ?? "") + "\u0000" + (solutionDirectory ?? "") + "\u0000" + userManifestRoot;
 
-    private static EffectResolver RentSynthesisResolver(string? projectDirectory, string? solutionDirectory)
+    /// <summary>
+    /// #1564: the user-level manifest directory for one conversion: the injected
+    /// <see cref="ConversionOptions.UserManifestRoot"/>, else <c>CALOR_HOME</c> or
+    /// <c>HOME</c> as they are right now. Empty means no user-level manifests.
+    /// </summary>
+    internal string ResolveUserManifestRoot()
+    {
+        var root = _options.UserManifestRoot ?? ManifestLoader.GetUserManifestsDirectory();
+        if (string.IsNullOrWhiteSpace(root))
+            return "";
+        try
+        {
+            return Path.GetFullPath(root);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or System.Security.SecurityException)
+        {
+            return root;
+        }
+    }
+
+    private static EffectResolver RentSynthesisResolver(
+        string? projectDirectory,
+        string? solutionDirectory,
+        string userManifestRoot)
     {
         var pool = SynthesisResolvers.GetOrAdd(
-            ManifestScopeKey(projectDirectory, solutionDirectory),
+            ManifestScopeKey(projectDirectory, solutionDirectory, userManifestRoot),
             _ => new System.Collections.Concurrent.ConcurrentBag<EffectResolver>());
         if (pool.TryTake(out var pooled))
             return pooled;
-        var resolver = new EffectResolver();
+        var loader = userManifestRoot.Length == 0
+            ? new ManifestLoader(loadUserLevelManifests: false)
+            : new ManifestLoader(userManifestRoot);
+        var resolver = new EffectResolver(loader);
         resolver.Initialize(projectDirectory, solutionDirectory);
         return resolver;
     }
@@ -883,10 +935,11 @@ public sealed class CSharpToCalorConverter
     private static void ReturnSynthesisResolver(
         EffectResolver resolver,
         string? projectDirectory,
-        string? solutionDirectory)
+        string? solutionDirectory,
+        string userManifestRoot)
         => SynthesisResolvers
             .GetOrAdd(
-                ManifestScopeKey(projectDirectory, solutionDirectory),
+                ManifestScopeKey(projectDirectory, solutionDirectory, userManifestRoot),
                 _ => new System.Collections.Concurrent.ConcurrentBag<EffectResolver>())
             .Add(resolver);
 
@@ -935,7 +988,7 @@ public sealed class CSharpToCalorConverter
             return;
 
         cancellationToken.ThrowIfCancellationRequested();
-        var resolver = RentSynthesisResolver(_options.ProjectDirectory, _options.SolutionDirectory);
+        var resolver = RentSynthesisResolver(_options.ProjectDirectory, _options.SolutionDirectory, context.UserManifestRoot);
         try
         {
             var probe = new CalorEmitter(CreateContext(sourceFile)).Emit(module);
@@ -974,7 +1027,7 @@ public sealed class CSharpToCalorConverter
         }
         finally
         {
-            ReturnSynthesisResolver(resolver, _options.ProjectDirectory, _options.SolutionDirectory);
+            ReturnSynthesisResolver(resolver, _options.ProjectDirectory, _options.SolutionDirectory, context.UserManifestRoot);
         }
     }
 

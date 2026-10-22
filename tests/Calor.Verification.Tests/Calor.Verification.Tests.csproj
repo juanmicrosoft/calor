@@ -41,5 +41,7 @@
   <ItemGroup>
     <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
     <Compile Include="..\Shared\Z3ConsumerGuardTests.cs" Link="Shared\Z3ConsumerGuardTests.cs" />
+    <!-- #1564: pins CALOR_HOME to an empty directory so in-process conversion never reads ~/.calor/manifests. -->
+    <Compile Include="..\Shared\HermeticCalorHome.cs" Link="Shared\HermeticCalorHome.cs" />
   </ItemGroup>
 </Project>
