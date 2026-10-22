@@ -354,6 +354,13 @@ public sealed class ConversionContext
     public bool RescueUnusableMembers { get; set; }
 
     /// <summary>
+    /// #1514: what the converter's own round-trip compile check found for the
+    /// emitted output (<see cref="ConversionRoundTrip"/>). Stays
+    /// <see cref="ConversionRoundTrip.NotRun"/> when conversion stopped earlier.
+    /// </summary>
+    public string RoundTrip { get; set; } = ConversionRoundTrip.NotRun;
+
+    /// <summary>
     /// When true, the emitter elides the trailing <c>§/C</c> on zero-arg
     /// expression-context <c>§C</c> calls. RFC <c>v0.6-call-closer-elision</c>
     /// Phase 2. Default <c>true</c> as of v0.6.1; the parser accepts both
@@ -878,6 +885,7 @@ public sealed class ConversionContext
         Stats.InteropBlocksEmitted = 0;
         Stats.FallbackInteropBlocksEmitted = 0;
         Stats.MembersDropped = 0;
+        RoundTrip = ConversionRoundTrip.NotRun;
     }
 }
 
@@ -942,18 +950,53 @@ public static class ConversionEnabledBy
 }
 
 /// <summary>
+/// #1514: the result of the converter's own round-trip compile check (emitted Calor
+/// → C# → Roslyn compile). Reported per file as <c>conversionPaths.roundTrip</c>.
+/// </summary>
+public static class ConversionRoundTrip
+{
+    /// <summary>The emitted Calor compiled, and the C# it generates compiled.</summary>
+    public const string Verified = "verified";
+
+    /// <summary>
+    /// The check ran and failed (or crashed). Lossless and selected-branch-lossy
+    /// conversions are then refused; a plain lossy conversion keeps its output but
+    /// reports the outcome <c>unverified</c>.
+    /// </summary>
+    public const string Failed = "failed";
+
+    /// <summary>
+    /// The caller turned the check off (<see cref="ConversionOptions.ValidateRoundTripCSharp"/>
+    /// = false) because it compiles the generated C# itself: project migration
+    /// validates all files together, and the round-trip harness compiles the bytes.
+    /// </summary>
+    public const string Deferred = "deferred";
+
+    /// <summary>Conversion stopped before the check (the file is refused).</summary>
+    public const string NotRun = "not-run";
+}
+
+/// <summary>
 /// #1144: per-file summary of the paths a conversion took, with the options that
 /// applied. Additive to the existing loss counters; <see cref="SchemaVersion"/>
-/// versions this object only.
+/// versions this object only. Version 2 (#1514) added <see cref="RoundTrip"/> and
+/// the <c>unverified</c> outcome.
 /// </summary>
 public sealed record ConversionPathSummary
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+
+    /// <summary>Outcome of a written file whose generated C# failed the round-trip compile check (plain lossy mode only).</summary>
+    public const string UnverifiedOutcome = "unverified";
 
     [JsonPropertyName("schemaVersion")]
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
-    /// <summary><c>native</c>, <c>preserved</c> (interop/rescue/passthrough, no loss), <c>lossy</c>, or <c>refused</c> (conversion failed).</summary>
+    /// <summary>
+    /// <c>native</c>, <c>preserved</c> (interop/rescue/passthrough, no loss), <c>lossy</c>,
+    /// <c>unverified</c> (written, but the generated C# failed the round-trip compile
+    /// check; plain lossy mode only), or <c>refused</c> (conversion failed).
+    /// </summary>
     [JsonPropertyName("outcome")]
     public required string Outcome { get; init; }
 
@@ -984,11 +1027,16 @@ public sealed record ConversionPathSummary
     [JsonPropertyName("passthroughOnError")]
     public bool PassthroughOnError { get; init; }
 
+    /// <summary>#1514: the converter's round-trip compile check (<see cref="ConversionRoundTrip"/>).</summary>
+    [JsonPropertyName("roundTrip")]
+    public string RoundTrip { get; init; } = ConversionRoundTrip.NotRun;
+
     public static ConversionPathSummary From(
         IEnumerable<ConversionLoss> losses,
         bool success,
         bool rescueUnusableMembers,
-        bool passthroughOnError)
+        bool passthroughOnError,
+        string roundTrip = ConversionRoundTrip.NotRun)
     {
         var list = losses.ToList();
         int Count(string path) => list.Count(l => l.Path == path);
@@ -1007,14 +1055,20 @@ public sealed record ConversionPathSummary
                 .OrderBy(g => g.Key, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.Count()),
             RescueUnusableMembers = rescueUnusableMembers,
-            PassthroughOnError = passthroughOnError
+            PassthroughOnError = passthroughOnError,
+            RoundTrip = roundTrip
         }.WithSuccess(success);
     }
 
-    /// <summary>The same counts with the outcome recomputed for whether the file was written.</summary>
+    /// <summary>
+    /// The same counts with the outcome recomputed for whether the file was written.
+    /// A written file whose round-trip check failed is <c>unverified</c> whatever its
+    /// counts (#1514): it must never read as a clean result.
+    /// </summary>
     public ConversionPathSummary WithSuccess(bool success) => this with
     {
         Outcome = !success ? "refused"
+            : RoundTrip == ConversionRoundTrip.Failed ? UnverifiedOutcome
             : Lossy + Dropped > 0 ? "lossy"
             : Interop + Rescue + Passthrough > 0 ? "preserved"
             : "native"
@@ -1023,7 +1077,8 @@ public sealed record ConversionPathSummary
     /// <summary>Summary of <paramref name="result"/>; <paramref name="success"/> overrides when a surface refuses after conversion.</summary>
     public static ConversionPathSummary From(ConversionResult result, bool? success = null)
         => From(result.Losses, success ?? result.Success,
-            result.Context.RescueUnusableMembers, result.Context.PassthroughOnError);
+            result.Context.RescueUnusableMembers, result.Context.PassthroughOnError,
+            result.Context.RoundTrip);
 
     /// <summary>
     /// One human-readable line naming the preservation paths, or null when no member

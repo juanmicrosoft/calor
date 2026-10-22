@@ -18,7 +18,7 @@
     "lossCount": 0,
     "losses": [],
     "conversionPaths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "native",
       "interop": 0,
       "rescue": 0,
@@ -27,7 +27,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": true,
-      "passthroughOnError": false
+      "passthroughOnError": false,
+      "roundTrip": "verified"
     },
     "diagnosticCodes": []
   },
@@ -41,7 +42,7 @@
     "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
     "exit": 0,
     "conversionPaths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "native",
       "interop": 0,
       "rescue": 0,
@@ -50,7 +51,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": false,
-      "passthroughOnError": false
+      "passthroughOnError": false,
+      "roundTrip": "deferred"
     }
   },
   "mcp-convert": {
@@ -61,7 +63,7 @@
     "interopPreservations": 0,
     "locations": [],
     "paths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "native",
       "interop": 0,
       "rescue": 0,
@@ -70,7 +72,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": false,
-      "passthroughOnError": false
+      "passthroughOnError": false,
+      "roundTrip": "verified"
     },
     "issueCodes": [],
     "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{ns_global:_global:global}\n    §CL{c001:Names:pub:stat}\n      §MT{m002:TryName:pub:stat}\n        §I{i32:id}\n        §I{?str:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"
@@ -83,7 +86,7 @@
     "interopPreservations": 0,
     "locations": [],
     "paths": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "outcome": "native",
       "interop": 0,
       "rescue": 0,
@@ -92,7 +95,8 @@
       "dropped": 0,
       "triggers": {},
       "rescueUnusableMembers": false,
-      "passthroughOnError": true
+      "passthroughOnError": true,
+      "roundTrip": "verified"
     },
     "issueCodes": [],
     "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §CDIR{nullable-directive:I251bGxhYmxlIGVuYWJsZQ}\n  §U{System.Diagnostics.CodeAnalysis}\n  §NS{ns_global:_global:global}\n    §CL{c001:Names:pub:stat}\n      §MT{m002:TryName:pub:stat}\n        §I{i32:id}\n        §I{?str:name:out}[@NotNullWhen(true)]\n        §O{bool}\n        §ASSIGN name (? (== id 1) \"one\" null)\n        §R (!= name null)\n\n\n\n"

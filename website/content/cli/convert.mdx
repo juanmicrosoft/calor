@@ -53,7 +53,7 @@ calor convert MyService.cs --benchmark
 | `--no-fallback` | — | `false` | Fail on unsupported constructs instead of emitting fallback TODOs |
 | `--validate` | — | `false` | Parse generated Calor before writing and report errors |
 | `--passthrough` | — | `false` | Widen the set of C# members preserved as `§CSHARP` interop blocks. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
-| `--lossy` | — | `false` | Allow reported semantic substitutions and drops. Without it, conversion is lossless: a construct with no exact Calor form is preserved as C# or refused |
+| `--lossy` | — | `false` | Allow reported semantic substitutions and drops. Without it, conversion is lossless: a construct with no exact Calor form is preserved as C# or refused. The output is still compiled back to C#; if that fails, it is written but reported `unverified` and the command exits `2` |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
@@ -142,18 +142,33 @@ and `enabledBy` when they apply. `data.conversionPaths` summarizes the file:
 
 ```json illustrative
 "conversionPaths": {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "outcome": "preserved",
   "interop": 0, "rescue": 1, "passthrough": 0, "lossy": 0, "dropped": 0,
   "triggers": { "round-trip-failure": 1 },
   "rescueUnusableMembers": true,
-  "passthroughOnError": false
+  "passthroughOnError": false,
+  "roundTrip": "verified"
 }
 ```
 
-`outcome` is `native`, `preserved`, `lossy`, or `refused`. A refused
+`outcome` is `native`, `preserved`, `lossy`, `unverified`, or `refused`. A refused
 conversion writes nothing, exits `1`, and prints
 `Conversion refused; no output written (automatic rescue: on, --passthrough: off).`
+
+`roundTrip` reports the converter's round-trip check: it compiles the generated
+Calor, then compiles the C# that Calor produces.
+
+| `roundTrip` | Meaning |
+|:------------|:--------|
+| `verified` | Both compiles succeeded. |
+| `failed` | A compile failed. A lossless conversion is then refused, and so is one with `--select-active-preprocessor-branch-lossy`. A plain `--lossy` conversion is written with `outcome: "unverified"`. |
+| `deferred` | The caller compiles the C# itself. `calor migrate` and the MCP project tools do this for the whole project at once; a failure there refuses the file. |
+| `not-run` | Conversion stopped before the check, so the file is refused. |
+
+Schema version 2 (0.26) added `roundTrip` and the `unverified` outcome. Before
+0.26, `--lossy` skipped the check entirely. A file whose output did not compile
+could then report `outcome: "native"`, print "✓ Conversion successful", and exit `0`.
 Before 0.25 the text said "via --passthrough fallback" for every rescue, even
 when you had not passed the flag.
 
@@ -172,12 +187,19 @@ diagnostic whose message starts with the feature name, for example
 | `conversionPaths` | The per-file outcome and per-path counts above |
 
 So `nativeConversionCount > 0` does not mean the file is native. Read
-`conversionPaths.outcome`. A conversion can be partial in two ways:
+`conversionPaths.outcome`. A conversion can be partial in these ways:
 
 - **Preserved** (`outcome: "preserved"`, exit `0`): the file is written, and some
   members, statements, or holes are still C#.
 - **Refused** (`outcome: "refused"`, exit `1`): nothing is written. This happens when
   `--no-fallback` meets a construct with no Calor form, or when no rescue applies.
+- **Unverified** (`outcome: "unverified"`, exit `2`, plain `--lossy` only): the file is
+  written, but its C# does not compile. The report prints
+  `✗ Round-trip check failed` with the first compiler errors. Fix the output by hand,
+  or rerun without `--lossy`: the default lossless mode keeps a failing type as C#
+  where it can. The check compiles the file on its own, so a file that uses a type
+  declared in another file of your project is also `unverified`. `--passthrough` does
+  not change this outcome under `--lossy`.
 
 A rescue keeps the original C# of the whole top-level type, not only the member that
 failed. The [C# interoperability guide](/docs/guides/csharp-interoperability/) lists, per
@@ -533,6 +555,7 @@ assuming it reproduces the website headline.
 |:-----|:--------|
 | `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
 | `1` | Missing input, unsupported construct with `--no-fallback`, timeout, or a refused conversion (`outcome: "refused"`; no file written) |
+| `2` | Plain `--lossy` only: the file was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
 
 ---
 

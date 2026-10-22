@@ -126,13 +126,19 @@ Partial results look like this:
 
 - **`calor_convert`:** `isError: false` with `outcome: "preserved"` means usable
   output with some C# kept. `isError: true` with `outcome: "refused"` means no
-  usable output.
+  usable output. With `fidelity: "lossy"`, `isError: true` with
+  `outcome: "unverified"` and `paths.roundTrip: "failed"` means `calorSource` is
+  returned (and written to `outputPath`), but its C# does not compile. `issues[]`
+  lists the compiler errors. Before 0.26 lossy mode skipped this check and could
+  return such output with `isError: false`.
 - **`calor_batch` and `calor_migrate`:** in the default lossless mode, one failed
   file means no file is written. Every file then reports `outcome: "refused"` with
   its counts, and the result has `isError: true`. In the `W1-F6-project` fixture, a
   two-file project with one file that needs a rescue, `calor_batch` reports
   `failedFiles: 2`. With `skipOnError: false`, the response also carries `error`,
-  naming the first failed file, and a `preservationPaths` line.
+  naming the first failed file, and a `preservationPaths` line. Their
+  `conversionPaths.roundTrip` is `deferred`: the project-wide compile does the
+  round-trip check, and a failure there refuses the file.
 
 The [C# interoperability guide](/docs/guides/csharp-interoperability/) shows, per
 C# feature, what `calor_convert` returns with and without `passthroughOnError`.

@@ -363,7 +363,7 @@ public class ConversionPathReportingTests : IDisposable
             Assert.True(exit == 0, stderr);
             var data = Data(stdout);
             var paths = data.GetProperty("conversionPaths");
-            Assert.Equal(1, paths.GetProperty("schemaVersion").GetInt32());
+            Assert.Equal(2, paths.GetProperty("schemaVersion").GetInt32());
             Assert.Equal("preserved", paths.GetProperty("outcome").GetString());
             Assert.Equal(2, paths.GetProperty("rescue").GetInt32());
             Assert.Equal(0, paths.GetProperty("passthrough").GetInt32());
@@ -408,15 +408,18 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
-    public void F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires()
+    public void F6_REPORT_10_CliLossy_RoundTripIsReported_ButNoRescueFires()
     {
-        // --lossy skips the generated-C# round trip, so the rescue never fires and the
-        // report says so: no rescue, no trigger. (The lossy contract allows this.)
+        // #1514: --lossy now runs the round trip, but only to report it. No rescue
+        // fires (with or without --passthrough), so the output is written and
+        // reported unverified (exit 2): no rescue, no trigger.
         foreach (var flags in new[] { new[] { "--lossy", "--format", "json" }, new[] { "--lossy", "--passthrough", "--format", "json" } })
         {
             var (exit, stdout, stderr) = Cli(TrailingLabel, flags);
-            Assert.True(exit == 0, stderr);
+            Assert.True(exit == 2, stderr);
             var paths = Data(stdout).GetProperty("conversionPaths");
+            Assert.Equal("unverified", paths.GetProperty("outcome").GetString());
+            Assert.Equal("failed", paths.GetProperty("roundTrip").GetString());
             Assert.Equal(0, paths.GetProperty("rescue").GetInt32() + paths.GetProperty("passthrough").GetInt32());
             Assert.Empty(paths.GetProperty("triggers").EnumerateObject());
         }

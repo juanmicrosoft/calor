@@ -420,7 +420,10 @@ public sealed class ConvertTool : McpToolBase
                 Tip = "Use calor_help with feature='overview' to see all available Calor syntax before writing or editing .calr files."
             };
 
-            return Task.FromResult(McpToolResult.Json(output, isError: !success));
+            // #1514: lossy output that failed the round-trip compile check is returned
+            // (and written), but flagged as an error so it never reads as clean.
+            var unverified = output.LossSummary.Paths.Outcome == ConversionPathSummary.UnverifiedOutcome;
+            return Task.FromResult(McpToolResult.Json(output, isError: !success || unverified));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

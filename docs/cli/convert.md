@@ -150,7 +150,11 @@ nearest complete member or type and are preserved verbatim as C# interop.
 Success means the emitted Calor parses and compiles, and its generated C#
 compiles through Roslyn. Output files are replaced atomically only after these
 checks pass. `--lossy` permits substitutions or drops, but every occurrence is
-reported with its source location.
+reported with its source location. Lossy output still goes through the same
+round-trip compile check (#1514). When it fails, the file is written but
+`conversionPaths.outcome` is `unverified`, `conversionPaths.roundTrip` is
+`failed`, each compiler error is a warning, and the command exits `2`.
+(`--select-active-preprocessor-branch-lossy` still refuses on a failed check.)
 
 ### Conditional compilation and compiler directives
 
@@ -391,9 +395,9 @@ Review the warnings and manually adjust as needed.
 
 | Code | Meaning |
 |:-----|:--------|
-| `0` | Conversion successful |
-| `1` | Conversion completed with warnings |
-| `2` | Error - file not found, parse error, etc. |
+| `0` | Conversion completed; read `conversionPaths.outcome` to tell native from preserved or lossy output |
+| `1` | Missing input, timeout, `--no-fallback` refusal, or any refused conversion (`outcome: "refused"`; nothing written) |
+| `2` | Plain `--lossy` output was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
 
 ---
 

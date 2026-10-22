@@ -61,8 +61,10 @@ The C# → Calor surfaces report in three shapes:
 | MCP `calor_migrate` (`phase: "convert"`) | The tool's own result object | `perFile[].errors[]` and `perFile[].warnings[]` | `perFile[].losses[]` and `perFile[].conversionPaths` |
 | MCP `calor_batch` (`action: "convert"`) | The tool's own result object | `files[].issues[]` | `files[].conversionPaths` |
 
-`conversionPaths.outcome` (`native`, `preserved`, `lossy`, `refused`) is the field
-to test. The native construct counts (`nativeConversionCount`,
+`conversionPaths.outcome` (`native`, `preserved`, `lossy`, `unverified`, `refused`) is the field
+to test. `unverified` means the file was written under `--lossy` but its C# failed
+the round-trip compile check; `conversionPaths.roundTrip` says whether that check
+ran (`verified`, `failed`, `deferred`, `not-run`). The native construct counts (`nativeConversionCount`,
 `lossSummary.nativeConversions`) also count constructs of a type a rescue later
 replaced with C#. See [Which mechanism kept the C#](/docs/guides/csharp-interoperability/#which-mechanism-kept-the-c)
 for the per-surface defaults.
