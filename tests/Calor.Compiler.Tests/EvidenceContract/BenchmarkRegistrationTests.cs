@@ -181,7 +181,7 @@ public class BenchmarkRegistrationTests
         }
         var manifest = JsonNode.Parse(packet["sha256.json"])!;
         foreach (var name in EvidenceContractValidator.RegistrationPacketFiles)
-            manifest["files"]![$"{EvidenceContractValidator.RegistrationDir}/{name}"] = EvidenceContractValidator.TextSha256(packet[name]);
+            manifest["files"]![$"{EvidenceContractValidator.SealedRegistrationDir}/{name}"] = EvidenceContractValidator.TextSha256(packet[name]);
         packet["sha256.json"] = manifest.ToJsonString();
         return packet;
     }

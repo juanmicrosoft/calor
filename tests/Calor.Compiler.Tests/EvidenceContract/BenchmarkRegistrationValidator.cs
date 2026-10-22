@@ -6,13 +6,18 @@ namespace Calor.Compiler.Tests.EvidenceContract;
 
 /// <summary>
 /// #1276 (0.24 B1) benchmark registration: the contract's <c>benchmarkEquivalence.registrationRule</c>
-/// checked against the committed packet under <c>docs/plans/evidence/b1-1276/registration/</c>.
+/// checked against the committed packet under <c>eng/benchmark-publication/b1-1276/registration/</c>
+/// (#1585: moved from <c>docs/plans/evidence/b1-1276/registration/</c> with its bytes unchanged, so the
+/// seal keys and the recorded oracle commands keep that sealed name).
 /// Pair rows go through the same E008-E010 rules as any benchmark row; the B codes add what a
 /// registration must pin before any disposition exists.
 /// </summary>
 internal static partial class EvidenceContractValidator
 {
-    public const string RegistrationDir = "docs/plans/evidence/b1-1276/registration";
+    public const string RegistrationDir = "eng/benchmark-publication/b1-1276/registration";
+
+    /// <summary>The name the packet was sealed and merged under; its seal keys use it.</summary>
+    public const string SealedRegistrationDir = "docs/plans/evidence/b1-1276/registration";
 
     public static readonly IReadOnlyList<string> RegistrationPacketFiles =
         ["registration.json", "pairs.json", "corpus-inventory.json", "exclusions.json", "metric-set.json"];
@@ -48,7 +53,7 @@ internal static partial class EvidenceContractValidator
         var document = Str(registration["document"]);
         foreach (var name in RegistrationPacketFiles)
         {
-            var key = $"{RegistrationDir}/{name}";
+            var key = $"{SealedRegistrationDir}/{name}";
             if (Str(manifest?[key]) != TextSha256(packet[name]))
                 v.Add(new("B001", key, "sha256.json does not record this packet file's LF-normalized SHA-256"));
         }
