@@ -41,7 +41,7 @@ on:
       - 'tests/E2E/agent-tasks/**'
       - '.github/workflows/benchmark.yml'
       # #1422: a change to any gate input re-runs the gate (and its cleanup).
-      - 'docs/plans/evidence/b1-1276/**'
+      - 'eng/benchmark-publication/**'
       - 'docs/plans/evidence/evidence-contract-1407/**'
       # Sealed documents the gate's seal check reads (B2-01), so also freshness inputs.
       - 'docs/plans/b1-1276-benchmark-registration.md'
@@ -234,8 +234,8 @@ jobs:
           # B1's packet validator (seals, oracle reconciliation, known witness, recomputed statistics).
           dotnet test tests/Calor.Compiler.Tests -c Release --no-build \
             --filter "FullyQualifiedName~BenchmarkResultsTests|FullyQualifiedName~BenchmarkRegistrationTests"
-          REG=docs/plans/evidence/b1-1276/registration
-          RES=docs/plans/evidence/b1-1276/results
+          REG=eng/benchmark-publication/b1-1276/registration
+          RES=eng/benchmark-publication/b1-1276/results
           OUT="$RUNNER_TEMP/b1-regen"
           mkdir -p "$OUT"
           for i in 1 2; do
@@ -330,7 +330,7 @@ jobs:
             echo
             echo "This PR publishes \`website/public/data/benchmark-headline.json\`, written by"
             echo "\`scripts/benchmark_publication_gate.py\` (#1422) from the B1 results packet"
-            echo "(\`docs/plans/evidence/b1-1276/results/\`), and its provenance entry in"
+            echo "(\`eng/benchmark-publication/b1-1276/results/\`), and its provenance entry in"
             echo "\`bench/phase0-agent-native/commit-stamp-index.json\`. Nothing else changes."
             echo
             echo "The #1422 gate refuses this PR when an included pair is not EQUIVALENT, a registered pair or"

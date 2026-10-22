@@ -130,9 +130,12 @@ what a program does.
   from the committed B1 results (226 registered Calor/C# program pairs, 17 of them included) at a
   `main` commit. So
   the publication branch and pull request are now named after that commit, not the version in
-  `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks. Its inputs
-  moved from `docs/plans/evidence/` to `eng/benchmark-publication/`, byte for byte, so they stay
-  when the evidence directory is archived.
+  `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks.
+- **The B1 registration and results files moved to `eng/benchmark-publication/b1-1276/` (#1585),**
+  byte for byte, so they survive when `docs/plans/evidence/` is archived. Their hash seals still
+  name the old paths, and the gate maps those names to the new location instead of rewriting
+  anything sealed. The gate's third input, the #1407 evidence contract, has not moved yet: a
+  hash-pinned determinism script reads it from `docs/plans/evidence/`.
 
 ### Documentation
 
