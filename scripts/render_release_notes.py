@@ -2,8 +2,7 @@
 """Render the release notes: the `## [VERSION]` section of CHANGELOG.md (#1546).
 
 publish-nuget.yml renders the notes with this script. changelog_section and version_headers live
-in scripts/release_checks.py (#1582); scripts/verify_release_adjudication.py imports the same
-functions, so the two cannot disagree while that script remains.
+in scripts/release_checks.py (#1582), which preflight also uses, so the two cannot disagree.
 The version is matched literally. A missing section, or a version header that appears more than
 once, is an error.
 

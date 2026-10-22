@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using Xunit;
-using static Calor.Compiler.Tests.ReleaseGate.ReleaseAdjudicationGateTests;
+using static Calor.Compiler.Tests.Release.ReleaseWorkflowTests;
 
-namespace Calor.Compiler.Tests.ReleaseGate;
+namespace Calor.Compiler.Tests.Release;
 
 /// <summary>
 /// #1548: the byte-reproducibility evidence holds for Microsoft's .NET SDK 10.0.401 only. #1582

@@ -1,286 +1,237 @@
 ---
 name: create-release
 description: >-
-    Automate the Calor release process end-to-end: bump version across Directory.Build.props,
-    website, and changelog files; run the statistical benchmark suite
-    (30 runs); open and merge a release PR; publish through the #1410 adjudication-gated
-    publish-nuget workflow (which creates the GitHub release and dispatches the website deploy);
-    and verify both packages reached nuget.org.
-    Use when the user asks to "cut a release",
-    "create a release", "ship a version", "release vX.Y.Z", or "do a release".
+    Prepare and hand off a Calor release: bump the version in Directory.Build.props (and the
+    website's version pins), write the `## [X.Y.Z]` CHANGELOG section, open and merge the release
+    PR, then have the maintainer dispatch publish-nuget.yml from main, first with dry_run: true
+    and then for real. The workflow, not this skill, pushes the packages, creates the tag and the
+    GitHub release, and dispatches the website. Afterwards, confirm both packages on nuget.org.
+    Use when the user asks to "cut a release", "create a release", "ship a version",
+    "release vX.Y.Z", or "do a release".
 allowed-tools: Bash, Read, Write, Edit
 user-invocable: true
 ---
 
-# /create-release - Create a New Calor Release
+# /create-release - Prepare a Calor release
 
-This skill automates the release process: bump versions across all components, run benchmarks, create a PR, merge it, create a GitHub release with proper tagging, and **confirm the NuGet packages actually published**. Step 8 is not optional — creating the release only *triggers* the workflow, and in this repo it has failed silently for long stretches.
+The release contract (#1548, implemented by #1582): **a release is a dispatch of
+`publish-nuget.yml` from `main`**. The dispatch names a version that equals `<Version>` in
+`Directory.Build.props`, and `CHANGELOG.md` holds a non-empty `## [X.Y.Z]` section for it. The
+packages reach nuget.org through OIDC Trusted Publishing. No adjudication record, identity, or
+maintainer override exists any more.
 
-**VS Code extension support was withdrawn after v0.13.1.** There is no VSIX build, no Marketplace
-publish, and no `editors/vscode` tree. Any step below that mentions them describes a channel that
-no longer exists — the only release artifacts are the two NuGet packages.
+What this skill does, and what it does not:
 
-**Release gate (#1410).** Since 0.24 R2, no public surface publishes without one successful #1408
-adjudication identity, `calor-adjudication:v1:<adjudication commit>:<terminal record sha256>`.
-There is no manual `gh release create` step and no version override: `publish-nuget.yml` is the
-only release path, and it creates the GitHub release itself after the packages are pushed. A
-release created by hand publishes nothing else and turns `release-audit.yml` red. The contract
-(`docs/plans/v0.24-evidence-contract.md`) defines no maintenance-release path, so until #1408
-records `MILESTONE-SUCCEEDED` no release can be cut. Design:
-`docs/plans/evidence/r2-1410/release-gate.md`.
+- It bumps the version, writes the CHANGELOG section, and opens and merges the release PR.
+- It does **not** create the tag or the GitHub release, and it never runs `gh release create`.
+  `publish-nuget.yml` creates both, after the packages are on nuget.org and the installed tool
+  passed its check. A release made by hand publishes nothing and turns `release-audit.yml` red.
+- The **maintainer** dispatches `publish-nuget.yml`. Prepare the commands and wait; do not
+  dispatch it, a dry run included, unless the maintainer explicitly asks you to in this session.
 
-## Steps to Perform
+The only release artifacts are the two NuGet packages, `calor` and `Calor.Sdk`. VS Code
+extension support was withdrawn after v0.13.1: there is no VSIX and no Marketplace publish.
 
-### 1. Determine the Next Version
+## 1. Pick the version
 
-Read the current version from `Directory.Build.props`:
+Read the current version:
 
 ```bash
 sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' Directory.Build.props
 ```
 
-(Not `grep -oP` — BSD grep on macOS has no `-P` and exits 2.)
+(Not `grep -oP`: BSD grep on macOS has no `-P`.)
 
-Calculate the next version using patch increment logic:
-- Patch increment: `0.1.6` → `0.1.7` → ... → `0.1.9`
-- Minor rollover: `0.1.9` → `0.2.0`
-- Continue pattern until `0.9.9`
-- Major rollover: `0.9.9` → `1.0.0`
+Propose the next one (see [Version calculation](#version-calculation)) and ask the user to confirm
+it or name another. The version must match `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-suffix`, or
+preflight rejects it.
 
-Ask the user to confirm the next version or allow them to specify a different one.
+## 2. Bump the version and write the CHANGELOG section
 
-### 2. Run Benchmarks
+| File | Change |
+|------|--------|
+| `Directory.Build.props` | `<Version>X.Y.Z</Version>`. There must be exactly one `<Version>` element. |
+| `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add a fresh empty `## [Unreleased]` above it. |
+| `website/content/changelog.mdx` | Add the same section at the top, after the `---` separator. Turn doc references into site links (`/docs/...`). |
+| `website/package.json`, `website/package-lock.json` | `"version": "X.Y.Z"` (root and workspace entries). |
+| `website/src/lib/version.ts` | `SITE_VERSION = 'X.Y.Z'` (the version pill in the site header). |
+| `website/src/components/landing/WhatsNewBanner.tsx` | Version string and a one-line headline. Keep the link to `/docs/changelog/`. |
+| `website/tests/public-claims.spec.ts` | `currentRelease` and the release date it checks. |
 
-Run the benchmark suite in statistical mode (30 runs with confidence intervals) to regenerate the
-website dashboard data:
+The `## [X.Y.Z]` section of `CHANGELOG.md` **is the release notes**. `publish-nuget.yml` renders it
+verbatim (`scripts/render_release_notes.py`) into the GitHub release body. So:
+
+- Follow the public-writing rule in `CLAUDE.md`: write for a CS college student, lead with what
+  changed, use numbers rather than adjectives.
+- **No benchmark numbers.** No benchmark summary, ratio, interval, or program count in
+  `CHANGELOG.md`, `changelog.mdx`, the PR body, or the release (#1548). This skill does not run
+  benchmarks; benchmark publication is a separate `benchmark.yml` dispatch and is not part of a
+  release.
+- No claim that the release or its evidence was "independently verified" or "independently
+  adjudicated". The wording scan (`release_checks.py wording`) fails the run on those phrases,
+  in the notes, the packages, the release metadata, and the built site, unless they are negated.
+- The section must be non-empty and its header must appear exactly once.
+
+Check that no live version spot was missed:
 
 ```bash
-dotnet run --project tests/Calor.Evaluation -c Release -- run --format website --output website/public/data/benchmark-results.json --statistical --runs 30
+grep -rn "$OLD_VERSION" website/src website/package.json Directory.Build.props
 ```
 
-**Release notes carry no benchmark numbers (#1548).** Do not write a benchmark summary, ratio,
-interval, or program count into `CHANGELOG.md`, `website/content/changelog.mdx`, the release PR
-body, or the GitHub release. The notes are adjudicated text (`G014`); benchmark results are
-published, if at all, only through the separate #1547 dispatch that the record must approve.
+Only historical prose (the changelog, pages describing what shipped earlier) may still name the
+old version.
 
-**Note**: Statistical benchmark runs (30 iterations) add approximately 5-10
-minutes. The reported intervals repeat deterministic observations over a fixed
-corpus; they do not establish independent sampling uncertainty.
-
-### 3. Update Version Files
-
-Update these files with the new version:
-
-| File | What to Update |
-|------|----------------|
-| `Directory.Build.props` | `<Version>X.Y.Z</Version>` |
-| `website/package.json` | `"version": "X.Y.Z"` |
-| `website/package-lock.json` | Root and workspace package versions |
-| `website/src/lib/version.ts` | `SITE_VERSION = 'X.Y.Z'` — this is the pill next to "calor" in the site header; if you skip it, the header keeps showing the previous version even after CHANGELOG and banner update |
-| `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` (no benchmark numbers) |
-| `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format) |
-| `website/src/components/landing/WhatsNewBanner.tsx` | Update version number and one-line description of the release |
-| `website/public/data/benchmark-provenance.json` | Match the regenerated benchmark source commit (the full 40-hex SHA the generator now writes) and declared source version |
-| `bench/phase0-agent-native/commit-stamp-index.json` | Update the `publicationStamps` entry for every changed benchmark stamp (#1417). A stamp naming a pre-merge branch commit gets a pending phase-1 identity and a post-merge write-back; `LedgerCommitStampTests` fails until the index matches |
-| `website/content/benchmarking/{index,methodology,results}.mdx` | Match the regenerated benchmark date and provenance |
-| `website/content/philosophy/index.mdx` | Match the publishing release, benchmark source, declared source version, and run count |
-| `website/tests/public-claims.spec.ts` | Update `currentRelease` and keep release/provenance drift gates current |
-
-**How to verify you got all the version spots**: after editing, run
-`grep -rn "$OLD_VERSION" website/src website/package.json Directory.Build.props`
-— the only remaining match should be `changelog.mdx` and prose references in
-`website/content/**` describing what shipped in that version (those are historical
-and stay). Any live component or config still pointing at the old version means
-you missed it.
-
-When updating CHANGELOG.md:
-1. Find the line `## [Unreleased]`
-2. Replace it with `## [X.Y.Z] - YYYY-MM-DD` where YYYY-MM-DD is today's date
-3. Add a new `## [Unreleased]` section above the new version header
-
-When updating website/content/changelog.mdx:
-1. Add a new `## [X.Y.Z] - YYYY-MM-DD` section after the `---` separator at the top (before the previous version)
-2. Copy the **Added**, **Fixed**, **Removed** sections from CHANGELOG.md
-3. Convert any doc references to website links (e.g., `[page title](/docs/path/)`)
-
-When updating WhatsNewBanner.tsx:
-1. Update the version string (e.g., `v0.4.8`)
-2. Update the one-line description to highlight the most notable feature in this release
-3. Keep the "See what's new" link pointing to `/docs/changelog/`
-
-### 4. Create Release Branch and PR
+## 3. Open and merge the release PR
 
 ```bash
-git checkout -b release/vX.Y.Z
-# Start from a clean release branch. Stage the complete reviewed release diff,
-# including new tests.
+git checkout -b release/vX.Y.Z origin/main
 git add -A
-git status --short
-git commit -m "chore: bump version to X.Y.Z"
+git status --short          # review: only the files above
+git -c commit.gpgsign=false commit -m "chore(release): X.Y.Z"
 git push -u origin release/vX.Y.Z
+gh pr create --title "chore(release): X.Y.Z" --body "Version bump and the [X.Y.Z] CHANGELOG section. Publishing is a separate dispatch of publish-nuget.yml from main."
 ```
 
-Create the PR. Since 0.25 (#1546) this is the **candidate-preparation PR**, not a release surface:
-its products (the version and the `CHANGELOG.md` section) become candidate bytes that the gate
-checks on every run (`G009`, `G014`). Its body is not release text: do not restate the notes or
-any benchmark number in it.
-
-```bash
-gh pr create --title "Prepare the vX.Y.Z candidate" --body "$(cat <<'EOF'
-Prepares the vX.Y.Z candidate: version bump and the `## [X.Y.Z]` CHANGELOG section.
-Nothing is published by this PR. The notes reach users only through the #1410 gate,
-which checks this section against the adjudicated notes (G014).
-
-## Checklist
-- [ ] Version updated in Directory.Build.props
-- [ ] Version updated in website/package.json
-- [ ] Version updated in website/package-lock.json
-- [ ] Version updated in website/src/lib/version.ts
-- [ ] CHANGELOG.md updated with version and date
-- [ ] website/content/changelog.mdx updated with version and changes
-- [ ] website/src/components/landing/WhatsNewBanner.tsx updated with version and headline
-- [ ] website/tests/public-claims.spec.ts pins every live release surface
-EOF
-)"
-```
-
-### 5. Merge the PR
-
-Wait for any CI checks, then merge:
+Wait for CI to pass, then merge (with the maintainer's approval):
 
 ```bash
 gh pr merge --squash --delete-branch
+git checkout main && git pull
 ```
 
-### 6. Publish through the adjudication gate
+Merging publishes nothing. The commit that `main` points at when the maintainer dispatches is the
+release candidate. Anything merged after that is not in the release.
 
-Do **not** run `gh release create`. Dispatch the gated release workflow from `main` with the
-identity that #1408 recorded (the adjudication commit is on `main`; the candidate, the version, and
-the notes all come from the record, and every one is checked):
+## 4. The maintainer dispatches publish-nuget.yml
+
+`publish-nuget.yml` has two inputs, and only `workflow_dispatch` triggers it:
+
+| Input | Type | Meaning |
+|---|---|---|
+| `version` | string, required | Must equal `<Version>` in `Directory.Build.props` on `main`. It is checked, never used as an override. |
+| `dry_run` | boolean, default `false` | Run every check and pack, then stop before the `publish` job. |
+
+There is no `--prerelease` input or flag. The workflow derives it: a `0.x` version or a `-suffix`
+version becomes a prerelease.
+
+**First a dry run**, then, if it is green, the real run:
 
 ```bash
-ID='calor-adjudication:v1:<adjudication commit>:<terminal record sha256>'
-gh workflow run publish-nuget.yml --ref main -f adjudication_identity="$ID"
+gh workflow run publish-nuget.yml --ref main -f version=X.Y.Z -f dry_run=true
+# after the dry run passes:
+gh workflow run publish-nuget.yml --ref main -f version=X.Y.Z
 ```
 
-The workflow fails closed unless the identity verifies. In order, it: verifies the identity;
-runs the release test gates on the candidate commit; packs and verifies the packages and the notes
-(the `CHANGELOG.md` section for the version, rendered from the candidate) against the adjudicated
-hashes; pushes to NuGet; creates the GitHub release `vX.Y.Z` at the candidate with the notes plus a
-`<!-- calor-adjudication: ... -->` trailer; attaches release metadata; and dispatches the website
-workflow from `main` with the same identity, which checks out the candidate.
+`--ref` must be `main`. Any other ref fails in the first step.
 
-It never dispatches benchmark publication (#1547). Publishing the adjudicated benchmark headline
-is a separate decision. It needs the record's `publication.benchmark-results.approved: true` and
-an explicit dispatch:
-`gh workflow run benchmark.yml --ref main -f adjudication_identity="$ID" -f publish_results=true`.
+### Jobs, in order
 
-### 7. Cleanup and Return to Main Branch
+1. **`preflight`**: refuses any ref but `main`. Checks out `main` at full depth and runs
+   `release_checks.py preflight`. The version must equal `Directory.Build.props`, CHANGELOG must
+   hold exactly one non-empty `## [X.Y.Z]` section, and a tag `vX.Y.Z` must be absent or already
+   at this commit. Outputs the candidate commit, the tag, and the prerelease flag.
+2. In parallel, all on the candidate commit:
+   - **`test`**: 13 test projects, one runner each, with the manifest drift check, the
+     `check_trx.py` inventory, and the no-Z3-skip guard.
+   - **`sdk-consumer`**: the Calor.Sdk consumer check on 5 RIDs (linux-x64, linux-arm64,
+     osx-arm64, win-x64, win-arm64).
+   - **`release-quality`**: script self-tests, `check_test_quality.py`, sample IDs, coverage,
+     mutation, performance and flake ratchets, the round-trip harness, and the scorecard.
+   - **`site`**: builds the website, checks it uses only self-hosted fonts, and runs the wording
+     scan over `website/out`.
+3. **`package`** (no environment, no `id-token`): packs `calor` and `Calor.Sdk`
+   (`CalorSdkRequireAllRids=true`). Then it inspects the SDK package on all RIDs, checks the
+   packed Z3 against the pins, writes the SBOM and metadata, and renders the notes from
+   CHANGELOG. It runs the wording scan over the notes, packages, and metadata, and compares any
+   version nuget.org already serves, entry by entry. It uploads the `release-bundle` artifact.
+   **A dry run ends here.**
+4. **`publish`** (skipped when `dry_run` is true; runs in the `nuget-release` environment, which
+   admits only `main`): exchanges the GitHub OIDC token for a one-hour NuGet key
+   (`NuGet/login`), and fails if the key is empty. It verifies the bundle against the package
+   job's `SHA256SUMS` hash and attests the packages. It repeats the existing-version compare,
+   this time always blocking, then pushes both packages. Finally it polls nuget.org for up to 30
+   minutes and compares the served packages entry by entry.
+5. **`install-check`**: calls `verify-release.yml`. It installs `calor` from nuget.org on
+   linux-x64, osx-arm64, and win-x64, retrying for up to 30 minutes, and requires
+   `calor verify samples/Verification/proven-contracts.calr` to print `Proven: 14` and
+   `Skipped: 0`.
+6. **`release`**: verifies the bundle again. The remote tag must be absent or at the candidate.
+   Creates the tag and the GitHub release `vX.Y.Z` (title `vX.Y.Z`, body = the rendered notes,
+   `--prerelease` when derived). Attaches the release metadata without overwriting.
+7. **`website`**: dispatches `nextjs-gh-pages.yml` from `main` with `tag=vX.Y.Z` and
+   `commit=<candidate>`. That workflow checks that the tag names that commit, then rebuilds the
+   site, rescans it, and deploys it.
+
+Every step before the push blocks the push. Every step after the push blocks the GitHub release,
+its metadata, and the website. The workflow never dispatches benchmark publication.
+
+### What a dry run proves, and what it cannot
+
+A dry run runs `preflight`, `test`, `sdk-consumer`, `release-quality`, `site`, and `package`. It
+never enters `nuget-release` and never calls `NuGet/login`, so it cannot test the OIDC exchange or
+the Trusted Publishing policy. `publish`, `install-check`, `release`, and `website` are skipped.
+
+In a dry run, two "already released" findings are warnings, not failures: a tag `vX.Y.Z` at
+another commit, and a different package already on nuget.org. A dry run of the version already
+released therefore still exercises everything else. A real run fails on both.
+
+## 5. Watch the run and confirm on nuget.org — do not skip
 
 ```bash
-git checkout main
-git pull
-```
-
-The website deploy is dispatched by `publish-nuget`. A re-deploy needs the same
-identity and the release tag; it deploys only the adjudicated site tree:
-
-```bash
-gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ID"
-```
-
-### 8. Verify NuGet — DO NOT SKIP
-
-**Dispatching `publish-nuget` does not make it succeed.** Since #1410 the GitHub release and the
-website come only after the NuGet push, but a successful push is still not
-proof that nuget.org serves the packages.
-
-**Wait for the publish workflow first.** Querying nuget.org before it finishes shows the previous
-version and looks like failure.
-
-```bash
-VER=0.12.1   # the version you cut
-
-# Watch the publish workflow to completion (get the run id for THIS tag)
 gh run list --workflow publish-nuget.yml --event workflow_dispatch --limit 5 \
   --json databaseId,status,conclusion,createdAt
 gh run watch <run-id>
 ```
 
-A green workflow is still not sufficient evidence — check nuget.org and the GitHub release
-directly. Note nuget.org's flat-container index can lag a successful push by several minutes, so
-re-check before concluding it failed:
+A green run already means nuget.org served both packages, matching entry by entry, and the
+installed tool proved the sample. Still check directly, because the flat-container index can lag
+by several minutes:
 
 ```bash
-# nuget.org — both packages must list $VER
+VER=X.Y.Z
 curl -s https://api.nuget.org/v3-flatcontainer/calor/index.json     | jq -r '.versions[-3:][]'
 curl -s https://api.nuget.org/v3-flatcontainer/calor.sdk/index.json | jq -r '.versions[-3:][]'
-
-# (No release assets are expected: the VSIX channel was removed after v0.13.1.)
+gh release view "v$VER" --json tagName,isPrerelease,targetCommitish
 ```
 
-Strongest check for NuGet — install the published tool and exercise Z3, which is the part most
-likely to be broken by a packaging change:
+Report the release as shipped only after nuget.org lists **both** packages at the new version.
+If only one is there, say exactly which.
 
-```bash
-rm -rf /tmp/calorcheck          # else a stale/newer install makes this a no-op
-dotnet tool install --tool-path /tmp/calorcheck calor --version "$VER"
-/tmp/calorcheck/calor --version
-/tmp/calorcheck/calor verify samples/Verification/proven-contracts.calr
-```
+## Failure modes
 
-Expect `Proven: 14`, **`Skipped: 0`**, exit 0. A package whose Z3 is broken does **not** print
-"Z3 not available" (that string only ever appears in test-skip messages) — it emits diagnostic
-`Calor0710`, *"Static contract verification skipped: Z3 SMT solver is not available"*, and a
-nonzero `Skipped:` count. Do not pick a different sample casually:
-`samples/Contracts/contracts.calr` exits 1 **by design** (it contains a deliberately disproven
-postcondition) and will look like a broken package.
-
-Known failure modes, so they are recognised rather than re-diagnosed:
-
-| Symptom | Cause | Fix |
+| Where | Symptom | Cause and fix |
 |---|---|---|
-| `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted | Republish via `build-z3.yml` (`workflow_dispatch`), commit the manifest it prints, **then re-publish via `workflow_dispatch`, not `gh run rerun`** — see below. **Never rehash the live assets.** |
-| `test` job aborts with `terminate called after throwing 'std::system_error'` | Native (Z3) crash taking down the test host; `publish` is correctly skipped | Re-dispatch; if it reproduces, stop and investigate — a repeating native crash is not flake |
+| `preflight` | `publish-nuget runs only from main` | Dispatched from another ref. Re-dispatch with `--ref main`. |
+| `preflight` | `Directory.Build.props declares [...]` | The input differs from the merged version, or the PR is not merged yet. |
+| `preflight` | `CHANGELOG.md must hold exactly one '## [X.Y.Z]' header` / `section [X.Y.Z] is empty` | Fix CHANGELOG through a PR, then re-dispatch. |
+| `preflight` (real run) | `already released: tag vX.Y.Z already points at ...` | The version was released from another commit. Bump the version; never move a tag. |
+| `test` | `Enforce test inventory` count mismatch | A test count changed without `eng/test-manifest.json`. Fix on main through a PR. |
+| `test` | `terminate called after throwing 'std::system_error'` | A native (Z3) crash took down the test host. Re-dispatch once; if it repeats, investigate. |
+| `test` / `package` | `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted. Republish via `build-z3.yml`, commit the manifest it prints, then re-dispatch. Never rehash the live assets. |
+| `site` / `package` | `forbidden wording` | The notes, package text, metadata, or site claims independent verification or adjudication. Reword through a PR. |
+| `package` / `publish` | `already released: nuget.org serves ... with content other than the package built here` | nuget.org already has a different package at this version. Bump the version. |
+| `publish` | `NuGet/login` fails, or `Trusted Publishing returned no key` | The nuget.org `calor-release` policy or the `nuget-release` environment is wrong. Run `scripts/check_release_credentials.py --live`; settings are a maintainer action. |
+| `publish` | bundle verification fails | The artifact does not match the package job's record. Re-dispatch; do not edit the bundle. |
+| `publish` | `nuget.org does not serve ... after 60 attempts` | Indexing lag over 30 minutes. Re-dispatch: the push uses `--skip-duplicate` and the compare accepts an identical package. |
+| `install-check` | `could not be installed ... after 30 attempts`, or no `Proven: 14` / `Skipped: 0` | A broken package (for example Z3 missing, `Calor0710`). Investigate before anything else; the GitHub release was not created. |
+| `release` | `tag vX.Y.Z already points at ...` / `existing release ... has a body other than these notes` | A tag or release was made by hand. Releases are never edited; the maintainer must resolve it. |
 
-There is no editor-extension channel to verify. VS Code support was withdrawn after v0.13.1 and
-the Marketplace listing is abandoned at v0.3.8; the language server (`calor lsp`) ships inside the
-`calor` NuGet package, so verifying that package covers it.
+### Re-running
 
-#### Retrying a failed publish (do NOT re-cut the version)
+Fix the cause on `main` and dispatch again with the same `version`. Do not delete tags, edit
+releases, or bump the version just because a run failed. Prefer a fresh dispatch to
+`gh run rerun`: a fresh dispatch takes the current `main`. Once the packages are pushed, a
+re-dispatch is safe. The push skips duplicates, every compare accepts an identical package, an
+existing release is accepted only when its body equals the notes, and metadata is never
+overwritten.
 
-A failed publish is not a reason to delete the tag or bump the version. Fix the cause and re-run
-the failing channel only.
+Note that a re-dispatch releases whatever `main` holds. If `main` moved on after a push, the
+rebuilt packages usually differ from the ones already on nuget.org, and the existing-version
+compare stops the run. Do not merge unrelated changes between a partial run and its
+re-dispatch.
 
-- **NuGet.** Re-dispatch with the same identity:
-  `gh workflow run publish-nuget.yml --ref main -f adjudication_identity="$ID"`. Every job checks
-  out the adjudicated candidate, so a fix committed to `main` after the candidate does **not**
-  reach the packages; such a fix changes the candidate and needs a new adjudication (#1407 §8
-  stopping rule 4). The push uses `--skip-duplicate`, and an existing release is accepted only if
-  its body already carries this identity.
-- **A failed publish never justifies re-cutting.** Fix the cause and re-dispatch; the tag stays.
+## Version calculation
 
-Note that republishing `z3-binaries` retroactively changes what **every past tag** resolves to, so
-older tags' manifests become invalid. That is a reason to prefer fixing forward.
-
-Report the release as shipped only after nuget.org confirms **both** packages at the new version.
-If only one landed, say exactly which one.
-
-## Version Calculation Logic
-
-Given version `MAJOR.MINOR.PATCH`:
-
-1. Increment PATCH by 1
-2. If PATCH > 9, set PATCH = 0 and increment MINOR
-3. If MINOR > 9, set MINOR = 0 and increment MAJOR
-
-Examples:
-- `0.1.6` → `0.1.7`
-- `0.1.9` → `0.2.0`
-- `0.9.9` → `1.0.0`
-- `1.0.0` → `1.0.1`
-
-## Pre-release Flag
-
-- Version < 1.0.0: Always use `--prerelease` flag
-- Version >= 1.0.0: Do not use `--prerelease` flag (stable release)
+Given `MAJOR.MINOR.PATCH`: increment PATCH; if PATCH > 9, set it to 0 and increment MINOR; if
+MINOR > 9, set it to 0 and increment MAJOR. Examples: `0.1.6` → `0.1.7`, `0.1.9` → `0.2.0`,
+`0.9.9` → `1.0.0`. The user may choose another version.

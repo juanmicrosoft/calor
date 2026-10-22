@@ -67,6 +67,16 @@ All notable changes to this project will be documented in this file.
   version.
 - **The .NET SDK pin (10.0.401) now lives in one shared action** instead of 8 copies across the
   release workflows.
+- **The old gate's code is deleted (#1583).** Nothing called it after #1582. Removed: the two gate
+  scripts (`verify_release_adjudication.py`, about 1,240 lines, and `verify_maintainer_override.py`,
+  about 380), the map of which record each release needed, 358 compiler tests that tested the gate
+  or the 0.25 candidate freeze it read, and a website heading-id test that kept the gate's copy of
+  the site's anchor rules in step. The tests of the release workflows, the credential path and
+  the SDK pin stay. No published package or website page changes.
+- **The `create-release` agent skill describes the new procedure.** It bumps the version, writes
+  the `## [X.Y.Z]` section, and merges the release PR. The maintainer then dispatches
+  `publish-nuget.yml`, first with `dry_run: true`. The skill no longer claims it creates the GitHub
+  release; the workflow does that.
 
 ## [0.25.0] - 2026-10-20
 

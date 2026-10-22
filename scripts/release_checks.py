@@ -26,8 +26,8 @@ exits nonzero on any problem, and the workflow never masks that exit.
 another commit, a different package already on nuget.org) as warnings, so a dry run of the version
 already on main still exercises every other check. A real release passes no flag and fails on them.
 
-changelog_section, version_headers, and tree_digest live here; render_release_notes.py,
-reproducible_builds.py, and (until #1583 retires it) verify_release_adjudication.py import them.
+changelog_section, version_headers, and tree_digest live here; render_release_notes.py and
+reproducible_builds.py import them.
 Tests: scripts/test_release_checks.py.
 """
 

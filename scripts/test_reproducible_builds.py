@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Guards for reproducible publication builds (packages and website).
 
-The release gate (#1410) rebuilds packages, release metadata and the website and
-compares SHA-256 hashes with the adjudicated ones, so every source of build
+Two builds of one commit must produce the same packages, release metadata and
+website bytes (reproducible-builds.yml proves it), so every source of build
 nondeterminism found by 0.24 C2 (#1424) and by this fix's own proof must stay fixed:
 
   * .nupkg zip entries carried the wall-clock pack time  -> DeterministicTimestamp
@@ -344,9 +344,9 @@ class CompareToolTests(unittest.TestCase):
             text = (REPO_ROOT / ".github" / "workflows" / wf).read_text(encoding="utf-8")
             self.assertIn("python3 scripts/reproducible_builds.py check-runtime --sdk 10.0.401 --prune", text, wf)
 
-    def test_tree_digest_is_the_release_gate_digest(self) -> None:
-        import verify_release_adjudication as gate
-        self.assertIs(gate.tree_digest, rb.tree_digest)
+    def test_tree_digest_is_the_release_checks_digest(self) -> None:
+        import release_checks
+        self.assertIs(release_checks.tree_digest, rb.tree_digest)
 
 
 class Z3CopyTests(unittest.TestCase):
