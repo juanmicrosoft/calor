@@ -181,6 +181,15 @@ public sealed class WebsiteFeatureSupportParityTests
         "Declarations are kept: `partial-property` (`full`).\n\n### Counts, Partial Results, and the JSON Envelope\n")]
     [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
         "Declarations are kept: `partial-property` ( **partial** ).\n\n### Counts, Partial Results, and the JSON Envelope\n")]
+    // Any run of Markdown emphasis or code markers around the level word.
+    [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
+        "Declarations are kept: `partial-property` (*full*).\n\n### Counts, Partial Results, and the JSON Envelope\n")]
+    [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
+        "Declarations are kept: `partial-property` (_full_).\n\n### Counts, Partial Results, and the JSON Envelope\n")]
+    [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
+        "Declarations are kept: `partial-property` (__full__).\n\n### Counts, Partial Results, and the JSON Envelope\n")]
+    [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
+        "Declarations are kept: `partial-property` (**`full`**).\n\n### Counts, Partial Results, and the JSON Envelope\n")]
     [InlineData("cli/convert.mdx", "`[out-var] Feature 'out-var' is partially supported…`", "`[out-var] out-var is Full…`")]
     // Codex round 3: a claim wrapped across a soft line break is one statement.
     [InlineData("cli/convert.mdx", "### Counts, Partial Results, and the JSON Envelope\n",
@@ -346,7 +355,7 @@ public sealed class WebsiteFeatureSupportParityTests
     // A level word in another case is a statement when used predicatively ("`x` is full",
     // "reports FULL"); "the full list" or "partial members" is ordinary English.
     private static readonly Regex PredicativeLevel = new(
-        @"(?:\b(?:is|are|was|be|as|reports|level)\s*:?\s+|\(\s*)(?:\*\*|`)?(?<l>full|partial|notsupported|manualrequired)(?![\w-])",
+        @"(?:\b(?:is|are|was|be|as|reports|level)\s*:?\s+|\(\s*)[*_`]*(?<l>full|partial|notsupported|manualrequired)[*_`]*(?![\w-])",
         RegexOptions.IgnoreCase);
 
     private static int Stated(string text)
