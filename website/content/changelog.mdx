@@ -95,6 +95,45 @@ All notable changes to Calor, organized by release.
   `checked`), and `checked` blocks stay C#, so overflow behaves as in the original. A nullable
   small integer (`byte? b; b += 1`) stays C#, reported as `compound-assignment-narrowing`.
 
+The four fixes below turn inputs that compiled to wrong C# into errors (#1592). Each one is a
+**breaking change for hand-written Calor**: code that compiled in 0.26 can now fail with the
+new diagnostic. The C# converter emits code that passes all four checks.
+
+- **Writes to immutable bindings and loop variables are errors (`Calor0213`, #1550).** A
+  binding without `~` (`§B{x:i32} 1`) is immutable, and only the loop may update a `§L` loop
+  variable. `§ASSIGN` (including a tuple target such as `§ASSIGN (x, y) (1, 2)`), compound
+  assignment, `(inc x)`/`(dec x)`, a `§A{ref}` or `§A{out}` argument, and a mutable rebind
+  (`§B{~i}`) of a loop variable all compiled silently before,
+  because the generated C# local is not `readonly`. Writing to a loop variable changed how many
+  times the loop ran. Writes inside `§PP` blocks and collection statements such as `§PUSH` are
+  checked too. Fix: declare the binding mutable, `§B{~x:i32} 1`. Statement-form
+  collections (`§LIST`, `§ARR`, `§DICT`, `§HSET`) have no mutability marker and stay assignable.
+  5 of the 217 benchmark programs in `tests/TestData/Benchmarks` had this bug and now fail with
+  `Calor0213`. They are inputs of the published B1 benchmark (#1276), so they stay unchanged and
+  are listed as known failures.
+- **Unknown visibility words are errors (`Calor0122`, #1607).** A word such as `:bogus`, the typo
+  `:prv`, or a modifier in the visibility slot (`§MT{m1:Area:abs}`) compiled silently as
+  `private`, and the modifier was dropped. The message lists the accepted words. `pro` and `pri`
+  are now accepted everywhere as `protected` and `private`; `:pro` used to compile as `private`
+  on a method. A compact header with an unknown word, such as `§MT{Run:prv}`, used to declare a
+  method named `prv`; it is now the same error. An interface method takes only `pub` or no
+  visibility; any other word used to be dropped. The documented compact event header
+  `§EVT{Click:pub:EventHandler}` now parses.
+- **Built-in operations check their operand count (`Calor0110`, #1608).** `(indexof s "@" 3)`
+  compiled to `s.IndexOf("@")` and dropped the start index. `indexof` now emits the start index
+  and an optional count (`s.IndexOf("@", 3)`, `s.IndexOf("@", 1, 4)`), and `sb-new` passes every
+  operand to the `StringBuilder` constructor. Extra operands to `contains`, `starts`, `ends`,
+  `equals` and `str` are an error. Comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`) and `**` take
+  exactly two operands: `(< a b c)` used to mean `(a < b) < c`.
+- **An ambiguous type-first binding header is an error (`Calor0123`, #1635).** A two-field
+  header is read name-first unless the first field is a built-in or PascalCase type. `§B{W:t}`
+  therefore declared a variable `W` of type `t`. When the first field looks like a type (`W`,
+  `long`, `T[]`) and the second like a variable, the parser now asks for the name-first form,
+  `§B{t:W}`. A third header field other than `const` or `mut`, which was ignored, is an error
+  too. The converter
+  used to write `§B{T:item}` for a C# local `T item`, which compiled with the name and type
+  swapped. It now writes `§B{item:T}`.
+
 ### Testing
 
 - **The soundness sweep now runs against `main` every day.** The sweep is the 0.24 harness

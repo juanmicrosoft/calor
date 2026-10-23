@@ -1694,9 +1694,9 @@ public sealed class Binder
             RawCSharpNode => null,
             // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
             LocalFunctionStatementNode => null,
-            PreprocessorDirectiveNode => null,
-            EventSubscribeNode => null,
-            EventUnsubscribeNode => null,
+            PreprocessorDirectiveNode => ScanUnboundWrites(stmt),
+            EventSubscribeNode => ScanUnboundWrites(stmt),
+            EventUnsubscribeNode => ScanUnboundWrites(stmt),
             // Unknown — explicit unsupported node, NOT null
             _ => BindUnsupportedStatement(stmt)
         };
@@ -1824,6 +1824,7 @@ public sealed class Binder
             ParameterModifier.None,
             forStmt.VariableSpan,
             "for");
+        loopVar.IsLoopVariable = true; // #1550
         if (!_scope.TryDeclare(loopVar))
         {
             _diagnostics.ReportError(forStmt.Span, DiagnosticCode.DuplicateDefinition,
@@ -2105,6 +2106,8 @@ public sealed class Binder
         if (rebindTarget != null)
         {
             rebindTarget = InvalidateMutableFlowNarrowing(rebindTarget);
+            if (rebindTarget.StorageIdentity.IsLoopVariable)
+                ReportWriteToReadOnlyLocal(rebindTarget, bind.IdentifierSpan, "rebind {0}");
             if (!CanRebind(rebindTarget))
             {
                 _diagnostics.ReportError(
@@ -2196,6 +2199,7 @@ public sealed class Binder
             isTypeInferred: bind.TypeName is null,
             methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer),
             genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null);
+        variable.IsImmutableBinding = !bind.IsMutable && !bind.IsCollectionStatementForm; // #1550
 
         if (!_scope.TryDeclare(variable))
         {
@@ -5012,6 +5016,10 @@ public sealed class Binder
     private BoundUnaryExpression BindUnaryOperation(UnaryOperationNode unaryOp)
     {
         var operand = BindExpression(unaryOp.Operand);
+        if (unaryOp.Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement)
+            ReportWriteToReadOnlyLocal(operand, unaryOp.Operand.Span, "increment {0}");
+        else if (unaryOp.Operator is UnaryOperator.PreDecrement or UnaryOperator.PostDecrement)
+            ReportWriteToReadOnlyLocal(operand, unaryOp.Operand.Span, "decrement {0}");
         var resultType = unaryOp.Operator switch
         {
             UnaryOperator.Not => "BOOL",
@@ -6474,6 +6482,9 @@ public sealed class Binder
             {
                 bound[index] = BindExpression(arguments[index]);
                 reason = GetInvalidByReferenceReason(bound[index], modifier is "ref" or "out");
+                // #1550: ref/out keep parity with §ASSIGN (maintainer decision, 2026-10-11).
+                if (reason == null && modifier is "ref" or "out")
+                    ReportWriteToReadOnlyLocal(bound[index], arguments[index].Span, $"pass {{0}} as a '{modifier}' argument");
             }
             if (reason != null)
             {
@@ -7035,10 +7046,54 @@ public sealed class Binder
 
     private readonly HashSet<string> _unsupportedNodeTypes = new();
 
+    /// <summary>
+    /// #1550 (D1 RO-LV-1): refuses a write to an immutable <c>§B</c> binding or a <c>§L</c>
+    /// loop variable. Every write form reports here: <c>§ASSIGN</c>, compound assignment,
+    /// increment/decrement and a <c>ref</c>/<c>out</c> argument. Writes used to compile
+    /// silently (the C# local is not readonly). A mutable rebind (<c>§B{~i}</c>) of a loop
+    /// variable reports here too; a rebind of an immutable binding stays Calor0260.
+    /// </summary>
+    private void ReportWriteToReadOnlyLocal(BoundExpression target, Parsing.TextSpan span, string form)
+    {
+        if (target is BoundVariableExpression { Variable: var variable })
+            ReportWriteToReadOnlyLocal(variable, span, form);
+        else if (target is BoundTupleLiteral tuple) // #1550 review: `§ASSIGN (x, y) (2, 3)`
+            foreach (var element in tuple.Elements)
+                ReportWriteToReadOnlyLocal(element, element.Span, form);
+    }
+
+    private void ReportWriteToReadOnlyLocal(VariableSymbol variable, Parsing.TextSpan span, string form)
+    {
+        // A name the binder could not resolve may be a binding declared inside a §PP block.
+        if (variable.Id.IsNone && !variable.Name.Contains('.')
+            && LookupPreprocessorLocal(variable.Name) is { } preprocessorLocal)
+        {
+            if (preprocessorLocal != UnboundLocal.Writable)
+                ReportReadOnlyWrite(variable.Name, isLoopVariable: false, span, form);
+            return;
+        }
+        var storage = variable.StorageIdentity;
+        if (storage.IsLoopVariable)
+            ReportReadOnlyWrite(variable.Name, isLoopVariable: true, span, form);
+        else if (storage.IsImmutableBinding)
+            ReportReadOnlyWrite(variable.Name, isLoopVariable: false, span, form);
+    }
+
+    private void ReportReadOnlyWrite(string name, bool isLoopVariable, Parsing.TextSpan span, string form)
+    {
+        var what = form.Replace("{0}", $"'{name}'", StringComparison.Ordinal);
+        _diagnostics.ReportError(span, DiagnosticCode.WriteToReadOnlyLocal, isLoopVariable
+            ? $"Cannot {what}: it is a §L loop variable, which only the loop may update. " +
+              $"Copy it into a mutable binding (§B{{~name}} {name}) or use a §WH loop."
+            : $"Cannot {what}: it is an immutable binding. " +
+              $"Declare it mutable with a leading '~' (§B{{~{name}}} or §B{{~{name}:type}}).");
+    }
+
     private BoundAssignmentStatement BindAssignmentStatement(AssignmentStatementNode assign)
     {
         var target = BindExpression(assign.Target);
         var value = BindExpression(assign.Value);
+        ReportWriteToReadOnlyLocal(target, assign.Target.Span, "assign to {0}");
         if (target is BoundVariableExpression variable)
         {
             var restored = InvalidateMutableFlowNarrowing(variable.Variable);
@@ -7053,6 +7108,7 @@ public sealed class Binder
     {
         var target = BindExpression(compound.Target);
         var value = BindExpression(compound.Value);
+        ReportWriteToReadOnlyLocal(target, compound.Target.Span, "assign to {0}");
         return new BoundCompoundAssignment(compound.Span, target, compound.Operator, value);
     }
 
@@ -7171,8 +7227,168 @@ public sealed class Binder
         return new BoundUsingStatement(sync.Span, null, lockExpr, body);
     }
 
+    /// <summary>
+    /// #1550 review: a statement the binder does not bind (a preprocessor body, an event
+    /// subscription, an opaque statement such as <c>§PUSH</c> or <c>§EACHKV</c>) may still not
+    /// write a read-only local. Walks its subtree with its own lexical scopes: a name declared
+    /// inside the subtree is judged by that declaration (an immutable <c>§B</c> or a <c>§L</c>
+    /// variable stays read-only; anything else is writable), and any other name by the
+    /// enclosing scope.
+    /// </summary>
+    private BoundStatement? ScanUnboundWrites(StatementNode root)
+    {
+        ScanUnboundWrites(root, new Dictionary<string, UnboundLocal>(StringComparer.Ordinal));
+        if (root is PreprocessorDirectiveNode preprocessor)
+            RecordPreprocessorDeclarations(preprocessor);
+        return null;
+    }
+
+    /// <summary>
+    /// #1550 review round 3: <c>#if</c> opens no C# scope, so a binding declared at the top of a
+    /// <c>§PP</c> branch is visible to the statements after the block. The binder does not bind
+    /// the block, so it records the declared names here, per scope; a later write to one of them
+    /// is checked against the strictest branch (read-only if any branch declares it read-only).
+    /// </summary>
+    private readonly Dictionary<Scope, Dictionary<string, UnboundLocal>> _preprocessorLocals = new();
+
+    private void RecordPreprocessorDeclarations(PreprocessorDirectiveNode preprocessor)
+    {
+        if (!_preprocessorLocals.TryGetValue(_scope, out var declared))
+            _preprocessorLocals[_scope] = declared = new Dictionary<string, UnboundLocal>(StringComparer.Ordinal);
+        void Record(IEnumerable<StatementNode>? branch)
+        {
+            foreach (var statement in branch ?? [])
+            {
+                if (statement is PreprocessorDirectiveNode nested)
+                {
+                    Record(nested.Body);
+                    Record(nested.ElseBody);
+                }
+                else if (statement is BindStatementNode bind
+                         && !(bind.IsMutable && _scope.Lookup(bind.Name) is VariableSymbol))
+                {
+                    var kind = bind.IsMutable || bind.IsCollectionStatementForm ? UnboundLocal.Writable : UnboundLocal.Immutable;
+                    if (!declared.TryGetValue(bind.Name, out var existing) || existing == UnboundLocal.Writable)
+                        declared[bind.Name] = kind;
+                }
+            }
+        }
+        Record(preprocessor.Body);
+        Record(preprocessor.ElseBody);
+    }
+
+    private UnboundLocal? LookupPreprocessorLocal(string name)
+    {
+        for (var scope = _scope; scope != null; scope = scope.Parent)
+        {
+            if (_preprocessorLocals.TryGetValue(scope, out var declared) && declared.TryGetValue(name, out var kind))
+                return kind;
+        }
+        return null;
+    }
+
+    private enum UnboundLocal { Writable, Immutable, Loop }
+
+    private void ScanUnboundWrites(AstNode node, Dictionary<string, UnboundLocal> scope)
+    {
+        void Check(ExpressionNode target, string form)
+        {
+            if (target is TupleLiteralNode tuple)
+            {
+                foreach (var element in tuple.Elements)
+                    Check(element, form);
+                return;
+            }
+            if (target is not ReferenceNode reference)
+                return;
+            if (scope.TryGetValue(reference.Name, out var local))
+            {
+                if (local != UnboundLocal.Writable)
+                    ReportReadOnlyWrite(reference.Name, local == UnboundLocal.Loop, target.Span, form);
+            }
+            else if (_scope.Lookup(reference.Name) is VariableSymbol variable)
+            {
+                ReportWriteToReadOnlyLocal(variable, target.Span, form);
+            }
+            else if (LookupPreprocessorLocal(reference.Name) is UnboundLocal.Immutable)
+            {
+                ReportReadOnlyWrite(reference.Name, isLoopVariable: false, target.Span, form);
+            }
+        }
+
+        void CheckArguments(IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? modifiers)
+        {
+            for (var index = 0; modifiers != null && index < arguments.Count && index < modifiers.Count; index++)
+            {
+                if (modifiers[index] is "ref" or "out")
+                    Check(arguments[index], $"pass {{0}} as a '{modifiers[index]}' argument");
+            }
+        }
+
+        var childScope = new Dictionary<string, UnboundLocal>(scope, StringComparer.Ordinal);
+        switch (node)
+        {
+            case AssignmentStatementNode assign: Check(assign.Target, "assign to {0}"); break;
+            case CompoundAssignmentStatementNode compound: Check(compound.Target, "assign to {0}"); break;
+            case UnaryOperationNode { Operator: UnaryOperator.PreIncrement or UnaryOperator.PostIncrement } inc:
+                Check(inc.Operand, "increment {0}"); break;
+            case UnaryOperationNode { Operator: UnaryOperator.PreDecrement or UnaryOperator.PostDecrement } dec:
+                Check(dec.Operand, "decrement {0}"); break;
+            case CallStatementNode call: CheckArguments(call.Arguments, call.ArgumentModifiers); break;
+            case CallExpressionNode call: CheckArguments(call.Arguments, call.ArgumentModifiers); break;
+            case ForStatementNode loop: childScope[loop.VariableName] = UnboundLocal.Loop; break;
+            case ForeachStatementNode each: childScope[each.VariableName] = UnboundLocal.Writable; break;
+            case DictionaryForeachNode each:
+                childScope[each.KeyName] = UnboundLocal.Writable;
+                childScope[each.ValueName] = UnboundLocal.Writable;
+                break;
+            case CatchClauseNode { VariableName: { } caught }: childScope[caught] = UnboundLocal.Writable; break;
+            case LambdaExpressionNode lambda:
+                foreach (var parameter in lambda.Parameters)
+                    childScope[parameter.Name] = UnboundLocal.Writable;
+                break;
+        }
+
+        // Each child property (a then-branch, an else-branch, a body) is its own scope.
+        var baseScope = childScope;
+        System.Reflection.PropertyInfo? currentProperty = null;
+        foreach (var (child, property) in Analysis.RecursiveAstWalker.GetAllChildEdges(node))
+        {
+            if (!Equals(property, currentProperty))
+            {
+                currentProperty = property;
+                childScope = new Dictionary<string, UnboundLocal>(baseScope, StringComparer.Ordinal);
+            }
+            ScanUnboundWrites(child, childScope);
+            // A declaration is visible to the siblings after it, in the scope that holds them.
+            switch (child)
+            {
+                case BindStatementNode { IsMutable: true } rebind
+                    when childScope.ContainsKey(rebind.Name) || _scope.Lookup(rebind.Name) is VariableSymbol:
+                    if (childScope.TryGetValue(rebind.Name, out var local))
+                    {
+                        if (local != UnboundLocal.Writable)
+                            ReportReadOnlyWrite(rebind.Name, local == UnboundLocal.Loop, rebind.IdentifierSpan, "rebind {0}");
+                    }
+                    else if (_scope.Lookup(rebind.Name) is VariableSymbol outer)
+                    {
+                        ReportWriteToReadOnlyLocal(outer, rebind.IdentifierSpan, "rebind {0}");
+                    }
+                    break;
+                case BindStatementNode bind:
+                    childScope[bind.Name] = bind.IsMutable || bind.IsCollectionStatementForm
+                        ? UnboundLocal.Writable : UnboundLocal.Immutable;
+                    break;
+                case IsPatternNode { VariableName: { } pattern }:
+                    childScope[pattern] = UnboundLocal.Writable;
+                    break;
+            }
+        }
+    }
+
     private BoundStatement BindUnsupportedStatement(StatementNode stmt)
     {
+        ScanUnboundWrites(stmt); // #1550 review
         var typeName = stmt.GetType().Name;
         if (_unsupportedNodeTypes.Add(typeName))
         {

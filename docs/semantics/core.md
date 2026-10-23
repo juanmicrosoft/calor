@@ -454,7 +454,7 @@ By default, bindings are immutable:
 
 ```calor
 §B{x:i32} 42
-§ASSIGN x 43             // ERROR: x is immutable
+§ASSIGN x 43             // ERROR Calor0213: x is immutable
 ```
 
 Mutable bindings require explicit declaration:
@@ -494,9 +494,12 @@ Mutable bindings require explicit declaration:
 
 | Code | Name | Description |
 |------|------|-------------|
+| Calor0122 | UnknownVisibility | Visibility slot holds a word that is not a visibility (parser) |
+| Calor0123 | TypeFirstBindingHeader | `§B{W:t}` spelled type-first but read name-first (parser) |
 | Calor0200 | UndefinedReference | Reference to undefined symbol |
 | Calor0201 | DuplicateDefinition | Symbol already defined |
 | Calor0202 | TypeMismatch | Type incompatibility |
+| Calor0213 | WriteToReadOnlyLocal | Write (`§ASSIGN`, compound, inc/dec, `ref`/`out`) to an immutable `§B` binding or a `§L` loop variable |
 | Calor0300 | InvalidPrecondition | Malformed REQUIRES |
 | Calor0301 | InvalidPostcondition | Malformed ENSURES |
 | Calor0302 | ContractViolation | Runtime contract failure |

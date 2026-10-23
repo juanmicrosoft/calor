@@ -55,11 +55,6 @@ public class ShadowingDifferentialTests
             "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
             "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
             "    §IF{i2} (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n" },
-        // Mutable §B rebinding a §L for-loop variable — the loop var IS reassignable,
-        // so both pass and emitter treat it as `i = 9;` (valid), not a re-declaration (#732).
-        new object[] { "for-loop-var-rebind",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~s} 0\n" +
-            "    §L{l1:i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" },
         // Mutable §B rebinding a parameter — parameters are reassignable, so `x = 9;`.
         new object[] { "parameter-rebind",
             "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n    §B{~x:i32} 9\n    §R x\n" },
@@ -122,6 +117,12 @@ public class ShadowingDifferentialTests
         // §ASSIGN, not a fresh same-name §B.)
         new object[] { "same-scope-duplicate",
             "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n" },
+        // Mutable §B rebinding a §L for-loop variable (#1550): a §L loop variable is
+        // read-only in Calor (only the loop advances it), so `i = 9;` is Calor0213. Before
+        // 0.27 this was accepted and silently changed the iteration.
+        new object[] { "for-loop-var-rebind",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~s} 0\n" +
+            "    §L{l1:i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" },
     };
 
     [Theory]

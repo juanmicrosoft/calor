@@ -4537,7 +4537,33 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             csharpAttrs);
     }
 
+    /// <summary>
+    /// #1550: a body's own reassigned locals decide which of its bindings are mutable. Accessor and
+    /// operator bodies used to inherit the set of whichever method was converted last, so a getter
+    /// that reassigns a local (`var m = x; m = m.Where(p);`) emitted an immutable binding that the
+    /// binder now rejects (Calor0213). The set is widened for the body and restored after it.
+    /// </summary>
+    private IReadOnlyList<StatementNode> WithBodyReassignments(SyntaxNode? body, Func<IReadOnlyList<StatementNode>> convert)
+    {
+        if (body == null)
+            return convert();
+        var saved = _reassignedVariables;
+        _reassignedVariables = new HashSet<string>(saved);
+        _reassignedVariables.UnionWith(CollectReassignedVariables(body));
+        try
+        {
+            return convert();
+        }
+        finally
+        {
+            _reassignedVariables = saved;
+        }
+    }
+
     private IReadOnlyList<StatementNode> ConvertAccessorBody(AccessorDeclarationSyntax accessor)
+        => WithBodyReassignments(accessor, () => ConvertAccessorBodyCore(accessor));
+
+    private IReadOnlyList<StatementNode> ConvertAccessorBodyCore(AccessorDeclarationSyntax accessor)
     {
         if (accessor.Body != null)
         {
@@ -4693,6 +4719,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     private IReadOnlyList<StatementNode> ConvertMethodBody(BlockSyntax? body, ArrowExpressionClauseSyntax? expressionBody)
+        => WithBodyReassignments((SyntaxNode?)body ?? expressionBody, () => ConvertMethodBodyCore(body, expressionBody));
+
+    private IReadOnlyList<StatementNode> ConvertMethodBodyCore(BlockSyntax? body, ArrowExpressionClauseSyntax? expressionBody)
     {
         if (body != null)
         {
@@ -8343,13 +8372,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         foreach (var unary in scope.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>())
         {
-            if (unary.Operand is IdentifierNameSyntax id)
-                reassigned.Add(id.Identifier.ValueText);
+            // #1550 review: `(x)++` writes x too; AssignedLocalNames unwraps the parentheses.
+            foreach (var name in AssignedLocalNames(unary.Operand))
+                reassigned.Add(name);
         }
         foreach (var unary in scope.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>())
         {
             if (unary.Operand is IdentifierNameSyntax id)
                 reassigned.Add(id.Identifier.ValueText);
+            else if (unary.IsKind(SyntaxKind.PreIncrementExpression) || unary.IsKind(SyntaxKind.PreDecrementExpression))
+                foreach (var name in AssignedLocalNames(unary.Operand))
+                    reassigned.Add(name);
         }
         foreach (var argument in scope.DescendantNodes().OfType<ArgumentSyntax>())
         {
@@ -14663,7 +14696,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (lambda.Body is BlockSyntax block)
         {
-            stmtBody = ConvertBlock(block).ToList();
+            stmtBody = WithBodyReassignments(block, () => ConvertBlock(block)).ToList(); // #1550 review round 3
         }
 
         return new LambdaExpressionNode(
@@ -14705,7 +14738,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<StatementNode>? stmtBody = null;
         if (anonMethod.Body is BlockSyntax block)
         {
-            stmtBody = ConvertBlock(block).ToList();
+            stmtBody = WithBodyReassignments(block, () => ConvertBlock(block)).ToList(); // #1550 review round 3
         }
 
         return new LambdaExpressionNode(

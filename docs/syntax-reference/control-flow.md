@@ -87,7 +87,7 @@ integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
 
 **Simple countdown:**
 ```
-§B{i} 10
+§B{~i} 10
 §WH{while1} (> i 0)
   §P i
   §ASSIGN i (- i 1)
@@ -95,7 +95,7 @@ integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
 
 **Read until done:**
 ```
-§B{running} true
+§B{~running} true
 §WH{while1} running
   §B{input} §C{Console.ReadLine} §/C
   §IF{if1} (== input "quit")
@@ -125,7 +125,7 @@ The loop variable must be declared MUTABLE (`§B{~name:type}`) and updated with 
 
 **Execute at least once:**
 ```
-§B{i} 0
+§B{~i} 0
 §DO{do1}
   §P i
   §ASSIGN i (+ i 1)
@@ -186,7 +186,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 
 **Sum all values:**
 ```
-§B{total} 0
+§B{~total} 0
 §EACHKV{e1:k:v} scores
   §ASSIGN total (+ total v)
 ```

@@ -169,6 +169,13 @@ public sealed class BindStatementNode : StatementNode
     public AttributeCollection Attributes { get; }
 
     /// <summary>
+    /// #1550: the declaration is a statement-form collection (<c>§LIST{xs:i32}</c>,
+    /// <c>§ARR</c>, <c>§DICT</c>, <c>§SET</c>) rather than a <c>§B</c>. That form has no
+    /// mutability marker, so it is not an immutable binding and may be reassigned.
+    /// </summary>
+    public bool IsCollectionStatementForm { get; init; }
+
+    /// <summary>
     /// Optional effect row annotating the bound type, written same-line-adjacent to
     /// the header group: <c>§B{f:Func&lt;i32,i32&gt;} §E{cw} &lt;init&gt;</c>.
     /// Position 7 of docs/design/effect-rows-in-the-type-system.md §3.3. A <c>§E</c>
