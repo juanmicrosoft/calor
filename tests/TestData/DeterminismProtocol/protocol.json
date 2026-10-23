@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.8.0",
+  "protocolVersion": "1.9.0",
   "status": "REGISTERED",
   "cases": {
     "registry": "tests/TestData/DeterminismProtocol/cases.json",
@@ -170,7 +170,7 @@
     {
       "id": "osx-arm64",
       "rid": "osx-arm64",
-      "runner": "macos-14",
+      "runner": "macos-15",
       "runnerOs": "macOS",
       "runnerArch": "ARM64",
       "logicalProcessors": 3,
@@ -510,6 +510,14 @@
         "timestampUtc": "2026-10-22T00:00:00Z",
         "afterDecisionBearingExecution": true,
         "justification": "0.26 release contract (#1548, epic #1591): the packet moves to tests/TestData/DeterminismProtocol/ as an ordinary input, and the evidence tree is archived on branch evidence/archive-2026-10. Removed: the freeze (D001), the 0.24 evidence-contract link (D002, the contract rows of D003, the inventory check of D010), the compute budget, execution limits, release epoch, candidate and merge-commit bindings and the ledger (D008 and the plan step; the plan step keeps its run-history guards: one execution per commit, no reused execution id, no second execution while one is unfinished, and a change outside docs/ after a failed execution), the hash freeze of the packet and harness (D015), and main's copy of the validator. The workflow part digests and the shard-step script hashes stay as structural pins: they catch a negated, skipped or masked command that the other checks do not; a reviewed change updates them. The epoch's 70-minute osx-arm64 job timeout becomes the registered one. Kept: every case, cell, artifact, profile, environment, attempt count, determinism row, gate, agreement rule, decider and record format, the structural checks D003-D007 and D009-D014, and D016's weakening check."
+      },
+      {
+        "version": "1.9.0",
+        "pr": 0,
+        "issue": 0,
+        "timestampUtc": "2026-10-23T00:00:00Z",
+        "afterDecisionBearingExecution": true,
+        "justification": "GitHub retires the macos-14 runner image on 2026-11-02 (actions/runner-images#13518). The osx-arm64 environment's runner label moves from macos-14 to macos-15, the same hosted ARM64 class (3 logical processors, 7 GiB), so logicalProcessors, memoryGiB, runnerOs and runnerArch are unchanged. No shard-step script changes, so no scriptSha256 is re-pinned. Kept: every case, cell, artifact, profile, environment, attempt count, timeout, determinism row, gate, agreement rule, decider and record format. Records from earlier executions name macos-14 in their image fields; a disagreement is still never excused by an image change."
       }
     ]
   },

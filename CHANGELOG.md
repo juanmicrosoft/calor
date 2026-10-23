@@ -17,6 +17,16 @@ All notable changes to this project will be documented in this file.
   the sweep still builds and that the fixture covers every case. `main` passes today: 0
   findings, and 4 of 710 cases time out. (#1589)
 
+### Release process
+
+- **macOS CI jobs moved from `macos-14` to `macos-15`.** GitHub retires the `macos-14` runner
+  image on 2026-11-02. Five osx-arm64 jobs moved: three in pull-request CI (the packaged SDK
+  consumer, the CLI tool consumer and the Z3 test-host matrix) and two release-only ones (the
+  release SDK consumer and the post-publish install check). Both images are ARM64 with 3 CPUs
+  and 7 GB of memory, so nothing else changed. The determinism protocol's osx-arm64 environment
+  (the runner its dispatch-only workflow uses) moved too, as protocol 1.9.0. A new test fails if any workflow names a macOS
+  image other than `macos-15`. The release-only jobs first run on the next release dry run.
+
 ## [0.26.0] - 2026-10-23
 
 Calor 0.26 has three C# → Calor converter fixes, and one of them fixes a silent behavior
