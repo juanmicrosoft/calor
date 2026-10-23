@@ -318,16 +318,28 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         status.StartsWith("oracle-", StringComparison.Ordinal) || status.StartsWith("candidate-build-", StringComparison.Ordinal)
         || status is "swap-build-failed" or "calor-compile-failed";
 
-    /// <summary>A failure's identity for baselines: status, checkpoint, and the diagnostic codes and exception types in
-    /// its detail (paths and timings are left out, so the same failure keeps its fingerprint).</summary>
+    /// <summary>
+    /// A failure's identity for baselines: status, checkpoint, exit code (<c>exit N</c> or <c>dotnet build failed (N)</c>),
+    /// and the failure detail with volatile tokens normalized away (absolute paths, line/column positions, hex hashes,
+    /// GUIDs, durations), so the same failure keeps its fingerprint across machines while two different errors with the
+    /// same code (CS0103 for <c>Foo</c> and for <c>Bar</c>) do not alias.
+    /// </summary>
     internal static string FailureFingerprint(OracleFileReport file)
     {
         var detail = file.Detail ?? "";
-        var codes = System.Text.RegularExpressions.Regex.Matches(detail, @"\b(?:CS|MSB|NU|NETSDK|Calor)\d{4}\b").Select(m => m.Value);
-        var exceptions = System.Text.RegularExpressions.Regex.Matches(detail, @"\b[A-Z][A-Za-z0-9]*Exception\b").Select(m => m.Value);
-        var exit = System.Text.RegularExpressions.Regex.Match(detail, @"\bexit -?\d+").Value;
-        return MemberDifferentialOracle.Hash(string.Join("\u0001", [file.Status, file.Checkpoint ?? "", exit,
-            .. codes.Concat(exceptions).Distinct().Order(StringComparer.Ordinal)]));
+        var exit = System.Text.RegularExpressions.Regex.Match(detail, @"\bexit -?\d+|dotnet build failed \(-?\d+\)").Value;
+        return MemberDifferentialOracle.Hash(string.Join("\u0001", file.Status, file.Checkpoint ?? "", exit, NormalizeFailure(detail)));
+    }
+
+    internal static string NormalizeFailure(string detail)
+    {
+        var s = System.Text.RegularExpressions.Regex.Replace(detail, @"(?:[A-Za-z]:)?(?:[/\\][^\s:()'""\[\]]+)+", "<path>");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\(\d+,\d+(?:,\d+,\d+)?\)", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", "<guid>");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b[0-9a-f]{12,}\b", "<hex>");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b\d+(?:\.\d+)?\s*(?:ms|s)\b", "<time>");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
+        return s.Trim();
     }
 
     /// <summary>Member comparisons a file made: AGREE, DIFFERENT, and TIMEOUT / NONDETERMINISTIC with a compared prefix.</summary>

@@ -15,10 +15,12 @@ namespace Calor.RoundTrip.Harness.Oracle;
 /// one build is a difference.
 ///
 /// <para>Each build runs twice, every run in a fresh collectible load context, in the order original,
-/// converted, original, converted, so each run starts from clean static state. An input is compared only
-/// when both builds reproduce it on re-run; the member is NONDETERMINISTIC only when no stable input
-/// differs. An input whose setup (receiver, arguments) or observation failed identically on both builds, or
-/// whose observation is incomplete on both, is not counted as compared.</para>
+/// converted, original, converted, so each run starts from clean static state. Each observation has named
+/// parts (result, args, this, statics, project, stdout, files), compared one by one: a part counts only when
+/// both builds reproduce it on re-run, and a nondeterministic part is set aside alone, so it never hides a
+/// stable difference in another part. The member is NONDETERMINISTIC only when no part of any input was
+/// reproducible. A setup (receiver, arguments) or observation failure identical on both builds, or a part
+/// rendered incompletely on both, is not counted as compared.</para>
 ///
 /// <para>A member input that times out or crashes is handled by restarting with the member limited to the
 /// inputs before it, so every run executes the same inputs in the same order; the failing input is then
@@ -116,8 +118,55 @@ public static partial class MemberDifferentialOracle
         Witnesses = [witness], Fingerprint = Hash("SURFACE\u0001" + m.Key + "\u0001" + witness),
     };
 
-    private static bool NotEvidence(string a, string b) =>
-        a == b && (a.StartsWith(SetupFailed, StringComparison.Ordinal) || StateRenderer.IsIncompleteObservation(a));
+    /// <summary>Separates an observation's parts; a part name never contains the separators.</summary>
+    internal const char PartSeparator = '\u001e', NameSeparator = '\u001f';
+
+    /// <summary>The named parts of one observation: result, args, this, statics, project, stdout, files (or setup).</summary>
+    internal static Dictionary<string, string> Parts(string observation)
+    {
+        var parts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var part in observation.Split(PartSeparator))
+        {
+            var cut = part.IndexOf(NameSeparator);
+            parts[cut < 0 ? "observation" : part[..cut]] = cut < 0 ? part : part[(cut + 1)..];
+        }
+        return parts;
+    }
+
+    /// <summary>
+    /// Compares one input's observations part by part. A part counts when it is stable (each build reproduces it on
+    /// re-run); a stable part that differs between the builds is a difference, whatever the other parts do. An unstable
+    /// part is set aside alone, so nondeterminism in one part (a <c>Guid.NewGuid()</c> static, say) never hides a stable
+    /// difference in another. An input counts as compared when its primary part (the member's result, or a type's
+    /// statics) is reproducible and complete on both builds; a setup failure identical on both builds is not evidence.
+    /// </summary>
+    internal static (List<(string Part, string A, string B)> Differing, List<string> Unstable, bool Compared) CompareParts(
+        string a1, string a2, string b1, string b2)
+    {
+        var (pa1, pa2, pb1, pb2) = (Parts(a1), Parts(a2), Parts(b1), Parts(b2));
+        var differing = new List<(string, string, string)>();
+        var unstable = new List<string>();
+        var compared = false;
+        // The member's own outcome: it must be reproducible and complete for the input to count as compared (other parts,
+        // such as an empty stdout, are always stable and prove nothing on their own).
+        var all = new[] { pa1, pa2, pb1, pb2 };
+        var primary = all.Any(d => d.ContainsKey("result")) ? "result" : all.Any(d => d.ContainsKey("statics")) ? "statics" : null;
+        foreach (var name in all.SelectMany(d => d.Keys).Distinct().Order(StringComparer.Ordinal))
+        {
+            string V(Dictionary<string, string> d) => d.TryGetValue(name, out var v) ? v : "<absent>";
+            var (x1, x2, y1, y2) = (V(pa1), V(pa2), V(pb1), V(pb2));
+            if (x1 != x2 || y1 != y2)
+            {
+                unstable.Add(name);
+                continue;
+            }
+            if (x1 != y1)
+                differing.Add((name, x1, y1));
+            else if (name == primary && !StateRenderer.IsIncompleteObservation(x1))
+                compared = true;
+        }
+        return (differing, unstable, compared || differing.Count > 0);
+    }
 
     /// <summary>The verdict for one member from its four runs (original 1, converted 1, original 2, converted 2).</summary>
     private static MemberVerdict Judge(PlannedMember member, MemberRun[] r, int? limitedAt, OracleOptions options)
@@ -125,41 +174,56 @@ public static partial class MemberDifferentialOracle
         var verdict = new MemberVerdict { Type = member.Type, Member = member.Member, Kind = member.Kind, Status = MemberStatus.Agree, LimitedAt = limitedAt };
         var n = r.Min(x => x.Completed);
         var (a1, b1, a2, b2) = (r[0].Observations, r[1].Observations, r[2].Observations, r[3].Observations);
-        var stable = Enumerable.Range(0, n).Where(i => a1[i] == a2[i] && b1[i] == b2[i]).ToList();
-        var executed = stable.Where(i => !NotEvidence(a1[i], b1[i])).ToList();
-        var differing = executed.Where(i => a1[i] != b1[i])
-            .Select(i => (Label: MemberOracleInputs.Render(member.Inputs[i]), A: a1[i], B: b1[i])).ToList();
+        var differing = new List<(string Label, string A, string B)>();
+        var unstableParts = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        (string Label, string Part, string X, string Y)? firstUnstable = null;
+        var executed = 0;
+        for (var i = 0; i < n; i++)
+        {
+            var label = MemberOracleInputs.Render(member.Inputs[i]);
+            var (diff, unstable, compared) = CompareParts(a1[i], a2[i], b1[i], b2[i]);
+            differing.AddRange(diff.Select(d => ($"{label} [{d.Part}]", d.A, d.B)));
+            foreach (var part in unstable)
+            {
+                unstableParts[part] = unstableParts.GetValueOrDefault(part) + 1;
+                if (firstUnstable is null)
+                {
+                    var (x1, x2) = (Parts(a1[i]).GetValueOrDefault(part, "<absent>"), Parts(a2[i]).GetValueOrDefault(part, "<absent>"));
+                    firstUnstable = x1 != x2 ? ($"{label} [{part}]", part, x1, x2)
+                        : ($"{label} [{part}]", part, Parts(b1[i]).GetValueOrDefault(part, "<absent>"), Parts(b2[i]).GetValueOrDefault(part, "<absent>"));
+                }
+            }
+            if (compared)
+                executed++;
+        }
+        var unstableNote = unstableParts.Count == 0 ? null
+            : "nondeterministic parts set aside: " + string.Join(", ", unstableParts.Select(kv => $"{kv.Key} on {kv.Value} input(s)"));
         if (differing.Count > 0)
         {
             return verdict with
             {
-                Status = MemberStatus.Different, Reason = "OBSERVATION", Inputs = executed.Count,
+                Status = MemberStatus.Different, Reason = "OBSERVATION" + (unstableNote is null ? "" : "; " + unstableNote), Inputs = executed,
                 Witnesses = differing.Take(options.MaxWitnesses).Select(d => Witness(member.Member, d.Label, d.A, d.B, "original", "converted")).ToList(),
                 Fingerprint = Hash(string.Join("\u0000", differing.Select(d => $"{d.Label}\u0001{d.A}\u0002{d.B}"))),
             };
         }
-        var unstable = Enumerable.Range(0, n).Except(stable).ToList();
-        if (unstable.Count > 0)
+        if (executed == 0 && firstUnstable is { } u)
         {
-            var u = unstable[0];
-            var originalUnstable = a1[u] != a2[u];
             return verdict with
             {
-                Status = MemberStatus.Nondeterministic, Inputs = executed.Count,
-                Reason = $"a build disagreed with its own re-run on {unstable.Count} of {n} inputs; the {executed.Count} stable inputs agree",
-                Witnesses = [Witness(member.Member, MemberOracleInputs.Render(member.Inputs[u]), originalUnstable ? a1[u] : b1[u], originalUnstable ? a2[u] : b2[u], "run1", "run2")],
+                Status = MemberStatus.Nondeterministic, Inputs = 0,
+                Reason = $"no part of any input was reproducible on both builds ({unstableNote})",
+                Witnesses = [Witness(member.Member, u.Label, u.X, u.Y, "run1", "run2")],
             };
         }
-        var notRun = n - executed.Count;
         if (limitedAt is not null)
-            return verdict with { Status = MemberStatus.Timeout, Inputs = executed.Count, Reason = $"input {limitedAt} timed out or crashed; the {executed.Count} inputs before it agree" };
-        if (executed.Count == 0)
+            return verdict with { Status = MemberStatus.Timeout, Inputs = executed, Reason = $"input {limitedAt} timed out or crashed; the {executed} inputs before it agree" + (unstableNote is null ? "" : $" ({unstableNote})") };
+        if (executed == 0)
             return verdict with { Status = MemberStatus.Skipped, Reason = "no input could be compared: setup or observation failed, or the observation was incomplete, on both builds" };
-        return verdict with
-        {
-            Inputs = executed.Count,
-            Reason = notRun > 0 ? $"{notRun} of {n} inputs not compared (setup failed or observation incomplete on both builds)" : null,
-        };
+        var notRun = n - executed;
+        var notes = new[] { notRun > 0 ? $"{notRun} of {n} inputs not compared (setup failed or observation incomplete on both builds)" : null, unstableNote }
+            .Where(x => x is not null).ToList();
+        return verdict with { Inputs = executed, Reason = notes.Count == 0 ? null : string.Join("; ", notes) };
     }
 
     /// <summary>
@@ -191,7 +255,17 @@ public static partial class MemberDifferentialOracle
         var summary = $"original {Describe(original)}, converted {Describe(converted)}";
         if (original.Concat(converted).Any(p => p.Outcome == ProbeOutcome.Infrastructure))
             return ("infrastructure:" + summary, prefix with { Status = MemberStatus.Inconclusive, Reason = $"input {k}: a replay never reached the input ({summary})" });
-        bool Consistent(ProbeResult[] p) => p.All(x => x.Outcome == p[0].Outcome && (!x.Finished || x.Observation == p[0].Observation));
+        // A build's replays must reproduce their termination and their primary part (the member's result); other parts
+        // may be noisy (a Guid static) and are compared part by part below, so they neither block HANG/CRASH attribution
+        // nor hide a stable difference.
+        static string Primary(string? observation)
+        {
+            if (observation is null)
+                return "";
+            var parts = Parts(observation);
+            return parts.TryGetValue("result", out var r) ? r : parts.TryGetValue("statics", out var st) ? st : observation;
+        }
+        bool Consistent(ProbeResult[] p) => p.All(x => x.Outcome == p[0].Outcome && (!x.Finished || Primary(x.Observation) == Primary(p[0].Observation)));
         if (!Consistent(original) || !Consistent(converted))
             return ("nondeterministic:" + summary, prefix with { Status = MemberStatus.Nondeterministic, Reason = $"input {k} timed out or crashed, and its replays disagree ({summary})" });
         var quick = options.MemberTimeout.TotalSeconds / 4;
@@ -208,12 +282,12 @@ public static partial class MemberDifferentialOracle
                 Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
             });
         }
-        if (o.Finished && c.Finished && o.Observation != c.Observation)
-            return ($"differs:{Hash(o.Observation + "\u0002" + c.Observation)}", prefix with
+        if (o.Finished && c.Finished && CompareParts(o.Observation!, original[1].Observation!, c.Observation!, converted[1].Observation!).Differing is { Count: > 0 } parts)
+            return ($"differs:{Hash(string.Join("\u0000", parts.Select(d => $"{d.Part}\u0001{d.A}\u0002{d.B}")))}", prefix with
             {
                 Status = MemberStatus.Different, Reason = "OBSERVATION",
-                Witnesses = [Witness(prefix.Member, $"input #{k} (replayed from clean state)", o.Observation!, c.Observation!, "original", "converted")],
-                Fingerprint = Hash($"{k}\u0001{o.Observation}\u0002{c.Observation}"),
+                Witnesses = [.. parts.Take(options.MaxWitnesses).Select(d => Witness(prefix.Member, $"input #{k} [{d.Part}] (replayed from clean state)", d.A, d.B, "original", "converted"))],
+                Fingerprint = Hash($"{k}\u0001" + string.Join("\u0000", parts.Select(d => $"{d.Part}\u0001{d.A}\u0002{d.B}"))),
             });
         return (o.Finished && c.Finished ? "agrees" : $"both-fail:{o.Outcome}/{c.Outcome}", prefix with
         {

@@ -633,6 +633,58 @@ public class MemberOracleTests
         Assert.Contains("/private/var/x/=/_oracle/", SubjectBuild.PathMap("/var/x"), StringComparison.Ordinal);
     }
 
+    // ---- Capacity exception: part-wise comparison and failure fingerprints ------------------------
+
+    /// <summary>A nondeterministic public static (in every input's project part) never hides a stable return difference.</summary>
+    [Fact]
+    public void GuidStatic_DoesNotHideAStableReturnDifference()
+    {
+        const string guid = "public static class G { public static string Id => System.Guid.NewGuid().ToString(); } ";
+        var verdicts = Compare(guid + "public static class S { public static int F(int x) => x + 1; }",
+            guid + "public static class S { public static int F(int x) => x + 2; }", ["G", "S"]);
+        var f = Single(verdicts, "static F(System.Int32)->System.Int32");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Contains("[result]", f.Witnesses[0], StringComparison.Ordinal);
+        Assert.Contains("project", f.Reason, StringComparison.Ordinal);
+    }
+
+    /// <summary>The same project with no behavior change agrees, with the nondeterministic part set aside and reported.</summary>
+    [Fact]
+    public void GuidStatic_SetsAsideOnlyThatPart()
+    {
+        const string source = "public static class G { public static string Id => System.Guid.NewGuid().ToString(); } public static class S { public static int F(int x) => x + 1; }";
+        var f = Single(Compare(source, source, ["G", "S"]), "static F(System.Int32)->System.Int32");
+        Assert.Equal(MemberStatus.Agree, f.Status);
+        Assert.Contains("nondeterministic parts set aside: project", f.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompareParts_JudgesEachPartAlone()
+    {
+        static string Obs(string result, string project) =>
+            "result" + MemberDifferentialOracle.NameSeparator + result + MemberDifferentialOracle.PartSeparator + "project" + MemberDifferentialOracle.NameSeparator + project;
+        var (differing, unstable, compared) = MemberDifferentialOracle.CompareParts(Obs("1", "g1"), Obs("1", "g2"), Obs("2", "g3"), Obs("2", "g4"));
+        Assert.Equal(["result"], differing.Select(d => d.Part));
+        Assert.Equal(["project"], unstable);
+        Assert.True(compared);
+        var setup = "setup" + MemberDifferentialOracle.NameSeparator + "setup-failed(receiver: X)" + MemberDifferentialOracle.PartSeparator + "stdout" + MemberDifferentialOracle.NameSeparator + "\"\"";
+        Assert.False(MemberDifferentialOracle.CompareParts(setup, setup, setup, setup).Compared);
+    }
+
+    [Fact]
+    public void FailureFingerprint_UsesTheNormalizedMessage()
+    {
+        OracleFileReport Failure(string detail) => new() { File = "a.cs", Status = "candidate-build-failed", Detail = detail };
+        var foo = Failure("dotnet build failed (1): /tmp/w1/src/A.cs(3,9): error CS0103: The name 'Foo' does not exist in the current context");
+        var fooElsewhere = Failure("dotnet build failed (1): /var/x/worker-2/src/A.cs(17,4): error CS0103: The name 'Foo' does not exist in the current context");
+        var bar = Failure("dotnet build failed (1): /tmp/w1/src/A.cs(3,9): error CS0103: The name 'Bar' does not exist in the current context");
+        var otherExit = Failure("dotnet build failed (2): /tmp/w1/src/A.cs(3,9): error CS0103: The name 'Foo' does not exist in the current context");
+        Assert.Equal(OracleRunner.FailureFingerprint(foo), OracleRunner.FailureFingerprint(fooElsewhere));
+        Assert.NotEqual(OracleRunner.FailureFingerprint(foo), OracleRunner.FailureFingerprint(bar));
+        Assert.NotEqual(OracleRunner.FailureFingerprint(foo), OracleRunner.FailureFingerprint(otherExit));
+        Assert.DoesNotContain("/tmp", OracleRunner.NormalizeFailure(foo.Detail!), StringComparison.Ordinal);
+    }
+
     // ---- Codex round 2 false negatives --------------------------------------------------------
 
     [Fact]

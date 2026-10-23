@@ -140,50 +140,70 @@ public static partial class MemberDifferentialOracle
             : new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<replay timed out at earlier input {run.Completed}>");
     }
 
+    /// <summary>An observation under construction: one sink per named part, encoded in insertion order.</summary>
+    private sealed class ObservationParts
+    {
+        private readonly List<(string Name, StateRenderer.Sink Sink)> _parts = [];
+
+        public StateRenderer.Sink this[string name]
+        {
+            get
+            {
+                foreach (var (n, sink) in _parts)
+                    if (n == name)
+                        return sink;
+                var created = new StateRenderer.Sink();
+                _parts.Add((name, created));
+                return created;
+            }
+        }
+
+        public string Encode() => string.Join(PartSeparator, _parts.Select(p => p.Name + NameSeparator + p.Sink.Result()));
+    }
+
     /// <summary>One invocation on fresh arguments and (for instance members) a fresh receiver, then every project type's
-    /// public statics, so a change the call made anywhere in the project is part of this input's observation.</summary>
+    /// public statics, so a change the call made anywhere in the project is part of this input's observation. Each kind of
+    /// evidence is its own part, compared on its own.</summary>
     private static string Observe(Type type, PlannedMember member, MemberInfo? info, object?[] tuple, int depth, string sandbox,
         IReadOnlyDictionary<string, Type> types)
     {
         var stdout = new StringWriter(CultureInfo.InvariantCulture);
         Console.SetOut(stdout);
         Console.SetError(stdout);
-        var sink = new StateRenderer.Sink();
+        var parts = new ObservationParts();
         try
         {
-            ObserveInto(sink, type, member, info, tuple, depth);
-            sink.Append(" project=");
-            StateRenderer.AppendProjectStatics(sink, types, depth);
+            if (ObserveInto(parts, type, member, info, tuple, depth))
+                StateRenderer.AppendProjectStatics(parts["project"], types, depth);
         }
         catch (Exception ex)
         {
             // The oracle failed to observe (not the member): a structured setup failure, never agreement on its own.
             var inner = StateRenderer.Unwrap(ex);
-            sink = new StateRenderer.Sink();
-            sink.Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {inner.Message})");
+            parts = new ObservationParts();
+            parts["setup"].Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {inner.Message})");
         }
-        sink.Append(" stdout=");
-        StateRenderer.Append(sink, stdout.ToString(), 0);
+        StateRenderer.Append(parts["stdout"], stdout.ToString(), 0);
         var files = Directory.EnumerateFiles(sandbox, "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(sandbox, f) + "=" + Hash(Convert.ToBase64String(File.ReadAllBytes(f))))
             .Order(StringComparer.Ordinal).ToList();
         if (files.Count > 0)
-            sink.Append(" files=[" + string.Join(";", files) + "]");
-        return sink.Result();
+            parts["files"].Append(string.Join(";", files));
+        return parts.Encode();
     }
 
-    private static void ObserveInto(StateRenderer.Sink sb, Type type, PlannedMember member, MemberInfo? info, object?[] tuple, int depth)
+    /// <summary>Writes the member's parts; false when setup failed (the only part is then <c>setup</c>).</summary>
+    private static bool ObserveInto(ObservationParts parts, Type type, PlannedMember member, MemberInfo? info, object?[] tuple, int depth)
     {
         switch (member.Kind)
         {
             case "enum-values":
-                sb.Append(string.Join(",", Enum.GetNames(type).Zip(Enum.GetValuesAsUnderlyingType(type).Cast<object>(),
+                parts["result"].Append(string.Join(",", Enum.GetNames(type).Zip(Enum.GetValuesAsUnderlyingType(type).Cast<object>(),
                     (n, v) => n + "=" + Convert.ToString(v, CultureInfo.InvariantCulture))));
-                return;
+                return true;
             case "statics":
-                sb.Append("statics=");
-                StateRenderer.AppendStatics(sb, type, depth);
-                return;
+                StateRenderer.AppendStatics(parts["statics"], type, depth);
+                return true;
             case "construct":
             {
                 object?[] args;
@@ -193,31 +213,29 @@ public static partial class MemberDifferentialOracle
                 }
                 catch (Exception ex)
                 {
-                    sb.Append($"{SetupFailed}(args: {StateRenderer.Unwrap(ex).GetType().FullName})");
-                    return;
+                    parts["setup"].Append($"{SetupFailed}(args: {StateRenderer.Unwrap(ex).GetType().FullName})");
+                    return false;
                 }
                 try
                 {
                     var instance = info is ConstructorInfo ctor ? ctor.Invoke(args) : Activator.CreateInstance(type);
-                    sb.Append("state=");
-                    StateRenderer.Append(sb, instance, depth);
+                    parts["result"].Append("state=");
+                    StateRenderer.Append(parts["result"], instance, depth);
                 }
                 catch (Exception ex)
                 {
-                    sb.Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
+                    parts["result"].Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
                 }
                 // Arguments and static state are observed whether the constructor returned or threw.
-                sb.Append(" args=");
-                StateRenderer.Append(sb, args, depth);
-                sb.Append(" statics=");
-                StateRenderer.AppendStatics(sb, type, depth);
-                return;
+                StateRenderer.Append(parts["args"], args, depth);
+                StateRenderer.AppendStatics(parts["statics"], type, depth);
+                return true;
             }
         }
         if (info is not MethodInfo method)
         {
-            sb.Append("<member missing>");
-            return;
+            parts["result"].Append("<member missing>");
+            return true;
         }
         object? receiver = null;
         if (!method.IsStatic)
@@ -236,8 +254,8 @@ public static partial class MemberDifferentialOracle
             }
             catch (Exception ex)
             {
-                sb.Append($"{SetupFailed}(receiver: {StateRenderer.Unwrap(ex).GetType().FullName})");
-                return;
+                parts["setup"].Append($"{SetupFailed}(receiver: {StateRenderer.Unwrap(ex).GetType().FullName})");
+                return false;
             }
         }
         object?[] arguments;
@@ -247,30 +265,26 @@ public static partial class MemberDifferentialOracle
         }
         catch (Exception ex)
         {
-            sb.Append($"{SetupFailed}(args: {StateRenderer.Unwrap(ex).GetType().FullName})");
-            return;
+            parts["setup"].Append($"{SetupFailed}(args: {StateRenderer.Unwrap(ex).GetType().FullName})");
+            return false;
         }
         try
         {
             var returned = method.Invoke(receiver, arguments);
-            sb.Append("return=");
+            parts["result"].Append("return=");
             if (method.ReturnType == typeof(void))
-                sb.Append("void");
+                parts["result"].Append("void");
             else
-                StateRenderer.Append(sb, returned, depth);
+                StateRenderer.Append(parts["result"], returned, depth);
         }
         catch (Exception ex)
         {
-            sb.Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
+            parts["result"].Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
         }
-        sb.Append(" args=");
-        StateRenderer.Append(sb, arguments, depth);
+        StateRenderer.Append(parts["args"], arguments, depth);
         if (receiver is not null)
-        {
-            sb.Append(" this=");
-            StateRenderer.Append(sb, receiver, depth);
-        }
-        sb.Append(" statics=");
-        StateRenderer.AppendStatics(sb, type, depth);
+            StateRenderer.Append(parts["this"], receiver, depth);
+        StateRenderer.AppendStatics(parts["statics"], type, depth);
+        return true;
     }
 }
