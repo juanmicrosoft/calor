@@ -908,6 +908,26 @@ public static class FeatureSupport
                 "indexer or member targets) keep the statement as C# interop",
             Workaround = "Assign to the variable in its own statement, then use the variable"
         },
+        // #1633 / #1632: an assignment, ++ or -- whose evaluation order a hoist could change.
+        ["compound-assignment-order"] = new FeatureInfo
+        {
+            Name = "compound-assignment-order",
+            Support = SupportLevel.NotSupported,
+            Description = "Assignments, compound assignments, ++ and -- convert natively with C#'s order: the target's receiver and arguments run first and once, " +
+                "then a compound read, then the right-hand side. A receiver or argument that would run twice or after hoisted statements is bound to a temp. " +
+                "Shapes that cannot keep that order stay C# interop: a struct receiver that would need a temp, a postfix ++/-- whose hoist would pass an earlier read " +
+                "of the same variable or an earlier call, and a do-while condition, catch filter or switch-expression guard that would need hoisted statements",
+            Workaround = "Evaluate the receiver, index or right-hand side into a local in its own statement first"
+        },
+        // #1634: C# casts a compound result back to the target type (`b = (byte)(b + 10)`).
+        ["compound-assignment-narrowing"] = new FeatureInfo
+        {
+            Name = "compound-assignment-narrowing",
+            Support = SupportLevel.NotSupported,
+            Description = "A compound assignment or ++/-- whose result C# narrows implicitly converts with an explicit cast for built-in numeric and char targets. " +
+                "Other narrowed targets (a nullable small integer, for which Calor's cast would drop the ?) stay C# interop",
+            Workaround = "Write the assignment with an explicit cast, as in b = (byte)(b + 10)"
+        },
         // #1574 / #1573: Calor writes C#'s `default` and a member named @default the same way.
         ["default-member-collision"] = new FeatureInfo
         {

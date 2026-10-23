@@ -16,8 +16,12 @@ public class ConversionPathReportingTests : IDisposable
 {
     private const string Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
-    /// <summary>A label before the last statement: native output fails the C# round trip, so the library default refuses.</summary>
-    private const string TrailingLabel = "public class G { public int M(int x) { here: return x; } }";
+    /// <summary>
+    /// A private static property with accessor bodies: the native output fails the C# round trip
+    /// (CS0273/CS0274), so the library default refuses. #1632 fixed the previous stand-in, a label
+    /// before the last statement (`here: return x;`), whose statement the converter dropped.
+    /// </summary>
+    private const string TrailingLabel = "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }";
 
     private readonly string _tempDir = Directory.CreateTempSubdirectory("calor-f6-").FullName;
 
@@ -382,7 +386,7 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public void F6_REPORT_12_CliWebsiteExample_MatchesTheDocumentedOutput()
     {
-        const string counter = "public class Counter\n{\n    public int Next(int x)\n    {\n        done:\n        return x + 1;\n    }\n}\n";
+        const string counter = "public class Counter\n{\n    private static int count;\n    private static int Count { get { return count; } set { count = value; } }\n\n    public int Next() { Count = Count + 1; return Count; }\n}\n";
 
         var (exit, stdout, stderr) = CliNamed("Counter.cs", counter);
         Assert.True(exit == 0, stderr);
@@ -516,7 +520,7 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public async Task F6_REPORT_13_McpWebsiteExample_MatchesTheDocumentedPayload()
     {
-        const string source = "public class G { public int M(int x) { here: return x; } }";
+        const string source = "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }";
 
         var (ptError, ptPayload) = await Mcp("calor_convert", new { source, passthroughOnError = true });
         Assert.False(ptError);

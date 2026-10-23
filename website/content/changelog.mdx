@@ -60,6 +60,41 @@ All notable changes to Calor, organized by release.
   - The type checker does not visit class members (`§CL` methods), so these new errors do not
     fire there yet. Runtime guards still apply there.
 
+- **Compound assignments read their target before the right-hand side (#1633).** This was a
+  silent behavior change in 0.25.0 and 0.26.0. In `x += F().N();` the converter called `F()`
+  before it read `x`, so when `F()` changed `x` the converted code computed a different value
+  (12 instead of 3 in the issue's example). The converter now keeps C#'s order for every
+  compound operator (`+=` through `>>=`, and `??=`): it evaluates the target's receiver and
+  index first, once, then reads the target, then runs the right-hand side. Before, `a[I()] += 1`
+  and `a[I()]++` called `I()` twice. A receiver or index that would run twice or out of order is
+  bound to a temporary (`§B{_asgN}`). `x ??= v` no longer runs `v` when `x` is not null, and no
+  longer calls a property setter when nothing changes. A shape that cannot keep this order stays
+  C#, reported as the new `compound-assignment-order` loss.
+- **Hoisted statements stay inside the body they belong to (#1632).** The converter sometimes
+  moves part of an expression into a statement of its own ("hoists" it), for example the old
+  value in `x = Use(x++)`. Under an unbraced `if`/`else`, loop, `using`, `lock` or `fixed` body,
+  or in a switch section, that statement used to land before the enclosing statement. The
+  generated C# then failed to compile (CS0841) or ran the hoisted code once instead of on every
+  iteration. An unbraced body now converts as a block of its own. The same audit fixed six
+  related placement bugs:
+  - a labeled statement (`L: y += 5;`) was dropped, leaving only the label;
+  - a hoist from an `else if` condition ran before the whole `if` chain;
+  - a hoist from a `while` condition ran once, before the loop (it now runs before each test);
+  - the update of `x++` in an `if` condition ran only when the condition was true;
+  - `Use(x, x++)` passed the incremented `x` as the first argument;
+  - in `if (x < F())`, `F()` ran before `x` was read.
+
+  These now keep C#'s order, or the statement stays C#. A `do`-`while` condition, a `catch`
+  filter or a switch-expression guard that would need a hoist also stays C#.
+- **Compound assignments on small integer types compile (#1634).** `b += 10` on a `byte`
+  converted to `b = b + 10`, which fails with CS0266 because `b + 10` is an `int`. The round-trip
+  check caught it and kept the whole type as C#. The converter now writes the cast that C# applies
+  implicitly, `b = (byte)(b + 10)`, for every compound operator and for `++` and `--` on `byte`,
+  `sbyte`, `short`, `ushort` and `char`.
+  The cast follows the module's overflow setting (`unchecked` unless the project is compiled
+  `checked`), and `checked` blocks stay C#, so overflow behaves as in the original. A nullable
+  small integer (`byte? b; b += 1`) stays C#, reported as `compound-assignment-narrowing`.
+
 ### Testing
 
 - **The soundness sweep now runs against `main` every day.** The sweep is the 0.24 harness
