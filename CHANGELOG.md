@@ -121,6 +121,36 @@ what a program does.
   the `## [X.Y.Z]` section, and merges the release PR. The maintainer then dispatches
   `publish-nuget.yml`, first with `dry_run: true`. The skill no longer claims it creates the GitHub
   release; the workflow does that.
+- **The website deploy builds exactly the released commit, and checks it with `main`'s scripts
+  (#1585).** `publish-nuget` still starts the deploy after the release. The deploy fails unless
+  the release tag names the commit that was released and that commit is on `main`. It builds that
+  commit in its own checkout. The font check and the wording scan come from `main`, so redeploying
+  an older tag meets today's checks. The deploy no longer clones the full repository.
+- **Publishing benchmark results needs no release (#1585).** The benchmark headline is computed
+  from the committed B1 results (226 registered Calor/C# program pairs, 17 of them included) at a
+  `main` commit. So
+  the publication branch and pull request are now named after that commit, not the version in
+  `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks.
+- **The B1 registration and results files moved to `eng/benchmark-publication/b1-1276/` (#1585),**
+  byte for byte, so they survive when `docs/plans/evidence/` is archived. Their hash seals still
+  name the old paths, and the gate maps those names to the new location instead of rewriting
+  anything sealed. The gate's third input, the #1407 evidence contract, has not moved yet: a
+  hash-pinned determinism script reads it from `docs/plans/evidence/`.
+
+### Documentation
+
+- **A test now checks every converter support level the website states (#1585).** The
+  `calor feature-check` page and the C# interoperability guides say which C# features the
+  converter supports `Full`, `Partial` or `NotSupported`. A new test reads those claims and
+  compares each one with the converter's feature registry, `FeatureSupport`, which is what
+  `calor feature-check` prints. The test reads every page: tables, prose, the command's JSON
+  output in code blocks, and quoted converter warnings such as `Feature 'out-var' is partially
+  supported`. Today the pages make 18 such claims, and all 18 match. A wrong level or
+  an unknown feature name fails CI. So does a level word or a phrase such as "fully supported" in
+  a paragraph, list item or table row that names a feature, unless it is one of the forms the
+  test reads. Three passages that use these words in another sense are listed, each with a reason.
+  The page's list of known gaps between the registry and real converter behavior must match the
+  test's list, and each gap carries a reason.
 
 ## [0.25.0] - 2026-10-20
 

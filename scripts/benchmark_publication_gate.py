@@ -32,7 +32,7 @@ before the first-parent commit that landed results.json there, and still present
 Mentions of a hash in prose authorize nothing.
 
 Freshness (#1422 PR 2). The checked-out HEAD is the candidate (the workflow checks out the
-adjudicated candidate). It may publish while origin/main has moved on, but only if main changed
+dispatched commit). It may publish while origin/main has moved on, but only if main changed
 none of the headline's inputs since the candidate: the registered B1 packet and results packet,
 the contract that authorizes methods, the three seals and every file they name (B2-01), every
 registered pair file and the benchmark corpus, the
@@ -40,8 +40,15 @@ registered generator (tests/Calor.Evaluation), B1's C# validator files, and this
 (for example unrelated tests next to the validator) do not count. The written bytes are a function
 of the candidate alone: the comparison is with the headline published at the candidate, and the
 stamp index is the candidate's plus this entry. Nothing depends on the clock or on main's later
-state, so an adjudicated hash taken at the candidate matches a later publish-time run. Exit 2 is a
+state, so a hash taken at the candidate matches a later publish-time run. Exit 2 is a
 usage error.
+
+Location (#1585). The B1 registration and results packets live under eng/benchmark-publication/.
+They were sealed under docs/plans/evidence/b1-1276/, so their seals, the registration tree merged at
+the registration commit, and the recorded oracle commands still name those paths, byte for byte.
+RELOCATED maps each sealed name to where the files are now; nothing sealed was rewritten. The #1407
+contract stays in docs/plans/evidence/ for now: the G2 determinism harness (scripts/
+determinism_protocol.py, frozen by hash) reads it there, and CI runs main's copy of that harness.
 
   python3 scripts/benchmark_publication_gate.py check --commit <40-hex> --regenerated <dir>
 """
@@ -56,10 +63,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-REGISTRATION = "docs/plans/evidence/b1-1276/registration"
-RESULTS = "docs/plans/evidence/b1-1276/results"
+HOME = "eng/benchmark-publication"
+PACKET = f"{HOME}/b1-1276"
+REGISTRATION = f"{PACKET}/registration"
+RESULTS = f"{PACKET}/results"
 CONTRACT = "docs/plans/evidence/evidence-contract-1407/contract.json"
 CONTRACT_SEAL = "docs/plans/evidence/evidence-contract-1407/sha256.json"
+# #1585: the names the B1 packets were sealed and merged under. Seal keys, the registration
+# commit's tree, and commits before the move use them.
+SEALED_REGISTRATION = "docs/plans/evidence/b1-1276/registration"
+SEALED_RESULTS = "docs/plans/evidence/b1-1276/results"
+# Sealed directory -> current location.
+RELOCATED = ((SEALED_REGISTRATION, REGISTRATION), (SEALED_RESULTS, RESULTS))
 HEADLINE = "website/public/data/benchmark-headline.json"
 STAMP_INDEX = "bench/phase0-agent-native/commit-stamp-index.json"
 MAIN_REF = "refs/remotes/origin/main"
@@ -126,6 +141,30 @@ def key_sha256(key: dict) -> str:
     return sha256(canonical.encode("utf-8"))
 
 
+def current_path(relative: str) -> str:
+    """Where a file named by its sealed (pre-#1585) path lives now; other paths are unchanged."""
+    for sealed, now in RELOCATED:
+        if relative == sealed or relative.startswith(sealed + "/"):
+            return now + relative[len(sealed):]
+    return relative
+
+
+def sealed_path(relative: str) -> str:
+    """The pre-#1585 name of a relocated file or directory (other paths are unchanged)."""
+    for sealed, now in RELOCATED:
+        if relative == now or relative.startswith(now + "/"):
+            return sealed + relative[len(now):]
+    return relative
+
+
+def at(root: Path, rev: str, relative: str) -> str | None:
+    """The object id of a current path at rev, or of its sealed name when rev predates the move."""
+    found = git(root, "rev-parse", "--verify", "--quiet", f"{rev}:{relative}")
+    if found is None and sealed_path(relative) != relative:
+        found = git(root, "rev-parse", "--verify", "--quiet", f"{rev}:{sealed_path(relative)}")
+    return found
+
+
 def load(root: Path, relative: str):
     path = root / relative
     try:
@@ -157,11 +196,12 @@ def check_seals(root: Path, findings: list) -> None:
         if not files:
             findings.append(("B2-01", f"{seal_path} lists no files"))
         for relative, expected in sorted(files.items()):
-            path = root / relative
+            path = root / current_path(relative)
             actual = normalize(path.read_bytes()) if path.is_file() else "missing"
             if actual != expected:
-                findings.append(("B2-01", f"{relative} is {actual}, sealed as {expected} in {seal_path}"))
-    sealed = set(load(root, f"{RESULTS}/sha256.json").get("files") or {})
+                where = "" if current_path(relative) == relative else f" (now {current_path(relative)})"
+                findings.append(("B2-01", f"{relative}{where} is {actual}, sealed as {expected} in {seal_path}"))
+    sealed = {current_path(p) for p in load(root, f"{RESULTS}/sha256.json").get("files") or {}}
     present = {f"{RESULTS}/{p.name}" for p in (root / RESULTS).iterdir() if p.name != "sha256.json"}
     for name in ("results.json", "pair-manifest.json", "metrics-run-1.json", "metrics-run-2.json",
                  "oracle-run-1.json", "oracle-run-2.json"):
@@ -189,7 +229,8 @@ def check_registration_unchanged(root: Path, manifest: dict, prior: list, findin
                                   "prior amendment authorizes it"))
     if git(root, "merge-base", "--is-ancestor", commit, MAIN_REF) is None:
         findings.append(("B2-02", f"registration commit {commit} is not an ancestor of {MAIN_REF}"))
-    then, now = git(root, "rev-parse", f"{commit}:{REGISTRATION}"), git(root, "rev-parse", f"HEAD:{REGISTRATION}")
+    # The registration was merged under its sealed name; tree ids depend on content only.
+    then, now = at(root, commit, REGISTRATION), git(root, "rev-parse", f"HEAD:{REGISTRATION}")
     if then is None or then != now:
         findings.append(("B2-02", f"{REGISTRATION} at HEAD ({now}) is not the tree merged at {commit} ({then}); "
                                   "a changed registration is a #1407 amendment and a new run"))
@@ -260,11 +301,16 @@ def _authorizations(text: str | None) -> list:
 
 
 def results_landing(root: Path) -> str | None:
-    """The first-parent commit of origin/main that landed the current results.json bytes."""
+    """The first-parent commit of origin/main that landed the current results.json bytes.
+
+    The bytes are followed across the #1585 move: a commit that only moved results.json (its parent
+    had the same bytes under the sealed name) is not a landing, so the move does not restart the
+    amendment clock."""
     path = f"{RESULTS}/results.json"
     current = git(root, "rev-parse", f"HEAD:{path}")
-    for commit in (git(root, "log", "--first-parent", "--format=%H", MAIN_REF, "--", path) or "").split():
-        if git(root, "rev-parse", f"{commit}:{path}") == current and git(root, "rev-parse", f"{commit}^1:{path}") != current:
+    log = git(root, "log", "--first-parent", "--format=%H", MAIN_REF, "--", path, sealed_path(path)) or ""
+    for commit in log.split():
+        if at(root, commit, path) == current and at(root, f"{commit}^1", path) != current:
             return commit
     return None
 
@@ -349,8 +395,8 @@ def input_paths(root: Path) -> list:
         except (ValueError, AttributeError):
             files = {}
         for path in sorted(files) if isinstance(files, dict) else []:
-            if path not in paths:
-                paths.append(path)
+            if current_path(path) not in paths:
+                paths.append(current_path(path))
     try:
         pairs = json.loads(git(root, "show", f"HEAD:{REGISTRATION}/pairs.json") or "{}").get("pairs") or []
     except (ValueError, AttributeError):
@@ -454,7 +500,7 @@ def check_published(root: Path, key: dict, key_hash: str, amendments: list, metr
 
 def identity(root: Path, commit: str) -> dict:
     trees = {"/": git(root, "rev-parse", f"{commit}^{{tree}}", check=True)}
-    for path in ("src", "tests/Calor.Evaluation", "tests/TestData/Benchmarks", "docs/plans/evidence/b1-1276",
+    for path in ("src", "tests/Calor.Evaluation", "tests/TestData/Benchmarks", PACKET,
                  "scripts/benchmark_publication_gate.py"):
         trees[path] = git(root, "rev-parse", f"{commit}:{path}", check=True)
     contents = {}

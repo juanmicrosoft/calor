@@ -196,7 +196,7 @@ public class BenchmarkResultsTests
         results["results.json"] = summary.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
         var seals = new JsonObject();
         foreach (var name in results.Keys.Where(k => k != "sha256.json").Order(StringComparer.Ordinal))
-            seals[$"{EvidenceContractValidator.ResultsDir}/{name}"] = Sha(results[name]);
+            seals[$"{EvidenceContractValidator.SealedResultsDir}/{name}"] = Sha(results[name]);
         results["sha256.json"] = new JsonObject { ["algorithm"] = "sha256", ["files"] = seals }.ToJsonString();
         return results;
     }

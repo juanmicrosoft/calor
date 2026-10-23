@@ -15,7 +15,10 @@ from pathlib import Path
 
 CUTOFF = "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1"
 CORPUS = "tests/TestData/Benchmarks"
-PACKET = Path("docs/plans/evidence/b1-1276/registration")
+PACKET = Path("eng/benchmark-publication/b1-1276/registration")
+# #1585: the packet moved here from docs/plans/evidence/ with its bytes unchanged; its seal keys keep
+# the name it was sealed and merged under.
+SEALED_PACKET = "docs/plans/evidence/b1-1276/registration"
 DOC = "docs/plans/b1-1276-benchmark-registration.md"
 SCENARIO_EXCLUSION = "X1-scenario-variant"
 ORACLE_FILES = [
@@ -133,7 +136,7 @@ def build(root: Path) -> dict[str, str]:
     key["exclusionsSha256"] = sha(files["exclusions.json"].encode())
     files["registration.json"] = dump(registration)
 
-    hashed = {f"{PACKET.as_posix()}/{name}": sha(text.encode()) for name, text in sorted(files.items())}
+    hashed = {f"{SEALED_PACKET}/{name}": sha(text.encode()) for name, text in sorted(files.items())}
     hashed[DOC] = lf_sha(root / DOC)
     files["sha256.json"] = dump({"algorithm": "sha256", "normalization": "LF", "files": hashed})
     return files

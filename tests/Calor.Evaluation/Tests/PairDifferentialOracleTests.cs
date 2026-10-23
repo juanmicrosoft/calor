@@ -107,7 +107,7 @@ public class PairDifferentialOracleTests
     [Fact]
     public void PreflightRefusesAnotherCommitOrAMalformedSha()
     {
-        var registration = Path.Combine(PairOracleCommand.RepoRoot(AppContext.BaseDirectory), "docs/plans/evidence/b1-1276/registration");
+        var registration = Path.Combine(PairOracleCommand.RepoRoot(AppContext.BaseDirectory), "eng/benchmark-publication/b1-1276/registration");
         Assert.Contains("full 40-hex", PairOracleCommand.Preflight(registration, "72a0a855"), StringComparison.Ordinal);
         Assert.Contains("HEAD is not", PairOracleCommand.Preflight(registration, new string('0', 40)), StringComparison.Ordinal);
         // An untracked compilation unit at the right commit is still refused.

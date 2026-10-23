@@ -2,9 +2,11 @@
 name: Deploy Next.js to GitHub Pages
 
 # Runs only by dispatch from main, for a release tag whose commit is on main. publish-nuget
-# dispatches it after the packages are on nuget.org and the installed-tool check passed (#1582).
-# It builds the tagged commit, not the dispatch ref. There is no `release: created` trigger.
-# #1585 reworks this workflow further.
+# dispatches it after the packages are on nuget.org and the installed-tool check passed, and
+# passes the released commit; the tag must name exactly that commit (#1582, #1585). There is no
+# `release: created` trigger: releases created with GITHUB_TOKEN raise no `release` events.
+# It builds the tagged commit, not main, because main may document unreleased behavior. The site
+# checks (self-hosted fonts, forbidden wording) come from main, so an older tag meets today's checks.
 on:
   workflow_dispatch:
     inputs:
@@ -41,14 +43,20 @@ jobs:
           echo "::error::deploy only from main (got $GITHUB_REF)"
           exit 1
 
-      - name: Checkout full history
+      # Commit history only (no trees or blobs beyond main's scripts/): enough to resolve the
+      # tag and check that its commit is on main.
+      - name: Check out main's site checks
         uses: actions/checkout@v4
         with:
+          path: main
           fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: scripts
           persist-credentials: false
 
-      # The wording scan is main's copy, kept outside the work tree: an older tag may predate it.
-      - name: Check out the release tag (its commit must be on main)
+      - name: Resolve the release tag (its commit must be on main)
+        id: tag
+        working-directory: main
         env:
           TAG: ${{ inputs.tag }}
           EXPECTED: ${{ inputs.commit }}
@@ -60,39 +68,44 @@ jobs:
           if [ -n "$EXPECTED" ] && [ "$commit" != "$EXPECTED" ]; then
             echo "::error::$TAG names $commit, not the released commit $EXPECTED"; exit 1
           fi
-          cp scripts/release_checks.py "$RUNNER_TEMP/release_checks.py"
-          git checkout -q --detach "$commit"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the release tag's commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.commit }}
+          path: release
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: website/package-lock.json
+          cache-dependency-path: release/website/package-lock.json
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Install dependencies
-        working-directory: website
+        working-directory: release/website
         run: npm ci
 
       - name: Build
-        working-directory: website
+        working-directory: release/website
         run: npm run build
 
       - name: Check the site serves only self-hosted fonts (#1548)
-        run: python3 scripts/check_website_fonts.py --out website/out
+        run: python3 main/scripts/check_website_fonts.py --website release/website --out release/website/out
 
-      # Formerly gate code G012: the built site must not claim the release evidence was
-      # independently adjudicated or verified.
+      # The built site must not claim the release was independently adjudicated or verified.
       - name: Scan the built site for forbidden wording
-        run: python3 "$RUNNER_TEMP/release_checks.py" wording website/out
+        run: python3 main/scripts/release_checks.py wording release/website/out
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: website/out
+          path: release/website/out
 
   # Deployment job
   deploy:

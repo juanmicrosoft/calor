@@ -8,13 +8,16 @@ namespace Calor.Compiler.Tests.EvidenceContract;
 
 /// <summary>
 /// #1276 (0.24 B1) results: the dispositioned pair manifest and aggregate under
-/// <c>docs/plans/evidence/b1-1276/results/</c>, checked against the registration packet and the
+/// <c>eng/benchmark-publication/b1-1276/results/</c> (sealed as <c>docs/plans/evidence/b1-1276/results/</c>), checked against the registration packet and the
 /// committed raw oracle and metric runs. R codes: R001 seals, R002 manifest completeness, R003
 /// dispositions come from the valid reconciled oracle run, R004 inclusion, R005 the metric and key.
 /// </summary>
 internal static partial class EvidenceContractValidator
 {
-    public const string ResultsDir = "docs/plans/evidence/b1-1276/results";
+    public const string ResultsDir = "eng/benchmark-publication/b1-1276/results";
+
+    /// <summary>The name the results were sealed under; their seal keys use it.</summary>
+    public const string SealedResultsDir = "docs/plans/evidence/b1-1276/results";
 
     /// <summary>The main commit that merged the registration (PR #1473); the oracle ran at exactly this commit.</summary>
     public const string RegistrationMergeCommit = "f0e0eb682a8658364170ad49aff2d2c433d570f8";
@@ -42,12 +45,13 @@ internal static partial class EvidenceContractValidator
         var seals = JsonNode.Parse(results["sha256.json"])!["files"]?.AsObject();
         foreach (var name in results.Keys.Where(k => k != "sha256.json"))
         {
-            if (Str(seals?[$"{ResultsDir}/{name}"]) != RawSha256(results[name]))
+            if (Str(seals?[$"{SealedResultsDir}/{name}"]) != RawSha256(results[name]))
                 v.Add(new("R001", name, "sha256.json does not record this results file's SHA-256"));
         }
         foreach (var sealedName in seals?.Select(s => s.Key) ?? [])
         {
-            if (!results.ContainsKey(sealedName[(ResultsDir.Length + 1)..]))
+            if (!sealedName.StartsWith(SealedResultsDir + "/", StringComparison.Ordinal)
+                || !results.ContainsKey(sealedName[(SealedResultsDir.Length + 1)..]))
                 v.Add(new("R001", sealedName, "sealed file is missing"));
         }
 
@@ -149,7 +153,7 @@ internal static partial class EvidenceContractValidator
             || !Regex.IsMatch(Str(environment["metricRuns"]?["commit"]) ?? "", "^[0-9a-f]{40}$") || Bool(environment["metricRuns"]?["bitIdentical"]) != true
             || Array(environment["metricRuns"]?["exitCodes"]).Any(c => Int(c) != 0) || Array(environment["metricRuns"]?["exitCodes"]).Count != 2
             || Str(environment["machine"]?["oracleEnvironmentString"]) != Str(run2["environment"])
-            || new[] { "run1", "run2" }.Any(r => Str(environment["oracleRuns"]?[r]?["command"])?.Contains($"pair-oracle --registration {RegistrationDir} --registration-commit {RegistrationMergeCommit}", StringComparison.Ordinal) != true)
+            || new[] { "run1", "run2" }.Any(r => Str(environment["oracleRuns"]?[r]?["command"])?.Contains($"pair-oracle --registration {SealedRegistrationDir} --registration-commit {RegistrationMergeCommit}", StringComparison.Ordinal) != true)
             || Str(environment["oracleRuns"]?["run2"]?["command"])?.Contains("--compare-with", StringComparison.Ordinal) != true
             || Array(environment["metricRuns"]?["commands"]).Select(Str).FirstOrDefault()?.Contains("pair-metrics", StringComparison.Ordinal) != true
             || Str(environment["oracleRuns"]?["run1"]?["output"]) != "oracle-run-1.json" || Str(environment["oracleRuns"]?["run2"]?["output"]) != "oracle-run-2.json"
