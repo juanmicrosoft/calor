@@ -6,7 +6,6 @@
     "commit": "399649371c66ddc8e20709ea234c2f40109b2879",
     "runner": "local macOS arm64 (Apple silicon), .NET 10 SDK"
   },
-  "timeoutTolerance": 8,
   "cases": {
     "R1-NUM-ARITH-ADD-001": {
       "class": "no-claim",

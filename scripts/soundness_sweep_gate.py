@@ -10,22 +10,19 @@ P845) pointed at one build of main, the gate fails on:
   * a failed control: the 13 oracle controls, solver availability on any slot, a mutation
     pair whose oracle verdicts differ, or a CTRL-RETRO-845 / CTRL-RETRO-FIXED case whose token
     differs from its registered expected outcome;
-  * any finding: a FALSE-PROOF or FINDING row, a finding record, or a case whose class is a
-    finding class (false proof, stale-cache proof, spurious refutation, ...);
-  * a missing case: a fixture case that a slot never executed;
-  * a changed verdict: a case whose (class, token) differs from
-    tests/TestData/SoundnessSweep/expected-verdicts.json.
-
-Timeouts are the one exception to the last rule. A timed-out case carries no proof claim (the
-harness classifies any attempt that proves something unsound as a false proof, even a late
-one), so a timeout cannot hide a false proof; it only loses coverage. A verdict change that
-only moves a case into or out of a timeout is reported, and the job fails only when more
-cases newly time out on one slot than the fixture's `timeoutTolerance`.
+  * any finding: a FALSE-PROOF or FINDING row, a finding record, or a finding class on a case's
+    final result OR on any of its retained attempts (including an over-time attempt's late
+    observation), so a retry cannot fold a finding into `flaky`;
+  * a missing case: a fixture case that B1 or N1 never executed;
+  * a changed verdict: a case whose final (class, token) differs from
+    tests/TestData/SoundnessSweep/expected-verdicts.json. Every difference fails, timeouts
+    included; the summary marks differences that involve a timeout so a slow runner is easy
+    to tell from a compiler change.
 
 Subcommands:
   gate          judge a finished run (writes a Markdown job summary; exit 1 on failure)
   check-fixture validate the fixture against the case index (PR-time check; no run needed)
-  freeze        rewrite the fixture from a clean run (for a reviewed fixture update)
+  freeze        rewrite the fixture from a run that passes every other check
 """
 
 from __future__ import annotations
@@ -40,7 +37,6 @@ PACKET = Path("tests/TestData/SoundnessSweep")
 FIXTURE = PACKET / "expected-verdicts.json"
 SLOTS = ("B1", "N1", "P845")
 TIMEOUT_TOKEN = "TimeoutOrUnavailable"
-TIMEOUT_CLASSES = {"timed-out"}
 
 # Report.cs FindingClasses: any of these on any case fails the job, whatever the fixture says.
 FINDING_CLASSES = {
@@ -49,6 +45,7 @@ FINDING_CLASSES = {
     "stale-cache-proof", "semantic-divergence", "control-mismatch", "candidate-unconfirmed",
 }
 FAILING_ROW_STATUSES = {"FALSE-PROOF", "FINDING"}
+VERDICT_PREFIX = "verdict changed: "
 
 
 def load_json(path: Path):
@@ -70,9 +67,6 @@ def fixture_errors(repo: Path, fixture: dict) -> list[str]:
     errors: list[str] = []
     if fixture.get("schemaVersion") != 1:
         errors.append("schemaVersion must be 1")
-    tolerance = fixture.get("timeoutTolerance")
-    if not isinstance(tolerance, int) or isinstance(tolerance, bool) or tolerance < 0:
-        errors.append("timeoutTolerance must be a non-negative integer")
     cases = fixture.get("cases")
     if not isinstance(cases, dict):
         return errors + ["cases must be an object keyed by case id"]
@@ -98,10 +92,6 @@ def fixture_errors(repo: Path, fixture: dict) -> list[str]:
     return errors
 
 
-def is_timeout(verdict: dict | None) -> bool:
-    return verdict is not None and (verdict.get("class") in TIMEOUT_CLASSES or verdict.get("token") == TIMEOUT_TOKEN)
-
-
 def final_results(out: Path, slot: str) -> dict[str, dict]:
     finals: dict[str, dict] = {}
     for record in read_lines(out / slot / "case-results.jsonl"):
@@ -109,16 +99,30 @@ def final_results(out: Path, slot: str) -> dict[str, dict]:
     return finals
 
 
-def judge(repo: Path, out: Path, run_exit: int, report_exit: int) -> dict:
-    """Everything the summary shows; `failures` decides the job."""
-    failures: list[str] = []
-    drift: list[str] = []
-    fixture = load_json(repo / FIXTURE)
-    problems = fixture_errors(repo, fixture)
-    failures += [f"fixture: {p}" for p in problems]
-    expected: dict[str, dict] = fixture.get("cases", {}) if isinstance(fixture.get("cases"), dict) else {}
+def finding_classes(record: dict) -> set[str]:
+    return {record.get("class"), *(record.get("addedFindings") or [])} & FINDING_CLASSES
 
-    # 1. Run validity.
+
+def attempt_findings(out: Path, slot: str, record: dict) -> tuple[set[str], list[str]]:
+    """Finding classes on any retained attempt of a case, and attempt files that are missing."""
+    found: set[str] = set()
+    missing: list[str] = []
+    for attempt in record.get("attempts") or []:
+        found |= finding_classes(attempt)
+        path = out / slot / attempt.get("path", "")
+        if not attempt.get("path") or not path.is_file():
+            missing.append(attempt.get("path") or "?")
+            continue
+        raw = load_json(path)
+        found |= finding_classes(raw)
+        if isinstance(raw.get("lateObservation"), dict):
+            found |= finding_classes(raw["lateObservation"])
+    return found, missing
+
+
+def run_failures(repo: Path, out: Path, run_exit: int, report_exit: int) -> tuple[list[str], dict]:
+    """Every check except the comparison with the fixture."""
+    failures: list[str] = []
     if run_exit != 0:
         failures.append(f"sweep `run` exited {run_exit} (3 = preflight, 4 = pin/native image, 5 = solver availability, 6 = CLI contradiction)")
     if report_exit != 0:
@@ -134,7 +138,6 @@ def judge(repo: Path, out: Path, run_exit: int, report_exit: int) -> dict:
         if summary and validity != "pinned":
             failures.append(f"{slot}: run validity is {validity!r}, not 'pinned'")
 
-    # 2. Controls.
     oracle_path = out / "oracle-controls.json"
     if not oracle_path.is_file():
         failures.append("oracle-controls.json is missing: the preflight did not run")
@@ -146,23 +149,23 @@ def judge(repo: Path, out: Path, run_exit: int, report_exit: int) -> dict:
     if not controls:
         failures.append("controls.json is missing: `report` did not finish")
     else:
-        for slot, availability in controls["solverAvailability"].items():
-            if not availability["pass"]:
-                bad = [c["caseId"] for c in availability["cases"] if not c["ok"]]
+        for slot in SLOTS:
+            availability = controls["solverAvailability"].get(slot)
+            if not availability or not availability["pass"]:
+                bad = [c["caseId"] for c in (availability or {}).get("cases", []) if not c["ok"]]
                 failures.append(f"{slot}: solver-availability control mismatch {bad}")
-        for slot, pairs in controls["mutationPairs"].items():
-            for pair in pairs:
+        for slot in ("B1", "N1"):
+            for pair in controls["mutationPairs"].get(slot, []):
                 if not pair["oracleEqual"]:
                     failures.append(f"{slot}: mutation pair {pair['pair']} oracle verdicts differ")
-        for slot, mismatches in controls["controlMismatches"].items():
-            for m in mismatches:
+            for m in controls["controlMismatches"].get(slot, []):
                 failures.append(f"{slot}: control {m['caseId']} expected {m['expected']}, got {m['token']} (class {m['class']})")
 
-    # 3. Findings and row status.
     row_counts: dict[str, dict] = {}
     for slot in ("B1", "N1"):
         status_path = out / slot / "row-status.json"
         if not status_path.is_file():
+            failures.append(f"{slot}/row-status.json is missing: `report` did not finish")
             continue
         status = load_json(status_path)
         row_counts[slot] = status["counts"]
@@ -173,62 +176,69 @@ def judge(repo: Path, out: Path, run_exit: int, report_exit: int) -> dict:
         if findings:
             failures.append(f"{slot}: {findings} finding record(s) in {slot}/findings/")
 
-    # 4. Verdicts, slot by slot, against the fixture.
-    by_class: dict[str, collections.Counter] = {}
-    executed: dict[str, int] = {}
-    new_timeouts: dict[str, list[str]] = {}
+    finals = {slot: final_results(out, slot) for slot in SLOTS}
+    index = case_index_ids(repo)
     for slot in SLOTS:
-        finals = final_results(out, slot)
-        executed[slot] = len(finals)
-        by_class[slot] = collections.Counter(r["class"] for r in finals.values())
-        new_timeouts[slot] = []
-        for cid, record in finals.items():
+        for cid, record in finals[slot].items():
+            found = finding_classes(record)
+            in_attempts, missing = attempt_findings(out, slot, record)
+            if found | in_attempts:
+                failures.append(f"{slot}: {cid} {', '.join(sorted(found | in_attempts))} (final {record['class']}/{record.get('token')})")
+            if missing:
+                failures.append(f"{slot}: {cid} attempt file(s) missing: {missing}")
+        # B1 and N1 execute every case; P845 executes only its availability and #845 controls.
+        if slot != "P845":
+            absent = [cid for cid in index if cid not in finals[slot]]
+            if absent:
+                failures.append(f"{slot}: {len(absent)} case(s) not executed, e.g. {absent[:3]}")
+    context = {
+        "finals": finals, "rowCounts": row_counts,
+        "retro845": controls.get("retro845", {}).get("B1", {}).get("cases", []),
+        "executions": len(read_lines(out / "ledger.jsonl")),
+    }
+    return failures, context
+
+
+def judge(repo: Path, out: Path, run_exit: int, report_exit: int) -> dict:
+    """Everything the summary shows; `failures` decides the job."""
+    fixture = load_json(repo / FIXTURE)
+    failures = [f"fixture: {p}" for p in fixture_errors(repo, fixture)]
+    expected: dict[str, dict] = fixture["cases"] if isinstance(fixture.get("cases"), dict) else {}
+    checks, context = run_failures(repo, out, run_exit, report_exit)
+    failures += checks
+    timeout_related: list[str] = []
+    for slot in SLOTS:
+        for cid, record in context["finals"][slot].items():
+            if finding_classes(record):
+                continue  # already a failure above
             actual = {"class": record["class"], "token": record.get("token")}
-            findings = sorted({record["class"], *record.get("addedFindings", [])} & FINDING_CLASSES)
-            if findings:
-                failures.append(f"{slot}: {cid} {', '.join(findings)} (token {actual['token']})")
-                continue
             want = expected.get(cid)
             if want is None:
                 failures.append(f"{slot}: {cid} has no expected verdict in the fixture")
             elif actual != want:
                 change = f"{slot}: {cid} expected {want['class']}/{want['token']}, got {actual['class']}/{actual['token']}"
-                if is_timeout(actual) or is_timeout(want) or (record["class"] == "flaky" and TIMEOUT_TOKEN in record.get("tokens", [])):
-                    drift.append(change)
-                    if (is_timeout(actual) or record["class"] == "flaky") and not is_timeout(want):
-                        new_timeouts[slot].append(cid)
-                else:
-                    failures.append(f"verdict changed: {change}")
-        # B1 and N1 execute every case; P845 executes only its availability and #845 controls.
-        if slot != "P845":
-            missing = [cid for cid in expected if cid not in finals]
-            if missing:
-                failures.append(f"{slot}: {len(missing)} case(s) not executed, e.g. {missing[:3]}")
-    tolerance = fixture.get("timeoutTolerance", 0) if isinstance(fixture.get("timeoutTolerance"), int) else 0
-    for slot, cids in new_timeouts.items():
-        if len(cids) > tolerance:
-            failures.append(f"{slot}: {len(cids)} case(s) newly timed out, more than timeoutTolerance {tolerance}: {cids[:10]}")
-
-    retro = []
-    for case in controls.get("retro845", {}).get("B1", {}).get("cases", []):
-        retro.append(case)
-    ledger = read_lines(out / "ledger.jsonl")
+                failures.append(VERDICT_PREFIX + change)
+                if TIMEOUT_TOKEN in (want["token"], actual["token"], *(record.get("tokens") or [])):
+                    timeout_related.append(change)
     return {
-        "failures": failures, "drift": drift, "byClass": by_class, "executed": executed,
-        "executions": len(ledger), "rowCounts": row_counts, "retro845": retro,
-        "newTimeouts": new_timeouts, "tolerance": tolerance,
+        "failures": failures, "timeoutRelated": timeout_related,
+        "byClass": {s: collections.Counter(r["class"] for r in context["finals"][s].values()) for s in SLOTS},
+        "executed": {s: len(context["finals"][s]) for s in SLOTS},
+        "executions": context["executions"], "rowCounts": context["rowCounts"], "retro845": context["retro845"],
     }
 
 
-def markdown(result: dict, run_url: str | None) -> str:
+def markdown(result: dict, run_url: str | None, commit: str | None = None) -> str:
     ok = not result["failures"]
     lines = [f"## Soundness sweep (#1589): {'PASS' if ok else 'FAIL'}", ""]
+    if commit:
+        lines += [f"Commit under test: `{commit}`", ""]
     if run_url:
         lines += [f"Run: {run_url}", ""]
     lines += [
         f"{result['executions']} case executions. Final results per slot: "
         + ", ".join(f"{slot} {n}" for slot, n in result["executed"].items()) + ".",
-        "All three slots run the same build of main (#1589 single baseline).",
+        "All three slots run the same build (#1589 single baseline).",
         "",
         "### Verdicts by class",
         "",
@@ -246,10 +256,11 @@ def markdown(result: dict, run_url: str | None) -> str:
         lines += ["", "### CTRL-RETRO-845 (B1)", "", "| Case | Expected | Token |", "|---|---|---|"]
         for case in result["retro845"]:
             lines.append(f"| {case['caseId']} | {case['expected']} | {case['token']} |")
-    lines += ["", "### Regressions against expected-verdicts.json", ""]
+    lines += ["", "### Failures and regressions against expected-verdicts.json", ""]
     lines += [f"- {f}" for f in result["failures"]] or ["None."]
-    lines += ["", f"### Timeout drift (reported only; tolerance {result['tolerance']} new timeouts per slot)", ""]
-    lines += [f"- {d}" for d in result["drift"]] or ["None."]
+    if result["timeoutRelated"]:
+        lines += ["", "### Of those, verdict changes that involve a timeout (check runner speed first)", ""]
+        lines += [f"- {d}" for d in result["timeoutRelated"]]
     return "\n".join(lines) + "\n"
 
 
@@ -262,7 +273,7 @@ def headline(result: dict) -> str:
 def cmd_gate(args) -> int:
     repo, out = Path(args.repo).resolve(), Path(args.out).resolve()
     result = judge(repo, out, args.run_exit, args.report_exit)
-    text = markdown(result, args.run_url)
+    text = markdown(result, args.run_url, args.commit)
     print(text)
     if args.summary:
         with open(args.summary, "a", encoding="utf-8") as handle:
@@ -285,30 +296,29 @@ def cmd_check_fixture(args) -> int:
 
 def cmd_freeze(args) -> int:
     repo, out = Path(args.repo).resolve(), Path(args.out).resolve()
+    failures, context = run_failures(repo, out, 0, 0)
+    finals = context["finals"]
+    # The three slots ran one build, so they must agree before one verdict per case is recorded.
+    for slot in ("N1", "P845"):
+        for cid, record in finals[slot].items():
+            b1 = finals["B1"].get(cid)
+            if b1 is not None and (record["class"], record.get("token")) != (b1["class"], b1.get("token")):
+                failures.append(f"{slot}: {cid} {record['class']}/{record.get('token')} differs from B1 {b1['class']}/{b1.get('token')}")
+    if failures:
+        print("refusing to freeze; the run fails these checks:", file=sys.stderr)
+        for failure in failures:
+            print(f"  {failure}", file=sys.stderr)
+        return 1
     old = load_json(repo / FIXTURE) if (repo / FIXTURE).is_file() else {}
-    b1 = final_results(out, "B1")
-    if (out / "invalid-run.jsonl").is_file():
-        print("refusing to freeze an invalid run", file=sys.stderr)
-        return 1
-    bad = [cid for cid, r in b1.items() if ({r["class"], *r.get("addedFindings", [])} & FINDING_CLASSES)]
-    if bad:
-        print(f"refusing to freeze a run with findings: {bad[:10]}", file=sys.stderr)
-        return 1
-    index = case_index_ids(repo)
-    absent = [cid for cid in index if cid not in b1]
-    if absent:
-        print(f"refusing to freeze: {len(absent)} case(s) not executed on B1", file=sys.stderr)
-        return 1
     fixture = {
         "schemaVersion": 1,
         "issue": 1589,
         "note": old.get("note", "Expected (class, token) per sweep case at main, checked by scripts/soundness_sweep_gate.py. Update only in a reviewed PR, with the reason in the PR body."),
         "recordedFrom": {"commit": args.commit, "runner": args.runner},
-        "timeoutTolerance": old.get("timeoutTolerance", args.timeout_tolerance),
-        "cases": {cid: {"class": b1[cid]["class"], "token": b1[cid].get("token")} for cid in index},
+        "cases": {cid: {"class": finals["B1"][cid]["class"], "token": finals["B1"][cid].get("token")} for cid in case_index_ids(repo)},
     }
     (repo / FIXTURE).write_text(json.dumps(fixture, indent=2) + "\n", encoding="utf-8")
-    print(f"wrote {FIXTURE}: {len(index)} cases")
+    print(f"wrote {FIXTURE}: {len(fixture['cases'])} cases")
     return 0
 
 
@@ -323,6 +333,7 @@ def main(argv: list[str]) -> int:
     gate.add_argument("--summary")
     gate.add_argument("--headline")
     gate.add_argument("--run-url")
+    gate.add_argument("--commit")
     gate.set_defaults(func=cmd_gate)
     check = sub.add_parser("check-fixture")
     check.add_argument("--repo", default=".")
@@ -332,7 +343,6 @@ def main(argv: list[str]) -> int:
     freeze.add_argument("--out", required=True)
     freeze.add_argument("--commit", required=True)
     freeze.add_argument("--runner", required=True)
-    freeze.add_argument("--timeout-tolerance", type=int, default=8)
     freeze.set_defaults(func=cmd_freeze)
     args = parser.parse_args(argv)
     return args.func(args)

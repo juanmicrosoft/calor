@@ -11,10 +11,10 @@ name: Soundness sweep
 # The harness's `run` exits 0 even when it records findings, so scripts/soundness_sweep_gate.py
 # decides: it fails on an invalid run, any failed control (oracle controls, solver availability,
 # mutation pairs, CTRL-RETRO-845, CTRL-RETRO-FIXED), any finding (false proof, stale-cache
-# proof, ...), and any verdict that differs from tests/TestData/SoundnessSweep/expected-verdicts.json.
-# A timeout-only change is reported and fails only above the fixture's timeoutTolerance.
+# proof, ...) on a final result or any retained attempt, and any verdict that differs from
+# tests/TestData/SoundnessSweep/expected-verdicts.json, timeouts included.
 #
-# On a failed scheduled or dispatched run on main, `notify` opens (or comments on) one tracking
+# On a failed scheduled or dispatched run (both always check out main), `notify` opens (or comments on) one tracking
 # issue labeled `soundness-sweep`, with GITHUB_TOKEN and `issues: write` only.
 #
 # Pull requests get `harness-check` (the harness builds, the fixture parses and covers every case,
@@ -31,7 +31,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: soundness-sweep-${{ github.event.pull_request.number || github.ref }}
+  group: soundness-sweep-${{ github.event.pull_request.number || 'main' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -93,11 +93,15 @@ jobs:
       contents: read
     outputs:
       headline: ${{ steps.sweep.outputs.headline }}
+      commit: ${{ steps.sweep.outputs.commit }}
 
     steps:
+      # Scheduled and dispatched runs always sweep main HEAD, whatever ref dispatched them;
+      # a pull request sweeps its own merge commit.
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || 'refs/heads/main' }}
           persist-credentials: false
 
       - name: Setup .NET
@@ -126,6 +130,7 @@ jobs:
           bash scripts/run-soundness-sweep.sh --out "$RUNNER_TEMP/soundness-sweep" \
             --summary "$GITHUB_STEP_SUMMARY" --headline "$headline_file" --run-url "$RUN_URL" || status=$?
           echo "headline=$(head -c 900 "$headline_file" | tr -d '\r\n')" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           exit "$status"
 
       - name: Upload the sweep report
@@ -141,7 +146,8 @@ jobs:
 
   notify:
     needs: sweep
-    if: failure() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # Scheduled and dispatched runs always sweep main (see the sweep job's checkout).
+    if: failure() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -155,7 +161,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           HEADLINE: ${{ needs.sweep.outputs.headline }}
           SWEEP_RESULT: ${{ needs.sweep.result }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ needs.sweep.outputs.commit || 'unknown (the job failed before the sweep ran)' }}
           EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail

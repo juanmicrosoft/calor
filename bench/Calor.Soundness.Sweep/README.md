@@ -42,13 +42,15 @@ The full report is in `<out>/results/`:
 - **A failed control.** The 13 oracle controls, solver availability, the mutation pairs, or a
   CTRL-RETRO-845 or CTRL-RETRO-FIXED token that differs from its registered expected outcome.
 - **Any finding.** A false proof, stale-cache proof, spurious refutation, missing demotion, and
-  so on, or a row with status FALSE-PROOF or FINDING.
+  so on, or a row with status FALSE-PROOF or FINDING. The gate reads every retained attempt
+  of a case, including the late result of an attempt that ran over time. A finding in a retry
+  therefore fails the job even when the harness combines the attempts into `flaky`.
 - **A changed verdict.** A case whose `(class, token)` differs from
   `tests/TestData/SoundnessSweep/expected-verdicts.json`, or a case that did not run.
 
-Timeouts are reported, not failed. A timed-out case makes no proof claim, so it cannot hide a
-false proof; it only loses coverage. The job fails when more cases newly time out on one slot
-than the fixture's `timeoutTolerance` (8). Main has 4 timed-out cases today.
+Timeouts count as verdicts. Main has 4 timed-out cases today. A case that newly times out, or
+an expected timeout that now completes, fails the job. The summary marks the changes that
+involve a timeout; check the runner's speed before suspecting the compiler.
 
 CTRL-RETRO-845 checks the #845 fix (PR #961). With every slot on `main`, the control cannot
 show the pre-fix bug, so rows NUM-LITERAL-TYPED and NUM-ARITH-ADD stay INCOMPLETE. That is
@@ -67,8 +69,9 @@ A failed scheduled run opens one issue labeled `soundness-sweep`, or comments on
      `p1` label. Do not edit the fixture to make the job green.
    - **A failed control or an invalid run.** The run cannot be trusted; nothing was measured.
      Check the runner image, the .NET SDK and the Z3 bootstrap first.
-   - **Timeouts above the tolerance.** Usually a slower runner. Rerun once. If it persists,
-     compare the case durations in `ledger.jsonl` with a green run.
+   - **Only timeout changes.** Usually a slower or faster runner. Rerun once. If it persists,
+     compare the case durations in `ledger.jsonl` with a green run, and update the fixture in
+     a reviewed PR if the new timing is the norm.
 4. Close the tracking issue when `main` is green again.
 
 ### Updating the expected verdicts
@@ -82,8 +85,8 @@ python3 scripts/soundness_sweep_gate.py freeze --out /tmp/sweep-new/results \
   --commit "$(git rev-parse HEAD)" --runner "local macOS arm64"
 ```
 
-`freeze` refuses a run with findings or an invalid run, so a finding can never become an
-expected verdict. Say in the PR body which cases changed and why. A PR that touches the
+`freeze` runs every gate check except the fixture comparison, on all three slots, and refuses
+the run if any fails or if the slots disagree. A finding can never become an expected verdict. Say in the PR body which cases changed and why. A PR that touches the
 fixture, the gate or the harness runs the full sweep in CI.
 
 ## Pull requests

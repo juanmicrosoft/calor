@@ -18,10 +18,10 @@ All notable changes to Calor, organized by release.
   `main` on a macOS ARM64 runner and runs the sweep (1,448 case executions, about 5 minutes).
   It fails on any false proof (a contract reported as proven that an input violates), any other
   finding, any failed control such as CTRL-RETRO-845, and any case whose verdict differs from
-  a checked-in fixture of expected verdicts. A timeout alone does not fail the job unless more
-  than 8 new cases time out. A failed run on `main` opens or updates one issue labeled
-  `soundness-sweep`. Each pull request checks that the sweep still builds and that the fixture
-  covers every case. `main` passes today: 0 findings, and 4 of 710 cases time out. (#1589)
+  a checked-in fixture of expected verdicts, including which cases time out. A failed run on
+  `main` opens or updates one issue labeled `soundness-sweep`. Each pull request checks that
+  the sweep still builds and that the fixture covers every case. `main` passes today: 0
+  findings, and 4 of 710 cases time out. (#1589)
 
 ## [0.26.0] - 2026-10-23
 

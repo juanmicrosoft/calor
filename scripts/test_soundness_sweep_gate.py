@@ -34,10 +34,12 @@ def write(path: Path, data) -> None:
 class Sweep:
     """A synthetic repo (case index + fixture) and a clean sweep output for it."""
 
-    def __init__(self, root: Path, tolerance: int = 1):
+    def __init__(self, root: Path):
         self.repo, self.out = root / "repo", root / "out"
         write(self.repo / gate.PACKET / "cases-index.json", {"cases": [{"id": c} for c in CASES]})
-        self.fixture = {"schemaVersion": 1, "issue": 1589, "timeoutTolerance": tolerance, "cases": dict(EXPECTED)}
+        self.fixture = {"schemaVersion": 1, "issue": 1589, "cases": dict(EXPECTED)}
+        # Extra retained attempts per (slot, case): raw attempt records written next to attempt 1.
+        self.extra_attempts: dict[tuple[str, str], list[dict]] = {}
         self.results = {slot: {c: dict(v) for c, v in EXPECTED.items()} for slot in ("B1", "N1")}
         self.results["P845"] = {"R1-CTRL-RETRO-845-001": dict(EXPECTED["R1-CTRL-RETRO-845-001"])}
         self.summary = {b: {"rowStatusCounts": {"CLEAN-WITHIN-BUDGET": 2}, "findings": 0, "runValidity": "pinned"} for b in ("B1", "N1")}
@@ -54,8 +56,16 @@ class Sweep:
     def judge(self, run_exit: int = 0, report_exit: int = 0) -> dict:
         write(self.repo / gate.FIXTURE, self.fixture)
         for slot, cases in self.results.items():
-            lines = [json.dumps({"caseId": c, "class": v["class"], "token": v["token"], "addedFindings": v.get("addedFindings", []),
-                                 "tokens": [v["token"]]}) for c, v in cases.items()]
+            lines = []
+            for c, v in cases.items():
+                raws = [{"status": "executed", "class": v["class"], "addedFindings": v.get("addedFindings", [])}, *self.extra_attempts.get((slot, c), [])]
+                attempts = []
+                for n, raw in enumerate(raws, 1):
+                    path = f"attempts/{c}/sweep-attempt-{n}.json"
+                    write(self.out / slot / path, raw)
+                    attempts.append({"attempt": n, "class": raw.get("class"), "path": path})
+                lines.append(json.dumps({"caseId": c, "class": v["class"], "token": v["token"], "addedFindings": v.get("addedFindings", []),
+                                         "tokens": v.get("tokens", [v["token"]]), "attempts": attempts}))
             (self.out / slot).mkdir(parents=True, exist_ok=True)
             (self.out / slot / "case-results.jsonl").write_text("".join(line + "\n" for line in lines), encoding="utf-8")
         for b in ("B1", "N1"):
@@ -133,17 +143,49 @@ class GateTests(unittest.TestCase):
         del self.sweep.results["N1"]["R1-A-002"]
         self.assertFailsWith(self.sweep.judge(), "N1: 1 case(s) not executed")
 
-    def test_timeout_drift_within_tolerance_is_reported_only(self) -> None:
+    def test_new_timeout_fails_and_is_marked_timeout_related(self) -> None:
         self.sweep.results["B1"]["R1-A-001"] = {"class": "timed-out", "token": "TimeoutOrUnavailable"}
-        self.sweep.results["N1"]["R1-B-001"] = {"class": "validated-proof", "token": "Proven"}
         result = self.sweep.judge()
-        self.assertEqual([], result["failures"])
-        self.assertEqual(2, len(result["drift"]))
+        self.assertFailsWith(result, "verdict changed: B1: R1-A-001")
+        self.assertEqual(1, len(result["timeoutRelated"]))
+        self.assertIn("involve a timeout", gate.markdown(result, None, "abc"))
 
-    def test_timeouts_above_tolerance_fail(self) -> None:
-        for cid in ("R1-A-001", "R1-A-002"):
-            self.sweep.results["B1"][cid] = {"class": "timed-out", "token": "TimeoutOrUnavailable"}
-        self.assertFailsWith(self.sweep.judge(), "B1: 2 case(s) newly timed out")
+    def test_expected_timeout_that_now_completes_or_crashes_fails(self) -> None:
+        self.sweep.results["N1"]["R1-B-001"] = {"class": "validated-proof", "token": "Proven"}
+        self.sweep.results["B1"]["R1-B-001"] = {"class": "crashed", "token": None}
+        result = self.sweep.judge()
+        self.assertFailsWith(result, "verdict changed: N1: R1-B-001")
+        self.assertFailsWith(result, "verdict changed: B1: R1-B-001 expected timed-out/TimeoutOrUnavailable, got crashed/None")
+
+    def test_finding_in_a_retry_attempt_fails_even_when_combined_as_flaky(self) -> None:
+        self.sweep.results["B1"]["R1-A-001"] = {"class": "flaky", "token": "Failed", "tokens": ["TimeoutOrUnavailable", "Failed"]}
+        self.sweep.extra_attempts[("B1", "R1-A-001")] = [{"status": "executed", "class": "spurious-refutation", "addedFindings": []}]
+        self.assertFailsWith(self.sweep.judge(), "B1: R1-A-001 spurious-refutation (final flaky/Failed)")
+
+    def test_finding_in_a_late_observation_fails(self) -> None:
+        self.sweep.extra_attempts[("N1", "R1-A-002")] = [
+            {"status": "over-time", "lateObservation": {"status": "executed", "class": "no-claim", "addedFindings": ["required-demotion-absent"]}}]
+        self.assertFailsWith(self.sweep.judge(), "N1: R1-A-002 required-demotion-absent")
+
+    def test_missing_attempt_file_fails(self) -> None:
+        self.sweep.judge()
+        (self.sweep.out / "B1" / "attempts" / "R1-A-001" / "sweep-attempt-1.json").unlink()
+        self.assertFailsWith(gate.judge(self.sweep.repo, self.sweep.out, 0, 0), "B1: R1-A-001 attempt file(s) missing")
+
+    def test_freeze_refuses_findings_on_any_slot_and_slot_disagreement(self) -> None:
+        self.sweep.results["P845"]["R1-CTRL-RETRO-845-001"] = {"class": "validated-proof", "token": "Failed"}
+        self.sweep.results["N1"]["R1-A-002"]["addedFindings"] = ["spurious-model"]
+        self.sweep.judge()
+        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out), "commit": "c", "runner": "r"})()
+        before = (self.sweep.repo / gate.FIXTURE).read_text(encoding="utf-8")
+        self.assertEqual(1, gate.cmd_freeze(args))
+        self.assertEqual(before, (self.sweep.repo / gate.FIXTURE).read_text(encoding="utf-8"))
+
+    def test_freeze_writes_the_fixture_from_a_clean_run(self) -> None:
+        self.sweep.judge()
+        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out), "commit": "c", "runner": "r"})()
+        self.assertEqual(0, gate.cmd_freeze(args))
+        self.assertEqual(EXPECTED, gate.load_json(self.sweep.repo / gate.FIXTURE)["cases"])
 
     def test_fixture_cannot_expect_a_finding(self) -> None:
         self.sweep.fixture["cases"]["R1-A-001"] = {"class": "false-unconditional-proof", "token": "Proven"}
@@ -164,6 +206,8 @@ class RealFixtureTests(unittest.TestCase):
     def test_workflow_runs_the_gate_and_notifies_with_issues_write_only(self) -> None:
         text = (REPO_ROOT / ".github/workflows/soundness-sweep.yml").read_text(encoding="utf-8")
         self.assertIn("bash scripts/run-soundness-sweep.sh", text)
+        # Scheduled and dispatched runs sweep main, whatever ref dispatched them.
+        self.assertIn("ref: ${{ github.event_name == 'pull_request' && github.sha || 'refs/heads/main' }}", text)
         self.assertIn("python3 scripts/soundness_sweep_gate.py check-fixture", text)
         notify = text.split("\n  notify:\n", 1)[1]
         self.assertIn("    permissions:\n      issues: write\n\n", notify)

@@ -56,7 +56,7 @@ report_exit=${PIPESTATUS[0]}
 set -e
 
 gate=(python3 "$repo/scripts/soundness_sweep_gate.py" gate --repo "$repo" --out "$results"
-  --run-exit "$run_exit" --report-exit "$report_exit")
+  --run-exit "$run_exit" --report-exit "$report_exit" --commit "$commit")
 [ -z "$summary" ] || gate+=(--summary "$summary")
 [ -z "$headline" ] || gate+=(--headline "$headline")
 [ -z "$run_url" ] || gate+=(--run-url "$run_url")
