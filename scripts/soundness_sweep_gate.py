@@ -100,7 +100,12 @@ def final_results(out: Path, slot: str) -> dict[str, dict]:
 
 
 def finding_classes(record: dict) -> set[str]:
-    return {record.get("class"), *(record.get("addedFindings") or [])} & FINDING_CLASSES
+    found = {record.get("class"), *(record.get("addedFindings") or [])} & FINDING_CLASSES
+    # CH-CLI-CROSSCHECK: the CLI contradicting the in-process channel on a control. The harness
+    # stops the run (exit 6) only for B1/N1 controls, so P845 contradictions must fail here.
+    if record.get("cliContradiction") is True or (record.get("cliCrosscheck") or {}).get("contradiction") is True:
+        found.add("cli-contradiction")
+    return found
 
 
 def attempt_findings(out: Path, slot: str, record: dict) -> tuple[set[str], list[str]]:
@@ -295,8 +300,16 @@ def cmd_check_fixture(args) -> int:
 
 
 def cmd_freeze(args) -> int:
-    repo, out = Path(args.repo).resolve(), Path(args.out).resolve()
-    failures, context = run_failures(repo, out, 0, 0)
+    # --out is scripts/run-soundness-sweep.sh's --out: the harness output is in results/, and the
+    # real `run`/`report` exit statuses are in exit-status.json (a run without them is refused).
+    root = Path(args.out).resolve()
+    repo, out = Path(args.repo).resolve(), root / "results"
+    status_path = root / "exit-status.json"
+    if not status_path.is_file():
+        print(f"refusing to freeze: {status_path} is missing (run the sweep with scripts/run-soundness-sweep.sh)", file=sys.stderr)
+        return 1
+    status = load_json(status_path)
+    failures, context = run_failures(repo, out, status.get("run", -1), status.get("report", -1))
     finals = context["finals"]
     # The three slots ran one build, so they must agree before one verdict per case is recorded.
     for slot in ("N1", "P845"):

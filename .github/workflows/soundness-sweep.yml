@@ -3,7 +3,7 @@ name: Soundness sweep
 # #1589 (0.27 epic #1592): run the 0.24 soundness sweep (bench/Calor.Soundness.Sweep, case
 # packet tests/TestData/SoundnessSweep/) against main on a schedule.
 #
-# Schedule: daily. On macos-14 the job takes about 10 minutes (the sweep itself is ~5 minutes,
+# Schedule: daily. On macos-15 the job takes about 10 minutes (the sweep itself is ~5 minutes,
 # 1,448 case executions), and macOS runner minutes are free for this public repository. Main takes
 # several merges a day, so a daily run keeps a new false proof to at most one day of merges to
 # bisect; a weekly run would leave a week of them.
@@ -87,7 +87,8 @@ jobs:
       || (needs.harness-check.result == 'success' && needs.harness-check.outputs.sweep_inputs_changed == 'true'))
     # The harness is macOS ARM64 only (BaselineHost loads the osx-arm64 native solver;
     # LoadedImageCapture reads the dyld image list and checks the registered solver hash).
-    runs-on: macos-14
+    # macos-15 (ARM64): macos-14 is retired on 2026-11-02 (actions/runner-images#13518).
+    runs-on: macos-15
     timeout-minutes: 60
     permissions:
       contents: read

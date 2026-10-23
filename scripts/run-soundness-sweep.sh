@@ -54,6 +54,9 @@ run_exit=${PIPESTATUS[0]}
 isolated dotnet "$sweep" report --repo "$repo" --out "$results" 2>&1 | tee "$out/report.log"
 report_exit=${PIPESTATUS[0]}
 set -e
+# `soundness_sweep_gate.py freeze --out "$out"` reads these, so a fixture is never frozen from a
+# run whose harness process failed.
+printf '{"run": %d, "report": %d}\n' "$run_exit" "$report_exit" > "$out/exit-status.json"
 
 gate=(python3 "$repo/scripts/soundness_sweep_gate.py" gate --repo "$repo" --out "$results"
   --run-exit "$run_exit" --report-exit "$report_exit" --commit "$commit")

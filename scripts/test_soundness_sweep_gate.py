@@ -35,7 +35,7 @@ class Sweep:
     """A synthetic repo (case index + fixture) and a clean sweep output for it."""
 
     def __init__(self, root: Path):
-        self.repo, self.out = root / "repo", root / "out"
+        self.repo, self.out = root / "repo", root / "out" / "results"  # out.parent is the run script's --out
         write(self.repo / gate.PACKET / "cases-index.json", {"cases": [{"id": c} for c in CASES]})
         self.fixture = {"schemaVersion": 1, "issue": 1589, "cases": dict(EXPECTED)}
         # Extra retained attempts per (slot, case): raw attempt records written next to attempt 1.
@@ -58,14 +58,18 @@ class Sweep:
         for slot, cases in self.results.items():
             lines = []
             for c, v in cases.items():
-                raws = [{"status": "executed", "class": v["class"], "addedFindings": v.get("addedFindings", [])}, *self.extra_attempts.get((slot, c), [])]
+                first = {"status": "executed", "class": v["class"], "addedFindings": v.get("addedFindings", [])}
+                if "cliCrosscheck" in v:
+                    first["cliCrosscheck"] = v["cliCrosscheck"]
+                raws = [first, *self.extra_attempts.get((slot, c), [])]
                 attempts = []
                 for n, raw in enumerate(raws, 1):
                     path = f"attempts/{c}/sweep-attempt-{n}.json"
                     write(self.out / slot / path, raw)
                     attempts.append({"attempt": n, "class": raw.get("class"), "path": path})
                 lines.append(json.dumps({"caseId": c, "class": v["class"], "token": v["token"], "addedFindings": v.get("addedFindings", []),
-                                         "tokens": v.get("tokens", [v["token"]]), "attempts": attempts}))
+                                         "tokens": v.get("tokens", [v["token"]]), "attempts": attempts,
+                                         "cliContradiction": v.get("cliContradiction", False)}))
             (self.out / slot).mkdir(parents=True, exist_ok=True)
             (self.out / slot / "case-results.jsonl").write_text("".join(line + "\n" for line in lines), encoding="utf-8")
         for b in ("B1", "N1"):
@@ -76,6 +80,7 @@ class Sweep:
         (self.out / "ledger.jsonl").write_text("{}\n" * 9, encoding="utf-8")
         if self.invalid:
             (self.out / "invalid-run.jsonl").write_text("".join(json.dumps({"reason": r}) + "\n" for r in self.invalid), encoding="utf-8")
+        write(self.out.parent / "exit-status.json", {"run": run_exit, "report": report_exit})
         return gate.judge(self.repo, self.out, run_exit, report_exit)
 
 
@@ -176,14 +181,29 @@ class GateTests(unittest.TestCase):
         self.sweep.results["P845"]["R1-CTRL-RETRO-845-001"] = {"class": "validated-proof", "token": "Failed"}
         self.sweep.results["N1"]["R1-A-002"]["addedFindings"] = ["spurious-model"]
         self.sweep.judge()
-        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out), "commit": "c", "runner": "r"})()
+        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out.parent), "commit": "c", "runner": "r"})()
         before = (self.sweep.repo / gate.FIXTURE).read_text(encoding="utf-8")
         self.assertEqual(1, gate.cmd_freeze(args))
         self.assertEqual(before, (self.sweep.repo / gate.FIXTURE).read_text(encoding="utf-8"))
 
+    def test_freeze_refuses_a_failed_harness_exit_or_missing_exit_status(self) -> None:
+        self.sweep.judge(run_exit=4)
+        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out.parent), "commit": "c", "runner": "r"})()
+        self.assertEqual(1, gate.cmd_freeze(args))
+        (self.sweep.out.parent / "exit-status.json").unlink()
+        self.assertEqual(1, gate.cmd_freeze(args))
+
+    def test_p845_cli_contradiction_fails(self) -> None:
+        self.sweep.results["P845"]["R1-CTRL-RETRO-845-001"]["cliContradiction"] = True
+        self.assertFailsWith(self.sweep.judge(), "P845: R1-CTRL-RETRO-845-001 cli-contradiction")
+
+    def test_cli_contradiction_in_an_attempt_fails(self) -> None:
+        self.sweep.results["B1"]["R1-CTRL-RETRO-845-001"]["cliCrosscheck"] = {"contradiction": True}
+        self.assertFailsWith(self.sweep.judge(), "B1: R1-CTRL-RETRO-845-001 cli-contradiction")
+
     def test_freeze_writes_the_fixture_from_a_clean_run(self) -> None:
         self.sweep.judge()
-        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out), "commit": "c", "runner": "r"})()
+        args = type("Args", (), {"repo": str(self.sweep.repo), "out": str(self.sweep.out.parent), "commit": "c", "runner": "r"})()
         self.assertEqual(0, gate.cmd_freeze(args))
         self.assertEqual(EXPECTED, gate.load_json(self.sweep.repo / gate.FIXTURE)["cases"])
 

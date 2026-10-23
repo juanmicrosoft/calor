@@ -81,13 +81,15 @@ refusal), update the fixture in the same reviewed PR:
 
 ```bash
 scripts/run-soundness-sweep.sh --out /tmp/sweep-new
-python3 scripts/soundness_sweep_gate.py freeze --out /tmp/sweep-new/results \
+python3 scripts/soundness_sweep_gate.py freeze --out /tmp/sweep-new \
   --commit "$(git rev-parse HEAD)" --runner "local macOS arm64"
 ```
 
-`freeze` runs every gate check except the fixture comparison, on all three slots, and refuses
-the run if any fails or if the slots disagree. A finding can never become an expected verdict. Say in the PR body which cases changed and why. A PR that touches the
-fixture, the gate or the harness runs the full sweep in CI.
+`freeze` runs every gate check except the fixture comparison, on all three slots, using the
+real `run` and `report` exit statuses the script recorded in `exit-status.json`. It refuses the
+run if any check fails or if the slots disagree, so a finding can never become an expected
+verdict. Say in the PR body which cases changed and why. A PR that touches the fixture, the
+gate or the harness runs the full sweep in CI.
 
 ## Pull requests
 
