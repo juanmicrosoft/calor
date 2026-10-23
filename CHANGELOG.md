@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A local inferred from a refined value now keeps the refinement, so writes to it are
+  checked (#1529).** A refinement type (`§RTYPE{r1:Nat:i32} (>= # INT:0)`) is a base type plus
+  a predicate. The type checker already typed `§B{~x} a`, with `a: Nat`, as `Nat`. But the code
+  generator and the obligation engine (the step that turns refinements into proof obligations
+  and runtime guards) only read the bind's annotation. So `§ASSIGN x INT:-5` compiled with no
+  guard and no obligation, and `x` silently held `-5`. Now `§B{~x} a` behaves exactly like
+  `§B{~x:Nat} a`: every `§ASSIGN` and `inc`/`dec` of `x` has a runtime guard for `Nat`, and the
+  obligation engine treats it like the annotated local. This also holds inside class methods,
+  which the type checker does not visit.
+  A lambda parameter typed by a delegate whose parameter is `Nat` is guarded the same way, also
+  when the lambda is assigned to a delegate variable. A local inferred from a parameter with
+  only an inline refinement (`§I{i32:a} | (pred)`) is still a plain `i32`, because the checker
+  types that parameter as `i32`.
+  - Where refinement verification runs, a write guard is now removed only by a proof of the
+    refinement that guard checks. Before, a proof for a different refinement of a variable
+    with the same name could remove it.
+  - **Breaking:** a program that writes a value outside the refinement into such a local now
+    throws `ArgumentOutOfRangeException` at the write. Where refinement verification runs (the
+    MCP refinement tools), it can instead report `Calor1121`, a failed obligation. If the local
+    should be free to leave the refinement, annotate its base type: `§B{~x:i32} a`.
+  - **Breaking:** passing a variable that has a refinement as a `ref` or `out` argument is now
+    the new error `Calor1104`. Before, `int.TryParse(s, out x)` could leave a `Nat` variable
+    negative with no check. Pass a base-typed temporary and assign it back with `§ASSIGN`,
+    which is guarded.
+- **Two named refinements of the same base type are now different types (#1530).** Every
+  `§RTYPE` was stored with the same placeholder predicate, `#<base>`. So the type checker saw
+  `Nat` and `Pos` over `i32` as one type, and accepted either where the other was expected.
+  Named refinements are now nominal: the refinement's name is part of its identity. Runtime
+  guards are unchanged.
+  - **Breaking:** binding, passing, returning or assigning a value of one named refinement where
+    a different one is expected is now `Calor0202`, for example `§B{y:Pos} a` with `a: Nat`, or
+    calling `TakeNat(p)` with `p: Pos`. To convert on purpose, call a function that takes the
+    base type and returns the target refinement; its return guard checks the value. Plain base
+    values keep their old rules. A conditional `(? c a p)` whose arms are two different
+    refinements now has the base type; before, it took the first arm's refinement.
+  - **Breaking:** a mutable rebind of an existing variable keeps its named refinement and
+    cannot change it (`§B{~x} p` after `§B{~x} a`, with `a: Nat` and `p: Pos`). A parameter
+    with an inline refinement cannot be rebound as a named refinement. A type pattern cannot
+    name a refinement type: `(is a Pos p)` used to test only the base `i32` and bind an
+    unchecked `Pos`. All three are now `Calor0202`.
+  - These refinement errors are also reported inside `try`, `foreach`, `using` and the other
+    block statements whose other type-checker errors are left to later passes, and inside
+    the right-hand side of an `§ASSIGN`.
+  - Type-checker messages now name a refinement by its `§RTYPE` name (`Nat`) instead of
+    `i32{#i32}`.
+  - The type checker does not visit class members (`§CL` methods), so these new errors do not
+    fire there yet. Runtime guards still apply there.
+
 ### Testing
 
 - **The soundness sweep now runs against `main` every day.** The sweep is the 0.24 harness
