@@ -1,0 +1,2852 @@
+{
+  "schemaVersion": 1,
+  "issue": 1589,
+  "note": "Expected (class, token) per sweep case at main, checked by scripts/soundness_sweep_gate.py. Update only in a reviewed PR, with the reason in the PR body.",
+  "recordedFrom": {
+    "commit": "399649371c66ddc8e20709ea234c2f40109b2879",
+    "runner": "local macOS arm64 (Apple silicon), .NET 10 SDK"
+  },
+  "timeoutTolerance": 8,
+  "cases": {
+    "R1-NUM-ARITH-ADD-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-005": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-NUM-ARITH-ADD-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-009": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-ARITH-ADD-010": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-ADD-011": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-ARITH-ADD-012": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-ADD-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-014": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-ARITH-ADD-015": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-ADD-016": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-NUM-ARITH-SUB-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-004": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-NUM-ARITH-SUB-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-008": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-NUM-ARITH-SUB-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-011": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-SUB-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-013": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-SUB-014": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-ARITH-SUB-015": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-SUB-016": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-MUL-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-MUL-002": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-NUM-ARITH-MUL-003": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-NUM-ARITH-MUL-004": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-NUM-ARITH-MUL-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-MUL-006": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-NUM-ARITH-MUL-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-MUL-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-MUL-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-ARITH-MUL-010": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-NUM-ARITH-MUL-011": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-NUM-ARITH-MUL-012": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-MUL-013": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-MUL-014": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-ARITH-MUL-015": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-ARITH-MUL-016": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-NUM-DIVMOD-LITERAL-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-DIVMOD-LITERAL-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-DIVMOD-LITERAL-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-DIVMOD-LITERAL-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-009": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-DIVMOD-LITERAL-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-LITERAL-014": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-007": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-009": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-ENTAILED-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-008": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-DIVMOD-VAR-UNGUARDED-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-SHIFT-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-014": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-015": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-016": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-SHIFT-017": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-BITWISE-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-BITWISE-009": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-BITWISE-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-BITWISE-014": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-COMPARE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-COMPARE-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-010": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-COMPARE-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-012": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-COMPARE-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-014": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-015": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-016": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-COMPARE-017": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-EQUALITY-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-EQUALITY-010": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-EQUALITY-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NEGATE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-007": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-NUM-NEGATE-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NEGATE-009": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NEGATE-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NEGATE-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NARROW-ARITH-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-007": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-ARITH-008": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-NARROW-COMPARE-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NARROW-COMPARE-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NARROW-COMPARE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NARROW-COMPARE-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NARROW-COMPARE-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-NARROW-COMPARE-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NARROW-COMPARE-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-NARROW-COMPARE-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-LITERAL-TYPED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-LITERAL-TYPED-011": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-LITERAL-OVERSIZE-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-LITERAL-OVERSIZE-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-LITERAL-OVERSIZE-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-LITERAL-OVERSIZE-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-MIXED-U64-SIGNED-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-MIXED-U64-SIGNED-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-MIXED-U64-SIGNED-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-MIXED-U64-SIGNED-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-MIXED-U64-SIGNED-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-UNWHITELISTED-OPS-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-UNWHITELISTED-OPS-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-UNWHITELISTED-OPS-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-001": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-002": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-003": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-004": {
+      "class": "timed-out",
+      "token": "TimeoutOrUnavailable"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-007": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-008": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-009": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-007": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-009": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-010": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-011": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-NUM-OVERFLOW-CHECKED-012": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-010": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-011": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-NUM-OVERFLOW-UNCHECKED-012": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-CONNECTIVES-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-CONNECTIVES-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-011": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-CONNECTIVES-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-014": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-CONNECTIVES-015": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONNECTIVES-016": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-SHORTCIRCUIT-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-007": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-SHORTCIRCUIT-008": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BOOL-CONDITIONAL-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-CONDITIONAL-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-CONDITIONAL-010": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-CONDITIONAL-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-IMPLICATION-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-IMPLICATION-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-IMPLICATION-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-IMPLICATION-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-IMPLICATION-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-IMPLICATION-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-IMPLICATION-007": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-BOOL-IMPLICATION-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-NESTING-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-NESTING-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-NESTING-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-NESTING-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-NESTING-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BOOL-NESTING-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-NESTING-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BOOL-NESTING-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-003": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-RETURN-EXPR-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-007": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-BODY-RETURN-EXPR-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-RETURN-EXPR-014": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-003": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-IF-ELSE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-006": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-BODY-IF-ELSE-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IF-ELSE-013": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-IF-ELSE-014": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-GUARD-CLAUSE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-003": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-GUARD-CLAUSE-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-GUARD-CLAUSE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-GUARD-CLAUSE-010": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-GUARD-CLAUSE-011": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-NESTED-RETURN-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-NESTED-RETURN-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-NESTED-RETURN-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-NESTED-RETURN-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-NESTED-RETURN-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-NESTED-RETURN-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-NESTED-RETURN-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-NESTED-RETURN-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-IMMUTABLE-BIND-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-IMMUTABLE-BIND-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-BODY-IMMUTABLE-BIND-009": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-BODY-IMMUTABLE-BIND-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-IMMUTABLE-BIND-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-WIDTH-BIND-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-WIDTH-BIND-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-WIDTH-BIND-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-WIDTH-BIND-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-WIDTH-BIND-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-DIVISION-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-DIVISION-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-DIVISION-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-DIVISION-004": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-BODY-DIVISION-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-DIVISION-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-DIVISION-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-DIVISION-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-007": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-LOOP-CALL-MUTABLE-008": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-ARRAY-RETURN-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-ARRAY-RETURN-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-ARRAY-RETURN-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-BODY-ARRAY-RETURN-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-PRESERVED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-PRESERVED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-PRESERVED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-PRESERVED-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-POST-PARAM-PRESERVED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-PRESERVED-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-PRESERVED-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-PRESERVED-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-POST-PARAM-MUTATED-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-MUTATED-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-MUTATED-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-MUTATED-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-MUTATED-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-MUTATED-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-PARAM-MUTATED-007": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-POST-PARAM-MUTATED-008": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-RESULT-PARAM-COLLISION-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-RESULT-PARAM-COLLISION-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-RESULT-PARAM-COLLISION-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-ARRAY-ALIAS-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-ARRAY-ALIAS-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-ARRAY-ALIAS-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-ARRAY-ALIAS-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-ARRAY-ALIAS-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-METHOD-RECEIVER-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-METHOD-RECEIVER-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-METHOD-RECEIVER-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-METHOD-RECEIVER-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-POST-METHOD-RECEIVER-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-QNT-FORALL-BOUNDED-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-QNT-FORALL-BOUNDED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-FORALL-BOUNDED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-FORALL-BOUNDED-004": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-QNT-FORALL-BOUNDED-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-QNT-FORALL-BOUNDED-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-FORALL-BOUNDED-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-FORALL-BOUNDED-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-FORALL-BOUNDED-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-FORALL-BOUNDED-010": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-QNT-FORALL-BOUNDED-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-EXISTS-BOUNDED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-EXISTS-BOUNDED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-EXISTS-BOUNDED-003": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-QNT-EXISTS-BOUNDED-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-QNT-EXISTS-BOUNDED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-EXISTS-BOUNDED-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-QNT-EXISTS-BOUNDED-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-EXISTS-BOUNDED-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-UNBOUNDED-001": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-QNT-UNBOUNDED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-UNBOUNDED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-UNBOUNDED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-UNBOUNDED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-BOUND-TYPES-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-BOUND-TYPES-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-BOUND-TYPES-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-BOUND-TYPES-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-BOUND-TYPES-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-BOUND-TYPES-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-QNT-NESTED-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-QNT-NESTED-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-QNT-NESTED-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-QNT-NESTED-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-QNT-NESTED-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-ARR-LENGTH-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-LENGTH-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-LENGTH-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-LENGTH-004": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-ARR-LENGTH-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-LENGTH-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-LENGTH-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-LENGTH-008": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-ARR-INDEX-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-INDEX-002": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-ARR-INDEX-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-INDEX-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-INDEX-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-INDEX-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-INDEX-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-INDEX-008": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-ARR-ELEMENT-TYPES-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-ELEMENT-TYPES-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-ARR-COMPUTED-BASE-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-ARR-COMPUTED-BASE-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-ARR-COMPUTED-BASE-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-ARR-COMPUTED-BASE-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-OPS-PREDICATE-001": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-OPS-PREDICATE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-PREDICATE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-PREDICATE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-PREDICATE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-PREDICATE-006": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-OPS-PREDICATE-007": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-OPS-PREDICATE-008": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-OPS-PREDICATE-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-PREDICATE-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-PREDICATE-011": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-001": {
+      "class": "timed-out",
+      "token": "TimeoutOrUnavailable"
+    },
+    "R1-STR-OPS-COUNT-INDEX-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-007": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-OPS-COUNT-INDEX-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-STR-CULTURE-MODE-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-CULTURE-MODE-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-CULTURE-MODE-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-CULTURE-MODE-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-CULTURE-MODE-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-CULTURE-MODE-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-CULTURE-MODE-007": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-UNMODELED-OPS-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-UNMODELED-OPS-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-UNMODELED-OPS-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-UNMODELED-OPS-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-UNMODELED-OPS-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-STR-NULL-NONASCII-001": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-NULL-NONASCII-002": {
+      "class": "timed-out",
+      "token": "TimeoutOrUnavailable"
+    },
+    "R1-STR-NULL-NONASCII-003": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-NULL-NONASCII-004": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-STR-NULL-NONASCII-005": {
+      "class": "timed-out",
+      "token": "TimeoutOrUnavailable"
+    },
+    "R1-FLD-ACCESS-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-ACCESS-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-ACCESS-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-ACCESS-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-ACCESS-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-ACCESS-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-ACCESS-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-INHERITED-NESTED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-INHERITED-NESTED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-INHERITED-NESTED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-INHERITED-NESTED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-INHERITED-NESTED-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-FLD-IMPLICIT-RECEIVER-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLD-IMPLICIT-RECEIVER-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLD-IMPLICIT-RECEIVER-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLD-IMPLICIT-RECEIVER-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-006": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-007": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-FLT-REFUSAL-008": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-CALL-IN-CONTRACT-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-CALL-IN-CONTRACT-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-CALL-IN-CONTRACT-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-CALL-IN-CONTRACT-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-CALL-IN-CONTRACT-005": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-GEN-REFUSAL-001": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-GEN-REFUSAL-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-GEN-REFUSAL-003": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-GEN-REFUSAL-004": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-001": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-002": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-003": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-004": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-005": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-006": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-007": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-UNSAT-PRECONDITIONS-008": {
+      "class": "refusal-validated",
+      "token": "ProvenVacuous"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-001": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-003": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-VAC-PRECONDITION-SAT-CLAIM-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-PROOF-001": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-PROOF-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-PROOF-003": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-PROOF-004": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-PROOF-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-PROOF-006": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-PROOF-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-PROOF-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-PROOF-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-PROOF-010": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-PROOF-011": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-BRANCH-FACTS-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-007": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-BRANCH-FACTS-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-009": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-012": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-BRANCH-FACTS-013": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-LOOP-FACTS-001": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-LOOP-FACTS-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-LOOP-FACTS-003": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-LOOP-VARIABLE-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-OBL-LOOP-VARIABLE-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-001": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-003": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-004": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-005": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-006": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-MUTATION-KILL-007": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-003": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-REFINEMENT-ENTRY-008": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-REFINEMENT-RETURN-001": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-REFINEMENT-RETURN-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-REFINEMENT-RETURN-003": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-REFINEMENT-RETURN-004": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-REFINEMENT-RETURN-005": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-SUBTYPE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-SUBTYPE-002": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-SUBTYPE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-SUBTYPE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-SUBTYPE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-INDEX-BOUNDS-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-INDEX-BOUNDS-002": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-INDEX-BOUNDS-003": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-INDEX-BOUNDS-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-OBL-SELFREF-001": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-SELFREF-002": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-SELFREF-003": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-SELFREF-004": {
+      "class": "validated-proof",
+      "token": "Discharged"
+    },
+    "R1-OBL-SELFREF-005": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-UNGATED-FORMS-001": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-UNGATED-FORMS-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-UNGATED-FORMS-003": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-FORMS-004": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-FORMS-005": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-UNGATED-FORMS-006": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-UNGATED-FORMS-007": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-OBL-UNGATED-FORMS-008": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-REFERENCE-001": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-REFERENCE-002": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-REFERENCE-003": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-REFERENCE-004": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-OBL-UNGATED-REFERENCE-005": {
+      "class": "refusal-validated",
+      "token": "Assumed"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-PRECONDITION-WEAKENING-007": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-POSTCONDITION-STRENGTHENING-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-IMPL-POSTCONDITION-STRENGTHENING-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-POSTCONDITION-STRENGTHENING-003": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-IMPL-POSTCONDITION-STRENGTHENING-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-POSTCONDITION-STRENGTHENING-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-IMPL-ASSUMPTION-FORMS-001": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-IMPL-ASSUMPTION-FORMS-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-ASSUMPTION-FORMS-003": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-IMPL-ASSUMPTION-FORMS-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-ASSUMPTION-FORMS-005": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-IMPL-DIVISION-TOTALIZED-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-DIVISION-TOTALIZED-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-DIVISION-TOTALIZED-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-IMPL-DIVISION-TOTALIZED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-INH-INHERITED-GUARD-EMISSION-001": {
+      "class": "no-claim",
+      "token": null
+    },
+    "R1-INH-INHERITED-GUARD-EMISSION-002": {
+      "class": "no-claim",
+      "token": null
+    },
+    "R1-INH-INHERITED-GUARD-EMISSION-003": {
+      "class": "no-claim",
+      "token": null
+    },
+    "R1-INH-INHERITED-GUARD-EMISSION-004": {
+      "class": "no-claim",
+      "token": null
+    },
+    "R1-CACHE-BODY-CHANGE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-BODY-CHANGE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-BODY-CHANGE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-BODY-CHANGE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-BODY-CHANGE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-PRECONDITION-CHANGE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-PRECONDITION-CHANGE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-PRECONDITION-CHANGE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-PRECONDITION-CHANGE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-PRECONDITION-CHANGE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-DEPENDENCY-CHANGE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-DEPENDENCY-CHANGE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-DEPENDENCY-CHANGE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-DEPENDENCY-CHANGE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-LITERAL-WIDTH-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-LITERAL-WIDTH-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CACHE-SEMANTICS-VERSION-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-SEMANTICS-VERSION-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CACHE-SEMANTICS-VERSION-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-004": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-005": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-007": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-SIMP-CONSTANT-FOLDING-008": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-004": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-006": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-007": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-008": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-009": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-010": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-H1-UNARY-FOLD-011": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-SIMP-H1-INVALID-TYPING-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-SIMP-H1-INVALID-TYPING-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-MIX-QNT-ARRAY-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-MIX-QNT-ARRAY-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-MIX-QNT-ARRAY-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-MIX-QNT-ARRAY-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-MIX-STR-COND-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-MIX-STR-COND-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-MIX-STR-COND-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-MIX-DIV-IMPL-001": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-MIX-DIV-IMPL-002": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-MIX-DIV-IMPL-003": {
+      "class": "refusal-validated",
+      "token": "Unsupported"
+    },
+    "R1-CTRL-POSITIVE-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-003": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-005": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-007": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-POSITIVE-008": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-NEGATIVE-001": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-NEGATIVE-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-NEGATIVE-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-NEGATIVE-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-NEGATIVE-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-NEGATIVE-006": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-MUTATION-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-MUTATION-002": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-MUTATION-003": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-CTRL-MUTATION-004": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-CTRL-RETRO-845-001": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-RETRO-845-002": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-RETRO-845-003": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-RETRO-845-004": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-RETRO-845-005": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-RETRO-845-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-RETRO-FIXED-001": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-CTRL-RETRO-FIXED-002": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-CTRL-RETRO-FIXED-003": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-CTRL-RETRO-FIXED-004": {
+      "class": "no-claim",
+      "token": "Failed"
+    },
+    "R1-CTRL-RETRO-FIXED-005": {
+      "class": "no-claim",
+      "token": "Assumed"
+    },
+    "R1-CTRL-RETRO-FIXED-006": {
+      "class": "validated-proof",
+      "token": "Proven"
+    },
+    "R1-CTRL-RETRO-FIXED-007": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    },
+    "R1-CTRL-RETRO-FIXED-008": {
+      "class": "no-claim",
+      "token": "Unsupported"
+    }
+  }
+}
