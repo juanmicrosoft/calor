@@ -11,124 +11,122 @@ namespace Calor.RoundTrip.Harness.Oracle;
 /// Two values from different load contexts render equal when their observable public state is equal.
 ///
 /// <para>Depth counts member hops from the rendered value. At depth 2 an object shows its public
-/// instance fields and properties (hidden base members included, labelled with their declaring type),
-/// and their public fields and properties in turn. A type that overrides <see cref="object.ToString"/>
+/// instance fields and properties, and their public fields and properties in turn. Every declaration in
+/// the hierarchy is shown: a member hidden by a more derived one (<c>new</c>) is kept and labelled with
+/// its declaring type; only true overrides collapse. A type that overrides <see cref="object.ToString"/>
 /// also shows that string, which is how text-holding types such as <see cref="StringBuilder"/> expose
-/// their content. Below the last level a complex value renders as its type name. Scalars always render
-/// in full, tagged with their runtime type where two types share a spelling (<c>1</c> is an int,
-/// <c>1L</c> a long). Collections show their elements (up to <see cref="MaxItems"/>, then an explicit
-/// marker) at one level deeper, plus their own public properties such as Count and Capacity.</para>
+/// their content. A delegate shows its target's state and, when the generator can supply its parameters,
+/// what it returns on generated inputs. Below the last level a complex value renders as its type name.
+/// Scalars always render in full, tagged with their runtime type where two types share a spelling
+/// (<c>1</c> is an int, <c>1L</c> a long). Collections show every element at one level deeper, plus their
+/// own public properties such as Count and Capacity.</para>
 ///
-/// <para>Nothing is silently cut: a rendering longer than <see cref="DisplayLength"/> is stored as its
-/// first <see cref="DisplayLength"/> characters plus a hash of the whole rendering, and a rendering that
-/// reaches <see cref="HardCap"/> ends with <see cref="Incomplete"/> so the observation says so.</para>
+/// <para>Nothing is cut: every character is hashed, and only the display prefix is stored. A rendering
+/// that cannot be completed (more than <see cref="MaxItems"/> elements, more than <see cref="HardCap"/>
+/// characters, or a delegate it cannot call) ends with <see cref="Incomplete"/>, and the oracle never
+/// counts such an observation as agreement.</para>
 /// </summary>
-public static class StateRenderer
+public static partial class StateRenderer
 {
     public const int DefaultDepth = 2;
-    public const int MaxItems = 4096;
+    public const int MaxItems = 1_000_000;
     public const int DisplayLength = 16_384;
-    public const int HardCap = 4 * 1024 * 1024;
+    public const long HardCap = 256L * 1024 * 1024;
     public const string Incomplete = "…#INCOMPLETE";
+
+    /// <summary>
+    /// The rendering target: keeps the first <see cref="DisplayLength"/> characters and hashes every character.
+    /// </summary>
+    public sealed class Sink
+    {
+        private readonly StringBuilder _prefix = new();
+        private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        private readonly char[] _one = new char[1];
+
+        public long Length { get; private set; }
+        public bool IsIncomplete { get; private set; }
+        public bool Full => Length >= HardCap;
+
+        public Sink Append(string? s)
+        {
+            if (string.IsNullOrEmpty(s) || Full)
+                return this;
+            if (_prefix.Length < DisplayLength)
+                _prefix.Append(s, 0, Math.Min(s.Length, DisplayLength - _prefix.Length));
+            _hash.AppendData(MemoryMarshalBytes(s));
+            Length += s.Length;
+            if (Full)
+                IsIncomplete = true;
+            return this;
+        }
+
+        public Sink Append(char c)
+        {
+            _one[0] = c;
+            return Append(new string(_one));
+        }
+
+        public void MarkIncomplete() => IsIncomplete = true;
+
+        private static byte[] MemoryMarshalBytes(string s) => Encoding.UTF8.GetBytes(s);
+
+        /// <summary>The stored observation: the text when short, else the prefix plus the hash of everything.</summary>
+        public string Result()
+        {
+            var suffix = IsIncomplete ? Incomplete : "";
+            return Length <= DisplayLength
+                ? _prefix + suffix
+                : _prefix + "…#sha256:" + Convert.ToHexStringLower(_hash.GetCurrentHash()) + suffix;
+        }
+    }
 
     public static string Render(object? value, int depth)
     {
-        var sb = new StringBuilder();
-        Append(sb, value, depth);
-        return Compact(sb);
+        var sink = new Sink();
+        Append(sink, value, depth);
+        return sink.Result();
     }
 
-    /// <summary>Long renderings keep a readable prefix plus a hash of the complete text, so equality still covers every character.</summary>
-    public static string Compact(StringBuilder sb)
-    {
-        if (sb.Length >= HardCap)
-            sb.Append(Incomplete);
-        if (sb.Length <= DisplayLength)
-            return sb.ToString();
-        var full = sb.ToString();
-        return full[..DisplayLength] + "…#sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(full)))
-            + (full.EndsWith(Incomplete, StringComparison.Ordinal) ? Incomplete : "");
-    }
+    /// <summary>Whether a stored observation is incomplete (so it can never count as agreement).</summary>
+    public static bool IsIncompleteObservation(string observation) => observation.Contains(Incomplete, StringComparison.Ordinal);
 
-    private static void Append(StringBuilder sb, object? value, int depth)
+    internal static void Append(Sink sb, object? value, int depth)
     {
-        if (sb.Length >= HardCap)
+        if (sb.Full)
             return;
         switch (value)
         {
-            case null:
-                sb.Append("null");
-                return;
-            case string s:
-                AppendString(sb, s);
-                return;
-            case char c:
-                sb.Append($"'\\u{(int)c:x4}'");
-                return;
-            case bool b:
-                sb.Append(b ? "true" : "false");
-                return;
-            case int i:
-                sb.Append(i.ToString(CultureInfo.InvariantCulture));
-                return;
-            case long l:
-                sb.Append(l.ToString(CultureInfo.InvariantCulture)).Append('L');
-                return;
-            case short sh:
-                sb.Append(sh.ToString(CultureInfo.InvariantCulture)).Append('s');
-                return;
-            case byte by:
-                sb.Append(by.ToString(CultureInfo.InvariantCulture)).Append('y');
-                return;
-            case sbyte sby:
-                sb.Append(sby.ToString(CultureInfo.InvariantCulture)).Append("sy");
-                return;
-            case uint ui:
-                sb.Append(ui.ToString(CultureInfo.InvariantCulture)).Append('u');
-                return;
-            case ulong ul:
-                sb.Append(ul.ToString(CultureInfo.InvariantCulture)).Append("uL");
-                return;
-            case ushort us:
-                sb.Append(us.ToString(CultureInfo.InvariantCulture)).Append("us");
-                return;
-            case double d:
-                sb.Append(d.ToString("R", CultureInfo.InvariantCulture)).Append('d');
-                return;
-            case float f:
-                sb.Append(f.ToString("R", CultureInfo.InvariantCulture)).Append('f');
-                return;
-            case decimal m:
-                sb.Append(m.ToString(CultureInfo.InvariantCulture)).Append('m');
-                return;
-            case DateTime dt:
-                sb.Append(dt.ToString("O", CultureInfo.InvariantCulture)).Append('/').Append(dt.Kind);
-                return;
-            case DateTimeOffset dto:
-                sb.Append(dto.ToString("O", CultureInfo.InvariantCulture));
-                return;
+            case null: sb.Append("null"); return;
+            case string s: AppendString(sb, s); return;
+            case char c: sb.Append($"'\\u{(int)c:x4}'"); return;
+            case bool b: sb.Append(b ? "true" : "false"); return;
+            case int i: sb.Append(i.ToString(CultureInfo.InvariantCulture)); return;
+            case long l: sb.Append(l.ToString(CultureInfo.InvariantCulture) + "L"); return;
+            case short sh: sb.Append(sh.ToString(CultureInfo.InvariantCulture) + "s"); return;
+            case byte by: sb.Append(by.ToString(CultureInfo.InvariantCulture) + "y"); return;
+            case sbyte sby: sb.Append(sby.ToString(CultureInfo.InvariantCulture) + "sy"); return;
+            case uint ui: sb.Append(ui.ToString(CultureInfo.InvariantCulture) + "u"); return;
+            case ulong ul: sb.Append(ul.ToString(CultureInfo.InvariantCulture) + "uL"); return;
+            case ushort us: sb.Append(us.ToString(CultureInfo.InvariantCulture) + "us"); return;
+            case double d: sb.Append(d.ToString("R", CultureInfo.InvariantCulture) + "d"); return;
+            case float f: sb.Append(f.ToString("R", CultureInfo.InvariantCulture) + "f"); return;
+            case decimal m: sb.Append(m.ToString(CultureInfo.InvariantCulture) + "m"); return;
+            case DateTime dt: sb.Append(dt.ToString("O", CultureInfo.InvariantCulture) + "/" + dt.Kind); return;
+            case DateTimeOffset dto: sb.Append(dto.ToString("O", CultureInfo.InvariantCulture)); return;
             case Enum e:
                 // The underlying value is rendered in its own type, so unsigned 64-bit values never narrow.
-                sb.Append(TypeName(e.GetType())).Append('.').Append(e.ToString()).Append("(=")
-                  .Append(Convert.ToString(Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture), CultureInfo.InvariantCulture))
-                  .Append(')');
+                sb.Append(TypeName(e.GetType()) + "." + e + "(=" + Convert.ToString(
+                    Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture), CultureInfo.InvariantCulture) + ")");
                 return;
-            case Type t:
-                sb.Append("typeof(").Append(TypeName(t)).Append(')');
-                return;
-            case Delegate del:
-                AppendDelegate(sb, del);
-                return;
-            case Task task:
-                AppendTask(sb, task, depth);
-                return;
+            case Type t: sb.Append("typeof(" + TypeName(t) + ")"); return;
+            case Delegate del: AppendDelegate(sb, del, depth); return;
+            case Task task: AppendTask(sb, task, depth); return;
             case MemberInfo member:
-                sb.Append('<').Append(member.MemberType).Append(' ')
-                  .Append(member.DeclaringType is { } declaring ? TypeName(declaring) + "::" : "").Append(member).Append('>');
+                sb.Append("<" + member.MemberType + " " + (member.DeclaringType is { } declaring ? TypeName(declaring) + "::" : "") + member + ">");
                 return;
             case Exception ex:
                 // Exception.ToString carries stack traces and line numbers, which differ between equivalent builds.
-                sb.Append(TypeName(ex.GetType())).Append('(');
+                sb.Append(TypeName(ex.GetType()) + "(");
                 AppendString(sb, ex.Message);
                 if (depth > 0 && ex.InnerException is { } inner)
                 {
@@ -138,7 +136,7 @@ public static class StateRenderer
                 sb.Append(')');
                 return;
             case IFormattable formattable when value.GetType().IsPrimitive || value.GetType().Namespace == "System":
-                sb.Append(TypeName(value.GetType())).Append('(').Append(formattable.ToString(null, CultureInfo.InvariantCulture)).Append(')');
+                sb.Append(TypeName(value.GetType()) + "(" + formattable.ToString(null, CultureInfo.InvariantCulture) + ")");
                 return;
         }
 
@@ -154,7 +152,7 @@ public static class StateRenderer
         }
         if (type.IsPointer || type.IsByRefLike)
         {
-            sb.Append("<byref-like ").Append(TypeName(type)).Append('>');
+            sb.Append("<byref-like " + TypeName(type) + ">");
             return;
         }
 
@@ -162,31 +160,7 @@ public static class StateRenderer
         if (depth <= 0)
             return;
         if (value is IEnumerable items)
-        {
-            sb.Append('[');
-            try
-            {
-                var n = 0;
-                foreach (var item in items)
-                {
-                    if (n > 0)
-                        sb.Append(", ");
-                    if (n++ == MaxItems)
-                    {
-                        sb.Append("…more");
-                        break;
-                    }
-                    Append(sb, item, depth - 1);
-                    if (sb.Length >= HardCap)
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                sb.Append('!').Append(Unwrap(ex).GetType().FullName);
-            }
-            sb.Append(']');
-        }
+            AppendItems(sb, items, depth);
         AppendMembers(sb, value, type, depth);
         if (OverridesToString(type))
         {
@@ -197,20 +171,51 @@ public static class StateRenderer
             }
             catch (Exception ex)
             {
-                sb.Append('!').Append(Unwrap(ex).GetType().FullName);
+                sb.Append("!" + Unwrap(ex).GetType().FullName);
             }
         }
     }
 
-    private static void AppendString(StringBuilder sb, string s)
+    private static void AppendItems(Sink sb, IEnumerable items, int depth)
+    {
+        sb.Append('[');
+        try
+        {
+            var n = 0;
+            foreach (var item in items)
+            {
+                if (n > 0)
+                    sb.Append(", ");
+                if (n++ == MaxItems || sb.Full)
+                {
+                    // An enumeration this long (or unbounded) cannot be compared in full.
+                    sb.MarkIncomplete();
+                    break;
+                }
+                Append(sb, item, depth - 1);
+            }
+        }
+        catch (Exception ex)
+        {
+            sb.Append("!" + Unwrap(ex).GetType().FullName);
+        }
+        sb.Append(']');
+    }
+
+    private static void AppendString(Sink sb, string s)
     {
         sb.Append('"');
+        var chunk = new StringBuilder(Math.Min(s.Length, 8192) + 16);
         foreach (var c in s)
         {
-            if (sb.Length >= HardCap)
-                break;
-            sb.Append(c is '"' or '\\' ? "\\" + c : c < 0x20 || c > 0x7e ? $"\\u{(int)c:x4}" : c.ToString());
+            chunk.Append(c is '"' or '\\' ? "\\" + c : c < 0x20 || c > 0x7e ? $"\\u{(int)c:x4}" : c.ToString());
+            if (chunk.Length >= 8192)
+            {
+                sb.Append(chunk.ToString());
+                chunk.Clear();
+            }
         }
+        sb.Append(chunk.ToString());
         sb.Append('"');
     }
 
@@ -220,103 +225,12 @@ public static class StateRenderer
         return declaring is not null && declaring != typeof(object) && declaring != typeof(ValueType) && declaring != typeof(Enum);
     }
 
-    /// <summary>A delegate's type and target methods. Compiler-generated lambda names are masked, because they are
-    /// not part of behavior and differ between equivalent builds; the declaring type is kept.</summary>
-    private static void AppendDelegate(StringBuilder sb, Delegate del)
-    {
-        sb.Append("<delegate ").Append(TypeName(del.GetType()));
-        foreach (var d in del.GetInvocationList())
-        {
-            var method = d.Method;
-            sb.Append(" -> ").Append(method.DeclaringType is { } t ? TypeName(t) : "?").Append('.')
-              .Append(method.Name.Contains('<') ? "<lambda>" : method.Name);
-        }
-        sb.Append('>');
-    }
-
-    /// <summary>Public instance fields and readable non-indexer properties, ordered by label.</summary>
-    private static void AppendMembers(StringBuilder sb, object value, Type type, int depth)
-    {
-        sb.Append('{');
-        var first = true;
-        foreach (var (label, member) in PublicState(type))
-        {
-            if (sb.Length >= HardCap)
-                break;
-            if (!first)
-                sb.Append(", ");
-            first = false;
-            sb.Append(label).Append('=');
-            object? memberValue;
-            try
-            {
-                memberValue = member is FieldInfo f ? f.GetValue(value) : ((PropertyInfo)member).GetValue(value);
-            }
-            catch (Exception ex)
-            {
-                sb.Append('!').Append(Unwrap(ex).GetType().FullName);
-                continue;
-            }
-            Append(sb, memberValue, depth - 1);
-        }
-        sb.Append('}');
-    }
-
-    /// <summary>The public state members of a type (static ones when <paramref name="statics"/>), each with a label: the
-    /// member name, or <c>DeclaringType.Name</c> for a member that a more derived member hides.</summary>
-    public static IReadOnlyList<(string Label, MemberInfo Member)> PublicState(Type type, bool statics = false)
-    {
-        var flags = BindingFlags.Public | (statics ? BindingFlags.Static | BindingFlags.DeclaredOnly : BindingFlags.Instance);
-        var members = type.GetFields(flags).Where(f => !f.FieldType.IsByRefLike && !f.FieldType.IsPointer).Cast<MemberInfo>()
-            .Concat(type.GetProperties(flags).Where(p => p.GetIndexParameters().Length == 0 && p.GetMethod is { IsPublic: true }
-                && !p.PropertyType.IsByRefLike && !p.PropertyType.IsPointer))
-            .ToList();
-        // Reflection reports an overridden property once (most derived) but a hidden (`new`) one once per declaring type.
-        return members.GroupBy(m => m.Name, StringComparer.Ordinal)
-            .SelectMany(g => g.OrderByDescending(m => Depth(m.DeclaringType))
-                .Select((m, i) => (Label: i == 0 ? m.Name : TypeName(m.DeclaringType!) + "." + m.Name, Member: m)))
-            .OrderBy(x => x.Label, StringComparer.Ordinal)
-            .ToList();
-    }
-
-    private static int Depth(Type? t)
-    {
-        var d = 0;
-        for (; t is not null; t = t.BaseType)
-            d++;
-        return d;
-    }
-
-    /// <summary>Static state of a type: its own public static fields and properties.</summary>
-    public static string RenderStatics(Type type, int depth)
-    {
-        var sb = new StringBuilder("{");
-        var first = true;
-        foreach (var (label, member) in PublicState(type, statics: true))
-        {
-            if (!first)
-                sb.Append(", ");
-            first = false;
-            sb.Append(label).Append('=');
-            try
-            {
-                var v = member is FieldInfo f ? f.GetValue(null) : ((PropertyInfo)member).GetValue(null);
-                Append(sb, v, depth - 1);
-            }
-            catch (Exception ex)
-            {
-                sb.Append('!').Append(Unwrap(ex).GetType().FullName);
-            }
-        }
-        return Compact(sb.Append('}'));
-    }
-
     /// <summary>
     /// A task's outcome after it completes. The wait is unbounded here: the member's time budget bounds it, so a
     /// task that never completes makes the member time out instead of rendering an unfinished status. Task ids
     /// and scheduler details are process-specific and never rendered.
     /// </summary>
-    private static void AppendTask(StringBuilder sb, Task task, int depth)
+    private static void AppendTask(Sink sb, Task task, int depth)
     {
         try
         {
@@ -326,7 +240,7 @@ public static class StateRenderer
         {
             // Observed below through the task's status and exception.
         }
-        sb.Append("Task(").Append(task.Status);
+        sb.Append("Task(" + task.Status);
         if (task.IsFaulted)
         {
             sb.Append(", !");
@@ -357,28 +271,5 @@ public static class StateRenderer
                     return ex;
             }
         }
-    }
-
-    /// <summary>A load-context-independent type name: namespace, name and generic arguments, no assembly qualifiers.
-    /// Compiler-generated types render as one placeholder, because their names are not part of a type's behavior.</summary>
-    public static string TypeName(Type t)
-    {
-        if (t.IsByRef)
-            return "ref " + TypeName(t.GetElementType()!);
-        if (t.IsArray)
-            return TypeName(t.GetElementType()!) + "[" + new string(',', t.GetArrayRank() - 1) + "]";
-        if (t.IsGenericParameter)
-            return t.Name;
-        if (t.Name.Contains('<'))
-            return "<compiler-generated>";
-        var simple = t.Name.Split('`')[0];
-        var name = t.IsNested ? TypeName(t.DeclaringType!) + "+" + simple : (t.Namespace is { Length: > 0 } ns ? ns + "." : "") + simple;
-        if (!t.IsGenericType)
-            return name;
-        var args = t.GetGenericArguments();
-        // Nested types repeat their parents' generic arguments; show only the ones this type adds.
-        var inherited = t.IsNested ? t.DeclaringType!.GetGenericArguments().Length : 0;
-        var own = args.Skip(inherited).ToArray();
-        return own.Length == 0 ? name : name + "<" + string.Join(",", own.Select(TypeName)) + ">";
     }
 }

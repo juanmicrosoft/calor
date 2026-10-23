@@ -153,7 +153,7 @@ public class MemberOracleTests
             "public class Box<T> { public T Value { get; set; } public int Count<U>(U[] items) => items?.Length ?? 0; }",
             "public class Box<T> { public T Value { get; set; } public int Count<U>(U[] items) => items?.Length ?? 1; }", ["Box`1"]);
         Assert.Contains(verdicts, v => v.Type == "Box<System.Object>" && v.Member == "ctor()" && v.Status == MemberStatus.Agree);
-        Assert.Contains(verdicts, v => v.Type == "Box<System.Object>" && v.Member.StartsWith("Count<System.Object>", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
+        Assert.Contains(verdicts, v => v.Type == "Box<System.Object>" && v.Member.StartsWith("Count<U>", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
     }
 
     [Fact]
@@ -280,6 +280,9 @@ public class MemberOracleTests
         },
     };
 
+    /// <summary>The gate fixtures' file a.cs is expected to be exercised.</summary>
+    private static readonly OracleExpected Expected = new() { Projects = { ["P"] = ["a.cs"] } };
+
     private static OracleBaselineEntry Entry(string member, string witness) =>
         new() { Project = "P", File = "a.cs", Member = member, Finding = "finding", Fingerprint = "fp-" + witness, Witness = witness };
 
@@ -287,7 +290,7 @@ public class MemberOracleTests
     public void Gate_UnlistedDifferenceOnALosslessFile_Fails()
     {
         var report = GateReport(lossRecorded: false);
-        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
         Assert.False(report.Passed);
         Assert.Equal("failing", Assert.Single(report.Gate).Decision);
     }
@@ -296,7 +299,7 @@ public class MemberOracleTests
     public void Gate_DifferenceOnAFileWithARecordedLoss_IsTolerated()
     {
         var report = GateReport(lossRecorded: true);
-        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
         Assert.True(report.Passed);
         Assert.Equal("loss-recorded", Assert.Single(report.Gate).Decision);
     }
@@ -305,11 +308,11 @@ public class MemberOracleTests
     public void Gate_BaselinedDifference_PassesOnlyWithTheSameFingerprint()
     {
         var same = GateReport(lossRecorded: false);
-        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, same, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, Expected, same, ["a.cs"]);
         Assert.True(same.Passed);
 
         var changed = GateReport(lossRecorded: false, witness: "w2");
-        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, changed, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, Expected, changed, ["a.cs"]);
         Assert.False(changed.Passed);
         Assert.Equal("baseline-changed", Assert.Single(changed.Gate).Decision);
     }
@@ -318,23 +321,59 @@ public class MemberOracleTests
     public void Gate_BaselineEntryForAnAgreeingMember_IsStale()
     {
         var report = GateReport(lossRecorded: true);
-        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::N()", "w")] }, report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::N()", "w")] }, Expected, report, ["a.cs"]);
         Assert.False(report.Passed);
         Assert.Contains(report.Gate, g => g.Decision == "baseline-stale" && g.Member == "T::N()");
     }
 
-    /// <summary>A converted build that crashes or hangs the file's process (where the original does not) fails like a difference.</summary>
+    /// <summary>A file the oracle could not finish (a crash outside any member, a process timeout) fails the gate.</summary>
     [Fact]
-    public void Gate_ConvertedCrash_Fails()
+    public void Gate_FileFailure_Fails()
     {
         var report = new OracleProjectReport
         {
             Project = "P",
-            Files = { new OracleFileReport { File = "a.cs", Status = "converted-crashed", Detail = "exit 134: stack overflow" } },
+            Files = { new OracleFileReport { File = "a.cs", Status = "oracle-crashed", Checkpoint = "plan", Detail = "exit 134" } },
         };
-        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
         Assert.False(report.Passed);
-        Assert.Equal(("a.cs", "<file>", "failing"), (report.Gate[0].File, report.Gate[0].Member, report.Gate[0].Decision));
+        Assert.Contains(report.Gate, g => g is { File: "a.cs", Member: "<file>", Decision: "failing" });
+    }
+
+    /// <summary>Coverage is checked by file identity: an expected file that is no longer exercised fails, even if another file is new.</summary>
+    [Fact]
+    public void Gate_ExpectedFileNoLongerExercised_Fails()
+    {
+        var report = new OracleProjectReport
+        {
+            Project = "P",
+            Files =
+            {
+                new OracleFileReport { File = "a.cs", Status = "swap-build-failed" },
+                new OracleFileReport { File = "b.cs", Status = "exercised" },
+            },
+        };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs", "b.cs"]);
+        Assert.False(report.Passed);
+        Assert.Contains(report.Gate, g => g is { File: "a.cs", Member: "<coverage>", Decision: "failing" });
+        Assert.Contains(report.Gate, g => g is { File: "b.cs", Decision: "new-coverage" });
+    }
+
+    [Fact]
+    public void Gate_TooFewComparedMembers_Fails()
+    {
+        var report = GateReport(lossRecorded: true) with { MinimumComparedMembers = 5 };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
+        Assert.Contains(report.Gate, g => g.Member == "<coverage>" && g.Decision == "failing");
+    }
+
+    [Fact]
+    public void Gate_InconclusiveMember_Fails()
+    {
+        var report = GateReport(lossRecorded: true);
+        report.Files[0].Members.Add(new MemberVerdict { Type = "T", Member = "P()", Kind = "static", Status = MemberStatus.Inconclusive, Reason = "replay never reached the input" });
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
+        Assert.Contains(report.Gate, g => g.Member == "T::P()" && g.Decision == "failing");
     }
 
     [Fact]
@@ -446,25 +485,124 @@ public class MemberOracleTests
     }
 
     [Fact]
-    public void TimeoutClassification_FollowsTheCleanStateProbes()
+    public void TimeoutClassification_FollowsTheCleanStateReplays()
     {
         var prefix = new MemberVerdict { Type = "T", Member = "F()", Kind = "static", Status = MemberStatus.Timeout, LimitedAt = 3, Inputs = 3 };
         var options = new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) };
-        ProbeResult Hang() => new(false, 4, null);
-        ProbeResult Quick(string o = "r") => new(true, 0.1, o);
-        Assert.Equal("HANG", MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick(), Quick()], [Hang(), Hang()], options).Reason);
-        Assert.Equal(MemberStatus.Timeout, MemberDifferentialOracle.ClassifyTimeout(prefix, [Hang(), Hang()], [Hang(), Hang()], options).Status);
-        Assert.Equal(MemberStatus.Nondeterministic, MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick(), Hang()], [Hang(), Hang()], options).Status);
-        Assert.Equal(MemberStatus.Different, MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick("a"), Quick("a")], [Quick("b"), Quick("b")], options).Status);
-        Assert.Equal(MemberStatus.Timeout, MemberDifferentialOracle.ClassifyTimeout(prefix, [Quick(), Quick()], [Quick(), Quick()], options).Status);
+        ProbeResult Hang() => new(ProbeOutcome.Hung, 4, null);
+        ProbeResult Crash() => new(ProbeOutcome.Crashed, 0, null);
+        ProbeResult Quick(string o = "r") => new(ProbeOutcome.Finished, 0.1, o);
+        ProbeResult Lost() => new(ProbeOutcome.Infrastructure, 0, "replay timed out");
+        MemberVerdict Classify(ProbeResult[] o, ProbeResult[] c) => MemberDifferentialOracle.ClassifyTimeout(prefix, o, c, options);
+        Assert.Equal("HANG", Classify([Quick(), Quick()], [Hang(), Hang()]).Reason);
+        Assert.Equal("CRASH", Classify([Quick(), Quick()], [Crash(), Crash()]).Reason);
+        Assert.Equal(MemberStatus.Timeout, Classify([Hang(), Hang()], [Hang(), Hang()]).Status);
+        Assert.Equal(MemberStatus.Nondeterministic, Classify([Quick(), Hang()], [Hang(), Hang()]).Status);
+        // Self-consistency is checked before HANG: an original whose replays disagree is never a HANG difference.
+        Assert.Equal(MemberStatus.Nondeterministic, Classify([Quick("a"), Quick("b")], [Hang(), Hang()]).Status);
+        Assert.Equal(MemberStatus.Different, Classify([Quick("a"), Quick("a")], [Quick("b"), Quick("b")]).Status);
+        Assert.Equal(MemberStatus.Timeout, Classify([Quick(), Quick()], [Quick(), Quick()]).Status);
+        Assert.Equal(MemberStatus.Inconclusive, Classify([Quick(), Quick()], [Lost(), Quick()]).Status);
+    }
+
+    /// <summary>A prefix that already differs still folds the replay outcome into its fingerprint.</summary>
+    [Fact]
+    public void TimeoutClassification_ChangesTheFingerprintOfADifferingPrefix()
+    {
+        var prefix = new MemberVerdict { Type = "T", Member = "F()", Kind = "static", Status = MemberStatus.Different, LimitedAt = 3, Fingerprint = "p", Witnesses = ["w"] };
+        var options = new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) };
+        var shared = MemberDifferentialOracle.ClassifyTimeout(prefix, [new(ProbeOutcome.Hung, 4, null), new(ProbeOutcome.Hung, 4, null)],
+            [new(ProbeOutcome.Hung, 4, null), new(ProbeOutcome.Hung, 4, null)], options);
+        var asymmetric = MemberDifferentialOracle.ClassifyTimeout(prefix, [new(ProbeOutcome.Finished, 0.1, "r"), new(ProbeOutcome.Finished, 0.1, "r")],
+            [new(ProbeOutcome.Hung, 4, null), new(ProbeOutcome.Hung, 4, null)], options);
+        Assert.Equal(MemberStatus.Different, shared.Status);
+        Assert.NotEqual(shared.Fingerprint, asymmetric.Fingerprint);
+    }
+
+    /// <summary>A converted build that hangs only on a later call (state from earlier calls) is replayed with that sequence.</summary>
+    [Fact]
+    public void SequenceDependentHang_IsReplayedWithItsPrefix()
+    {
+        var verdicts = Compare(
+            "public static class S { static int calls; public static int F(bool b) { calls++; return 1; } }",
+            "public static class S { static int calls; public static int F(bool b) { if (++calls == 2) System.Threading.Thread.Sleep(4000); return 1; } }",
+            ["S"], timeoutSeconds: 1);
+        var f = Single(verdicts, "static F(System.Boolean)->System.Int32");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Equal("HANG", f.Reason);
+    }
+
+    // ---- Codex round 2 false negatives --------------------------------------------------------
+
+    [Fact]
+    public void DefaultInterfaceImplementation_IsDrivenThroughTheImplementingType()
+    {
+        var verdicts = Compare("public interface I { int F() => 1; } public class C : I { }", "public interface I { int F() => 2; } public class C : I { }", ["I", "C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member.StartsWith("via I.F", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
+        Assert.Contains(verdicts, v => v.Type == "I" && v.Kind == "interface-member");
     }
 
     [Fact]
-    public void Gate_CoverageBelowTheFloor_Fails()
+    public void ExplicitInterfaceImplementation_IsDriven()
     {
-        var report = GateReport(lossRecorded: true) with { MinimumExercisedFiles = 2 };
-        OracleRunner.ApplyGate("P", new OracleBaseline(), report, ["a.cs"]);
-        Assert.Contains(report.Gate, g => g.Member == "<coverage>" && g.Decision == "failing");
+        var verdicts = Compare("public interface I { int F(); } public class C : I { int I.F() => 1; }", "public interface I { int F(); } public class C : I { int I.F() => 2; }", ["I", "C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member.StartsWith("via I.F", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
+    }
+
+    [Fact]
+    public void HiddenSameSignatureBaseProperty_IsPartOfTheState()
+    {
+        const string b = "public class Base { public int X { get; set; } = 1; } ";
+        var verdicts = Compare(b + "public class C : Base { public new int X { get; set; } = 5; public C() { base.X = 1; } }",
+            b + "public class C : Base { public new int X { get; set; } = 5; public C() { base.X = 2; } }", ["Base", "C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member == "ctor()" && v.Status == MemberStatus.Different);
+    }
+
+    [Fact]
+    public void HiddenSameSignatureBaseMethod_IsDriven()
+    {
+        const string c = "public class C : Base { public new int F() => 5; }";
+        var verdicts = Compare("public class Base { public int F() => 1; } " + c, "public class Base { public int F() => 2; } " + c, ["Base", "C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member.StartsWith("Base.F", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
+    }
+
+    [Fact]
+    public void ReturnedDelegate_IsCalled()
+    {
+        var verdicts = Compare("public static class S { public static System.Func<int, int> F() => x => x + 1; }",
+            "public static class S { public static System.Func<int, int> F() => x => x + 2; }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F()->System.Func<System.Int32,System.Int32>").Status);
+    }
+
+    [Fact]
+    public void DelegateItCannotCall_IsNeverAgreement()
+    {
+        const string source = "public static class S { public static System.Func<System.IO.Stream, int> F() => s => 1; }";
+        var f = Single(Compare(source, source, ["S"]), "static F()->System.Func<System.IO.Stream,System.Int32>");
+        Assert.NotEqual(MemberStatus.Agree, f.Status);
+    }
+
+    [Fact]
+    public void TokenElementsOfCollectionArguments_AreMaterialized()
+    {
+        var verdicts = Compare("public static class S { public static int F(System.Exception[] e) => e?.Length ?? 0; }",
+            "public static class S { public static int F(System.Exception[] e) => e == null ? 0 : e.Length > 0 && e[0] != null ? 99 : e.Length; }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F(System.Exception[])->System.Int32").Status);
+    }
+
+    [Fact]
+    public void MutationOfAnotherTypesStatics_IsCompared()
+    {
+        const string a = "public static class A { public static int X; } ";
+        var verdicts = Compare(a + "public static class Z { public static void F() { A.X = 1; } }", a + "public static class Z { public static void F() { A.X = 2; } }", ["A", "Z"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F()->System.Void").Status);
+    }
+
+    [Fact]
+    public void AllTypesScope_IncludesTypesNotListed()
+    {
+        var verdicts = Compare("public class Listed { } public class Unlisted { public int X = 1; }", "public class Listed { } public class Unlisted { public int X = 2; }", ["*"]);
+        Assert.Contains(verdicts, v => v.Type == "Unlisted" && v.Member == "ctor()" && v.Status == MemberStatus.Different);
     }
 
     // ---- Inputs ---------------------------------------------------------------------------------

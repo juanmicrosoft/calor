@@ -29,7 +29,8 @@ public sealed class SubjectBuild
     public IReadOnlyDictionary<string, string> DependencyPaths { get; }
 
     /// <summary>Everything a child process needs to rebuild the same compilation without MSBuild.</summary>
-    public sealed record Spec(string ProjectFile, string TargetFramework, string[] CompilerArguments, Dictionary<string, string> DependencyPaths, string? TargetPath = null);
+    public sealed record Spec(string ProjectFile, string TargetFramework, string[] CompilerArguments, Dictionary<string, string> DependencyPaths,
+        string? TargetPath = null, string BuildProperties = "", string DotnetPath = "dotnet");
 
     public Spec BuildSpec { get; }
 
@@ -90,7 +91,7 @@ public sealed class SubjectBuild
             throw new InvalidOperationException("MSBuild reported no compiler arguments.");
         var targetPath = json.RootElement.TryGetProperty("Properties", out var properties) && properties.TryGetProperty("TargetPath", out var tp)
             ? tp.GetString() : null;
-        return FromSpec(new Spec(projectFile, tfm, args, DependencyMap(items, projectDir), targetPath), cancellationToken);
+        return FromSpec(new Spec(projectFile, tfm, args, DependencyMap(items, projectDir), targetPath, common, config.DotnetPath), cancellationToken);
     }
 
     /// <summary>Rebuilds the compilation from a captured compiler command line (no MSBuild).</summary>
@@ -135,45 +136,63 @@ public sealed class SubjectBuild
         return new SubjectBuild(spec, compilation, generators, parsed.ManifestResources, additional, provider) { GeneratorLoadFailures = failures };
     }
 
-    /// <summary>
-    /// Checks the in-process original against the assembly <c>dotnet build</c> produced: the same type definitions,
-    /// the same member names per type, and the same manifest resources. Returns a description of the first mismatch,
-    /// or null. (Signing is dropped in-process, so identities are compared by name.)
-    /// </summary>
-    public string? VerifyAgainstRealBuild(ArmImage original)
-    {
-        if (BuildSpec.TargetPath is not { } path || !File.Exists(path))
-            return $"the dotnet build output '{BuildSpec.TargetPath}' was not found";
-        var real = Shape(File.ReadAllBytes(path));
-        var ours = Shape(original.Image);
-        var missing = real.Except(ours).Take(3).ToList();
-        var extra = ours.Except(real).Take(3).ToList();
-        return missing.Count == 0 && extra.Count == 0 ? null
-            : $"only in the dotnet build: [{string.Join("; ", missing)}]; only in-process: [{string.Join("; ", extra)}]";
-    }
+    /// <summary>The assembly <c>dotnet build</c> produced for the original subject: the oracle's original arm.</summary>
+    public byte[] RealOriginalImage() =>
+        BuildSpec.TargetPath is { } path && File.Exists(path) ? File.ReadAllBytes(path)
+            : throw new InvalidOperationException($"the dotnet build output '{BuildSpec.TargetPath}' was not found");
 
-    private static HashSet<string> Shape(byte[] image)
+    /// <summary>
+    /// Builds swapped candidates with the real <c>dotnet build</c> (the SDK's compiler, every MSBuild target), so the
+    /// converted arm is exactly what the project would ship. Each worker owns a private working copy, built once up
+    /// front; a candidate is one incremental build of that copy with one file replaced, then restored.
+    /// </summary>
+    public sealed class CandidateWorker
     {
-        using var pe = new System.Reflection.PortableExecutable.PEReader(new MemoryStream(image));
-        var md = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
-        var shape = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var handle in md.TypeDefinitions)
+        private readonly string _root;
+        private readonly string _projectFile;
+        private readonly string _targetPath;
+        private readonly Spec _spec;
+        private readonly TimeSpan _timeout;
+
+        private CandidateWorker(string root, string projectFile, string targetPath, Spec spec, TimeSpan timeout) =>
+            (_root, _projectFile, _targetPath, _spec, _timeout) = (root, projectFile, targetPath, spec, timeout);
+
+        /// <summary>Copies <paramref name="workDir"/> (sources only) to <paramref name="root"/> and builds it once.</summary>
+        public static async Task<CandidateWorker> CreateAsync(SubjectBuild build, string workDir, string root, TimeSpan timeout, CancellationToken cancellationToken)
         {
-            var type = md.GetTypeDefinition(handle);
-            var name = md.GetString(type.Namespace) + "." + md.GetString(type.Name);
-            // Compiler-generated and file-local type names embed hashes of file paths (generated files live elsewhere
-            // in-process), so they are not part of the compared shape; their declaring source types are.
-            if (name.Contains('<'))
-                continue;
-            shape.Add("type " + name);
-            foreach (var m in type.GetMethods())
-                shape.Add($"method {name}::{md.GetString(md.GetMethodDefinition(m).Name)}");
-            foreach (var f in type.GetFields())
-                shape.Add($"field {name}::{md.GetString(md.GetFieldDefinition(f).Name)}");
+            RoundTripPipeline.CopyDirectory(workDir, root, cancellationToken);
+            var projectFile = Path.Combine(root, Path.GetRelativePath(workDir, build.ProjectFile));
+            var targetPath = Path.Combine(root, Path.GetRelativePath(workDir, build.BuildSpec.TargetPath!));
+            var worker = new CandidateWorker(root, projectFile, targetPath, build.BuildSpec, timeout);
+            var (exit, output) = await worker.BuildAsync(cancellationToken);
+            return exit == 0 ? worker : throw new InvalidOperationException($"candidate worker build failed ({exit}): {output}");
         }
-        foreach (var r in md.ManifestResources)
-            shape.Add("resource " + md.GetString(md.GetManifestResource(r).Name));
-        return shape;
+
+        private async Task<(int Exit, string Output)> BuildAsync(CancellationToken cancellationToken)
+        {
+            var (exit, stdout, stderr) = await ProcessRunner.RunAsync(_spec.DotnetPath,
+                $"build \"{_projectFile}\" {_spec.BuildProperties} -nodeReuse:false --verbosity quiet", Path.GetDirectoryName(_projectFile)!,
+                _timeout, new Dictionary<string, string> { ["MSBUILDDISABLENODEREUSE"] = "1" }, cancellationToken);
+            var output = (stdout + stderr).Trim();
+            return (exit, output.Length > 800 ? output[^800..] : output);
+        }
+
+        /// <summary>The built assembly with <paramref name="relativePath"/> replaced by <paramref name="text"/>, or the build failure.</summary>
+        public async Task<(byte[]? Image, string? Error)> BuildCandidateAsync(string relativePath, string text, CancellationToken cancellationToken)
+        {
+            var path = Path.Combine(_root, relativePath);
+            var original = await File.ReadAllTextAsync(path, cancellationToken);
+            try
+            {
+                await File.WriteAllTextAsync(path, text, cancellationToken);
+                var (exit, output) = await BuildAsync(cancellationToken);
+                return exit == 0 ? (await File.ReadAllBytesAsync(_targetPath, cancellationToken), null) : (null, $"dotnet build failed ({exit}): {output}");
+            }
+            finally
+            {
+                await File.WriteAllTextAsync(path, original, CancellationToken.None);
+            }
+        }
     }
 
     private sealed class FileText(string path) : AdditionalText
@@ -308,8 +327,8 @@ public sealed class SubjectBuild
             case "declared":
                 return declared.Order(StringComparer.Ordinal).ToList();
             case "all":
-                declared.UnionWith(_compilation.SyntaxTrees.SelectMany(t => DeclaredTypes(_compilation, t)));
-                return declared.Order(StringComparer.Ordinal).ToList();
+                // Every type of each emitted assembly, generator output included (the planner enumerates the image).
+                return [OraclePlanner.AllTypes, .. declared.Order(StringComparer.Ordinal)];
         }
         var simpleNames = declared.Select(n => n.Split('.', '+')[^1].Split('`')[0]).ToHashSet(StringComparer.Ordinal);
         var result = new HashSet<string>(declared, StringComparer.Ordinal);

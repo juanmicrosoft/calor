@@ -329,7 +329,7 @@ public sealed class RoundTripPipeline
         return workDir;
     }
 
-    private static void CopyDirectory(
+    internal static void CopyDirectory(
         string source,
         string destination,
         CancellationToken cancellationToken)

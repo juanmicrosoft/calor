@@ -93,7 +93,20 @@ async Task<int> OracleCommand(string[] args)
         return 2;
     }
 
-    var withValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet", "--depth", "--scope", "--shard", "--baseline", "--jobs", "--member-timeout" };
+    var expectedPath = GetOption(args, "--expected") ?? Calor.RoundTrip.Harness.Oracle.OracleExpected.DefaultPath(repoRoot);
+    Calor.RoundTrip.Harness.Oracle.OracleExpected expected;
+    try
+    {
+        expected = Calor.RoundTrip.Harness.Oracle.OracleExpected.Load(expectedPath);
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or System.Text.Json.JsonException or IOException)
+    {
+        Console.Error.WriteLine($"Invalid oracle expected-files list: {ex.Message}");
+        return 2;
+    }
+    var writeExpected = args.Contains("--write-expected");
+
+    var withValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet", "--depth", "--scope", "--shard", "--baseline", "--jobs", "--member-timeout", "--expected" };
     var names = new List<string>();
     for (var i = 0; i < args.Length; i++)
     {
@@ -126,12 +139,24 @@ async Task<int> OracleCommand(string[] args)
         Console.WriteLine($"Member oracle: {config.ProjectName}");
         var options = new Calor.RoundTrip.Harness.Oracle.OracleOptions { Depth = depth, MemberTimeout = memberTimeout };
         var report = await new Calor.RoundTrip.Harness.Oracle.OracleRunner(
-            config, options, baseline, scope, shardIndex, shardCount, jobs).RunAsync();
+            config, options, baseline, expected, scope, shardIndex, shardCount, jobs).RunAsync();
         reports.Add(report);
+        if (writeExpected && shardCount == 1 && report.Inconclusive is null)
+            expected.Projects[config.ProjectName] = report.Files.Where(f => f.Status == "exercised").Select(f => f.File).Order(StringComparer.Ordinal).ToList();
         var suffix = shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "";
         await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}{suffix}-member-oracle.json"),
             System.Text.Json.JsonSerializer.Serialize(report, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");
         Console.WriteLine($"  {config.ProjectName}: {(report.Inconclusive is not null ? "INCONCLUSIVE " + report.Inconclusive : report.Passed ? "pass" : "FAIL")} in {report.WallClockSeconds:0}s");
+    }
+
+    if (writeExpected)
+    {
+        var ordered = new Calor.RoundTrip.Harness.Oracle.OracleExpected
+        {
+            Projects = expected.Projects.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToDictionary(kv => kv.Key, kv => kv.Value),
+        };
+        await File.WriteAllTextAsync(expectedPath, System.Text.Json.JsonSerializer.Serialize(ordered, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");
+        Console.WriteLine($"Wrote {expectedPath}");
     }
 
     var markdown = Calor.RoundTrip.Harness.Oracle.OracleRunner.Markdown(reports);
@@ -147,36 +172,41 @@ async Task<int> OracleCommand(string[] args)
 // #1587 internal: one file of the member oracle, in its own process (spawned by `oracle`).
 async Task<int> OracleFileCommand(string[] args)
 {
-    var options = OracleChildOptions(args) with
-    {
-        Limits = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(await File.ReadAllTextAsync(RequiredOption(args, "--limits")))!,
-    };
+    var options = await OracleChildOptionsAsync(args);
     await Calor.RoundTrip.Harness.Oracle.OracleRunner.RunFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--original"),
-        RequiredOption(args, "--file"), RequiredOption(args, "--relative"), options, RequiredOption(args, "--scope"), RequiredOption(args, "--stem"),
-        self: args.Contains("--self"));
+        RequiredOption(args, "--candidate"), RequiredOption(args, "--scope-file"), RequiredOption(args, "--conversion"),
+        RequiredOption(args, "--relative"), options, RequiredOption(args, "--stem"), self: args.Contains("--self"));
     Console.Out.Flush();
     // A member that never returned leaves a thread running; exiting the process is the only way to stop it.
     Environment.Exit(0);
     return 0;
 }
 
-// #1587 internal: one input of one member from clean state, in its own process (spawned by `oracle` after a timeout).
+// #1587 internal: one clean-state replay of a member input, in its own process (spawned by `oracle` after a timeout or crash).
 async Task<int> OracleProbeCommand(string[] args)
 {
-    await Calor.RoundTrip.Harness.Oracle.OracleRunner.ProbeFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--plan-image"),
-        RequiredOption(args, "--run-image"), RequiredOption(args, "--scope-file"), (await File.ReadAllTextAsync(RequiredOption(args, "--member-file"))).Trim(),
-        int.Parse(RequiredOption(args, "--input"), System.Globalization.CultureInfo.InvariantCulture), OracleChildOptions(args), RequiredOption(args, "--out"));
+    await Calor.RoundTrip.Harness.Oracle.OracleRunner.ProbeFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--original"),
+        RequiredOption(args, "--candidate"), RequiredOption(args, "--scope-file"), (await File.ReadAllTextAsync(RequiredOption(args, "--member-file"))).Trim(),
+        int.Parse(RequiredOption(args, "--input"), System.Globalization.CultureInfo.InvariantCulture), args.Contains("--on-candidate"),
+        await OracleChildOptionsAsync(args), RequiredOption(args, "--out"), RequiredOption(args, "--marker"));
     Console.Out.Flush();
     Environment.Exit(0);
     return 0;
 }
 
-Calor.RoundTrip.Harness.Oracle.OracleOptions OracleChildOptions(string[] args) => new()
+async Task<Calor.RoundTrip.Harness.Oracle.OracleOptions> OracleChildOptionsAsync(string[] args)
 {
-    Depth = int.Parse(RequiredOption(args, "--depth"), System.Globalization.CultureInfo.InvariantCulture),
-    MemberTimeout = TimeSpan.FromSeconds(double.Parse(RequiredOption(args, "--member-timeout"), System.Globalization.CultureInfo.InvariantCulture)),
-    SeedKey = RequiredOption(args, "--seed"),
-};
+    var trace = (await File.ReadAllTextAsync(RequiredOption(args, "--trace-file"))).Trim();
+    return new Calor.RoundTrip.Harness.Oracle.OracleOptions
+    {
+        Depth = int.Parse(RequiredOption(args, "--depth"), System.Globalization.CultureInfo.InvariantCulture),
+        MemberTimeout = TimeSpan.FromSeconds(double.Parse(RequiredOption(args, "--member-timeout"), System.Globalization.CultureInfo.InvariantCulture)),
+        SeedKey = RequiredOption(args, "--seed"),
+        Limits = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(await File.ReadAllTextAsync(RequiredOption(args, "--limits")))!,
+        ReceiverBans = System.Text.Json.JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(RequiredOption(args, "--bans")))!.ToHashSet(StringComparer.Ordinal),
+        TraceMember = trace.Length == 0 ? null : trace,
+    };
+}
 
 string RequiredOption(string[] args, string flag) => GetOption(args, flag) ?? throw new ArgumentException($"missing {flag}");
 
@@ -1096,6 +1126,8 @@ static void PrintUsage()
           --member-timeout <sec>   Budget for all inputs of one member on one run (default 5)
           --baseline <path>        Reviewed findings (default eng/member-oracle-baseline.json)
           --output <path>          Report directory (default conversion-reports)
+          --expected <path>        Files each project must exercise (default eng/member-oracle-expected.json)
+          --write-expected         Rewrite that list from this run (unsharded runs only)
 
         Options (run):
           --projects-dir <path>    Directory containing target project clones

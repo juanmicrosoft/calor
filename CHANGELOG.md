@@ -100,9 +100,11 @@ what a program does.
     A converted build that hangs or crashes where the original does not is a difference.
   - CI runs it as the `member-oracle` job. A difference fails the job unless the file's
     conversion records a loss or `eng/member-oracle-baseline.json` lists it. The job also
-    fails if fewer files or members are checked than the floors in `ProjectConfigs`.
-  - When it landed, it exercised 92 of 289 corpus files and compared 900 distinct members
-    with no difference found. Another 790 members could not be driven yet, mostly
+    fails if a file listed in `eng/member-oracle-expected.json` is no longer checked.
+  - Both builds come from `dotnet build`, so the oracle compares exactly what the project
+    would ship.
+  - When it landed, it exercised 92 of 289 corpus files and compared 929 distinct members
+    with no difference found. Another 1,061 members could not be driven yet, mostly
     because no generated input can construct them. The issue's two-member example is a
     test fixture, and the oracle flags it.
 

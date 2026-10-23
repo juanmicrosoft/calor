@@ -145,44 +145,52 @@ dotnet run --project tools/Calor.RoundTrip.Harness -- oracle --all \
   --dotnet dotnet --output ./oracle-reports/
 ```
 
-**Builds.** The oracle runs `dotnet build` once on the subject library. It then
-captures the exact `csc` arguments MSBuild computes and rebuilds the library
-in-process with Roslyn. The rebuild includes source generators (with the
-project's additional files and analyzer config) and manifest resources. Before
-any comparison, the in-process original must match the `dotnet build` output:
-the same types, members and resources. Otherwise the project is inconclusive.
-
-**Per file.** For every library file, the oracle:
+**Builds.** Both arms are real `dotnet build` outputs. The original is the
+library as the project builds it. For every library file, the oracle:
 
 1. converts it with the default leg's options
    (`ConvertCommand.BuildCSharpToCalorOptions`, Lossless);
 2. compiles the Calor back to C#;
-3. emits the library again with only that file swapped.
+3. checks the swap with a fast in-process Roslyn compile (the same `csc`
+   arguments MSBuild computes), which also lists the types to drive;
+4. builds the library again with `dotnet build`, in one of several private
+   working copies, with only that file replaced.
 
-Each file runs in its own process. Every run loads a build into a fresh
-collectible `AssemblyLoadContext`, so static state starts clean.
+So the converted arm is exactly what the project would ship, with every MSBuild
+target and source generator applied. Each file is then compared in its own
+process. Every run loads a build into a fresh collectible `AssemblyLoadContext`,
+so static state starts clean.
 
 **What it compares.** By default (`--scope all`), the oracle drives every type
-of the project for every swapped file, internal types included. A change can
-reach behavior through any chain of callers. `--scope dependents` and
-`--scope declared` narrow this for debugging. For each type, it compares:
+of the emitted assembly for every swapped file. That includes internal types and
+types a source generator produced, because a change can reach behavior through
+any chain of callers. `--scope dependents` and `--scope declared` narrow this
+for debugging. For each type, it compares:
 
-- the surface: members, kind, visibility, base chain and interfaces. A member
-  present in only one build is a difference;
+- the surface: members (interface members included), kind, visibility, base
+  chain and interfaces. A member present in only one build is a difference;
 - construction: the state after each public constructor, recursing into public
-  fields and properties to depth 2 (`--depth`). Hidden base members are included.
-  An overridden `ToString()` is included too, which shows text such as a
-  `StringBuilder`'s content;
-- methods, property setters and indexers, declared or inherited from the same
-  assembly. It compares the return value, the thrown exception type, argument
-  state after the call (including `ref`/`out`), the receiver's state, the type's
-  public static state, console output, and files created in a sandbox directory.
-  Tasks are awaited. Instance members run on a fresh receiver for each input,
-  built from a constructor and input that actually construct;
+  fields and properties to depth 2 (`--depth`). Every declaration in the
+  hierarchy counts, including members hidden with `new`. An overridden
+  `ToString()` is included, which shows text such as a `StringBuilder`'s
+  content;
+- methods, property setters and indexers: declared ones, base-type ones from the
+  same assembly (hidden ones included), and interface methods implemented
+  explicitly or by default implementation, called through the interface. It
+  compares the return value, the thrown exception type, argument state after
+  the call (including `ref`/`out`), the receiver's state, the type's public
+  static state, console output, and files created in a sandbox directory;
+- the public static state of every project type after each member, so a member
+  that changes another type's statics is caught;
 - enum values, and the type's static state after initialization.
 
-Scalars carry their runtime type (`1` versus `1L`). A long observation is
-compared through a hash of the whole rendering, never a truncated prefix.
+Instance members run on a fresh receiver for each input, built from a
+constructor and input that actually construct. Tasks are awaited. A returned
+delegate is called on generated inputs, and its captured state is shown. Scalars
+carry their runtime type (`1` versus `1L`). Every character of a rendering is
+hashed. A rendering that cannot be completed is never counted as agreement: one
+over 1,000,000 elements, over 256 MB, or containing a delegate the generator
+cannot call.
 
 **Inputs** come from `MemberOracleInputs` (`1587-member-inputs-v1`), seeded per
 project. It is a fork of the hash-pinned B1 generator, extended with:
@@ -195,34 +203,42 @@ project. It is a fork of the hash-pinned B1 generator, extended with:
 Generic types and methods are closed over `object`, `string` or `int` when the
 constraints allow it.
 
-**Nondeterminism and time.** Each build runs twice. An input is compared only
-when both builds reproduce it. A member is `NONDETERMINISTIC` (skipped, not
-failed) only when no stable input differs.
+**Nondeterminism, time and crashes.** Each build runs twice. An input is
+compared only when both builds reproduce it. A member is `NONDETERMINISTIC`
+(skipped, not failed) only when no stable input differs. An input whose setup
+failed identically on both builds is not counted as compared.
 
-A member over its time budget (`--member-timeout`, default 5 s) ends the
-process. The file restarts with that member limited to the inputs before the
-one that hung. A per-project calibration run (the original compared with itself)
-finds these limits once for all files. The hanging input is then probed from
-clean state, twice per build, in fresh processes:
+A member input over its time budget (`--member-timeout`, default 5 s) ends the
+process, and so does a crash. A crash is located to its run, member and input by
+a checkpoint file and a traced re-run. The file restarts with that member limited
+to the inputs before the failing one. A per-project calibration run (the original
+compared with itself) finds these limits once for all files.
 
-- one build hangs while the other finishes quickly: `HANG`, a difference;
-- both builds hang: `TIMEOUT`, and the earlier inputs are still compared;
-- the probes disagree with each other: `NONDETERMINISTIC`.
+The failing input is then replayed from clean state, twice per build, in fresh
+processes. A replay runs the members before it and the member's earlier inputs
+first, so state-dependent failures reproduce:
 
-A process that crashes is re-run with the original compared with itself. If
-that run completes, the converted build is at fault, and the file fails.
+- one build fails (hangs or crashes) while the other finishes quickly: `HANG`
+  or `CRASH`, a difference;
+- both builds fail: `TIMEOUT`, and the earlier inputs are still compared;
+- a build's replays disagree with each other: `NONDETERMINISTIC`;
+- a replay never reaches the input: `INCONCLUSIVE`, which fails.
 
 **Gate.** The job fails on any of the following:
 
 - a difference, unless the file's conversion ledger records a lossy or dropped
   construct, or `eng/member-oracle-baseline.json` lists the member with the same
   fingerprint. The fingerprint is a hash of every differing input with both full
-  observations;
-- a converted-build crash or hang;
+  observations, plus any replay outcome;
+- a file the oracle could not finish, an inconclusive member, or a swapped file
+  that compiles in-process but not with `dotnet build`;
 - a baseline entry whose fingerprint changed, or whose member now agrees;
 - an inconclusive project;
-- coverage below the project's floors (`OracleMinimumExercisedFiles` and
-  `OracleMinimumComparedMembers` in `ProjectConfigs`).
+- a file listed in `eng/member-oracle-expected.json` that is no longer
+  exercised. Coverage is checked by file identity, so a new file cannot hide a
+  lost one. A newly exercised file is reported; add it with `--write-expected`;
+- fewer member comparisons than the project's floor
+  (`OracleMinimumComparedMembers` in `ProjectConfigs`, unsharded runs).
 
 Files matched by a harness exclude pattern are reported as `excluded`, not
 dropped. Each project writes `<Project>-member-oracle.json`, which lists every
@@ -236,15 +252,15 @@ When it landed (2026-10-22), it exercised 92 of 289 files:
 |---------|-----------------|---------------------------|----------------|
 | Synthetic | 5 of 5 | 41 | 0 |
 | Synthetic2 | 1 of 1 | 10 | 0 |
-| MediatR | 8 of 32 | 71 | 51 |
-| Serilog | 14 of 112 (6 excluded) | 339 | 293 |
-| FluentValidation | 64 of 139 | 439 | 446 |
+| MediatR | 8 of 32 | 78 | 63 |
+| Serilog | 14 of 112 (6 excluded) | 338 | 389 |
+| FluentValidation | 64 of 139 | 462 | 609 |
 
 The other files do not convert with the default options. Most members are
 never compared because no generated input can build their receiver or
 arguments: interfaces, delegates and subject types without a usable
-constructor. Across all file swaps, the oracle made 33,625 member comparisons
-and found no difference. The whole corpus took about 5 minutes on a 4-job
+constructor. Across all file swaps, the oracle made 35,139 member comparisons
+and found no difference. The whole corpus took about 4.5 minutes on a 4-job
 laptop run. `AGREE` means no disagreement on a finite input set, not a proof
 of equivalence.
 

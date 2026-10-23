@@ -126,10 +126,7 @@ public sealed record RoundTripConfig
     /// <summary>Minimum fraction of all candidate files that must be converted natively with zero losses.</summary>
     public double MinimumNativeFraction { get; init; }
 
-    /// <summary>#1587 member-oracle floor: files the oracle must exercise (convert, swap-build and drive). Losing one fails the job.</summary>
-    public int OracleMinimumExercisedFiles { get; init; }
-
-    /// <summary>#1587 member-oracle floor: members whose inputs the oracle must compare across both builds.</summary>
+    /// <summary>#1587 member-oracle floor: member comparisons (a member counted once per swapped file) across both builds.</summary>
     public int OracleMinimumComparedMembers { get; init; }
 
     /// <summary>Conversion options this run uses. Defaults to the historical Lossy leg.</summary>

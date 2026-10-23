@@ -21,6 +21,9 @@ public static class MemberStatus
 
     /// <summary>Not exercised; <see cref="MemberVerdict.Reason"/> says why.</summary>
     public const string Skipped = "SKIPPED";
+
+    /// <summary>The oracle could not decide (for example a probe never reached the input). The gate fails it.</summary>
+    public const string Inconclusive = "INCONCLUSIVE";
 }
 
 public sealed record MemberVerdict
@@ -70,10 +73,51 @@ public sealed record OracleOptions
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public Action<string, int>? OnTimeout { get; init; }
+
+    /// <summary>Types whose receiver construction timed out on an earlier attempt: their instance members are skipped.</summary>
+    public IReadOnlySet<string> ReceiverBans { get; init; } = new HashSet<string>();
+
+    /// <summary>Child mode: receiver construction for this type timed out during planning; must end the process.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Action<string>? OnPlanTimeout { get; init; }
+
+    /// <summary>Called before each member of each run with (run label, member key): the crash checkpoint.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Action<string, string>? OnMemberStart { get; init; }
+
+    /// <summary>The member whose inputs are checkpointed one by one (set when locating a crash).</summary>
+    public string? TraceMember { get; init; }
+
+    /// <summary>Called before each input of <see cref="TraceMember"/> with (run label, input index).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Action<string, int>? OnInputStart { get; init; }
+
+    /// <summary>Probe child: called right before the probed input runs (a crash after it is the subject's).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Action? OnProbeInput { get; init; }
 }
 
-/// <summary>One run of a single input of a member, from clean state, to attribute a timeout.</summary>
-public sealed record ProbeResult(bool Finished, double Seconds, string? Observation);
+/// <summary>How a probe ended.</summary>
+public static class ProbeOutcome
+{
+    /// <summary>The input returned or threw within the budget; the observation is comparable.</summary>
+    public const string Finished = "finished";
+
+    /// <summary>The input did not finish within the member budget.</summary>
+    public const string Hung = "hung";
+
+    /// <summary>The process died while the input ran (for example a stack overflow).</summary>
+    public const string Crashed = "crashed";
+
+    /// <summary>The probe never reached the input (replay, loading or harness failure): not a behavioral observation.</summary>
+    public const string Infrastructure = "infrastructure";
+}
+
+/// <summary>One replay of a member up to a single input, from clean state, to attribute a timeout or crash.</summary>
+public sealed record ProbeResult(string Outcome, double Seconds, string? Observation)
+{
+    public bool Finished => Outcome == ProbeOutcome.Finished;
+}
 
 /// <summary>
 /// One build of a subject: the emitted assembly image plus where its dependencies live. Every

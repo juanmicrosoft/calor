@@ -279,19 +279,23 @@ public static class MemberOracleInputs
     {
         var e = ElementType(collectionType)!;
         var array = Array.CreateInstance(e, items.Length);
-        Array.Copy(items, array, items.Length);
+        // Elements are materialized like arguments, so token elements (exceptions, enums) become real values.
+        for (var i = 0; i < items.Length; i++)
+            array.SetValue(Materialize(items[i], e), i);
         return collectionType.IsArray ? array : Activator.CreateInstance(typeof(List<>).MakeGenericType(e), array)!;
     }
 
     /// <summary>Arm-neutral rendering of an input tuple for witnesses.</summary>
-    public static string Render(object?[] tuple) => "(" + string.Join(", ", tuple.Select(v => v switch
+    public static string Render(object?[] tuple) => "(" + string.Join(", ", tuple.Select(RenderToken)) + ")";
+
+    private static string RenderToken(object? v) => v switch
     {
         EnumToken t => "enum:" + t.Value.ToString(CultureInfo.InvariantCulture),
         DefaultInstanceToken => "new()",
         FactoryToken f => f.Label,
-        ListSpec l => "[" + string.Join(",", l.Items.Select(i => StateRenderer.Render(i, 0))) + "]",
+        ListSpec l => "[" + string.Join(",", l.Items.Select(RenderToken)) + "]",
         _ => StateRenderer.Render(v, 0),
-    })) + ")";
+    };
 
     /// <summary>SplitMix64: a fixed, portable PRNG, so the input set never depends on the runtime's Random.</summary>
     internal sealed class SplitMix64(ulong state)
