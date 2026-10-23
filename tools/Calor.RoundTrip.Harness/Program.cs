@@ -35,6 +35,12 @@ switch (command)
         return await RegenBundleReadmesCommand(cliArgs.Skip(1).ToArray());
     case "failure-census":
         return await FailureCensusCommand(cliArgs.Skip(1).ToArray());
+    case "oracle":
+        return await OracleCommand(cliArgs.Skip(1).ToArray());
+    case "oracle-file":
+        return await OracleFileCommand(cliArgs.Skip(1).ToArray());
+    case "oracle-probe":
+        return await OracleProbeCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -45,6 +51,165 @@ switch (command)
         PrintUsage();
         return 1;
 }
+
+// #1587: the member-level differential oracle. Builds each subject twice per file (original, and with
+// that one file swapped for its default-mode round-tripped C#) and compares member behavior.
+async Task<int> OracleCommand(string[] args)
+{
+    var projectsDir = Path.GetFullPath(GetOption(args, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir);
+    var outputDir = Path.GetFullPath(GetOption(args, "--output") ?? "conversion-reports");
+    var dotnetPath = GetOption(args, "--dotnet") ?? "dotnet";
+    var depth = int.TryParse(GetOption(args, "--depth"), out var d) && d >= 0 ? d : Calor.RoundTrip.Harness.Oracle.StateRenderer.DefaultDepth;
+    var jobs = int.TryParse(GetOption(args, "--jobs"), out var j) && j > 0 ? j : Math.Max(1, Math.Min(4, Environment.ProcessorCount));
+    var memberTimeout = double.TryParse(GetOption(args, "--member-timeout"), System.Globalization.NumberStyles.Float,
+        System.Globalization.CultureInfo.InvariantCulture, out var mt) && mt > 0 ? TimeSpan.FromSeconds(mt) : TimeSpan.FromSeconds(5);
+    var scope = (GetOption(args, "--scope") ?? "all").ToLowerInvariant();
+    if (scope is not ("all" or "dependents" or "declared"))
+    {
+        Console.Error.WriteLine("--scope must be 'all', 'dependents' or 'declared'.");
+        return 2;
+    }
+    var (shardIndex, shardCount) = (0, 1);
+    if (GetOption(args, "--shard") is { } shard)
+    {
+        var parts = shard.Split('/');
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var i) || !int.TryParse(parts[1], out var n) || n < 1 || i < 1 || i > n)
+        {
+            Console.Error.WriteLine("--shard must be <index>/<count>, 1-based (for example 2/3).");
+            return 2;
+        }
+        (shardIndex, shardCount) = (i - 1, n);
+    }
+    var repoRoot = Path.GetFullPath(Path.Combine(ProjectConfigs.DefaultCorpusDir, "..", ".."));
+    var baselinePath = GetOption(args, "--baseline") ?? Calor.RoundTrip.Harness.Oracle.OracleBaseline.DefaultPath(repoRoot);
+    Calor.RoundTrip.Harness.Oracle.OracleBaseline baseline;
+    try
+    {
+        baseline = Calor.RoundTrip.Harness.Oracle.OracleBaseline.Load(baselinePath);
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or System.Text.Json.JsonException or IOException)
+    {
+        Console.Error.WriteLine($"Invalid oracle baseline: {ex.Message}");
+        return 2;
+    }
+
+    var expectedPath = GetOption(args, "--expected") ?? Calor.RoundTrip.Harness.Oracle.OracleExpected.DefaultPath(repoRoot);
+    Calor.RoundTrip.Harness.Oracle.OracleExpected expected;
+    try
+    {
+        expected = Calor.RoundTrip.Harness.Oracle.OracleExpected.Load(expectedPath);
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or System.Text.Json.JsonException or IOException)
+    {
+        Console.Error.WriteLine($"Invalid oracle expected-files list: {ex.Message}");
+        return 2;
+    }
+    var writeExpected = args.Contains("--write-expected");
+
+    var withValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet", "--depth", "--scope", "--shard", "--baseline", "--jobs", "--member-timeout", "--expected" };
+    var names = new List<string>();
+    for (var i = 0; i < args.Length; i++)
+    {
+        if (withValues.Contains(args[i])) { i++; continue; }
+        if (!args[i].StartsWith("--", StringComparison.Ordinal)) names.Add(args[i]);
+    }
+    if (args.Contains("--all"))
+        names = ProjectConfigs.KnownProjects.ToList();
+    if (names.Count == 0)
+    {
+        Console.Error.WriteLine("oracle requires a project name or --all.");
+        return 2;
+    }
+
+    Directory.CreateDirectory(outputDir);
+    var reports = new List<Calor.RoundTrip.Harness.Oracle.OracleProjectReport>();
+    foreach (var name in names)
+    {
+        var config = ProjectConfigs.Get(name, projectsDir, dotnetPath);
+        if (config is null)
+        {
+            Console.Error.WriteLine($"Unknown project: {name}");
+            return 2;
+        }
+        if (!Directory.Exists(config.OriginalProjectPath))
+        {
+            Console.Error.WriteLine($"{name}: {config.OriginalProjectPath} is missing (initialize the corpus submodules).");
+            return 2;
+        }
+        Console.WriteLine($"Member oracle: {config.ProjectName}");
+        var options = new Calor.RoundTrip.Harness.Oracle.OracleOptions { Depth = depth, MemberTimeout = memberTimeout };
+        var report = await new Calor.RoundTrip.Harness.Oracle.OracleRunner(
+            config, options, baseline, expected, scope, shardIndex, shardCount, jobs).RunAsync();
+        reports.Add(report);
+        if (writeExpected && shardCount == 1 && report.Inconclusive is null)
+            expected.Projects[config.ProjectName] = report.Files.Where(f => f.Status == "exercised").OrderBy(f => f.File, StringComparer.Ordinal)
+                .ToDictionary(f => f.File, Calor.RoundTrip.Harness.Oracle.OracleRunner.Compared);
+        var suffix = shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "";
+        await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}{suffix}-member-oracle.json"),
+            System.Text.Json.JsonSerializer.Serialize(report, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");
+        Console.WriteLine($"  {config.ProjectName}: {(report.Inconclusive is not null ? "INCONCLUSIVE " + report.Inconclusive : report.Passed ? "pass" : "FAIL")} in {report.WallClockSeconds:0}s");
+    }
+
+    if (writeExpected)
+    {
+        var ordered = new Calor.RoundTrip.Harness.Oracle.OracleExpected
+        {
+            Projects = expected.Projects.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToDictionary(kv => kv.Key, kv => kv.Value),
+        };
+        await File.WriteAllTextAsync(expectedPath, System.Text.Json.JsonSerializer.Serialize(ordered, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");
+        Console.WriteLine($"Wrote {expectedPath}");
+    }
+
+    var markdown = Calor.RoundTrip.Harness.Oracle.OracleRunner.Markdown(reports);
+    var summarySuffix = (names.Count == 1 ? "-" + names[0] : "") + (shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "");
+    await File.WriteAllTextAsync(Path.Combine(outputDir, $"member-oracle-summary{summarySuffix}.md"), markdown);
+    if (Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY") is { Length: > 0 } summary)
+        await File.AppendAllTextAsync(summary, markdown + "\n");
+    Console.WriteLine();
+    Console.WriteLine(markdown);
+    return reports.All(r => r.Passed) ? 0 : 1;
+}
+
+// #1587 internal: one file of the member oracle, in its own process (spawned by `oracle`).
+async Task<int> OracleFileCommand(string[] args)
+{
+    var options = await OracleChildOptionsAsync(args);
+    await Calor.RoundTrip.Harness.Oracle.OracleRunner.RunFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--original"),
+        RequiredOption(args, "--candidate"), RequiredOption(args, "--scope-file"), RequiredOption(args, "--conversion"),
+        RequiredOption(args, "--relative"), options, RequiredOption(args, "--stem"), self: args.Contains("--self"));
+    Console.Out.Flush();
+    // A member that never returned leaves a thread running; exiting the process is the only way to stop it.
+    Environment.Exit(0);
+    return 0;
+}
+
+// #1587 internal: one clean-state replay of a member input, in its own process (spawned by `oracle` after a timeout or crash).
+async Task<int> OracleProbeCommand(string[] args)
+{
+    await Calor.RoundTrip.Harness.Oracle.OracleRunner.ProbeFileAsync(RequiredOption(args, "--spec"), RequiredOption(args, "--original"),
+        RequiredOption(args, "--candidate"), RequiredOption(args, "--scope-file"), (await File.ReadAllTextAsync(RequiredOption(args, "--member-file"))).Trim(),
+        int.Parse(RequiredOption(args, "--input"), System.Globalization.CultureInfo.InvariantCulture), args.Contains("--on-candidate"),
+        await OracleChildOptionsAsync(args), RequiredOption(args, "--out"), RequiredOption(args, "--marker"));
+    Console.Out.Flush();
+    Environment.Exit(0);
+    return 0;
+}
+
+async Task<Calor.RoundTrip.Harness.Oracle.OracleOptions> OracleChildOptionsAsync(string[] args)
+{
+    var trace = (await File.ReadAllTextAsync(RequiredOption(args, "--trace-file"))).Trim();
+    return new Calor.RoundTrip.Harness.Oracle.OracleOptions
+    {
+        Depth = int.Parse(RequiredOption(args, "--depth"), System.Globalization.CultureInfo.InvariantCulture),
+        MemberTimeout = TimeSpan.FromSeconds(double.Parse(RequiredOption(args, "--member-timeout"), System.Globalization.CultureInfo.InvariantCulture)),
+        SeedKey = RequiredOption(args, "--seed"),
+        Limits = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(await File.ReadAllTextAsync(RequiredOption(args, "--limits")))!,
+        ReceiverBans = System.Text.Json.JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(RequiredOption(args, "--bans")))!.ToHashSet(StringComparer.Ordinal),
+        TraceMember = trace.Length == 0 ? null : trace,
+    };
+}
+
+string RequiredOption(string[] args, string flag) => GetOption(args, flag) ?? throw new ArgumentException($"missing {flag}");
 
 async Task<int> CompareEvidenceCommand(string[] args)
 {
@@ -949,7 +1114,21 @@ static void PrintUsage()
                                                           no builds/tests, and no eligibility evaluated)
           calor-roundtrip screen-determinism --epoch <dir> D-S5.1 screen: gates 0.2's 5-consecutive-green rule
                                                           over an epoch's eligible tasks
+          calor-roundtrip oracle <project...>|--all       Member-level differential oracle (#1587): per file,
+                                                          original build vs. that file round-tripped
           calor-roundtrip list                            List known projects
+
+        Options (oracle):
+          --depth <n>              State recursion depth (default 2)
+          --scope <all|dependents|declared>  Types driven per file: every project type (default), the
+                                   file's types plus those of files that mention them, or only its own
+          --shard <i>/<n>          Run every n-th file starting at i (1-based)
+          --jobs <n>               Files checked in parallel, one process each (default min(4, cores))
+          --member-timeout <sec>   Budget for all inputs of one member on one run (default 5)
+          --baseline <path>        Reviewed findings (default eng/member-oracle-baseline.json)
+          --output <path>          Report directory (default conversion-reports)
+          --expected <path>        Files each project must exercise (default eng/member-oracle-expected.json)
+          --write-expected         Rewrite that list from this run (unsharded runs only)
 
         Options (run):
           --projects-dir <path>    Directory containing target project clones

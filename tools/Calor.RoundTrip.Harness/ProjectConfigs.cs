@@ -24,6 +24,9 @@ namespace Calor.RoundTrip.Harness;
 /// measured on main when it landed (2026-10-22), so losing a single file fails
 /// the leg. Raise them as the converter improves; lowering one needs a reason in
 /// the PR that does it.
+///
+/// Member-oracle coverage (#1587) is per file: <c>eng/member-oracle-expected.json</c> lists
+/// the files each project must exercise and the member comparisons each made.
 /// </summary>
 public static class ProjectConfigs
 {

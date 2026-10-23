@@ -85,6 +85,28 @@ what a program does.
   CI. One PR comment shows both legs side by side.
 - **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
   now describes both legs and lists each leg's floors.
+- **A new differential oracle checks that converted code behaves like the original
+  (#1587).** Until now, Lossless validation only compiled the round-tripped C#. The
+  round-trip harness caught a behavior change only if the subject's own tests happened to
+  exercise it. For example, `new List<int> { 5 }` became `new List<int>(5)` (an empty
+  list), and `Capacity = 64` was dropped. Both conversions still reported zero losses.
+  - For each corpus file that converts with the `calor convert` defaults, the oracle
+    builds the project twice: the original, and with only that file swapped for its
+    round-tripped C#. Each build is loaded into its own assembly load context.
+  - It constructs every type and compares the state to depth 2, meaning the public fields
+    and properties, and their fields and properties. It also calls methods on generated
+    inputs and compares return values, exception types and the state after the call.
+  - A member whose two runs on the same build disagree is skipped as nondeterministic.
+    A converted build that hangs or crashes where the original does not is a difference.
+  - CI runs it as the `member-oracle` job. A difference fails the job unless the file's
+    conversion records a loss or `eng/member-oracle-baseline.json` lists it. The job also
+    fails if a file listed in `eng/member-oracle-expected.json` is no longer checked.
+  - Both builds come from `dotnet build`, so the oracle compares exactly what the project
+    would ship.
+  - When it landed, it exercised 92 of 289 corpus files and compared 931 distinct members
+    with no difference found. Another 1,067 members could not be driven yet, mostly
+    because no generated input can construct them. The issue's two-member example is a
+    test fixture, and the oracle flags it.
 
 ### Release process
 

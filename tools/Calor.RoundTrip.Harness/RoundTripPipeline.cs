@@ -329,7 +329,7 @@ public sealed class RoundTripPipeline
         return workDir;
     }
 
-    private static void CopyDirectory(
+    internal static void CopyDirectory(
         string source,
         string destination,
         CancellationToken cancellationToken)
@@ -1914,7 +1914,7 @@ public sealed class RoundTripPipeline
     /// The CSharpEmitter adds Calor-specific using directives and headers that
     /// the target project doesn't know about.
     /// </summary>
-    private static string PostProcessEmittedCSharp(string emittedCode, string originalSource)
+    internal static string PostProcessEmittedCSharp(string emittedCode, string originalSource)
     {
         var lines = emittedCode.Split('\n').ToList();
         var result = new List<string>();

@@ -235,6 +235,20 @@ See `bench/corpus/README.md` ("Two harness legs") for what each leg converts wit
 the vendored `bench/corpus/` corpus. Pass a single project name
 (`run MediatR`) to shrink the loop while debugging a specific regression.
 
+The `member-oracle` CI job (#1587) runs the member-level differential oracle,
+which takes a few minutes for the whole corpus:
+
+```bash
+dotnet run --project tools/Calor.RoundTrip.Harness -- oracle --all --output ./oracle-reports/
+dotnet run --project tools/Calor.RoundTrip.Harness -- oracle Serilog --scope declared   # one subject, narrower scope
+```
+
+A behavior difference fails unless the file's conversion records a loss or
+`eng/member-oracle-baseline.json` lists it with the same fingerprint. A file in
+`eng/member-oracle-expected.json` that is no longer exercised also fails; after a
+converter change that exercises more files, rerun with `--write-expected`. See `bench/corpus/README.md`
+("Member-level differential oracle").
+
 ### E2E Tests
 
 ```bash

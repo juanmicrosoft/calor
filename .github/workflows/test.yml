@@ -1155,6 +1155,75 @@ jobs:
           path: conversion-reports/*-roundtrip.*
           retention-days: 90
 
+  member-oracle:
+    # #1587: the member-level differential oracle. For each corpus file that converts with the
+    # default (Lossless) options, it builds the subject twice (original, and with only that file
+    # swapped for its round-tripped C#), loads both into collectible load contexts and compares
+    # construction state (depth 2), method results, thrown exception types and post-call state.
+    # A difference fails unless the file's conversion records a loss or eng/member-oracle-baseline.json
+    # lists it with the same witness. One matrix entry per subject keeps each under a few minutes.
+    # Same gate as roundtrip-verification: skipped on docs-only changes, fails safe otherwise.
+    name: member-oracle (${{ matrix.subject }})
+    if: >-
+      always() &&
+      needs.detect-changes.outputs.has_non_docs_changes != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [detect-changes]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - subject: synthetic
+            projects: Synthetic Synthetic2
+          - subject: mediatr
+            projects: MediatR
+          - subject: serilog
+            projects: Serilog
+          - subject: fluentvalidation
+            projects: FluentValidation
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: ${{ matrix.subject == 'synthetic' && 'false' || 'recursive' }}
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup .NET 8 (MediatR/FluentValidation target net8.0)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Build the harness
+        run: dotnet build tools/Calor.RoundTrip.Harness/ -c Release
+
+      - name: Run the member oracle
+        run: |
+          start=$(date +%s)
+          dotnet run --project tools/Calor.RoundTrip.Harness/ -c Release --no-build -- \
+            oracle ${{ matrix.projects }} \
+            --dotnet dotnet \
+            --output ./oracle-reports/
+          echo "member-oracle wall clock: $(( $(date +%s) - start ))s"
+
+      - name: Upload member-oracle reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: member-oracle-${{ matrix.subject }}
+          path: oracle-reports/
+          retention-days: 90
+
   roundtrip-summary:
     # #1586: one PR comment that shows both harness legs side by side. It only
     # reports; each roundtrip-verification leg is what blocks.
