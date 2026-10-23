@@ -6,7 +6,6 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
-using Calor.Compiler.Tests.EvidenceContract;
 using Calor.Compiler.Verification.Obligations;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -394,9 +393,9 @@ public class RefOutImplementationTests
 
     private static IEnumerable<(string Id, string Source, string Allowed)> Rows()
     {
-        var root = EvidenceContractTests.RepoRoot();
-        var scope = JsonNode.Parse(File.ReadAllText(Path.Combine(root, RefOutContractValidator.R0ScopePath)))!;
-        foreach (var c in scope["cases"]!.AsArray().Where(c => c!["id"]!.GetValue<string>().StartsWith("F1-REFOUT-0", StringComparison.Ordinal)))
+        var root = CliTestHarness.FindRepoRoot();
+        var r0 = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "tests/TestData/InteropScope/R0/cases.json")))!;
+        foreach (var c in r0["cases"]!.AsArray().Where(c => c!["id"]!.GetValue<string>().StartsWith("F1-REFOUT-0", StringComparison.Ordinal)))
             yield return (c!["id"]!.GetValue<string>(), R0Fixture(c["id"]!.GetValue<string>()), c["expected"]!.GetValue<string>());
         // Codex review round 1 reproducers: a nested value-type field path, a by-reference call in
         // a decomposed chain with a by-value overload, a by-reference element before a hoisted
@@ -406,8 +405,8 @@ public class RefOutImplementationTests
         foreach (var (id, source, allowed) in Pr2Witnesses)
             yield return (id, source, allowed);
         foreach (var id in new[] { "X-INT-05", "X-INT-08" })
-            yield return (id, File.ReadAllText(Path.Combine(root, "docs/plans/evidence/v0.25-f1-943/fixtures", id + ".cs.txt")), "native-or-preserved");
-        foreach (var c in RefOutContractTests.Contract()["cases"]!.AsArray().Where(c => c!["kind"]!.GetValue<string>() == "csharp"))
+            yield return (id, File.ReadAllText(Path.Combine(root, "tests/TestData/InteropScope/F1/fixtures", id + ".cs.txt")), "native-or-preserved");
+        foreach (var c in RefOutContractCaseTests.Contract()["cases"]!.AsArray().Where(c => c!["kind"]!.GetValue<string>() == "csharp"))
         {
             var src = c!["source"]!;
             // D1-CS-16 is native for its by-reference calls; its unrelated `[1] = "one"` index
@@ -521,7 +520,7 @@ public class RefOutImplementationTests
     }
 
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
-        EvidenceContractTests.RepoRoot(), "docs/plans/evidence/v0.25-r0-1426/fixtures", id + ".cs.txt"));
+        CliTestHarness.FindRepoRoot(), "tests/TestData/InteropScope/R0/fixtures", id + ".cs.txt"));
 
     internal static async Task<(string Calor, List<string> Losses)> ConvertAsync(string source, Surface surface)
     {

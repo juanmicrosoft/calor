@@ -7,7 +7,6 @@ using Calor.Compiler.Commands;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
-using Calor.Compiler.Tests.EvidenceContract;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -26,7 +25,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ArrayExpressionConversionTests
 {
-    private const string R0Fixtures = "docs/plans/evidence/v0.25-r0-1426/fixtures";
+    private const string R0Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
     public enum Surface
     {
@@ -680,8 +679,8 @@ public class ArrayExpressionConversionTests
     public async Task StatementPositionControl_IsUnchanged()
     {
         // F5-ARRAY-03: statement-position arrays keep exactly the R0 baseline output.
-        var baseline = File.ReadAllText(Path.Combine(EvidenceContractTests.RepoRoot(),
-            "docs/plans/evidence/v0.25-r0-1426/generated/F5-ARRAY-03.mcp-default.calr.txt"));
+        var baseline = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt"));
         var (calor, _) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
         Assert.Equal(baseline.ReplaceLineEndings().TrimEnd(), calor.ReplaceLineEndings().TrimEnd());
     }
@@ -1106,7 +1105,7 @@ public class ArrayExpressionConversionTests
     };
 
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
-        EvidenceContractTests.RepoRoot(), R0Fixtures, id + ".cs.txt"));
+        CliTestHarness.FindRepoRoot(), R0Fixtures, id + ".cs.txt"));
 
     private static async Task<(string Calor, List<string> Losses)> ConvertAsync(string source, Surface surface)
     {

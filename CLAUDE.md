@@ -294,6 +294,14 @@ thing to avoid, not vocabulary.
 Test: would a second-year CS student skim the entry and know what changed and whether it
 affects them?
 
+## Evidence and review records
+
+`docs/plans/evidence/` is archived (#1584) on orphan branch `evidence/archive-2026-10`; only its
+README stays on `main`, and `EvidenceTreeGuardTests` fails if anything else is added there. Do not
+write evidence into the repository: put review rounds and verdicts in the PR body, large run
+outputs in workflow artifacts, and inputs a test reads in `tests/TestData/` as ordinary fixtures
+(no hash seals or amendment steps).
+
 ## Benchmarks
 
 Benchmarks live in `benchmarks/`. When writing or modifying benchmarks, ensure they are **not biased towards Calor** — benchmarks must be fair and representative comparisons.

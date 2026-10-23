@@ -5,8 +5,8 @@ name: Reproducible publication builds
 # workflow builds each surface twice, in this checkout and in a fresh clone at another
 # path, and fails on any byte difference. The second build also gets its own HOME,
 # NuGet and npm caches, time zone and locale, plus ambient SOURCE_DATE_EPOCH and
-# DeterministicTimestamp values that must be ignored. Local proof and design:
-# docs/plans/evidence/deterministic-builds/.
+# DeterministicTimestamp values that must be ignored. Local proof and design (archived):
+# https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/deterministic-builds/README.md
 #
 # No paths filter: packages and the site read inputs from all over the tree (README.md,
 # docs/assets, bench/ and tests/ files embedded as resources, scripts, the bootstrap action).

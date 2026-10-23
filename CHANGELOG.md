@@ -132,10 +132,35 @@ what a program does.
   the publication branch and pull request are now named after that commit, not the version in
   `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks.
 - **The B1 registration and results files moved to `eng/benchmark-publication/b1-1276/` (#1585),**
-  byte for byte, so they survive when `docs/plans/evidence/` is archived. Their hash seals still
-  name the old paths, and the gate maps those names to the new location instead of rewriting
-  anything sealed. The gate's third input, the #1407 evidence contract, has not moved yet: a
-  hash-pinned determinism script reads it from `docs/plans/evidence/`.
+  byte for byte, so they survive when `docs/plans/evidence/` is archived. (#1584 then removed
+  their hash seals and the gate's use of the #1407 evidence contract; see below.)
+- **`docs/plans/evidence/` is archived, and a clone is about 140 MB smaller (#1584).** The
+  directory held 2,990 review records, TRX files, transcripts and freeze manifests from the 0.24
+  and 0.25 milestones. All of it is on the orphan branch `evidence/archive-2026-10` (a branch
+  with no shared history that is never merged), and a short README on `main` points there.
+  History is not rewritten, so `.git` keeps its size.
+- **Tests that check real converter, verifier or benchmark behavior kept their inputs as
+  ordinary fixtures (#1584).** The shared interop controls, the interop guide's CLI and MCP
+  transcripts, the by-reference cases, the R0 conversion fixtures, the soundness sweep's case
+  packet and the determinism protocol now live under `tests/TestData/`. They have no hash seal
+  or amendment step: a change is reviewed in its pull request like any other test input. The
+  `bench/Calor.Soundness.Sweep` harness reads its cases from the new location.
+- **Tests that only checked a historical record against itself are deleted (#1584).** Removed:
+  the 0.24 evidence-contract, candidate-invalidation and candidate-manifest validators, the R0
+  scope packet, the T1 register, the D1 contract seal and the S2 disposition record, plus the
+  governance-only checks of the soundness registration and the B1 packets. That is 683 compiler
+  tests; a new guard test fails if a file other than the README is added under
+  `docs/plans/evidence/`. No published package or website page changes behavior.
+- **The determinism and benchmark gates lost their freeze machinery, not their checks
+  (#1584).** The determinism protocol (the workflow that runs the verifier tests many times on
+  every platform and compares the results byte for byte) no longer charges a compute budget, binds
+  runs to a release candidate, or runs `main`'s copy of its validator. Its hash freeze (D015) is
+  gone, and a change no longer needs an amendment-log entry; the existing entries stay as history.
+  It still refuses a change that weakens it against `main`, such as a removed case or a gate
+  command that lost its failure status. The benchmark publication gate no longer reads seals or
+  the 0.24 contract's amendment log; a method change is now a reviewed change to the
+  registration. Both still run every content check, and a local re-run reproduced the B1 results
+  byte for byte.
 
 ### Documentation
 
@@ -597,8 +622,8 @@ adjudication (#1408) recorded the outcome `MILESTONE-FAILED`. It failed for thre
 
 A failed record cannot pass the release gate (#1410). On 2026-10-10 the maintainer decided to
 release 0.24.0 anyway, as an explicit maintainer override outside the gate. The decision is
-recorded in `docs/plans/evidence/adjudication-1408/maintainer-override.json`. The failed
-[terminal record](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/evidence/adjudication-1408/terminal-record.json)
+recorded in [`adjudication-1408/maintainer-override.json`](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/adjudication-1408/maintainer-override.json). The failed
+[terminal record](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/adjudication-1408/terminal-record.json)
 stays unchanged.
 
 This is the first release on NuGet since 0.21.0. The v0.22.0 tag and GitHub pre-release exist,

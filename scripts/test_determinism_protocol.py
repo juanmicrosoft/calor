@@ -22,8 +22,7 @@ import determinism_protocol as dp  # noqa: E402
 import determinism_runner as dr  # noqa: E402
 
 ROOT = dp.ROOT
-PROTOCOL, CASES, CONTRACT = dp.load(ROOT, dp.PROTOCOL), dp.load(ROOT, dp.CASES), dp.load(ROOT, dp.CONTRACT)
-HASHES = dp.load(ROOT, dp.HASHES)["files"]
+PROTOCOL, CASES = dp.load(ROOT, dp.PROTOCOL), dp.load(ROOT, dp.CASES)
 ORACLE = "Calor.Verification.Tests.VerifierRuntimeDifferential.VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle"
 STRING_ROW = "Calor.Verification.Tests.IntegrationTests.StringInBodyOnly_StillNeverElides"
 THEORY = next(t["name"] for t in CASES["groups"]["verification"]["tests"] if t["multiplicity"] > 1)
@@ -32,7 +31,7 @@ COMMIT, RUN = "c" * 40, "4242"
 
 def codes(protocol=None, cases=None, texts=None, baseline=None) -> set[str]:
     return {c for c, _ in dp.validate(ROOT, protocol or copy.deepcopy(PROTOCOL), cases or copy.deepcopy(CASES),
-                                      copy.deepcopy(CONTRACT), texts, baseline)}
+                                      texts, baseline)}
 
 
 def mutate(edit, source=PROTOCOL) -> dict:
@@ -96,7 +95,7 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual([], dp.validate(ROOT))
 
     def test_unchanged_packet_is_valid_against_itself_as_baseline(self) -> None:
-        self.assertEqual(set(), codes(baseline=(PROTOCOL, CASES, HASHES)))
+        self.assertEqual(set(), codes(baseline=(PROTOCOL, CASES)))
 
     def test_case_registry_shape(self) -> None:
         # Amendment 1.4.0: + 62 verification tests (S2 repairs); compiler-verifier + 1 test in a registered
@@ -116,31 +115,20 @@ class RegistrationTests(unittest.TestCase):
             self.assertIn(f"Calor.Compiler.Tests.{s2}", CASES["groups"]["compiler-verifier"]["classes"])
             self.assertTrue(any(n.startswith(f"Calor.Compiler.Tests.{s2}.") for n in compiler), s2)
 
-    def test_worst_case_fits_the_accepted_ceiling(self) -> None:
-        self.assertEqual((795, 115, 3180), dp.worst_case(PROTOCOL))  # amendment 1.5.0: Windows 110 min, 4 executions, ceiling 3,200
-        self.assertEqual(835, dp.epoch_worst_case(PROTOCOL))  # amendment 1.7.0: osx-arm64 70 min in the 0.25 epoch only
-
-
 class NegativeRegistrationControls(unittest.TestCase):
     def only(self, code: str, **kwargs) -> None:
         self.assertEqual({code}, codes(**kwargs))
 
-    def test_d001_inspected_before_freeze(self) -> None:
-        self.only("D001", protocol=mutate(lambda p: p["freeze"].update(decisionBearingExecutionBeforeFreeze=True)))
-
-    def test_d002_unrecorded_contract_version(self) -> None:
-        self.only("D002", protocol=mutate(lambda p: p["contract"].update(contractVersion="1.0.5")))
-
-    def test_d003_contract_row_missing_remapped_or_off_platform(self) -> None:
-        self.only("D003", protocol=mutate(lambda p: p["determinismRows"].pop(0)))
-        self.only("D003", protocol=mutate(lambda p: p["determinismRows"][0].update(environments=["linux-x64"])))
-        self.only("D003", protocol=mutate(lambda p: p["determinismRows"][0].update(cases=[f"test:verification:{ORACLE}"])))
+    def test_d003_row_with_an_unregistered_case_or_environment(self) -> None:
+        self.only("D003", protocol=mutate(lambda p: p["determinismRows"][0].update(environments=["no-such-env"])))
+        self.only("D003", protocol=mutate(lambda p: p["determinismRows"][0].update(cases=["test:verification:No.Such.Test"])))
+        self.only("D003", protocol=mutate(lambda p: p["determinismRows"][0].update(cases=[])))
 
     def test_d004_floating_label_or_missing_platform(self) -> None:
         self.only("D004", protocol=mutate(lambda p: p["environments"][3].update(runner="windows-latest")))
         self.only("D004", protocol=mutate(lambda p: p["environments"][3].pop("memoryGiB")))
-        # Named co-fires: the rows that name win-arm64 (D003) and the recomputed budget (D008).
-        self.assertEqual({"D004", "D003", "D008"}, codes(protocol=mutate(lambda p: p["environments"].pop(4))))
+        # Named co-fire: the rows that name win-arm64 (D003).
+        self.assertEqual({"D004", "D003"}, codes(protocol=mutate(lambda p: p["environments"].pop(4))))
 
     def test_d005_floating_sdk(self) -> None:
         self.only("D005", protocol=mutate(lambda p: p["toolchain"].update(sdk="10.0.x")))
@@ -155,35 +143,6 @@ class NegativeRegistrationControls(unittest.TestCase):
                      lambda p: p["runPlan"].update(earlyStop=True)):
             self.only("D007", protocol=mutate(edit))
 
-    def test_d008_budget_over_ceiling(self) -> None:
-        self.only("D008", protocol=mutate(lambda p: p["budget"].update(maxExecutions=5)))  # 5 x 795 > 3,200 (amendment 1.5.0)
-
-    def test_d008_release_epoch(self) -> None:
-        # Amendment 1.7.0: the epoch (after run 6) has 2,100 minutes; run 7 spent 397; the window after run 7 allows 2
-        # executions of 835 each with the epoch's 70-minute macOS timeout: 397 + 1,670 = 2,067 <= 2,100.
-        ep = PROTOCOL["budget"]["releaseEpoch"]
-        self.assertEqual((6, 2100, 397, 7, 2, 2, 0, 1703, {"osx-arm64": 70}, 835, 1670, 1590), tuple(ep[k] for k in (
-            "epochAfterRunNumber", "epochCeilingRunnerMinutes", "spentBeforeWindow", "afterRunNumber", "maxExecutions",
-            "maxExecutionsPerCandidate", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "jobTimeoutMinutes",
-            "worstCasePerExecution", "worstCaseWithEpochTimeouts", "worstCaseTotal")))
-        self.assertLessEqual(ep["spentBeforeWindow"] + ep["worstCaseWithEpochTimeouts"], ep["epochCeilingRunnerMinutes"])
-        for edit in (lambda e: e.update(maxExecutions=3), lambda e: e.update(worstCaseTotal=1500), lambda e: e.update(maxDispatchedControlRuns=1),
-                     lambda e: e.update(ceilingRunnerMinutes=1702), lambda e: e.update(afterRunNumber=0), lambda e: e.update(amendment="9.9.9"),
-                     lambda e: e.update(candidateManifest="eng/candidate.json"), lambda e: e.pop("maxExecutions"),
-                     lambda e: e.update(spentBeforeWindow=300), lambda e: e.update(epochCeilingRunnerMinutes=2000),
-                     lambda e: e.update(epochAfterRunNumber=7), lambda e: e.pop("spentBeforeWindow"),
-                     lambda e: e.update(maxExecutionsPerCandidate=3), lambda e: e.update(maxExecutionsPerCandidate=True),
-                     lambda e: e.update(worstCasePerExecution=795), lambda e: e.update(worstCaseWithEpochTimeouts=1590),
-                     lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 40}), lambda e: e.update(jobTimeoutMinutes={"osx-x64": 70}),
-                     lambda e: e.update(jobTimeoutMinutes={"osx-arm64": "70"}), lambda e: e.update(jobTimeoutMinutes={"osx-arm64": 200}),
-                     lambda e: e.pop("priorResultPath"), lambda e: e.update(priorResultPath="docs/plans/evidence/g2-1421/latest.json")):
-            self.only("D008", protocol=mutate(lambda p, edit=edit: edit(p["budget"]["releaseEpoch"])))
-        # The 1.6.0 shape (no window) is still judged by its own formula.
-        legacy = mutate(lambda p: p["budget"].update(releaseEpoch={k: v for k, v in p["budget"]["releaseEpoch"].items() if k in (
-            "amendment", "release", "maxDispatchedControlRuns", "candidateManifest")} | {
-            "afterRunNumber": 6, "maxExecutions": 2, "ceilingRunnerMinutes": 1600, "worstCaseTotal": 1590}))
-        self.assertEqual(set(), codes(protocol=legacy))
-
     def test_d009_line_ending_normalization(self) -> None:
         self.only("D009", protocol=mutate(lambda p: p["agreement"].update(normalizationRules=["CRLF -> LF"])))
         self.only("D009", protocol=mutate(lambda p: p["agreement"]["projections"][0]["dropped"].append("outcome")))
@@ -191,18 +150,22 @@ class NegativeRegistrationControls(unittest.TestCase):
     def test_d010_registry_drift(self) -> None:
         self.only("D010", cases=mutate(lambda c: c["cells"]["ids"].pop(), CASES))
         self.only("D010", cases=mutate(lambda c: c["groups"]["verification"]["tests"][0].update(multiplicity=5), CASES))
+        # A committed oracle report that is gone, or compared by one oracle profile only.
+        report = next(i for i, a in enumerate(CASES["artifacts"]) if "committedPath" in a)
+        self.only("D010", cases=mutate(lambda c: c["artifacts"][report].update(committedPath="bench/no-such-report.json"), CASES))
+        self.only("D010", cases=mutate(lambda c: c["artifacts"][report].update(profiles=["oracle-isolated"]), CASES))
         # Named co-fire: emptying the guard test also removes its DeterminismRecord call site (D014).
         self.assertEqual({"D010", "D014"}, codes(texts={"tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs": "x"}))
 
     def test_d011_timing_sensitive_set_must_stay_empty(self) -> None:
-        entry = {"case": f"test:verification:{ORACLE}", "reason": "flaky", "amendment": "1.0.0", "contractAmendment": "1.1.1"}
+        entry = {"case": f"test:verification:{ORACLE}", "reason": "flaky"}
         self.only("D011", protocol=mutate(lambda p: p["cases"]["timingSensitiveSet"].append(entry)))
 
     def test_d012_vocabulary_changed(self) -> None:
         self.only("D012", protocol=mutate(lambda p: p["attemptStatuses"].pop("timeout")))
 
     def test_d013_unregistered_machinery(self) -> None:
-        self.only("D013", protocol=mutate(lambda p: p["workflow"].update(amendment="9.9.9")))
+        self.only("D013", protocol=mutate(lambda p: p["workflow"].update(path=".github/workflows/other.yml")))
         self.only("D013", protocol=mutate(lambda p: p["workflow"].update(status="pending-second-g2-pr")))
 
     def test_d014_gate_site_drift(self) -> None:
@@ -210,18 +173,18 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
             "VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle\"", "VerifierRuntimeDifferentialTests\"")})
         self.only("D014", texts={".github/workflows/publish-nuget.yml": ""})
-        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace("git show origin/main:scripts", "git show HEAD:scripts")})
+        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
+            "determinism_protocol.py validate --root . --baseline-ref origin/main", "determinism_protocol.py validate --root .")})
         gate = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs"
         self.only("D014", texts={gate: (ROOT / gate).read_text(encoding="utf-8").replace("DeterminismRecord.WriteCells(results);", "")})
 
     def test_d014_structural_bypasses(self) -> None:
         """The two bypasses open after round 3, plus continue-on-error, || true, and a reorder."""
         test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
-        main = '          python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main\n'
+        main = "          python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main\n"
         oracle_step = "      - name: Run verifier-runtime differential gate\n"
-        own_step = "      - name: Validate the determinism protocol and its controls (#1421)\n"
-        main_step = "      - name: Validate the determinism protocol with main's validator (#1421)\n"
-        main_block = test_yml[test_yml.index(main_step):test_yml.index(own_step)]
+        main_step = "      - name: Validate the determinism protocol and its controls (#1421)\n"
+        main_block = test_yml[test_yml.index(main_step):test_yml.index("      # #881 pinned reproduction")]
         publish = (ROOT / ".github/workflows/publish-nuget.yml").read_text(encoding="utf-8")
         for path, mutated in (
             (".github/workflows/test.yml", test_yml.replace(main, "          if false; then\n  " + main + "          fi\n")),
@@ -230,8 +193,8 @@ class NegativeRegistrationControls(unittest.TestCase):
             (".github/workflows/test.yml", test_yml.replace(oracle_step, oracle_step + "        if: ${{ 1 == 2 }}\n")),
             (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        continue-on-error: true\n")),
             (".github/workflows/test.yml", test_yml.replace(main, main.rstrip("\n") + " || true\n")),
-            (".github/workflows/test.yml", test_yml.replace(main_block, "").replace(  # reorder: main's validator after this tree's
-                "      # #881 pinned reproduction", main_block + "      # #881 pinned reproduction", 1)),
+            (".github/workflows/test.yml", test_yml.replace(main_block, "").replace(  # reorder: before the checkout
+                "      - name: Checkout code\n", main_block + "      - name: Checkout code\n", 1)),
             (".github/workflows/publish-nuget.yml", publish.replace(
                 "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          mkdir -p artifacts/test\n          set +e\n", 1)),
             (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        'if': ${{ 1 == 2 }}\n")),
@@ -255,17 +218,86 @@ class NegativeRegistrationControls(unittest.TestCase):
         gate = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs"
         self.only("D014", texts={gate: (ROOT / gate).read_text(encoding="utf-8").replace("DeterminismRecord.WriteCells(results);", "")})
 
-    def test_d016_unrecorded_or_weakening_change_against_main(self) -> None:
-        changed = dict(HASHES, **{dp.PROTOCOL: "0" * 64})
-        self.only("D016", baseline=(PROTOCOL, CASES, changed))
+    def test_d016_weakening_change_against_main(self) -> None:
         bigger = mutate(lambda p: p["runPlan"].update(attemptsPerJob=20))
-        self.assertIn("D016", codes(baseline=(bigger, CASES, HASHES)))
+        self.assertIn("D016", codes(baseline=(bigger, CASES)))
         more = mutate(lambda c: c["groups"]["verification"]["tests"][0].update(multiplicity=9), CASES)
-        self.assertIn("D016", codes(baseline=(PROTOCOL, more, HASHES)))
+        self.assertIn("D016", codes(baseline=(PROTOCOL, more)))
         renamed = mutate(lambda c: c["cells"]["ids"][0].update(formId="replacement:scalar-type:i8"), CASES)
-        self.assertIn("D016", codes(baseline=(PROTOCOL, renamed, HASHES)))
+        self.assertIn("D016", codes(baseline=(PROTOCOL, renamed)))
         no_cells = mutate(lambda p: p["profiles"][1].update(oracle=False))
-        self.assertIn("D016", codes(protocol=no_cells, baseline=(PROTOCOL, CASES, HASHES)))
+        self.assertIn("D016", codes(protocol=no_cells, baseline=(PROTOCOL, CASES)))
+        no_gate = mutate(lambda p: p["gates"]["steps"].pop(0))
+        self.assertIn("D016", codes(protocol=no_gate, baseline=(PROTOCOL, CASES)))
+        # Review round 1 (#1584): a gate command weakened in the workflow and in the protocol together.
+        command = PROTOCOL["gates"]["steps"][0]["commands"][0]
+
+        def masked(p):
+            gate = p["gates"]["steps"][0]
+            gate["commands"] = [c + " || true" if c == command else c for c in gate["commands"]]
+            gate["script"] = [c + " || true" if c == command else c for c in gate["script"]]
+        test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        self.assertIn(command, test_yml)
+        self.assertIn("D016", codes(protocol=mutate(masked), baseline=(PROTOCOL, CASES),
+                                    texts={".github/workflows/test.yml": test_yml.replace(command, command + " || true", 1)}))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["steps"][0].update(after=[])), baseline=(PROTOCOL, CASES)))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"].pop()), baseline=(PROTOCOL, CASES)))
+        # Review round 3 (#1584): a shard script changes only when the gate names the pin it replaces.
+        old_pin = PROTOCOL["gates"]["shardSteps"][0]["scriptSha256"]
+        repinned = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64))
+        self.assertIn("D016", codes(protocol=repinned, baseline=(PROTOCOL, CASES)))
+        acknowledged = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64, repinnedFrom=old_pin))
+        self.assertNotIn("D016", codes(protocol=acknowledged, baseline=(PROTOCOL, CASES)))
+        stale = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64, repinnedFrom="1" * 64))
+        self.assertIn("D016", codes(protocol=stale, baseline=(PROTOCOL, CASES)))
+        # Review round 2 (#1584): a registered test command dropped from the protocol together with the workflow.
+        dropped = mutate(lambda p: p["gates"]["shardSteps"][0]["testCommands"].pop())
+        self.assertIn("D016", codes(protocol=dropped, baseline=(PROTOCOL, CASES)))
+
+    def test_d014_shard_step_cannot_skip_its_tests_even_when_re_pinned(self) -> None:
+        """Review round 2 (#1584): editing a shard script and re-pinning scriptSha256 to match must still fail
+        when the edit ends the script early, negates or guards a test, or changes a test command."""
+        test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        gate = next(g for g in PROTOCOL["gates"]["shardSteps"] if g["workflow"] == ".github/workflows/test.yml")
+        head = "      - name: Run project tests\n        run: |\n          set -euo pipefail\n"
+        self.assertIn(head, test_yml)
+        test_line = '          dotnet test "${{ matrix.project }}" -c Release \\\n'
+        self.assertIn(test_line, test_yml)
+        for mutated in (test_yml.replace(head, head + "          exit 0\n", 1),
+                        test_yml.replace(head, head + "          exit\n", 1),
+                        test_yml.replace(test_line, "          ! " + test_line[10:], 1),
+                        test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
+                                         'if false; then\n            eval', 1),
+                        test_yml.replace('--filter "$SHARD2_FILTER"', '--filter "$SHARD1_FILTER"', 1),
+                        # Review round 3: loop wrappers that never run, a literal condition, and an ERR trap.
+                        test_yml.replace(head, head + "          while ! true; do\n", 1).replace(
+                            "          if grep -q \"Z3 not available\"", "          done\n          if grep -q \"Z3 not available\"", 1),
+                        test_yml.replace(head, head + "          until ! false; do\n", 1).replace(
+                            "          if grep -q \"Z3 not available\"", "          done\n          if grep -q \"Z3 not available\"", 1),
+                        test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
+                                         'if [ 1 = 0 ]; then\n            eval', 1),
+                        test_yml.replace(head, head + "          trap 'exit 0' ERR\n", 1)):
+            self.assertNotEqual(test_yml, mutated)
+            step = next(s for s in dp.parse_workflow(mutated)[gate["job"]]["steps"] if s.get("name") == gate["step"])
+            pin = dp.sha256_bytes("\n".join(ln for ln in step["run"].splitlines() if ln.strip()).encode("utf-8"))
+            repinned = mutate(lambda p: next(g for g in p["gates"]["shardSteps"] if g["workflow"] == gate["workflow"]).update(scriptSha256=pin))
+            self.assertIn("D014", codes(protocol=repinned, texts={".github/workflows/test.yml": mutated}))
+        # The committed scripts pass, including the step's trailing `exit 1` after the last test.
+        self.assertEqual(set(), codes())
+
+    def test_d016_compares_with_the_packet_at_its_pre_1584_location(self) -> None:
+        """Review round 2 (#1584): a baseline from before the move is read from its old location, not skipped."""
+        legacy = "d89ffcbc840d4c1d90ee8dd3b445a5021b559eb4"
+        if dr.git("cat-file", "-e", f"{legacy}^{{commit}}").returncode != 0:
+            self.skipTest("the pre-#1584 commit is not in this clone")
+        baseline = dp.load_baseline(ROOT, legacy)
+        self.assertIsNotNone(baseline)
+        self.assertEqual("1.7.0", baseline[0]["protocolVersion"])
+        self.assertEqual(set(), codes(baseline=baseline))  # the retired main's-validator gates are allowed to go
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["determinismRows"].pop()), baseline=baseline))
+        # #1584: a reviewed change that weakens nothing needs no amendment entry.
+        reworded = mutate(lambda p: p["limitations"].append("an added limitation"))
+        self.assertEqual(set(), codes(protocol=reworded, baseline=(PROTOCOL, CASES)))
 
     def test_baseline_that_cannot_be_read_fails_closed(self) -> None:
         with self.assertRaises(SystemExit):
@@ -535,65 +567,14 @@ def this_run(mode="execution", execution_id="E9") -> dict:
     return past(900, f"determinism {mode} {execution_id}", sha=NEW, status="in_progress", minutes=0, started=False)
 
 
-# The 0.24 rules (before amendment 1.6.0's 0.25 epoch), which the guards below exercise unless a test passes PROTOCOL.
-PRE_EPOCH = mutate(lambda p: p["budget"].pop("releaseEpoch"))
-
-
 class PlanGuards(unittest.TestCase):
-    """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
+    """Each guard the plan job applies before any attempt runs."""
 
-    def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",), ledger=None,
-             current=True, merge=None, protocol=PRE_EPOCH, manifest=None, results=None) -> list[str]:
+    def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",),
+             current=True, protocol=PROTOCOL) -> list[str]:
         runs = list(inventory) + ([this_run(mode, execution_id)] if current else [])
         return dr.plan_problems(protocol, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
-                                ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths),
-                                pr_merge_commit=lambda pr: merge, manifest_candidate=lambda path: manifest,
-                                committed_result=lambda path: (results or {}).get(path))
-
-    def test_release_epoch_allows_two_executions_on_the_manifest_candidate(self) -> None:
-        # Amendment 1.6.0: runs 1-6 are the 0.24 history (4 executions, 1,608 minutes); the epoch charges only later runs.
-        # Amendment 1.7.0: run 7 (397 minutes, INCOMPLETE on the first candidate) is charged to the 2,100 epoch ceiling;
-        # the window after run 7 allows 2 more executions, both on the re-frozen candidate.
-        history = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=400) for i in (2, 3, 5, 6)]
-        history += [past(1, "determinism control C1", minutes=13, event="pull_request"),
-                    past(4, "determinism execution E4", sha="4" * 40, minutes=2, started=False, conclusion="failure")]
-        history += [past(7, "determinism execution E7", sha=OLD, minutes=397, conclusion="failure")]
-        epoch = dict(protocol=PROTOCOL, manifest=NEW)
-        self.assertEqual([], self.plan(inventory=history, **epoch))  # 397 + 835 <= 2,100
-        for manifest in (None, OLD, NEW[:12], 7):
-            self.refused("named by docs/plans/evidence/v0.25-candidate/candidate-manifest.json", inventory=history, protocol=PROTOCOL, manifest=manifest)
-        self.refused("outside docs/", inventory=history, paths=["docs/x.md"], **epoch)  # the re-frozen candidate still needs a repair
-        second = history + [past(8, "determinism execution E8", sha=NEW, minutes=400, conclusion="failure")]
-        path = "docs/plans/evidence/v0.25-regeneration/determinism/epoch-results/8.json"
-        decided = {"schemaVersion": 1, "mode": "execution", "commit": NEW, "runIds": {"E8": "8"}, "verdict": "INCOMPLETE",
-                   "classCounts": {"AGREE-PASS": 660, "DISAGREE": 0, "AGREE-FAIL": 0, "INCOMPLETE": 1644}, "protocolVersion": "1.7.0"}
-        epoch["results"] = {path: decided}
-        self.assertEqual([], self.plan(inventory=second, paths=["docs/x.md"], **epoch))  # the same candidate again: 797 + 835 <= 2,100
-        # Only after a recorded INCOMPLETE first execution with no disagreement or agreed failure.
-        for bad in ({}, {path: dict(decided, verdict="NON-DETERMINISTIC")}, {path: dict(decided, verdict="FAILING")},
-                    {path: dict(decided, classCounts=dict(decided["classCounts"], DISAGREE=1))},
-                    {path: dict(decided, classCounts=dict(decided["classCounts"], **{"AGREE-FAIL": 2}))},
-                    {path: dict(decided, commit=OLD)}, {path: dict(decided, runIds={"E8": "9"})}, {path: dict(decided, protocolVersion="1.6.0")}):
-            self.refused("may run again only after", inventory=second, paths=["docs/x.md"], **dict(epoch, results=bad))
-        self.refused("executed at most 1 time", inventory=second, protocol=PRE_EPOCH)  # once per commit outside the epoch
-        third = second + [past(9, "determinism execution E9b", sha=NEW, minutes=400)]
-        self.refused("already executed 2 time(s)", inventory=third, **epoch)
-        self.refused("limit of 2 execution", inventory=third, **epoch)
-        self.refused("exceeds the 2100", inventory=history[:-1] + [past(7, "determinism execution E7", sha=OLD, minutes=1266)], **epoch)
-        self.refused("exceeds the 2100", inventory=history + [past(8, "unreadable", status="in_progress", minutes=50)], **epoch)
-        include = dr.matrix(PROTOCOL, "execution")["include"]
-        self.assertEqual({70}, {c["timeout"] for c in include if c["env"] == "osx-arm64"})  # the epoch's macOS timeout
-        self.assertEqual({50}, {c["timeout"] for c in dr.matrix(PRE_EPOCH, "execution")["include"] if c["env"] == "osx-arm64"})
-        self.refused("limit of 0 control", inventory=history, mode="control", execution_id="C9", **epoch)
-        early = dict(this_run(), runNumber=6)
-        problems = dr.plan_problems(PROTOCOL, mode="execution", execution_id="E9", env=dispatch(), inventory=history[:-1] + [early],
-                                    ledger={"entries": []}, changed_paths=lambda o, n: ["src/x"], manifest_candidate=lambda p: NEW)
-        self.assertTrue(any("where the 0.25 epoch starts" in p for p in problems), problems)
-        self.assertNotIn("merge commit", " ".join(self.plan(inventory=history, **epoch)))  # the 1.5.0 binding is 0.24-only
-
-    def test_manifest_candidate_reads_protected_main_and_fails_closed(self) -> None:
-        self.assertIsNone(dr.manifest_candidate("docs/plans/evidence/no-such/candidate-manifest.json"))
-        self.assertIsNone(dr.manifest_candidate("README.md"))  # not JSON
+                                changed_paths=lambda old, new: None if paths is None else list(paths))
 
     def refused(self, needle: str, **kwargs) -> None:
         problems = self.plan(**kwargs)
@@ -601,49 +582,24 @@ class PlanGuards(unittest.TestCase):
 
     def test_first_execution_is_planned_from_the_protocol(self) -> None:
         self.assertEqual([], self.plan())
-        # Amendment 1.3.0: maxDispatchedControlRuns 0, so a dispatched control run is refused.
-        self.assertEqual(["the limit of 0 control runs is reached (0 recorded)"], self.plan(mode="control", execution_id="C1"))
+        self.assertEqual([], self.plan(mode="control", execution_id="C1"))
         include = dr.matrix(PROTOCOL, "execution")["include"]
         envs = dp.env_by_id(PROTOCOL)
         self.assertEqual(10, len(include))
-        overrides = PROTOCOL["budget"]["releaseEpoch"]["jobTimeoutMinutes"]  # amendment 1.7.0
         for cell in include:
             env = envs[cell["env"]]
-            self.assertEqual((env["runner"], overrides.get(env["id"], env["jobTimeoutMinutes"])), (cell["runner"], cell["timeout"]))
+            self.assertEqual((env["runner"], env["jobTimeoutMinutes"]), (cell["runner"], cell["timeout"]))
+        # #1584: the 0.25 epoch's 70-minute macOS timeout is the registered one.
+        self.assertEqual({70}, {c["timeout"] for c in include if c["env"] == "osx-arm64"})
         self.assertEqual({20}, {c["timeout"] for c in dr.matrix(PROTOCOL, "control")["include"]})
 
-    def test_fourth_execution_runs_only_on_the_amendment_merge(self) -> None:
-        # Amendment 1.5.0 (budget.extraExecution): after 3 executions, one more, only on the merge commit GitHub recorded
-        # for the amendment's PR. A commit whose subject merely names that PR does not qualify.
-        three = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=400) for i in (1, 2, 3)]
-        self.assertEqual([], self.plan(inventory=three, merge=NEW))
-        for merge in (None, OLD, NEW[:12], "not a sha"):
-            self.refused("may run only on the merge commit", inventory=three, merge=merge)
-        self.assertEqual([], self.plan(inventory=three[:2], merge=None))  # the first three executions are not bound
+    def test_malformed_mode_execution_id_or_commit_is_refused(self) -> None:
+        self.refused("mode must be control or execution", mode="nightly")
+        self.refused("mode must be control or execution", execution_id="has space")
+        self.refused("mode must be control or execution", execution_id="")
+        self.refused("mode must be control or execution", env=dispatch(GITHUB_SHA=NEW[:12]))
 
-    def test_the_merge_commit_comes_from_githubs_record_of_a_merged_pr(self) -> None:
-        good = {"merged": True, "base": {"ref": "main"}, "merge_commit_sha": NEW}
-        self.assertEqual(NEW, dr.pr_merge_commit(REPO, "t", 1537, get=lambda path, token: good))
-        for data in (dict(good, merged=False), dict(good, base={"ref": "release"}), {}):
-            self.assertIsNone(dr.pr_merge_commit(REPO, "t", 1537, get=lambda path, token, d=data: d))
-
-        def boom(path, token):
-            raise OSError("network")
-        self.assertIsNone(dr.pr_merge_commit(REPO, "t", 1537, get=boom))
-
-    def test_second_execution_of_a_commit_is_refused(self) -> None:
-        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW)])
-        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW, conclusion="failure")])
-        self.refused("already executed", inventory=[past(1, "unreadable title", sha=NEW)])  # fail closed: counted as an execution
-        self.refused("unfinished", inventory=[past(1, "determinism execution E1", status="in_progress", started=False)])
-        self.assertEqual([], self.plan(inventory=[past(1, "determinism control C1", sha=NEW)]))  # a control run is not an execution
-        ledgered = {"entries": [{"runId": 1, "mode": "execution", "commit": NEW, "runnerMinutes": 1, "attemptsStarted": True}]}
-        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW, started=False)], ledger=ledgered)
-        refused_run = {"entries": [dict(ledgered["entries"][0], attemptsStarted=False)]}  # a ledgered plan refusal is not an execution
-        self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1", sha=NEW, started=False)], ledger=refused_run))
-
-    def test_deleted_or_foreign_runs_are_refused(self) -> None:
-        self.refused("missing from the API inventory", ledger={"entries": [{"runId": 7, "mode": "execution", "runnerMinutes": 300}]})
+    def test_foreign_runs_are_refused(self) -> None:
         self.refused("not listed exactly once", current=False)  # a copied workflow's run is not in this workflow's inventory
         self.refused("only .github/workflows/determinism-protocol.yml", env=dispatch(GITHUB_WORKFLOW_REF=f"{REPO}/.github/workflows/copy.yml@x"))
         copy_text = "on:\n  workflow_dispatch:\njobs:\n  x:\n    steps:\n      - run: python3 scripts/determinism_runner.py plan\n"
@@ -655,30 +611,19 @@ class PlanGuards(unittest.TestCase):
         finally:
             dp.Path.glob = original
 
+    def test_second_execution_of_a_commit_is_refused(self) -> None:
+        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW)])
+        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW, conclusion="failure")])
+        self.refused("already executed", inventory=[past(1, "unreadable title", sha=NEW)])  # fail closed: counted as an execution
+        self.refused("unfinished", inventory=[past(1, "determinism execution E1", status="in_progress", started=False)])
+        self.assertEqual([], self.plan(inventory=[past(1, "determinism control C1", sha=NEW)]))  # a control run is not an execution
+
     def test_docs_only_repair_is_refused(self) -> None:
         failed = [past(1, "determinism execution E1", conclusion="failure")]
-        self.refused("outside docs/", inventory=failed, paths=["docs/plans/evidence/g3-1135/ledger.json", "docs/fix notes.md"])
+        self.refused("outside docs/", inventory=failed, paths=["docs/plans/notes.md", "docs/fix notes.md"])
         self.refused("outside docs/", inventory=failed, paths=None)  # git cannot tell: fail closed
         self.assertEqual([], self.plan(inventory=failed, paths=["docs/x.md", "tests/Calor.Verification.Tests/X.cs"]))
         self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1")], paths=["docs/x.md"]))
-
-    def test_budget_exceeded_is_refused(self) -> None:
-        # Amendment 1.5.0: ceiling 3,200, worst case 795 per execution.
-        spent = [past(i, f"determinism control C{i}", minutes=1200, started=False) for i in (1, 2)]  # 13 + 2,400 + 795 > 3,200
-        self.refused("exceeds the 3200", inventory=spent)
-        self.refused("exceeds the 3200", inventory=[past(i, "unreadable", status="in_progress", minutes=0) for i in (1, 2, 3, 4)])
-        busy = [past(1, "determinism execution E1", status="in_progress", minutes=2500)]  # measured minutes plus the worst case
-        self.refused("exceeds the 3200", inventory=busy, mode="control", execution_id="C1")
-        self.refused("missing from the API inventory", ledger={"entries": [{"runId": 3, "runnerMinutes": 1}]})
-        bigger = {"entries": [{"runId": 1, "mode": "control", "runnerMinutes": 2500}]}
-        self.refused("exceeds the 3200", inventory=[past(1, "determinism control C1", minutes=1)], ledger=bigger)
-        executions = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=1) for i in (1, 2, 3, 4)]
-        self.refused("limit of 4 execution", inventory=executions)
-        cancelled = [past(i, f"determinism control C{i}", minutes=0, started=False, conclusion="cancelled") for i in (1, 2)]
-        self.refused("limit of 0 control", inventory=cancelled, mode="control", execution_id="C3")  # every dispatch counts
-        refusals = [past(i, f"determinism execution E{i}", minutes=1, started=False, conclusion="failure") for i in (1, 2, 3)]
-        self.assertEqual([], self.plan(inventory=refusals))  # refused runs are charged but are not executions
-        self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1", minutes=1900, event="pull_request")]))
 
     def test_retry_rerun_or_reused_id_is_refused(self) -> None:
         self.refused("GITHUB_RUN_ATTEMPT=2", env=dispatch(GITHUB_RUN_ATTEMPT="2"))
@@ -773,7 +718,7 @@ class PlanGuards(unittest.TestCase):
         upper = dict(good_observed(windows, NEW), dotnetPath="d:\\A\\_TEMP\\DOTNET-1421\\dotnet.exe")
         self.assertEqual([], dp.judge(PROTOCOL, windows, upper, NEW))  # Windows paths compare case-insensitively
 
-    def test_inventory_and_ledger_come_from_the_api(self) -> None:
+    def test_inventory_comes_from_the_api(self) -> None:
         jobs = [{"id": 1, "started_at": "2026-10-03T10:00:00Z", "completed_at": "2026-10-03T10:00:01Z"},
                 {"id": 2, "started_at": "2026-10-03T10:00:00Z", "completed_at": "2026-10-03T10:02:00Z"}, {"id": 3, "started_at": None}]
         self.assertEqual(3, dr.job_minutes(jobs, True))
@@ -794,14 +739,6 @@ class PlanGuards(unittest.TestCase):
         for broken in ({"workflow_runs": [run]}, {"total_count": 2, "workflow_runs": [run]}, {"total_count": 2, "workflow_runs": [run, run]}):
             with self.assertRaises(dr.Refusal):
                 dr.paged("/runs", "workflow_runs", "t", lambda path, token, b=broken: b)
-        inventory = [past(1, "determinism control C1", minutes=13), past(2, "determinism execution E1", minutes=300)]
-        one, two = {"runId": 1, "mode": "control", "commit": OLD, "runnerMinutes": 13}, {"runId": "2", "mode": "execution", "commit": OLD, "runnerMinutes": 300}
-        self.assertEqual([], dr.ledger_problems({"entries": [one, two]}, inventory))
-        self.assertEqual(2, len(dr.ledger_problems({"entries": [dict(one, runnerMinutes=12)]}, inventory)))
-        self.assertEqual(1, len(dr.ledger_problems({"entries": [one, two, dict(one, runId=9)]}, inventory)))
-        for wrong in (dict(two, commit=NEW), dict(two, mode="control")):
-            self.assertEqual(1, len(dr.ledger_problems({"entries": [one, wrong]}, inventory)))
-            self.refused("another commit or mode", inventory=inventory, ledger={"entries": [wrong]})
         with self.assertRaises(dr.Refusal):
             dr.job_minutes([{"id": 6, "started_at": None, "completed_at": "2026-10-03T10:04:00Z", "conclusion": "success"}], True)
 

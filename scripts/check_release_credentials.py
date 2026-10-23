@@ -47,7 +47,8 @@ the old key was revoked.
     the API gave.
 
 Exit 0 only when every check passes (CLOSED, possibly with A001). Exit 1 when a check fails
-(OPEN), cannot be completed (UNKNOWN), or was refused with no attestation (UNVERIFIABLE). Maintainer steps: docs/plans/evidence/release-gaps-0.25/README.md.
+(OPEN), cannot be completed (UNKNOWN), or was refused with no attestation (UNVERIFIABLE). Maintainer steps: the 0.25
+release-gaps record, archived at https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/release-gaps-0.25/README.md.
 Tests: scripts/test_check_release_credentials.py.
 """
 
@@ -682,7 +683,7 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--from-dir", help="also read the settings from saved API responses (tests)")
     parser.add_argument("--attest-workflow-permissions", metavar="FILE",
                         help="maintainer attestation of the Actions workflow permissions, used only when the API "
-                             "answers HTTP 403 (docs/plans/evidence/release-gaps-0.25/"
+                             "answers HTTP 403 (tests/TestData/ReleaseCredentials/"
                              "actions-workflow-permissions-attestation.json)")
     return run(parser.parse_args(argv))
 

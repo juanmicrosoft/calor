@@ -125,6 +125,40 @@ public class PairDifferentialOracleTests
     }
 
     [Fact]
+    public void PinCheckPassesTheUnsealedRegistrationAndStillChecksSealsWhenPresent()
+    {
+        // #1584 removed the seal and the oracle pins from the current registration; a registration that
+        // carries them (as the one merged at f0e0eb68 does) is still checked file by file.
+        var root = PairOracleCommand.RepoRoot(AppContext.BaseDirectory);
+        var registration = Path.Combine(root, "eng/benchmark-publication/b1-1276/registration");
+        Assert.Null(PairOracleCommand.PinProblem(root, registration));
+
+        var sealedDir = Directory.CreateTempSubdirectory("b1-1276-pins-").FullName;
+        try
+        {
+            File.Copy(Path.Combine(registration, "registration.json"), Path.Combine(sealedDir, "registration.json"));
+            const string pairs = "eng/benchmark-publication/b1-1276/registration/pairs.json";
+            var good = PairDifferentialOracle.Sha256Hex(Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(root, pairs)).Replace("\r\n", "\n")));
+            void Seal(string sha) => File.WriteAllText(Path.Combine(sealedDir, "sha256.json"),
+                new JsonObject { ["files"] = new JsonObject { [pairs] = sha } }.ToJsonString());
+            Seal(good);
+            Assert.Null(PairOracleCommand.PinProblem(root, sealedDir));
+            Seal(new string('0', 64));
+            Assert.Contains("does not match its registered hash", PairOracleCommand.PinProblem(root, sealedDir), StringComparison.Ordinal);
+
+            File.Delete(Path.Combine(sealedDir, "sha256.json"));
+            var pinned = JsonNode.Parse(File.ReadAllText(Path.Combine(registration, "registration.json")))!;
+            pinned["oracle"]!["implementation"]![0]!["sha256"] = new string('0', 64);
+            File.WriteAllText(Path.Combine(sealedDir, "registration.json"), pinned.ToJsonString());
+            Assert.Contains("PairDifferentialOracle.cs does not match", PairOracleCommand.PinProblem(root, sealedDir), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(sealedDir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void DifferentStdoutIsNotEquivalent()
     {
         // Main() and Main(string[]) are the same entry point.

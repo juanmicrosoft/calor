@@ -11,15 +11,15 @@ using Xunit;
 namespace Calor.Compiler.Tests.SoundnessRegistration;
 
 /// <summary>
-/// #1419 (0.24 R1) — the released-verifier soundness sweep registration is complete, frozen, and
-/// executable before #1311 runs it. Positive controls run on the committed packet; each negative
-/// control changes one fact and asserts its specific code (and only the co-firing codes it names).
-/// Nothing here runs the verifier: the oracle tests execute registrant C# only, and the case
-/// validity test compiles with VerifyContracts and VerifyRefinements off and reads only errors.
+/// #1419 (0.24 R1): the soundness sweep's case packet (<c>tests/TestData/SoundnessSweep/</c>, read by
+/// <c>bench/Calor.Soundness.Sweep</c>) is executable. The generator reproduces the committed case index,
+/// the oracle controls give their expected verdicts, every case oracle compiles against the BCL only, and
+/// every case is valid Calor. Nothing here runs the verifier: the oracle tests execute C# only, and the
+/// case validity test compiles with VerifyContracts and VerifyRefinements off and reads only errors.
 /// </summary>
 public class SoundnessRegistrationTests
 {
-    private const string PacketDir = "docs/plans/evidence/r1-1419";
+    private const string PacketDir = "tests/TestData/SoundnessSweep";
     private const string UpdateVariable = "CALOR_UPDATE_R1_CASE_INDEX";
 
     // Rows whose cases are only parsed in R1: full compilation would run the always-on inheritance
@@ -27,15 +27,8 @@ public class SoundnessRegistrationTests
     private static readonly string[] ParseOnlyRowPrefixes = ["IMPL-", "SIMP-", "CTRL-RETRO-845"];
 
     // ------------------------------------------------------------------
-    // Positive controls
+    // The packet is executable
     // ------------------------------------------------------------------
-
-    [Fact]
-    public void CommittedRegistrationIsValid()
-    {
-        var violations = Validate(Registration(), Templates(), Manifests());
-        Assert.True(violations.Count == 0, Describe(violations));
-    }
 
     [Fact]
     public void CaseIndexMatchesTheGenerator()
@@ -65,7 +58,7 @@ public class SoundnessRegistrationTests
             File.WriteAllText(path, text, new UTF8Encoding(false));
         Assert.True(File.Exists(path), $"{path} is missing; regenerate with {UpdateVariable}=1");
         Assert.True(File.ReadAllText(path).Replace("\r\n", "\n") == text,
-            $"cases-index.json differs from the generator output. The case set is frozen; changing it needs a registration amendment ({UpdateVariable}=1 regenerates).");
+            $"cases-index.json differs from the generator output. The sweep's preflight compares the same index; regenerate it with {UpdateVariable}=1 and review the changed cases.");
     }
 
     [Fact]
@@ -190,107 +183,9 @@ public class SoundnessRegistrationTests
         Assert.Equal(frozen, live);
     }
 
-    [Fact]
-    public void PacketHashesMatchSha256Manifest()
-    {
-        var root = RepoRoot();
-        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(root, PacketDir, "sha256.json")))!["files"]!.AsObject();
-        foreach (var required in new[] { "registration.json", "templates.json", "cases-index.json", "manifest-B1.json",
-                     "manifest-N1.json", "derive-manifests.py" })
-            Assert.True(manifest.ContainsKey($"{PacketDir}/{required}"), $"sha256.json does not cover {required}");
-        Assert.True(manifest.ContainsKey("docs/plans/v0.24-r1-soundness-registration.md"), "sha256.json does not cover the document");
-        var mismatches = manifest.Where(kv => Sha256Lf(Path.Combine(root, kv.Key)) != kv.Value!.GetValue<string>())
-            .Select(kv => $"\"{kv.Key}\": \"{Sha256Lf(Path.Combine(root, kv.Key))}\"").ToList();
-        Assert.True(mismatches.Count == 0, "Re-hash:\n" + string.Join(",\n", mismatches));
-    }
-
-    // ------------------------------------------------------------------
-    // Negative controls: one changed fact, one specific code
-    // ------------------------------------------------------------------
-
-    [Theory]
-    [InlineData("R001")]
-    [InlineData("R002")]
-    [InlineData("R003")]
-    [InlineData("R004")]
-    [InlineData("R005")]
-    [InlineData("R006")]
-    [InlineData("R007")]
-    [InlineData("R008")]
-    [InlineData("R009")]
-    [InlineData("R010")]
-    [InlineData("R011")]
-    [InlineData("R012")]
-    [InlineData("R013")]
-    [InlineData("R014")]
-    [InlineData("R015")]
-    [InlineData("R016")]
-    public void NegativeControlFailsClosed(string code)
-    {
-        var registration = Registration();
-        var templates = Templates();
-        var manifests = Manifests();
-        JsonNode Row(string id) => registration["denominator"]!["rows"]!.AsArray().Single(r => r!["id"]!.GetValue<string>() == id)!;
-        var coFiring = new HashSet<string>(StringComparer.Ordinal);
-        switch (code)
-        {
-            case "R001": Row("NUM-SHIFT")["classification"] = "maybe-modeled"; break;
-            case "R002": Row("XCL-KINDUCTION")["releaseCritical"] = true; break;
-            case "R003": Row("NUM-SHIFT")["entryPoints"]!.AsArray().Add("no-such-entry-point"); break;
-            case "R004":
-                templates["templates"]!.AsArray().Add(new JsonObject { ["id"] = "T-X", ["row"] = "NO-SUCH-ROW", ["instances"] = 0,
-                    ["calor"] = "", ["oracle"] = new JsonObject { ["prop"] = "true" } });
-                break;
-            case "R005": registration["budget"]!["allocation"]!["minimizationReserve"] = 10_000; break;
-            case "R006": registration["baselines"]!.AsArray().Single(b => b!["id"]!.GetValue<string>() == "N1")!["commit"] = "b1d23d7d74aa17a460d6a7d429836ca8396bb182"; break;
-            case "R007":
-                // Pooling B1 and N1 into one path also breaks the N1 manifest's own result path (named co-fire).
-                registration["noPooling"]!["resultPaths"]!["N1"] = registration["noPooling"]!["resultPaths"]!["B1"]!.GetValue<string>();
-                coFiring.Add("R016");
-                break;
-            case "R008": registration["dispositionHandoff"]!["vocabulary"]!.AsArray().RemoveAt(4); break;
-            case "R009":
-                foreach (var row in registration["denominator"]!["rows"]!.AsArray())
-                    row!["samplingDimensions"] = new JsonArray(row["samplingDimensions"]!.AsArray()
-                        .Select(d => d!.GetValue<string>()).Where(d => d != "caches").Select(d => (JsonNode)d).ToArray());
-                break;
-            case "R010":
-                var map = registration["denominator"]!["whitelistCoverageMap"]!.AsArray();
-                map.Remove(map.Single(m => m!["member"]!.GetValue<string>() == "Modulo"));
-                break;
-            case "R011": registration["hypotheses"]![0]!["status"] = "executed"; break;
-            case "R012": registration["controls"]!["retrospective845"]!["preFixParent"] = "0000000000000000000000000000000000000000"; break;
-            case "R013": templates["templates"]![0]!["oracle"]!["prop"] = "Calor.Compiler.Program.Compile(null!, null, null!) != null"; break;
-            case "R014": templates["templates"]![0]!["expectedOutcome"] = "Proven"; break;
-            case "R015": registration["freeze"]!["decisionBearingInspectionBeforeFreeze"] = true; break;
-            case "R016": manifests["N1"]["rows"]![0]!["id"] = "B1:NUM-ARITH-ADD"; break;
-        }
-        var codes = Validate(registration, templates, manifests).Select(v => v.Code).ToHashSet();
-        Assert.Contains(code, codes);
-        codes.Remove(code);
-        codes.ExceptWith(coFiring);
-        Assert.True(codes.Count == 0, $"unrelated codes fired: {string.Join(", ", codes)}");
-    }
-
-    [Theory]
-    [InlineData("9.9.9")]   // not a recorded contract version
-    [InlineData("1.0.5")]   // unrecorded version between real ones
-    public void RegistrationUnderAnUnrecordedContractVersionFailsClosed(string version)
-    {
-        var registration = Registration();
-        registration["contract"]!["contractVersion"] = version;
-        var codes = Validate(registration, Templates(), Manifests()).Select(v => v.Code).ToHashSet();
-        Assert.Equal(new HashSet<string> { "R006" }, codes);
-    }
-
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
-
-    private static IReadOnlyList<SoundnessRegistrationValidator.Violation> Validate(
-        JsonNode registration, JsonNode templates, IReadOnlyDictionary<string, JsonNode> manifests) =>
-        SoundnessRegistrationValidator.Validate(registration, templates, Contract(), manifests,
-            SweepCaseGenerator.Generate(registration, templates));
 
     private static string ToNamespaced(string source, string ns)
     {
@@ -304,8 +199,6 @@ public class SoundnessRegistrationTests
     private static JsonNode Registration() => Load(PacketDir + "/registration.json");
 
     private static JsonNode Templates() => Load(PacketDir + "/templates.json");
-
-    private static JsonNode Contract() => Load("docs/plans/evidence/evidence-contract-1407/contract.json");
 
     private static Dictionary<string, JsonNode> Manifests() => new(StringComparer.Ordinal)
     {
@@ -325,20 +218,11 @@ public class SoundnessRegistrationTests
         }
     }
 
-    private static string Describe(IEnumerable<SoundnessRegistrationValidator.Violation> violations) =>
-        string.Join("\n", violations.Select(v => $"{v.Code}: {v.Message}"));
-
     private static string GitBlobId(string path)
     {
         var content = File.ReadAllBytes(path);
         var header = Encoding.ASCII.GetBytes($"blob {content.Length}\0");
         return Convert.ToHexStringLower(SHA1.HashData([.. header, .. content]));
-    }
-
-    private static string Sha256Lf(string path)
-    {
-        var text = File.ReadAllText(path, Encoding.UTF8).Replace("\r\n", "\n");
-        return Convert.ToHexStringLower(SHA256.HashData(new UTF8Encoding(false).GetBytes(text)));
     }
 
     private static string RepoRoot()

@@ -6,7 +6,7 @@
   "epic": 1409,
   "gate": "B1",
   "contractVersion": "1.0.1",
-  "contractRule": "docs/plans/evidence/evidence-contract-1407/contract.json#/benchmarkEquivalence/registrationRule",
+  "contractRule": "evidence-contract-1407/contract.json#/benchmarkEquivalence/registrationRule (0.24 evidence contract, archived by #1584 on branch evidence/archive-2026-10)",
   "document": "docs/plans/b1-1276-benchmark-registration.md",
   "cutoff": {
     "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
@@ -18,8 +18,7 @@
     "pairs": "pairs.json",
     "corpusInventory": "corpus-inventory.json",
     "exclusions": "exclusions.json",
-    "metricSet": "metric-set.json",
-    "hashes": "sha256.json"
+    "metricSet": "metric-set.json"
   },
   "denominator": {
     "pairingRule": "A pair is a .calr file and the .cs file with the same directory and stem. manifest.json names exactly these pairs: benchmarks (per-pair metric loop), bugScenarios (buggy variants), and editTasks (edited variants). Every .calr and every hand-written .cs under the corpus root at the cutoff belongs to exactly one pair; every other file is listed in corpus-inventory.json as non-pair with a reason.",
@@ -48,21 +47,18 @@
   "oracle": {
     "id": "b1-1276-pair-oracle",
     "version": "1",
-    "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit <full SHA of the main commit that merged this registration> --output <file outside the repository, run 1>; then the same command with --compare-with <run 1 file> --output <file outside the repository, run 2>",
+    "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration eng/benchmark-publication/b1-1276/registration --registration-commit <full SHA of the main commit that merged this registration> --output <file outside the repository, run 1>; then the same command with --compare-with <run 1 file> --output <file outside the repository, run 2>",
     "runs": 2,
     "runAgreement": "The first run exits 4: it is not a result. The second run (--compare-with the first) reconciles them. It is invalid unless the first run has the same oracleId, oracleVersion, inputGeneratorVersion, registrationCommit, pairsSha256, and environment and exactly the same pair ids. A pair whose verdict differs between the runs is UNCLASSIFIED (NONDETERMINISTIC_ACROSS_RUNS). The second file keeps its raw verdicts (runResults) and the reconciled ones (results) and exits 0 only when valid, otherwise 3. Both files are retained; there is no rerun-until-agreement.",
     "implementation": [
       {
-        "path": "tests/Calor.Evaluation/Equivalence/PairDifferentialOracle.cs",
-        "sha256": "d50ead4e5aba7a4d1709ad850eea32e5abccc2cacb3a9b3e0c7fa40630fa98e9"
+        "path": "tests/Calor.Evaluation/Equivalence/PairDifferentialOracle.cs"
       },
       {
-        "path": "tests/Calor.Evaluation/Equivalence/InputGenerator.cs",
-        "sha256": "d461e4b20bb254d75b60ad800a51908916d690ff2a9cd3012a4b519efce9b7bc"
+        "path": "tests/Calor.Evaluation/Equivalence/InputGenerator.cs"
       },
       {
-        "path": "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs",
-        "sha256": "a3fe191b66edc417007ac0df0d94dd9d02b0faa6b1259e3568a30742573b9629"
+        "path": "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs"
       }
     ],
     "isolation": "Each pair runs in its own child process (300,000 ms limit). A crash is UNCLASSIFIED (ORACLE_CRASH); exceeding the limit is UNCLASSIFIED (TIMEOUT).",
@@ -186,7 +182,7 @@
   },
   "comparabilityNote": "pairManifestSha256 here is the hash of the registration pair manifest. A result's pairManifestSha256 is the hash of its own dispositioned manifest, which must name this registration's hash; results with different dispositioned manifests are not comparable. No earlier benchmark result is comparable with a result of this method. generatorVersion names the results generator that the second #1276 PR implements exactly as statistics.interval.algorithm specifies.",
   "afterRegistration": [
-    "Any change to a pinned field (a pair's files or hashes, task statement, input set, expected outputs, failure behavior, the oracle and its command or implementation files, the metric set or implementation files, the aggregation and interval method, the sampling unit, or an exclusion) is a #1407 amendment. BenchmarkRegistrationTests fails when any packet file, the document, a corpus file, an oracle file, or a metric implementation file differs from this registration, and it pins the SHA-256 of sha256.json as a constant, so a regenerated and resealed packet still fails until that constant is changed in a reviewed amendment.",
+    "Any change to a pinned field (a pair's files or hashes, task statement, input set, expected outputs, failure behavior, the oracle and its command, the metric set, the aggregation and interval method, the sampling unit, or an exclusion) changes what the published results describe, so it needs a new oracle run and new results. BenchmarkRegistrationTests fails when a packet file is inconsistent or a corpus file differs from this registration. #1584 removed the packet seal (sha256.json), the implementation hash pins, and the #1407 amendment step; such a change is reviewed in its pull request.",
     "A pair repaired, dropped, or re-dispositioned after registration stays reported with its previous disposition.",
     "Historical benchmark artifacts (website/public/data/benchmark-results.json and its derivatives) stay historical; they are not regenerated in place or relabeled as outputs of this method."
   ],

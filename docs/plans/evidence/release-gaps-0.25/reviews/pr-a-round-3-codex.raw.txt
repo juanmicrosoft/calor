@@ -1,7 +1,0 @@
-tokens used
-83,747
-VERDICT: REQUEST-CHANGES
-
-- **MAJOR — `scripts/check_release_credentials.py:124`: The allowlist still misses valid environment declarations.** Another job using `"environm\u0065nt": nuget-release`, or a flow mapping beneath a normal job header, produces no workflow errors. I reproduced both and confirmed they parse as environment declarations. With otherwise valid settings, the checker reports CLOSED even though another job can access the environment’s secrets. [GitHub documents that access rule here](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#environment-secrets). **Fix:** parse YAML before checking job environments, or reject unsupported escaped keys and nested flow mappings conservatively. Add both mutations to the Python tests and `ReleaseWorkflowGateTests`.
-
-- **MINOR — `scripts/check_release_credentials.py:152`: Guard validation checks text presence rather than execution.** Wrapping the existing shell guard in an uncalled `check_key() { … }` function still passes the scanner. I confirmed that this mutated step exits 0 with an empty key, defeating the promised failure before setup while the structural test remains green. The committed guard works correctly. **Fix:** allowlist the complete guard script, or execute the extracted guard with an empty key and require failure. Add an uncalled-function mutation test.

@@ -20,8 +20,8 @@
   <!-- Reproducible publication builds. Two builds of one commit must produce the
        same package bytes in any checkout directory, so anyone can rebuild a release
        and compare it with what shipped (.github/workflows/reproducible-builds.yml). Guarded by
-       scripts/test_reproducible_builds.py; proof in
-       docs/plans/evidence/deterministic-builds/. -->
+       scripts/test_reproducible_builds.py; proof archived on branch evidence/archive-2026-10
+       (deterministic-builds/). -->
   <PropertyGroup Label="Reproducible builds">
     <!-- Roslyn: no MVID/timestamp randomness (the SDK default, made explicit). -->
     <Deterministic>true</Deterministic>

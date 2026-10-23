@@ -7,7 +7,6 @@ using Calor.Compiler.Commands;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
-using Calor.Compiler.Tests.EvidenceContract;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -26,7 +25,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class IteratorAccessorConversionTests
 {
-    private const string R0Fixtures = "docs/plans/evidence/v0.25-r0-1426/fixtures";
+    private const string R0Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
     public enum Surface
     {
@@ -264,7 +263,7 @@ public class IteratorAccessorConversionTests
     {
         // F4-ITER-03: the regression control. Native illegal yields stay rejected.
         var calor = File.ReadAllText(Path.Combine(
-            EvidenceContractTests.RepoRoot(), R0Fixtures, "F4-ITER-03.calr.txt"));
+            CliTestHarness.FindRepoRoot(), R0Fixtures, "F4-ITER-03.calr.txt"));
         var compilation = Program.Compile(calor, "F4-ITER-03.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0209");
@@ -398,7 +397,7 @@ public class IteratorAccessorConversionTests
     }
 
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
-        EvidenceContractTests.RepoRoot(), R0Fixtures, id + ".cs.txt"));
+        CliTestHarness.FindRepoRoot(), R0Fixtures, id + ".cs.txt"));
 
     private static async Task<(string Calor, List<string> Losses)> ConvertAsync(string source, Surface surface)
     {

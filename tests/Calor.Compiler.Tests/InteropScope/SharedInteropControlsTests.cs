@@ -6,7 +6,6 @@ using System.Text.Json.Nodes;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Mcp;
 using Calor.Compiler.Migration;
-using Calor.Compiler.Tests.EvidenceContract;
 using Calor.Compiler.Verification.Z3.Cache;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,22 +14,22 @@ using Xunit;
 namespace Calor.Compiler.Tests.InteropScope;
 
 /// <summary>
-/// #1428 (0.25 T1): the shared behavioral controls. Every control registered in the T1 register
-/// (<c>docs/plans/evidence/v0.25-t1-1428/register.json</c>) is converted on every measured surface
+/// #1428 (0.25 T1): the shared behavioral controls. Every control in
+/// <c>tests/TestData/InteropScope/T1/controls.json</c> is converted on every measured surface
 /// (library, CLI convert, CLI migrate, MCP convert with and without passthroughOnError, MCP migrate,
 /// MCP batch), compiled, run and compared with the original C#. Each fixture's <c>Probe.Run()</c>
 /// returns a trace of values, aliasing, evaluation order, exceptions and iterator timing, so a
 /// compile that changes behavior fails. A cell's outcome must be one the control allows and must
 /// equal the committed observation in <c>controls-results.json</c>: a reclassified cell fails until
-/// the results are regenerated (<c>CALOR_REGENERATE_T1_CONTROLS=1</c>) and the register approves the
-/// new results hash.
+/// the results are regenerated (<c>CALOR_REGENERATE_T1_CONTROLS=1</c>) and the new observations are
+/// reviewed in the pull request that changes them.
 /// </summary>
 public sealed class SharedInteropControlsTests : IDisposable
 {
-    public const string Dir = "docs/plans/evidence/v0.25-t1-1428";
+    public const string Dir = "tests/TestData/InteropScope/T1";
     public const string ResultsPath = Dir + "/controls-results.json";
 
-    /// <summary>The surfaces measured in-repo, in register order.</summary>
+    /// <summary>The surfaces measured in-repo, in controls-file order.</summary>
     public static readonly string[] Surfaces =
         ["library", "cli-convert", "cli-migrate", "mcp-convert", "mcp-convert-passthroughOnError", "mcp-migrate", "mcp-batch"];
 
@@ -48,7 +47,7 @@ public sealed class SharedInteropControlsTests : IDisposable
     public static TheoryData<string, string> Cells()
     {
         var data = new TheoryData<string, string>();
-        foreach (var control in Register()["controls"]!.AsArray())
+        foreach (var control in Controls()["controls"]!.AsArray())
             foreach (var surface in Surfaces)
                 data.Add(control!["id"]!.GetValue<string>(), surface);
         return data;
@@ -62,8 +61,8 @@ public sealed class SharedInteropControlsTests : IDisposable
         // surfaces resolve theirs from CALOR_HOME when each conversion starts, and the test assembly pins that
         // to an empty directory (tests/Shared/HermeticCalorHome.cs). A user's ~/.calor/manifests never applies.
         Assert.Equal(global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot, Effects.Manifests.ManifestLoader.GetUserManifestsDirectory());
-        var control = Register()["controls"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;
-        var source = File.ReadAllText(Path.Combine(EvidenceContractTests.RepoRoot(), control["fixture"]!.GetValue<string>()));
+        var control = Controls()["controls"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), control["fixture"]!.GetValue<string>()));
         var original = Run(source);
         var (calor, paths, surfaceError) = await ConvertAsync(source, surface);
         var cell = Classify(id, calor, paths, surfaceError, original);
@@ -88,11 +87,11 @@ public sealed class SharedInteropControlsTests : IDisposable
             $"{id} on {surface} reclassified: committed {committed["surfaces"]?[surface]?.ToJsonString()}, observed {cell.ToJsonString()}");
     }
 
-    /// <summary>The surface defaults the register records are what each entry point actually builds.</summary>
+    /// <summary>The surface defaults the controls file records are what each entry point actually builds.</summary>
     [Fact]
     public void RegisteredDefaults_MatchTheEntryPoints()
     {
-        var surfaces = Register()["surfaces"]!.AsArray().ToDictionary(s => s!["id"]!.GetValue<string>(), s => s!);
+        var surfaces = Controls()["surfaces"]!.AsArray().ToDictionary(s => s!["id"]!.GetValue<string>(), s => s!);
         void Check(string id, ConversionOptions options)
         {
             Assert.Equal(surfaces[id]["defaults"]!["rescueUnusableMembers"]!.GetValue<bool>(), options.RescueUnusableMembers);
@@ -101,14 +100,14 @@ public sealed class SharedInteropControlsTests : IDisposable
         Check("library", new ConversionOptions());
         Check("cli-convert", Commands.ConvertCommand.BuildCSharpToCalorOptions(benchmark: false, verbose: false, explain: false,
             noFallback: false, passthrough: false, explicitCallClosers: false));
-        // Every committed cell reports the options that applied; they must agree with the registered defaults.
+        // Every committed cell reports the options that applied; they must agree with the recorded defaults.
         foreach (var (control, node) in Results())
             foreach (var (surface, cell) in node!["surfaces"]!.AsObject())
                 if (cell!["paths"] is JsonObject p)
                 {
                     Assert.True(surfaces[surface]["defaults"]!["rescueUnusableMembers"]!.GetValue<bool>() == p["rescueUnusableMembers"]!.GetValue<bool>()
                         && surfaces[surface]["defaults"]!["passthroughOnError"]!.GetValue<bool>() == p["passthroughOnError"]!.GetValue<bool>(),
-                        $"{control} on {surface}: reported options differ from the registered defaults");
+                        $"{control} on {surface}: reported options differ from the recorded defaults");
                 }
     }
 
@@ -292,17 +291,17 @@ public sealed class SharedInteropControlsTests : IDisposable
         }
     }
 
-    // ---- Register and committed results ------------------------------------------------------------
+    // ---- Controls and committed results ------------------------------------------------------------
 
-    public static JsonNode Register() => JsonNode.Parse(File.ReadAllText(Path.Combine(EvidenceContractTests.RepoRoot(), Dir, "register.json")))!;
+    public static JsonNode Controls() => JsonNode.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), Dir, "controls.json")))!;
 
     private static JsonObject Results()
     {
-        var path = Path.Combine(EvidenceContractTests.RepoRoot(), ResultsPath);
+        var path = Path.Combine(CliTestHarness.FindRepoRoot(), ResultsPath);
         return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!["controls"]!.AsObject() : new JsonObject();
     }
 
-    /// <summary>Regeneration only: merges one observed cell into the results file, in register order.</summary>
+    /// <summary>Regeneration only: merges one observed cell into the results file, in controls-file order.</summary>
     private static void Record(string id, string original, string surface, JsonObject cell)
     {
         lock (RecordLock)
@@ -312,7 +311,7 @@ public sealed class SharedInteropControlsTests : IDisposable
             _recorded[id] = entry;
             entry["surfaces"]![surface] = cell;
             var ordered = new JsonObject();
-            foreach (var c in Register()["controls"]!.AsArray().Select(c => c!["id"]!.GetValue<string>()).Where(_recorded.ContainsKey))
+            foreach (var c in Controls()["controls"]!.AsArray().Select(c => c!["id"]!.GetValue<string>()).Where(_recorded.ContainsKey))
             {
                 var e = _recorded[c]!;
                 var s = new JsonObject();
@@ -326,7 +325,7 @@ public sealed class SharedInteropControlsTests : IDisposable
                 ["producer"] = "tests/Calor.Compiler.Tests/InteropScope/SharedInteropControlsTests.cs (CALOR_REGENERATE_T1_CONTROLS=1)",
                 ["controls"] = ordered,
             };
-            File.WriteAllText(Path.Combine(EvidenceContractTests.RepoRoot(), ResultsPath),
+            File.WriteAllText(Path.Combine(CliTestHarness.FindRepoRoot(), ResultsPath),
                 file.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n");
         }
     }

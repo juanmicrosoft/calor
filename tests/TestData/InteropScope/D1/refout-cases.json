@@ -1,0 +1,2895 @@
+{
+  "description": "By-reference (ref/out/in) cases (#1427). RefOutContractCaseTests compiles each calor case and compares the result with 'observed'; each csharp and r0-fixture case must print expectedOutput and every mutant must print something else.",
+  "diagnostics": [
+    {
+      "symbol": "InvalidByReferenceOperand",
+      "range": "Calor0200-Calor0299",
+      "allocatedBy": 943,
+      "code": "Calor0212",
+      "meaning": "A ref, out or in operand that C# cannot pass by reference, or a discard that C# would bind to a declared `_` (RO-LV-2, RO-DECL-2). Reported by the binder before C# generation. #943 sets `code` when it allocates one; expectations then resolve the symbol to that code."
+    }
+  ],
+  "preludes": {
+    "fn": [
+      "§M{m1:P}",
+      "  §F{f0:Bump:pub} (i32:x:ref) -> void",
+      "    §ASSIGN x (+ x 1)",
+      "  §F{f9:SetOut:pub} (i32:x:out) -> void",
+      "    §ASSIGN x 7",
+      "  §F{f8:Twice:pub} (i32:x:in) -> i32",
+      "    §R (* x 2)",
+      "  §F{f7:BumpGet:pub} (i32:x:ref) -> i32",
+      "    §ASSIGN x (+ x 1)",
+      "    §R (* x 100)",
+      "  §F{f6:SetNeg:pub} (i32:x:out) -> void",
+      "    §ASSIGN x -5"
+    ],
+    "cls": [
+      "§M{m1:P}",
+      "  §CL{c1:K:pub:stat}",
+      "    §MT{m0:Bp:pub:stat} (i32:x:ref)",
+      "      §ASSIGN x (+ x 1)",
+      "    §MT{m9:So:pub:stat} (i32:x:out)",
+      "      §ASSIGN x 7"
+    ],
+    "inst": [
+      "§M{m1:P}",
+      "  §F{f0:Bump:pub} (i32:x:ref) -> void",
+      "    §ASSIGN x (+ x 1)"
+    ]
+  },
+  "cases": [
+    {
+      "id": "D1-SYN-01",
+      "area": "syntax",
+      "shape": "local",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-SYN-1",
+        "RO-SYN-3",
+        "RO-CALL-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §C{Bump} §A{ref} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-SYN-02",
+      "area": "syntax",
+      "shape": "named-argument",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-SYN-1",
+        "RO-CALL-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 0",
+        "    §C{SetOut} §A{out}[x] v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "SetOut(x: out v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-SYN-03",
+      "area": "syntax",
+      "shape": "in-argument",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-SYN-1",
+        "RO-LV-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{v:i32} 4",
+        "    §R §C{Twice} §A{in} v §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Twice(in v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-SYN-04",
+      "area": "syntax",
+      "shape": "modifier-text",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-SYN-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §C{Bump} §A{byref} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0107"
+      },
+      "observed": {
+        "errors": [
+          "Calor0107"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-SYN-05",
+      "area": "syntax",
+      "shape": "constructor-argument",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-SYN-2",
+        "RO-UNS-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:H:pub}",
+        "    §CTOR{k1:pub} (i32:x:out)",
+        "      §ASSIGN x 1",
+        "  §F{f1:Run:pub} () -> void",
+        "    §B{~v:i32} 0",
+        "    §B{h} §NEW{H} §A{out} v §/NEW"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0107"
+      },
+      "observed": {
+        "errors": [
+          "Calor0107"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-CALL-01",
+      "area": "call-shape",
+      "shape": "expression-call",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-CALL-4",
+        "RO-CALL-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §R (+ §C{BumpGet} §A{ref} v §/C v)"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "BumpGet(ref v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-CALL-02",
+      "area": "call-shape",
+      "shape": "missing-modifier",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-CALL-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §C{Bump} §A v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-CALL-03",
+      "area": "call-shape",
+      "shape": "wrong-modifier",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-CALL-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §C{SetOut} §A{ref} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-CALL-04",
+      "area": "call-shape",
+      "shape": "wrong-modifier",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-CALL-3",
+        "RO-LV-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §C{Bump} §A{in} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-CALL-05",
+      "area": "call-shape",
+      "shape": "overload-by-modifier",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-CALL-3"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Pick:pub} (i32:x) -> i32",
+        "    §R 1",
+        "  §F{f2:Pick:pub} (i32:x:ref) -> i32",
+        "    §R 2",
+        "  §F{f3:Run:pub} () -> i32",
+        "    §B{~v:i32} 0",
+        "    §R §C{Pick} §A{ref} v §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Pick(ref v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-CALL-06",
+      "area": "call-shape",
+      "shape": "in-omitted",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-3",
+        "RO-CALL-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §R §C{Twice} §A 7 §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-01",
+      "area": "lvalue",
+      "shape": "literal",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> void",
+        "    §C{Bump} §A{ref} 5 §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds",
+      "note": "Refused only by the generated C# compile (Calor1002) at the measured commit."
+    },
+    {
+      "id": "D1-LV-02",
+      "area": "lvalue",
+      "shape": "computed-expression",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~v:i32} 1",
+        "    §C{Bump} §A{ref} (+ v 1) §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-03",
+      "area": "lvalue",
+      "shape": "property",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-2"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub}",
+        "    §PROP{p1:N:i32:pub}",
+        "      §GET",
+        "      §SET",
+        "    §MT{m1:Run:pub} () -> void",
+        "      §E{}",
+        "      §C{Bump} §A{ref} N §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-04",
+      "area": "lvalue",
+      "shape": "in-parameter",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-2",
+        "RO-LV-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:p:in) -> void",
+        "    §C{Bump} §A{ref} p §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-05",
+      "area": "lvalue",
+      "shape": "readonly-field",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-2"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub}",
+        "    §FLD{i32:n:pub:readonly}",
+        "    §MT{m1:Run:pub} () -> void",
+        "      §C{Bump} §A{ref} n §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-06",
+      "area": "lvalue",
+      "shape": "immutable-binding",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{v:i32} 1",
+        "    §C{Bump} §A{ref} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "Parity: `§ASSIGN v 2` on the same immutable binding is accepted at the measured commit (D1-LV-07)."
+    },
+    {
+      "id": "D1-LV-07",
+      "area": "lvalue",
+      "shape": "immutable-binding",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{v:i32} 1",
+        "    §ASSIGN v 2",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted"
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "Parity control for D1-LV-06."
+    },
+    {
+      "id": "D1-LV-08",
+      "area": "lvalue",
+      "shape": "loop-variable",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> void",
+        "    §L{l1:i:0:3:1}",
+        "      §C{Bump} §A{ref} i §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref i)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "Parity: `§ASSIGN i 5` inside the same loop is accepted at the measured commit."
+    },
+    {
+      "id": "D1-LV-09",
+      "area": "lvalue",
+      "shape": "bare-field",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1",
+        "RO-EFF-4"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub}",
+        "    §FLD{i32:n:pub}",
+        "    §MT{m1:Run:pub} () -> void",
+        "      §E{}",
+        "      §C{Bump} §A{ref} n §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref n)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-10",
+      "area": "lvalue",
+      "shape": "array-element",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1",
+        "RO-EFF-1"
+      ],
+      "prelude": "cls",
+      "source": [
+        "    §MT{m1:Run:pub:stat} () -> i32",
+        "      §E{alloc,mut}",
+        "      §ARR{arr:i32}",
+        "        1",
+        "        2",
+        "      §C{Bp} §A{ref} §IDX{arr} 1 §/C",
+        "      §R §IDX{arr} 1"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bp(ref arr[1])"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-LV-11",
+      "area": "lvalue",
+      "shape": "array-element",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §E{alloc,mut}",
+        "    §ARR{arr:i32}",
+        "      1",
+        "      2",
+        "    §C{Bump} §A{ref} §IDX{arr} 1 §/C",
+        "    §R §IDX{arr} 1"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref arr[1])"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "The same element operand is accepted in a class method (D1-LV-10) but refused with Calor0208 in a module function."
+    },
+    {
+      "id": "D1-LV-12",
+      "area": "lvalue",
+      "shape": "receiver-field",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1",
+        "RO-EFF-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub}",
+        "    §FLD{i32:n:pub}",
+        "  §F{f1:Run:pub} (K:k) -> void",
+        "    §E{mut}",
+        "    §C{Bump} §A{ref} k.n §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref k.n)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "`§ASSIGN k.n 3` in the same position binds and charges `mut`; the by-reference form is refused with Calor0208."
+    },
+    {
+      "id": "D1-DECL-01",
+      "area": "declaration",
+      "shape": "discard",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-DECL-2"
+      ],
+      "prelude": "cls",
+      "source": [
+        "    §MT{m2:Run:pub:stat} () -> i32",
+        "      §C{So} §A{out} _ §/C",
+        "      §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "out _"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-DECL-02",
+      "area": "declaration",
+      "shape": "discard",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-DECL-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §C{SetOut} §A{out} _ §/C",
+        "    §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "out _"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "In a module function `_` is reported as an undefined variable (Calor0200)."
+    },
+    {
+      "id": "D1-DECL-03",
+      "area": "declaration",
+      "shape": "discard",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-DECL-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> void",
+        "    §C{Bump} §A{ref} _ §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds",
+      "note": "Refused today only because `_` is undefined; the refusal must name the discard."
+    },
+    {
+      "id": "D1-DECL-04",
+      "area": "declaration",
+      "shape": "discard-collision",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-DECL-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:_) -> i32",
+        "    §C{SetOut} §A{out} _ §/C",
+        "    §R _"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "InvalidByReferenceOperand"
+      },
+      "observed": {
+        "errors": [
+          "Calor0212"
+        ]
+      },
+      "status": "holds",
+      "note": "Accepted at the measured commit and emitted as `SetOut(out _)`, which C# binds to the parameter `_`: the call overwrites the input instead of discarding."
+    },
+    {
+      "id": "D1-CALL-07",
+      "area": "call-shape",
+      "shape": "overload-by-modifier",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-CALL-3"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Pick:pub} (i32:x) -> i32",
+        "    §R 1",
+        "  §F{f2:Pick:pub} (i32:x:ref) -> i32",
+        "    §R 2",
+        "  §F{f3:Run:pub} () -> i32",
+        "    §B{~v:i32} 0",
+        "    §R §C{Pick} §A v §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Pick(v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "No modifier with a by-value overload available: the by-value overload is selected."
+    },
+    {
+      "id": "D1-LV-13",
+      "area": "lvalue",
+      "shape": "readonly-field-ctor",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-LV-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub}",
+        "    §FLD{i32:n:pub:readonly}",
+        "    §CTOR{k1:pub} ()",
+        "      §ASSIGN n 1",
+        "      §C{Bump} §A{ref} n §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref n)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-01",
+      "area": "nullability",
+      "shape": "nullable-annotation",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-5"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Set:pub} (?str:s:ref) -> void",
+        "    §ASSIGN s null",
+        "  §F{f1:Run:pub} () -> bool",
+        "    §B{~t:?str} \"x\"",
+        "    §C{Set} §A{ref} t §/C",
+        "    §R (== t null)"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Set(ref t)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-02",
+      "area": "nullability",
+      "shape": "nullable-annotation",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-5",
+        "RO-REP-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Set:pub} (?str:s:ref) -> void",
+        "    §ASSIGN s null",
+        "  §F{f1:Run:pub} () -> i32",
+        "    §B{~t:str} \"x\"",
+        "    §C{Set} §A{ref} t §/C",
+        "    §R (len t)"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-03",
+      "area": "nullability",
+      "shape": "nullable-annotation",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-5"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Get:pub} (?str:s:out) -> void",
+        "    §ASSIGN s null",
+        "  §F{f1:Run:pub} () -> str",
+        "    §B{~t:str} \"x\"",
+        "    §C{Get} §A{out} t §/C",
+        "    §R t"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-04",
+      "area": "nullability",
+      "shape": "nullable-annotation",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-5"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Get:pub} (str:s:out) -> void",
+        "    §ASSIGN s \"y\"",
+        "  §F{f1:Run:pub} () -> bool",
+        "    §B{~t:?str} null",
+        "    §C{Get} §A{out} t §/C",
+        "    §R (== t null)"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-05",
+      "area": "nullability",
+      "shape": "narrowing",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-2",
+        "RO-NULL-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Set:pub} (?str:s:ref) -> void",
+        "    §ASSIGN s null",
+        "  §F{f1:Run:pub} (?str:p) -> i32",
+        "    §B{~s:?str} p",
+        "    §IF{i1} (!= s null)",
+        "      §C{Set} §A{ref} s §/C",
+        "      §B{str:u} s",
+        "      §R (len u)",
+        "    §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0272"
+      },
+      "observed": {
+        "errors": [
+          "Calor0272"
+        ]
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "Control D1-NULL-06 shows the same narrowing is accepted without the call."
+    },
+    {
+      "id": "D1-NULL-07",
+      "area": "nullability",
+      "shape": "alias-narrowing",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-2",
+        "RO-ALIAS-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Two:pub} (?str:a:ref, ?str:b:ref) -> i32",
+        "    §IF{i1} (!= a null)",
+        "      §ASSIGN b null",
+        "      §B{str:u} a",
+        "      §R (len u)",
+        "    §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0272"
+      },
+      "observed": {
+        "errors": [
+          "Calor0272"
+        ]
+      },
+      "status": "holds",
+      "note": "`Two(ref s, ref s)` makes `a` null after the narrowing; the binder invalidates only the written name."
+    },
+    {
+      "id": "D1-NULL-09",
+      "area": "nullability",
+      "shape": "alias-narrowing",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-2",
+        "RO-ALIAS-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Clear:pub} (?str:s:ref) -> void",
+        "    §ASSIGN s null",
+        "  §F{f1:Two:pub} (?str:a:ref, ?str:b:ref) -> i32",
+        "    §IF{i1} (!= a null)",
+        "      §C{Clear} §A{ref} b §/C",
+        "      §B{str:u} a",
+        "      §R (len u)",
+        "    §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0272"
+      },
+      "observed": {
+        "errors": [
+          "Calor0272"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-08",
+      "area": "nullability",
+      "shape": "generic-type-payload",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-4",
+        "RO-NULL-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Run:pub} (Dict<i32, str>:d) -> str",
+        "    §B{~v:str} \"keep\"",
+        "    §B{bool:ok} §C{d.TryGetValue} §A 2 §A{out} v §/C",
+        "    §B{str:w} v",
+        "    §R w"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "out v"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "Accepted, and no diagnostic is activated (0.22 excludes generic payloads). A miss writes null into the declared `str`: this is the 0.22 limit that null can inhabit `str`, not a non-null guarantee."
+    },
+    {
+      "id": "D1-NULL-10",
+      "area": "nullability",
+      "shape": "heap-alias-narrowing",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-2"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub:stat}",
+        "    §FLD{?str:slot:pub:stat}",
+        "    §MT{m1:ClearSlot:pub:stat} ()",
+        "      §ASSIGN slot null",
+        "    §MT{m2:Check:pub:stat} (?str:a:ref) -> i32",
+        "      §IF{i1} (!= a null)",
+        "        §C{ClearSlot} §/C",
+        "        §B{str:u} a",
+        "        §R (len u)",
+        "      §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0272"
+      },
+      "observed": {
+        "errors": [
+          "Calor0272"
+        ]
+      },
+      "status": "holds",
+      "note": "`Check(ref K.slot)` makes `a` and `slot` one location; the call nulls it after the narrowing."
+    },
+    {
+      "id": "D1-NULL-11",
+      "area": "nullability",
+      "shape": "getter-alias",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-2"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:Box:pub}",
+        "    §FLD{?str:Name:pub}",
+        "    §PROP{pr1:Trigger:i32:pub}",
+        "      §GET",
+        "        §ASSIGN this.Name null",
+        "        §R INT:0",
+        "    §MT{mt1:Probe:pub} (?str:a:ref) -> i32",
+        "      §E{mut}",
+        "      §IF{i1} (!= a null)",
+        "        §B{sink:i32} this.Trigger",
+        "        §B{str:u} a",
+        "        §R (len u)",
+        "      §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0272"
+      },
+      "observed": {
+        "errors": [
+          "Calor0272"
+        ]
+      },
+      "status": "holds",
+      "note": "`box.Probe(ref box.Name)`: the getter nulls the aliased storage after the narrowing."
+    },
+    {
+      "id": "D1-NULL-12",
+      "area": "nullability",
+      "shape": "nullable-annotation",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-5"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Read:pub} (str:s:in) -> i32",
+        "    §R (len s)",
+        "  §F{f1:Run:pub} (?str:p) -> i32",
+        "    §B{~t:?str} p",
+        "    §R §C{Read} §A{in} t §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-13",
+      "area": "nullability",
+      "shape": "nullable-annotation",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-5"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Read:pub} (?str:s:in) -> bool",
+        "    §R (== s null)",
+        "  §F{f1:Run:pub} () -> bool",
+        "    §B{~t:str} \"x\"",
+        "    §R §C{Read} §A{in} t §/C"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0208"
+      },
+      "observed": {
+        "errors": [
+          "Calor0208"
+        ]
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-NULL-06",
+      "area": "nullability",
+      "shape": "narrowing",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-NULL-2"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Run:pub} (?str:p) -> i32",
+        "    §B{~s:?str} p",
+        "    §IF{i1} (!= s null)",
+        "      §B{str:u} s",
+        "      §R (len u)",
+        "    §R 0"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted"
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds"
+    },
+    {
+      "id": "D1-EFF-01",
+      "area": "effects",
+      "shape": "array-element",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-1"
+      ],
+      "prelude": "cls",
+      "source": [
+        "    §MT{m1:Run:pub:stat} () -> i32",
+        "      §E{alloc}",
+        "      §ARR{arr:i32}",
+        "        1",
+        "        2",
+        "      §C{Bp} §A{ref} §IDX{arr} 1 §/C",
+        "      §R §IDX{arr} 1"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0410"
+      },
+      "observed": {
+        "errors": [
+          "Calor0410"
+        ]
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A2"
+      ],
+      "note": "A heap write through `ref` is not charged `mut`; the direct assignment (D1-EFF-03) is."
+    },
+    {
+      "id": "D1-EFF-02",
+      "area": "effects",
+      "shape": "array-element",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-1"
+      ],
+      "prelude": "cls",
+      "source": [
+        "    §MT{m1:Run:pub:stat} () -> i32",
+        "      §E{alloc}",
+        "      §ARR{arr:i32}",
+        "        1",
+        "        2",
+        "      §C{So} §A{out} §IDX{arr} 1 §/C",
+        "      §R §IDX{arr} 1"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0410"
+      },
+      "observed": {
+        "errors": [
+          "Calor0410"
+        ]
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A2"
+      ]
+    },
+    {
+      "id": "D1-EFF-03",
+      "area": "effects",
+      "shape": "array-element",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-1"
+      ],
+      "prelude": "cls",
+      "source": [
+        "    §MT{m1:Run:pub:stat} () -> i32",
+        "      §E{alloc}",
+        "      §ARR{arr:i32}",
+        "        1",
+        "        2",
+        "      §ASSIGN §IDX{arr} 1 7",
+        "      §R §IDX{arr} 1"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0410"
+      },
+      "observed": {
+        "errors": [
+          "Calor0410"
+        ]
+      },
+      "status": "holds",
+      "note": "Parity control for D1-EFF-01 and D1-EFF-02."
+    },
+    {
+      "id": "D1-EFF-04",
+      "area": "effects",
+      "shape": "local",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-1",
+        "RO-EFF-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §E{}",
+        "    §B{~v:i32} 1",
+        "    §C{Bump} §A{ref} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "Bump(ref v)"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A2"
+      ]
+    },
+    {
+      "id": "D1-EFF-05",
+      "area": "effects",
+      "shape": "bare-field",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-4"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:K:pub}",
+        "    §FLD{i32:n:pub}",
+        "    §MT{m1:Run:pub} () -> void",
+        "      §E{}",
+        "      §ASSIGN n 3"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted"
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "note": "Parity control for D1-LV-09: a bare-name field write charges nothing at the measured commit."
+    },
+    {
+      "id": "D1-EFF-06",
+      "area": "effects",
+      "shape": "local",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-3"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Run:pub} () -> i32",
+        "    §E{}",
+        "    §B{~v:i32} 1",
+        "    §C{Mystery.Mutate} §A{ref} v §/C",
+        "    §R v"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "rejected",
+        "diagnostic": "Calor0410"
+      },
+      "observed": {
+        "errors": [
+          "Calor0410"
+        ]
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A2"
+      ],
+      "note": "An unresolved callee keeps the unknown-call charge (Calor0410 with warning Calor0411); by-reference arguments do not make it pure."
+    },
+    {
+      "id": "D1-EFF-07",
+      "area": "effects",
+      "shape": "local",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-EFF-3",
+        "RO-EFF-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Run:pub} (str:s) -> i32",
+        "    §E{}",
+        "    §B{~n:i32} 0",
+        "    §C{Int32.TryParse} §A s §A{out} n §/C",
+        "    §R n"
+      ],
+      "verify": false,
+      "expected": {
+        "outcome": "accepted",
+        "emits": [
+          "out n"
+        ]
+      },
+      "observed": {
+        "errors": []
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A2"
+      ],
+      "note": "A resolved pure BCL callee writing a local charges nothing."
+    },
+    {
+      "id": "D1-ANA-01",
+      "area": "analysis",
+      "shape": "parameter",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-1",
+        "RO-ANA-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "    §Q (> x 0)",
+        "    §C{Bump} §A{ref} x §/C",
+        "    §PROOF{pr1} (> x 0)",
+        "    §R x"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "unsupported"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Unsupported"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ]
+    },
+    {
+      "id": "D1-ANA-02",
+      "area": "analysis",
+      "shape": "parameter",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-1",
+        "RO-ANA-3"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "    §Q (> x 0)",
+        "    §C{SetNeg} §A{out} x §/C",
+        "    §PROOF{pr1} (> x 0)",
+        "    §R x"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "unsupported"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Unsupported"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "SetNeg writes -5: a discharge from the stale precondition would be a false proof."
+    },
+    {
+      "id": "D1-ANA-03",
+      "area": "analysis",
+      "shape": "in-argument",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "    §Q (> x 0)",
+        "    §B{d:i32} §C{Twice} §A{in} x §/C",
+        "    §PROOF{pr1} (> x 0)",
+        "    §R d"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "discharged"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Discharged"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ]
+    },
+    {
+      "id": "D1-ANA-04",
+      "area": "analysis",
+      "shape": "aliased-parameter",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-2",
+        "RO-ALIAS-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f1:Two:pub} (i32:a:ref, i32:b:ref) -> i32",
+        "    §Q (> a 0)",
+        "    §ASSIGN b 0",
+        "    §PROOF{pr1} (> a 0)",
+        "    §R a"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "unsupported"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Unsupported"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "`Two(ref v, ref v)` makes `a` zero."
+    },
+    {
+      "id": "D1-ANA-05",
+      "area": "analysis",
+      "shape": "local",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-4",
+        "RO-ANA-1"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §F{f2:Set:pub} (i32:x) -> void",
+        "    §R",
+        "  §F{f3:Set:pub} (i32:x:out) -> void",
+        "    §ASSIGN x -5",
+        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "    §Q (> x 0)",
+        "    §C{Set} §A{out} x §/C",
+        "    §PROOF{pr1} (> x 0)",
+        "    §R x"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "unsupported"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Unsupported"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "The test first compiles `warmup` (the same body passing `§A x` to the by-value overload, whose proof is discharged) into the same verification cache directory, then this case.",
+      "warmup": [
+        "  §F{f2:Set:pub} (i32:x) -> void",
+        "    §R",
+        "  §F{f3:Set:pub} (i32:x:out) -> void",
+        "    §ASSIGN x -5",
+        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "    §Q (> x 0)",
+        "    §C{Set} §A x §/C",
+        "    §PROOF{pr1} (> x 0)",
+        "    §R x"
+      ]
+    },
+    {
+      "id": "D1-ANA-08",
+      "area": "analysis",
+      "shape": "parameter",
+      "polarity": "positive",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-1"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:x) -> i32",
+        "    §C{Bump} §A{ref} x §/C",
+        "    §IF{i1} (> x 0)",
+        "      §PROOF{pr1} (> x 0)",
+        "    §R x"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "discharged"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Discharged"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "A guard evaluated after the call is fresh (R-OBL's scoped guard rule)."
+    },
+    {
+      "id": "D1-ANA-09",
+      "area": "analysis",
+      "shape": "aliased-parameter",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-1",
+        "RO-ANA-2"
+      ],
+      "prelude": "fn",
+      "source": [
+        "  §F{f1:Run:pub} (i32:x:ref) -> i32",
+        "    §C{Bump} §A{ref} x §/C",
+        "    §IF{i1} (> x 0)",
+        "      §PROOF{pr1} (> x 0)",
+        "    §R x"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "unsupported"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Unsupported"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "The D1-ANA-08 shape with a by-reference parameter: R-OBL's alias exception makes even the fresh guard unusable."
+    },
+    {
+      "id": "D1-ANA-10",
+      "area": "analysis",
+      "shape": "getter-alias",
+      "polarity": "negative",
+      "kind": "calor",
+      "rules": [
+        "RO-ANA-1",
+        "RO-ANA-2"
+      ],
+      "prelude": "inst",
+      "source": [
+        "  §CL{c1:Box:pub}",
+        "    §FLD{i32:Value:pub}",
+        "    §PROP{pr1:Trigger:i32:pub}",
+        "      §GET",
+        "        §ASSIGN this.Value INT:-5",
+        "        §R INT:0",
+        "    §MT{mt1:Probe:pub}",
+        "      §I{i32:x:ref}",
+        "      §O{i32}",
+        "      §E{mut}",
+        "      §Q (> x INT:0)",
+        "      §B{sink:i32} this.Trigger",
+        "      §PROOF{pr1} (> x INT:0)",
+        "      §R x"
+      ],
+      "verify": true,
+      "expected": {
+        "outcome": "accepted",
+        "proof": "unsupported"
+      },
+      "observed": {
+        "errors": [],
+        "proof": "Unsupported"
+      },
+      "status": "holds",
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "note": "R-OBL's own witness (S2ObligationStateTests.PropertyGetterRead_KillsAliasedRefParameterFact): `box.Probe(ref box.Value)`; reading Trigger stores -5 through the alias. No explicit call or store appears in the body."
+    },
+    {
+      "id": "D1-ANA-06",
+      "area": "analysis",
+      "shape": "local",
+      "polarity": "negative",
+      "kind": "spec",
+      "rules": [
+        "RO-ANA-5"
+      ],
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "witness": "§B{~d:i32} 1, then a callee that assigns its ref parameter 0, then (/ 10 d). At the measured commit the division-by-zero check reports nothing with or without the call, so no executable witness discriminates yet. #943 must add one (or a different checker that uses constant values) before READY."
+    },
+    {
+      "id": "D1-ANA-07",
+      "area": "analysis",
+      "shape": "preserved-csharp",
+      "polarity": "negative",
+      "kind": "spec",
+      "rules": [
+        "RO-ANA-6",
+        "RO-COPY-4"
+      ],
+      "r0Rows": [
+        "F1-REFOUT-A1"
+      ],
+      "witness": "A body whose by-reference call is kept as inline `§CS{}` (F1-REFOUT-02's `out var` before repair) has no facts: a `§Q` fact on the out operand does not discharge a later `§PROOF`. Covered by R-OBL's opacity rule; #943 adds the witness."
+    },
+    {
+      "id": "D1-CS-01",
+      "area": "copy",
+      "shape": "struct-element-field",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-COPY-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public struct Point { public int X; }",
+        "public static class Probe",
+        "{",
+        "    static void Bump(ref int x) { x = x + 1; }",
+        "    public static string Run()",
+        "    {",
+        "        var grid = new Point[2, 2];",
+        "        Bump(ref grid[1, 1].X);",
+        "        var nested = new Point[][] { new Point[] { new Point { X = 5 } } };",
+        "        Bump(ref nested[0][0].X);",
+        "        return grid[1, 1].X + \"|\" + nested[0][0].X;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "1|6",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "Bump(ref grid[1, 1].X);",
+          "replace": "var h1 = grid[1, 1]; Bump(ref h1.X);"
+        },
+        {
+          "kind": "copy",
+          "find": "Bump(ref nested[0][0].X);",
+          "replace": "var h2 = nested[0][0]; Bump(ref h2.X);"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-02",
+      "area": "copy",
+      "shape": "struct-element",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-COPY-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public struct Point { public int X; }",
+        "public static class Probe",
+        "{",
+        "    static void Reset(ref Point p) { p.X = 9; }",
+        "    public static string Run()",
+        "    {",
+        "        var pts = new Point[] { new Point { X = 1 } };",
+        "        Reset(ref pts[0]);",
+        "        return pts[0].X.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "9",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "Reset(ref pts[0]);",
+          "replace": "var h = pts[0]; Reset(ref h);"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-03",
+      "area": "copy",
+      "shape": "struct-local-field",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-COPY-1",
+        "RO-LV-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public struct Inner { public int X; }",
+        "public struct Outer { public Inner In; }",
+        "public static class Probe",
+        "{",
+        "    static void Bump(ref int x) { x = x + 1; }",
+        "    public static string Run()",
+        "    {",
+        "        var o = new Outer();",
+        "        Bump(ref o.In.X);",
+        "        return o.In.X.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "1",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "Bump(ref o.In.X);",
+          "replace": "var h = o.In; Bump(ref h.X);"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-04",
+      "area": "copy",
+      "shape": "receiver-field",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-COPY-2",
+        "RO-ORD-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public sealed class Box { public int X = 1; }",
+        "public static class Probe",
+        "{",
+        "    static readonly Box shared = new Box();",
+        "    static int calls;",
+        "    static Box Get() { calls++; return shared; }",
+        "    static void Bump(ref int x) { x = x + 1; }",
+        "    public static string Run()",
+        "    {",
+        "        Bump(ref Get().X);",
+        "        return shared.X + \"|\" + calls;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "2|1",
+      "mutants": [
+        {
+          "kind": "reorder",
+          "find": "Bump(ref Get().X);",
+          "replace": "Get(); Bump(ref Get().X);"
+        }
+      ],
+      "note": "Hoisting a reference-type receiver once is allowed; evaluating it twice is not."
+    },
+    {
+      "id": "D1-CS-05",
+      "area": "copy",
+      "shape": "local",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-COPY-3",
+        "RO-EXC-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "using System;",
+        "public static class Probe",
+        "{",
+        "    static void SetThenThrow(out int r) { r = 1; throw new InvalidOperationException(\"boom\"); }",
+        "    static void BumpThenThrow(ref int r) { r = r + 10; throw new InvalidOperationException(\"boom\"); }",
+        "    public static string Run()",
+        "    {",
+        "        int r = 5;",
+        "        try { SetThenThrow(out r); } catch (InvalidOperationException) { }",
+        "        int s = 5;",
+        "        try { BumpThenThrow(ref s); } catch (InvalidOperationException) { }",
+        "        return r + \"|\" + s;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "1|15",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "try { SetThenThrow(out r); }",
+          "replace": "try { int t; SetThenThrow(out t); r = t; }"
+        },
+        {
+          "kind": "copy",
+          "find": "try { BumpThenThrow(ref s); }",
+          "replace": "try { int u = s; BumpThenThrow(ref u); s = u; }"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-06",
+      "area": "aliasing",
+      "shape": "static-field",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-ALIAS-1",
+        "RO-COPY-3"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static int counter = 10;",
+        "    static int BumpAndRead(ref int x) { x = x + 1; return counter; }",
+        "    public static string Run()",
+        "    {",
+        "        int seen = BumpAndRead(ref counter);",
+        "        return seen + \"|\" + counter;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "11|11",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "int seen = BumpAndRead(ref counter);",
+          "replace": "int t = counter; int seen = BumpAndRead(ref t); counter = t;"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-07",
+      "area": "aliasing",
+      "shape": "same-storage-twice",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-ALIAS-1",
+        "RO-ALIAS-2"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static void AddBoth(ref int a, ref int b) { a = a + 1; b = b + 10; }",
+        "    static int AddAndRead(ref int a, int b) { a = a + 100; return b; }",
+        "    public static string Run()",
+        "    {",
+        "        int v = 0;",
+        "        AddBoth(ref v, ref v);",
+        "        int w = 1;",
+        "        int seen = AddAndRead(ref w, w);",
+        "        return v + \"|\" + w + \"|\" + seen;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "11|101|1",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "AddBoth(ref v, ref v);",
+          "replace": "int a = v, b = v; AddBoth(ref a, ref b); v = a; v = b;"
+        },
+        {
+          "kind": "reorder",
+          "find": "int seen = AddAndRead(ref w, w);",
+          "replace": "AddAndRead(ref w, 0); int seen = w;"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-08",
+      "area": "evaluation-order",
+      "shape": "expression-call",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-CALL-4",
+        "RO-ORD-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static int BumpAndGet(ref int x) { x = x + 1; return x * 100; }",
+        "    public static string Run()",
+        "    {",
+        "        int v = 1;",
+        "        int after = BumpAndGet(ref v) + v;",
+        "        int u = 1;",
+        "        int before = u + BumpAndGet(ref u);",
+        "        return after + \"|\" + before;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "202|201",
+      "mutants": [
+        {
+          "kind": "reorder",
+          "find": "int after = BumpAndGet(ref v) + v;",
+          "replace": "int after = v + BumpAndGet(ref v);"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-09",
+      "area": "evaluation-order",
+      "shape": "array-element",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-ORD-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "using System;",
+        "public static class Probe",
+        "{",
+        "    static string log = \"\";",
+        "    static int Note(string s) { log += s; return 0; }",
+        "    static void Set(ref int slot, int value) { slot = value; }",
+        "    public static string Run()",
+        "    {",
+        "        var arr = new int[2];",
+        "        try { Set(ref arr[5], Note(\"second\")); }",
+        "        catch (IndexOutOfRangeException) { log += \"|oob\"; }",
+        "        object[] objs = new string[1];",
+        "        try { Set2(ref objs[0], Note(\"third\")); }",
+        "        catch (ArrayTypeMismatchException) { log += \"|covariance\"; }",
+        "        return log;",
+        "    }",
+        "    static void Set2(ref object slot, int value) { slot = value; }",
+        "}"
+      ],
+      "expectedOutput": "|oob|covariance",
+      "mutants": [
+        {
+          "kind": "reorder",
+          "find": "try { Set(ref arr[5], Note(\"second\")); }",
+          "replace": "try { var n = Note(\"second\"); Set(ref arr[5], n); }"
+        }
+      ],
+      "note": "Bounds and covariance checks happen when the reference is taken, before later arguments."
+    },
+    {
+      "id": "D1-CS-10",
+      "area": "evaluation-order",
+      "shape": "short-circuit",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-ORD-2"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "using System.Collections.Generic;",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var d = new Dictionary<string, int> { [\"a\"] = 1 };",
+        "        string? k = null;",
+        "        int v = 0;",
+        "        bool ok = k != null && d.TryGetValue(k, out v);",
+        "        return ok + \"|\" + v;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "False|0",
+      "mutants": [
+        {
+          "kind": "hoist",
+          "find": "bool ok = k != null && d.TryGetValue(k, out v);",
+          "replace": "bool pre = d.TryGetValue(k!, out v); bool ok = k != null && pre;"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-11",
+      "area": "evaluation-order",
+      "shape": "loop-condition",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-ORD-2"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "using System.Collections.Generic;",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var q = new Queue<int>(new[] { 1, 2, 3 });",
+        "        int n;",
+        "        int sum = 0;",
+        "        while (q.TryDequeue(out n)) { sum += n; }",
+        "        return sum.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "6",
+      "mutants": [
+        {
+          "kind": "hoist",
+          "find": "while (q.TryDequeue(out n)) { sum += n; }",
+          "replace": "bool more = q.TryDequeue(out n); while (more) { sum += n; more = false; }"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-12",
+      "area": "call-shape",
+      "shape": "named-argument",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-CALL-2",
+        "RO-ORD-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static string log = \"\";",
+        "    static int Next(string tag, int value) { log += tag; return value; }",
+        "    static int Div(int a, int b, out int remainder) { remainder = a % b; return a / b; }",
+        "    public static string Run()",
+        "    {",
+        "        int rem;",
+        "        int q = Div(remainder: out rem, b: Next(\"b\", 2), a: Next(\"a\", 7));",
+        "        return q + \"|\" + rem + \"|\" + log;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "3|1|ba",
+      "mutants": [
+        {
+          "kind": "reorder",
+          "find": "int q = Div(remainder: out rem, b: Next(\"b\", 2), a: Next(\"a\", 7));",
+          "replace": "int q = Div(a: Next(\"a\", 7), b: Next(\"b\", 2), remainder: out rem);"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-13",
+      "area": "call-shape",
+      "shape": "overload-by-modifier",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-CALL-3"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static int Pick(int x) { return 1; }",
+        "    static int Pick(ref int x) { x = 5; return 2; }",
+        "    public static string Run()",
+        "    {",
+        "        int v = 0;",
+        "        int which = Pick(ref v);",
+        "        return which + \"|\" + v;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "2|5",
+      "mutants": [
+        {
+          "kind": "drop-modifier",
+          "find": "int which = Pick(ref v);",
+          "replace": "int which = Pick(v);"
+        }
+      ]
+    },
+    {
+      "id": "D1-CS-14",
+      "area": "declaration",
+      "shape": "out-var",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-DECL-1"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "using System;",
+        "using System.Collections.Generic;",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var fs = new List<Func<int>>();",
+        "        foreach (var s in new[] { \"1\", \"2\" })",
+        "        {",
+        "            if (int.TryParse(s, out var n)) fs.Add(() => n);",
+        "        }",
+        "        return fs[0]() + \"|\" + fs[1]();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "1|2",
+      "mutants": [
+        {
+          "kind": "hoist",
+          "find": "        foreach (var s in new[] { \"1\", \"2\" })\n        {\n            if (int.TryParse(s, out var n))",
+          "replace": "        int n;\n        foreach (var s in new[] { \"1\", \"2\" })\n        {\n            if (int.TryParse(s, out n))"
+        }
+      ],
+      "note": "The declaration must stay inside the loop body: one variable per iteration."
+    },
+    {
+      "id": "D1-CS-15",
+      "area": "declaration",
+      "shape": "discard",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-DECL-2"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        int _ = 5;",
+        "        int.TryParse(\"42\", out _);",
+        "        return _.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "42",
+      "mutants": [
+        {
+          "kind": "discard",
+          "find": "int.TryParse(\"42\", out _);",
+          "replace": "int.TryParse(\"42\", out var unused);"
+        }
+      ],
+      "note": "`_` here is a declared local, not a discard; emitting `§A{out} _` as a discard changes the result."
+    },
+    {
+      "id": "D1-CS-16",
+      "area": "nullability",
+      "shape": "generic-type-payload",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-NULL-4",
+        "RO-NULL-1",
+        "RO-REP-1"
+      ],
+      "conversion": "native",
+      "source": [
+        "using System.Collections.Generic;",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var names = new Dictionary<int, string> { [1] = \"one\" };",
+        "        string? hit;",
+        "        bool a = names.TryGetValue(1, out hit);",
+        "        string? miss = \"keep\";",
+        "        bool b = names.TryGetValue(2, out miss);",
+        "        return a + \":\" + hit + \"|\" + b + \":\" + (miss == null);",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "True:one|False:True",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "bool b = names.TryGetValue(2, out miss);",
+          "replace": "string? t; bool b = names.TryGetValue(2, out t);"
+        }
+      ],
+      "note": "A miss writes null into the caller's variable. The C# output shows the run-time write only; the Calor post-call state (declared type kept, transfer unchecked) is D1-NULL-08."
+    },
+    {
+      "id": "D1-CS-17",
+      "area": "nullability",
+      "shape": "flow-attribute",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-NULL-3"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "using System.Diagnostics.CodeAnalysis;",
+        "public static class Probe",
+        "{",
+        "    static bool TryName(int id, [NotNullWhen(true)] out string? name) { name = id == 1 ? \"one\" : null; return name != null; }",
+        "    public static string Run()",
+        "    {",
+        "        if (TryName(1, out var n)) { string s = n; return s.Length.ToString(); }",
+        "        return \"none\";",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "3",
+      "mutants": [],
+      "note": "Type-checks without warnings only through NotNullWhen; native conversion would need flow narrowing that 0.22 excludes."
+    },
+    {
+      "id": "D1-CS-18",
+      "area": "unsupported",
+      "shape": "ref-local",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var arr = new int[] { 1, 2 };",
+        "        ref int r = ref arr[0];",
+        "        r = 5;",
+        "        return arr[0].ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "5",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-19",
+      "area": "unsupported",
+      "shape": "span-indexer",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "using System;",
+        "public static class Probe",
+        "{",
+        "    static void Bump(ref int x) { x = x + 1; }",
+        "    public static string Run()",
+        "    {",
+        "        Span<int> span = stackalloc int[] { 1, 2 };",
+        "        Bump(ref span[0]);",
+        "        return span[0].ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "2",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-20",
+      "area": "unsupported",
+      "shape": "ref-extension",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public struct Counter { public int N; }",
+        "public static class Ext { public static void Inc(this ref Counter c) { c.N++; } }",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var c = new Counter();",
+        "        c.Inc();",
+        "        return c.N.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "1",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-21",
+      "area": "unsupported",
+      "shape": "constructor-argument",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1",
+        "RO-SYN-2"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public sealed class Holder { public Holder(out int x) { x = 3; } }",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        int v;",
+        "        var h = new Holder(out v);",
+        "        return v.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "3",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-22",
+      "area": "unsupported",
+      "shape": "delegate-by-ref",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public delegate void RefAction(ref int x);",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        RefAction bump = (ref int x) => x = x + 1;",
+        "        int v = 1;",
+        "        bump(ref v);",
+        "        return v.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "2",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-23",
+      "area": "lvalue",
+      "shape": "in-omitted",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-LV-3"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static int Twice(in int x) { return x * 2; }",
+        "    public static string Run()",
+        "    {",
+        "        int seven = 7;",
+        "        return Twice(7) + \"|\" + Twice(seven);",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "14|14",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-24",
+      "area": "declaration",
+      "shape": "out-var-loop-header",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-DECL-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static int n = 99;",
+        "    static bool Next(out int x) { x = 0; return false; }",
+        "    public static string Run()",
+        "    {",
+        "        while (Next(out var n)) { }",
+        "        return n.ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "99",
+      "mutants": [
+        {
+          "kind": "hoist",
+          "find": "        while (Next(out var n)) { }",
+          "replace": "        int n;\n        while (Next(out n)) { }"
+        }
+      ],
+      "note": "The out variable is scoped to the `while` statement; after it, `n` is the field. Hoisting the declaration changes the result."
+    },
+    {
+      "id": "D1-CS-25",
+      "area": "unsupported",
+      "shape": "in-extension",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public struct Big { public int A; }",
+        "public static class Ext { public static int Read(this in Big b) { return b.A; } }",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var b = new Big { A = 4 };",
+        "        return b.Read().ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "4",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-26",
+      "area": "unsupported",
+      "shape": "indexer-argument",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public sealed class Table",
+        "{",
+        "    public int this[in int key] => key * 3;",
+        "}",
+        "public static class Probe",
+        "{",
+        "    public static string Run()",
+        "    {",
+        "        var t = new Table();",
+        "        int k = 2;",
+        "        return t[in k].ToString();",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "6",
+      "mutants": []
+    },
+    {
+      "id": "D1-CS-27",
+      "area": "evaluation-order",
+      "shape": "in-array-element",
+      "polarity": "positive",
+      "kind": "csharp",
+      "rules": [
+        "RO-ORD-1",
+        "RO-LV-3"
+      ],
+      "conversion": "native-or-preserved",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static string log = \"\";",
+        "    static string Note(string s) { log += s; return s; }",
+        "    static string Read(in object slot, string tag) { return tag + \"=\" + slot; }",
+        "    static string ReadRef(ref object slot, string tag) { return tag + \"=\" + slot; }",
+        "    public static string Run()",
+        "    {",
+        "        object[] a = new string[] { \"x\" };",
+        "        return Read(in a[0], Note(\"n\")) + \"|\" + log;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "n=x|n",
+      "mutants": [
+        {
+          "kind": "modifier-change",
+          "find": "return Read(in a[0], Note(\"n\")) + \"|\" + log;",
+          "replace": "return ReadRef(ref a[0], Note(\"n\")) + \"|\" + log;"
+        }
+      ],
+      "note": "`in` takes a read-only reference without the covariance check; emitting it as `ref` throws ArrayTypeMismatchException."
+    },
+    {
+      "id": "D1-CS-28",
+      "area": "unsupported",
+      "shape": "conditional-ref",
+      "polarity": "negative",
+      "kind": "csharp",
+      "rules": [
+        "RO-UNS-1"
+      ],
+      "conversion": "preserved-or-rejected",
+      "source": [
+        "public static class Probe",
+        "{",
+        "    static void Bump(ref int x) { x = x + 1; }",
+        "    public static string Run()",
+        "    {",
+        "        int a = 1, b = 10;",
+        "        bool first = false;",
+        "        Bump(ref first ? ref a : ref b);",
+        "        return a + \"|\" + b;",
+        "    }",
+        "}"
+      ],
+      "expectedOutput": "1|11",
+      "mutants": []
+    },
+    {
+      "id": "D1-R0-01",
+      "area": "representation",
+      "shape": "local",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-REP-1",
+        "RO-MIG-2",
+        "RO-NULL-4"
+      ],
+      "r0Case": "F1-REFOUT-01",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-01.cs.txt",
+      "conversion": "native",
+      "expectedOutput": "12|-1|42|alpha|missing",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "Bump(ref v);",
+          "replace": "int t = v; Bump(ref t);"
+        }
+      ]
+    },
+    {
+      "id": "D1-R0-02",
+      "area": "declaration",
+      "shape": "out-var",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-DECL-1",
+        "RO-DECL-2",
+        "RO-MIG-1"
+      ],
+      "r0Case": "F1-REFOUT-02",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-02.cs.txt",
+      "conversion": "native-or-rejected",
+      "expectedOutput": "7|-1|True|False",
+      "mutants": []
+    },
+    {
+      "id": "D1-R0-03",
+      "area": "migration",
+      "shape": "array-element",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-MIG-2",
+        "RO-ALIAS-1",
+        "RO-LV-1"
+      ],
+      "r0Case": "F1-REFOUT-03",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-03.cs.txt",
+      "conversion": "native",
+      "expectedOutput": "3|11|11",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "AddBoth(ref v, ref v);",
+          "replace": "int a = v, b = v; AddBoth(ref a, ref b); v = a; v = b;"
+        }
+      ]
+    },
+    {
+      "id": "D1-R0-04",
+      "area": "exception",
+      "shape": "named-argument",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-EXC-1",
+        "RO-CALL-2",
+        "RO-LV-3"
+      ],
+      "r0Case": "F1-REFOUT-04",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-04.cs.txt",
+      "conversion": "native",
+      "expectedOutput": "3|1|14|1",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "SetThenThrow(out r);",
+          "replace": "int tmp9; SetThenThrow(out tmp9); r = tmp9;"
+        }
+      ],
+      "note": "Blocked on X-TRYCATCH-01 (#1485), not on ref/out."
+    },
+    {
+      "id": "D1-R0-05",
+      "area": "migration",
+      "shape": "expression-call",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-MIG-2",
+        "RO-CALL-4"
+      ],
+      "r0Case": "F1-REFOUT-05",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-05.cs.txt",
+      "conversion": "native",
+      "expectedOutput": "202|2",
+      "mutants": [
+        {
+          "kind": "reorder",
+          "find": "int total = BumpAndGet(ref v) + v;",
+          "replace": "int total = v + BumpAndGet(ref v);"
+        }
+      ]
+    },
+    {
+      "id": "D1-R0-06",
+      "area": "definite-assignment",
+      "shape": "generic-type-payload",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-DA-1",
+        "RO-MIG-2",
+        "RO-NULL-4"
+      ],
+      "r0Case": "F1-REFOUT-06",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-06.cs.txt",
+      "conversion": "native",
+      "expectedOutput": "True:3|False:0|True:2|False:True",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "bool foundB = counts.TryGetValue(\"b\", out miss);",
+          "replace": "int t; bool foundB = counts.TryGetValue(\"b\", out t);"
+        }
+      ]
+    },
+    {
+      "id": "D1-R0-07",
+      "area": "unsupported",
+      "shape": "method-generic",
+      "polarity": "negative",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-NULL-3",
+        "RO-NULL-4",
+        "RO-UNS-1",
+        "RO-MIG-1"
+      ],
+      "r0Case": "F1-REFOUT-07",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-07.cs.txt",
+      "conversion": "preserved-or-rejected",
+      "expectedOutput": "True:5|False:True|True:one|False:True",
+      "mutants": []
+    },
+    {
+      "id": "D1-R0-08",
+      "area": "copy",
+      "shape": "struct-element-field",
+      "polarity": "positive",
+      "kind": "r0-fixture",
+      "rules": [
+        "RO-COPY-1",
+        "RO-COPY-4"
+      ],
+      "r0Case": "F1-REFOUT-08",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-08.cs.txt",
+      "conversion": "native",
+      "expectedOutput": "2",
+      "mutants": [
+        {
+          "kind": "copy",
+          "find": "Bump(ref pts[0].X);",
+          "replace": "var h = pts[0]; Bump(ref h.X);"
+        }
+      ]
+    }
+  ]
+}

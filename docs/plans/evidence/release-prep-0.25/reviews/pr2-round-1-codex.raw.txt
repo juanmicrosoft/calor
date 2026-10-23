@@ -1,7 +1,0 @@
-VERDICT: REQUEST-CHANGES
-
-| Severity | File:line | Finding | Suggested fix |
-|---|---|---|---|
-| MAJOR | `.github/workflows/verify-release.yml:119` | The SDK assertion fails on Windows even with the correct SDK. The [CLI writes a platform newline](https://raw.githubusercontent.com/dotnet/sdk/main/src/Cli/Microsoft.DotNet.Cli.Utils/AnsiConsole.cs); Bash command substitution strips LF but preserves CR, leaving `10.0.401\r`. The `win-x64` job therefore exits before installing Calor. | Strip CR before comparing, e.g. `sdk="$(dotnet --version \| tr -d '\r')"`. Update `ReleaseSdkPinTests`, which currently requires the faulty command, and cover LF/CRLF output. |
-
-YAML parsing, font source/export checks, font-byte and CSS parity checks, and the release-credential check passed. Fresh builds and xUnit tests were not run under the read-only constraint.

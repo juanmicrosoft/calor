@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""0.24 G2 (#1421): the verifier determinism protocol — registration validator and decider.
+"""0.24 G2 (#1421): the verifier determinism protocol — protocol validator and decider.
 
-The protocol is docs/plans/evidence/g2-1421/protocol.json; its case registry is cases.json.
-This module holds what the registration freezes: the validator (codes D001-D016), the value
-rules that turn one test invocation into registered case values, and the agreement decider.
-The execution machinery (workflow, environment check, attempt runner, budget and history
-guards) is scripts/determinism_runner.py and .github/workflows/determinism-protocol.yml,
-registered by amendment 1.1.0; #1135 executes it.
+The protocol is tests/TestData/DeterminismProtocol/protocol.json; its case registry is cases.json.
+This module holds the validator (codes D003-D014 and D016), the value rules that turn one test
+invocation into registered case values, and the agreement decider, which compares the values of
+every attempt byte for byte. The execution machinery (workflow, environment check, attempt runner)
+is scripts/determinism_runner.py and .github/workflows/determinism-protocol.yml.
 
-  validate [--baseline-ref REF]   fail closed on registration defects; with a baseline,
-                                  also on unrecorded or weakening changes to the packet
+#1584 (0.26 release contract, #1548) moved the protocol here from the archived evidence tree and removed its
+governance: the freeze and amendment log (D001), the 0.24 evidence-contract link (D002, the contract
+rows of D003, the inventory check of D010), the compute budget (D008), and the hash freeze of the
+packet and harness (D015). Every structural check of the protocol against the tree (including the
+workflow-part digests and the shard-step script pins, which catch a negated or skipped command), and
+D016's check that a change does not weaken the protocol on protected main, stay.
+
+  validate [--baseline-ref REF]   fail closed on protocol defects; with a baseline,
+                                  also on changes that weaken the protocol
   decide --records DIR --execution-id ID --run-id ID --commit SHA --mode M --out FILE
 
 Nothing here retries, normalizes a compared value, or converts a missing value to agreement.
@@ -29,16 +35,12 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKET = "docs/plans/evidence/g2-1421"
-PROTOCOL, CASES, HASHES, README = (f"{PACKET}/{n}" for n in ("protocol.json", "cases.json", "sha256.json", "README.md"))
-CONTRACT = "docs/plans/evidence/evidence-contract-1407/contract.json"
-INVENTORY = "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json"
+PACKET = "tests/TestData/DeterminismProtocol"
+PROTOCOL, CASES = (f"{PACKET}/{n}" for n in ("protocol.json", "cases.json"))
 Z3_CONSUMERS = "eng/z3-consumers.json"
 ORACLE_REPORT = "bench/phase0-agent-native/verifier-runtime-differential.json"
 HARNESS = "scripts/determinism_protocol.py"
 RECORDER = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs"
-FROZEN_FILES = [PROTOCOL, CASES, README, HARNESS, "scripts/test_determinism_protocol.py", RECORDER,
-                "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialModels.cs"]
 # Instrumentation call sites that must stay in the oracle's test code (D014).
 CALL_SITES = {"tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs": ["DeterminismRecord.WriteCells(results);"],
               "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/VerifierRuntimeDifferentialTests.cs":
@@ -175,7 +177,21 @@ def check_gates(protocol, text) -> list[str]:
         else:
             cmds = shell_commands(script)
             if gate.get("scriptSha256") != sha256_bytes("\n".join(ln for ln in script.splitlines() if ln.strip()).encode("utf-8")):
-                problems.append(f"{where}: shard script differs from its frozen hash")
+                problems.append(f"{where}: shard script differs from its pinned hash")
+            # #1584 review round 2: the step must run exactly its registered dotnet test commands, and nothing may
+            # end it before the last one, negate a command, or put a test behind a constant or negated condition.
+            tests = [c for _, c in cmds if c.startswith("dotnet test ")]
+            if not gate.get("testCommands") or tests != gate["testCommands"]:
+                problems.append(f"{where}: shard dotnet test commands differ from the registered testCommands")
+            last = max((i for i, (_, c) in enumerate(cmds) if c.startswith("dotnet test ")), default=-1)
+            # Round 3: no loop wrapper at all (the registered scripts loop only with `for`), no condition comparing two
+            # literals, and no ERR trap (it can turn a failing test into a successful step).
+            constant = r"\[\[?\s+([^\s$`]+)\s+(=|==|!=|-eq|-ne|-lt|-gt|-le|-ge)\s+([^\s$`]+)\s+\]\]?"
+            if any(re.match(r"^(exit|return)(\s+0)?\s*(;|$)", c) or (i < last and re.match(r"^(exit|return)\b", c))
+                   or c.startswith("!") or re.match(r"^(el)?if\s+(!|false\b|true\b|:(\s|;))", c)
+                   or re.match(r"^(while|until)\b", c) or re.match(rf"^(el)?if\s+{constant}", c)
+                   or (c.startswith("trap ") and re.search(r"\bERR\b", c)) for i, (_, c) in enumerate(cmds)):
+                problems.append(f"{where}: shard script ends early, negates a command, loops, traps ERR, or guards a test with a constant condition")
             masked = any(re.search(r"\|\|\s*(true|:|exit 0)\b|^set \+[a-z]*e", c) and not c.startswith("trap ") for _, c in cmds)
             if not cmds or cmds[0] != (0, "set -euo pipefail") or masked or not any("dotnet test" in c for _, c in cmds):
                 problems.append(f"{where}: shard script lacks set -euo pipefail, runs no dotnet test, or masks a status")
@@ -184,8 +200,9 @@ def check_gates(protocol, text) -> list[str]:
 
 WORKFLOW, RUNNER = ".github/workflows/determinism-protocol.yml", "scripts/determinism_runner.py"
 DECIDE_IF = "always() && needs.plan.result == 'success'"
-WORKFLOW_PARTS = {  # amendment 1.1.0: SHA-256 (16 hex) of each job's keys (index 0) and each step, as parse_workflow reads them
-    "plan:0": "5a48c415c7fc964b", "plan:1": "2db9c7c8a7174f79", "plan:2": "1f8548f9a3cb9cae", "plan:3": "47e7e3c7ab7763dc",
+WORKFLOW_PARTS = {  # SHA-256 (16 hex) of each job's keys (index 0) and each step, as parse_workflow reads them; a reviewed
+    # change to the workflow updates this table (#1584: plan:3 for the plan step without main's validator)
+    "plan:0": "5a48c415c7fc964b", "plan:1": "2db9c7c8a7174f79", "plan:2": "1f8548f9a3cb9cae", "plan:3": "8ba4c21af8e7f7c4",
     "attempts:0": "95c5a75705cbffaf", "attempts:1": "2db9c7c8a7174f79", "attempts:2": "664d96a21de47fa7", "attempts:3": "39bc936fd2af1aad",
     "attempts:4": "1b3c075981f376c2", "attempts:5": "871788616e61c5e0", "attempts:6": "ab7077183f82fb38", "attempts:7": "a841980fb7493496",
     "attempts:8": "526ff9b79dab0c0c", "attempts:9": "0d3233caf79b9ded", "decide:0": "f998a4391dcc9b1a", "decide:1": "2db9c7c8a7174f79",
@@ -195,7 +212,7 @@ ISOLATE = "Isolate the home directory and refuse a re-run"
 JOB_SHAPE = {  # job -> (job keys compared exactly, [(step name, required runner command or action, if)])
     "plan": ({"runs-on": "ubuntu-24.04", "timeout-minutes": "planJobTimeoutMinutes"},
              [(ISOLATE, None, None), ("Checkout code", "actions/checkout@v4", None),
-              ("Validate, check history and budget, and plan the run", "plan", None)]),
+              ("Validate and plan the run", "plan", None)]),
     "attempts": ({"needs": "plan", "name": "attempts (${{ matrix.env }} job ${{ matrix.job }})", "runs-on": "${{ matrix.runner }}",
                   "timeout-minutes": "${{ matrix.timeout }}"},
                  [(ISOLATE, None, None), ("Checkout code", "actions/checkout@v4", None),
@@ -278,6 +295,7 @@ def workflow_problems(text: str, protocol) -> list[str]:
     return problems
 
 
+
 def _inside(path, roots) -> bool:
     if not isinstance(path, str) or not path or not roots:
         return False
@@ -355,10 +373,6 @@ def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
 
 
-def sha256_lf(path: Path) -> str:
-    return sha256_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
-
-
 def cell_digest(cell: dict) -> str:
     canonical = json.dumps(cell, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return sha256_bytes(canonical.encode("utf-8"))[:32]
@@ -423,78 +437,58 @@ def contribution_matrix(protocol, cases) -> dict[str, int]:
     return matrix
 
 
-def worst_case(protocol) -> tuple[int, int, int]:
-    b, control = protocol["budget"], protocol["control"]
-    overhead = b["planJobTimeoutMinutes"] + b["decideJobTimeoutMinutes"]
-    execution = overhead + sum(protocol["runPlan"]["jobsPerEnvironment"] * e["jobTimeoutMinutes"] for e in protocol["environments"])
-    control_run = overhead + len(protocol["environments"]) * control["jobsPerEnvironment"] * control["jobTimeoutMinutes"]
-    return execution, control_run, b["maxExecutions"] * execution + b["maxDispatchedControlRuns"] * control_run
-
-
-def epoch_worst_case(protocol) -> int:
-    """Amendment 1.7.0: one execution's worst case in the 0.25 epoch, with its job-timeout overrides (none: worst_case's)."""
-    b = protocol["budget"]
-    overrides = (b.get("releaseEpoch") or {}).get("jobTimeoutMinutes") or {}
-    return b["planJobTimeoutMinutes"] + b["decideJobTimeoutMinutes"] + sum(
-        protocol["runPlan"]["jobsPerEnvironment"] * overrides.get(e["id"], e["jobTimeoutMinutes"]) for e in protocol["environments"])
-
-
 def vkey(version: str) -> tuple:
     return tuple(int(x) for x in version.split("."))
 
 
-def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, baseline=None) -> list[tuple[str, str]]:
+LEGACY_PACKET = "/".join(("docs", "plans", "evidence", "g2-1421"))  # where protected main kept it before #1584
+# The two calor-first-guard steps that ran main's copy of the validator; #1584 retired them on purpose.
+RETIRED_GATES = {(".github/workflows/test.yml", "calor-first-guard", "Fetch main's determinism protocol validator (#1421)"),
+                 (".github/workflows/test.yml", "calor-first-guard", "Validate the determinism protocol with main's validator (#1421)")}
+
+
+def gates_weakened(old_p, protocol) -> bool:
+    """D016: every gate on protected main is still registered under the same workflow, job and step, with
+    every earlier step it required, every command and script line it had, and (shard steps) every registered
+    dotnet test command and its scriptSha256. A gate may gain lines. A shard step's script may change only when
+    the gate names the pin it replaces (repinnedFrom equal to main's scriptSha256), so the change is deliberate
+    and visible in review; D014 still checks the new script's test commands and structure. The gates #1584
+    retired (RETIRED_GATES) are not required."""
+    retired = {step for _, _, step in RETIRED_GATES}
+    for kind in ("steps", "shardSteps"):
+        new = {(g["workflow"], g["job"], g["step"]): g for g in protocol.get("gates", {}).get(kind, [])}
+        for old in old_p.get("gates", {}).get(kind, []):
+            if (old["workflow"], old["job"], old["step"]) in RETIRED_GATES:
+                continue
+            now = new.get((old["workflow"], old["job"], old["step"]))
+            if now is None or not set(old.get("after", [])) - retired <= set(now.get("after", [])) \
+                    or not set(old.get("commands", [])) <= set(now.get("commands", [])) \
+                    or not set(old.get("script", [])) <= set(now.get("script", [])) \
+                    or not set(old.get("testCommands", [])) <= set(now.get("testCommands", [])) \
+                    or (old.get("scriptSha256") != now.get("scriptSha256") and now.get("repinnedFrom") != old.get("scriptSha256")):
+                return True
+    return False
+
+
+def validate(root: Path, protocol=None, cases=None, texts=None, baseline=None) -> list[tuple[str, str]]:
     """texts maps a repository-relative path to replacement text (negative controls only).
-    baseline is (protocol, cases, hashes) as registered on protected main, when one exists."""
+    baseline is (protocol, cases) as registered on protected main, when one exists."""
     def text(rel):
         return texts[rel] if texts and rel in texts else (root / rel).read_text(encoding="utf-8")
 
     protocol = protocol if protocol is not None else load(root, PROTOCOL)
     cases = cases if cases is not None else load(root, CASES)
-    contract = contract if contract is not None else load(root, CONTRACT)
     v: list[tuple[str, str]] = []
 
     def add(code, message):
         v.append((code, message))
 
     semver = re.compile(r"^\d+\.\d+\.\d+$")
-    # D001 lifecycle and protocol amendments.
-    if protocol.get("status") != "FROZEN-AT-MERGE" or protocol.get("freeze", {}).get("decisionBearingExecutionBeforeFreeze") is not False:
-        add("D001", "status must be FROZEN-AT-MERGE and decisionBearingExecutionBeforeFreeze explicitly false")
-    version, log = protocol.get("protocolVersion", ""), protocol.get("amendments", {}).get("amendmentLog")
-    if not semver.match(version) or not isinstance(log, list):
-        add("D001", "protocolVersion must be MAJOR.MINOR.PATCH and amendments.amendmentLog a list")
-        log = []
-    previous = "1.0.0"
-    for entry in log:
-        ok = (isinstance(entry.get("pr"), int) and entry.get("justification") and isinstance(entry.get("afterDecisionBearingExecution"), bool)
-              and re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", str(entry.get("timestampUtc", "")))
-              and semver.match(str(entry.get("version", ""))) and vkey(entry["version"]) > vkey(previous))
-        if not ok:
-            add("D001", f"amendment {entry.get('version')} lacks a field or does not increase the version")
-        else:
-            previous = entry["version"]
-    if version != previous:
-        add("D001", "protocolVersion must equal the latest amendment (1.0.0 with none)")
-
-    # D002 contract linkage.
-    known = {"1.0.0"} | {a.get("version") for a in contract.get("amendmentLog", [])}
-    cv = protocol.get("contract", {}).get("contractVersion")
-    child = next((c for c in contract.get("children", []) if c.get("issue") == 1421), {})
-    if cv not in known or vkey(cv) > vkey(contract["contractVersion"]) or protocol["contract"].get("consumes") != child.get("consumes") \
-            or not re.match(r"^[0-9a-f]{40}$", protocol.get("registrationBase", {}).get("commit", "")):
-        add("D002", "contract version, consumed sections, or registration base differ from the contract")
-
     envs, profiles = protocol.get("environments", []), profile_by_id(protocol)
     env_ids, by_env = [e.get("id") for e in envs], env_by_id(protocol)
     universe = case_universe(protocol, cases)
-    # D003 determinism rows: every contract row registered on its platforms with its own test.
+    # D003 determinism rows: each maps registered cases to registered environments that run them.
     rows = {r["id"]: r for r in protocol.get("determinismRows", [])}
-    for crow in contract.get("determinismRows", {}).get("rows", []):
-        row = rows.get(crow["id"], {})
-        if not set(crow["platforms"]) <= set(row.get("environments", [])) or f"test:verification:{crow['test']}" not in row.get("cases", []) \
-                or crow.get("releaseBlocking") is not True:
-            add("D003", f"contract row {crow['id']} is not registered with its test on every platform it names")
     for row in rows.values():
         if not row.get("cases") or not set(row.get("environments", [])) <= set(env_ids):
             add("D003", f"row {row['id']} has no cases or names an unregistered environment")
@@ -545,53 +539,6 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
         add("D007", f"run plan needs >= 2 jobs and >= {MIN_ATTEMPTS_PER_ENVIRONMENT} attempts per environment, rate 1.0, "
                     "no early stop, no retry or re-execution, and positive process timeouts")
 
-    # D008 budget: recomputed worst case within the accepted ceiling.
-    b = protocol.get("budget", {})
-    ceiling = next((c for c in contract["authorityCapacity"]["capacity"]["ceilings"] if c["id"] == "determinism-compute"), {})
-    try:
-        computed = worst_case(protocol)
-    except (KeyError, TypeError):
-        computed = None
-    if ceiling.get("status") != "ACCEPTED" or b.get("ceilingId") != "determinism-compute" or b.get("ceilingRunnerMinutes") != ceiling.get("value") \
-            or computed is None or (b.get("worstCasePerExecution"), b.get("worstCasePerControlRun"), b.get("worstCaseTotal")) != computed \
-            or computed[2] > ceiling["value"]:
-        add("D008", f"budget must match the accepted determinism-compute ceiling and the recomputed worst case {computed}")
-    # Amendment 1.6.0: the 0.25 epoch (budget.releaseEpoch) has its own limit and ceiling under the same worst-case formula,
-    # no dispatched control run, and executions bound to the 0.25 candidate manifest.
-    # Amendment 1.7.0: the epoch (runs after epochAfterRunNumber) gets its own ceiling, and its remaining executions a window
-    # (runs after afterRunNumber) with epoch-only job timeouts (raise only, registered environments) and a per-candidate
-    # limit. worstCaseTotal keeps the registered-table formula above; the window's binding worst case uses the epoch timeouts,
-    # and the minutes spent before the window plus that worst case must fit the epoch ceiling.
-    ep = b.get("releaseEpoch")
-    if ep is not None:
-        def whole(value):
-            return isinstance(value, int) and not isinstance(value, bool)
-        envs = env_by_id(protocol)
-        overrides = ep.get("jobTimeoutMinutes", {})
-        raised = isinstance(overrides, dict) and all(k in envs and whole(t) and t >= envs[k]["jobTimeoutMinutes"] for k, t in overrides.items())
-        per_candidate = ep.get("maxExecutionsPerCandidate", 1)
-        ok = all(whole(ep.get(k)) for k in ("afterRunNumber", "maxExecutions", "maxDispatchedControlRuns", "ceilingRunnerMinutes", "worstCaseTotal")) \
-            and raised and ep["afterRunNumber"] >= 1 and ep["maxExecutions"] >= 1 and ep["maxDispatchedControlRuns"] == 0 \
-            and computed is not None and ep["worstCaseTotal"] == ep["maxExecutions"] * computed[0] and ep["worstCaseTotal"] <= ep["ceilingRunnerMinutes"] \
-            and whole(per_candidate) and 1 <= per_candidate <= ep["maxExecutions"] \
-            and (per_candidate == 1 or re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/\{runId\}\.json$", str(ep.get("priorResultPath", "")))) \
-            and ep.get("amendment") in {a.get("version") for a in log} \
-            and re.match(r"^docs/plans/evidence/[A-Za-z0-9._/-]+/candidate-manifest\.json$", str(ep.get("candidateManifest", ""))) is not None
-        window = ("epochAfterRunNumber", "epochCeilingRunnerMinutes", "spentBeforeWindow", "worstCasePerExecution", "worstCaseWithEpochTimeouts")
-        if ok and (overrides or "maxExecutionsPerCandidate" in ep or any(k in ep for k in window)):
-            try:
-                epoch_worst = epoch_worst_case(protocol)
-            except (KeyError, TypeError):
-                epoch_worst = None
-            ok = epoch_worst is not None and all(whole(ep.get(k)) for k in window) \
-                and 1 <= ep["epochAfterRunNumber"] < ep["afterRunNumber"] and ep["spentBeforeWindow"] >= 0 \
-                and ep["worstCasePerExecution"] == epoch_worst and ep["worstCaseWithEpochTimeouts"] == ep["maxExecutions"] * epoch_worst \
-                and ep["worstCaseWithEpochTimeouts"] <= ep["ceilingRunnerMinutes"] \
-                and ep["ceilingRunnerMinutes"] == ep["epochCeilingRunnerMinutes"] - ep["spentBeforeWindow"]
-        if not ok:
-            add("D008", "budget.releaseEpoch must name its amendment and candidate manifest, allow no control run, only raise "
-                        "registered job timeouts, and keep the minutes spent plus each remaining execution's worst case within its own ceiling")
-
     # D009 no normalization of compared values.
     ag = protocol.get("agreement", {})
     if ag.get("normalizationRules") != []:
@@ -615,32 +562,28 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
     derived = derive_cells(json.loads(text(ORACLE_REPORT)))
     if cases.get("cells", {}).get("ids") != derived or cases["cells"].get("count") != len(derived):
         add("D010", "registered cells differ from the cells derived from the committed oracle report")
-    inv = next(a for a in load(root, INVENTORY)["artifacts"] if a["id"] == "verifier-runtime-differential")
     reports = [a for a in cases.get("artifacts", []) if "committedPath" in a]
-    if sorted((a["name"], a["committedPath"], tuple(a["profiles"])) for a in reports) != \
-            sorted((Path(p).name, p, tuple(sorted(ORACLE_PROFILES))) for p in inv["paths"]):
-        add("D010", "registered report artifacts differ from the inventory's verifier-runtime-differential paths")
+    if any(tuple(a["profiles"]) != tuple(sorted(ORACLE_PROFILES)) or not (root / a["committedPath"]).is_file() for a in reports) or not reports:
+        add("D010", "a registered report artifact is missing or is not compared by both oracle profiles")
     for a in (a for a in cases.get("artifacts", []) if "expected" in a):
         if any(part not in text(a["source"]) for part in a["expected"].split("|")) or not set(a["profiles"]) <= set(profiles):
             add("D010", f"artifact {a['name']} expected value does not match {a['source']}")
 
-    # D011 timing-sensitive set: only by a recorded amendment and a #1407 amendment.
-    ts, amended = protocol.get("cases", {}).get("timingSensitiveSet"), {a.get("version") for a in log}
+    # D011 timing-sensitive set: the decider gives it no semantics.
+    ts = protocol.get("cases", {}).get("timingSensitiveSet")
     if ts != []:
-        add("D011", "timingSensitiveSet must stay empty: the decider gives it no semantics until an amendment (with a #1407 amendment) adds them")
+        add("D011", "timingSensitiveSet must stay empty: the decider gives it no semantics")
 
     # D012 frozen vocabularies.
     if sorted(protocol.get("attemptStatuses", {})) != sorted(ATTEMPT_STATUSES) or sorted(protocol.get("caseClasses", {})) != sorted(CASE_CLASSES) \
             or protocol.get("executionVerdicts", {}).get("order") != VERDICT_ORDER:
         add("D012", "attempt statuses, case classes, or verdict order differ from the frozen sets")
 
-    # D013 execution machinery: none may exist until a recorded amendment registers it.
+    # D013 execution machinery: the registered workflow and runner, and no other workflow running the runner.
     wf = protocol.get("workflow", {})
-    if wf.get("status") == "pending-second-g2-pr":
-        if (root / wf.get("path", "missing")).exists() or (root / wf.get("runner", "missing")).exists():
-            add("D013", "execution machinery exists while the protocol records it as pending")
-    elif wf.get("status") != "registered" or wf.get("amendment") not in amended or not all((root / wf.get(k, "missing")).exists() for k in ("path", "runner")):
-        add("D013", "execution machinery must be registered by a recorded amendment")
+    if wf.get("status") != "registered" or (wf.get("path"), wf.get("runner")) != (WORKFLOW, RUNNER) \
+            or not all((root / wf.get(k, "missing")).exists() for k in ("path", "runner")):
+        add("D013", "the execution machinery must be the registered workflow and runner")
     else:
         for problem in workflow_problems(text(wf["path"]), protocol):
             add("D013", f"{wf['path']}: {problem}")
@@ -649,7 +592,7 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             if rel != wf["path"] and "determinism_runner" in text(rel):
                 add("D013", f"{rel} runs the execution machinery outside the registered workflow")
 
-    if any(not home_safe(text(rel)) for rel in [HARNESS] + [f for f in wf.get("frozenFiles", []) if f.endswith(".py")]):
+    if any(not home_safe(text(rel)) for rel in (HARNESS, RUNNER)):
         add("D013", "a harness file references the real home directory")
 
     # D014 every declared gate site still runs the registered command; no runner configuration appeared.
@@ -665,26 +608,15 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
     if any(site not in text(rel) for rel, sites in CALL_SITES.items() for site in sites):
         add("D014", "a DeterminismRecord call site was removed from the oracle's test code")
 
-    # D015 the packet and harness are frozen by hash.
-    hashes = json.loads(text(HASHES)).get("files", {}) if (root / HASHES).exists() else {}
-    for rel in FROZEN_FILES + wf.get("frozenFiles", []):
-        if rel not in hashes or not (root / rel).exists() or (sha256_lf(root / rel) != hashes[rel] and not (texts and rel in texts)):
-            add("D015", f"sha256.json does not cover {rel} or its hash differs")
-
-    # D016 against the registration on protected main: any change is a recorded amendment, never a weakening.
+    # D016 against the protocol on protected main: a change never weakens it.
     if baseline is not None:
-        old_p, old_c, old_h = baseline
-        if old_h != hashes:
-            new = [a for a in log if a.get("version") not in {x.get("version") for x in old_p["amendments"]["amendmentLog"]}]
-            if not new or vkey(version) <= vkey(old_p["protocolVersion"]) or log[:len(old_p["amendments"]["amendmentLog"])] != old_p["amendments"]["amendmentLog"]:
-                add("D016", "the packet changed without a new protocol version and amendment entry (earlier entries are immutable)")
+        old_p, old_c = baseline
         old_m, new_m = contribution_matrix(old_p, old_c), contribution_matrix(protocol, cases)
         new_cells, new_arts = cases.get("cells", {}).get("ids", []), cases.get("artifacts", [])
         old_rows = {r["id"]: r for r in old_p["determinismRows"]}
         weaker = [name for name, bad in (
             ("cases or contributions removed", any(new_m.get(k, 0) < n for k, n in old_m.items())),
-            ("a gate was removed or changed", any(g not in protocol.get("gates", {}).get(k, []) for k in ("steps", "shardSteps")
-                                                  for g in old_p.get("gates", {}).get(k, []))),
+            ("a gate was removed or lost a command, script line, or prerequisite", gates_weakened(old_p, protocol)),
             ("a registered cell or artifact was repurposed", new_cells[:len(old_c["cells"]["ids"])] != old_c["cells"]["ids"]
              or any(a not in new_arts for a in old_c["artifacts"])),
             ("determinism row mapping narrowed", any(not (set(r["cases"]) <= set(rows.get(i, {}).get("cases", []))
@@ -695,7 +627,7 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             ("determinism rows removed", not set(r["id"] for r in old_p["determinismRows"]) <= set(rows)),
         ) if bad]
         if weaker:
-            add("D016", f"the amendment weakens the registration: {', '.join(weaker)}")
+            add("D016", f"the change weakens the protocol on protected main: {', '.join(weaker)}")
     return v
 
 
@@ -932,18 +864,22 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
 
 
 def load_baseline(root: Path, ref: str):
-    """(protocol, cases, hashes) registered at ref; None only when ref verifiably has no packet."""
+    """(protocol, cases) registered at ref, at this location or, for a ref before #1584, at LEGACY_PACKET;
+    None only when ref verifiably has neither packet."""
     def git(*args):
         return subprocess.run(["git", *args], cwd=root, capture_output=True, check=False)
     if git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").returncode != 0:
         raise SystemExit(f"baseline ref {ref} does not resolve to a commit")
-    present = [git("cat-file", "-e", f"{ref}:{rel}").returncode == 0 for rel in (PROTOCOL, CASES, HASHES)]
-    if not any(present) and git("ls-tree", "-d", ref, PACKET).stdout == b"":
-        return None
-    if not all(present):
-        raise SystemExit(f"baseline {ref} has a partial packet")
-    old = [json.loads(git("show", f"{ref}:{rel}").stdout) for rel in (PROTOCOL, CASES, HASHES)]
-    return old[0], old[1], old[2]["files"]
+    for packet in (PACKET, LEGACY_PACKET):
+        rels = [f"{packet}/{n}" for n in ("protocol.json", "cases.json")]
+        present = [git("cat-file", "-e", f"{ref}:{rel}").returncode == 0 for rel in rels]
+        if not any(present) and git("ls-tree", "-d", ref, packet).stdout == b"":
+            continue
+        if not all(present):
+            raise SystemExit(f"baseline {ref} has a partial packet at {packet}")
+        old = [json.loads(git("show", f"{ref}:{rel}").stdout) for rel in rels]
+        return old[0], old[1]
+    return None
 
 
 def main(argv=None) -> int:
@@ -951,7 +887,7 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     v = sub.add_parser("validate")
     v.add_argument("--baseline-ref")
-    v.add_argument("--root", default=str(ROOT), help="tree to validate (the trusted entry point runs main's validator on a PR tree)")
+    v.add_argument("--root", default=str(ROOT), help="tree to validate")
     d = sub.add_parser("decide")
     d.add_argument("--records", action="append", required=True)
     d.add_argument("--execution-id", required=True)

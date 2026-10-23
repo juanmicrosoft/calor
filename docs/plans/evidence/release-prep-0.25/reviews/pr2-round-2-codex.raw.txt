@@ -1,7 +1,0 @@
-VERDICT: APPROVE
-
-| Severity | File:line | Finding | Suggested fix |
-|---|---|---|---|
-| — | — | No remaining issues found. | — |
-
-Verified the CRLF fix with LF/CRLF inputs, YAML validity, SDK guards, font hashes and fallback metrics, base-path handling, and font-check negative controls. Fresh builds and xUnit tests were not run under the read-only constraint.
