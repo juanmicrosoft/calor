@@ -1,0 +1,188 @@
+name: Soundness sweep
+
+# #1589 (0.27 epic #1592): run the 0.24 soundness sweep (bench/Calor.Soundness.Sweep, case
+# packet tests/TestData/SoundnessSweep/) against main on a schedule.
+#
+# Schedule: daily. On macos-15 the job takes about 10 minutes (the sweep itself is ~5 minutes,
+# 1,448 case executions), and macOS runner minutes are free for this public repository. Main takes
+# several merges a day, so a daily run keeps a new false proof to at most one day of merges to
+# bisect; a weekly run would leave a week of them.
+#
+# The harness's `run` exits 0 even when it records findings, so scripts/soundness_sweep_gate.py
+# decides: it fails on an invalid run, any failed control (oracle controls, solver availability,
+# mutation pairs, CTRL-RETRO-845, CTRL-RETRO-FIXED), any finding (false proof, stale-cache
+# proof, ...) on a final result or any retained attempt, and any verdict that differs from
+# tests/TestData/SoundnessSweep/expected-verdicts.json, timeouts included.
+#
+# On a failed scheduled or dispatched run (both always check out main), `notify` opens (or comments on) one tracking
+# issue labeled `soundness-sweep`, with GITHUB_TOKEN and `issues: write` only.
+#
+# Pull requests get `harness-check` (the harness builds, the fixture parses and covers every case,
+# the gate's self-tests pass). A pull request that changes the sweep's own inputs also runs the
+# full sweep, so a fixture update is proven in the PR that makes it.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+  pull_request:
+    branches: [ main, 'release/**' ]
+
+permissions: {}
+
+concurrency:
+  group: soundness-sweep-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  harness-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      sweep_inputs_changed: ${{ steps.inputs.outputs.changed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Build the sweep harness
+        run: dotnet build bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj -c Release
+
+      - name: Check the expected-verdicts fixture
+        run: python3 scripts/soundness_sweep_gate.py check-fixture
+
+      - name: Test the sweep gate
+        run: python3 scripts/test_soundness_sweep_gate.py
+
+      - name: Detect changes to the sweep's inputs
+        id: inputs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          pattern='^(\.github/workflows/soundness-sweep\.yml|scripts/soundness_sweep_gate\.py|scripts/run-soundness-sweep\.sh|tests/TestData/SoundnessSweep/|bench/Calor\.Soundness\.Sweep/|tests/Calor\.Compiler\.Tests/SoundnessRegistration/(SweepCaseGenerator|IndependentOracle)\.cs$)'
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -E "$pattern" || true)
+          echo "$changed"
+          if [ -n "$changed" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+
+  sweep:
+    needs: harness-check
+    if: >-
+      !cancelled() && (github.event_name != 'pull_request'
+      || (needs.harness-check.result == 'success' && needs.harness-check.outputs.sweep_inputs_changed == 'true'))
+    # The harness is macOS ARM64 only (BaselineHost loads the osx-arm64 native solver;
+    # LoadedImageCapture reads the dyld image list and checks the registered solver hash).
+    # macos-15 (ARM64): macos-14 is retired on 2026-11-02 (actions/runner-images#13518).
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      headline: ${{ steps.sweep.outputs.headline }}
+      commit: ${{ steps.sweep.outputs.commit }}
+
+    steps:
+      # Scheduled and dispatched runs always sweep main HEAD, whatever ref dispatched them;
+      # a pull request sweeps its own merge commit.
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || 'refs/heads/main' }}
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Build the compiler under test
+        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release
+
+      - name: Build the sweep harness
+        run: dotnet build bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj -c Release
+
+      - name: Run the sweep and gate it
+        id: sweep
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          headline_file="$RUNNER_TEMP/sweep-headline.txt"
+          echo "sweep did not reach the gate" > "$headline_file"
+          status=0
+          bash scripts/run-soundness-sweep.sh --out "$RUNNER_TEMP/soundness-sweep" \
+            --summary "$GITHUB_STEP_SUMMARY" --headline "$headline_file" --run-url "$RUN_URL" || status=$?
+          echo "headline=$(head -c 900 "$headline_file" | tr -d '\r\n')" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload the sweep report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: soundness-sweep-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/soundness-sweep/
+            !${{ runner.temp }}/soundness-sweep/home/
+          if-no-files-found: warn
+          retention-days: 30
+
+  notify:
+    needs: sweep
+    # Scheduled and dispatched runs always sweep main (see the sweep job's checkout).
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+
+    steps:
+      - name: Open or update the soundness-sweep tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEADLINE: ${{ needs.sweep.outputs.headline }}
+          SWEEP_RESULT: ${{ needs.sweep.result }}
+          SHA: ${{ needs.sweep.outputs.commit || 'unknown (the job failed before the sweep ran)' }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          label=soundness-sweep
+          if ! gh label list --limit 200 --json name --jq '.[].name' | grep -qx "$label"; then
+            gh label create "$label" --color B60205 --description "Scheduled soundness sweep (#1589) failed on main"
+          fi
+          body=$(printf '%s\n' \
+            "The soundness sweep failed on main ($EVENT)." \
+            "" \
+            "- Run: $RUN_URL" \
+            "- Commit: $SHA" \
+            "- Sweep job: $SWEEP_RESULT" \
+            "- Gate: ${HEADLINE:-the job failed before the gate ran}" \
+            "" \
+            "The job summary lists every regression; the run's artifact holds the full report." \
+            "What to do: bench/Calor.Soundness.Sweep/README.md, \"When the scheduled sweep fails\".")
+          number=$(gh issue list --label "$label" --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "Soundness sweep failing on main" --label "$label" --body "$body"
+          fi
