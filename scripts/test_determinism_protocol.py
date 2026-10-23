@@ -242,9 +242,14 @@ class NegativeRegistrationControls(unittest.TestCase):
                                     texts={".github/workflows/test.yml": test_yml.replace(command, command + " || true", 1)}))
         self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["steps"][0].update(after=[])), baseline=(PROTOCOL, CASES)))
         self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"].pop()), baseline=(PROTOCOL, CASES)))
-        # A reviewed shard-script change only moves its pin; D014 still checks the script's structure.
+        # Review round 3 (#1584): a shard script changes only when the gate names the pin it replaces.
+        old_pin = PROTOCOL["gates"]["shardSteps"][0]["scriptSha256"]
         repinned = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64))
-        self.assertNotIn("D016", codes(protocol=repinned, baseline=(PROTOCOL, CASES)))
+        self.assertIn("D016", codes(protocol=repinned, baseline=(PROTOCOL, CASES)))
+        acknowledged = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64, repinnedFrom=old_pin))
+        self.assertNotIn("D016", codes(protocol=acknowledged, baseline=(PROTOCOL, CASES)))
+        stale = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64, repinnedFrom="1" * 64))
+        self.assertIn("D016", codes(protocol=stale, baseline=(PROTOCOL, CASES)))
         # Review round 2 (#1584): a registered test command dropped from the protocol together with the workflow.
         dropped = mutate(lambda p: p["gates"]["shardSteps"][0]["testCommands"].pop())
         self.assertIn("D016", codes(protocol=dropped, baseline=(PROTOCOL, CASES)))
@@ -263,7 +268,15 @@ class NegativeRegistrationControls(unittest.TestCase):
                         test_yml.replace(test_line, "          ! " + test_line[10:], 1),
                         test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
                                          'if false; then\n            eval', 1),
-                        test_yml.replace('--filter "$SHARD2_FILTER"', '--filter "$SHARD1_FILTER"', 1)):
+                        test_yml.replace('--filter "$SHARD2_FILTER"', '--filter "$SHARD1_FILTER"', 1),
+                        # Review round 3: loop wrappers that never run, a literal condition, and an ERR trap.
+                        test_yml.replace(head, head + "          while ! true; do\n", 1).replace(
+                            "          if grep -q \"Z3 not available\"", "          done\n          if grep -q \"Z3 not available\"", 1),
+                        test_yml.replace(head, head + "          until ! false; do\n", 1).replace(
+                            "          if grep -q \"Z3 not available\"", "          done\n          if grep -q \"Z3 not available\"", 1),
+                        test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
+                                         'if [ 1 = 0 ]; then\n            eval', 1),
+                        test_yml.replace(head, head + "          trap 'exit 0' ERR\n", 1)):
             self.assertNotEqual(test_yml, mutated)
             step = next(s for s in dp.parse_workflow(mutated)[gate["job"]]["steps"] if s.get("name") == gate["step"])
             pin = dp.sha256_bytes("\n".join(ln for ln in step["run"].splitlines() if ln.strip()).encode("utf-8"))

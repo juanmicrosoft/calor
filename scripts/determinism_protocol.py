@@ -184,10 +184,14 @@ def check_gates(protocol, text) -> list[str]:
             if not gate.get("testCommands") or tests != gate["testCommands"]:
                 problems.append(f"{where}: shard dotnet test commands differ from the registered testCommands")
             last = max((i for i, (_, c) in enumerate(cmds) if c.startswith("dotnet test ")), default=-1)
+            # Round 3: no loop wrapper at all (the registered scripts loop only with `for`), no condition comparing two
+            # literals, and no ERR trap (it can turn a failing test into a successful step).
+            constant = r"\[\[?\s+([^\s$`]+)\s+(=|==|!=|-eq|-ne|-lt|-gt|-le|-ge)\s+([^\s$`]+)\s+\]\]?"
             if any(re.match(r"^(exit|return)(\s+0)?\s*(;|$)", c) or (i < last and re.match(r"^(exit|return)\b", c))
                    or c.startswith("!") or re.match(r"^(el)?if\s+(!|false\b|true\b|:(\s|;))", c)
-                   or re.match(r"^(while|until)\s+(false|true|:)\b", c) for i, (_, c) in enumerate(cmds)):
-                problems.append(f"{where}: shard script ends early, negates a command, or guards a test with a constant condition")
+                   or re.match(r"^(while|until)\b", c) or re.match(rf"^(el)?if\s+{constant}", c)
+                   or (c.startswith("trap ") and re.search(r"\bERR\b", c)) for i, (_, c) in enumerate(cmds)):
+                problems.append(f"{where}: shard script ends early, negates a command, loops, traps ERR, or guards a test with a constant condition")
             masked = any(re.search(r"\|\|\s*(true|:|exit 0)\b|^set \+[a-z]*e", c) and not c.startswith("trap ") for _, c in cmds)
             if not cmds or cmds[0] != (0, "set -euo pipefail") or masked or not any("dotnet test" in c for _, c in cmds):
                 problems.append(f"{where}: shard script lacks set -euo pipefail, runs no dotnet test, or masks a status")
@@ -446,8 +450,10 @@ RETIRED_GATES = {(".github/workflows/test.yml", "calor-first-guard", "Fetch main
 def gates_weakened(old_p, protocol) -> bool:
     """D016: every gate on protected main is still registered under the same workflow, job and step, with
     every earlier step it required, every command and script line it had, and (shard steps) every registered
-    dotnet test command. A gate may gain lines; a shard step's scriptSha256 may change, since D014 checks its
-    test commands and structure. The gates #1584 retired (RETIRED_GATES) are not required."""
+    dotnet test command and its scriptSha256. A gate may gain lines. A shard step's script may change only when
+    the gate names the pin it replaces (repinnedFrom equal to main's scriptSha256), so the change is deliberate
+    and visible in review; D014 still checks the new script's test commands and structure. The gates #1584
+    retired (RETIRED_GATES) are not required."""
     retired = {step for _, _, step in RETIRED_GATES}
     for kind in ("steps", "shardSteps"):
         new = {(g["workflow"], g["job"], g["step"]): g for g in protocol.get("gates", {}).get(kind, [])}
@@ -458,7 +464,8 @@ def gates_weakened(old_p, protocol) -> bool:
             if now is None or not set(old.get("after", [])) - retired <= set(now.get("after", [])) \
                     or not set(old.get("commands", [])) <= set(now.get("commands", [])) \
                     or not set(old.get("script", [])) <= set(now.get("script", [])) \
-                    or not set(old.get("testCommands", [])) <= set(now.get("testCommands", [])):
+                    or not set(old.get("testCommands", [])) <= set(now.get("testCommands", [])) \
+                    or (old.get("scriptSha256") != now.get("scriptSha256") and now.get("repinnedFrom") != old.get("scriptSha256")):
                 return True
     return False
 
