@@ -38,14 +38,13 @@ public class ConverterDefect1574Tests
         ("CH-user-conversion", "public class W { public static int conv; public int V; public static implicit operator W(int v) { conv++; return new W { V = v }; } } public static class Probe { static int G() => 4; public static string Run() { W a, b; a = b = G(); W w; int i; w = i = G(); return W.conv + \":\" + a.V + b.V + w.V + i + ReferenceEquals(a, b); } }", "native"),
         ("CH-compound-inner", "public static class Probe { " + Log + "static int y = 1; public static string Run() { int x; x = y += G(); return log + x + \":\" + y; } }", "native"),
         ("CH-self-reference", "public static class Probe { public static string Run() { int x = 1, y; y = x = x + 1; return x + \":\" + y; } }", "native"),
-        // Hoisted statements are flushed only by a block, so a chain converts natively only when
-        // its statement sits directly in a block; an unbraced if/else or loop body and a switch
-        // section keep the statement as C# (they would otherwise land before the enclosing statement).
-        ("CH-unbraced-if", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; if (log.Length == 0) x = y = G(); else x = y = I(); if (log.Length == 0) x = y = I(); else y = x = G(); return log + x + y; } }", "preserved"),
+        // #1632: an unbraced if/else or loop body and a switch section convert as statement lists of
+        // their own, so a chain there converts natively, its temp inside the body.
+        ("CH-unbraced-if", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; if (log.Length == 0) x = y = G(); else x = y = I(); if (log.Length == 0) x = y = I(); else y = x = G(); return log + x + y; } }", "native"),
         ("CH-braced-if", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; if (log.Length == 0) { x = y = G(); } else { x = y = I(); } if (log.Length == 0) { x = y = I(); } else { y = x = G(); } return log + x + y; } }", "native"),
-        ("CH-switch-section", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; switch (log.Length) { case 0: x = y = G(); break; default: x = y = I(); break; } return log + x + y; } }", "preserved"),
+        ("CH-switch-section", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; switch (log.Length) { case 0: x = y = G(); break; default: x = y = I(); break; } return log + x + y; } }", "native"),
         ("CH-switch-section-block", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; switch (log.Length) { case 0: { x = y = G(); break; } default: { x = y = I(); break; } } return log + x + y; } }", "native-or-preserved"),
-        ("CH-loop-body", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; for (int k = 0; k < 3; k++) x = y = G(); return log + x + y; } }", "preserved"),
+        ("CH-loop-body", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; for (int k = 0; k < 3; k++) x = y = G(); return log + x + y; } }", "native"),
         ("CH-braced-loop-body", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; for (int k = 0; k < 3; k++) { x = y = G(); } return log + x + y; } }", "native"),
         ("CH-block-lambda", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; System.Action a = () => { x = y = G(); }; a(); a(); return log + x + y; } }", "native-or-preserved"),
         ("CH-expression-lambda", "public static class Probe { " + Log + "public static string Run() { int x = 0, y = 0; System.Action a = () => x = y = G(); a(); a(); return log + x + y; } }", "preserved"),

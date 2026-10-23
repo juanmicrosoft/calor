@@ -11,13 +11,13 @@
       "Output: <dir>/Counter.calr"
     ],
     "stderr": [],
-    "calor": "§M{m001:Counter:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CSHARP{public class Counter\n{\n    public int Next(int x)\n    {\n        done:\n        return x + 1;\n    }\n}}§/CSHARP\n\n\n"
+    "calor": "§M{m001:Counter:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CSHARP{public class Counter\n{\n    private static int count;\n    private static int Count { get { return count; } set { count = value; } }\n\n    public int Next() { Count = Count + 1; return Count; }\n}}§/CSHARP\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Counter.cs -o Counter.calr --format json",
     "exit": 0,
     "success": true,
-    "nativeConversionCount": 3,
+    "nativeConversionCount": 8,
     "interopPreservationCount": 1,
     "lossCount": 1,
     "losses": [
@@ -77,7 +77,7 @@
     "arguments": "{ source }",
     "isError": true,
     "success": false,
-    "nativeConversions": 3,
+    "nativeConversions": 8,
     "interopPreservations": 0,
     "locations": [],
     "paths": {
@@ -96,13 +96,13 @@
     "issueCodes": [
       "error:Calor1343:roundtrip-csharp-validation"
     ],
-    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Counter:pub}\n      §MT{m002:Next:pub} (i32:x) -> i32\n        §LABEL{done}\n\n\n\n"
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{p002:Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{m003:Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
     "isError": false,
     "success": true,
-    "nativeConversions": 3,
+    "nativeConversions": 8,
     "interopPreservations": 1,
     "locations": [
       {
@@ -128,6 +128,6 @@
       "roundTrip": "verified"
     },
     "issueCodes": [],
-    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CSHARP{public class Counter\n{\n    public int Next(int x)\n    {\n        done:\n        return x + 1;\n    }\n}}§/CSHARP\n\n\n"
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CSHARP{public class Counter\n{\n    private static int count;\n    private static int Count { get { return count; } set { count = value; } }\n\n    public int Next() { Count = Count + 1; return Count; }\n}}§/CSHARP\n\n\n"
   }
 }
