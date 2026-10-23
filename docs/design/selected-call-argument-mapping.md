@@ -51,7 +51,7 @@ only call mapping properties, not its variable annotation handling.
 The existing source-catalog and corpus generators were executed against the
 combined tree, not replaced by arithmetic or a copied golden. The actual catalog
 has33 routes with275 retained; regeneration changed canonical ordering only.
-The normal ratchets passed. The [integration audit](../plans/evidence/n3-mapping-2026-09-11/integration-e299-audit.json)
+The normal ratchets passed. The [integration audit](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/n3-mapping-2026-09-11/integration-e299-audit.json)
 pins the tested production file hashes: all six T1 source rows are retained
 exactly, while the only delta from accepted T1 is the previously audited
 `JsonValueFormatter`52→56 count/hash. All other source, opacity, outcome and
@@ -99,7 +99,7 @@ Unresolved calls were not accepted as passing identity controls.
 The first normal corpus ratchet correctly rejected the automatic merge's56-error
 record: actual N1/N3 binding yields55. The existing generators and a fresh
 inspection of the existing conversion/binding pipeline establish the exact
-delta in the [new integration audit](../plans/evidence/n3-mapping-2026-09-11/integration-3b513a-audit.json).
+delta in the [new integration audit](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/n3-mapping-2026-09-11/integration-3b513a-audit.json).
 One historical274 at7412..7417, the `any` input to `FormatLiteralObjectValue`,
 is no longer reported under N1's resolved-identity requirement. Its fresh bound
 source has neither a declaration nor a Roslyn symbol. This remains
@@ -157,7 +157,7 @@ The initial combined207-case selection and the existing14-case generator run
 pass. Regeneration changes neither the source-catalog golden nor the coverage
 baseline. A separate fresh conversion/binding capture again produces55 errors
 for `JsonValueFormatter`, with the same complete ordered diagnostic records as
-the prior capture. The [post-N2 audit](../plans/evidence/n3-mapping-2026-09-11/integration-63220-audit.json)
+the prior capture. The [post-N2 audit](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/n3-mapping-2026-09-11/integration-63220-audit.json)
 pins the new production file hashes and actual measurements. Relative to
 accepted N2, only that file's52→55 count/hash differs; removing the same three
 scalar statement identities reproduces its52-error hash. The absent nominal
@@ -261,7 +261,7 @@ remains in the worktree's `.n3-evidence`; successful compiler selections reached
 227 cases before the last eight matrix cases were added.
 
 The first CI run found an additional required product-ratchet update:
-[the per-file audit](../plans/evidence/n3-mapping-2026-09-11/corpus-ratchet-audit.json)
+[the per-file audit](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/n3-mapping-2026-09-11/corpus-ratchet-audit.json)
 accounts for exactly four new statement274 findings in Serilog's
 `JsonValueFormatter.cs` (52→56 raw binding Errors, zero propagated before/after).
 Removing exactly those four identities reproduces the prior52-error SHA256.

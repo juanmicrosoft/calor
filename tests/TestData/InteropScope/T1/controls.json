@@ -1,0 +1,240 @@
+{
+  "description": "Shared interop controls (#1428). SharedInteropControlsTests converts each fixture on every measured surface, compiles and runs it, and compares the trace with the original C#. 'expected' lists the allowed outcomes; controls-results.json holds the committed observation of each cell.",
+  "surfaces": [
+    {
+      "id": "library",
+      "measured": true,
+      "entry": "new CSharpToCalorConverter() with default ConversionOptions",
+      "defaults": {
+        "rescueUnusableMembers": false,
+        "passthroughOnError": false
+      }
+    },
+    {
+      "id": "cli-convert",
+      "measured": true,
+      "entry": "calor convert Input.cs -o Input.calr --format json (no conversion flags)",
+      "defaults": {
+        "rescueUnusableMembers": true,
+        "passthroughOnError": false
+      }
+    },
+    {
+      "id": "cli-migrate",
+      "measured": true,
+      "entry": "calor migrate <dir> --skip-verify --skip-analyze --report <json> (one-file project)",
+      "defaults": {
+        "rescueUnusableMembers": false,
+        "passthroughOnError": false
+      }
+    },
+    {
+      "id": "mcp-convert",
+      "measured": true,
+      "entry": "MCP calor_convert {source}",
+      "defaults": {
+        "rescueUnusableMembers": false,
+        "passthroughOnError": false
+      }
+    },
+    {
+      "id": "mcp-convert-passthroughOnError",
+      "measured": true,
+      "entry": "MCP calor_convert {source, passthroughOnError: true}",
+      "defaults": {
+        "rescueUnusableMembers": false,
+        "passthroughOnError": true
+      }
+    },
+    {
+      "id": "mcp-migrate",
+      "measured": true,
+      "entry": "MCP calor_migrate {projectPath, phase: convert} (one-file project)",
+      "defaults": {
+        "rescueUnusableMembers": false,
+        "passthroughOnError": false
+      }
+    },
+    {
+      "id": "mcp-batch",
+      "measured": true,
+      "entry": "MCP calor_batch {action: convert, projectPath} (one-file project, writes output)",
+      "defaults": {
+        "rescueUnusableMembers": false,
+        "passthroughOnError": false
+      }
+    },
+    {
+      "id": "sdk",
+      "measured": false,
+      "reason": "src/Calor.Sdk has only MSBuild Sdk.props/Sdk.targets and no conversion entry point (F6 decision D4-sdk-surface); the library row is the SDK surface."
+    },
+    {
+      "id": "msbuild",
+      "measured": false,
+      "reason": "Calor.Tasks compiles Calor and does not call the C# to Calor converter; no conversion behavior to measure."
+    },
+    {
+      "id": "lsp",
+      "measured": false,
+      "reason": "Calor.LanguageServer does not call the C# to Calor converter; no conversion behavior to measure."
+    }
+  ],
+  "controls": [
+    {
+      "id": "T1-REFOUT-NULLABLE",
+      "covers": [
+        "refout-nullable-locals"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-REFOUT-NULLABLE.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-LOCAL-INTERP",
+      "covers": [
+        "local-function-interpolation",
+        "local-function-calls"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-LOCAL-INTERP.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-ARRAY-ARGS-RETURNS",
+      "covers": [
+        "array-arguments",
+        "array-returns"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-ARRAY-ARGS-RETURNS.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-ARRAY-CONDITIONAL",
+      "covers": [
+        "array-conditional-branches"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-ARRAY-CONDITIONAL.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-ITER-ACCESSOR",
+      "covers": [
+        "iterator-accessor-fallback"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-ITER-ACCESSOR.cs.txt",
+      "expected": "preserved"
+    },
+    {
+      "id": "T1-RESCUE-COMBO",
+      "covers": [
+        "rescue-combinations"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-RESCUE-COMBO.cs.txt",
+      "expected": "preserved-or-rejected"
+    },
+    {
+      "id": "T1-INTERP-STRING",
+      "covers": [
+        "interpolation-string"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INTERP-STRING.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-INTERP-FORMATTABLE",
+      "covers": [
+        "interpolation-formattablestring",
+        "interpolation-iformattable"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INTERP-FORMATTABLE.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-INTERP-OVERLOADS",
+      "covers": [
+        "interpolation-competing-overloads"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INTERP-OVERLOADS.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-INTERP-HANDLER",
+      "covers": [
+        "interpolation-custom-handler"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INTERP-HANDLER.cs.txt",
+      "expected": "preserved-or-rejected"
+    },
+    {
+      "id": "T1-INTERP-CULTURE",
+      "covers": [
+        "interpolation-format-culture"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INTERP-CULTURE.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "X-INT-01",
+      "covers": [
+        "X-INT-01"
+      ],
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-08.cs.txt",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-02",
+      "covers": [
+        "X-INT-02"
+      ],
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-01.cs.txt",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-03",
+      "covers": [
+        "X-INT-03"
+      ],
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F4-ITER-01.cs.txt",
+      "expected": "preserved"
+    },
+    {
+      "id": "X-INT-04",
+      "covers": [
+        "X-INT-04"
+      ],
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-03.cs.txt",
+      "expected": "preserved"
+    },
+    {
+      "id": "X-INT-05",
+      "covers": [
+        "X-INT-05"
+      ],
+      "fixture": "tests/TestData/InteropScope/F1/fixtures/X-INT-05.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "X-INT-06",
+      "covers": [
+        "X-INT-06"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/X-INT-06.cs.txt",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "X-INT-07",
+      "covers": [
+        "X-INT-07"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/X-INT-07.cs.txt",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-08",
+      "covers": [
+        "X-INT-08"
+      ],
+      "fixture": "tests/TestData/InteropScope/F1/fixtures/X-INT-08.cs.txt",
+      "expected": "native-or-preserved"
+    }
+  ]
+}

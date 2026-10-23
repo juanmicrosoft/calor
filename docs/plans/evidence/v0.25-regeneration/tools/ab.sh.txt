@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-C25=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25
-bash $C25/tools/fresh.sh $C25/a
-bash $C25/tools/local.sh a $C25/a $C25/out/clone-a
-bash $C25/tools/local.sh b $C25/second/nested/fresh $C25/out/clone-b

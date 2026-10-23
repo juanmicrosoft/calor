@@ -1,0 +1,357 @@
+{
+  "description": "Expected conversion outcome of each R0 interop case (#1426). The fixtures are in fixtures/.",
+  "cases": [
+    {
+      "id": "F1-REFOUT-01",
+      "family": "F1",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-01.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-02",
+      "family": "F1",
+      "expected": "native-or-rejected",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-02.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-03",
+      "family": "F1",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-03.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-04",
+      "family": "F1",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-04.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-05",
+      "family": "F1",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-05.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-06",
+      "family": "F1",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-06.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-07",
+      "family": "F1",
+      "expected": "preserved-or-rejected",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-07.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-08",
+      "family": "F1",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F1-REFOUT-08.cs.txt"
+    },
+    {
+      "id": "F1-REFOUT-A1",
+      "family": "F1",
+      "expected": "rejected"
+    },
+    {
+      "id": "F1-REFOUT-A2",
+      "family": "F1",
+      "expected": "rejected"
+    },
+    {
+      "id": "F2-INTERP-01",
+      "family": "F2",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-01.cs.txt"
+    },
+    {
+      "id": "F2-INTERP-02",
+      "family": "F2",
+      "expected": "native-or-preserved",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-02.cs.txt"
+    },
+    {
+      "id": "F2-INTERP-03",
+      "family": "F2",
+      "expected": "preserved-or-rejected",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-03.cs.txt"
+    },
+    {
+      "id": "F2-INTERP-04",
+      "family": "F2",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-04.cs.txt"
+    },
+    {
+      "id": "F2-INTERP-05",
+      "family": "F2",
+      "expected": "rejected",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-05.calr.txt"
+    },
+    {
+      "id": "F2-INTERP-06",
+      "family": "F2",
+      "expected": "rejected",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-06.calr.txt"
+    },
+    {
+      "id": "F2-INTERP-07",
+      "family": "F2",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F2-INTERP-07.cs.txt"
+    },
+    {
+      "id": "F2-INTERP-08",
+      "family": "F2",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "F2-INTERP-09",
+      "family": "F2",
+      "expected": "native"
+    },
+    {
+      "id": "F2-INTERP-10",
+      "family": "F2",
+      "expected": "native"
+    },
+    {
+      "id": "F3-LOCAL-01",
+      "family": "F3",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F3-LOCAL-01.cs.txt"
+    },
+    {
+      "id": "F3-LOCAL-02",
+      "family": "F3",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F3-LOCAL-02.cs.txt"
+    },
+    {
+      "id": "F3-LOCAL-03",
+      "family": "F3",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F3-LOCAL-03.cs.txt"
+    },
+    {
+      "id": "F3-LOCAL-04",
+      "family": "F3",
+      "expected": "preserved",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F3-LOCAL-04.cs.txt"
+    },
+    {
+      "id": "F3-LOCAL-A1",
+      "family": "F3",
+      "expected": "native-or-rejected"
+    },
+    {
+      "id": "F3-LOCAL-05",
+      "family": "F3",
+      "expected": "preserved"
+    },
+    {
+      "id": "F4-ITER-01",
+      "family": "F4",
+      "expected": "preserved",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F4-ITER-01.cs.txt"
+    },
+    {
+      "id": "F4-ITER-02",
+      "family": "F4",
+      "expected": "preserved",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F4-ITER-02.cs.txt"
+    },
+    {
+      "id": "F4-ITER-03",
+      "family": "F4",
+      "expected": "rejected",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F4-ITER-03.calr.txt"
+    },
+    {
+      "id": "F4-ITER-04",
+      "family": "F4",
+      "expected": "preserved"
+    },
+    {
+      "id": "F5-ARRAY-01",
+      "family": "F5",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-01.cs.txt"
+    },
+    {
+      "id": "F5-ARRAY-02",
+      "family": "F5",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-02.cs.txt"
+    },
+    {
+      "id": "F5-ARRAY-03",
+      "family": "F5",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-03.cs.txt"
+    },
+    {
+      "id": "F5-ARRAY-04",
+      "family": "F5",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-04.cs.txt"
+    },
+    {
+      "id": "F5-ARRAY-05",
+      "family": "F5",
+      "expected": "native",
+      "fixture": "tests/TestData/InteropScope/R0/fixtures/F5-ARRAY-05.cs.txt"
+    },
+    {
+      "id": "F5-ARRAY-06",
+      "family": "F5",
+      "expected": "native-or-rejected"
+    },
+    {
+      "id": "F6-REPORT-01",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-02",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-03",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-04",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-05",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-06",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-07",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-08",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-09",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-10",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-11",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-12",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "F6-REPORT-13",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-01",
+      "family": "F1",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-02",
+      "family": "F5",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-03",
+      "family": "F4",
+      "expected": "preserved"
+    },
+    {
+      "id": "X-INT-04",
+      "family": "F2",
+      "expected": "preserved"
+    },
+    {
+      "id": "X-INT-05",
+      "family": "F1",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "X-INT-06",
+      "family": "F2",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "X-INT-07",
+      "family": "F5",
+      "expected": "native"
+    },
+    {
+      "id": "X-INT-08",
+      "family": "F1",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "DOC-F1-01",
+      "family": "F1",
+      "expected": "native"
+    },
+    {
+      "id": "DOC-F2-01",
+      "family": "F2",
+      "expected": "native"
+    },
+    {
+      "id": "DOC-F3-01",
+      "family": "F3",
+      "expected": "native-or-preserved"
+    },
+    {
+      "id": "DOC-F3-02",
+      "family": "F3",
+      "expected": "native"
+    },
+    {
+      "id": "DOC-F4-01",
+      "family": "F4",
+      "expected": "preserved"
+    },
+    {
+      "id": "DOC-F5-01",
+      "family": "F5",
+      "expected": "native"
+    },
+    {
+      "id": "DOC-F6-01",
+      "family": "F6",
+      "expected": "native"
+    },
+    {
+      "id": "DOC-F6-02",
+      "family": "F6",
+      "expected": "native"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 name: determinism-protocol
 
 # 0.24 G2 (#1421): execution machinery for the registered verifier determinism protocol
-# (docs/plans/evidence/g2-1421/protocol.json, amendment 1.1.0). #1135 executes it. Dispatch
-# only: no automatic trigger. Every dispatched run is charged to determinism-compute, and the
-# plan job refuses a re-run, an executed commit, a docs-only repair, or a run over the budget.
+# (tests/TestData/DeterminismProtocol/protocol.json). Dispatch only: no automatic trigger. Every
+# attempt of every registered environment runs the registered tests, and the decide job compares
+# their values byte for byte. The plan job validates the protocol and refuses a re-run, a
+# reused execution id, or a second execution of one commit.
 # scripts/determinism_protocol.py checks this file's structure (workflow_problems, D013).
 
 run-name: determinism ${{ inputs.mode }} ${{ inputs.execution_id }}
@@ -62,7 +63,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate, check history and budget, and plan the run
+      - name: Validate and plan the run
         id: plan
         env:
           MODE: ${{ inputs.mode }}
@@ -70,9 +71,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py"
           "$PY" scripts/determinism_runner.py plan --mode "$MODE" --execution-id "$EXECUTION" \
-            --main-validator "$RUNNER_TEMP/determinism_protocol_main.py" --github-output "$GITHUB_OUTPUT"
+            --github-output "$GITHUB_OUTPUT"
 
   attempts:
     needs: plan

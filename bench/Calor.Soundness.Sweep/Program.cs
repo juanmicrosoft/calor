@@ -36,7 +36,7 @@ internal static partial class Program
 
     internal static (JsonNode Registration, Dictionary<string, JsonNode> Templates, IReadOnlyList<SweepCaseGenerator.Case> Cases, Dictionary<string, RowInfo> Rows) Load(string repo)
     {
-        var packet = Path.Combine(repo, "docs/plans/evidence/r1-1419");
+        var packet = Path.Combine(repo, "tests/TestData/SoundnessSweep");
         var registration = JsonNode.Parse(File.ReadAllText(Path.Combine(packet, "registration.json")))!;
         var templates = JsonNode.Parse(File.ReadAllText(Path.Combine(packet, "templates.json")))!;
         var rows = registration["denominator"]!["rows"]!.AsArray().Select((r, i) => new RowInfo(S(r!["id"]), S(r["classification"]),
@@ -58,7 +58,7 @@ internal static partial class Program
         Directory.CreateDirectory(outRoot);
         var scratch = Scratch("sweep");
         // Preflight: the generator reproduces the frozen case index; the 13 oracle controls hold on this machine.
-        var index = JsonNode.Parse(File.ReadAllText(Path.Combine(repo, "docs/plans/evidence/r1-1419/cases-index.json")))!["cases"]!.AsArray();
+        var index = JsonNode.Parse(File.ReadAllText(Path.Combine(repo, "tests/TestData/SoundnessSweep/cases-index.json")))!["cases"]!.AsArray();
         if (cases.Count != index.Count || cases.Zip(index).Any(p => p.First.Id != S(p.Second!["id"]) || p.First.CalorSha256 != S(p.Second["calorSha256"]) || p.First.OracleSha256 != S(p.Second["oracleSha256"])))
             return Fail("PREFLIGHT FAIL: case index mismatch", 3);
         var oracleControls = OracleControls(templates["$oracleControls"]);

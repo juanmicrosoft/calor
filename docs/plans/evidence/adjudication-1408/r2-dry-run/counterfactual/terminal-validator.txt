@@ -1,3 +1,0 @@
-  Passed Calor.Compiler.Tests.EvidenceContract.A1TerminalRecordScratchCheck.A1RecordIsAValidTerminalRecord [6 ms]
-     Passed: 1
-TVAL-EXIT=0

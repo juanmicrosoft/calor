@@ -2,18 +2,22 @@
 """0.24 G2 (#1421): execution machinery for the registered verifier determinism protocol.
 
 Run only by .github/workflows/determinism-protocol.yml (workflow_dispatch only). The protocol is
-docs/plans/evidence/g2-1421/protocol.json; the value rules, the workflow structure check, the
-environment judgment, and the decider are frozen in scripts/determinism_protocol.py and imported.
+tests/TestData/DeterminismProtocol/protocol.json; the value rules, the workflow structure check, the
+environment judgment, and the decider are in scripts/determinism_protocol.py and imported.
 
-  plan          validate the packet (this tree and main's validator, D016); refuse a non-dispatch or
-                foreign run, a re-run, a reused execution id, an executed commit, a docs-only repair,
-                a run missing from the API inventory or ledger, and a run over the budget or run limits
+  plan          validate the protocol (against protected main, D016); refuse a non-dispatch or
+                foreign run, a re-run, a reused execution id, an executed commit, an unfinished
+                execution, and a docs-only repair after a failed execution; write the matrix
   install-sdk   install exactly toolchain.sdk into a private root with a SHA-256-pinned installer
   env-check     check and record one job's environment
   run-job       run every attempt of one job once, writing the attempt record after every invocation
   fill-missing  record every attempt of a job that has no record (never runs one)
-  decide        the frozen decider, bound to the dispatched commit and this run
-  ledger-check  the ledger and the API inventory list the same dispatched runs and minutes
+  decide        the decider, bound to the dispatched commit and this run
+
+#1584 removed the plan step's governance: main's copy of the validator, the 0.24 compute budget and
+execution limits, the run ledger, and the 0.25 candidate and 1.5.0 merge-commit bindings. The run
+history still comes from the GitHub API, and every attempt, environment, isolation and decision
+rule stays.
 
 Nothing here retries an attempt, re-runs a job or a commit, normalizes a compared value, or looks
 up, reads, writes, or deletes the real home directory: the workflow moves every job's home under
@@ -89,22 +93,17 @@ def env_profiles(protocol, mode, env) -> list[dict]:
     return profiles if mode == "control" else [p for p in profiles if p["id"] in env["profiles"]]
 
 
-# ---------------------------------------------------------------- plan: history, budget, repairs
+# ---------------------------------------------------------------- plan: run history
 
 
 def classify(run) -> str:
     match = TITLE.match(run.get("title") or "")
-    return match.group(1) if match else "unknown"  # an unreadable title is charged and counted as an execution
+    return match.group(1) if match else "unknown"  # an unreadable title is counted as an execution
 
 
-def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, pr_merge_commit=None,
-                  manifest_candidate=None, committed_result=None) -> list[str]:
+def plan_problems(protocol, *, mode, execution_id, env, inventory, changed_paths) -> list[str]:
     """Guards before any attempt runs. inventory is every run of the workflow from the GitHub API
-    (fetch_inventory); ledger is #1135's ledger (entries with runId, commit, mode, runnerMinutes);
-    changed_paths(old, new) lists changed paths, or None if git cannot tell; pr_merge_commit(pr) gives the full SHA
-    GitHub recorded as that PR's merge into main, or None if it cannot tell (amendment 1.5.0); manifest_candidate(path)
-    gives candidate.commit of that manifest on protected main, or None if it cannot tell (amendment 1.6.0);
-    committed_result(path) gives that JSON file on protected main, or None (amendment 1.7.0)."""
+    (fetch_inventory); changed_paths(old, new) lists changed paths, or None if git cannot tell."""
     problems = []
     if env.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
         problems.append(f"event {env.get('GITHUB_EVENT_NAME')}: only a workflow_dispatch run may execute the protocol")
@@ -120,92 +119,18 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
             or TITLE.match(current[0]["title"]).groups() != (mode, execution_id):
         problems.append(f"run {here} is not listed exactly once in the workflow's inventory as 'determinism {mode} {execution_id}'")
     prior = [dict(r) for r in inventory if r["event"] == "workflow_dispatch" and str(r["id"]) != here]
-    listed = {str(r["id"]): r for r in prior}
-    for entry in ledger.get("entries", []):
-        run = listed.get(str(entry.get("runId")))
-        if run is None:
-            problems.append(f"ledger run {entry.get('runId')} is missing from the API inventory (deleted?); history cannot be trusted")
-        elif entry.get("commit", run["headSha"]) != run["headSha"] or entry.get("mode", classify(run)) != classify(run):
-            problems.append(f"ledger run {entry.get('runId')} names another commit or mode than the API inventory")
-        else:  # the larger of the two records counts, and a ledgered execution's commit stays executed
-            run["minutes"] = max(run["minutes"], int(entry.get("runnerMinutes") or 0))
-            run["attemptsStarted"] = run["attemptsStarted"] or entry.get("attemptsStarted") is True
-    b = protocol["budget"]
-    execution_worst, control_worst, _ = dp.worst_case(protocol)
-    epoch = b.get("releaseEpoch")
-    if epoch:  # amendment 1.7.0: an epoch execution's worst case uses the epoch's job timeouts
-        execution_worst = dp.epoch_worst_case(protocol)
-    worst = {"execution": execution_worst, "control": control_worst, "unknown": execution_worst}
-    if epoch:
-        # Amendment 1.6.0 (0.25 re-proof): every run after run number afterRunNumber belongs to the epoch, which has its
-        # own execution limit and ceiling; the 0.24 runs before it are not charged to it. The executed-commit, unfinished-run
-        # and docs-only rules below still read every prior run.
-        # Amendment 1.7.0: the limits count the window (runs after afterRunNumber); the budget charges every epoch run
-        # (after epochAfterRunNumber) to the epoch ceiling.
-        if len(current) != 1 or not int(current[0].get("runNumber") or 0) > epoch["afterRunNumber"]:
-            problems.append(f"run {here} is not numbered after run {epoch['afterRunNumber']}, where the 0.25 epoch starts")
-        counted = [r for r in prior if int(r.get("runNumber") or 0) > epoch["afterRunNumber"]]
-        charged = [r for r in prior if int(r.get("runNumber") or 0) > epoch.get("epochAfterRunNumber", epoch["afterRunNumber"])]
-        recorded, limits = 0, (epoch["maxExecutions"], epoch["maxDispatchedControlRuns"])
-        ceiling = epoch.get("epochCeilingRunnerMinutes", epoch["ceilingRunnerMinutes"])
-    else:
-        counted = charged = prior
-        recorded, ceiling, limits = b["dryRunSpent"], b["ceilingRunnerMinutes"], (b["maxExecutions"], b["maxDispatchedControlRuns"])
-    recorded += sum(r["minutes"] for r in charged)
-    reserved = sum(worst[classify(r)] for r in charged if r["status"] != "completed")
-    if recorded + reserved + worst[mode] > ceiling:
-        problems.append(f"budget: {recorded} recorded + {reserved} reserved for unfinished runs + {worst[mode]} for this run "
-                        f"exceeds the {ceiling} runner-minute ceiling (contract stopping rule 1)")
     executions = [r for r in prior if classify(r) != "control" and (r["status"] != "completed" or r["attemptsStarted"])]
-    counted_executions = [r for r in counted if r in executions]
-    controls = [r for r in counted if classify(r) == "control"]  # every dispatched control run counts, started or not
-    limit, count = (limits[0], len(counted_executions)) if mode == "execution" else (limits[1], len(controls))
-    if count >= limit:
-        problems.append(f"the limit of {limit} {mode} runs is reached ({count} recorded)")
-    if epoch and mode == "execution":
-        # The executions run only on the candidate commit that the 0.25 candidate manifest on protected main names;
-        # a missing, unreadable or different manifest refuses.
-        named = manifest_candidate(epoch["candidateManifest"]) if manifest_candidate else None
-        if not isinstance(named, str) or not re.match(r"^[0-9a-f]{40}$", named) or named != commit:
-            problems.append(f"a 0.25 execution may run only on the candidate commit named by {epoch['candidateManifest']} on "
-                            f"protected main (protocol amendment {epoch['amendment']}): it names {named}, the dispatched commit is {commit}")
-    extra = b.get("extraExecution")
-    if mode == "execution" and extra and not epoch and count >= extra["afterExecutions"]:
-        # Amendment 1.5.0: an execution beyond the first afterExecutions runs only on the merge commit of the PR that
-        # recorded the named protocol amendment (the re-frozen #1423 candidate): the dispatched SHA must equal the merge
-        # commit GitHub recorded for that PR into main. Anything unresolvable refuses.
-        pr = next((a.get("pr") for a in protocol["amendments"]["amendmentLog"] if a.get("version") == extra["amendment"]), None)
-        merge = pr_merge_commit(pr) if pr_merge_commit and isinstance(pr, int) and pr > 0 else None
-        if not merge or not re.match(r"^[0-9a-f]{40}$", merge) or merge != commit:
-            problems.append(f"execution {count + 1} may run only on the merge commit of PR #{pr} (protocol amendment "
-                            f"{extra['amendment']}): GitHub records {merge}, the dispatched commit is {commit}")
     if any((TITLE.match(r.get("title") or "") or [None, None, None])[2] == execution_id for r in prior):
         problems.append(f"execution id {execution_id} was already dispatched")
     if mode == "execution":
         if any(r["status"] != "completed" for r in executions):
             problems.append("another execution is unfinished")
-        # Amendment 1.7.0: in the epoch, the manifest's candidate (the only commit an epoch execution may run on) may be
-        # executed up to maxExecutionsPerCandidate times; every other commit, and every commit before the epoch, at most once.
         same = [r for r in executions if r["headSha"] == commit]
-        per_commit = epoch.get("maxExecutionsPerCandidate", 1) if epoch and all(r in counted_executions for r in same) else 1
-        if len(same) >= per_commit:
-            problems.append(f"commit {commit} was already executed {len(same)} time(s); a commit is executed at most "
-                            f"{per_commit} time(s) (retryPolicy; protocol amendment 1.7.0 for the 0.25 candidate)")
-        for r in same if len(same) < per_commit else []:
-            # Amendment 1.7.0: the candidate runs again only after its execution was decided INCOMPLETE with no DISAGREE and
-            # no AGREE-FAIL, as the decided record committed on protected main says; anything else refuses.
-            path = str(epoch.get("priorResultPath", "")).replace("{runId}", str(r["id"]))
-            rec = committed_result(path) if committed_result and path else None
-            counts = rec.get("classCounts") if isinstance(rec, dict) and isinstance(rec.get("classCounts"), dict) else {}
-            if not isinstance(rec, dict) or rec.get("schemaVersion") != 1 or rec.get("mode") != "execution" or rec.get("commit") != commit \
-                    or str(r["id"]) not in [str(v) for v in (rec.get("runIds") or {}).values()] or rec.get("verdict") != "INCOMPLETE" \
-                    or counts.get("DISAGREE") != 0 or counts.get("AGREE-FAIL") != 0 or rec.get("protocolVersion") != protocol["protocolVersion"]:
-                problems.append(f"commit {commit} may run again only after its execution run {r['id']} was decided INCOMPLETE with no "
-                                f"DISAGREE or AGREE-FAIL, recorded at {path or 'priorResultPath'} on protected main (protocol amendment 1.7.0)")
+        if same:
+            problems.append(f"commit {commit} was already executed {len(same)} time(s); a commit is executed at most once (retryPolicy)")
         previous = max((r for r in executions if r["status"] == "completed"), key=lambda r: r["runNumber"], default=None)
         # The API does not expose a prior verdict, so every execution run that did not conclude success is
-        # treated as possibly NON-DETERMINISTIC or FAILING (fail closed). A re-execution of the same candidate
-        # (amendment 1.7.0) needs no repair: it runs only after an INCOMPLETE first execution (checked above).
+        # treated as possibly NON-DETERMINISTIC or FAILING (fail closed).
         if previous is not None and previous["conclusion"] != "success" and previous["headSha"] != commit:
             paths = changed_paths(previous["headSha"], commit)
             if paths is None or not any(not p.startswith("docs/") for p in paths):
@@ -218,8 +143,7 @@ def matrix(protocol, mode) -> dict:
     _, jobs, _ = shape(protocol, mode)
     include = []
     for env in protocol["environments"]:
-        overrides = (protocol["budget"].get("releaseEpoch") or {}).get("jobTimeoutMinutes") or {}  # amendment 1.7.0
-        timeout = protocol["control"]["jobTimeoutMinutes"] if mode == "control" else overrides.get(env["id"], env["jobTimeoutMinutes"])
+        timeout = protocol["control"]["jobTimeoutMinutes"] if mode == "control" else env["jobTimeoutMinutes"]
         projects = sorted({p["project"] for p in env_profiles(protocol, mode, env)})
         for job in range(1, jobs + 1):
             include.append({"env": env["id"], "job": job, "runner": env["runner"], "timeout": timeout,
@@ -291,52 +215,12 @@ def changed_paths(old: str, new: str):
     return [p for p in result.stdout.decode("utf-8", "surrogateescape").split("\0") if p] if result.returncode == 0 else None
 
 
-def pr_merge_commit(repo: str, token: str, pr: int, get=api):
-    """Amendment 1.5.0: the merge commit GitHub recorded for a PR merged into main, or None (fail closed)."""
-    try:
-        data = get(f"/repos/{repo}/pulls/{int(pr)}", token)
-    except Exception:  # noqa: BLE001 - any API failure refuses the run
-        return None
-    merged = data.get("merged") is True and (data.get("base") or {}).get("ref") == "main"
-    return data.get("merge_commit_sha") if merged else None
-
-
-def committed_result(path: str, ref: str = "origin/main"):
-    """Amendment 1.7.0: a JSON file as committed on protected main, or None (fail closed)."""
-    result = subprocess.run(["git", "show", f"{ref}:{path}"], cwd=ROOT, capture_output=True, check=False)
-    try:
-        return json.loads(result.stdout) if result.returncode == 0 else None
-    except ValueError:
-        return None
-
-
-def manifest_candidate(path: str, ref: str = "origin/main"):
-    """Amendment 1.6.0: candidate.commit of the candidate manifest on protected main, or None (fail closed)."""
-    data = committed_result(path, ref)
-    try:
-        commit = data["candidate"]["commit"] if data is not None else None
-    except (KeyError, TypeError):
-        return None
-    return commit if isinstance(commit, str) else None
-
-
-def load_ledger(protocol) -> dict:
-    path = ROOT / protocol["executions"]["ledger"]
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"entries": []}
-
-
 def cmd_plan(args, env=os.environ) -> int:
     protocol = dp.load(ROOT, dp.PROTOCOL)
     problems = [f"{c}: {m}" for c, m in dp.validate(ROOT, baseline=dp.load_baseline(ROOT, "origin/main"))]
-    trusted = subprocess.run([sys.executable, args.main_validator, "validate", "--root", str(ROOT), "--baseline-ref", "origin/main"],
-                             capture_output=True, text=True, check=False)
-    if trusted.returncode != 0:
-        problems.append(f"main's validator rejects this tree:\n{trusted.stdout}{trusted.stderr}")
     inventory = fetch_inventory(env["GITHUB_REPOSITORY"], env["GH_TOKEN"])
     problems += plan_problems(protocol, mode=args.mode, execution_id=args.execution_id, env=env, inventory=inventory,
-                              ledger=load_ledger(protocol), changed_paths=changed_paths,
-                              pr_merge_commit=lambda pr: pr_merge_commit(env["GITHUB_REPOSITORY"], env["GH_TOKEN"], pr),
-                              manifest_candidate=manifest_candidate, committed_result=committed_result)
+                              changed_paths=changed_paths)
     print(json.dumps({"inventory": inventory}, indent=1))
     if problems:
         print("\n".join(f"REFUSED: {p}" for p in problems))
@@ -697,7 +581,7 @@ def upload_problems(out: Path) -> list[str]:
     return sorted(str(p.relative_to(out)) for p in out.rglob("*") if UPLOAD_FORBIDDEN & set(p.name))
 
 
-# ---------------------------------------------------------------- decide and ledger
+# ---------------------------------------------------------------- decide
 
 
 def cmd_decide(args, env=os.environ) -> int:
@@ -706,28 +590,11 @@ def cmd_decide(args, env=os.environ) -> int:
                     "--commit", env["GITHUB_SHA"], "--mode", args.mode, "--out", args.out])
 
 
-def ledger_problems(ledger: dict, inventory: list[dict]) -> list[str]:
-    """executions.ledgerCheck, both ways: every dispatched run is in the ledger with its measured minutes,
-    and every ledger run is still in the inventory."""
-    entries = {str(e.get("runId")): e for e in ledger.get("entries", [])}
-    dispatched = {str(r["id"]): r for r in inventory if r["event"] == "workflow_dispatch"}
-    problems = [f"ledger run {i} is not in the API inventory (deleted?)" for i in entries if i not in dispatched]
-    for i, run in dispatched.items():
-        entry = entries.get(i)
-        if entry is None:
-            problems.append(f"run {i} ({run['title']}) is not in the ledger")
-        elif entry.get("commit") != run["headSha"] or entry.get("mode") != classify(run):
-            problems.append(f"run {i}: ledger commit or mode differs from the API inventory")
-        elif run["status"] == "completed" and entry.get("runnerMinutes") != run["minutes"]:
-            problems.append(f"run {i}: ledger says {entry.get('runnerMinutes')} runner-minutes, measured {run['minutes']}")
-    return problems
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("plan")
-    for name in ("--mode", "--execution-id", "--main-validator", "--github-output"):
+    for name in ("--mode", "--execution-id", "--github-output"):
         p.add_argument(name, required=True)
     p = sub.add_parser("install-sdk")
     p.add_argument("--root", required=True)
@@ -748,8 +615,6 @@ def main(argv=None) -> int:
     for name in ("--records", "--execution-id", "--out"):
         p.add_argument(name, required=True)
     p.add_argument("--mode", required=True, choices=sorted(dp.MODES))
-    p = sub.add_parser("ledger-check")
-    p.add_argument("--ledger", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command in ("run-job", "fill-missing"):
@@ -758,11 +623,6 @@ def main(argv=None) -> int:
             if args.command == "run-job":
                 return run_job(protocol, dp.load(ROOT, dp.CASES), job_timeout=args.job_timeout, **kwargs)
             return fill_missing(protocol, **kwargs)
-        if args.command == "ledger-check":
-            problems = ledger_problems(json.loads(Path(args.ledger).read_text(encoding="utf-8")),
-                                       fetch_inventory(os.environ["GITHUB_REPOSITORY"], os.environ["GH_TOKEN"]))
-            print("\n".join(problems) or "ledger and inventory list the same dispatched runs")
-            return 1 if problems else 0
         return {"plan": cmd_plan, "install-sdk": cmd_install_sdk, "env-check": cmd_env_check, "decide": cmd_decide}[args.command](args)
     except Refusal as error:
         print(f"REFUSED: {error}")

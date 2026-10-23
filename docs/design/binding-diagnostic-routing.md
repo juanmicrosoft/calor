@@ -148,7 +148,7 @@ process outputs still describe their original candidates and fixtures.
 No released binary was swapped underneath a live process; version invalidation
 is tested through the existing cache fixtures, not described as such a deployment.
 
-[The process supplement](../plans/evidence/diagnostic-routing-1396/README.md)
+[The process supplement](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/diagnostic-routing-1396/README.md)
 adds actual SDK builds and real watch observations at the pinned implementation
 candidate. Both inherited warnings-as-errors and neutral consumer configurations
 are retained: independent generated-C# rejection is not nullable-binder activation.

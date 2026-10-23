@@ -1,5 +1,0 @@
-tokens used
-84,801
-VERDICT: REQUEST-CHANGES
-
-- **MAJOR — [.github/workflows/benchmark.yml:331](.github/workflows/benchmark.yml#L331): Candidate checkout can remove G015 enforcement.** The initial check runs the current verifier without `--benchmark-worktree`, so it accepts records without benchmark approval. Line 107 then checks out the candidate, replacing the verifier. For a candidate predating this PR, the publishing step runs the older verifier, which ignores `publication.benchmark-results.approved`, allowing publication with approval missing or false. This affects dispatches of the current workflow on `main`, beyond the documented older-ref residual. I confirmed that the older verifier accepts publication inputs the new verifier rejects with G015. Preserve the dispatch commit’s verifier outside the candidate worktree and use it for the final check with `--repo`. Add a regression covering a pre-G015 candidate and an unapproved record.

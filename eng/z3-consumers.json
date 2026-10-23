@@ -113,7 +113,7 @@
       {"path": "bench/mcp/harness/McpBenchHarness.csproj", "role": "Benchmark harness outside G1 scope; builds only after the bootstrap. Not a registered Z3 consumer."},
       {"path": "tests/DebugRT/DebugRT.csproj", "role": "Manual scratch harness, excluded in eng/test-manifest.json. Not a registered Z3 consumer."}
     ],
-    "excludedTrees": ["bench/corpus/", "docs/plans/evidence/"]
+    "excludedTrees": ["bench/corpus/"]
   },
   "postPublicationProbes": [
     {

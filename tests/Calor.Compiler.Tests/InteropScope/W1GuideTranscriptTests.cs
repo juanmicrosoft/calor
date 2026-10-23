@@ -2,14 +2,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Mcp;
-using Calor.Compiler.Tests.EvidenceContract;
 using Xunit;
 
 namespace Calor.Compiler.Tests.InteropScope;
 
 /// <summary>
 /// #1429 (0.25 W1): the CLI and MCP transcripts behind the interoperability guide. Each fixture in
-/// <c>docs/plans/evidence/v0.25-w1-1429/fixtures/</c> is converted with <c>calor convert</c> (text and
+/// <c>tests/TestData/InteropScope/W1/fixtures/</c> is converted with <c>calor convert</c> (text and
 /// JSON), the CLI output is compiled with default options, the fixture is migrated with
 /// <c>calor migrate</c>, and it is converted with MCP <c>calor_convert</c> with and without
 /// <c>passthroughOnError</c>. The observation must equal the committed transcript in
@@ -19,7 +18,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// </summary>
 public sealed class W1GuideTranscriptTests : IDisposable
 {
-    public const string Dir = "docs/plans/evidence/v0.25-w1-1429";
+    public const string Dir = "tests/TestData/InteropScope/W1";
 
     /// <summary>Fixture id and the C# file name it is converted as (the CLI derives the module name from it).</summary>
     public static readonly (string Id, string File)[] Fixtures =
@@ -66,7 +65,7 @@ public sealed class W1GuideTranscriptTests : IDisposable
     [Fact]
     public async Task ProjectTranscript_MatchesTheCommittedFixture()
     {
-        var root = EvidenceContractTests.RepoRoot();
+        var root = CliTestHarness.FindRepoRoot();
         string Write(string dir)
         {
             File.WriteAllText(Path.Combine(dir, "Inventory.cs"), File.ReadAllText(Path.Combine(root, Dir, "fixtures", "W1-F1-refout.cs.txt")));
@@ -116,62 +115,9 @@ public sealed class W1GuideTranscriptTests : IDisposable
         Compare("W1-F6-project", result);
     }
 
-    /// <summary>
-    /// The per-family W1 records: the six families in order, status equal to the scope's readiness
-    /// (W1 never decides READY; it mirrors one that scope.json wrote back after A1, citing the same READY
-    /// record), pages and anchors that exist, transcripts that exist, and, while not READY, a non-empty
-    /// list of what READY still needs.
-    /// </summary>
-    [Fact]
-    public void FamilyRecords_AreConsistentWithTheScopeAndThePages()
-    {
-        var root = EvidenceContractTests.RepoRoot();
-        var records = JsonNode.Parse(File.ReadAllText(Path.Combine(root, Dir, "records.json")))!;
-        var scope = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "docs/plans/evidence/v0.25-r0-1426/scope.json")))!;
-        Assert.Equal(scope["scopeVersion"]!.GetValue<string>(), records["scopeVersion"]!.GetValue<string>());
-        Assert.Equal("reduced", records["independence"]!.GetValue<string>());
-        var families = records["families"]!.AsArray();
-        Assert.Equal(["F1", "F2", "F3", "F4", "F5", "F6"], families.Select(f => f!["family"]!.GetValue<string>()));
-        foreach (var family in families)
-        {
-            var id = family!["family"]!.GetValue<string>();
-            var scopeReadiness = scope["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!["readiness"]!;
-            var readiness = scopeReadiness["status"]!.GetValue<string>();
-            var status = family["status"]!.GetValue<string>();
-            Assert.Equal(readiness, status);
-            if (status == "READY")
-            {
-                // R0 scope 1.6.0 (D-READY-EVIDENCE-DIRS): W1 mirrors a READY that scope.json wrote back after A1, citing the
-                // same A1 READY record; W1 itself never decides READY.
-                Assert.Equal("1.6.0", scopeReadiness["writtenBack"]!["amendment"]!.GetValue<string>());
-                Assert.True(JsonNode.DeepEquals(scopeReadiness["readyRecord"], family["readyRecord"]), $"{id}: W1 cites a different READY record");
-                Assert.Null(family["readyNeeds"]);
-            }
-            else
-                Assert.NotEmpty(family["readyNeeds"]!.AsArray());
-            foreach (var transcript in family["transcripts"]!.AsArray())
-                Assert.True(File.Exists(Path.Combine(root, Dir, "transcripts", transcript!.GetValue<string>() + ".json")), $"{id}: {transcript}");
-            foreach (var page in family["pages"]!.AsArray().Select(p => p!.GetValue<string>()))
-            {
-                var parts = page.Split('#');
-                var path = Path.Combine(root, parts[0]);
-                Assert.True(File.Exists(path), $"{id}: {page}");
-                if (parts.Length == 2)
-                {
-                    // The site's heading ids (website/src/lib/headings.ts): lower-case, non-alphanumeric runs to '-'.
-                    var slugs = Regex.Matches(File.ReadAllText(path), @"^#{2,4} (.+)$", RegexOptions.Multiline)
-                        .Select(m => Regex.Replace(Regex.Replace(m.Groups[1].Value.Replace("`", "").ToLowerInvariant(), "[^a-z0-9]+", "-"), "(^-|-$)", ""));
-                    Assert.Contains(parts[1], slugs);
-                }
-            }
-        }
-        foreach (var page in records["sharedPages"]!.AsArray())
-            Assert.True(File.Exists(Path.Combine(root, page!.GetValue<string>())), page!.GetValue<string>());
-    }
-
     private static void Compare(string id, JsonObject observed)
     {
-        var path = Path.Combine(EvidenceContractTests.RepoRoot(), Dir, "transcripts", id + ".json");
+        var path = Path.Combine(CliTestHarness.FindRepoRoot(), Dir, "transcripts", id + ".json");
         if (Regenerate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -222,7 +168,7 @@ public sealed class W1GuideTranscriptTests : IDisposable
     [Fact]
     public void WebsiteSources_AreExcerptsOfTheFixtures()
     {
-        var root = EvidenceContractTests.RepoRoot();
+        var root = CliTestHarness.FindRepoRoot();
         string? Fixture(string id) => Path.Combine(root, Dir, "fixtures", id + ".cs.txt") is var f && File.Exists(f) ? File.ReadAllText(f) : null;
         var seen = new HashSet<string>();
         var problems = new List<string>();
@@ -259,7 +205,7 @@ public sealed class W1GuideTranscriptTests : IDisposable
     [Fact]
     public void WebsiteFences_QuoteTheCliOutput()
     {
-        var root = EvidenceContractTests.RepoRoot();
+        var root = CliTestHarness.FindRepoRoot();
         var seen = new HashSet<string>();
         foreach (var page in Directory.EnumerateFiles(Path.Combine(root, "website", "content"), "*.mdx", SearchOption.AllDirectories))
         {
@@ -296,7 +242,7 @@ public sealed class W1GuideTranscriptTests : IDisposable
     private async Task<JsonObject> ObserveAsync(string id)
     {
         var file = Fixtures.Single(f => f.Id == id).File;
-        var source = File.ReadAllText(Path.Combine(EvidenceContractTests.RepoRoot(), Dir, "fixtures", id + ".cs.txt"));
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), Dir, "fixtures", id + ".cs.txt"));
         var name = Path.GetFileNameWithoutExtension(file);
         var result = new JsonObject();
 

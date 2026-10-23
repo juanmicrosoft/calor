@@ -1,5 +1,0 @@
-{"tool": "calor_migrate", "project": "mixed", "isError": true, "totalFiles": 2, "successCount": 0, "failureCount": 2, "derived": {"files": 2, "statuses": ["failed", "failed"], "refused": 2}, "consistent": true}
-{"tool": "calor_migrate", "project": "clean", "isError": false, "totalFiles": 2, "successCount": 1, "failureCount": 0, "derived": {"files": 2, "statuses": ["partial", "success"], "refused": 0}, "consistent": true}
-{"tool": "calor_batch", "project": "mixed", "isError": true, "aggregate": {"summary": {"totalFiles": 2, "successfulFiles": 0, "partialFiles": 0, "failedFiles": 2, "skippedFiles": 0, "timedOutFiles": 0, "successRate": 0, "totalDurationMs": 43, "totalCsharpBlocks": 0}}, "derived": {"files": 2, "statuses": ["failed", "failed"], "refused": 2}, "consistent": true}
-{"tool": "calor_batch", "project": "clean", "isError": false, "aggregate": {"summary": {"totalFiles": 2, "successfulFiles": 1, "partialFiles": 1, "failedFiles": 0, "skippedFiles": 0, "timedOutFiles": 0, "successRate": 50, "totalDurationMs": 36, "totalCsharpBlocks": 1}}, "derived": {"files": 2, "statuses": ["partial", "success"], "refused": 0}, "consistent": true}
-allConsistent True

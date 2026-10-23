@@ -541,7 +541,7 @@ jobs:
     # names no environment, and `nuget-release` admits `main` alone (admin bypass off). That branch
     # rule is a required security control, not a fail-safe: an unrestricted (or auto-recreated)
     # `nuget-release` would still yield a matching environment claim. This is the only job with
-    # `id-token: write`. Settings and checklist: docs/plans/evidence/release-gaps-0.25/README.md;
+    # `id-token: write`. Settings and checklist: https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/release-gaps-0.25/README.md;
     # scripts/check_release_credentials.py --live reports them.
     environment: nuget-release
     permissions:

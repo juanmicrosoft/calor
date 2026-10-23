@@ -10,9 +10,9 @@ using CalorCompilationOptions = Calor.Compiler.CompilationOptions;
 namespace Calor.Evaluation.Equivalence;
 
 /// <summary>
-/// The #1276 (0.24 B1) registered differential oracle. Its rules are pinned in
-/// <c>docs/plans/evidence/b1-1276/registration/registration.json</c>; changing one is a #1407
-/// amendment, and the registration tests fail when this file's hash drifts. Every step treats both
+/// The #1276 (0.24 B1) registered differential oracle. Its rules are described in
+/// <c>eng/benchmark-publication/b1-1276/registration/registration.json</c>; #1584 removed the hash pin
+/// of this file, and the published B1 results stay tied to the oracle commit they ran at. Every step treats both
 /// arms identically except the Calor-to-C# compile. EQUIVALENT means no disagreement on the
 /// registered finite input set, not a proof.
 /// </summary>

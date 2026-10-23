@@ -1,7 +1,0 @@
-tokens used
-86,331
-VERDICT: REQUEST-CHANGES
-
-- **MAJOR — `scripts/verify_release_adjudication.py:124`: CHANGELOG rendering differs from publish-nuget’s awk.** Python matches the version literally; awk interprets its dots as regex wildcards. With version `0.25.0-rc.1`, awk also includes a following `## [0.25.0-rc-1]` section, while Python stops there. I reproduced different normalized hashes. Consequently, G014 can pass before publication fails with G011; neither hash can satisfy both renderers. Use one shared literal renderer for the gate and workflow, and add differential tests for regex metacharacters, CRLF, trailing whitespace, and duplicate headers.
-
-- **MINOR — `docs/plans/evidence/release-gaps-0.25/README.md:177`: Scope the benchmark publication guarantee to the updated workflow.** Legacy refs and reruns retain their old publication logic and write-capable `GITHUB_TOKEN`. For example, `v0.22.0` contains a dispatch-enabled `create-pull-request` step requiring neither new approval. Document this residual path explicitly, including that PR A’s NuGet credential isolation does not restrict benchmark branch publication. If the intended guarantee includes historical workflows, document and verify repository controls that remove their publication authority.

@@ -31,7 +31,7 @@ internal static class Report
         foreach (var b in new[] { "B1", "N1" })
         {
             var other = b == "B1" ? "N1" : "B1";
-            var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(repo, $"docs/plans/evidence/r1-1419/manifest-{b}.json")))!;
+            var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(repo, $"tests/TestData/SoundnessSweep/manifest-{b}.json")))!;
             var pins = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, "pins.json")))!;
             var (rowsDir, findingsDir) = (Path.Combine(outRoot, b, "rows"), Path.Combine(outRoot, b, "findings"));
             Directory.CreateDirectory(rowsDir);

@@ -4,9 +4,9 @@ namespace Calor.Verification.Tests.VerifierRuntimeDifferential;
 
 /// <summary>
 /// #1421 (0.24 G2): opt-in record for the registered verifier determinism protocol
-/// (docs/plans/evidence/g2-1421/protocol.json). It writes nothing unless
+/// (tests/TestData/DeterminismProtocol/protocol.json). It writes nothing unless
 /// CALOR_DETERMINISM_RECORD_DIR is set, and it never changes a verdict, the report, or an
-/// assertion. Frozen by docs/plans/evidence/g2-1421/sha256.json: a change is a protocol amendment.
+/// assertion. A change to the recorded format is reviewed with the protocol (#1584 removed its hash freeze).
 /// Cells are written as compact JSON (no platform newline); generated reports are
 /// written as the exact bytes the gate compares, so the protocol can compare them unnormalized.
 /// </summary>

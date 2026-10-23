@@ -24,7 +24,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class LocalFunctionConversionTests
 {
-    private const string R0Fixtures = "docs/plans/evidence/v0.25-r0-1426/fixtures";
+    private const string R0Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
     public enum Surface
     {

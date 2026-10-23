@@ -296,7 +296,7 @@ class CredentialCheckTests(unittest.TestCase):
 
     # -- workflow permissions: 403, attestation ---------------------------------------------
 
-    ATTESTATION = REPO_ROOT / "docs" / "plans" / "evidence" / "release-gaps-0.25" / \
+    ATTESTATION = REPO_ROOT / "tests" / "TestData" / "ReleaseCredentials" / \
         "actions-workflow-permissions-attestation.json"
 
     def attest(self, **changes: object) -> list[str]:

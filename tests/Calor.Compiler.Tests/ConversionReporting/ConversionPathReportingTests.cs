@@ -9,12 +9,12 @@ namespace Calor.Compiler.Tests.ConversionReporting;
 /// 0.25 F6 (#1144): every conversion surface reports the path that actually preserved
 /// each member (converter interop, automatic rescue, requested passthrough) with the
 /// trigger that fired, or reports the file as refused. Test names carry the registered
-/// F6-REPORT case ids. Fixtures are the R0 packet's (#1426) committed C# inputs, plus
+/// F6-REPORT case ids. Fixtures are the R0 (#1426) C# inputs in tests/TestData/InteropScope/R0/, plus
 /// one inline input (a trailing label) that only rescue or passthrough can convert.
 /// </summary>
 public class ConversionPathReportingTests : IDisposable
 {
-    private const string Fixtures = "docs/plans/evidence/v0.25-r0-1426/fixtures";
+    private const string Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
     /// <summary>A label before the last statement: native output fails the C# round trip, so the library default refuses.</summary>
     private const string TrailingLabel = "public class G { public int M(int x) { here: return x; } }";

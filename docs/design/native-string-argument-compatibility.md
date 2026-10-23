@@ -79,7 +79,7 @@ a safety result. Non-null-to-nullable-accepting compatibility may remove an old
 false-positive208 without adding274. Such changes are not equivalent to an
 unsafe formerly rejected input becoming accepted.
 
-The [N4 evidence record](../plans/evidence/native-string-1383/README.md)
+The [N4 evidence record](https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/native-string-1383/README.md)
 classifies the two changed source rows, distinguishes propagated diagnostics
 from affected-module counts, and retains actual default API/CLI controls,
 realized-versus-manifest reference profiles and failed attempts.

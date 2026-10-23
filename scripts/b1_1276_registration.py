@@ -15,11 +15,8 @@ from pathlib import Path
 
 CUTOFF = "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1"
 CORPUS = "tests/TestData/Benchmarks"
+# #1585 moved the packet here; #1584 dropped its seal (sha256.json) and the oracle hash pins.
 PACKET = Path("eng/benchmark-publication/b1-1276/registration")
-# #1585: the packet moved here from docs/plans/evidence/ with its bytes unchanged; its seal keys keep
-# the name it was sealed and merged under.
-SEALED_PACKET = "docs/plans/evidence/b1-1276/registration"
-DOC = "docs/plans/b1-1276-benchmark-registration.md"
 SCENARIO_EXCLUSION = "X1-scenario-variant"
 ORACLE_FILES = [
     "tests/Calor.Evaluation/Equivalence/PairDifferentialOracle.cs",
@@ -34,10 +31,6 @@ def git(root: Path, *args: str) -> bytes:
 
 def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
-
-def lf_sha(path: Path) -> str:
-    return sha(path.read_bytes().replace(b"\r\n", b"\n"))
 
 
 def dump(obj) -> str:
@@ -126,7 +119,7 @@ def build(root: Path) -> dict[str, str]:
     files["metric-set.json"] = dump(metric_set)
 
     registration = json.loads((root / PACKET / "registration.json").read_text(encoding="utf-8"))
-    registration["oracle"]["implementation"] = [{"path": p, "sha256": lf_sha(root / p)} for p in ORACLE_FILES]
+    registration["oracle"]["implementation"] = [{"path": p} for p in ORACLE_FILES]
     registration["denominator"]["pairs"] = len(pairs)
     registration["denominator"]["toOracle"] = len(pairs) - len(excluded)
     registration["denominator"]["excludedPreRegistered"] = len(excluded)
@@ -135,10 +128,6 @@ def build(root: Path) -> dict[str, str]:
     key["metricSetSha256"] = sha(files["metric-set.json"].encode())
     key["exclusionsSha256"] = sha(files["exclusions.json"].encode())
     files["registration.json"] = dump(registration)
-
-    hashed = {f"{SEALED_PACKET}/{name}": sha(text.encode()) for name, text in sorted(files.items())}
-    hashed[DOC] = lf_sha(root / DOC)
-    files["sha256.json"] = dump({"algorithm": "sha256", "normalization": "LF", "files": hashed})
     return files
 
 
@@ -147,7 +136,7 @@ def main() -> int:
     files = build(root)
     for name, text in files.items():
         (root / PACKET / name).write_bytes(text.encode("utf-8"))
-    print(f"wrote {len(files)} files; seal (SHA-256 of sha256.json) {sha(files['sha256.json'].encode())}")
+    print(f"wrote {len(files)} files")
     return 0
 
 

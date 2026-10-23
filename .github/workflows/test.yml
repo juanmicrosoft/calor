@@ -103,20 +103,9 @@ jobs:
           python3 scripts/test_reproducible_builds.py
           python3 scripts/test_release_checks.py
 
-      # #1421 (0.24 G2): the determinism protocol's gates. The validator checks these three
-      # steps structurally (D014): own steps, no condition, unmasked, in this order. Main's copy
-      # of the validator judges this tree; this tree's copy is used only while main has none.
-      - name: Fetch main's determinism protocol validator (#1421)
-        run: |
-          set -euo pipefail
-          git rev-parse --verify origin/main
-          git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py" || cp scripts/determinism_protocol.py "$RUNNER_TEMP/determinism_protocol_main.py"
-
-      - name: Validate the determinism protocol with main's validator (#1421)
-        run: |
-          set -euo pipefail
-          python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main
-
+      # #1421 (0.24 G2): the determinism protocol's gate. The validator checks this step
+      # structurally (D014): its own step, no condition, unmasked. With --baseline-ref it also
+      # fails on a change that weakens the protocol on protected main (D016).
       - name: Validate the determinism protocol and its controls (#1421)
         run: |
           set -euo pipefail

@@ -71,15 +71,10 @@ class Fixture:
     PAIRS = [("Cat/A", "EQUIVALENT", True, "manifest.benchmarks"), ("Cat/B", "EQUIVALENT", True, "manifest.benchmarks"),
              ("Cat/C", "NOT-EQUIVALENT", False, "manifest.benchmarks"), ("Cat/D", "UNCLASSIFIED", False, "manifest.benchmarks"),
              ("Cat/E", "EXCLUDED-PRE-REGISTERED", False, "manifest.bugScenarios")]
-    CONTRACT_DOC = "docs/plans/contract.md"  # a sealed file outside every INPUT_PATHS entry
 
-    def __init__(self, tmp: Path, legacy: bool = False):
+    def __init__(self, tmp: Path):
         self.tmp, self.root, self.origin = tmp, tmp / "work", tmp / "origin.git"
-        # legacy: seal and merge the packet under its pre-#1585 names (docs/plans/evidence/), as the
-        # real packet was; move() then relocates it, bytes unchanged.
-        self.reg, self.res = ((gate.SEALED_REGISTRATION, gate.SEALED_RESULTS) if legacy
-                              else (gate.REGISTRATION, gate.RESULTS))
-        self.contract_file, self.contract_seal = gate.CONTRACT, gate.CONTRACT_SEAL
+        self.reg, self.res = gate.REGISTRATION, gate.RESULTS
         self.regen = tmp / "regen"
         run(tmp, "git", "init", "-q", "--bare", "-b", "main", str(self.origin))
         run(tmp, "git", "init", "-q", "-b", "main", str(self.root))
@@ -88,12 +83,10 @@ class Fixture:
         self.git("remote", "add", "origin", str(self.origin))
         for path in ("src/a.txt", "tests/Calor.Evaluation/a.txt", "website/public/data/benchmark-results.json",
                      "scripts/benchmark_publication_gate.py", *[p for p in gate.INPUT_PATHS if p.endswith((".cs", ".csproj"))],
-                     f"{gate.VALIDATOR}/CandidateManifestTests.cs"):
+                     f"{gate.VALIDATOR}/OtherTests.cs"):
             self.write(path, "{}\n")
         shutil.copy(REPO_ROOT / "scripts/benchmark_publication_gate.py", self.root / "scripts/benchmark_publication_gate.py")
         self.write_json(gate.STAMP_INDEX, {"publicationStamps": []})
-        self.contract = {"amendmentLog": [{"version": "1.0.1", "change": "acceptance"}]}
-        self.write_contract()
         self.registered = []
         for pair_id, *_ in self.PAIRS:
             name = pair_id.split("/")[1]
@@ -110,7 +103,6 @@ class Fixture:
                     "generatorVersion": gate.GENERATOR, "exclusionsSha256": "2" * 64}
         self.write_json(f"{self.reg}/pairs.json", {"pairs": self.registered})
         self.write_json(f"{self.reg}/registration.json", {"comparability": self.key})
-        self.seal(self.reg, lf=True)
         self.registration_commit = self.commit_and_push("registration")
         copy = self.root / "scripts/benchmark_publication_gate.py"
         copy.write_text(copy.read_text().replace(gate.ACCEPTED_REGISTRATION_COMMITS[0], self.registration_commit))
@@ -140,19 +132,7 @@ class Fixture:
     def file_sha(self, relative: str) -> str:
         return sha((self.root / relative).read_bytes())
 
-    def seal(self, directory: str, lf: bool) -> None:
-        files = {f"{directory}/{p.name}": sha(p.read_bytes()) for p in sorted((self.root / directory).iterdir())
-                 if p.name != "sha256.json"}
-        self.write_json(f"{directory}/sha256.json", {"files": files})
-
-    def write_contract(self) -> None:
-        self.write_json(self.contract_file, self.contract)
-        if not (self.root / self.CONTRACT_DOC).exists():
-            self.write(self.CONTRACT_DOC, "# contract\n")
-        self.write_json(self.contract_seal, {"files": {self.contract_file: self.file_sha(self.contract_file),
-                                                       self.CONTRACT_DOC: self.file_sha(self.CONTRACT_DOC)}})
-
-    def publish_results(self, message: str, reseal: bool = True, push: bool = True) -> str:
+    def publish_results(self, message: str, rekey: bool = True, push: bool = True) -> str:
         """Write the manifest and results (deriving counts from the manifest) and commit them."""
         for i, field in ((1, "firstOracleResultSha256"), (2, "oracleResultSha256")):
             self.write_json(f"{self.res}/oracle-run-{i}.json", {"valid": i == 2})
@@ -164,23 +144,12 @@ class Fixture:
         self.results.setdefault("byDisposition", counts)
         self.results.setdefault("denominator", len(self.manifest["pairs"]))
         self.results["comparability"].setdefault("pairManifestSha256", "")
-        if not self.results["comparability"]["pairManifestSha256"] or reseal:
+        if not self.results["comparability"]["pairManifestSha256"] or rekey:
             self.results["comparability"]["pairManifestSha256"] = self.file_sha(f"{self.res}/pair-manifest.json")
         self.write_json(f"{self.res}/results.json", self.results)
         for i in (1, 2):
             self.write_json(f"{self.res}/metrics-run-{i}.json", {"pairs": ["Cat/A", "Cat/B"]})
-        self.seal(self.res, lf=False)
         commit = self.commit_and_push(message, push=push)
-        self.copy_regenerated()
-        return commit
-
-    def move(self) -> str:
-        """#1585: git mv the sealed packet to its current location, bytes and seals unchanged."""
-        for old, new in ((self.reg, gate.REGISTRATION), (self.res, gate.RESULTS)):
-            (self.root / new).parent.mkdir(parents=True, exist_ok=True)
-            self.git("mv", old, new)
-        self.reg, self.res = gate.REGISTRATION, gate.RESULTS
-        commit = self.commit_and_push("move the packet out of docs/plans/evidence (#1585)")
         self.copy_regenerated()
         return commit
 
@@ -284,12 +253,6 @@ class GateTests(unittest.TestCase):
         self.f.publish_results("rewrite a task statement")
         self.assertIn("Cat/A: registered fields changed: taskStatement", self.assertRefused("B2-04"))
 
-    def test_registration_changed_after_its_merge_is_refused(self) -> None:
-        self.f.write_json(f"{gate.REGISTRATION}/registration.json", {"comparability": self.f.key, "edited": True})
-        self.f.seal(gate.REGISTRATION, lf=True)
-        self.f.commit_and_push("edit the registration")
-        self.assertRefused("B2-02")
-
     def test_reduced_run_count_is_a_method_change(self) -> None:
         self.f.results["comparability"]["runCount"] = 1
         self.f.publish_results("one run")
@@ -300,122 +263,10 @@ class GateTests(unittest.TestCase):
         self.f.publish_results("other metrics")
         self.assertIn("metricSetSha256", self.assertRefused("B2-06"))
 
-    def test_changed_aggregation_without_an_amendment_is_refused(self) -> None:
+    def test_changed_aggregation_that_the_registration_does_not_name_is_refused(self) -> None:
         self.f.results["comparability"]["aggregationMethod"] = "agg-v2"
         self.f.publish_results("new aggregation")
         self.assertIn("never a workflow input", self.assertRefused("B2-06"))
-
-    def _new_key_hash(self) -> str:
-        self.f.results["comparability"]["aggregationMethod"] = "agg-v2"
-        self.f.results["comparability"]["pairManifestSha256"] = self.f.file_sha(f"{self.f.res}/pair-manifest.json")
-        return gate.key_sha256(self.f.results["comparability"])
-
-    def _amend(self, authorization: dict | None, prose: str = "", commit: bool = True) -> None:
-        entry = {"version": "1.2.0", "change": prose}
-        if authorization is not None:
-            entry[gate.AUTHORIZATION] = authorization
-        self.f.contract["amendmentLog"].append(entry)
-        self.f.write_contract()
-        if commit:
-            self.f.commit_and_push("amendment")
-
-    def _legacy(self) -> Fixture:
-        """#1585: a packet sealed and merged under docs/plans/evidence/ (as the real one was)."""
-        (self.tmp / "legacy").mkdir()
-        self.f = Fixture(self.tmp / "legacy", legacy=True)
-        gate.ACCEPTED_REGISTRATION_COMMITS = (self.f.registration_commit,)
-        return self.f
-
-    def test_a_packet_moved_after_sealing_still_publishes(self) -> None:
-        f = self._legacy()
-        landed = f.git("rev-parse", "HEAD")
-        f.move()
-        # The seals still name the sealed paths; nothing sealed was rewritten.
-        self.assertIn(f"{gate.SEALED_REGISTRATION}/pairs.json",
-                      json.loads((f.root / gate.REGISTRATION / "sha256.json").read_text())["files"])
-        self.assertIn(f"{gate.SEALED_RESULTS}/results.json",
-                      json.loads((f.root / gate.RESULTS / "sha256.json").read_text())["files"])
-        code, text = f.check()
-        self.assertEqual(0, code, text)
-        self.assertEqual(landed, gate.results_landing(f.root), "the move commit is not where the results landed")
-        self.assertIn(gate.PACKET, f.headline()["provenance"]["treeHashes"])
-
-    def test_the_move_does_not_restart_the_amendment_clock(self) -> None:
-        """An amendment merged after the results but before the move is still not prior."""
-        f = self._legacy()
-        new_hash = self._new_key_hash()
-        f.publish_results("new aggregation")
-        self._amend({"comparabilityKeySha256": new_hash})
-        f.move()
-        self.assertIn("merged before these results", self.assertRefused("B2-06"))
-
-    def test_a_relocated_file_is_still_checked_against_its_seal(self) -> None:
-        f = self._legacy()
-        f.move()
-        f.write_json(f"{gate.RESULTS}/environment.json", {"edited": True})
-        sealed = json.loads((f.root / gate.RESULTS / "sha256.json").read_text())
-        sealed["files"][f"{gate.SEALED_RESULTS}/environment.json"] = "5" * 64
-        f.write_json(f"{gate.RESULTS}/sha256.json", sealed)
-        f.commit_and_push("a relocated results file that differs from its legacy-keyed seal")
-        text = self.assertRefused("B2-01")
-        self.assertIn(f"{gate.SEALED_RESULTS}/environment.json (now {gate.RESULTS}/environment.json) is ", text)
-
-    def test_a_relocated_registration_still_matches_the_merged_tree(self) -> None:
-        f = self._legacy()
-        f.move()
-        f.write_json(f"{gate.REGISTRATION}/registration.json", {"comparability": f.key, "edited": True})
-        f.seal(gate.REGISTRATION, lf=True)
-        f.commit_and_push("edit the registration after the move")
-        self.assertRefused("B2-02")
-
-    def test_amendment_for_another_key_does_not_authorize(self) -> None:
-        self._new_key_hash()
-        self._amend({"comparabilityKeySha256": "4" * 64})
-        self.f.publish_results("new aggregation, unrelated amendment")
-        self.assertRefused("B2-06")
-
-    def test_a_hash_mentioned_in_prose_does_not_authorize(self) -> None:
-        new_hash = self._new_key_hash()
-        self._amend(None, prose=f"Rejected: do NOT authorize comparabilityKeySha256 {new_hash}.")
-        self.f.publish_results("new aggregation, prose only")
-        self.assertRefused("B2-06")
-
-    def test_an_amendment_in_the_same_commit_as_the_results_is_not_prior(self) -> None:
-        new_hash = self._new_key_hash()
-        self._amend({"comparabilityKeySha256": new_hash}, commit=False)
-        self.f.publish_results("amendment and results together")
-        self.assertIn("merged before these results", self.assertRefused("B2-06"))
-
-    def test_amendment_and_results_merged_together_from_one_branch_are_not_prior(self) -> None:
-        new_hash = self._new_key_hash()
-        self.f.git("checkout", "-q", "-b", "feature")
-        self._amend({"comparabilityKeySha256": new_hash}, commit=False)
-        self.f.commit_and_push("amendment on the branch", push=False)
-        self.f.publish_results("results on the branch", push=False)
-        self.f.git("checkout", "-q", "main")
-        self.f.git("merge", "-q", "--no-ff", "-m", "merge feature", "feature")
-        self.f.commit_and_push("noop", push=True, allow_empty=True)
-        self.assertRefused("B2-06")
-
-    def test_an_amendment_withdrawn_after_the_results_no_longer_authorizes(self) -> None:
-        new_hash = self._new_key_hash()
-        self._amend({"comparabilityKeySha256": new_hash})
-        self.f.publish_results("new aggregation")
-        self.assertEqual(0, self.f.check()[0])
-        self.f.git("checkout", "-q", "--", ".")
-        self.f.git("clean", "-fdq")
-        self.f.contract["amendmentLog"][-1]["withdrawn"] = True
-        self.f.write_contract()
-        self.f.commit_and_push("withdraw later")
-        self.assertRefused("B2-06")
-
-    def test_supersession_must_be_an_exact_list_member(self) -> None:
-        published = self._publish_headline()
-        new_hash = self._new_key_hash()
-        self._amend({"comparabilityKeySha256": new_hash,
-                     "supersedesComparabilityKeySha256": f"DO NOT supersede {published['comparabilityKeySha256']}"})
-        self.f.publish_results("string, not list")
-        self.assertRefused("B2-07")
 
     def test_an_older_checkout_with_different_inputs_is_refused(self) -> None:
         self.f.write("tests/TestData/Benchmarks/Cat/new.txt", "added on main\n")
@@ -423,18 +274,8 @@ class GateTests(unittest.TestCase):
         self.f.git("checkout", "-q", "--detach", "HEAD~1")
         self.assertIn("differs from refs/remotes/origin/main", self.assertRefused("B2-08"))
 
-    def test_a_withdrawn_amendment_does_not_authorize(self) -> None:
-        new_hash = self._new_key_hash()
-        self._amend({"comparabilityKeySha256": new_hash})
-        self.f.contract["amendmentLog"][-1]["withdrawn"] = True
-        self.f.write_contract()
-        self.f.commit_and_push("withdraw")
-        self.f.publish_results("new aggregation, withdrawn amendment")
-        self.assertRefused("B2-06")
-
-    def test_a_reregistration_needs_a_prior_amendment(self) -> None:
+    def test_a_reregistration_is_not_accepted_without_a_reviewed_gate_change(self) -> None:
         self.f.write_json(f"{gate.REGISTRATION}/registration.json", {"comparability": self.f.key, "v": 2})
-        self.f.seal(gate.REGISTRATION, lf=True)
         self.f.manifest["registrationCommit"] = self.f.commit_and_push("re-register")
         self.f.publish_results("results for the new registration")
         self.assertIn("is not the accepted B1 registration", self.assertRefused("B2-02"))
@@ -445,27 +286,18 @@ class GateTests(unittest.TestCase):
         self.f.commit_and_push("publish headline")
         return self.f.headline()
 
-    def _amend_method(self, published_hash: str | None) -> str:
-        new_hash = self._new_key_hash()
-        self._amend({"comparabilityKeySha256": new_hash,
-                     "supersedesComparabilityKeySha256": [published_hash] if published_hash else []})
-        self.f.publish_results("amended aggregation")
-        return new_hash
-
-    def test_method_change_by_prior_amendment_is_published_as_incomparable(self) -> None:
-        published = self._publish_headline()
-        self._amend_method(published["comparabilityKeySha256"])
+    def test_a_registered_method_change_is_published_as_incomparable(self) -> None:
+        self._publish_headline()
+        self.f.key = dict(self.f.key, aggregationMethod="agg-v2")
+        self.f.write_json(f"{gate.REGISTRATION}/registration.json", {"comparability": self.f.key})
+        self.f.results["comparability"]["aggregationMethod"] = "agg-v2"
+        self.f.publish_results("registered aggregation change")
         code, text = self.f.check()
         self.assertEqual(0, code, text)
         self.assertIn("INCOMPARABLE with the published headline", text)
         self.assertIn("no delta, ratio change, or advantage movement", text)
         self.assertFalse(self.f.headline()["comparableWithPublished"])
         self.assertNotRegex(text, r"(?i)\bdelta\b[^,]*[-+]?\d+\.\d+")
-
-    def test_amended_key_that_does_not_name_the_published_key_is_refused(self) -> None:
-        self._publish_headline()
-        self._amend_method(None)
-        self.assertIn("no prior #1407 amendment authorizes this key superseding", self.assertRefused("B2-07"))
 
     def test_same_key_different_numbers_is_refused(self) -> None:
         published = self._publish_headline()
@@ -521,8 +353,8 @@ class GateTests(unittest.TestCase):
         self.assertEqual(0, code, text)
         at_candidate = self._outputs()
         self._clean()
-        self._candidate_then_main_moves({f"{gate.VALIDATOR}/CandidateInvalidationTests.cs": "new C1 test\n",
-                                         f"{gate.VALIDATOR}/CandidateManifestTests.cs": "edited C1 test\n",
+        self._candidate_then_main_moves({f"{gate.VALIDATOR}/NewTests.cs": "new test\n",
+                                         f"{gate.VALIDATOR}/OtherTests.cs": "edited test\n",
                                          "src/b.txt": "compiler change\n", "docs/other.md": "notes\n"})
         code, text = self.f.check()
         self.assertEqual(0, code, text)
@@ -531,14 +363,12 @@ class GateTests(unittest.TestCase):
     def test_every_headline_input_changed_on_main_is_refused(self) -> None:
         # (file changed on main, the input the refusal names)
         cases = [(f"{gate.REGISTRATION}/registration.json", gate.REGISTRATION),
-                 (f"{gate.RESULTS}/results.json", gate.RESULTS), (gate.CONTRACT, gate.CONTRACT),
+                 (f"{gate.RESULTS}/results.json", gate.RESULTS),
                  ("tests/TestData/Benchmarks/Cat/new.txt", "tests/TestData/Benchmarks"),
                  ("tests/TestData/Benchmarks/Cat/A.calr", "tests/TestData/Benchmarks/Cat/A.calr"),
                  ("tests/Calor.Evaluation/a.txt", "tests/Calor.Evaluation"),
-                 (gate.CONTRACT_SEAL, gate.CONTRACT_SEAL),  # review round 1, finding 1
-                 (Fixture.CONTRACT_DOC, Fixture.CONTRACT_DOC),  # named only by the candidate's seal
                  *[(p, p) for p in gate.INPUT_PATHS if p.endswith((".py", ".cs", ".csproj"))]]
-        self.assertEqual(16, len(cases))
+        self.assertEqual(13, len(cases))
         base = self.f.git("rev-parse", "HEAD")
         for path, named in cases:
             with self.subTest(input=path):
@@ -579,15 +409,16 @@ class GateTests(unittest.TestCase):
     def test_an_input_replaced_by_a_symlink_with_the_same_bytes_is_refused(self) -> None:
         """Review round 2: the blob id is unchanged, only the tree-entry mode (100644 -> 120000) differs."""
         candidate = self.f.git("rev-parse", "HEAD")
-        seal = self.f.root / gate.CONTRACT_SEAL
-        content = seal.read_text(encoding="utf-8")
-        blob_id = self.f.git("rev-parse", f"HEAD:{gate.CONTRACT_SEAL}")
-        seal.unlink()
-        os.symlink(content, seal)
+        relative = f"{gate.VALIDATOR}/BenchmarkPacketValidator.cs"
+        target = self.f.root / relative
+        content = target.read_text(encoding="utf-8")
+        blob_id = self.f.git("rev-parse", f"HEAD:{relative}")
+        target.unlink()
+        os.symlink(content, target)
         self.f.commit_and_push("same bytes, now a symlink")
-        self.assertEqual(blob_id, self.f.git("rev-parse", f"origin/main:{gate.CONTRACT_SEAL}"))
+        self.assertEqual(blob_id, self.f.git("rev-parse", f"origin/main:{relative}"))
         self.f.git("checkout", "-q", "--detach", candidate)
-        self.assertIn(f"  B2-08 {gate.CONTRACT_SEAL} at HEAD differs", self.assertRefused("B2-08"))
+        self.assertIn(f"  B2-08 {relative} at HEAD differs", self.assertRefused("B2-08"))
 
     def test_a_new_validator_partial_class_file_on_main_is_refused(self) -> None:
         """Verification pass: a new part of the validator class can rebind an unchanged call to a
@@ -597,7 +428,7 @@ class GateTests(unittest.TestCase):
                 self.f.git("checkout", "-q", "-f", "main")
                 self.f.git("reset", "-q", "--hard", "origin/main")
                 base = self.f.git("rev-parse", "HEAD")
-                self._candidate_then_main_moves({path: "namespace N;\ninternal static partial class EvidenceContractValidator\n"
+                self._candidate_then_main_moves({path: "namespace N;\ninternal static partial class BenchmarkPacketValidator\n"
                                                        "{\n    public static int ValidateBenchmarkResults(object a) => 0;\n}\n"})
                 text = self.assertRefused("B2-08")
                 self.assertIn(f"  B2-08 {path} at HEAD differs", text)
@@ -690,24 +521,8 @@ class GateTests(unittest.TestCase):
         self.assertIn("metrics-run-2.json is missing", text)
         self.assertIn("regenerated results.json differs", text)
 
-    def test_seal_mismatch_is_refused(self) -> None:
-        self.f.write_json(f"{gate.RESULTS}/environment.json", {"unsealed": True})
-        sealed = json.loads((self.f.root / gate.RESULTS / "sha256.json").read_text())
-        sealed["files"][f"{gate.RESULTS}/environment.json"] = "5" * 64
-        self.f.write_json(f"{gate.RESULTS}/sha256.json", sealed)
-        self.f.commit_and_push("bad seal")
-        self.assertRefused("B2-01")
-
-    def test_an_unsealed_oracle_run_is_refused(self) -> None:
-        sealed = json.loads((self.f.root / gate.RESULTS / "sha256.json").read_text())
-        del sealed["files"][f"{gate.RESULTS}/oracle-run-1.json"]
-        self.f.write_json(f"{gate.RESULTS}/sha256.json", sealed)
-        self.f.commit_and_push("unseal an oracle run")
-        self.assertIn("oracle-run-1.json is not sealed", self.assertRefused("B2-01"))
-
     def test_an_oracle_run_that_the_manifest_does_not_name_is_refused(self) -> None:
         self.f.write_json(f"{gate.RESULTS}/oracle-run-2.json", {"valid": True, "edited": True})
-        self.f.seal(gate.RESULTS, lf=False)
         self.f.commit_and_push("swap the reconciled oracle run")
         self.assertIn("oracleResultSha256 does not match", self.assertRefused("B2-01"))
 
@@ -898,22 +713,20 @@ class RealPacketTests(unittest.TestCase):
 
     def test_committed_b1_packet_is_publishable(self) -> None:
         root, findings = REPO_ROOT, []
-        gate.check_seals(root, findings)
         manifest = gate.load(root, f"{gate.RESULTS}/pair-manifest.json")
         results = gate.load(root, f"{gate.RESULTS}/results.json")
+        gate.check_oracle_runs(root, manifest, findings)
         registered = gate.load(root, f"{gate.REGISTRATION}/pairs.json")["pairs"]
-        prior = gate.prior_authorizations(root)
-        gate.check_registration_unchanged(root, manifest, prior, findings)
+        gate.check_registration(root, manifest, findings)
         included = gate.check_pairs(root, registered, manifest, results, findings)
-        key, key_hash, amendments = gate.check_method(root, results, prior, findings)
+        gate.check_method(root, results, findings)
         gate.check_headline_shape(results, findings)
-        # Regeneration needs the .NET build; the workflow runs it, and docs/plans/evidence/b2-1422
-        # records a local byte-identical run.
+        # Regeneration needs the .NET build; the workflow runs it (B2-10), and the #1585 local run
+        # reproduced the packet byte for byte.
         self.assertEqual([], findings)
         self.assertEqual(17, len(included))
         self.assertEqual({"EQUIVALENT": 17, "EXCLUDED-PRE-REGISTERED": 9, "NOT-EQUIVALENT": 192, "UNCLASSIFIED": 8},
                          results["byDisposition"])
-        self.assertEqual([], amendments, "the B1 key is the registered one; no amendment is needed or cited")
 
     def test_every_headline_input_exists(self) -> None:
         """A renamed input would be absent at both the candidate and main and so never differ; it must
@@ -922,12 +735,9 @@ class RealPacketTests(unittest.TestCase):
         for path in paths:
             with self.subTest(input=path):
                 self.assertTrue((REPO_ROOT / path).exists(), path)
-        sealed = {gate.current_path(p) for seal in gate.SEALS for p in gate.load(REPO_ROOT, seal)["files"]}
-        self.assertTrue({"docs/plans/v0.24-evidence-contract.md", "docs/plans/b1-1276-benchmark-registration.md",
-                         "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json"} <= set(paths))
-        # #1585: the B1 packets are read from eng/, never from their sealed docs/plans/evidence/ names.
-        self.assertEqual([], [p for p in paths if p.startswith("docs/plans/evidence/b1-1276")])
-        self.assertEqual(len(set(gate.INPUT_PATHS) | sealed) + 2 * 226, len(paths), "226 registered pairs, two files each")
+        # #1584: no headline input lives under docs/ (the packets are in eng/, the seals are gone).
+        self.assertEqual([], [p for p in paths if p.startswith("docs/")])
+        self.assertEqual(len(set(gate.INPUT_PATHS)) + 2 * 226, len(paths), "226 registered pairs, two files each")
         # Every input outside the corpus directory re-runs the workflow on push.
         push = WORKFLOW.read_text().split("  push:\n", 1)[1].split("\njobs:", 1)[0]
         patterns = re.findall(r"(?m)^      - '([^']+)'$", push)

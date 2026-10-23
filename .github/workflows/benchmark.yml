@@ -31,7 +31,7 @@ on:
         default: false
         type: boolean
       # #1422: no input may weaken or bypass the publication gate. A method change needs a
-      # merged #1407 amendment that names the new comparability key, never an override flag.
+      # reviewed change to the registration's comparability key, never an override flag.
   # Run on pushes to benchmark-related files
   push:
     branches: [main]
@@ -42,14 +42,9 @@ on:
       - '.github/workflows/benchmark.yml'
       # #1422: a change to any gate input re-runs the gate (and its cleanup).
       - 'eng/benchmark-publication/**'
-      - 'docs/plans/evidence/evidence-contract-1407/**'
-      # Sealed documents the gate's seal check reads (B2-01), so also freshness inputs.
-      - 'docs/plans/b1-1276-benchmark-registration.md'
-      - 'docs/plans/v0.24-evidence-contract.md'
-      # The B1 validator files only (INPUT_PATHS in the gate), not other EvidenceContract tests.
-      - 'tests/Calor.Compiler.Tests/EvidenceContract/Benchmark*.cs'
-      - 'tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractValidator.cs'
-      - 'tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs'
+      # The B1 validator files and the helper they use (INPUT_PATHS in the gate).
+      - 'tests/Calor.Compiler.Tests/BenchmarkPublication/Benchmark*.cs'
+      - 'tests/Calor.Compiler.Tests/CliTestHarness.cs'
       - 'tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj'
       - 'scripts/benchmark_publication_gate.py'
 
@@ -231,7 +226,7 @@ jobs:
         id: regenerate
         run: |
           set -euo pipefail
-          # B1's packet validator (seals, oracle reconciliation, known witness, recomputed statistics).
+          # B1's packet validator (oracle reconciliation, known witness, recomputed statistics).
           dotnet test tests/Calor.Compiler.Tests -c Release --no-build \
             --filter "FullyQualifiedName~BenchmarkResultsTests|FullyQualifiedName~BenchmarkRegistrationTests"
           REG=eng/benchmark-publication/b1-1276/registration
@@ -334,7 +329,7 @@ jobs:
             echo "\`bench/phase0-agent-native/commit-stamp-index.json\`. Nothing else changes."
             echo
             echo "The #1422 gate refuses this PR when an included pair is not EQUIVALENT, a registered pair or"
-            echo "the registration changed, the method differs without a #1407 amendment merged first,"
+            echo "the registration's pairs changed, the method differs from the registered one,"
             echo "the regenerated packet differs, or the provenance commit is not a full SHA on main."
             echo "Across different comparability keys no delta is reported. EQUIVALENT is not a"
             echo "correctness claim, and the headline describes this fixed corpus only."

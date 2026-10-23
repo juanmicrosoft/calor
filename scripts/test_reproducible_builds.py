@@ -14,8 +14,8 @@ nondeterminism found by 0.24 C2 (#1424) and by this fix's own proof must stay fi
 
 This file checks the configuration and the comparison tool without building
 anything. The real two-build proof is .github/workflows/reproducible-builds.yml
-(scripts/reproducible_builds.py); the recorded run is in
-docs/plans/evidence/deterministic-builds/.
+(scripts/reproducible_builds.py); the recorded run is archived at
+https://github.com/juanmicrosoft/calor/blob/d9dbd5a7270aff3a2c3e1efa6f85625f278474aa/deterministic-builds/README.md.
 """
 
 from __future__ import annotations
