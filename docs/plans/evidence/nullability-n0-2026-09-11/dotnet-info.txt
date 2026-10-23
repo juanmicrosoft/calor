@@ -1,0 +1,44 @@
+.NET SDK:
+ Version:           10.0.400
+ Commit:            14fbf8d527
+ Workload version:  10.0.400-manifests.330ea142
+ MSBuild version:   18.9.6+14fbf8d52
+
+Runtime Environment:
+ OS Name:     Mac OS X
+ OS Version:  26.6
+ OS Platform: Darwin
+ RID:         osx-arm64
+ Base Path:   /opt/homebrew/Cellar/dotnet/10.0.400/libexec/sdk/10.0.400/
+
+.NET workloads installed:
+There are no installed workloads to display.
+Configured to use workload sets when installing new manifests.
+No workload sets are installed. Run "dotnet workload restore" to install a workload set.
+
+Host:
+  Version:      10.0.11
+  Architecture: arm64
+  Commit:       e2f47b0110
+
+.NET SDKs installed:
+  10.0.400 [/opt/homebrew/Cellar/dotnet/10.0.400/libexec/sdk]
+
+.NET runtimes installed:
+  Microsoft.AspNetCore.App 10.0.11 [/opt/homebrew/Cellar/dotnet/10.0.400/libexec/shared/Microsoft.AspNetCore.App]
+  Microsoft.NETCore.App 10.0.11 [/opt/homebrew/Cellar/dotnet/10.0.400/libexec/shared/Microsoft.NETCore.App]
+
+Other architectures found:
+  None
+
+Environment variables:
+  DOTNET_ROOT                              [/opt/homebrew/Cellar/dotnet/10.0.400/libexec]
+
+global.json file:
+  <REPO>/global.json
+
+Learn more:
+  https://aka.ms/dotnet/info
+
+Download .NET:
+  https://aka.ms/dotnet/download

@@ -1,0 +1,45 @@
+{
+ "runId": 37629089909,
+ "workflow": "Performance Tests",
+ "title": "Performance Tests",
+ "event": "schedule",
+ "headBranch": "main",
+ "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+ "runAttempt": 1,
+ "status": "completed",
+ "conclusion": "failure",
+ "createdAt": "2026-10-07T13:30:53Z",
+ "updatedAt": "2026-10-07T13:33:43Z",
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/37629089909",
+ "runnerMinutes": 3,
+ "jobCounts": {
+  "completed/failure": 1
+ },
+ "jobs": [
+  {
+   "id": 112818354110,
+   "name": "performance",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T13:30:58Z",
+   "completedAt": "2026-10-07T13:33:42Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056219",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056219",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37629089909/112818354110-performance.log.gz"
+   }
+  }
+ ]
+}

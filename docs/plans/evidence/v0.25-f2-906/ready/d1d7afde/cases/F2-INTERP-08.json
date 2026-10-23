@@ -1,0 +1,168 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "F2-INTERP-08",
+ "family": "F2",
+ "role": "residual",
+ "expected": "native-or-preserved",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "f9e1e662fb7770a0284b6aa5f947ad20bc949911c642f482737b4733fc64d327",
+ "result": "passed",
+ "cells": {
+  "string": "passed",
+  "FormattableString": "passed",
+  "IFormattable": "passed",
+  "custom-handler": "passed",
+  "selected-overload-asserted": "passed",
+  "handler-side-effects": "passed"
+ },
+ "cellEvidence": {
+  "string": "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)",
+  "FormattableString": "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)",
+  "IFormattable": "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)",
+  "custom-handler": "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)",
+  "selected-overload-asserted": "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)",
+  "handler-side-effects": "RegisteredRow(F2-INTERP-08) and the T1-INTERP-OVERLOADS / T1-INTERP-HANDLER controls (trace includes the selected overload and handler side effects)"
+ },
+ "judgement": "",
+ "measurements": [
+  {
+   "kind": "t1-control",
+   "control": "T1-INTERP-OVERLOADS",
+   "results": "docs/plans/evidence/v0.25-t1-1428/controls-results.json",
+   "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/regen/controls-results.json",
+   "resultsSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "surfaces": {
+    "library": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "cli-convert": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "cli-migrate": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-convert": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-convert-passthroughOnError": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-migrate": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-batch": {
+     "outcome": "native",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    }
+   }
+  },
+  {
+   "kind": "t1-control",
+   "control": "T1-INTERP-HANDLER",
+   "results": "docs/plans/evidence/v0.25-t1-1428/controls-results.json",
+   "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/regen/controls-results.json",
+   "resultsSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "surfaces": {
+    "library": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "cli-convert": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "cli-migrate": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-convert": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-convert-passthroughOnError": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-migrate": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    },
+    "mcp-batch": {
+     "outcome": "preserved",
+     "compile": "permissive-effects:Calor0410",
+     "traceMatches": null
+    }
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f2-interpolation.trx.gz",
+     "match": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(row: \"F2-INTERP-08\"",
+     "count": 2,
+     "passed": 2,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f2-interpolation.trx.gz",
+     "match": "HoleWithStringLiteral_StaysInPlace",
+     "count": 1,
+     "passed": 1,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f2-interpolation.trx.gz",
+     "match": "HoleAndTargetShapes_KeepTheirCSharpMeaning",
+     "count": 22,
+     "passed": 22,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f2-interpolation.trx.gz",
+     "match": "BclHandlerTargets_ArePreservedAndMatch",
+     "count": 2,
+     "passed": 2,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

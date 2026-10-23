@@ -1,0 +1,36 @@
+using System.Collections.Generic;
+
+public static class Inventory
+{
+    public static int ParseOr(string text, int fallback)
+    {
+        if (int.TryParse(text, out var n))
+        {
+            return n;
+        }
+        return fallback;
+    }
+
+    public static int CountOf(Dictionary<string, int> stock, string item)
+    {
+        int count;
+        stock.TryGetValue(item, out count);
+        return count;
+    }
+
+    public static bool IsNumber(string text) => int.TryParse(text, out _);
+
+    public static void Bump(ref int x)
+    {
+        x = x + 1;
+    }
+
+    public static int Twice(in int x) => x * 2;
+
+    public static int Run()
+    {
+        int total = 1;
+        Bump(ref total);
+        return Twice(in total) + ParseOr("40", 0);
+    }
+}

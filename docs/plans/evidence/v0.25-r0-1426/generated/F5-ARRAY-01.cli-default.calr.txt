@@ -1,0 +1,30 @@
+§M{m001:F5-ARRAY-01:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Cell:pub}
+      §FLD{i32:V:pub}
+
+
+    §CSHARP{public class Grid
+{
+    public Cell[,] Build()
+    {
+        return new Cell[,]
+        {
+            { new Cell { V = 1 }, new Cell { V = 2 } },
+            { new Cell { V = 3 }, new Cell { V = 4 } }
+        };
+    }
+}}§/CSHARP
+
+    §CSHARP{public static class Probe
+{
+    public static string Run()
+    {
+        var cells = new Grid().Build();
+        return cells.GetLength(0) + "x" + cells.GetLength(1) + "|" + cells[0, 1].V + "|" + cells[1, 0].V;
+    }
+}}§/CSHARP
+
+

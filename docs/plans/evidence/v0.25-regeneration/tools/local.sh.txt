@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# 0.25 re-proof local lane (0.24 C2 regeneration-3 local.sh, rebuilt). usage: local.sh <lane> <tree> <out>
+set -uo pipefail
+TOOLS="$(cd "$(dirname "$0")" && pwd)"
+source "$TOOLS/env.sh" "$1"
+TREE="$2"; OUT="$3"
+mkdir -p "$OUT/tests"
+cd "$TREE" || exit 2
+CAND=48cae911700ceb0dfc358e00933650445d81604f
+[ "$(git rev-parse HEAD)" = "$CAND" ] || { echo "HEAD is not the candidate"; exit 2; }
+echo "start $(date -u +%FT%TZ) tree $TREE head $(git rev-parse HEAD) dotnet $(dotnet --version) node $(node --version)" > "$OUT/steps.txt"
+step() { local name="$1"; shift; "$@" > "$OUT/$name.log" 2>&1; local rc=$?; echo "STEP $name exit $rc at $(date -u +%FT%TZ)" >> "$OUT/steps.txt"; return $rc; }
+t() { local name="$1" proj="$2" filt="$3"; step "$name" dotnet test "$proj" -c Release --no-build --no-restore ${filt:+--filter "$filt"} --logger "trx;LogFileName=$name.trx" --results-directory "$OUT/tests"; }
+
+step fetch-main-and-tags git fetch --force --tags origin +refs/heads/main:refs/remotes/origin/main
+echo "origin/main $(git rev-parse origin/main)" >> "$OUT/steps.txt"
+step download-z3 bash src/Calor.Compiler/scripts/download-z3.sh
+step restore-locked dotnet restore --locked-mode
+step build-release dotnet build -c Release --no-restore
+step build-perf dotnet build tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj -c Release
+git status --porcelain > "$OUT/pre-publication-git-status.txt"
+step packages-and-metadata bash scripts/reproducible-build.sh "$TREE" "$OUT/build" packages
+step website bash scripts/reproducible-build.sh "$TREE" "$OUT/build" website
+step hash python3 scripts/reproducible_builds.py hash "$OUT/build" --json "$OUT/build-hashes.json"
+VRD="FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle"
+CALOR_UPDATE_VERIFIER_RUNTIME_DIFFERENTIAL_REPORTS=1 t vrd-regen tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj "$VRD"
+mkdir -p "$OUT/vrd"; cp bench/phase0-agent-native/verifier-runtime-differential.json bench/phase0-agent-native/verifier-runtime-differential.md "$OUT/vrd/"
+git status --porcelain > "$OUT/vrd-git-status.txt"
+step vrd-bytes-equal-committed git diff --exit-code -- bench/phase0-agent-native/
+t vrd-check tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj "$VRD"
+t modeled-forms tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj "FullyQualifiedName~ModeledFormsTests"
+t evidence-contract tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj "FullyQualifiedName~EvidenceContractTests"
+t ledger-stamps tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj "FullyQualifiedName~LedgerCommitStampTests"
+t b1-validator tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj "FullyQualifiedName~BenchmarkResultsTests|FullyQualifiedName~BenchmarkRegistrationTests"
+REG=docs/plans/evidence/b1-1276/registration; RES=docs/plans/evidence/b1-1276/results; B1="$OUT/b1-regen"; mkdir -p "$B1"
+b1() {
+  for i in 1 2; do
+    dotnet run --no-build --project tests/Calor.Evaluation -c Release -- pair-metrics --registration "$REG" --oracle-result "$RES/oracle-run-2.json" --output "$B1/metrics-run-$i.json" || return 1
+  done
+  dotnet run --no-build --project tests/Calor.Evaluation -c Release -- pair-results --registration "$REG" --first-oracle-result "$RES/oracle-run-1.json" \
+    --oracle-result "$RES/oracle-run-2.json" --metrics "$B1/metrics-run-1.json" "$B1/metrics-run-2.json" --output "$B1"
+}
+step b1-regenerate b1
+b1eq() { local rc=0; for f in "$B1"/*.json; do b=$(basename "$f"); if [ -f "$RES/$b" ]; then cmp "$f" "$RES/$b" && echo "equal $b" || { echo "DIFF $b"; rc=1; }; else echo "new $b"; fi; done; return $rc; }
+step b1-bytes-equal-committed b1eq
+git status --porcelain > "$OUT/b2-git-status.txt"
+step b2-gate python3 scripts/benchmark_publication_gate.py check --commit "$(git rev-parse HEAD)" --regenerated "$B1" --report "$OUT/benchmark-gate-report.txt"
+step render-release-notes python3 scripts/render_release_notes.py 0.25.0 CHANGELOG.md
+cp "$OUT/render-release-notes.log" "$OUT/release-notes.md"
+step build-ids dotnet build tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj -c Release
+t test-Calor.Ids.Tests tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj ""
+t test-Calor.Performance.Tests tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj ""
+git status --porcelain > "$OUT/final-git-status.txt"
+echo "end $(date -u +%FT%TZ)" >> "$OUT/steps.txt"

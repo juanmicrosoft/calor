@@ -1,0 +1,14 @@
+using System;
+using System.Collections.Generic;
+public static class Probe
+{
+    public static string Run()
+    {
+        var fs = new List<Func<int>>();
+        foreach (var s in new[] { "1", "2" })
+        {
+            if (int.TryParse(s, out var n)) fs.Add(() => n);
+        }
+        return fs[0]() + "|" + fs[1]();
+    }
+}

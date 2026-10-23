@@ -1,0 +1,79 @@
+{
+  "compiler": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+  "constructors": [
+    [
+      "Calor.Compiler.Parsing.TextSpan",
+      "System.String",
+      "System.String",
+      "System.Collections.Generic.IReadOnlyList\u00601[[Calor.Compiler.Binding.BoundExpression, calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null]]",
+      "System.Collections.Generic.IReadOnlyDictionary\u00602[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+      "System.Collections.Generic.IReadOnlyList\u00601[[Calor.Compiler.Binding.BoundExpression, calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null]]",
+      "Calor.Compiler.Binding.BoundTypes.NullableAnnotation"
+    ]
+  ],
+  "observations": [
+    {
+      "form": "expression",
+      "options": "requested-deferred",
+      "source": "\u00A7M{m:M}\n  \u00A7F{take:Take:pub} (i32:value) -\u003E i32\n    \u00A7E{}\n    \u00A7R value\n  \u00A7F{probe:Probe:pub} () -\u003E i32\n    \u00A7E{}\n    \u00A7R \u00A7C{Take} \u00A7A (?? 1 2) \u00A7/C",
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    {
+      "form": "expression",
+      "options": "ordinary-default",
+      "source": "\u00A7M{m:M}\n  \u00A7F{take:Take:pub} (i32:value) -\u003E i32\n    \u00A7E{}\n    \u00A7R value\n  \u00A7F{probe:Probe:pub} () -\u003E i32\n    \u00A7E{}\n    \u00A7R \u00A7C{Take} \u00A7A (?? 1 2) \u00A7/C",
+      "HasErrors": true,
+      "diagnostics": [
+        {
+          "Code": "Calor1002",
+          "Message": "Generated C# failed compilation (CS0019): Operator \u0027??\u0027 cannot be applied to operands of type \u0027int\u0027 and \u0027int\u0027",
+          "Severity": 0,
+          "Line": 7
+        }
+      ]
+    },
+    {
+      "form": "statement",
+      "options": "requested-deferred",
+      "source": "\u00A7M{m:M}\n  \u00A7F{take:Take:pub} (i32:value) -\u003E i32\n    \u00A7E{}\n    \u00A7R value\n  \u00A7F{probe:Probe:pub} () -\u003E i32\n    \u00A7E{}\n    \u00A7C{Take} \u00A7A (?? 1 2) \u00A7/C\n    \u00A7R 0",
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    {
+      "form": "statement",
+      "options": "ordinary-default",
+      "source": "\u00A7M{m:M}\n  \u00A7F{take:Take:pub} (i32:value) -\u003E i32\n    \u00A7E{}\n    \u00A7R value\n  \u00A7F{probe:Probe:pub} () -\u003E i32\n    \u00A7E{}\n    \u00A7C{Take} \u00A7A (?? 1 2) \u00A7/C\n    \u00A7R 0",
+      "HasErrors": true,
+      "diagnostics": [
+        {
+          "Code": "Calor1002",
+          "Message": "Generated C# failed compilation (CS0019): Operator \u0027??\u0027 cannot be applied to operands of type \u0027int\u0027 and \u0027int\u0027",
+          "Severity": 0,
+          "Line": 7
+        }
+      ]
+    },
+    {
+      "form": "binding",
+      "options": "requested-deferred",
+      "source": "\u00A7M{m:M}\n  \u00A7F{take:Take:pub} (i32:value) -\u003E i32\n    \u00A7E{}\n    \u00A7R value\n  \u00A7F{probe:Probe:pub} () -\u003E i32\n    \u00A7E{}\n    \u00A7B{result:i32} (?? 1 2)\n    \u00A7R result",
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    {
+      "form": "binding",
+      "options": "ordinary-default",
+      "source": "\u00A7M{m:M}\n  \u00A7F{take:Take:pub} (i32:value) -\u003E i32\n    \u00A7E{}\n    \u00A7R value\n  \u00A7F{probe:Probe:pub} () -\u003E i32\n    \u00A7E{}\n    \u00A7B{result:i32} (?? 1 2)\n    \u00A7R result",
+      "HasErrors": true,
+      "diagnostics": [
+        {
+          "Code": "Calor1002",
+          "Message": "Generated C# failed compilation (CS0019): Operator \u0027??\u0027 cannot be applied to operands of type \u0027int\u0027 and \u0027int\u0027",
+          "Severity": 0,
+          "Line": 7
+        }
+      ]
+    }
+  ]
+}

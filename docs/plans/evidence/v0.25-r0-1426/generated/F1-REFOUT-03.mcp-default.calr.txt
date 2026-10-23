@@ -1,0 +1,28 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{i32:counter:priv:stat} = 10
+
+      §MT{m002:Bump:pub:stat} (i32:x:ref)
+        §ASSIGN x (+ x 1)
+
+      §MT{m003:AddBoth:pub:stat} (i32:a:ref, i32:b:ref)
+        §ASSIGN a (+ a 1)
+        §ASSIGN b (+ b 10)
+
+      §MT{m004:Run:pub:stat} () -> str
+        §E{alloc}
+        §ARR{arr:i32}
+          1
+          2
+          3
+        §C{Bump} §A{ref} §IDX{arr} 1 §/C
+        §C{Bump} §A{ref} counter §/C
+        §B{~v:i32} 0
+        §C{AddBoth} §A{ref} v §A{ref} v §/C
+        §R (+ (+ (+ (+ §IDX{arr} 1 "|") counter) "|") v)
+
+
+

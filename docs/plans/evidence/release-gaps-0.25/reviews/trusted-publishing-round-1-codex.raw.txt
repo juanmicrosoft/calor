@@ -1,0 +1,19 @@
+VERDICT: REQUEST CHANGES
+
+1. **BLOCKING — `scripts/check_release_credentials.py:546`: an omitted environment bypasses its secret check.**  
+   With otherwise valid settings, return `{"total_count":0,"environments":[]}` while `environment` still describes `nuget-release` and its secrets response contains `NUGET_API_KEY`. `check_settings()` returns no findings and never requests those secrets, allowing CLOSED on an open fixture. This concerns inconsistent API/saved input; it does not establish that current live settings are open. **Fix:** always inspect the known release environment, reject inconsistent environment inventories, and add a regression test. Also reject unnamed secret entries instead of converting missing names to `"None"`.
+
+2. **MAJOR — `scripts/check_release_credentials.py:469`: attestation parsing accepts contradictory duplicate fields.**  
+   An attestation containing `"default_workflow_permissions":"write"` followed by `"default_workflow_permissions":"read"` passes validation and produces A001 after a 403. An impossible date such as `2026-99-99` also passes. This falls short of the promised strict validation. **Fix:** reject duplicate JSON members with an `object_pairs_hook`, validate dates with `datetime.date.fromisoformat`, and require U006 for these cases.
+
+3. **MINOR — `docs/plans/evidence/release-gaps-0.25/README.md:254`: policy changes do not universally fail closed.**  
+   Removing the policy’s environment restriction broadens trust; it does not make the exchange fail. The [NuGet validator](https://raw.githubusercontent.com/NuGet/NuGetGallery/main/src/NuGetGallery.Services/Authentication/Federated/GitHubTokenPolicyValidator.cs) skips environment validation when that criterion is empty. **Fix:** distinguish deletion or incompatible changes from changes that broaden authorization.
+
+Verified:
+
+- No direct credential bypass found under the supplied policy and GitHub settings. Upstream code confirms repository matching, workflow filename matching without ref checking, and rejection of a missing required environment claim.
+- The pin matches [NuGet/login v1.2.0](https://github.com/NuGet/login/releases/tag/v1.2.0). Its [implementation](https://raw.githubusercontent.com/NuGet/login/8d196754b4036150537f80ac539e15c2f1028841/src/index.ts) accepts `user`, masks the returned key, exposes `NUGET_API_KEY`, and fails on exchange errors. The workflow consumes that output correctly through `env`.
+- Workflow changes are confined to publish credential handling; dependencies and release gate steps remain unchanged. Earlier YAML mutation cases remain present; retiring S006 is appropriate.
+- In-memory probes confirmed: un-attested 403 → V001; other failures → UNKNOWN; valid attestation → clearly labelled A001; readable unsafe permissions remain S008/S009 despite an attestation.
+- Full Python tests could not run: the sandbox denied `/tmp` venv creation, and PyYAML is unavailable. The offline checker correctly failed closed with W012. `git diff --check` passed.
+- Working tree remains unchanged. No `--live`, workflow dispatch, or non-GET API operation was performed.

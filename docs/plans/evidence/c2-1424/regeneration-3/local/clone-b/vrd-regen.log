@@ -1,0 +1,5 @@
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/second/nested/fresh/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/out/clone-b/tests/vrd-regen.trx
+
+Passed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 7 s - Calor.Verification.Tests.dll (net10.0)

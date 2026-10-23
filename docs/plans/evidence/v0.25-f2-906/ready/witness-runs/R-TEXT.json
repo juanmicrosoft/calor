@@ -1,0 +1,31 @@
+{
+ "schema": "calor.v0.25-ready-witness-run/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "repair": "R-TEXT",
+ "pr": 1497,
+ "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+ "witnesses": [
+  "tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs"
+ ],
+ "result": "passed",
+ "runs": [
+  {
+   "lane": "w-R-TEXT",
+   "classes": [
+    "S2Z3TextEncodingTests"
+   ],
+   "total": 24,
+   "passed": 24,
+   "failed": 0,
+   "notExecuted": 0,
+   "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/w-R-TEXT.trx.gz"
+  }
+ ],
+ "command": "dotnet test tests/<project>/<project>.csproj -c Release --no-build --filter FullyQualifiedName~<witness class>",
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c25/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/measure/"
+ }
+}

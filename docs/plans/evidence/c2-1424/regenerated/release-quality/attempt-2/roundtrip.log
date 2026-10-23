@@ -1,0 +1,195 @@
+
+============================================================
+  Round-Trip Verification: Synthetic
+============================================================
+
+Phase 1/5: Creating working copy of Synthetic...
+  Working directory: /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/Synthetic/d09508d1
+
+Phase 2/5: Running baseline tests...
+  Baseline: 52/52 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 5 C# files to convert (0 excluded by pattern)
+ 5/5
+  Replaced: 5
+  Converted: 5/5 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 52/52 passed, 0 failed
+
+Fidelity: coverage 100.0% (5 native + 0 with-losses of 5; 0 reverted, 0 failed)
+
+PASS Synthetic: Pass
+   Baseline: 52/52 passing
+   Round-trip: 52/52 passing
+   Regressions: 0
+   Files converted: 5/5
+   Coverage: 100.0% (5 native, 0 with-losses, 0 reverted, 0 failed of 5)
+   Interop blocks: 0; distinct gaps: 0
+   Report: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/artifacts/migration/roundtrip/Synthetic-roundtrip.md
+
+============================================================
+  Round-Trip Verification: Synthetic2
+============================================================
+
+Phase 1/5: Creating working copy of Synthetic2...
+  Working directory: /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/Synthetic2/fe24792b
+
+Phase 2/5: Running baseline tests...
+  Baseline: 20/20 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 1 C# files to convert (0 excluded by pattern)
+ 1/1
+  Replaced: 1
+  Converted: 1/1 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 20/20 passed, 0 failed
+
+Fidelity: coverage 100.0% (1 native + 0 with-losses of 1; 0 reverted, 0 failed)
+
+PASS Synthetic2: Pass
+   Baseline: 20/20 passing
+   Round-trip: 20/20 passing
+   Regressions: 0
+   Files converted: 1/1
+   Coverage: 100.0% (1 native, 0 with-losses, 0 reverted, 0 failed of 1)
+   Interop blocks: 0; distinct gaps: 0
+   Report: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/artifacts/migration/roundtrip/Synthetic2-roundtrip.md
+
+============================================================
+  Round-Trip Verification: MediatR
+============================================================
+
+Phase 1/5: Creating working copy of MediatR...
+  Working directory: /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/MediatR/a7013904
+
+Phase 2/5: Running baseline tests...
+  ERROR: failed to parse TRX file /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/MediatR/a7013904/test/MediatR.Tests/TestResults/roundtrip_net8.0_20261007120607.trx: TRX is missing Results.
+  Baseline: 0/0 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 32 C# files to convert (0 excluded by pattern)
+ 10/32 20/32 30/32 32/32
+  Project validation rejected 1 candidate(s): src/MediatR/INotificationHandler.cs
+  Project validation rejected 5 candidate(s): src/MediatR/Internal/HandlersOrderer.cs, src/MediatR/Mediator.cs, src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs, src/MediatR/Registration/ServiceRegistrar.cs, src/MediatR/Wrappers/NotificationHandlerWrapper.cs
+  Replaced: 23
+  EmitCompilationError: 6
+  CompileError: 3
+  Converted: 23/32 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  ERROR: failed to parse TRX file /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/MediatR/a7013904/test/MediatR.Tests/TestResults/roundtrip_net8.0_20261007120623.trx: TRX is missing Results.
+  Round-trip: 0/0 passed, 0 failed
+
+Fidelity: coverage 71.9% (17 native + 6 with-losses of 32; 0 reverted, 9 failed)
+
+FAIL MediatR: Incomplete
+   Baseline: 0/0 passing
+   Round-trip: 0/0 passing
+   Regressions: 0
+   Files converted: 23/32
+   Coverage: 71.9% (17 native, 6 with-losses, 0 reverted, 9 failed of 32)
+   Interop blocks: 15; distinct gaps: 0
+   Report: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/artifacts/migration/roundtrip/MediatR-roundtrip.md
+   BLOCKED: evidence: Subject-test attempt 1 is not clean on both legs; legacy flake allowances do not waive evidence acceptance.
+   BLOCKED: test comparison is Incomplete
+   BLOCKED: one or more test runs produced no parseable TRX files
+   BLOCKED: one or more TRX files were unparseable
+   BLOCKED: baseline tests exited with 1
+   BLOCKED: round-trip tests exited with 1
+
+============================================================
+  Round-Trip Verification: Serilog
+============================================================
+
+Phase 1/5: Creating working copy of Serilog...
+  Working directory: /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/Serilog/56764135
+
+Phase 2/5: Running baseline tests...
+  Baseline: 811/811 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 106 C# files to convert (6 excluded by pattern)
+ 10/106 20/106 30/106 40/106 50/106 60/106 70/106 80/106 90/106 100/106 106/106
+  Project validation rejected 15 candidate(s): src/Serilog/Core/CustomDefaultMethodImplementationAttribute.cs, src/Serilog/Core/IDestructuringPolicy.cs, src/Serilog/Core/Pipeline/SilentLogger.cs, src/Serilog/Core/PropertiesInlineArray.cs, src/Serilog/Events/LogEventProperty.cs, src/Serilog/Guard.cs, src/Serilog/Log.cs, src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs, src/Serilog/Policies/ByteMemoryScalarConversionPolicy.cs, src/Serilog/Policies/DelegateDestructuringPolicy.cs, src/Serilog/Policies/EnumScalarConversionPolicy.cs, src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs, src/Serilog/Policies/ProjectedDestructuringPolicy.cs, src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs, src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+  Project validation rejected 24 candidate(s): src/Serilog/Capturing/MessageTemplateProcessor.cs, src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs, src/Serilog/Configuration/LoggerDestructuringConfiguration.cs, src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs, src/Serilog/Configuration/LoggerFilterConfiguration.cs, src/Serilog/Core/LevelOverrideMap.cs, src/Serilog/Core/LoggingLevelSwitch.cs, src/Serilog/Core/Sinks/AggregateSink.cs, src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs, src/Serilog/Data/LogEventPropertyValueRewriter.cs, src/Serilog/Debugging/SelfLog.cs, src/Serilog/Events/DictionaryValue.cs, src/Serilog/Events/LogEvent.cs, src/Serilog/Events/MessageTemplate.cs, src/Serilog/Events/ScalarValue.cs, src/Serilog/Formatting/Display/LevelOutputFormat.cs, src/Serilog/Formatting/Display/PropertiesOutputFormat.cs, src/Serilog/Formatting/Json/JsonFormatter.cs, src/Serilog/Formatting/Json/JsonValueFormatter.cs, src/Serilog/LoggerConfiguration.cs, src/Serilog/Rendering/MessageTemplateRenderer.cs, src/Serilog/Rendering/Padding.cs, src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs, src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+  Replaced: 57
+  EmitCompilationError: 39
+  CompileError: 10
+  Converted: 57/106 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 811/811 passed, 0 failed
+
+Fidelity: coverage 50.9% (44 native + 13 with-losses of 112; 0 reverted, 49 failed)
+
+PASS Serilog: Pass
+   Baseline: 811/811 passing
+   Round-trip: 811/811 passing
+   Regressions: 0
+   Files converted: 57/112
+   Coverage: 50.9% (44 native, 13 with-losses, 0 reverted, 49 failed of 112)
+   Interop blocks: 71; distinct gaps: 0
+   Report: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/artifacts/migration/roundtrip/Serilog-roundtrip.md
+
+============================================================
+  Round-Trip Verification: FluentValidation
+============================================================
+
+Phase 1/5: Creating working copy of FluentValidation...
+  Working directory: /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/FluentValidation/36e2a927
+
+Phase 2/5: Running baseline tests...
+  ERROR: failed to parse TRX file /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/FluentValidation/36e2a927/src/FluentValidation.Tests/TestResults/roundtrip_net8.0_20261007120718.trx: TRX is missing Results.
+  Baseline: 0/0 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 139 C# files to convert (0 excluded by pattern)
+ 10/139 20/139 30/139 40/139 50/139 60/139 70/139 80/139 90/139 100/139 110/139 120/139 130/139 139/139
+  Project validation rejected 8 candidate(s): src/FluentValidation/IValidationRule.cs, src/FluentValidation/Internal/MemberNameValidatorSelector.cs, src/FluentValidation/Internal/PropertyRule.cs, src/FluentValidation/Internal/RuleComponent.cs, src/FluentValidation/Internal/RuleComponentForNullableStruct.cs, src/FluentValidation/Internal/TrackingCollection.cs, src/FluentValidation/Internal/ValidationStrategy.cs, src/FluentValidation/Validators/EmailValidator.cs
+  Project validation rejected 1 candidate(s): src/FluentValidation/Internal/IncludeRule.cs
+  Project validation rejected 11 candidate(s): src/FluentValidation/Internal/AccessorCache.cs, src/FluentValidation/Internal/ConditionBuilder.cs, src/FluentValidation/Internal/DefaultValidatorSelector.cs, src/FluentValidation/Internal/RulesetValidatorSelector.cs, src/FluentValidation/Resources/LanguageManager.cs, src/FluentValidation/Results/ValidationResult.cs, src/FluentValidation/TestHelper/TestValidationResult.cs, src/FluentValidation/ValidatorDescriptor.cs, src/FluentValidation/Validators/ChildValidatorAdaptor.cs, src/FluentValidation/Validators/CreditCardValidator.cs, src/FluentValidation/Validators/LengthValidator.cs
+  Replaced: 97
+  EmitCompilationError: 20
+  CompileError: 19
+  EmitSyntaxError: 3
+  Converted: 97/139 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  ERROR: failed to parse TRX file /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/calor-roundtrip/FluentValidation/36e2a927/src/FluentValidation.Tests/TestResults/roundtrip_net8.0_20261007120742.trx: TRX is missing Results.
+  Round-trip: 0/0 passed, 0 failed
+
+Fidelity: coverage 69.8% (93 native + 4 with-losses of 139; 0 reverted, 42 failed)
+
+FAIL FluentValidation: Incomplete
+   Baseline: 0/0 passing
+   Round-trip: 0/0 passing
+   Regressions: 0
+   Files converted: 97/139
+   Coverage: 69.8% (93 native, 4 with-losses, 0 reverted, 42 failed of 139)
+   Interop blocks: 30; distinct gaps: 1
+   Report: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/artifacts/migration/roundtrip/FluentValidation-roundtrip.md
+   BLOCKED: evidence: Subject-test attempt 1 is not clean on both legs; legacy flake allowances do not waive evidence acceptance.
+   BLOCKED: test comparison is Incomplete
+   BLOCKED: one or more test runs produced no parseable TRX files
+   BLOCKED: one or more TRX files were unparseable
+   BLOCKED: baseline tests exited with 1
+   BLOCKED: round-trip tests exited with 1

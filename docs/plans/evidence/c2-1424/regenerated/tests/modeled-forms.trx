@@ -1,0 +1,242 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="8679efa3-ba1a-495a-8ed9-5337d0a73ce9" name="@Juans-Mac-Studio 2026-10-07 11:17:34" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-07T11:17:34.9864780-04:00" queuing="2026-10-07T11:17:34.9864780-04:00" start="2026-10-07T11:17:34.6640550-04:00" finish="2026-10-07T11:17:34.9890650-04:00" />
+  <TestSettings name="default" id="ca28ee99-c024-40a4-99cd-004178a2b424">
+    <Deployment runDeploymentRoot="_Juans-Mac-Studio_2026-10-07_11_17_34" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="be0f7a87-4b93-46bc-a28c-0a4a37394bad" testId="1415ab85-b625-0f6a-be11-7ee50c5cc2d9" testName="Calor.Verification.Tests.ModeledFormsTests.TryValidate_NamesTheOffendingConstruct" computerName="Juans-Mac-Studio" duration="00:00:00.0032349" startTime="2026-10-07T11:17:34.9086580-04:00" endTime="2026-10-07T11:17:34.9086660-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="be0f7a87-4b93-46bc-a28c-0a4a37394bad" />
+    <UnitTestResult executionId="793a6cbd-b518-436b-92b2-da80f7e693a6" testId="e2eb8fa1-0615-6989-9efb-ce802c2d8619" testName="Calor.Verification.Tests.ModeledFormsTests.Doc_GeneratedAppendix_MatchesCodeWhitelist" computerName="Juans-Mac-Studio" duration="00:00:00.0023180" startTime="2026-10-07T11:17:34.9266020-04:00" endTime="2026-10-07T11:17:34.9266020-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="793a6cbd-b518-436b-92b2-da80f7e693a6" />
+    <UnitTestResult executionId="f9d6c0e5-7b48-41c2-9b64-7ada8b42fbd2" testId="1d1003d5-e525-290f-3c3a-97c89cb77982" testName="Calor.Verification.Tests.ModeledFormsTests.ScalarFieldAccess_IsUnsupportedNotACrash" computerName="Juans-Mac-Studio" duration="00:00:00.0010686" startTime="2026-10-07T11:17:34.9355440-04:00" endTime="2026-10-07T11:17:34.9355450-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f9d6c0e5-7b48-41c2-9b64-7ada8b42fbd2" />
+    <UnitTestResult executionId="121f6975-93ce-452f-9ea7-7b3140a85bc4" testId="013d9424-185d-b000-ffab-9510af40b29d" testName="Calor.Verification.Tests.ModeledFormsTests.EveryWhitelistedBinaryOperator_Translates" computerName="Juans-Mac-Studio" duration="00:00:00.0040168" startTime="2026-10-07T11:17:34.9324610-04:00" endTime="2026-10-07T11:17:34.9324610-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="121f6975-93ce-452f-9ea7-7b3140a85bc4" />
+    <UnitTestResult executionId="c6306c7c-9a5d-402e-84cb-ca3649630e1d" testId="f589d7dd-f918-e31a-521f-d05fc05522d5" testName="Calor.Verification.Tests.ModeledFormsTests.UnmodeledOperandTyping_IsNotLabeledDrift" computerName="Juans-Mac-Studio" duration="00:00:00.0017805" startTime="2026-10-07T11:17:34.9284170-04:00" endTime="2026-10-07T11:17:34.9284170-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c6306c7c-9a5d-402e-84cb-ca3649630e1d" />
+    <UnitTestResult executionId="40a6ecd2-930d-44b8-a5ac-d679c8d25a14" testId="ae2136d4-629f-dd0b-2370-14452b94568f" testName="Calor.Verification.Tests.ModeledFormsTests.WhitelistedUnaryAndConditionalForms_Translate" computerName="Juans-Mac-Studio" duration="00:00:00.0019792" startTime="2026-10-07T11:17:34.9344620-04:00" endTime="2026-10-07T11:17:34.9344620-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="40a6ecd2-930d-44b8-a5ac-d679c8d25a14" />
+    <UnitTestResult executionId="a5030150-2c10-4574-9280-691fb5628590" testId="46c41886-a57b-a175-306e-1ee887cc2c27" testName="Calor.Verification.Tests.ModeledFormsTests.Verifier_GatesOutOfWhitelistContract_AsUnsupportedWithReason" computerName="Juans-Mac-Studio" duration="00:00:00.0154038" startTime="2026-10-07T11:17:34.9242430-04:00" endTime="2026-10-07T11:17:34.9242430-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a5030150-2c10-4574-9280-691fb5628590" />
+    <UnitTestResult executionId="4a43a24c-f49d-4ef6-b546-fa65cbbef381" testId="8c681046-b05f-b70a-ecb5-506ece656ea9" testName="Calor.Verification.Tests.ModeledFormsTests.AliasTypedQuantifierBoundVariable_StillProves" computerName="Juans-Mac-Studio" duration="00:00:00.0105022" startTime="2026-10-07T11:17:34.9464140-04:00" endTime="2026-10-07T11:17:34.9464140-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4a43a24c-f49d-4ef6-b546-fa65cbbef381" />
+    <UnitTestResult executionId="8dd56650-db1e-4f1a-9a99-9ac264e21baf" testId="26f95c3c-0d83-a7f1-16f7-bb938000e34e" testName="Calor.Verification.Tests.ModeledFormsTests.UserTypedQuantifierBoundVariable_IsWhitelisted" computerName="Juans-Mac-Studio" duration="00:00:00.0003197" startTime="2026-10-07T11:17:34.9358780-04:00" endTime="2026-10-07T11:17:34.9358780-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8dd56650-db1e-4f1a-9a99-9ac264e21baf" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.AliasTypedQuantifierBoundVariable_StillProves" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="8c681046-b05f-b70a-ecb5-506ece656ea9">
+      <Execution id="4a43a24c-f49d-4ef6-b546-fa65cbbef381" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="AliasTypedQuantifierBoundVariable_StillProves" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.UnmodeledOperandTyping_IsNotLabeledDrift" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="f589d7dd-f918-e31a-521f-d05fc05522d5">
+      <Execution id="c6306c7c-9a5d-402e-84cb-ca3649630e1d" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="UnmodeledOperandTyping_IsNotLabeledDrift" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.ScalarFieldAccess_IsUnsupportedNotACrash" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="1d1003d5-e525-290f-3c3a-97c89cb77982">
+      <Execution id="f9d6c0e5-7b48-41c2-9b64-7ada8b42fbd2" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="ScalarFieldAccess_IsUnsupportedNotACrash" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.Verifier_GatesOutOfWhitelistContract_AsUnsupportedWithReason" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="46c41886-a57b-a175-306e-1ee887cc2c27">
+      <Execution id="a5030150-2c10-4574-9280-691fb5628590" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="Verifier_GatesOutOfWhitelistContract_AsUnsupportedWithReason" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.EveryWhitelistedBinaryOperator_Translates" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="013d9424-185d-b000-ffab-9510af40b29d">
+      <Execution id="121f6975-93ce-452f-9ea7-7b3140a85bc4" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="EveryWhitelistedBinaryOperator_Translates" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.Doc_GeneratedAppendix_MatchesCodeWhitelist" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="e2eb8fa1-0615-6989-9efb-ce802c2d8619">
+      <Execution id="793a6cbd-b518-436b-92b2-da80f7e693a6" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="Doc_GeneratedAppendix_MatchesCodeWhitelist" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.WhitelistedUnaryAndConditionalForms_Translate" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="ae2136d4-629f-dd0b-2370-14452b94568f">
+      <Execution id="40a6ecd2-930d-44b8-a5ac-d679c8d25a14" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="WhitelistedUnaryAndConditionalForms_Translate" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.UserTypedQuantifierBoundVariable_IsWhitelisted" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="26f95c3c-0d83-a7f1-16f7-bb938000e34e">
+      <Execution id="8dd56650-db1e-4f1a-9a99-9ac264e21baf" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="UserTypedQuantifierBoundVariable_IsWhitelisted" />
+    </UnitTest>
+    <UnitTest name="Calor.Verification.Tests.ModeledFormsTests.TryValidate_NamesTheOffendingConstruct" storage="/users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/calor.verification.tests/bin/release/net10.0/calor.verification.tests.dll" id="1415ab85-b625-0f6a-be11-7ee50c5cc2d9">
+      <Execution id="be0f7a87-4b93-46bc-a28c-0a4a37394bad" />
+      <TestMethod codeBase="/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Verification.Tests.ModeledFormsTests" name="TryValidate_NamesTheOffendingConstruct" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="1415ab85-b625-0f6a-be11-7ee50c5cc2d9" executionId="be0f7a87-4b93-46bc-a28c-0a4a37394bad" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e2eb8fa1-0615-6989-9efb-ce802c2d8619" executionId="793a6cbd-b518-436b-92b2-da80f7e693a6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1d1003d5-e525-290f-3c3a-97c89cb77982" executionId="f9d6c0e5-7b48-41c2-9b64-7ada8b42fbd2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="013d9424-185d-b000-ffab-9510af40b29d" executionId="121f6975-93ce-452f-9ea7-7b3140a85bc4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f589d7dd-f918-e31a-521f-d05fc05522d5" executionId="c6306c7c-9a5d-402e-84cb-ca3649630e1d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ae2136d4-629f-dd0b-2370-14452b94568f" executionId="40a6ecd2-930d-44b8-a5ac-d679c8d25a14" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="46c41886-a57b-a175-306e-1ee887cc2c27" executionId="a5030150-2c10-4574-9280-691fb5628590" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8c681046-b05f-b70a-ecb5-506ece656ea9" executionId="4a43a24c-f49d-4ef6-b546-fa65cbbef381" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="26f95c3c-0d83-a7f1-16f7-bb938000e34e" executionId="8dd56650-db1e-4f1a-9a99-9ac264e21baf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="9" executed="9" passed="9" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.12)
+[xUnit.net 00:00:00.02]   Discovering: Calor.Verification.Tests
+[xUnit.net 00:00:00.05]   Discovered:  Calor.Verification.Tests
+[xUnit.net 00:00:00.05]   Starting:    Calor.Verification.Tests
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+[xUnit.net 00:00:00.11]   Finished:    Calor.Verification.Tests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

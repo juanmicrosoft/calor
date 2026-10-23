@@ -1,0 +1,69 @@
+# #1417 fresh-clone run, recorded 2026-10-02T15:20:45Z on macOS arm64, dotnet 10.0.401
+# Scratch paths shortened to <fresh>. Supersedes the first run (at b547aef8, before review).
+
+$ git clone https://github.com/juanmicrosoft/calor.git <fresh>   # no submodules
+$ git fetch <local worktree> milestone-0.24/p1-1417-durable-provenance && git checkout -b p1417 FETCH_HEAD
+#   (the branch head was fetched from the local worktree: pushing it was blocked by a credential
+#    problem at the time; origin/main below comes from GitHub, which is what the identities use)
+HEAD 8b5e3877769cf4aede9263dc439d1fe4f2f75de9
+$ git rev-parse --is-shallow-repository  ->  false
+$ git rev-parse refs/remotes/origin/main  ->  585b45d683eb19c1ab7caa413361d5ae890a0144
+$ git cat-file -e 3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a  ->  absent (the #1159 orphan; its ledger's identity is the landing commit 82a7c653)
+$ src/Calor.Compiler/scripts/download-z3.sh && dotnet build tests/Calor.Compiler.Tests -c Release
+$ dotnet test tests/Calor.Compiler.Tests -c Release --no-build --filter 'FullyQualifiedName~LedgerCommitStampTests|FullyQualifiedName~DurableProvenanceTests'
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.PendingIdentitiesAwaitLandingOrCompleteWithEqualTrees
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryIndexEntryStillMatchesItsArtifactsOwnStamp
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryPublishedBenchmarkStampIsIndexed
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryLedgerThatStampsAMeasurementIsIndexed
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryAuthoritativeIdentityResolvesFromProtectedMain
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.MergeCommitWriteBackNamesTheMergeCommit
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ClaimedTreeAndManifestHashesAreReRead
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.MeasuredOnTopOfMustNameTheLandingOfTheRepair
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.FalseIdenticalTreeClaimIsRejected
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.SquashMergeWriteBackResolvesFromAFreshClone
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.PullRequestMergeRefIsNotProtectedMain
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ShortShasAndTagsAreRejected
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ShallowCloneFailsInsteadOfSkipping
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.BranchOnlyCommitIsRejectedEvenWhenItIsHead
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.UnlandedPhase1MustNameAnExistingHead
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.CommitOnProtectedMainIsAuthoritativeInAFreshClone
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.TrueIdenticalTreeClaimVerifiesAtBothCommits
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.LandingCommitOnlyMustHaveLandedTheArtifact
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.WriteBackFailsClosedWhenTheMergeChangedAMeasuredInput(changedOnMain: "manifest.json")
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.WriteBackFailsClosedWhenTheMergeChangedAMeasuredInput(changedOnMain: "src/b.cs")
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ShortStampExpandsOnlyWhenUniqueAndMatching
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.PendingIdentityIsNeverAuthoritativeAndMustDescribeTheCommittedArtifact
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.CloneWithoutFetchedMainFails
+Total tests: 23
+
+## Same clone made shallow: git fetch --depth=1 origin main
+$ git rev-parse --is-shallow-repository  ->  true
+$ dotnet test ... --filter 'FullyQualifiedName~LedgerCommitStampTests.EveryAuthoritativeIdentity'
+P006 bench/phase0-agent-native/calor0425-corpus-ledger.json: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 bench/phase0-agent-native/effect-resolver-key-ledger.json: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 bench/phase0-agent-native/effect-rows-benefit-ledger.json: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 bench/phase0-agent-native/effect-rows-probe-ledger.json: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 bench/phase0-agent-native/higher-order-demand-ledger.json: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 website/public/data/agent-benchmark-results.json#/commit: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 website/public/data/agent-refactoring-results.json#/commit: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 website/public/data/benchmark-provenance.json#/agentRefactoring/sourceCommit: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 website/public/data/benchmark-provenance.json#/agentTasks/sourceCommit: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 website/public/data/benchmark-provenance.json#/sourceCommit: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+P006 website/public/data/benchmark-results.json#/commit: the clone is shallow, so no identity can be decided; authoritative validation fails rather than skips (§6). Fetch full history.
+Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1
+
+## Unshallowed, then refs/remotes/origin/main deleted (an unfetched clone)
+$ git fetch --unshallow origin && git update-ref -d refs/remotes/origin/main
+P004 bench/phase0-agent-native/calor0425-corpus-ledger.json: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/effect-resolver-key-ledger.json: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/effect-rows-benefit-ledger.json: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/effect-rows-probe-ledger.json: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/higher-order-demand-ledger.json: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/agent-benchmark-results.json#/commit: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/agent-refactoring-results.json#/commit: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-provenance.json#/agentRefactoring/sourceCommit: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-provenance.json#/agentTasks/sourceCommit: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-provenance.json#/sourceCommit: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-results.json#/commit: refs/remotes/origin/main is not present, so durability cannot be decided. Run `git fetch origin main`.
+P010 bench/phase0-agent-native/calor0425-corpus-ledger.json: landing commit 2a79dfdf60463508474119bd3bb8f7c60c74ec37 is not on refs/remotes/origin/main.
+Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1

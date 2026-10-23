@@ -1,0 +1,10 @@
+{
+  "schema": "calor-release-credentials-attestation/v1",
+  "repository": "juanmicrosoft/calor",
+  "setting": "actions/permissions/workflow",
+  "default_workflow_permissions": "read",
+  "can_approve_pull_request_reviews": false,
+  "confirmed_by": "@juanmicrosoft",
+  "confirmed_on": "2026-10-19",
+  "why_not_read": "GET repos/juanmicrosoft/calor/actions/permissions/workflow answers HTTP 403 to the gh login used for the check (it needs the Actions policies permission). The maintainer set Settings -> Actions -> General -> Workflow permissions to 'Read repository contents and packages permissions' and turned off 'Allow GitHub Actions to create and approve pull requests', and confirmed both on 2026-10-19."
+}

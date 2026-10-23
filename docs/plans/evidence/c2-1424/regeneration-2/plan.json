@@ -1,0 +1,27 @@
+{
+ "schema": "c2-1424/plan/2",
+ "issue": 1424,
+ "regeneration": {"number": 2, "of": 2, "note": "The last regeneration allowed (contract section 9; regeneration 1 on 696ab824 is counted as 1 of 2, see ../ledger.json)."},
+ "contractVersion": "1.4.0",
+ "candidate": {"commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d", "version": "0.24.0", "manifest": "docs/plans/evidence/c1-1423/candidate-manifest.json", "c1Landing": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9", "supersedes": "696ab82470626164979a07792ed74932ab88d9e6"},
+ "writtenAtUtc": "2026-10-08T18:53:00Z",
+ "writtenNote": "Written after the four CI dispatches (18:47Z) and the two local lanes (18:48-18:52Z), during release-quality. The commands are those of regeneration 1 (../plan.json) with the changes listed under changesFromRegeneration1; none was chosen after seeing a result.",
+ "changesFromRegeneration1": [
+  "Every local dotnet command uses Microsoft's SDK 10.0.401 build (dotnet-install.sh into a private root, with runtimes 10.0.12 and 8.0.31), not Homebrew's: #1526 found the two builds pack different bytes, and the publish job uses Microsoft's. toolchain.dotnetSdkBuild is recorded.",
+  "Local runs use an isolated HOME, CALOR_HOME, DOTNET_CLI_HOME, NuGet, npm, and XDG caches under the C2 scratch directory (the shell HOME redirect was refused in regeneration 1 and is used here).",
+  "Packages, release metadata, and the website are built by scripts/reproducible-build.sh (the publish job's and the Pages build's commands, added by #1526) in two fresh clones at different paths, hashed by scripts/reproducible_builds.py hash, and compared by its compare; CI's reproducible-builds.yml is dispatched on the candidate as a Linux lane.",
+  "The B2 gate runs against the real refs/remotes/origin/main (7eca4868); #1527 scoped its freshness check to the headline's inputs.",
+  "The determinism protocol (1.4.0) is dispatched once in execution mode, the 3rd and last execution slot; execution id c2-1424-regen-2.",
+  "Large files (over about 1 MB) go to a new commit on the orphan branch evidence/v0.24-archives; the PR keeps archives.json. Package binaries: hashes only.",
+  "Records live under docs/plans/evidence/c2-1424/regeneration-2/ as new files; regeneration 1's files stay unchanged as history."
+ ],
+ "lanes": [
+  {"id": "ci-determinism", "command": "gh workflow run determinism-protocol.yml --ref c2-1424/candidate-5e52d8ab -f mode=execution -f execution_id=c2-1424-regen-2", "charge": "regeneration-compute (chargeRule c2-candidate-determinism-protocol)"},
+  {"id": "ci-test", "command": "gh workflow run test.yml --ref c2-1424/candidate-5e52d8ab"},
+  {"id": "ci-tier2", "command": "gh workflow run tier2.yml --ref c2-1424/candidate-5e52d8ab"},
+  {"id": "ci-reproducible-builds", "command": "gh workflow run reproducible-builds.yml --ref c2-1424/candidate-5e52d8ab"},
+  {"id": "local-clone-a", "where": "git clone https://github.com/juanmicrosoft/calor.git <scratch>/r2/cand; checkout --detach 5e52d8ab", "script": "local.sh (z3 bootstrap, locked restore, Release build, differential regeneration and check, ModeledForms, EvidenceContract, LedgerCommitStamp, B1 validator and generator, B2 gate, packages and metadata, website, hashes, release notes, Ids and Performance tests); then rq.sh (release-quality steps, Tier 2, Z3 mirror, submodules)"},
+  {"id": "local-clone-b", "where": "a second fresh clone at <scratch>/r2/second/nested/fresh (different path)", "script": "local.sh, for the fresh-clone reproduction and the two-path byte comparison"}
+ ],
+ "rules": "As regeneration 1 (../plan.json rules), plus the stopping rule of the coordinator's instruction: a BLOCKED or FAILED row is recorded with its exact cause; the candidate is not changed."
+}

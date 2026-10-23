@@ -1,0 +1,20 @@
+Independent adversarial compatibility review of juanmicrosoft/calor PR1443.
+
+Worktree: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/typing-1397
+Exact head: 19d1827440af52f913ad96b947770e7c601593c5
+Base: 6a0000bbad93944c55e44d608a65781a4c0df09a
+Measured production commit: ef4227009f02ea13c3b2ab82719b625f4d10b197
+
+Act as an independent adversary of the actual full diff, not an author self-review. Read LIVE1397/1082, PR1443, and the committed T1 evidence. Give ACCEPT or BLOCK with high-confidence bugs/reproducers/source locations and honest gaps. Verify the head before reviewing; do not substitute another SHA. AI/model contexts can be correlated and do not count as human or statistically independent reviews.
+
+This is bounded nullable-reference typing/ownership, not Stage A/B activation. ?str/?string/known ?Foo must remain references, explicit Option/Some/None runtime wrappers.0272/3/4 are entirely AnalysisOnly. Active0275 is a genuine representation mismatch at supported initialization/return, not a nullable-state check. Default TypeChecker0202 may still reject first. The legacy expanded-local and nullable-native-call rejections must remain until1385/1383; previously accepted raw-inline nullable flows must not be newly activated. No implicit unwrap/default/throw or broad nullable-value acceptance.
+
+Focus on compatibility attacks: default/type-off/transpile/effect opt-outs, real CLI/env/watch/cache/MSBuild/editor propagation, transient early-TypeChecker ownership, warm-cache invalidation, unsupported semantics-major fail-closed, malformed or unknown type shapes, nullable generic/array/value-vs-reference distinctions, conditional/shadowed nominal declarations and contextual return boundaries. Ensure a passing fixture did not hide an unknown-as-safe fallback or weaken existing active binding/row checks. Inspect scope/claims against the actual implementation, including the19-code/34-route source ratchet, new test counts and explicit catalog regeneration hook. Preserve D3/D12/D14 and runtime guards. Test fair valid counterexamples as well as negative cases.
+
+Adjacent1398/1382/1383/1380/1381/1384/1401 work remains separate. The ordinary nominal member-read probe still rejects0411/0410; only its explicit effect-opt-out run isolates typing. Unknown/BCL/member/project reference gaps remain limitations, not a zero-Unknown safety result. N0/R1 frozen evidence must not be relabeled as the new head.
+
+Do not edit tracked files, commit/push/merge, or disturb another worktree. Existing product tests may run --no-build --no-restore; no builds competing with the other reviewer. New counterexample scratch, if needed, must be confined to /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/t1-compatibility-probes. Keep exact commands/results for any finding.
+
+RESEARCH IS FULLY PAUSED. No research/study tests or new proof inspection, paid model calls, .git/ppw-budget/frozen ppw-v018/I0b87/ledger/private-bundle changes, benchmark study edits, draft1438/1078 activity, root user-plan access, version/release or nullable activation. Do not run SpikeVerdictTests or EffectRowExperimentHarnessTests. Do not inspect sibling E1/harness worktrees; only the product source in this exact reviewed tree is in scope.
+
+Return checked SHA, verdict, findings and dispositions, validation performed, residual risk and any acceptance blocker. All actual final-head CI and delegated parent adjudication are still required after your review.

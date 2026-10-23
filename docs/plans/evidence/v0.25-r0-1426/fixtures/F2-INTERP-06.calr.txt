@@ -1,0 +1,4 @@
+§M{m001:InterpEffects}
+  §F{f001:Greet:pub} () -> str
+    §E{}
+    §R "hello ${Console.ReadLine()}"

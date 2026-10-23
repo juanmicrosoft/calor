@@ -1,0 +1,441 @@
+{
+ "schema": "calor.adjudication-terminal-record/1",
+ "issue": 1408,
+ "SYNTHETIC": "C2 (#1424) R2 dry run only. Not an adjudication; every outcome is a placeholder.",
+ "outcome": "MILESTONE-SUCCEEDED",
+ "adjudicationIndependence": "reduced",
+ "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+ "epicIndependentAdjudicationMet": false,
+ "contract": {
+  "version": "1.5.0",
+  "files": {
+   "docs/plans/v0.24-evidence-contract.md": "38b9303115d058977cd03216e7e9d0a6d77dc7d51a3d627724f1dba444a0adc4",
+   "docs/plans/evidence/evidence-contract-1407/contract.json": "91bcfff0f21bd04437de90bd7cd7cc221e3982051007b47b52985ca7b32ebfb8",
+   "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "db013ef25998dc0b571b490209dc59591180763e2d310adfaaa493688c719155"
+  }
+ },
+ "candidate": {
+  "commit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+  "version": "0.24.0"
+ },
+ "evidenceManifests": [
+  {
+   "role": "candidate-manifest",
+   "path": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+   "sha256": "dccdf0a52ba32083959e19c3b0c57ce7b0141a02bf238aab443dbb7454151601"
+  },
+  {
+   "role": "raw-artifact-freeze",
+   "path": "docs/plans/evidence/c2-1424/regeneration-3/raw-artifact-freeze.json",
+   "sha256": "8570b9d800e3cc2fe377290646fc12b626d6d400640cff50fb676d88313a85b4"
+  }
+ ],
+ "claimRegistry": {
+  "path": "docs/plans/evidence/c2-1424/regeneration-3/claim-registry.json",
+  "sha256": "b8966d1eaf0040bcca2a33c227fe08601d98bee6130a86617eedd2460f9250b8"
+ },
+ "adjudications": [
+  {
+   "subject": "verifier-runtime-differential",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "modeled-forms-whitelist",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "release-test-suites",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "ci-test-reports",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "test-manifest",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "z3-upstream-pins",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "z3-release-binaries",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "toolchain-pins",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "corpus-submodules",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "roundtrip-reports",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "roundtrip-baselines",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "quality-ratchet-baselines",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "release-quality-reports",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "sdk-consumer-check",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "tier1-verification",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "tier2-corpus-verification",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "ledger-provenance-index",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "benchmark-corpus",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "benchmark-results",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "benchmark-provenance",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "benchmark-results-md",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "website-benchmark-pages",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "benchmark-workflow-output",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "benchmark-publication-pr",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "llm-and-agent-results",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "changelog",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "github-release-notes",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "nuget-packages",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "candidate-packages",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "release-metadata",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "website-deployment",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "v019-audit-disposition",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "pre-cut-evidence-packets",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "evidence-contract",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1419",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1311",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1413",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1420",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1421",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1135",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1241",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1417",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1276",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1422",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1410",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1423",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "gate:#1424",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:release-adds-no-syntax",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:release-history-0.22-0.23",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:evidence-bounded-not-independent",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:no-benchmark-results-published",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:advisory-7-false-proofs-in-4-areas",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:sweep-limits",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:all-34-findings-fixed-or-demoted",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:obligation-stale-facts-demoted",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:cache-literal-width-fixed",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:interface-checks-throwing-preconditions",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:non-ascii-solver-symbols-escaped",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:warning-calor0819-added",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:reproducible-release-evidence-and-gate",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:benchmark-publication-refuses-incomparable",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:agent-refactoring-job-no-commit",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:historical-benchmark-numbers-labeled",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:z3-single-verified-path-five-rids",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:fixture-checks-truthful",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:numeric-forms-refused-or-demoted",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:differential-totals-429-156-585",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:text-utf16-code-units",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:nested-quantifier-unsupported",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:determinism-causes-fixed",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:unreachable-counterexamples-withheld",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:empty-clause-body-fixed",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:cache-format-1.22",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:packages-and-website-reproducible",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  },
+  {
+   "subject": "claim:binding-performance-restored",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated"
+  }
+ ],
+ "publication": {
+  "release-notes": {
+   "sha256": "05b8c2194efdd9756b1e92e197ae3de9d4c9c10d13c2c4b3465d54b62bdb192f",
+   "rawSha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+  },
+  "nuget-packages": {
+   "files": {
+    "Calor.Sdk.0.24.0.nupkg": "157fc9cab9db1fe095c0b77a9ff264c8ea6186585bea6b964fb53afed41053bb",
+    "calor.0.24.0.nupkg": "d59aea56abb0e89125805686c59b616e47614ecea9a1c9b5fcbc9fb929401cc5"
+   }
+  },
+  "release-metadata": {
+   "files": {
+    "calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.provenance.json": "1f00791f712d85811ab9ad3906dbba87eb1724957068ce3645d3dff1450af79d",
+    "calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.sbom.spdx.json": "eb2abecab68965c07cf0e41d99cd268b8a8c7c06494971aa046dd6c48cd1d9e3"
+   }
+  },
+  "website": {
+   "treeSha256": "e684dcab33d98ab1ca25d0a1e4c04ebaa9325f29cd9cd8ecc5c67888b9dc6323"
+  },
+  "benchmark-results": {
+   "files": {
+    "website/public/data/benchmark-headline.json": "312912fd3d8e02a22476e0d3fc41854c327e326ec989ece8c99faae28b05696a",
+    "bench/phase0-agent-native/commit-stamp-index.json": "c943954bb471092b670f9089f6527e5d40c232b9842de454787315f21f914731"
+   }
+  }
+ }
+}

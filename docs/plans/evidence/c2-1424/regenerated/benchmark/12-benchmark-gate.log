@@ -1,0 +1,3 @@
+0.24 B2 (#1422) benchmark publication gate
+REFUSED: 1 problem(s). No headline is written and nothing may be published.
+  B2-08 tests/Calor.Compiler.Tests/EvidenceContract at HEAD differs from refs/remotes/origin/main; only inputs equal to main's may publish

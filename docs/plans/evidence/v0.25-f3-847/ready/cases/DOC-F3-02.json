@@ -1,0 +1,105 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "caseId": "DOC-F3-02",
+ "family": "F3",
+ "role": "doc-example",
+ "expected": "native",
+ "scopeVersion": "1.4.0",
+ "requirementSha256": "6bd6d815921262183bc99b50c0caa347cd719faa42f260bac46efc37c8808c6c",
+ "result": "passed",
+ "cells": {
+  "example-compiles-default": "passed",
+  "example-matches-page-claim": "passed"
+ },
+ "cellEvidence": {
+  "example-compiles-default": "calor self-check docs reports no diagnostic (every complete ```calor program on the site compiles by default); WebsiteExampleCheckerTests pass",
+  "example-matches-page-claim": "W1GuideTranscriptTests pass (fences equal the CLI output; C# sources are verbatim excerpts) and the transcripts regenerate byte-identically; the page's claim is the W1 record's: guides/csharp-interoperability.mdx: W1-F3-local-functions converted output (one native, one capturing and preserved); cli/convert.mdx and syntax-reference/structure-tags.mdx: the existing local-function programs"
+ },
+ "judgement": "",
+ "measurements": [
+  {
+   "kind": "self-check-docs",
+   "command": "calor self-check docs --root . --format json",
+   "log": "docs/plans/evidence/v0.25-regeneration/measure/w1-self-check-docs.log",
+   "diagnostics": {
+    "total": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0
+   }
+  },
+  {
+   "kind": "w1-wording-scan",
+   "command": "python3 docs/plans/evidence/v0.25-w1-1429/reproduce/wording_scan.py",
+   "log": "docs/plans/evidence/v0.25-regeneration/measure/w1-wording-scan.log",
+   "result": "scanned 33 texts; 0 finding(s)"
+  },
+  {
+   "kind": "w1-pages",
+   "page": "website/content/syntax-reference/structure-tags.mdx",
+   "w1Record": "docs/plans/evidence/v0.25-w1-1429/records.json",
+   "pages": [
+    "website/content/guides/csharp-interoperability.mdx#keep-a-small-local-helper-function",
+    "website/content/cli/convert.mdx#local-functions",
+    "website/content/syntax-reference/structure-tags.mdx#local-functions"
+   ],
+   "examples": [
+    "guides/csharp-interoperability.mdx: W1-F3-local-functions converted output (one native, one capturing and preserved)",
+    "cli/convert.mdx and syntax-reference/structure-tags.mdx: the existing local-function programs"
+   ],
+   "transcripts": [
+    "W1-F3-local-functions"
+   ],
+   "regeneration": "CALOR_REGENERATE_W1_TRANSCRIPTS=1 reproduced every transcript byte-identically on the candidate (git diff empty)"
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f3-local-conversion.trx.gz",
+     "match": "LocalFunctionConversionTests",
+     "count": 91,
+     "passed": 91,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/f3-local-language.trx.gz",
+     "match": "LocalFunctionLanguageTests",
+     "count": 33,
+     "passed": 33,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/w1-transcripts.trx.gz",
+     "match": "W1GuideTranscriptTests",
+     "count": 13,
+     "passed": 13,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/w0-website-examples.trx.gz",
+     "match": "WebsiteExampleCheckerTests",
+     "count": 58,
+     "passed": 58,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c25/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/measure/"
+ },
+ "independence": "reduced"
+}

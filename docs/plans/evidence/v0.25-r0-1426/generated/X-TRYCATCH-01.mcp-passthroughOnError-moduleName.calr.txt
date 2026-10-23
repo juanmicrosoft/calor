@@ -1,0 +1,25 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §FLD{i32:counter:priv:stat} = 0
+
+    §MT{m002:Work:pub:stat} (bool:fail)
+      §E{throw,alloc}
+      §IF{if003} fail
+        §TH §NEW{InvalidOperationException} §A "x" §/NEW
+
+    §MT{m004:Step:pub:stat} (bool:fail)
+      §E{throw,alloc}
+      §TR{try005}
+        §C{Work} fail
+      §CA{InvalidOperationException:}
+      §ASSIGN counter (+ counter 1)
+
+    §MT{m006:Run:pub:stat} () -> str
+      §E{throw,alloc}
+      §C{Step} false
+      §C{Step} true
+      §R (str counter)
+
+

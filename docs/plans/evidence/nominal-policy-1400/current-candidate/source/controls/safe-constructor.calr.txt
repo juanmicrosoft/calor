@@ -1,0 +1,6 @@
+§M{m1:D1SafeConstructor}
+  §CL{c1:Item:pub}
+  §CL{c2:Flow:pub}
+    §MT{f1:Make:pub:static} () -> Item
+      §E{}
+      §R §NEW{Item}

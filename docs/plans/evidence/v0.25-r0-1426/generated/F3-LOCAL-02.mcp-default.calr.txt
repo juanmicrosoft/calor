@@ -1,0 +1,21 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Add:pub:stat} (i32:x) -> i32
+        §R (+ x 1000)
+
+      §MT{m004:Run:pub:stat} () -> str
+        §R (+ (+ §C{UseShadow} §/C "|") §C{Add} §A 2 §/C)
+
+      §CSHARP{
+    public static int UseShadow()
+    {
+        int Add(int x) => x + 1;
+        return Add(2);
+    }
+      }§/CSHARP
+
+
+

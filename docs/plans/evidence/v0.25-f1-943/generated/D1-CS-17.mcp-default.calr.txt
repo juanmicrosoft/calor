@@ -1,0 +1,21 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System.Diagnostics.CodeAnalysis}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:TryName:priv:stat}
+        §I{i32:id}
+        §I{?str:name:out}[@NotNullWhen(true)]
+        §O{bool}
+        §ASSIGN name (? (== id 1) "one" null)
+        §R (!= name null)
+
+      §MT{m003:Run:pub:stat} () -> str
+        §B{~n:?str} `default`
+        §IF{if004} §C{TryName} §A 1 §A{out} n §/C
+          §B{str:s} n
+          §R (str (len s))
+        §R "none"
+
+
+

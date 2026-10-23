@@ -1,0 +1,624 @@
+{
+  "base": "3b513a632149290481161b195a71aa6cb0e251a8",
+  "production": "a6a87f3975f85cead21d89d3d129690413309e78",
+  "sourceKeysBefore": 364,
+  "sourceKeysAfter": 364,
+  "changedSourceKeys": 9,
+  "allOtherCoordinatesIdentical": true,
+  "removedDiagnosticCount": 18,
+  "rows": [
+    {
+      "file": "FluentValidation/src/FluentValidation.Tests/CustomValidatorTester.cs",
+      "convertedCalorSha256": "af4768ccb482e12039d61d9ade3613c95587a75764a8c6c2a403a4712af2a8a8",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 29,
+          "after": 24
+        },
+        "BindingErrorIdentityHash": {
+          "before": "f1b290a12056a8e0ed2ffcfb82435c9c160b8cb6f851ca27fe07813ab7de4be9",
+          "after": "10a2165db1baf3793cf39493e14712eda2c947da420ff1793f519952493c72ad"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Task.CompletedTask'",
+          "Start": 1303,
+          "Length": 18,
+          "Line": 33,
+          "Column": 129,
+          "Expression": "Task.CompletedTask",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Task.CompletedTask'",
+          "Start": 4117,
+          "Length": 18,
+          "Line": 91,
+          "Column": 114,
+          "Expression": "Task.CompletedTask",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Task.CompletedTask'",
+          "Start": 4562,
+          "Length": 18,
+          "Line": 98,
+          "Column": 114,
+          "Expression": "Task.CompletedTask",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Task.CompletedTask'",
+          "Start": 7534,
+          "Length": 18,
+          "Line": 157,
+          "Column": 115,
+          "Expression": "Task.CompletedTask",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Task.CompletedTask'",
+          "Start": 10268,
+          "Length": 18,
+          "Line": 209,
+          "Column": 106,
+          "Expression": "Task.CompletedTask",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 10268,
+          "Length": 18,
+          "Line": 209,
+          "Column": 106,
+          "Expression": "Task.CompletedTask",
+          "Kind": "NominalBoundType",
+          "Type": "System.Threading.Tasks.Task",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Threading.Tasks.Task.CompletedTask",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 7534,
+          "Length": 18,
+          "Line": 157,
+          "Column": 115,
+          "Expression": "Task.CompletedTask",
+          "Kind": "NominalBoundType",
+          "Type": "System.Threading.Tasks.Task",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Threading.Tasks.Task.CompletedTask",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 4562,
+          "Length": 18,
+          "Line": 98,
+          "Column": 114,
+          "Expression": "Task.CompletedTask",
+          "Kind": "NominalBoundType",
+          "Type": "System.Threading.Tasks.Task",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Threading.Tasks.Task.CompletedTask",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 4117,
+          "Length": 18,
+          "Line": 91,
+          "Column": 114,
+          "Expression": "Task.CompletedTask",
+          "Kind": "NominalBoundType",
+          "Type": "System.Threading.Tasks.Task",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Threading.Tasks.Task.CompletedTask",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 1303,
+          "Length": 18,
+          "Line": 33,
+          "Column": 129,
+          "Expression": "Task.CompletedTask",
+          "Kind": "NominalBoundType",
+          "Type": "System.Threading.Tasks.Task",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Threading.Tasks.Task.CompletedTask",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation.Tests/ValidateAndThrowTester.cs",
+      "convertedCalorSha256": "999e171acd3a3736649e79cb13dc6443b6bb70ee7364ef8a15799b64813ed356",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 33,
+          "after": 31
+        },
+        "BindingErrorIdentityHash": {
+          "before": "7e5124d955974deda5fdff061fff19874b3dc4dbd317784a7cd529725eafa311",
+          "after": "c30d084a68d9f719e843b61524a1f987c746e111bdc9b0d3195cdb7edcf7a568"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 9370,
+          "Length": 19,
+          "Line": 212,
+          "Column": 98,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 9452,
+          "Length": 19,
+          "Line": 212,
+          "Column": 180,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 9452,
+          "Length": 19,
+          "Line": 212,
+          "Column": 180,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 9370,
+          "Length": 19,
+          "Line": 212,
+          "Column": 98,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation.Tests/ValidationResultTests.cs",
+      "convertedCalorSha256": "32374f42918b09441cb999a92ffbb8abf5e5d987a702c6f8a3472996e1b73a49",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 16,
+          "after": 15
+        },
+        "BindingErrorIdentityHash": {
+          "before": "303a23dce0b4f3f3ada9092905b098a388221f27b144c8eb7b555f16e54b83bf",
+          "after": "fe8d4be70fb76830406a44b6976e86dc4eb16556fdbb96f7023cfe1422090a79"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 2805,
+          "Length": 19,
+          "Line": 68,
+          "Column": 52,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 2805,
+          "Length": 19,
+          "Line": 68,
+          "Column": 52,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/Results/ValidationResult.cs",
+      "convertedCalorSha256": "30ad5e5bf5930cc417ac183f4c2a3f5b7a7efe02a7459208a6e92427a6614d45",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 35,
+          "after": 33
+        },
+        "BindingErrorIdentityHash": {
+          "before": "8d599e9895aae6a121be4b754035cab2050511e07629beb4147e948bde1fc7f7",
+          "after": "0192c601055b8d2dff9d96cc20527c0ec0e0433c23b326a4dd0d845d921c636e"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 4040,
+          "Length": 19,
+          "Line": 69,
+          "Column": 25,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0273",
+          "Severity": "Error",
+          "Message": "Return declares non-nullable 'string' but the returned value may be null (source annotation: 'Oblivious'). Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+          "Start": 4027,
+          "Length": 32,
+          "Line": 69,
+          "Column": 12,
+          "Expression": "\u00a7C{ToString} Environment.NewLine",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 4040,
+          "Length": 19,
+          "Line": 69,
+          "Column": 25,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [
+        {
+          "Code": "Calor0411",
+          "Message": "Unknown call target 'ToString': not an internal function, parameter, binding, or field visible to the effect pass. If this is a delegate-typed member, declare it where this module can see it with an effect row (\u00a7E{\u2026} on the same line as its type); otherwise add the callee to a .calor-effects.json manifest.",
+          "Line": 69,
+          "Column": 12
+        },
+        {
+          "Code": "Calor0410",
+          "Message": "Function 'ToString' uses effect 'unknown' but does not declare it",
+          "Line": 68,
+          "Column": 7
+        }
+      ],
+      "addedEffectDiagnostics": [
+        {
+          "Code": "Calor0419",
+          "Message": "Effects of 'ToString' are ASSUMED, not verified: calls 'ToString', whose effects are assumed. The declared effect set is accepted as an assumption, not a proof; narrow the interop surface or add manifest coverage to restore verification.",
+          "Line": 68,
+          "Column": 7
+        }
+      ]
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/ValidationException.cs",
+      "convertedCalorSha256": "068d5cc22c644b8d0d68ae9d3e5739a4a87ad3b75a881c0a7f7e08ce54eef5de",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 6,
+          "after": 5
+        },
+        "BindingErrorIdentityHash": {
+          "before": "54f7d1cdf5dc044497f065614a2d6839d951afbe4be20c4b2254e3c19e54e921",
+          "after": "bb21f789621df53473789ee414034e8fb93ad22961ef6728a012226d5c41ba49"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 0,
+          "Length": 19,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Leg2:overfl",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 0,
+          "Length": 19,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Leg2:overfl",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "MediatR/src/MediatR/INotificationHandler.cs",
+      "convertedCalorSha256": "b6fe43406e13c76e18cf06d37cb3abdca5060a7e69964a37ecf76801bbed7856",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 1,
+          "after": 0
+        },
+        "BindingErrorIdentityHash": {
+          "before": "3db0922b37a24fe58daec8d990ff96abbb547a225ecf723bbdea387f60bdd989",
+          "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Task.CompletedTask'",
+          "Start": 873,
+          "Length": 18,
+          "Line": 20,
+          "Column": 12,
+          "Expression": "Task.CompletedTask",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 873,
+          "Length": 18,
+          "Line": 20,
+          "Column": 12,
+          "Expression": "Task.CompletedTask",
+          "Kind": "NominalBoundType",
+          "Type": "System.Threading.Tasks.Task",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Threading.Tasks.Task.CompletedTask",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "serilog/src/Serilog/Debugging/SelfLog.cs",
+      "convertedCalorSha256": "feab75620cbe1697e5bf37bbc2416dafbcf9c5eeda0e077e7dffadc1cc5cde4e",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 8,
+          "after": 7
+        },
+        "BindingErrorIdentityHash": {
+          "before": "eadaf47e0382e12d4362d5cceeccdbf43bb99aac34398f3b62e676103295625b",
+          "after": "97ac318f9de6de57891f66844f9b2ea5b3f12cc61d01ca99e36659165edae683"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 0,
+          "Length": 19,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Leg2:overfl",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 0,
+          "Length": 19,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Leg2:overfl",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+      "convertedCalorSha256": "726d5f3365695aeaeb465eea6d303f7f15b68cb35323d8064b2153f7c7daa0d0",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 57,
+          "after": 53
+        },
+        "BindingErrorIdentityHash": {
+          "before": "9772b275f1064c5f88d910f8f28e2a21726c7770e55a29a385fc695ab3b5fd38",
+          "after": "451b98e676de6e7cd3267ade4c6061dfa19b7ce2d9823d92fe5b2e7554ac6134"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 2576,
+          "Length": 19,
+          "Line": 41,
+          "Column": 44,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 2916,
+          "Length": 19,
+          "Line": 48,
+          "Column": 57,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'ex.Message'",
+          "Start": 0,
+          "Length": 10,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Le",
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 0,
+          "Length": 19,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Leg2:overfl",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 0,
+          "Length": 19,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Leg2:overfl",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 0,
+          "Length": 10,
+          "Line": 1,
+          "Column": 1,
+          "Expression": "\u00a7M{m001:Le",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Exception.Message",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 2916,
+          "Length": 19,
+          "Line": 48,
+          "Column": 57,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        },
+        {
+          "Start": 2576,
+          "Length": 19,
+          "Line": 41,
+          "Column": 44,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    },
+    {
+      "file": "serilog/src/Serilog/Formatting/Json/JsonFormatter.cs",
+      "convertedCalorSha256": "f5cf20a2bf519cf7498a98f00a3afe7cfb9e6c7298b177b09c8d08934bdc43a6",
+      "coordinates": {
+        "BindingErrorCount": {
+          "before": 24,
+          "after": 23
+        },
+        "BindingErrorIdentityHash": {
+          "before": "bf1f89cac37a08af196e2f81fd9386c3f9beb3b5c0f70cc580aa0bd507cb353d",
+          "after": "85e63b5061e08e623017deb8b240470ff00a78ddd084253a962935b0531b9e58"
+        }
+      },
+      "removedAnalysisDiagnostics": [
+        {
+          "Code": "Calor0200",
+          "Severity": "Error",
+          "Message": "Undefined variable 'Environment.NewLine'",
+          "Start": 865,
+          "Length": 19,
+          "Line": 17,
+          "Column": 56,
+          "Expression": "Environment.NewLine",
+          "Propagated": false
+        }
+      ],
+      "addedDiagnostics": [],
+      "resolvedMembersAtChangedSites": [
+        {
+          "Start": 865,
+          "Length": 19,
+          "Line": 17,
+          "Column": 56,
+          "Expression": "Environment.NewLine",
+          "Kind": "NominalBoundType",
+          "Type": "string",
+          "Annotation": "NotAnnotated",
+          "Member": "System.Environment.NewLine",
+          "Assembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+        }
+      ],
+      "removedEffectDiagnostics": [],
+      "addedEffectDiagnostics": []
+    }
+  ],
+  "auditSourceSha256": "4d5dc774579bebcbb8ef5812284549aeeb1150fa9ac070594061fe9520ef5537",
+  "auditTargetsSha256": "c0fc2759bd443f5feee44e956c417557aa8946bea8f218ac3bb5fdea3fa4fc3e"
+}

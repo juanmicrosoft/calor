@@ -1,0 +1,41 @@
+start 2026-10-07T15:19:36Z
+10.0.401
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Calor.Runtime -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.43
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/bin/Release/net10.0/publish/
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/packages/worktree-pack-1/calor.0.24.0.nupkg'.
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Calor.Runtime -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Sdk -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
+  Calor.Runtime -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Tasks -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Sdk/obj/sdk-tasks-publish/
+  Calor.Sdk pack: staged 25 files into tasks/net10.0
+  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/packages/worktree-pack-1/Calor.Sdk.0.24.0.nupkg'.
+OK: Z3 assets in calor.0.24.0.nupkg match the committed pins.
+OK: Z3 assets in Calor.Sdk.0.24.0.nupkg match the committed pins.
+total 232216
+drwxr-xr-x@ 4 juanrivera  wheel       128 Oct  7 11:19 .
+drwxr-xr-x@ 3 juanrivera  wheel        96 Oct  7 11:19 ..
+-rw-r--r--@ 1 juanrivera  wheel  60298411 Oct  7 11:19 calor.0.24.0.nupkg
+-rw-r--r--@ 1 juanrivera  wheel  57981330 Oct  7 11:19 Calor.Sdk.0.24.0.nupkg
+7ca79f334f2a83b7a7d53b612e1a2957b96e7203c3d918a90d742e72b0e6910c  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/packages/worktree-pack-1/calor.0.24.0.nupkg
+3b828897426764ebce7a7ec40038fbcb5306742d2db019ac8315a6bc3038101e  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/packages/worktree-pack-1/Calor.Sdk.0.24.0.nupkg
+end 2026-10-07T15:19:47Z PACK-EXIT=0

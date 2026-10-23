@@ -1,0 +1,36 @@
+{
+  "ceilings": {
+    "s1-generated-cases": 1500,
+    "s1-timebox": "2026-10-13T00:36:51Z (10 days after the #1419 merge 2026-10-03T00:36:51Z)",
+    "s1-agent-hours": 20,
+    "s1-ci-minutes": 600,
+    "s1-local-machine-hours": 10,
+    "paid-spend-usd": 0
+  },
+  "used": {
+    "caseExecutions": 1500,
+    "stoppedBy": "1,500 case-execution ceiling, reached during the reserve cross-baseline re-runs after every registered sweep, control, and P845 case had executed",
+    "byBucket": {
+      "controls": 64,
+      "p845": 6,
+      "reserve-cross-baseline": 56,
+      "reserve-p845-availability": 14,
+      "reserve-retry": 4,
+      "sweep": 1356
+    },
+    "reserveUsed": 74,
+    "reserveAllocated": 74,
+    "sweepWallClockSeconds": 185.4,
+    "localMachineHours": "under 1 (sweep 185 s, cross-baseline re-runs under 1 min; builds, self-tests, reclassification, reports, and the native check each took minutes)",
+    "ciRunnerMinutes": 0,
+    "agentHours": "about 3 (2026-10-03T16:33Z to the final packet, including three review rounds and a verification pass)",
+    "paidSpendUsd": 0,
+    "timebox": "sweep finished 2026-10-03T16:53:50Z, inside the timebox"
+  },
+  "stoppedBy": "s1-generated-cases (1,500), reached by the registered reserve re-runs; the registered sweep had completed",
+  "notes": [
+    "The ceiling counts case executions across B1, N1, and P845. All 1,500 were used: 710 B1, 710 N1, 20 P845 (6 #845 cases + 14 availability checks charged to the reserve), 4 retries (reserve), and 56 cross-baseline re-runs of finding cases (reserve). 8 further re-runs (4 cases on each baseline) were not run because the ceiling was reached.",
+    "No case was executed outside the ledger. Harness self-tests ran on executor-written synthetic inputs (tools/Calor.Soundness.Sweep/selftest-templates.json); they are not registered cases and are not counted.",
+    "PR CI for this branch is ordinary PR CI (contract section 9), not sweep compute."
+  ]
+}

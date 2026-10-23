@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "issue": 1402,
+  "date": "2026-09-15",
+  "sourceCommit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+  "implementationPr": 1461,
+  "documentationPr": 1463,
+  "helperPreapprovalPr": 1462,
+  "sourceReviewDecision": "PASS",
+  "corpusAdjudication": "PASS_WITH_DOCUMENTED_COMPATIBILITY_LIMIT",
+  "publicationClaim": false,
+  "mergeGate": "Successful final-head CI and independent documentation/evidence review remain separate requirements; consult the linked PR checks.",
+  "sourceCiRun": 34988156401,
+  "sourceCorpusArtifact": 10405320561,
+  "sourceWebsiteRun": 34988156529,
+  "activeBoundaries": [
+    "Initializer/Calor0272",
+    "NativeReturn/Calor0273",
+    "MethodArgument/Calor0274"
+  ],
+  "activeShapes": ["ScalarString", "Array", "Generic", "Nominal"],
+  "limits": [
+    "Generic checks cover whitelisted immediate STRING payloads, not generic outer-container nullability.",
+    "Nominal checks require proven reference identity; supported Oblivious sources are conservatively possibly null.",
+    "Assignment/rebinding receiving checks, general member writes, constructor inputs, and whole-program non-nullness remain outside scope.",
+    "Allocated arrays retain declared element annotations; unfilled reference slots can still contain null.",
+    "Unresolved and unsupported shapes are not counted safe.",
+    "D3/D12/D14 demotions and runtime guards remain; issue 875 is not closed."
+  ],
+  "acceptedCompatibilityLoss": {
+    "file": "MediatR/src/MediatR/Internal/ObjectDetails.cs",
+    "baselineStatus": "Replaced",
+    "candidateStatus": "CompileError",
+    "diagnostic": "Calor0274",
+    "count": 6,
+    "sourceAnnotation": "Annotated",
+    "reason": "Early-return guard facts are outside the bounded transfer implemented here.",
+    "originalBugClaim": false,
+    "manualMigrationTest": "SafeConsumptionRuntimeTests.NominalEarlyReturnMigrationPreservesNullOrderingAtRuntime",
+    "runtimeOutputs": [1, 1, -1, 0],
+    "converterInsertsMigration": false
+  },
+  "repairedFindings": [
+    "Generic payload metadata lost through inferred-local guards and qualified/short joins.",
+    "Declared delegate return values lost structural array/generic metadata or diagnostic ownership.",
+    "Callable target changes lost at loop zero-iteration/backedge paths, else-if fallthrough, match arms, exception prefixes, and catch filters.",
+    "Loop discovery discarded diagnostics without restoring their deduplication state.",
+    "Sized array creation incorrectly rejected the production Synthetic FizzBuzz safe control.",
+    "Shared branch joins restored invalidated guards for active captured field bindings hidden by pattern names."
+  ],
+  "reviews": [
+    {
+      "context": "fa24d5d0-895f-49af-9339-8dd3b6d2d26f",
+      "role": "Compiler integration",
+      "sourceCommit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+      "decision": "CLEAN",
+      "promptSummary": "Review bound-node ownership, structural metadata, diagnostic routing, cache/dedup restoration, and final deltas while carrying forward prior reviews. Review bounded CI capacity without weakening gates.",
+      "reportedValidation": "903 targeted final-delta/integration cases; earlier final-source cycle independently ran 1633 compiler and 22 LSP routing cases."
+    },
+    {
+      "context": "2c335899-cd38-44b1-a0c9-d21c43ea6b46",
+      "role": "Adversarial callable/flow/state compatibility",
+      "sourceCommit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+      "decision": "CLEAN",
+      "promptSummary": "Review complete callable/flow/filter/diagnostic mechanisms, reproduce reported bypasses and resolved safe controls, then certify the final identity-based join and workflow deltas.",
+      "reportedValidation": "600 final delta regressions; independent production reproductions reject the shadowed and renamed controls with Calor0274 and suppress output, while fresh-guard, no-mutation, and other-storage controls remain accepted."
+    }
+  ],
+  "governance": {
+    "evidenceOwner": "Copilot parent session 183563e9-b822-44f0-843f-4ffee2c11e19",
+    "authority": "User-requested autonomous continuation of release 0.22; parent technical adjudication is not represented as an additional human review.",
+    "reviewSeparation": "Non-author isolated contexts; exact runtime/model builds were not independently attested, and no statistical-independence claim is made.",
+    "fullMilestoneAcceptance": "Requires documentation/evidence acceptance and the separate release/publication gates."
+  }
+}

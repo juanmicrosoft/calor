@@ -1,0 +1,128 @@
+{
+  "condition": "blockers-mapped-after-1413",
+  "state": "SATISFIED",
+  "amendment": "1.1.0",
+  "recordedAtUtc": "2026-10-12T02:22:52Z",
+  "rule": "A 0.24 S2 repair or demotion applies to a family when the family's native 0.25 work creates a construct the repair's change governs. Every repair in the S2 record has exactly one disposition here: applicable (with its PR, merge commit and regression witnesses) or not applicable (with a reason). Every applicable repair is merged on main; it blocks the family's READY until that record's blockersResolved entry cites the repair's merge commit and a retained witnessRun record under docs/plans/evidence/ showing its regression witnesses passed on the READY candidate (S007). A disposition is not a 0.25 repair, and 0.24 false proofs stay owned by 0.24.",
+  "applicable": [
+    {
+      "repair": "R-OBL",
+      "pr": 1496,
+      "kind": "DEMOTE-IN-0.24",
+      "rows": [
+        "OBL-MUTATION-KILL",
+        "OBL-BRANCH-FACTS",
+        "OBL-REFINEMENT-RETURN",
+        "OBL-SUBTYPE",
+        "OBL-SELFREF"
+      ],
+      "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+      "regressionWitness": [
+        "tests/Calor.Compiler.Tests/S2ObligationStateTests.cs"
+      ],
+      "families": [
+        "F1",
+        "F2",
+        "F3",
+        "F5"
+      ],
+      "reason": "Entry facts are dropped when a body may write a name they read, including ref/out/in aliasing and element or field stores; raw C# makes a body opaque. F1 adds by-reference writes. F2, F3 and F5 replace raw C# that is opaque today (inline `§CS{}` interpolation holes with calls, preserved local functions, preserved array expressions) with native calls and element stores, so the fact-kill rule must cover them."
+    },
+    {
+      "repair": "R-OBL-RESIDUALS",
+      "pr": 1503,
+      "kind": "DEMOTE-IN-0.24",
+      "rows": [],
+      "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+      "regressionWitness": [
+        "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
+      ],
+      "families": [
+        "F1",
+        "F2",
+        "F3",
+        "F5"
+      ],
+      "reason": "After a statement that may throw (calls, element reads, checked arithmetic) the obligation state is not exact. F1 adds calls that write `out` before throwing (F1-REFOUT-04); F2 lifts interpolation-hole calls into native calls; F3 adds native local-function calls; F5 adds native element initializers that may throw (F5-ARRAY-04)."
+    },
+    {
+      "repair": "R-TEXT",
+      "pr": 1497,
+      "kind": "FIX-IN-0.24",
+      "rows": [
+        "STR-NULL-NONASCII",
+        "STR-OPS-COUNT-INDEX"
+      ],
+      "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+      "regressionWitness": [
+        "tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs"
+      ],
+      "families": [
+        "F2"
+      ],
+      "reason": "String literals reach Z3 per UTF-16 code unit and null-tolerant string forms are refused when unsound. F2 changes what a string literal with `${...}` holes means (bound holes), so contract translation of interpolated strings must model the holes or refuse; it must not treat them as literal text."
+    }
+  ],
+  "notApplicable": [
+    {
+      "repair": "R-CACHE",
+      "pr": 1494,
+      "kind": "FIX-IN-0.24",
+      "reason": "Literal cache keys. No family changes literal hashing; a node kind the hasher does not know is never cached (the SawUnhashedKind rule), so new F2-F5 expression forms cannot share a cache entry."
+    },
+    {
+      "repair": "R-IMPL",
+      "pr": 1495,
+      "kind": "DEMOTE-IN-0.24",
+      "reason": "Interface/implementer implication prover. No family changes that channel. R-IMPL makes any string-, array- or user-type-sorted implication Assumed regardless of how the value was produced, so the 1.0.0 'uncertain' IMPL-ASSUMPTION-FORMS link for F1 and F2 resolves to not applicable."
+    },
+    {
+      "repair": "R-QNT",
+      "pr": 1498,
+      "kind": "DEMOTE-IN-0.24",
+      "reason": "Nested quantifiers. No family introduces quantifiers."
+    },
+    {
+      "repair": "R-NUM",
+      "pr": 1502,
+      "kind": "DEMOTE-IN-0.24",
+      "reason": "Sub-32-bit and oversize-literal arithmetic. No family changes numeric modeling."
+    }
+  ],
+  "familyBlockers": {
+    "F1": [
+      1427,
+      1423,
+      1496,
+      1503
+    ],
+    "F2": [
+      1426,
+      1423,
+      1497,
+      1496,
+      1503
+    ],
+    "F3": [
+      1426,
+      1423,
+      1496,
+      1503
+    ],
+    "F4": [
+      1426,
+      1423
+    ],
+    "F5": [
+      1426,
+      1423,
+      1496,
+      1503
+    ],
+    "F6": [
+      1426,
+      1423
+    ]
+  },
+  "unmergedCodeRequired": false
+}

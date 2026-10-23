@@ -1,0 +1,46 @@
+{
+  "condition": "interaction-and-doc-rows-registered",
+  "state": "SATISFIED",
+  "amendment": "1.1.0",
+  "recordedAtUtc": "2026-10-12T02:22:52Z",
+  "interaction": [
+    "X-INT-01",
+    "X-INT-02",
+    "X-INT-03",
+    "X-INT-04",
+    "X-INT-05",
+    "X-INT-06",
+    "X-INT-07",
+    "X-INT-08"
+  ],
+  "docExample": [
+    "DOC-F1-01",
+    "DOC-F2-01",
+    "DOC-F3-01",
+    "DOC-F3-02",
+    "DOC-F4-01",
+    "DOC-F5-01",
+    "DOC-F6-01",
+    "DOC-F6-02"
+  ],
+  "measured": [
+    "X-INT-01",
+    "X-INT-02",
+    "X-INT-03",
+    "X-INT-04",
+    "DOC-F3-01",
+    "DOC-F6-01",
+    "DOC-F6-02"
+  ],
+  "notMeasured": [
+    "X-INT-05",
+    "X-INT-06",
+    "X-INT-07",
+    "X-INT-08",
+    "DOC-F1-01",
+    "DOC-F2-01",
+    "DOC-F3-02",
+    "DOC-F4-01",
+    "DOC-F5-01"
+  ]
+}

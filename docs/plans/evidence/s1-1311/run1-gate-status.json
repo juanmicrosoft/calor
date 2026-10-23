@@ -1,0 +1,11 @@
+{
+  "gate": "S1 (#1311)",
+  "status": "BLOCKED",
+  "reason": "Contract section 8 stopping condition 1: the s1-generated-cases ceiling (1,500) was reached. Every registered sweep, control, and P845 case executed, but 8 registered cross-baseline re-runs (noPooling.crossBaselineUse) did not: OBL-SUBTYPE-002, STR-NULL-NONASCII-001, STR-NULL-NONASCII-004, STR-OPS-COUNT-INDEX-003, each on B1 and on N1. Further case executions need a reviewed amendment raising the ceiling by at least 8; otherwise S1 stays BLOCKED.",
+  "rowStatusesAreMechanical": "The per-baseline row statuses in bench/correctness/false-established/v024/<baseline>/row-status.json are the mechanical registered results; they use only each baseline's own sweep results and do not depend on the re-runs.",
+  "openItemsForMaintainer": [
+    "Ceiling: amend s1-generated-cases (+8 or more) to complete the cross-baseline re-runs, or keep S1 BLOCKED.",
+    "Provenance: the native libz3 image the sweep process mapped was not captured in-run (pins.json nativeSolverImageCheck). The results are provenance-unconfirmed for that pin until adjudicated; a conforming replacement sweep needs new capacity.",
+    "O2 completeness: in GEN-REFUSAL-002 and -004 (both baselines) the frozen input new object() cannot be passed to the emitted double[] parameter, so 1 replay input per case did not execute (status partial). The registered rowStatus does not use O2; whether this needs an amendment is a maintainer decision."
+  ]
+}

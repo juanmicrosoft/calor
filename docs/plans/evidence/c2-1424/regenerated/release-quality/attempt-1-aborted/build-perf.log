@@ -1,0 +1,13 @@
+  Determining projects to restore...
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj (in 152 ms).
+  2 of 3 projects are up-to-date for restore.
+  Calor.Runtime -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Performance.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.99

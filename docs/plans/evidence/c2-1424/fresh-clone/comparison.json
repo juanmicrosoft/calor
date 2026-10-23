@@ -1,0 +1,127 @@
+{
+ "schema": "c2-1424/fresh-clone-comparison/1",
+ "candidate": "696ab82470626164979a07792ed74932ab88d9e6",
+ "rows": [
+  {
+   "artifact": "verifier-runtime-differential",
+   "item": "verifier-runtime-differential.json",
+   "comparison": "bytes",
+   "worktree": "aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9",
+   "freshClone": "aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "verifier-runtime-differential",
+   "item": "verifier-runtime-differential.md",
+   "comparison": "bytes",
+   "worktree": "24901f2176fb3157dedcb79f40564f2bfe9bcd10db94018f5c8942c56c20b2d5",
+   "freshClone": "24901f2176fb3157dedcb79f40564f2bfe9bcd10db94018f5c8942c56c20b2d5",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "benchmark-results (B1 registered generator)",
+   "item": "metrics-run-1.json",
+   "comparison": "bytes",
+   "worktree": "d4674750802eb9698b0eadbcbfb77d94b8c0724bec26eab8f3a342faef668c85",
+   "freshClone": "d4674750802eb9698b0eadbcbfb77d94b8c0724bec26eab8f3a342faef668c85",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "benchmark-results (B1 registered generator)",
+   "item": "metrics-run-2.json",
+   "comparison": "bytes",
+   "worktree": "d4674750802eb9698b0eadbcbfb77d94b8c0724bec26eab8f3a342faef668c85",
+   "freshClone": "d4674750802eb9698b0eadbcbfb77d94b8c0724bec26eab8f3a342faef668c85",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "benchmark-results (B1 registered generator)",
+   "item": "pair-manifest.json",
+   "comparison": "bytes",
+   "worktree": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+   "freshClone": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "benchmark-results (B1 registered generator)",
+   "item": "results.json",
+   "comparison": "bytes",
+   "worktree": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f",
+   "freshClone": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "candidate-packages",
+   "item": "calor.0.24.0.nupkg",
+   "comparison": "bytes",
+   "worktree": "7ca79f334f2a83b7a7d53b612e1a2957b96e7203c3d918a90d742e72b0e6910c",
+   "freshClone": "f78b52ea0030440bc4ed53cec3ba1bddd670e3ed970df90b30e74a04b21d4781",
+   "result": "DIFFERENT"
+  },
+  {
+   "artifact": "candidate-packages",
+   "item": "calor.0.24.0.nupkg",
+   "comparison": "zip entry contents (sha256 per entry)",
+   "entries": 65,
+   "differingEntries": [
+    "tools/net10.0/any/Calor.Runtime.dll",
+    "tools/net10.0/any/Calor.Runtime.pdb",
+    "tools/net10.0/any/calor.dll",
+    "tools/net10.0/any/calor.pdb"
+   ],
+   "result": "DIFFERENT"
+  },
+  {
+   "artifact": "candidate-packages",
+   "item": "Calor.Sdk.0.24.0.nupkg",
+   "comparison": "bytes",
+   "worktree": "3b828897426764ebce7a7ec40038fbcb5306742d2db019ac8315a6bc3038101e",
+   "freshClone": "4c9e476a713ec20b97816c8a37cd9df14ce35f305bae3a403c711e472a9d9ad0",
+   "result": "DIFFERENT"
+  },
+  {
+   "artifact": "candidate-packages",
+   "item": "Calor.Sdk.0.24.0.nupkg",
+   "comparison": "zip entry contents (sha256 per entry)",
+   "entries": 32,
+   "differingEntries": [
+    "tasks/net10.0/Calor.Runtime.dll",
+    "tasks/net10.0/Calor.Tasks.dll",
+    "tasks/net10.0/calor.dll"
+   ],
+   "result": "DIFFERENT"
+  },
+  {
+   "artifact": "release-metadata",
+   "item": "calor-nuget-696ab82470626164979a07792ed74932ab88d9e6.provenance.json",
+   "comparison": "bytes",
+   "worktree": "3e01e4a2e0e9a4657e0604ee467dbeb9e0979c2585b4656589e36cffa2e428ca",
+   "freshClone": "e3c675ee3b7b1d3032564f034ca986bd293844bda884353ea8f3eb7bd22d1ff9",
+   "result": "DIFFERENT"
+  },
+  {
+   "artifact": "release-metadata",
+   "item": "calor-nuget-696ab82470626164979a07792ed74932ab88d9e6.sbom.spdx.json",
+   "comparison": "bytes",
+   "worktree": "51047a92ddacf53d5bfb59df891d91939ada75e48d3588c9795b14894a140251",
+   "freshClone": "9e5c99260df70dc208d17a48720803ff8cde0d05eae1e0e6f2d06e17d6c5ca6e",
+   "result": "DIFFERENT"
+  },
+  {
+   "artifact": "github-release-notes (rendered)",
+   "item": "release-notes.md",
+   "comparison": "bytes",
+   "worktree": "3d3e53d0df15aa4f8e5b07aa0c2d0ac9be9f1849125ef4b29340ea1e1ca67b1c",
+   "freshClone": "3d3e53d0df15aa4f8e5b07aa0c2d0ac9be9f1849125ef4b29340ea1e1ca67b1c",
+   "result": "IDENTICAL"
+  },
+  {
+   "artifact": "website-deployment (build only)",
+   "item": "treeSha256",
+   "comparison": "R2 tree digest",
+   "worktree": "8b2ba26a733a5617fd5fdbb0a1066926d51b68502bd95fccf6ae53c40f597cbf",
+   "freshClone": "69a1327ad174676279a9e71826e5deba240c75505f9b32cd766892e2531faaa3",
+   "result": "DIFFERENT"
+  }
+ ]
+}

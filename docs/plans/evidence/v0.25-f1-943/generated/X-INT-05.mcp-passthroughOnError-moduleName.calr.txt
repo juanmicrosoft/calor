@@ -1,0 +1,25 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §CSHARP{    public static string Run()
+    {
+        void Bump(ref int x) { x = x + 1; }
+        void SetThenThrow(out int y) { y = 7; throw new InvalidOperationException(); }
+
+        int a = 1;
+        Bump(ref a);
+        Bump(ref a);
+        int b = 0;
+        try
+        {
+            SetThenThrow(out b);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        return a + "|" + b;
+    }
+    }§/CSHARP
+
+

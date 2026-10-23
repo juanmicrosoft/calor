@@ -1,0 +1,5 @@
+warmup run 1: 12.759s
+measured run 2: 12.669s
+measured run 3: 12.419s
+measured run 4: 12.300s
+median: 12.419s (maximum 24.000s)

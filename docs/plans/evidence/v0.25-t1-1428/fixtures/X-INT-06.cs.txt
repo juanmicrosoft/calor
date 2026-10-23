@@ -1,0 +1,17 @@
+// 0.25 T1 (#1428) fixture X-INT-06 (F2 x F3): an interpolation hole that calls a native local
+// function. The local function has a side effect, so hole order and single evaluation are
+// observable; the hole result is formatted.
+using System;
+
+public static class Probe
+{
+    static string log = "";
+
+    public static string Run()
+    {
+        int Sq(int x) { log = log + x; return x * x; }
+
+        string s = $"{Sq(2):D3}-{Sq(3),3}-{Sq(Sq(2))}";
+        return s + "|" + log;
+    }
+}

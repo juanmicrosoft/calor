@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+  "compilerInventoryBeforeDocs": 12018,
+  "documentationCases": 50,
+  "compilerInventoryWithDocs": 12068,
+  "expectedCompilerSkips": 3,
+  "executionAuthority": {
+    "sourceCi": "https://github.com/juanmicrosoft/calor/actions/runs/34988156401",
+    "documentationPr": "https://github.com/juanmicrosoft/calor/pull/1463",
+    "note": "Consult final-head checks for execution disposition. Expected inventory is not a claim that an unfinished invocation passed."
+  },
+  "localReceipts": [
+    {
+      "sourceCommit": "2a79dfdf60463508474119bd3bb8f7c60c74ec37",
+      "scope": "Full compiler suite excluding the separately committed documentation cases",
+      "passed": 11415,
+      "skipped": 3,
+      "total": 11418,
+      "duration": "11m21s",
+      "inventoryGate": "PASS",
+      "limitation": "Historical pre-shadow-repair run; not a full final-head run."
+    },
+    {
+      "measuredOnTopOf": "2a79dfdf60463508474119bd3bb8f7c60c74ec37",
+      "sourceContentCommit": "eed448fa44ac95338619c0c5391cba7ce2e3432c",
+      "scope": "Author's related regression run including all 1907 callable cases",
+      "passed": 3131,
+      "includesShadowingDelta": 600
+    },
+    {
+      "sourceCommit": "eed448fa44ac95338619c0c5391cba7ce2e3432c",
+      "scope": "Parent normal catalog, binder baseline, effect ledger, and commit-stamp ratchets",
+      "passed": 38,
+      "duration": "1m3s",
+      "regenerationEnabled": false
+    }
+  ],
+  "persistentSurfaces": [
+    {
+      "test": "tests/Calor.Compiler.Tests/Binding/StageBReceivingSurfaceTests.cs",
+      "scope": "Outer array, nullable elements, immediate STRING generic payload, and nominal references at all three boundaries; production option combinations and safe-to-unsafe-to-safe shared-context transitions."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/Binding/BindingRoutingCliTests.cs",
+      "scope": "Actual CLI negative and safe controls, supported flag combinations, environment-off behavior, and output suppression."
+    },
+    {
+      "test": "tests/Calor.LanguageServer.Tests/Utilities/BindingDiagnosticRoutingTests.cs",
+      "scope": "Active shape/boundary parity and clearing stale diagnostics after edits."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/Binding/StructuralNullabilityJoinTests.cs",
+      "scope": "Conditional, match, and coalescing joins; array rank/container/elements; generic aliases and inferred payload retention."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/Binding/StageBDelegateReturnTests.cs",
+      "scope": "Bare and Invoke delegate returns through direct and inferred consumers; exact nullability diagnostic ownership with type checking on and off."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/Binding/CallableMutationFlowTests.cs",
+      "scope": "Deferred writes, aliases, call-time targets, loop paths, branches, exception prefixes and filters, diagnostic rollback, hidden captures, and resolved safe controls."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/Binding/ArrayAllocationAnnotationTests.cs",
+      "scope": "Actual FizzBuzz conversion/runtime, sized and rectangular arrays, constructor-filled nominal arrays, declared annotations, and nullable container/element negatives."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/SafeConsumptionRuntimeTests.cs",
+      "scope": "Executable manual ObjectDetails-style early-return migration and preserved null ordering."
+    },
+    {
+      "test": "tests/Calor.Compiler.Tests/NullabilityDocumentationTests.cs",
+      "scope": "Ten complete guide snippets through five production modes; committed with the documentation rather than counted in source-only inventory."
+    }
+  ],
+  "reusedEntryPointEvidence": {
+    "baselinePacket": "../scalar-activation-1386/surface-matrix.json",
+    "scope": "The shared compilation entry points and Stage A SDK/MSBuild/cache mechanisms are retained; these historical manual rows are not relabeled as new final-head Stage B measurements.",
+    "currentCoverage": "Final source CI runs package-consumer and Tasks/MSBuild suites. Stage B's direct shape/mode/cache controls are identified separately above."
+  },
+  "ciAttempts": [
+    {
+      "run": 34981014060,
+      "head": "2a79dfdf60463508474119bd3bb8f7c60c74ec37",
+      "disposition": "Compiler and quality jobs cancelled at their old 20/35-minute budgets; not a green source run."
+    },
+    {
+      "run": 34986981146,
+      "head": "eed448fa44ac95338619c0c5391cba7ce2e3432c",
+      "disposition": "Parent cancelled as superseded by the workflow-capacity head; not a clean attempt."
+    },
+    {
+      "run": 34988156529,
+      "head": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+      "disposition": "Website attempt 1: 55 passed and one assets.spec.ts networkidle timeout under /calor. Failed jobs retried once; attempt 2 passed. No asset budget or assertion was relaxed."
+    },
+    {
+      "run": 34985729502,
+      "head": "3ada71307892847a9c04b86f0eda36111dfab39d",
+      "disposition": "Obsolete manually dispatched documentation run cancelled after source-base updates; not final documentation acceptance."
+    }
+  ]
+}

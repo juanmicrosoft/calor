@@ -1,0 +1,14 @@
+  Determining projects to restore...
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Runtime/Calor.Runtime.csproj (in 42 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Compiler/Calor.Compiler.csproj (in 110 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj (in 120 ms).
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Ids.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/tests/Calor.Ids.Tests/bin/Release/net10.0/Calor.Ids.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.22

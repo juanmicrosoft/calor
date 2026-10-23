@@ -1,0 +1,1585 @@
+[
+  {
+    "artifact": "compiler-caches.trx",
+    "counters": {
+      "total": "54",
+      "executed": "54",
+      "passed": "54",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "cases": [
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Hash_Quantifiers",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.CacheEntry_InvalidatesOnZ3VersionChange",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPostcondition_NoResultReference_BodyDependent",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.CacheEntry_TimeoutZeroMeansInfinite_NotSmallest",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_DoesNotCacheUnsupported",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.CorruptedOutput_IsNotTrusted_ForcesRecompile",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.EveryModeledExpressionKind_HashesWithContent",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.MidCompileEdit_IsNotRecordedAsCompiled_NextRunRecompiles",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.ClearFirst_DiscardsPriorState",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.UnhashableKey_LookupRefusesEvenIfAnEntryExistsOnDisk",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.CacheEntry_SemanticsVersionMismatch_Invalid",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_HandlesMissingDirectory",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPrecondition_SameExpression_SameHash",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Hash_AllExpressionNodeTypes",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Hash_NestedExpressions",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_MissOnDifferentContract",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_HandleCorruptedFile",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.OptionsChange_InvalidatesAllCachedFiles",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_StatisticsIncludesEvictions",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPrecondition_DifferentParams_DifferentHash",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.WarmBuild_SkipsAllUnchangedFiles",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_Statistics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.NoCacheSettings_AlwaysRecompiles",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.E2E_CachedResultsMatchFreshResults",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.CompilerHashChange_InvalidatesAllCachedFiles",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPostcondition_ResultReferencing_IncludesBody",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.FileWithNonErrorDiagnostics_IsNeverSkipped_SoTheyReappearOnWarmRuns",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_MissAfterClear",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.EntryWithoutEffectSummary_IsNotACacheHit_SoViolationsStillSurface",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.E2E_NoCacheFlagDisablesCache",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.E2E_CacheHitOnSecondRun",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.E2E_CachePopulatesOnFirstRun",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_ClearBeforeVerification",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_DoesNotCacheSkipped",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.ChangedFile_IsRecompiled_OthersStaySkipped",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.E2E_ClearCacheFlagWorks",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.ManifestChange_InvalidatesAllCachedFiles",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_EvictsOldEntriesWhenSizeLimitExceeded",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPostcondition_IncludesPreconditions",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_VeryLongContractExpression",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.CacheEntry_UnprovenIsTimeoutDependent_DefinitiveIsNot",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.MissingOutput_ForcesRecompileOfThatFileOnly",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.UnhashableKind_RefusesCacheRoundTrip",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_DisabledReturnsNoHits",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_UnicodeInIdentifiers",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_HitsOnSecondCall",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_NoEvictionWhenUnlimited",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.FailedFile_IsNotCached_AndRecompilesNextRun",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPrecondition_DifferentParamNames_DifferentHash",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.Cache_PersistsAcrossInstances",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.HashPrecondition_DifferentExpression_DifferentHash",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.CacheEntry_InvalidatesOnFormatVersionChange",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.IncrementalCliBuildTests.CrossModuleViolation_IsNeverPublishedOrCached",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.VerificationCacheTests.ParameterSerialization_IsDelimiterForgeryProof",
+        "outcome": "Passed"
+      }
+    ]
+  },
+  {
+    "artifact": "lsp-state.trx",
+    "counters": {
+      "total": "42",
+      "executed": "42",
+      "passed": "42",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "cases": [
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.CancelledUpdate_PreservesCompletedSnapshotAndSameVersionRetrySucceedsAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.GetTokenAtPosition_ReturnsToken",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Update_ChangesSource",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.ReanalysisRegistrationRace_DidChangeVersionAlwaysWinsAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostic_Info_ConvertsSeverity",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_LegacySemver_ReportsCalor0701",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_InvalidSource_HasErrors",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.CancellationRace_NewerVersionWinsAndCanceledAnalysisCannotPublishAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.GetTokenAtPosition_InvalidPosition_ReturnsNull",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_MalformedNewType_PublishesDiagnosticWithoutThrowing(expression: \"\u00a7NEW{}\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_InteropConstruct_PublishesInfoSeverityUnsupported_NotError",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.DisposeDuringBlockedAnalysis_CancelsWithoutDisposingWorkerTokenAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Constructor_SetsProperties",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.GetTokenAtOffset_ReturnsToken",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostic_WithFix_PreservesFixDescription",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostic_Warning_ConvertsSeverity",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.OutOfOrderAndEqualVersions_AreIgnoredAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.AnalysisFailure_IsObservableAsCalor9999AndStructuredLogAsync(phaseValue: 2)",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspSeverity_MapsCorrectly",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.UndefinedVariable_WithSimilarName_HasQuickFix",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_CurrentSemver_NoVersionDiagnostics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.SupersededWorkspaceDiagnostics_CannotOverwriteUnchangedDocumentAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.DiagnosticPublicationRace_NeverRegressesGenerationForUnchangedUriAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_WithBindingErrors_StillHasAst",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_MalformedNewType_PublishesDiagnosticWithoutThrowing(expression: \"\u00a7NEW{   }\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_SetsFilePath",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostic_Error_ConvertsSeverity",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.NewerPendingUpdateWinsAndOlderRetryRemainsRejectedAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostics_ConvertsBag",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_MalformedNewType_PublishesDiagnosticWithoutThrowing(expression: \"\u00a7NEW{<i32>}\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.UndefinedVariable_WithSimilarName_HasDidYouMeanSuggestion",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Update_ClearsPreviousDiagnostics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.ConcurrentUpdatesAndReads_PublishOnlyCoherentLatestSnapshotAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnosticSingleLine_ConvertsRange",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.CancelledInitialOpen_IsUnacceptedAndAbsentAsync",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Calor0270_InferredLocalReceiver_IsOneInformationDiagnostic",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostic_ConvertsSingleLineRange",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.Utilities.DiagnosticConverterTests.ToLspDiagnostics_EmptyBag_ReturnsEmpty",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.AnalysisFailure_IsObservableAsCalor9999AndStructuredLogAsync(phaseValue: 4)",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Reanalyze_ValidSource_ParsesAst",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.Calor0270_MemberChainReceiver_IsSilentInTheEditor",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.LanguageServer.Tests.State.DocumentStateTests.AnalysisFailure_IsObservableAsCalor9999AndStructuredLogAsync(phaseValue: 3)",
+        "outcome": "Passed"
+      }
+    ]
+  },
+  {
+    "artifact": "msbuild-cache.trx",
+    "counters": {
+      "total": "40",
+      "executed": "40",
+      "passed": "40",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "cases": [
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.Load_MissingCache_ReturnsNull",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.CreateFileEntry_CapturesAllFields",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsFileUpToDate_MatchingStatFieldsButDifferentBytes_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsFileUpToDate_NullEntry_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_NoChange_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.NormalizeRelativePath_ConsistentAcrossPlatforms",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_NullCache_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsFileUpToDate_MtimeChanged_ContentSame_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.CanonicalInputs_DistinguishEveryTaskInput_AndDoNotPersistPaths",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeManifestHash_FindsManifestFiles_HashChangesOnContentChange",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_ManifestHashChanged_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsFileUpToDate_FileDoesNotExist_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ManifestHash_IncludesUserLevelManifests_AndDistinguishesScopes",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.LoadSave_RoundTrip_PreservesEffectSummary",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputePathHash_Deterministic",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsFileUpToDate_ContentChanged_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.GlobalInvalidationReasons_AreDeterministic_AndTrackCompilerSemantics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.Load_CurrentSchemaMissingSemanticVersion_IsRejectedAsPartial",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.GetCachePath_IsInsideOutputDirectory",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.GetPathComparer_ReturnsCorrectComparerForPlatform",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeRelativePath_OutOfProjectFile_Sanitized",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_OptionsHashChanged_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeRelativePath_OutOfProjectFile_RootedPath_Sanitized",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.Save_AtomicWrite_NoCorruptionOnRead",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_OutputDirectoryChanged_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_FormatVersionChanged_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.CanonicalInputs_ReferenceOrderIsStable_AndContentChangesFingerprint",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_OutputDirectory_NormalizedComparison",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.OptionsToken_EnvironmentOptOut_MovesTheToken",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeCompilerHash_TracksResolvedCompilerAndRuntimeClosure",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.NormalizeRelativePath_EdgeCases",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.OptionsToken_DistinguishesEffectiveTypeCheck",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeFileHash_SameContent_ReturnsSameHash",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.Load_CorruptCache_ReturnsNull",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeFileHash_DifferentContent_ReturnsDifferentHash",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ManifestLoader_LoadsSamePriorityManifestsInCanonicalPathOrder",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.CanonicalInputs_HashResolvedRuntimeImplementationContent",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.IsGlobalInvalidation_CompilerHashChanged_ReturnsTrue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.ComputeRelativePath_InProjectFile_NotSanitized",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Tasks.Tests.BuildStateCacheTests.LoadSave_RoundTrip_PreservesState",
+        "outcome": "Passed"
+      }
+    ]
+  },
+  {
+    "artifact": "nullability-baseline.trx",
+    "counters": {
+      "total": "139",
+      "executed": "139",
+      "passed": "139",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "cases": [
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundStructuralExpression_NonString_Type_Stays_Oblivious",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_Fires_For_StringOperation_ToString_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.NotAnnotated_Source_Into_NonNull_String_Target_IsSafe",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundType_PreservesRoslynSymbolBackreference",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_NonString_Type_Stays_Oblivious",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetParameterBoundTypes_UnresolvedResult_ReturnsEmpty",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S7_Calor0272_DoesNotFire_For_NonNullOption_Roundtrip",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_FiresFor_ReturningBcl_NullableString_FromNonNullReturn",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.MapAnnotation_Roslyn_Annotated_Becomes_Annotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_When_NonNullStringVariable_BoundToNonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.PropertySymbol_Inherits_NotAnnotated_From_NonNullStringProperty",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.NamespaceQualifiedTopLevelOverloads_ResolveBareCallsAndReportNoMatch",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_BothBranches_NotAnnotated_Yields_NotAnnotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_Predicate_Fires_For_NullableElementArray_Return",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S5_Calor0272_IsError_Under_CurrentSemVer",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetParameterBoundTypes_IntParse_ParameterIsNotAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_FiresFor_EnvironmentGetVariable_AssignedToNonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.Null_Target_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_NonStringElement_Array",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.CallGraphSideChannel_CarriesBoundReceiverTypesPerCallSite",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_Diagnostic_Message_MentionsSourceAnnotation",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_ObliviousBranch_Yields_Oblivious_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.Overloads_ResolveByArity_RegardlessOfDeclarationOrder",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Calor0272_DoesNotFire_For_NonNullUserClass_Roundtrip",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_NeverBranch_Uses_OtherBranch_Annotation",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.SameArityOverloads_ResolveByExactArgumentTypes",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundVariableExpression_Inherits_NotAnnotated_From_StringSymbol",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.NamedArgumentMatchingNoParameter_IsReported_NotAnIce",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.NullabilitySeverity_S5Gate_Error_At_Major2",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundInterpolatedStringExpression_Type_Is_NotAnnotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.Oblivious_Source_Into_Nullable_String_Target_IsSafe",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_InferredType_StringLocal_FromLiteral",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundType_StringConcat_IsNotAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundTypeEx_UnresolvedResult_ReturnsNull",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.LambdaParameter_Inherits_Annotated_From_NullableStringParameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_StringOperation_Substr_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.LambdaParameter_Inherits_NotAnnotated_From_NonNullStringParameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_FiresFor_CalorNullableString_Var_Passed_To_NonNullableParameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.FieldSymbol_Inherits_Annotated_From_NullableStringField",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.All_String_Surface_Aliases_Are_In_Scope(qualifiedName: \"string\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.Annotated_Source_Into_Nullable_String_Target_IsSafe",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_InterpolatedString_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_DoesNotFire_For_NonString_Return",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.ArrayOfString_Target_Skips_Silently_PerD6",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.MapAnnotation_Roslyn_None_Becomes_Oblivious_PerD3",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundTypeEx_StringArrayReturn_Surfaces_As_ArrayBoundType",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.NullabilitySeverity_S5Gate_Info_At_LegacyMajor",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.New_Expression_With_Args_Has_NotAnnotated_Type",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundTypeEx_ScalarReturn_Surfaces_As_NominalBoundType",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_When_TargetIs_NullableString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundBinaryExpression_StringConcat_Type_Is_NotAnnotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_DoesNotFire_For_ProvablyNonNull_StringLiteral",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_Fires_For_NullableStringParameter_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3A_Calor0274_ScopeBlocked_When_NullableArg_Fails_CalorOverload",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableUserClassReturn",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.NoArityMatch_IsANonSilentError",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_Fires_For_PostfixNullableString_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.EveryConcreteBoundExpression_DeclaresTypeOverride_PostF5",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.LambdaExpression_BindsToFunctionBoundType_WithUnchangedDisplayString(bindingLine: \"\u00a7B{g} \u00a7LAM{l2}\", expectedDisplay: \"LAMBDA()->VOID\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3A_Calor0274_DoesNotFire_For_NonNullArg_To_NonNullable_CalorParameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundStructuralExpression_String_WithNotAnnotated_Param_Yields_NotAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_AnnotatedAndOblivious_Yields_Annotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundVariableExpression_Inherits_Annotated_From_NullableStringSymbol",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_NonNullElementArray_Roundtrip",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundVariableExpression_NonString_Type_Stays_Oblivious",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.BoundExpressionType_DisplayString_ByteIdenticalToTypeName_OnCommonSampler",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundStructuralExpression_String_DefaultAnnotation_Stays_Oblivious",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.All_String_Surface_Aliases_Are_In_Scope(qualifiedName: \"str\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_FiresFor_PassingNullableBclString_To_NonNullableParameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_NonNullStringParameter_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Does_Not_Fire_For_UnresolvedType",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_NameOf_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S7_Calor0272_Fires_When_NullableOption_Bound_To_NonNullOption",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_Fires_When_NullableStringElement_Assigned_To_NonNullElementArray",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.LambdaExpression_BindsToFunctionBoundType_WithUnchangedDisplayString(bindingLine: \"\u00a7B{f} \u00a7LAM{l1:x:i32} (+ x INT:1)\", expectedDisplay: \"LAMBDA(i32)->INT\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_When_TargetElement_IsNullableString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.Oblivious_Source_Into_NonNull_String_Target_IsPossiblyNull_PerD3",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Bridges_Dotted_Namespace_On_ShortName_Match",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.LambdaFunctionBoundType_CarriesParameterAndReturnTypes",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_Fires_For_ArrayStringTarget_Direct_Predicate",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundStringLiteral_Utf8_Type_Is_NotAnnotated_ReadOnlySpanBytes",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.ForeachLoopVariable_BinderPath_Inherits_Annotated_From_NullableString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S5_Calor0273_IsError_Under_CurrentSemVer",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.ParameterSymbol_NonString_Keeps_Oblivious",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S7_Calor0273_Fires_For_NullableOption_Return_Into_NonNullDeclared",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundType_UnresolvedResult_ReturnsNull",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetParameterBoundTypes_StringConcat_ParametersAreAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Calor0272_Fires_When_NullableUserClass_Bound_To_NonNullUserClass",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_DoesNotFire_For_ProvablyNonNull_Literal_Argument",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Does_Not_Fire_For_PrimitiveType_INT",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundType_IntParse_IsNotAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_CalorNative_StringLiteral_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S5_Calor0274_IsError_Under_CurrentSemVer",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.PropertySymbol_Inherits_Annotated_From_NullableStringProperty",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.DuplicateSignature_IsAnError",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_Ternary_BothBranches_NotAnnotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3B_BoundCall_Type_Inherits_Declared_ReturnAnnotation_ForCalorFunction",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.TypeName_StringEquality_NotAddedAfterFreeze",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S7_Calor0274_Fires_For_NullableOption_Passed_To_NonNullParam",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_Ternary_VariableBranch_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.All_String_Surface_Aliases_Are_In_Scope(qualifiedName: \"System.String\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.All_String_Surface_Aliases_Are_In_Scope(qualifiedName: \"STRING\")",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3B_BoundCall_Type_Inherits_Annotated_For_NullableUserClassReturn",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.FieldSymbol_Inherits_NotAnnotated_From_NonNullStringField",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BoundTypeArchitectureTests.BoundType_HasNo_ParseFromString_Method",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Calor0274_Predicate_Fires_For_NullableUserClass_Argument",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.MapAnnotation_Roslyn_NotAnnotated_Becomes_NotAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S7_Calor0272_DoesNotFire_For_NonWhitelistedContainer",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_Message_NamesParameter_And_SourceAnnotation",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.Null_Source_ReturnsFalse",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Calor0273_Fires_For_NullableUserClass_Return_Into_NonNullDeclared",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.MetadataBinderNullabilityTests.GetReturnBoundType_EnvironmentGetVariable_IsAnnotated",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S5_AllThreeCodes_ShareSameGatedSeverity",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S8_Does_Not_Fire_For_DifferentShortName_Nominals",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundStringLiteral_Type_Is_NotAnnotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableCalorReturn",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.New_Expression_Result_Assigned_To_NonNull_UserRef_DoesNotFire_Calor0272",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_DoesNotFire_For_NonString_Parameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.ForeachLoopVariable_Inherits_Annotated_From_NullableStringElement",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_DoesNotFire_When_Parameter_IsNullableString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.NonString_Target_Skips_Silently_PerD6",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.New_Expression_Has_NotAnnotated_Type",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.BinderOverloadSetTests.SecondOverload_NoLongerSilentlyDropped",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_StringConcatenation_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0274_Predicate_Fires_For_NullableElementArray_Argument",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_DoesNotFire_For_StringOperation_Trim_Bound_To_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0272_Fires_When_NullableStringVariable_BoundToNonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.ForeachLoopVariable_BinderPath_Inherits_NotAnnotated_From_NonNullString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_FiresFor_ReturningBcl_NullableString_FromMethod",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundBinaryExpression_NonString_Type_Stays_Oblivious",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3A_Calor0274_Fires_For_NullableUserRefArg_To_NonNullable_CalorParameter",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_AnnotatedBranch_Yields_Annotated_String",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.F3A_Calor0274_DoesNotFire_When_TargetParameter_IsNullable",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityCheckerTests.Annotated_Source_Into_NonNull_String_Target_IsPossiblyNull",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.S7_Calor0272_Fires_When_NullableListElement_Bound_To_NonNullListElement",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.ForeachLoopVariable_Inherits_NotAnnotated_From_NonNullStringElement",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.Calor0273_DoesNotFire_When_ReturnType_IsNullableString",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Compiler.Tests.NullabilityIntegrationTests.BoundConditionalExpression_BothBranches_Annotated_Yields_Annotated_String",
+        "outcome": "Passed"
+      }
+    ]
+  },
+  {
+    "artifact": "retained-soundness-guards.trx",
+    "counters": {
+      "total": "92",
+      "executed": "92",
+      "passed": "92",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "cases": [
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CannotProveLengthEqualsLengthPlusOne",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.SameArrayLengthIsConsistent",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.MethodPostconditionGuard_CarriesOwnFunctionId_NotUnknown",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.TwoArrayParametersAreDistinctByDefault",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NarrowIntNegation_UsesCSharpPromotion",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ZeroLengthArrayHasNoValidIndices",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.MixedSignedness_MinusOneNeverEqualsUnsigned",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.StringAndArrayLengthAreIndependent",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ForallOverArrayIndicesWithLength",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.ConstructorPrecondition_ReportsOwnId_NotForeignMethodId",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.WideSignedLiteral_PreservesI64Value",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NarrowUnsignedMinusLiteral_IsSignedInt_CanBeNegative",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.ProvenPostcondition_Default_ElidesGuard",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.U32IndexMinusSignedOneHasMixedSemantics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.U32IndexWithU32ArrayLengthComparison",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.TranslatorRejectsNestedArrayDeclaration",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.U32IndexSubtractionWorksWithBoundedIndex",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ArrayCarriedObligation_IsAssumedNotProven",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CircularConstraintDoesNotFoolProver",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthMultiplicationCanOverflow",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthOverflowDoesNotCreateFalseProof",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LargeIndexLiteralAccessIsAllowed",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NarrowIntComparisonWithLiteral_StaysModeled",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.UnregisteredField_IsRefused",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ArrayParameter_DemotesEvenAPurelyNumericPostcondition",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.OnDemandArrayLength_SetsTheReferenceModelFlag",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.TwoArraysHaveIndependentLengths",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.DisprovesIndexValidWithoutPrecondition",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.AccessBeyondLengthIsNotConstrained",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ProvesIndexValidWhenPreconditionHolds",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.OperatorPostcondition_NeverElidesOnForeignMethodProof",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NonStringObligation_StaysProven",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.DisprovesAccessToEmptyArrayIsValidWithoutConstraint",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ConstrainedArraysCanShareElements",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CannotProveArrayElementConstrainsLength",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthDoesNotConstrainValidIndices",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ProvesLastValidIndexIsLengthMinusOneWithBoundedLength",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.MethodPostcondition_StringModelCarried_StaysAssumed_GuardKept",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.DisprovesLastValidIndexWithUnboundedLength",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CannotProveContradictoryLengthConstraints",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CannotInferLengthFromForallConstraint",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ArrayElementsAreImmutableDuringVerification",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.StringObligation_IsAssumedNotProven",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CannotExploitIndexWraparound",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.BoolArrayIsUnsupported",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.StringTypedParameter_DemotesEvenNumericObligation",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ContractDivision_GuardEntailedByPrecondition_StaysProven",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.IndexComparedWithLengthUsesCorrectSemantics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.NestedArrayTypeIsUnsupported",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ContractDivision_NonZeroGuardAlone_StillAssumed_OverflowResidual",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ProvesEmptyArrayLengthIsZero",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CounterexampleContainsArrayLengthInfo",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.ProvenPostcondition_WithOptOut_KeepsGuard",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ArrayEqualityCannotBeExpressedDirectly",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.MixedSignedness64Bit_IsRefused",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.MixedSignedness_U32WithI64_ComparisonModeled",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NarrowUnsignedWithInt32Arithmetic_WrapsAt32_NotAt64",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ShiftCount_IsMasked_LikeCSharp",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.MultipleLengthReferencesUseSameVariable",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CannotProveAllElementsEqualWithoutQuantifier",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ProvesNoValidIndexForEmptyArray",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthSubtractionCanUnderflow",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.SameArrayAccessedTwiceYieldsSameValue",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.DisprovesAccessAtLengthIsValid",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthComparedWithNegativeIntegerUsesCorrectSemantics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthCanBeMaxU32",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ContractDivision_UnguardedDivisor_DemotesToAssumed",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthIsImmutableDuringVerification",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NarrowIntArithmetic_UsesCSharpPromotion",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.Int32MinSubtractionBehavior",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ProvesLengthArithmeticWithPreconditions",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.I64ArrayLengthIsStill32Bit",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ContractDivision_ConstantDivisor_StaysProven",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.DifferentLargeIndicesYieldDifferentElements",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.DisprovesExistsIndexWithUnboundedLength",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.UncheckedI32Overflow_UsesBitVectorWraparound",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthComparedWithSignedMaxUsesCorrectSemantics",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.U32ArrayLengthIsUnsigned",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.SignedIndexCanBeNegative",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.LengthAdditionCanOverflow",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.SignedIndexAtInt32MinHandledCorrectly",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ContractDivision_ConditionalPosition_IsUnsupported",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.ExistsIndexWithinBoundsWithBoundedLength",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.CounterexampleProvidedForDisprovenLengthClaim",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.NegativeIndexAsUnsignedIsLargePositive",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.NegativeIndexComparedWithLengthHandledCorrectly",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.PurelyNumericObligation_StillProvenAfterD14",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.MethodPostcondition_Proven_Elides",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.ArrayLengthSoundnessTests.StringAndArrayLengthCanBeConstrainedTogether",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.ContractDivision_InsideImplicationConsequent_IsUnsupported",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.MethodElisionCursorTests.MethodPostcondition_ArrayTakingMethod_NeverElides_GuardKept",
+        "outcome": "Passed"
+      },
+      {
+        "name": "Calor.Verification.Tests.W1Slice1SoundnessTests.NarrowUnsignedArithmetic_PromotesToSignedInt",
+        "outcome": "Passed"
+      }
+    ]
+  }
+]

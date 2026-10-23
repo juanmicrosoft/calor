@@ -1,0 +1,50 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+  §U{System.Runtime.CompilerServices}
+  §U{System.Text}
+
+  §NS{ns_global:_global:global}
+    §CSHARP{
+[InterpolatedStringHandler]
+public ref struct RecordingHandler
+{
+    private StringBuilder builder;
+
+    public RecordingHandler(int literalLength, int formattedCount)
+    {
+        builder = new StringBuilder();
+        builder.Append("H(" + literalLength + "," + formattedCount + ")");
+    }
+
+    public void AppendLiteral(string s)
+    {
+        builder.Append("L[" + s + "]");
+    }
+
+    public void AppendFormatted<T>(T value)
+    {
+        builder.Append("F[" + value + "]");
+    }
+
+    public string Result()
+    {
+        return builder.ToString();
+    }
+}
+    }§/CSHARP
+
+    §CSHARP{public static class Probe
+{
+    public static string Log(RecordingHandler handler)
+    {
+        return handler.Result();
+    }
+
+    public static string Run()
+    {
+        int x = 7;
+        return Log($"a{x}b");
+    }
+}}§/CSHARP
+
+

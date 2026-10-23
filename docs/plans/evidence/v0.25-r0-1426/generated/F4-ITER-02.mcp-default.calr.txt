@@ -1,0 +1,42 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Source:pub}
+      §FLD{str:log:pub:stat} = ""
+
+      §PROP{p003:Guarded:Seq<i32>:pub}
+        §GET{pub}
+          §TR{try002}
+            §ASSIGN log (+ log "s")
+            §YIELD 1
+            §YIELD 2
+          §FI
+            §ASSIGN log (+ log "f")
+
+      §IXER{ix005:Seq<i32>:pub}
+        §GET{pub}
+          §YIELD 7
+          §IF{if004} fail
+            §TH §NEW{InvalidOperationException} §A "late" §/NEW
+          §YIELD 8
+
+
+    §CL{c006:Probe:pub:stat}
+      §MT{m007:Run:pub:stat} () -> str
+        §E{alloc}
+        §B{src} §NEW{Source} §/NEW
+        §EACH{each008:x:var} src.Guarded
+          §IF{if009} (== x 1)
+            §BK
+        §B{~seen:str} ""
+        §TR{try010}
+          §EACH{each011:y:var} §IDX{src} true
+            §ASSIGN seen (+ seen y)
+        §CA{InvalidOperationException:e}
+          §ASSIGN seen (+ (+ seen ":") e.Message)
+        §R (+ (+ Source.log "|") seen)
+
+
+

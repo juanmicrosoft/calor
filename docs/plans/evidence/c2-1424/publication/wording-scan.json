@@ -1,0 +1,41 @@
+{
+ "scanner": "scripts/verify_release_adjudication.py scan_text at 696ab82470626164979a07792ed74932ab88d9e6 (fresh clone)",
+ "surfaces": {
+  "release-notes": [
+   {
+    "code": "G012",
+    "message": "release-notes.md: forbidden wording 'independently verified'; 0.24 evidence is not independently adjudicated"
+   }
+  ],
+  "candidate-packages": [],
+  "website": [
+   {
+    "code": "G012",
+    "message": "docs/changelog/index.html: forbidden wording 'independently adjudicated'; 0.24 evidence is not independently adjudicated"
+   },
+   {
+    "code": "G012",
+    "message": "docs/changelog/index.html: forbidden wording 'independently verified'; 0.24 evidence is not independently adjudicated"
+   },
+   {
+    "code": "G012",
+    "message": "docs/changelog/index.txt: forbidden wording 'independently adjudicated'; 0.24 evidence is not independently adjudicated"
+   },
+   {
+    "code": "G012",
+    "message": "docs/changelog/index.txt: forbidden wording 'independently verified'; 0.24 evidence is not independently adjudicated"
+   },
+   {
+    "code": "G012",
+    "message": "search-index.json: forbidden wording 'independently verified'; 0.24 evidence is not independently adjudicated"
+   }
+  ],
+  "benchmark-headline-diagnostic": []
+ },
+ "verdict": {
+  "release-notes": "G012",
+  "candidate-packages": "clean",
+  "website": "G012",
+  "benchmark-headline-diagnostic": "clean"
+ }
+}

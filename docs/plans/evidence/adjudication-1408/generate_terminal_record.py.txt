@@ -1,0 +1,524 @@
+#!/usr/bin/env python3
+"""Generate the #1408 (0.24 A1) terminal record from git objects.
+
+Usage: generate_terminal_record.py <repo> <evidence commit> <out file>
+
+Every evidence hash is SHA-256 over the exact blob bytes at <evidence commit> (the C2 regeneration-3
+merge 12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e on main). A directory pointer carries `treeSha256`:
+SHA-256 over the sorted lines "<blob sha256>  <path relative to the directory>\\n" of every file under
+it at that commit (R2's tree-digest convention). Nothing is read from the working tree.
+
+Prepared by the A1 agent for the adjudicator (@juanmicrosoft). The agent proposes; the maintainer
+decides by merging. The committed copy of this script is generate_terminal_record.py.txt.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+
+REPO, EVIDENCE_COMMIT, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
+CANDIDATE = "04e61f188e85a710a91242e1ddbf35fcd50e329e"
+C1_LANDING = "b04e963f69a5a1016159cfcf8c5199eeea329fdb"
+C2_MERGE = "12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e"
+R3 = "docs/plans/evidence/c2-1424/regeneration-3/"
+EV = "docs/plans/evidence/"
+ROW = "reduced-maintainer-adjudicated"
+
+
+def git(*args: str) -> bytes:
+    return subprocess.run(["git", "-C", REPO, *args], check=True, capture_output=True).stdout
+
+
+def blob(path: str) -> bytes:
+    return git("show", f"{EVIDENCE_COMMIT}:{path}")
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def load(path: str) -> dict:
+    return json.loads(blob(path))
+
+
+def f(path: str) -> dict:
+    return {"path": path, "sha256": sha(blob(path))}
+
+
+def d(path: str) -> dict:
+    path = path.rstrip("/") + "/"
+    names = [n for n in git("ls-tree", "-r", "--name-only", EVIDENCE_COMMIT, "--", path).decode().splitlines() if n]
+    if not names:
+        raise SystemExit(f"empty or missing directory {path}")
+    lines = "".join(f"{sha(blob(n))}  {n[len(path):]}\n" for n in sorted(names))
+    return {"path": path, "files": len(names), "treeSha256": sha(lines.encode())}
+
+
+def ev(*items: str) -> list[dict]:
+    return [d(i) if i.endswith("/") else f(i) for i in items]
+
+
+contract = load(EV + "evidence-contract-1407/contract.json")
+inventory = load(EV + "evidence-contract-1407/artifact-inventory.json")
+packet = load(EV + "evidence-contract-1407/sha256.json")
+results = load(R3 + "results.json")
+freeze = load(R3 + "raw-artifact-freeze.json")
+registry = load(R3 + "claim-registry.json")
+publication = load(R3 + "publication-candidates.json")["publication"]
+limitation = contract["authorityCapacity"]["independence"]["publishedLimitation"]
+c2 = {a["id"]: a for a in results["artifacts"]}
+
+# Cross-check: every regeneration-3 file hash used here equals the raw-artifact freeze manifest.
+for path, digest in freeze["files"].items():
+    if path.startswith(R3) and sha(blob(path)) != digest:
+        raise SystemExit(f"{path} differs from raw-artifact-freeze.json")
+if freeze["candidate"]["commit"] != CANDIDATE or registry["candidate"] != CANDIDATE:
+    raise SystemExit("regeneration-3 records do not bind the candidate")
+
+TESTS = [R3 + f"ci/artifacts-37965086841/test-report-{p}.tar.gz" for p in (
+    "conversion", "enforcement", "evaluation", "experimental", "il-analysis", "language-server",
+    "roundtrip-harness", "semantics", "tasks", "verification")]
+CI_TEST = [R3 + "ci/run-37965086841.json"]
+RESULTS = [R3 + "results.json"]
+DET = [R3 + "determinism/result.json", R3 + "determinism/attempt-timing.json", R3 + "ci/run-37965084091.json"]
+REPRO = [R3 + "local/compare-a-b.md", R3 + "local/compare-local-ci-packages.md",
+         R3 + "local/compare-local-ci-website.md", R3 + "ci/run-37965092627.json"]
+
+# ---------------------------------------------------------------------------------------------
+# Artifact rows. c2Status is copied from regeneration-3 results.json; `cutoffDefects` quotes the
+# inventory's openDefects verbatim with the resolution this record adjudicates.
+# ---------------------------------------------------------------------------------------------
+ARTIFACTS = {
+    "verifier-runtime-differential": dict(
+        evidence=[R3 + "local/clone-a/vrd/verifier-runtime-differential.json", R3 + "local/clone-a/vrd/verifier-runtime-differential.md",
+                  R3 + "local/clone-a/vrd-check.log", R3 + "ci/artifacts-37965086841/verifier-runtime-differential.tar.gz", *DET],
+        bounds=["Totals 429 Proven / 156 Assumed / 585 refuted over 1,170 cells of the 65 whitelisted forms only; no claim beyond the whitelist.",
+                "Determinism is bounded by 30 attempts per environment on 5 platforms; rare non-determinism is not excluded."],
+        resolutions={"#1135: verdict changed on a byte-identical tree (runs 33137941806 success, 33139062112 failure, commit 04b32afa).": "Resolved by G3 PRs #1492 and #1500 (fresh Z3 context per query, platform-independent bytes) and confirmed on the candidate by determinism protocol 1.5.0, run 37965084091: DETERMINISTIC, 2,304 AGREE-PASS, all four determinism rows RESOLVED (C2 #1542). Adjudicated here: the frozen inventory has no defectResolutions entry for it."}),
+    "modeled-forms-whitelist": dict(evidence=[R3 + "local/clone-a/modeled-forms.log", R3 + "local/clone-a/tests/modeled-forms.trx", *CI_TEST],
+                                    bounds=["Validated (ModeledFormsTests 9 passed in two fresh clones); the whitelist bounds what the differential covers."]),
+    "release-test-suites": dict(evidence=[*CI_TEST, *TESTS, R3 + "local/clone-a/tests/Calor.Ids.Tests.trx", R3 + "local/clone-a/tests/Calor.Performance.Tests.trx"],
+                                bounds=["13 of 13 release-critical projects at the manifest's counts, one CI run (ubuntu-24.04) plus Ids and Performance locally on macOS.",
+                                        "Enforcement executed 694 of 695 in CI (the manifest's 1 expected skip) and 695 of 695 locally; the two runs disagree on that one skip."]),
+    "ci-test-reports": dict(evidence=[*CI_TEST, *TESTS, R3 + "archives.json"],
+                            bounds=["PASS-ONLY: a single CI run's reports, retained in git and on evidence/v0.24-archives. Enforcement 694/695 in CI vs 695/695 locally."]),
+    "test-manifest": dict(evidence=[R3 + "release-quality/test-quality.log", *CI_TEST],
+                          bounds=["Validated: every observed count equals expectedTotal/expectedSkipped (Compiler 13,038 with 3 skipped)."]),
+    "z3-upstream-pins": dict(evidence=[R3 + "local/clone-a/download-z3.log", R3 + "local/clone-b/download-z3.log"],
+                             bounds=["Re-materialized and verified, never rebuilt."]),
+    "z3-release-binaries": dict(evidence=[R3 + "local/z3-release-binaries.json", R3 + "release-quality/z3-release.log"],
+                                bounds=["7 of 7 mirror assets match .github/z3-binaries-4.15.7.sha256; the release is a pinned mirror, not rebuilt."]),
+    "toolchain-pins": dict(evidence=[R3 + "local/clone-a/restore.log", R3 + "ledger.json", EV + "c1-1423/candidate-manifest.json"],
+                           bounds=["Lockfiles verified by restore --locked-mode in two clones and every CI restore.",
+                                   "The exact SDK is observed, not pinned: CI requests setup-dotnet '10.0.x'. Every regeneration-3 job observed Microsoft SDK 10.0.401 / runtime 10.0.12. Byte reproducibility of the packages holds only with Microsoft's SDK 10.0.401 build."],
+                           resolutions={"Workflows request setup-dotnet 10.0.x, so the exact SDK patch is not pinned by CI; the 0.22 Stage B packet recorded SDK 10.0.401 / runtime 10.0.12 after the fact.":
+                                        "Not resolved. Accepted as observed-not-pinned by maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED (2026-10-07, candidate-manifest maintainerDecisions; no amendment). Carried as this row's limitation and as publish-time risk P2 in the sign-off packet."}),
+    "corpus-submodules": dict(evidence=[R3 + "release-quality/submodule-status.txt", R3 + "release-quality/submodules.log"],
+                              bounds=["Re-materialized: the candidate's gitlinks MediatR fb309026, serilog 0597ddfb, FluentValidation 71b3c60c."]),
+    "roundtrip-reports": dict(evidence=[R3 + "release-quality/roundtrip.log", R3 + "release-quality/roundtrip-delta.md"],
+                              bounds=["SINGLE-RUN on macOS (clone A); test.yml's roundtrip-verification job skipped itself by its change filter."]),
+    "roundtrip-baselines": dict(evidence=[R3 + "release-quality/roundtrip-delta.log", R3 + "release-quality/roundtrip-delta.md"],
+                                bounds=["No regression against eng/roundtrip-baselines.json, which records the current state, not a known-good state."]),
+    "quality-ratchet-baselines": dict(evidence=[R3 + "release-quality/performance.log", R3 + "release-quality/coverage.log", R3 + "release-quality/mutation.log",
+                                                R3 + "release-quality/flake.log", R3 + "ci/logs-37965086841/113937312892-quality-ratchets.log.gz"],
+                                      bounds=["Performance ratchet passed on macOS (median 12.869 s against 24.000 s). It was not run on ubuntu for the candidate.",
+                                              "Nightly performance.yml on ubuntu at candidate-equivalent code measured 16.081 s (run 37936442529, 7eca4868, pass) and 24.923 s (run 38052678011, b04e963f, fail); #1536 records the overrun and the maintainer's decision to fix it after 0.24.0 without changing the candidate. publish-nuget.yml's release-quality job can therefore fail on a slow runner and need a re-dispatch."],
+                                      resolutions={"The v0.22.0 release-event publish run 34999741476 failed in release-quality ('performance test run failed'), so no 0.22.0 package was published.":
+                                                   "The regression behind that failure (quadratic binding) is fixed by #1525; the candidate's ratchets pass locally. Not fully resolved on ubuntu runners: see #1536 and publish-time risk P3. The 0.22.0 failure itself stays historical."}),
+    "release-quality-reports": dict(evidence=[R3 + "release-quality/"],
+                                    bounds=["Every release-quality step ran once, locally in clone A on macOS, in order, all exit 0; not on ubuntu-latest (no workflow runs that job without the adjudication gate). The coverage step used Homebrew's dotnet host (planned)."],
+                                    resolutions={"The failing report of release run 34999741476 expires with the Actions artifact and is not retained durably.":
+                                                 "For 0.24 the reports are retained durably in git by C2 (#1542, release-quality/). The 0.22.0 report itself is lost and stays history."}),
+    "sdk-consumer-check": dict(evidence=[R3 + f"ci/logs-37965086841/{n}" for n in (
+        "113937313181-sdk-package-consumer_linux-x64_.log.gz", "113937313178-sdk-package-consumer_linux-arm64_.log.gz",
+        "113937313241-sdk-package-consumer_osx-arm64_.log.gz", "113937313182-sdk-package-consumer_win-x64_.log.gz",
+        "113937313396-sdk-package-consumer_win-arm64_.log.gz")] + CI_TEST,
+                               bounds=["PASS-ONLY: five RID job conclusions on the candidate; the job logs are retained in git by C2.",
+                                       "The job tests a Calor.Sdk it packs itself; no hash ties that package to the adjudicated Calor.Sdk.0.24.0.nupkg (157fc9ca...). The tie is indirect: both come from the candidate, Z3 natives come from the one verified bootstrap (#1471), and the pack is byte-reproducible with Microsoft SDK 10.0.401 (#1526)."],
+                               resolutions={
+                                   "No result record is emitted, so a release cannot later show which consumer results it relied on (#1410).":
+                                       "Partly resolved for 0.24: C2 committed the five job logs of run 37965086841 (#1542), and publish-nuget's publish job needs sdk-consumer on the candidate checkout. The job itself still emits no result record; carried as this row's limitation.",
+                                   "The check tests a package it packs itself with upstream-bootstrapped Z3 natives, while the publish job packs separately with z3-binaries release assets; no hash ties the tested package or natives to the published one (#1420, #1410).":
+                                       "Z3 part resolved by #1471 (one verified bootstrap for every job, including publish). Package part not resolved: no hash ties the tested package to the published one; carried as this row's limitation."}),
+    "tier1-verification": dict(evidence=[R3 + "ci/artifacts-37965086841/tier1-verification.tar.gz", R3 + "ci/logs-37965086841/113937313360-verify-phase1.log.gz"],
+                               bounds=["PASS-ONLY: one CI job (verify-phase1) on the candidate; no AST round-trip claim is made (#1481)."]),
+    "tier2-corpus-verification": dict(evidence=[R3 + "ci/tier2-fixtures-37965089769.json", R3 + "ci/artifacts-37965089769/tier2-verification.tar.gz", R3 + "release-quality/tier2/"],
+                                      bounds=["Registered FAIL verdict: 428 compile / 51 rejected / 30 known failures on ubuntu and macOS, matching eng/tier2-fixture-expectations.json. The 30 known failures stay failures and never count as passes."]),
+    "ledger-provenance-index": dict(evidence=[R3 + "local/clone-a/ledger-stamps.log", R3 + "local/clone-a/tests/ledger-stamps.trx", R3 + "local/clone-b/ledger-stamps.log"],
+                                    bounds=["Validated: LedgerCommitStampTests 5 passed in two clones against origin/main b04e963f."]),
+    "benchmark-corpus": dict(evidence=[R3 + "local/clone-a/b1-validator.log", R3 + "local/clone-a/tests/b1-validator.trx", R3 + "local/clone-a/b1-regen/pair-manifest.json", EV + "b1-1276/results/pair-manifest.json"],
+                             bounds=["Validated by the B1 packet validator (58 passed in two clones). Only 17 of 226 registered pairs are EQUIVALENT; equivalence never means either side is correct (contract §5)."],
+                             resolutions={"#1276: pairs are not all equivalent (witness DomainProblems/CsvParser at 3a452b094bc53086adc25bf51ac7787eb4986fc3); no pair manifest exists.":
+                                          "Resolved by B1 #1473 and #1482: a content-addressed pair manifest with an oracle disposition for every registered pair (17 EQUIVALENT, 192 NOT-EQUIVALENT, 8 UNCLASSIFIED, 9 excluded pre-registered). Non-equivalent pairs are dispositioned, not made equivalent. Adjudicated here: the inventory has no defectResolutions entry."}),
+    "benchmark-workflow-output": dict(evidence=[R3 + "local/clone-a/b2-headline/benchmark-headline.json", R3 + "local/clone-a/b2-headline/commit-stamp-index.json",
+                                                R3 + "local/clone-b/b2-headline/benchmark-headline.json", R3 + "local/clone-a/benchmark-gate-report.txt"],
+                                      bounds=["The headline bytes depend only on the candidate (no headline exists at the candidate). If main later carries headline or stamp bytes other than these, a publish-time run refuses (B2-07); it never writes other bytes.",
+                                              "Headline content: 17 EQUIVALENT pairs, geometric-mean r 1.235 (a corpus-resampling interval for this fixed corpus, not a population claim). Publishing it is governed by sign-off decision AD-3."]),
+    "github-release-notes": dict(evidence=[R3 + "local/clone-a/release-notes.md", R3 + "local/clone-b/release-notes.md", R3 + "local/wording-scan.json"],
+                                 bounds=["Historical-only by the inventory. The 0.24.0 notes candidate is rendered byte-identically (R2 digest 05b8c219...) and passes the G012 wording scan; it is adjudicated as a publication surface below, not as evidence."]),
+    "nuget-packages": dict(evidence=[R3 + "publication-candidates.json", R3 + "local/clone-a/build-hashes.json"],
+                           bounds=["Not regenerated by rule (contract §7); nothing is on nuget.org for 0.24.0 yet (newest: 0.21.0). The 0.24.0 bytes that may be pushed are exactly the adjudicated candidate-packages hashes, through the #1410 gate."],
+                           resolutions={"A workflow_dispatch version override and a dispatch from a non-tag commit can publish a package whose source differs from its release tag (#1410).":
+                                        "Resolved by R2 #1474 and #1475: publish-nuget.yml runs only by dispatch from main with an adjudication identity, has no version override, checks out the adjudicated candidate in every job, and compares any version already on nuget.org. Adjudicated here: the inventory has no defectResolutions entry."}),
+    "candidate-packages": dict(evidence=[R3 + "local/clone-a/build-hashes.json", R3 + "local/clone-b/build-hashes.json", R3 + "local/clone-a/packages.log",
+                                         R3 + "ci/reproducible-builds-37965092627/reproducible-packages-hashes/packages-1.json",
+                                         R3 + "ci/reproducible-builds-37965092627/reproducible-packages-hashes/packages-2.json", *REPRO],
+                               bounds=["Byte-identical in two macOS clones and two Linux CI builds, all with Microsoft's SDK 10.0.401 build. Homebrew's source-built 10.0.401 packs different bytes (#1526). Bytes are not committed; hashes only."]),
+    "release-metadata": dict(evidence=[R3 + "local/clone-a/release-metadata/calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.provenance.json",
+                                       R3 + "local/clone-a/release-metadata/calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.sbom.spdx.json",
+                                       R3 + "local/clone-b/release-metadata/calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.provenance.json"],
+                             bounds=["Generated from the candidate packages; identical in A, B, and Linux CI. Inherits the SDK-build bound of candidate-packages."]),
+    "website-deployment": dict(evidence=[R3 + "local/clone-a/website-tree.sha256", R3 + "local/compare-local-ci-website.md",
+                                         R3 + "ci/reproducible-builds-37965092627/reproducible-website-hashes/website-1.json", R3 + "local/wording-scan.json"],
+                               bounds=["Built, never deployed: 253 files, tree digest e684dcab... in A, B, and Linux CI.",
+                                       "The build downloads four Google Fonts at build time; a font change, or a failed fetch (seen once in #1542's CI), changes the tree or fails the build, and the gate then refuses the deploy (#1526 residual)."]),
+    "evidence-contract": dict(evidence=[R3 + "local/clone-a/evidence-contract.log", R3 + "local/clone-a/tests/evidence-contract.trx", EV + "evidence-contract-1407/sha256.json"],
+                              bounds=["Validated: EvidenceContractTests 324 passed in two clones, including the packet-hash check for contract 1.5.0. No amendment was made after the #1424 raw-artifact freeze."]),
+}
+HISTORICAL_NOTE = ("Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and "
+                   "this outcome does not make its numbers valid (contract §3).")
+
+
+def artifact_rows() -> list[dict]:
+    rows = []
+    for a in inventory["artifacts"]:
+        aid, cls = a["id"], a["classification"]
+        spec = ARTIFACTS.get(aid, {})
+        if cls == "stale":
+            raise SystemExit(f"{aid} is still stale; it could only be BLOCKED")
+        if cls != "historical-only" and not spec:
+            raise SystemExit(f"no adjudication written for {aid}")
+        resolved = {r["defect"]: f"Resolved by #{r['resolvedByPr']} ({r.get('scope', 'recorded in the inventory')})."
+                    for r in a.get("defectResolutions", [])}
+        resolved.update(spec.get("resolutions", {}))
+        defects = []
+        for text in a.get("openDefects", []):
+            if cls == "historical-only":
+                defects.append({"defect": text, "adjudication": "Not adjudicated as evidence: the artifact is historical-only."})
+            elif text not in resolved:
+                raise SystemExit(f"{aid}: cutoff defect without an adjudicated resolution: {text}")
+            else:
+                defects.append({"defect": text, "adjudication": resolved[text]})
+        row = {
+            "subject": aid,
+            "kind": "artifact",
+            "classification": cls,
+            "outcome": "HISTORICAL-ONLY" if cls == "historical-only" else "BOUNDED",
+            "independence": ROW,
+            "limitation": limitation,
+            "c2Status": c2[aid]["status"],
+            "rowLimitations": spec.get("bounds", [HISTORICAL_NOTE] if cls == "historical-only" else []),
+            "evidence": ev(*spec.get("evidence", [R3 + "results.json"])),
+        }
+        if cls == "historical-only" and "bounds" in spec:
+            row["rowLimitations"] = [HISTORICAL_NOTE, *spec["bounds"]]
+        if defects:
+            row["cutoffDefects"] = defects
+        rows.append(row)
+    return rows
+
+
+# ---------------------------------------------------------------------------------------------
+# Gate rows: one per child other than #1408. Closure evidence is the contract §10 text.
+# ---------------------------------------------------------------------------------------------
+GATES = {
+    1419: dict(prs=[1476], evidence=[EV + "r1-1419/registration.json", EV + "r1-1419/manifest-B1.json", EV + "r1-1419/manifest-N1.json", EV + "r1-1419/sha256.json"],
+               bounds=["Registration only: it fixes what S1 runs; it establishes no verdict."]),
+    1311: dict(prs=[1480], evidence=[EV + "s1-1311/gate-status.json", EV + "s1-1311/combined-row-status.json", EV + "s1-1311/pins.json", EV + "s1-1311/sha256.json"],
+               bounds=["MET within its ceilings: 3,008 of 3,008 case executions; run 2 provenance-confirmed, run 1 provenance-unconfirmed and on record.",
+                       "One platform (macOS arm64); 88 release-critical rows per baseline, 74 CLEAN-WITHIN-BUDGET (none found, not none exist), 10 FINDING, 4 FALSE-PROOF; 7 excluded XCL rows NOT-INVESTIGATED and not release-critical.",
+                       "Open S1 item O2 (partial replay in GEN-REFUSAL-002/-004) was never decided; the registered row status does not use it."]),
+    1413: dict(prs=[1494, 1495, 1496, 1497, 1498, 1502, 1503, 1499], evidence=[EV + "s2-1413/dispositions.json", *CI_TEST, R3 + "ci/artifacts-37965086841/test-report-verification.tar.gz"],
+               bounds=["Closure CLOSED/SUCCESS: 34 findings per baseline dispositioned (13 FIX-IN-0.24, 21 DEMOTE-IN-0.24) plus 4 discoveries; 7 accepted repairs (s2-repairs 7 by amendment 1.3.0).",
+                       "A demotion withdraws a wrong claim; it proves nothing new. Repair contents are bound to their PRs by the maintainer's merge review, not by a validator (dispositions.json validatorLimitations).",
+                       "Recorded deviation DEV-R-NUM-MERGE-MECHANICS (maintainer-accepted merge conflict resolution in #1502)."]),
+    1420: dict(prs=[1471], evidence=[R3 + "local/z3-release-binaries.json", R3 + "local/clone-a/packages.log", R3 + "ci/logs-37965086841/113937313181-sdk-package-consumer_linux-x64_.log.gz",
+                                     R3 + "ci/logs-37965086841/113937313008-z3-consumer-matrix_linux-arm64_.log.gz", EV + "g1-1420/README.md"],
+               bounds=["Consumer and RID inventory eng/z3-consumers.json; check-packaged-z3.py --all-rids passed on the candidate packages; the consumer matrices passed in one CI run."]),
+    1421: dict(prs=[1479, 1486], evidence=[EV + "g2-1421/protocol.json", EV + "g2-1421/sha256.json", *DET],
+               bounds=["Protocol 1.5.0 executed once on the candidate (the 4th and last execution). Determinism-compute 1,608 of 3,200 runner-minutes.",
+                       "Thirty attempts per environment bound, but cannot exclude, rare non-determinism (protocol limitation)."]),
+    1135: dict(prs=[1492, 1500], evidence=[*DET, R3 + "local/clone-a/vrd/verifier-runtime-differential.json", EV + "g3-1135/README.md", EV + "g3-1135/ledger.json"],
+               bounds=["Closed on the candidate by execution c2-1424-regen-3: DETERMINISTIC, complete, every determinism row RESOLVED. Executions 1-3 stay on record and establish nothing.",
+                       "Same 30-attempts-per-environment bound as #1421."]),
+    1241: dict(prs=[1481], evidence=[R3 + "ci/tier2-fixtures-37965089769.json", R3 + "release-quality/tier2/", EV + "g4-1241/README.md"],
+               bounds=["Tier 2's verdict is FAIL by registered design (428/51/30); the gate's closure is the truthful, checkout-pinned run, not a pass."]),
+    1417: dict(prs=[1472], evidence=[R3 + "local/clone-a/ledger-stamps.log", EV + "p1-1417/fresh-clone.log", EV + "p1-1417/README.md"],
+               bounds=["Identities resolve in a fresh clone against fetched main; existing short stamps stay as history beside their durable identities."]),
+    1276: dict(prs=[1473, 1482], evidence=[EV + "b1-1276/registration/registration.json", EV + "b1-1276/registration/sha256.json", EV + "b1-1276/results/sha256.json",
+                                           R3 + "local/clone-a/b1-regen/results.json", R3 + "local/clone-a/b1-validator.log"],
+               bounds=["The issue was closed (2026-10-03T16:32:38Z) before its PRs merged (18:03Z and 21:08Z); the closure evidence now exists on main (sign-off decision AD-5).",
+                       "17 of 226 pairs EQUIVALENT; the sampling unit is the program pair; equivalence is not correctness."]),
+    1422: dict(prs=[1487, 1527], evidence=[R3 + "local/clone-a/benchmark-gate-report.txt", R3 + "local/clone-a/b2-headline/benchmark-headline.json", EV + "b2-1422/README.md", EV + "b2-1422/local-e2e-pr2.md"],
+               bounds=["End-to-end refusal tests pass; the B2 gate passed on the candidate against the real main. B2-07: a publish-time run refuses if main carries other headline or stamp bytes."]),
+    1410: dict(prs=[1474, 1475], evidence=[EV + "r2-1410/release-gate.md", R3 + "r2-dry-run/success/gate.txt", R3 + "r2-dry-run/with-blocked-determinism/gate.txt", *CI_TEST],
+               bounds=["Every surface in contract §7 is wired to the one identity; the negative controls (ReleaseAdjudicationGateTests, ReleaseWorkflowGateTests) pass in tests (compiler) on the candidate.",
+                       "The release PR cannot consume an identity (it precedes the candidate); the gate checks only its products, which the frozen condition 7 does not accept (AD-1).",
+                       "Repository settings in release-gate.md §5 (environment-scoped NUGET_API_KEY, no admin bypass, v* tag ruleset, Pages environment) are recommendations a workflow cannot enforce."]),
+    1423: dict(prs=[1508, 1534, 1539], evidence=[EV + "c1-1423/candidate-manifest.json", EV + "c1-1423/refreeze-3-classifier.md", R3 + "classifier.txt", R3 + "classifier-record.json"],
+               bounds=["Third freeze (agent-prs-per-gate 3 for #1423 by amendment 1.5.0). The classifier is not a required check on later merges; A1 ran it on its own branch (NOT-INVALIDATED, reviews/classifier.txt in this directory)."]),
+    1424: dict(prs=[1517, 1542], evidence=[R3 + "results.json", R3 + "ledger.json", R3 + "raw-artifact-freeze.json", R3 + "regeneration.md", R3 + "local/compare-a-b.md"],
+               bounds=["Regeneration 3 of 3 complete: no BLOCKED or FAILED row; 583 of 1,500 regeneration runner-minutes. Regenerations 1 and 2 stay as history; regeneration 2 (PR #1535) was closed unmerged.",
+                       "Fresh-clone reproduction on macOS arm64 (two clones) plus Linux CI; nothing was published."]),
+}
+
+
+# Contract §8 stopping rule 1: a reached ceiling is followed by a merged amendment or the gate is
+# recorded BLOCKED. These gates had a review-rounds overrun (a change-requesting pass after round 3
+# followed by a fix, the counting amendments 1.3.0/1.3.1 used) with no amendment (capacity-audit.md).
+BLOCKED_GATES = {
+    1423: "C1 PR #1508: 4 change-requesting passes after round 3, each followed by a fix; no exception (c1-1423/reviews/verification-pass, refreeze-verification, -2, -3).",
+    1421: "G2 PR #1479: 2 change-requesting passes after round 3, each followed by a fix; no exception (g2-1421/reviews/verification-pass, -2).",
+    1276: "B1 PR #1473: 1 change-requesting pass after round 3 followed by a fix; amendment 1.1.0 raised only its PR size (b1-1276/reviews/verification-pass-codex.md).",
+    1311: "S1 PR #1480: 1 change-requesting pass after round 3 followed by fixes in e7cbce77 (s1-1311/reviews/round-verification.json).",
+    1410: "R2 PRs #1474/#1475: 1 change-requesting pass after round 3 followed by a fix (r2-1410/reviews/verification-pass-codex.md).",
+    1413: "S2 record PR #1499: 1 change-requesting pass after round 3 followed by a test change (s2-1413/reviews/dispositions/verification-codex.md).",
+    1422: "B2 PR #1527: 1 change-requesting pass after round 3 followed by fix bca13caf (b2-1422/reviews/pr2-verification-pass-codex.md).",
+}
+
+
+def gate_rows() -> list[dict]:
+    manifest = load(EV + "c1-1423/candidate-manifest.json")
+    merged = {c["issue"]: {p["pr"]: p["mergeCommit"] for p in c["mergedPrs"]} for c in manifest["acceptedChildren"]}
+    extra = {1423: {1508: "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff", 1534: "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9", 1539: C1_LANDING},
+             1424: {1517: "d2288bf934dcda609e8719856dc6ed9e0a9cca3b", 1542: C2_MERGE}}
+    for issue, prmap in extra.items():
+        for commit in prmap.values():
+            if git("rev-parse", commit).decode().strip() != commit or subprocess.run(
+                    ["git", "-C", REPO, "merge-base", "--is-ancestor", commit, EVIDENCE_COMMIT]).returncode != 0:
+                raise SystemExit(f"{commit} is not an ancestor of the evidence commit")
+    rows = []
+    for child in contract["children"]:
+        issue = child["issue"]
+        if issue == 1408:
+            continue
+        spec = GATES[issue]
+        prs = []
+        for pr in spec["prs"]:
+            commit = merged.get(issue, {}).get(pr) or extra.get(issue, {}).get(pr)
+            prs.append({"pr": pr, "mergeCommit": commit} if commit else {"pr": pr})
+        row_extra = {}
+        if issue in BLOCKED_GATES:
+            row_extra["blockedBy"] = ("Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment "
+                                      "raised it, so the gate is recorded BLOCKED. " + BLOCKED_GATES[issue])
+        rows.append({
+            "subject": f"gate:#{issue}",
+            "kind": "gate",
+            "gate": child.get("gate"),
+            "outcome": "BLOCKED" if issue in BLOCKED_GATES else "BOUNDED",
+            **row_extra,
+            "independence": ROW,
+            "limitation": limitation,
+            "closureEvidenceRequired": child.get("closureEvidence"),
+            "mergedPrs": prs,
+            "rowLimitations": spec["bounds"],
+            "evidence": ev(*spec["evidence"]),
+        })
+    return rows
+
+
+# ---------------------------------------------------------------------------------------------
+# Claim rows: every registered claim, in registry order, never added, dropped, or renamed.
+# ---------------------------------------------------------------------------------------------
+NOTES = R3 + "local/clone-a/release-notes.md"
+S2 = EV + "s2-1413/dispositions.json"
+CLAIMS = {
+    "claim:release-adds-no-syntax": ([NOTES, *CI_TEST], ["Checked against v0.22.0 (72a0a855): no new token kind or AST node; Token.cs, Lexer.cs, and ExpressionNodes.cs only add the internal WidthInferred flag (R-NUM). Parser.cs changes are the #1485 fix, which changes how existing programs with an empty clause body parse."]),
+    "claim:release-history-0.22-0.23": ([NOTES, EV + "evidence-contract-1407/contract.json"], ["Contract §2 row B1 records the failed 0.22.0 publish run 34999741476. nuget.org lists calor and Calor.Sdk up to 0.21.0 only (checked 2026-10-10). No v0.23.0 tag exists."]),
+    "claim:evidence-bounded-not-independent": ([NOTES, EV + "evidence-contract-1407/contract.json"], ["Holds by this record: every row is BOUNDED or HISTORICAL-ONLY with independence reduced-maintainer-adjudicated."]),
+    "claim:no-benchmark-results-published": ([NOTES, R3 + "local/clone-a/website-tree.sha256", R3 + "local/clone-a/b2-headline/benchmark-headline.json"],
+                                             ["True of the release's adjudicated packages, notes, metadata, and website tree: none carries a 0.24 benchmark result, and no website source reads benchmark-headline.json.",
+                                              "publish-nuget.yml dispatches benchmark.yml, which pushes the B2 headline (a benchmark result) to a public branch and opens a PR, so the claim fails on the release path (AD-3)."]),
+    "claim:advisory-7-false-proofs-in-4-areas": ([NOTES, EV + "s1-1311/findings.json", EV + "s1-1311/combined-row-status.json", S2], ["4 FALSE-PROOF rows per baseline holding the 7 false-proof findings; each fixed or demoted by S2. Found by a sampled sweep on one platform; other false proofs may exist."]),
+    "claim:sweep-limits": ([NOTES, EV + "s1-1311/results-summary.json", EV + "s1-1311/combined-row-status.json", EV + "s1-1311/gate-status.json"], ["The numbers restate the S1 record; whole-compiler soundness is not established."]),
+    "claim:all-34-findings-fixed-or-demoted": ([NOTES, S2, *CI_TEST], ["34 findings per baseline: 13 FIX-IN-0.24, 21 DEMOTE-IN-0.24; regression witnesses run in the candidate's suites. A demotion withdraws a claim; it does not prove the property."]),
+    "claim:obligation-stale-facts-demoted": ([NOTES, S2, R3 + "ci/artifacts-37965086841/test-report-verification.tar.gz", *CI_TEST], ["R-OBL #1496 and R-OBL-RESIDUALS #1503 with their witnesses; demotion only."]),
+    "claim:cache-literal-width-fixed": ([NOTES, S2, *CI_TEST], ["R-CACHE #1494; witness S2CacheLiteralWidthTests passes on the candidate."]),
+    "claim:interface-checks-throwing-preconditions": ([NOTES, S2, R3 + "ci/artifacts-37965086841/test-report-verification.tar.gz", *CI_TEST], ["R-IMPL #1495; quantifier-free integer contracts only; string, array, and user-type cases are Assumed (Calor0819)."]),
+    "claim:non-ascii-solver-symbols-escaped": ([NOTES, S2, *DET], ["R-TEXT #1497 (#1493). The Windows collision was never observed; the fix is by construction, and the determinism protocol passed on win-x64 and win-arm64."]),
+    "claim:warning-calor0819-added": ([NOTES, S2, *CI_TEST], ["Added by R-IMPL #1495; present in the candidate's diagnostics and tests."]),
+    "claim:reproducible-release-evidence-and-gate": ([NOTES, EV + "evidence-contract-1407/sha256.json", EV + "r1-1419/sha256.json", EV + "s1-1311/sha256.json", S2, EV + "g2-1421/sha256.json", EV + "r2-1410/release-gate.md", R3 + "r2-dry-run/success/gate.txt"],
+                                                     ["The gate covers the workflow files on main only; repository settings in release-gate.md §5 are not enforced by it."]),
+    "claim:benchmark-publication-refuses-incomparable": ([NOTES, EV + "b2-1422/README.md", EV + "b2-1422/local-e2e-pr2.md", R3 + "local/clone-a/benchmark-gate-report.txt"], ["Refusal paths are tested end to end; the freshness check covers only the headline's inputs, as the notes say."]),
+    "claim:agent-refactoring-job-no-commit": ([NOTES, EV + "b2-1422/README.md", *CI_TEST], ["benchmark.yml at the candidate: the job is contents: read with no commit step; ReleaseWorkflowGateTests.EveryPublishingCommandFollowsTheGateInItsJob passes."]),
+    "claim:historical-benchmark-numbers-labeled": ([NOTES, R3 + "local/wording-scan.json", R3 + "local/clone-a/website-tree.sha256"], ["The old numbers stay published as history (inventory: website-benchmark-pages historical-only); the label does not make them valid."]),
+    "claim:z3-single-verified-path-five-rids": ([NOTES, R3 + "local/clone-a/packages.log", R3 + "local/z3-release-binaries.json", R3 + "ci/logs-37965086841/113937313008-z3-consumer-matrix_linux-arm64_.log.gz"], ["check-packaged-z3.py --all-rids passed on the candidate packages; consumer matrices passed in one CI run."]),
+    "claim:fixture-checks-truthful": ([NOTES, R3 + "ci/tier2-fixtures-37965089769.json", R3 + "release-quality/tier2/"], ["428 + 51 + 30 = 509 tracked fixtures; Tier 2's overall verdict is FAIL by design."]),
+    "claim:numeric-forms-refused-or-demoted": ([NOTES, S2, R3 + "local/clone-a/vrd/verifier-runtime-differential.json", *CI_TEST], ["R-NUM #1502 (amendment 1.3.2 rule, no solver query); D-NUM-WHILE-BOUND demoted."]),
+    "claim:differential-totals-429-156-585": ([NOTES, R3 + "local/clone-a/vrd/verifier-runtime-differential.json", R3 + "local/clone-a/vrd/verifier-runtime-differential.md", R3 + "local/clone-a/vrd-check.log"], ["Byte-equal in two clones and ubuntu CI; totals over the whitelisted forms only."]),
+    "claim:text-utf16-code-units": ([NOTES, S2, *CI_TEST], ["R-TEXT #1497; proofs touching strings stay Assumed and keep their runtime checks."]),
+    "claim:nested-quantifier-unsupported": ([NOTES, S2, *CI_TEST], ["R-QNT #1498; a conservative restriction, also for nested forms the compiler could check at run time."]),
+    "claim:determinism-causes-fixed": ([NOTES, *DET, EV + "g3-1135/README.md"], ["The three causes are fixed by G3 #1492/#1500; protocol 1.5.0 on the candidate returned DETERMINISTIC (30 attempts per environment; rare non-determinism not excluded)."]),
+    "claim:unreachable-counterexamples-withheld": ([NOTES, S2, *CI_TEST], ["R-OBL #1496 and #1503; withholding may also hide real counterexamples, as the notes say."]),
+    "claim:empty-clause-body-fixed": ([NOTES, *CI_TEST, EV + "fix-1485/reviews/"], ["#1491 (issue #1485, closed); the regression tests run in the candidate's compiler suite."]),
+    "claim:cache-format-1.22": ([NOTES, *CI_TEST], ["VerificationCacheEntry.CurrentFormatVersion is \"1.22\" at the candidate."]),
+    "claim:packages-and-website-reproducible": ([NOTES, *REPRO, R3 + "local/clone-a/build-hashes.json", R3 + "local/clone-a/website-tree.sha256"],
+                                                ["Only with Microsoft's SDK 10.0.401 build; the Google Fonts fetch at build time can change the website bytes or fail the build (it failed once in #1542's CI)."]),
+    "claim:binding-performance-restored": ([NOTES, R3 + "local/clone-a/tests/Calor.Performance.Tests.trx", R3 + "release-quality/performance.log", EV + "fix-perf-binding/reviews/"],
+                                           ["#1525; Binding_MediumModule_Under500ms passes on the candidate. The suite-median ratchet still exceeds 24 s on some ubuntu runners (#1536, not a release claim; fix after 0.24.0)."]),
+}
+
+
+BLOCKED_CLAIMS = {
+    "claim:reproducible-release-evidence-and-gate": (
+        "The claim says a release can be published only through the #1410 gate. R2's own record (release-gate.md §5 item 1) says older "
+        "tags still hold an ungated publish-nuget.yml that can read the repository-scoped NUGET_API_KEY, and that the gate covers only the "
+        "workflow files on main until that credential moves to a main-only environment. No evidence shows that change was made, so the "
+        "exclusive-publication claim is not supported."),
+    "claim:no-benchmark-results-published": (
+        "On the designed release path, publish-nuget.yml dispatches benchmark.yml, which pushes the B2 headline (17 pairs, geometric-mean "
+        "r 1.235) to a public branch and opens a publication PR (contract §7 benchmark publication surface). That exposes a benchmark "
+        "result whether or not the PR merges, so the claim does not hold for the release path the record would authorize."),
+}
+
+
+def claim_rows() -> list[dict]:
+    claims = registry["claims"]
+    if set(claims) != set(CLAIMS) or len(claims) != len(set(claims)):
+        raise SystemExit("claim table does not match the frozen registry")
+    rows = []
+    for cid in claims:
+        evidence, bounds = CLAIMS[cid]
+        detail = registry["details"][cid]
+        extra = {"blockedBy": BLOCKED_CLAIMS[cid]} if cid in BLOCKED_CLAIMS else {}
+        rows.append({
+            "subject": cid, "kind": "claim", "outcome": "BLOCKED" if cid in BLOCKED_CLAIMS else "BOUNDED", **extra,
+            "independence": ROW, "limitation": limitation,
+            "notesLines": detail["lines"], "claimText": detail["text"], "rowLimitations": bounds, "evidence": ev(*evidence),
+        })
+    return rows
+
+
+rows = artifact_rows() + gate_rows() + claim_rows()
+
+PREDICATE = [
+    {"condition": 1, "text": "Every child other than #1408 is closed with its closure evidence (§10).",
+     "holds": "AT-SIGN-OFF",
+     "basis": "Each gate row above records its §10 closure evidence and merged PRs. At this record's preparation only #1276 is closed; sign-off step 1 closes the other 12 contract children (and R0 #1407, a sub-issue of the epic) before this record merges. The record must not merge while any is open.",
+     "evidence": ev(EV + "c1-1423/candidate-manifest.json", R3 + "results.json")},
+    {"condition": 2, "text": "Every #1419-registered release-critical row, for B1 and for N1, has an outcome or row status, none BLOCKED, not-investigated, or unclassified.",
+     "holds": True,
+     "basis": "88 release-critical rows per baseline: 74 CLEAN-WITHIN-BUDGET, 10 FINDING, 4 FALSE-PROOF, 0 INCOMPLETE. The 7 NOT-INVESTIGATED rows per baseline are the excluded XCL-* rows, none release-critical.",
+     "evidence": ev(EV + "s1-1311/combined-row-status.json", EV + "s1-1311/gate-status.json", EV + "r1-1419/registration.json")},
+    {"condition": 3, "text": "No #1408 adjudication row for any release-critical artifact, gate, or claim is BLOCKED.",
+     "holds": False, "basis": ("9 rows are BLOCKED (rowCounts): 7 gates under stopping rule 1 (review-rounds overrun with no amendment) and 2 claims "
+                               "whose evidence contradicts them. No artifact row is BLOCKED: every authoritative or derived artifact's evidence is "
+                               "present on the candidate (regeneration 3), and no inventory artifact is stale."),
+     "evidence": ev(R3 + "results.json", R3 + "raw-artifact-freeze.json")},
+    {"condition": 4, "text": "Zero unresolved false unconditional proofs; each is fixed or visibly demoted under #1413.",
+     "holds": True, "basis": "The 4 FALSE-PROOF rows (7 findings) per baseline and the discovery D-NUM-WHILE-BOUND are each FIX-IN-0.24 or DEMOTE-IN-0.24 with a regression witness; S2 closure CLOSED/SUCCESS.",
+     "evidence": ev(S2, EV + "s1-1311/findings.json")},
+    {"condition": 5, "text": "Every #1413 finding has a disposition other than NOT-INVESTIGATED or MILESTONE-FAILED.",
+     "holds": True, "basis": "B1: 34 findings (13 FIX, 21 DEMOTE); N1: 34 (13 FIX, 21 DEMOTE); discoveries: 4 (1 FIX, 3 DEMOTE). None NOT-INVESTIGATED or MILESTONE-FAILED.",
+     "evidence": ev(S2)},
+    {"condition": 6, "text": "Every authoritative and derived inventory artifact was regenerated by #1424 on the frozen #1423 candidate, with no stale input (publication surfaces as unpublished candidates, §7).",
+     "holds": True, "basis": "Regeneration 3 on 04e61f18: every authoritative and derived artifact is REGENERATED, VALIDATED (the source is the artifact), or RE-MATERIALIZED-VERIFIED (pinned inputs), except nuget-packages, which §7 forbids #1424 to regenerate; candidate-packages stands for it. No artifact is stale (amendment 1.4.0). Nothing was published.",
+     "evidence": ev(R3 + "results.json", R3 + "ledger.json", R3 + "raw-artifact-freeze.json")},
+    {"condition": 7, "text": "Every release surface in §7 consumes one matching adjudication identity (#1410 negative tests pass).",
+     "holds": False,
+     "basis": ("Under the frozen text this is not met. NuGet, the GitHub release and notes, release metadata, website, benchmark publication, and "
+               "the installed-tool check each run verify_release_adjudication.py on the identity, and the #1410 negative tests pass on the candidate. "
+               "But the release PR (a §7 surface) precedes the candidate and cannot consume an identity (R2 release-gate.md §6, C1 open item "
+               "R2-RELEASE-PR-CONDITION-7, never decided by amendment), and older tags keep an ungated publish path to the repository-scoped NuGet "
+               "credential (release-gate.md §5). #1408 cannot waive either after the freeze."),
+     "evidence": ev(EV + "r2-1410/release-gate.md", *CI_TEST, R3 + "r2-dry-run/success/gate.txt")},
+    {"condition": 8, "text": "Every adjudication row records independence = reduced-maintainer-adjudicated, and no row is SUPPORTED while the deviation stands.",
+     "holds": True, "basis": "By construction of this record; checked by R2 (G008) and EvidenceContractValidator.ValidateTerminalRecord (T002).", "evidence": []},
+    {"condition": 9, "text": "No §9 ceiling was exceeded without a merged amendment raising it.",
+     "holds": False,
+     "basis": ("review-rounds-per-pr (3; exceptions only for #1496, #1502, #1503) was exceeded without an amendment. C1 PR #1508: rounds 1-3, "
+               "then 5 more Codex passes, 4 of which requested changes and were followed by fixes (verification-pass, refreeze-verification, "
+               "-2, -3), and the PR was not closed and re-scoped. G2 PR #1479: rounds 1-3, then 2 change-requesting passes, each followed by a "
+               "fix, then a clean third pass. Amendments 1.3.0 and 1.3.1 counted exactly this pattern as an overrun that needed a registered "
+               "exception, and 1.3.0 states that no other PR gets an overrun allowance. Even under the looser budget some records assumed "
+               "(3 rounds plus 1 verification pass), #1508 (8 passes) and #1479 (6) exceed it. One change-requesting pass after round 3 "
+               "followed by a fix also occurred on #1473, #1480, #1474/#1475, #1499, #1527, and #1507. Supporting, not decisive: "
+               "ordinary-ci (15,000 runner-minutes) is recorded nowhere, and the A1 audit's Actions API sum is about 29,500 job-minutes on "
+               "0.24 PR branches; the maintainer-review hours (40 total, 2 per PR) are recorded nowhere. §9 forbids an amendment between the "
+               "#1424 raw-artifact freeze and #1408's close, and §8 forbids #1408 to weaken a condition. Details: capacity-audit.md."),
+     "evidence": ev(EV + "evidence-contract-1407/contract.json",
+                    EV + "c1-1423/reviews/round-3-codex.md", EV + "c1-1423/reviews/verification-pass-codex.md",
+                    EV + "c1-1423/reviews/refreeze-verification-codex.md", EV + "c1-1423/reviews/refreeze-verification-2-codex.md",
+                    EV + "c1-1423/reviews/refreeze-verification-3-codex.md", EV + "c1-1423/reviews/refreeze-verification-4-codex.md",
+                    EV + "g2-1421/reviews/round-3-codex.md", EV + "g2-1421/reviews/verification-pass-codex.md",
+                    EV + "g2-1421/reviews/verification-pass-2-codex.md", EV + "g2-1421/reviews/verification-pass-3-codex.md",
+                    EV + "b1-1276/reviews/verification-pass-codex.md", EV + "s1-1311/reviews/round-verification.json",
+                    EV + "r2-1410/reviews/verification-pass-codex.md", EV + "s2-1413/reviews/dispositions/verification-codex.md",
+                    EV + "b2-1422/reviews/pr2-verification-pass-codex.md",
+                    EV + "evidence-contract-1407/reviews/amendment-1.3.2-report-totals-correction-verification-pass-codex.md")},
+]
+
+SIGN_OFF_DECISIONS = [
+    {"id": "AD-1", "subject": "Release PR and §8 condition 7 (C1 open item R2-RELEASE-PR-CONDITION-7)",
+     "decision": ("Not waived. The gate checks the release PR's products (version G009, notes G011/G013), but the frozen condition requires every "
+                  "§7 surface to consume the identity, and #1408 cannot amend it after the freeze. Condition 7 is recorded as not met.")},
+    {"id": "AD-2", "subject": "Cutoff defects with no defectResolutions entry in the frozen inventory",
+     "decision": ("For verifier-runtime-differential, benchmark-corpus, nuget-packages, and release-quality-reports, the row names the "
+                  "resolving PRs. For toolchain-pins, quality-ratchet-baselines, and sdk-consumer-check, the unresolved residual is the "
+                  "row's published limitation, and the row is BOUNDED, not BLOCKED, because its required evidence on the candidate is "
+                  "present and conclusive."),
+     "ifRejected": "Each such artifact row becomes BLOCKED; the outcome stays MILESTONE-FAILED."},
+    {"id": "AD-3", "subject": "claim:no-benchmark-results-published",
+     "decision": ("BLOCKED. On the designed release path benchmark.yml pushes the B2 headline to a public branch and opens a publication PR, "
+                  "which exposes a benchmark result whether or not the PR merges.")},
+    {"id": "AD-4", "subject": "Terminal condition 9 (capacity ceilings)",
+     "decision": ("Condition 9 does not hold: review-rounds-per-pr was exceeded without a merged amendment on #1508 and #1479 (and, by the "
+                  "counting amendments 1.3.0 and 1.3.1 used, on #1473, #1480, #1474/#1475, #1499, #1527, and #1507). No amendment can be made in the "
+                  "§9 window, and #1408 cannot weaken a condition. Under stopping rule 1 the affected gates are BLOCKED. The terminal "
+                  "outcome is therefore MILESTONE-FAILED. No reading of the frozen text available to #1408 makes condition 9 hold: #1508 "
+                  "exceeds even a budget of 3 rounds plus one verification pass.")},
+    {"id": "AD-5", "subject": "#1276 closed before its closure evidence merged",
+     "decision": "Accept the closure: the issue closed at 2026-10-03T16:32:38Z, and its §10 closure evidence (#1473, #1482) merged the same day and is on main.",
+     "ifRejected": "Reopen #1276 and close it again; this does not change the record."},
+]
+
+counts: dict[str, dict[str, int]] = {}
+for r in rows:
+    counts.setdefault(r["kind"], {}).setdefault(r["outcome"], 0)
+    counts[r["kind"]][r["outcome"]] += 1
+
+record = {
+    "schema": "calor.adjudication-terminal-record/1",
+    "issue": 1408,
+    "epic": 1409,
+    "milestone": "0.24",
+    "outcome": "MILESTONE-FAILED",
+    "failedConditions": [3, 7, 9],
+    "outcomeBasis": ("Every required subject is adjudicated once (75 rows), none SUPPORTED. Conditions 2, 4, 5, 6, and 8 hold; condition 1 holds "
+                     "once the listed child issues are closed. Condition 9 does not hold: review-rounds-per-pr was exceeded without an amendment "
+                     "(AD-4). Condition 3 does not hold: under stopping rule 1 the seven gates with an unamended overrun are BLOCKED, and two "
+                     "claims are BLOCKED on their evidence. Condition 7 does not hold under the frozen text. §8 records MILESTONE-FAILED unless every "
+                     "condition holds. A MILESTONE-FAILED record never passes the #1410 gate (G006), so this record authorizes no publication of 0.24.0."),
+    "adjudicator": "@juanmicrosoft",
+    "adjudicationIndependence": "reduced",
+    "limitation": limitation,
+    "epicIndependentAdjudicationMet": False,
+    "independenceStatement": ("Contract §9 deviation: the adjudicator is the maintainer who directed, reviewed, and merged the repairs. "
+                              "Every row is at most BOUNDED. The epic's outcome sentence about independence is not met, and this record "
+                              "authorizes no public claim of independent review of 0.24 evidence."),
+    "signature": ("The adjudicator signs by merging the pull request that adds this file to main. That merge commit is the adjudication "
+                  "commit, and the identity is calor-adjudication:v1:<adjudication commit>:<SHA-256 of this file's exact bytes>. An A1 "
+                  "agent prepared this record and proposed every outcome; merging adopts them, including the sign-off decisions below."),
+    "contract": {"version": contract["contractVersion"], "files": packet["files"]},
+    "candidate": {"commit": CANDIDATE, "version": "0.24.0"},
+    "evidenceManifests": [
+        {"role": "candidate-manifest", **f(EV + "c1-1423/candidate-manifest.json"), "landing": C1_LANDING},
+        {"role": "raw-artifact-freeze", **f(R3 + "raw-artifact-freeze.json"), "landing": C2_MERGE},
+    ],
+    "claimRegistry": f(R3 + "claim-registry.json"),
+    "evidenceCommit": EVIDENCE_COMMIT,
+    "hashRule": "Every evidence sha256 is over the blob's exact bytes at evidenceCommit; a directory's treeSha256 is over sorted '<sha256>  <relative path>' lines of its files there.",
+    "regeneration": {"issue": 1424, "number": 3, "pr": 1542, "mergeCommit": C2_MERGE, "record": R3,
+                     "results": f(R3 + "results.json"), "ledger": f(R3 + "ledger.json")},
+    "terminalPredicate": PREDICATE,
+    "signOffDecisionsNote": "AD-4 decides the outcome. AD-1, AD-2, AD-3, and AD-5 record how the remaining rows and conditions were adjudicated.",
+    "signOffDecisions": SIGN_OFF_DECISIONS,
+    "rowCounts": counts,
+    "adjudications": rows,
+    "publication": publication,
+}
+with open(OUT, "w", encoding="utf-8") as handle:
+    handle.write(json.dumps(record, indent=1, ensure_ascii=False) + "\n")
+print(f"{len(rows)} rows: {json.dumps(counts)}")

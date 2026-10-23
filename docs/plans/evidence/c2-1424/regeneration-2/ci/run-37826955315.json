@@ -1,0 +1,68 @@
+{
+ "runId": 37826955315,
+ "workflow": "Reproducible publication builds",
+ "title": "Reproducible publication builds",
+ "event": "workflow_dispatch",
+ "headBranch": "c2-1424/candidate-5e52d8ab",
+ "headSha": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "runAttempt": 1,
+ "status": "completed",
+ "conclusion": "success",
+ "createdAt": "2026-10-08T18:47:09Z",
+ "updatedAt": "2026-10-08T18:53:21Z",
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/37826955315",
+ "runnerMinutes": 4,
+ "jobCounts": {
+  "completed/success": 2
+ },
+ "jobs": [
+  {
+   "id": 113482157179,
+   "name": "website",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-08T18:51:37Z",
+   "completedAt": "2026-10-08T18:53:20Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000058724",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261004.327.1",
+    "runnerName": "GitHub Actions 1000058724",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37826955315/113482157179-website.log.gz",
+    "runnerImageProvisionerVersion": "20261002.596"
+   }
+  },
+  {
+   "id": 113482157384,
+   "name": "packages",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-08T18:50:25Z",
+   "completedAt": "2026-10-08T18:52:11Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000058719",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261004.327.1",
+    "runnerName": "GitHub Actions 1000058719",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37826955315/113482157384-packages.log.gz",
+    "runnerImageProvisionerVersion": "20261002.596"
+   }
+  }
+ ]
+}

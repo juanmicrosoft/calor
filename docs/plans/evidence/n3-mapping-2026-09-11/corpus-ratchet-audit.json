@@ -1,0 +1,112 @@
+{
+  "kind": "product-binder-source-ratchet-audit",
+  "analyst": {
+    "identity": "Copilot/GPT-6 Astra",
+    "acceptedContext": "e9c6935e-da28-4a3b-94d4-0a5bbb596332",
+    "humanReviewClaimed": false
+  },
+  "implementation": "34492f286b5a9eb1679e3ee005cd91027339691f",
+  "previousRecordBase": "be488238d3aac374995174aa47526c7f3d09fd51",
+  "ciFailureRun": "https://github.com/juanmicrosoft/calor/actions/runs/34650809611",
+  "source": {
+    "file": "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs",
+    "corpusCommit": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
+    "sha256": "3f6fa1f940815933c4aa948d41eac450a783530453bc31af1ee1a2a76e3e9d87",
+    "conversionReportedSuccessBeforeAndAfter": false,
+    "diagnosticCoordinates": "converted Calor, UTF-16 zero-based start/end-exclusive, one-based line/column"
+  },
+  "measurement": {
+    "runner": "BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline",
+    "sourceFiles": 364,
+    "convertedAndBound": 364,
+    "binderVisits": 35179,
+    "incompleteDiagnostics": 0,
+    "sourceCoverageChangedFiles": 1,
+    "changedFields": ["BindingErrorCount", "BindingErrorIdentityHash"],
+    "sourceRepresentationAndOpaqueCoverageChanged": false,
+    "propagatedBindingErrorsChanged": false,
+    "normalRatchetPassedAfterAudit": true,
+    "skipRulesOrChecksChanged": false
+  },
+  "bindingErrors": {
+    "before": 52,
+    "after": 56,
+    "beforeIdentitySha256": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42",
+    "afterIdentitySha256": "2b1d449e0c39fb15d136f7176980fe63311effadcc8dded0297ff9c467cdfaf9",
+    "remainingIdentitySha256AfterRemovingExactlyTheFourFindingsBelow": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42",
+    "identityAlgorithm": "SHA256 UTF-8 of ordinal-sorted Code:Start:End:Message strings joined by LF",
+    "propagatedBeforeAndAfter": 0
+  },
+  "addedFindings": [
+    {
+      "code": "Calor0274",
+      "severity": "Error",
+      "phase": "Binder",
+      "boundary": "MethodArgument",
+      "shape": "ScalarString",
+      "disposition": "AnalysisOnly",
+      "target": "WriteQuotedJsonString",
+      "parameter": "str",
+      "sourceAnnotation": "Annotated",
+      "start": 4078,
+      "end": 4113,
+      "line": 103,
+      "column": 40,
+      "suppliedText": "(str (?? element.Key.Value \"null\"))",
+      "compatibilityClassification": "Unresolved"
+    },
+    {
+      "code": "Calor0274",
+      "severity": "Error",
+      "phase": "Binder",
+      "boundary": "MethodArgument",
+      "shape": "ScalarString",
+      "disposition": "AnalysisOnly",
+      "target": "FormatStringValue",
+      "parameter": "str",
+      "sourceAnnotation": "Annotated",
+      "start": 6807,
+      "end": 6818,
+      "line": 170,
+      "column": 38,
+      "suppliedText": "(str value)",
+      "compatibilityClassification": "Unresolved"
+    },
+    {
+      "code": "Calor0274",
+      "severity": "Error",
+      "phase": "Binder",
+      "boundary": "MethodArgument",
+      "shape": "Nominal",
+      "disposition": "AnalysisOnly",
+      "target": "FormatLiteralObjectValue",
+      "parameter": "value",
+      "sourceAnnotation": "Annotated",
+      "start": 7412,
+      "end": 7417,
+      "line": 184,
+      "column": 41,
+      "suppliedText": "value",
+      "compatibilityClassification": "Unresolved"
+    },
+    {
+      "code": "Calor0274",
+      "severity": "Error",
+      "phase": "Binder",
+      "boundary": "MethodArgument",
+      "shape": "ScalarString",
+      "disposition": "AnalysisOnly",
+      "target": "FormatStringValue",
+      "parameter": "str",
+      "sourceAnnotation": "Oblivious",
+      "start": 10755,
+      "end": 10774,
+      "line": 247,
+      "column": 34,
+      "suppliedText": "(?? (str value) \"\")",
+      "compatibilityClassification": "Unresolved",
+      "knownLimitation": "Explicit non-null coalesce fallback still loses static annotation; #1398 owns transfer repair."
+    }
+  ],
+  "acceptance": "Mechanism/ratchet reconciliation only. No production rejection, intended compatibility-break classification, Stage A/B acceptance or issue closure is established. All four compatibility classifications remain unresolved."
+}

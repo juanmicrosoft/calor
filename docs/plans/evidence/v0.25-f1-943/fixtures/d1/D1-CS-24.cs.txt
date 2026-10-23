@@ -1,0 +1,10 @@
+public static class Probe
+{
+    static int n = 99;
+    static bool Next(out int x) { x = 0; return false; }
+    public static string Run()
+    {
+        while (Next(out var n)) { }
+        return n.ToString();
+    }
+}

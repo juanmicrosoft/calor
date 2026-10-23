@@ -1,0 +1,10 @@
+identity calor-adjudication:v1:683c3e37cd41b16718545ccac7a61a7a12c49813:cc30c0fed1145a07a1b97c3300364ec041c9f466b7e1545852b0aadd7a8853f0
+::error::release gate (#1410) G008: gate:#1135: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1424: BLOCKED; a blocked release-critical row cannot be released
+RELEASE GATE: FAIL (2 violation(s)); nothing may be published.
+SURFACES-EXIT=1
+B2-EXIT=0
+::error::release gate (#1410) G008: gate:#1135: BLOCKED; a blocked release-critical row cannot be released
+::error::release gate (#1410) G008: gate:#1424: BLOCKED; a blocked release-critical row cannot be released
+RELEASE GATE: FAIL (2 violation(s)); nothing may be published.
+BENCHMARK-WORKTREE-EXIT=1

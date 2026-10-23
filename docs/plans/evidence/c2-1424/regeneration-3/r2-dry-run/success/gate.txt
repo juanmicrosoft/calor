@@ -1,0 +1,14 @@
+identity calor-adjudication:v1:846a23d5a4dbec41bc49eb64a20dd68027331d17:bc04c9331b8d041abff9257c4c712d954865742e36bced32e6e08c1e487958ad
+RELEASE GATE: PASS calor-adjudication:v1:846a23d5a4dbec41bc49eb64a20dd68027331d17:bc04c9331b8d041abff9257c4c712d954865742e36bced32e6e08c1e487958ad
+candidate=04e61f188e85a710a91242e1ddbf35fcd50e329e
+version=0.24.0
+tag=v0.24.0
+prerelease=true
+SURFACES-EXIT=0
+B2-EXIT=0
+RELEASE GATE: PASS calor-adjudication:v1:846a23d5a4dbec41bc49eb64a20dd68027331d17:bc04c9331b8d041abff9257c4c712d954865742e36bced32e6e08c1e487958ad
+candidate=04e61f188e85a710a91242e1ddbf35fcd50e329e
+version=0.24.0
+tag=v0.24.0
+prerelease=true
+BENCHMARK-WORKTREE-EXIT=0

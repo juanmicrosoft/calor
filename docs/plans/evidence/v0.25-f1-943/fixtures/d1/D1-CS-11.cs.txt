@@ -1,0 +1,12 @@
+using System.Collections.Generic;
+public static class Probe
+{
+    public static string Run()
+    {
+        var q = new Queue<int>(new[] { 1, 2, 3 });
+        int n;
+        int sum = 0;
+        while (q.TryDequeue(out n)) { sum += n; }
+        return sum.ToString();
+    }
+}

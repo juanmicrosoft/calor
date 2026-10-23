@@ -1,0 +1,200 @@
+{
+  "schema": "calor.v0.25.w1-family-records/1",
+  "issue": 1429,
+  "epic": 1425,
+  "scopeVersion": "1.6.0",
+  "registerVersion": "1.0.0",
+  "independence": "reduced",
+  "note": "W1 documentation records. Each family's status mirrors scope.json readiness (W1 does not change it). Since R0 scope amendment 1.6.0 (the post-release write-back under D-READY-EVIDENCE-DIRS) every family is READY. readyRecord cites the family's A1 READY record, which re-checked these pages and transcripts on the candidate d1d7afde and carries the maintainer's claim approval; it replaces the earlier readyNeeds list.",
+  "sharedPages": [
+    "website/content/guides/csharp-interoperability.mdx",
+    "website/content/guides/adding-calor-to-existing-projects.mdx",
+    "website/content/guides/index.mdx",
+    "website/content/cli/feature-check.mdx",
+    "website/content/cli/structured-output.mdx",
+    "website/content/cli/self-check.mdx",
+    "docs/cli/feature-check.md"
+  ],
+  "families": [
+    {
+      "family": "F1",
+      "issue": 943,
+      "status": "READY",
+      "docCases": [
+        "DOC-F1-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#call-tryparse-trygetvalue-and-other-ref-out-in-methods",
+        "website/content/syntax-reference/calls.mdx#by-reference-arguments-ref-out-in"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F1-refout converted output (compiled by self-check docs; equal to the CLI transcript)",
+        "syntax-reference/calls.mdx: RefOutDemo (complete program) and the Calor0212 refusal (expect=Calor0212)"
+      ],
+      "transcripts": [
+        "W1-F1-refout",
+        "W1-F1-outvar-statement",
+        "W1-F1-ref-return-expression",
+        "W1-F1-notnullwhen"
+      ],
+      "claimsCorrected": [
+        "out var in a call statement: calls.mdx and CHANGELOG said it converts; it failed the C# round trip (CLI rescue, MCP and migrate refuse). Fixed by F1 PR 2 (#1571): the lowered binding starts at default and converts natively (transcript W1-F1-outvar-statement regenerated)",
+        "expression-bodied ref return: not preserved by the converter; failed the round trip (rescued or refused). Fixed by F1 PR 2 (#1571): preserved like block-bodied ref returns (transcript W1-F1-ref-return-expression regenerated)",
+        "omitted-in call sites and by-reference operands that run code keep only the statement as §RAW, not the member (since F1 PR 2 #1571 the feature is the parameter's own kind, e.g. ref-parameter for ref a[Next()])",
+        "[NotNullWhen] on an out parameter: the guide, adding-Calor table and CHANGELOG said it stays C#; it converts natively with the attribute copied and inert (the out-parameter registry description said the same wrong thing; corrected by F1 PR 2, #1571)",
+        "omitted-in in an expression-bodied member preserves the whole member (feature method), not only a statement"
+      ],
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f1-943/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "e20b11152d1b218a5ea8827e8f4428ab3243da7b9d72649b4ce09750e133626c"
+      }
+    },
+    {
+      "family": "F2",
+      "issue": 906,
+      "status": "READY",
+      "docCases": [
+        "DOC-F2-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#format-strings-with-interpolation",
+        "website/content/syntax-reference/string-operations.mdx#converting-c-interpolated-strings"
+      ],
+      "examples": [
+        "syntax-reference/string-operations.mdx: Receipt and Greeting (complete programs)",
+        "guides/csharp-interoperability.mdx: W1-F2-interpolation output quoted as a fragment (its default compile reports Calor0410, as the page says)"
+      ],
+      "transcripts": [
+        "W1-F2-interpolation"
+      ],
+      "claimsCorrected": [
+        "handler targets: string-operations.mdx said the enclosing statement or member is kept as §CSHARP; a statement is kept as §RAW",
+        "docs/cli/feature-check.md listed string-interpolation as fully supported; it is Partial",
+        "the native hole subset excludes decimal, long and whole-number double literals and operators with call operands",
+        "verbatim string literals and doubles that do not render as plain digits with a fraction (1e-7, 0.0000001) are not native holes"
+      ],
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f2-906/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "a315d753ad04040ea78e416e7369f7fbd3c03b8f18816fecd21feceb50005d1a"
+      }
+    },
+    {
+      "family": "F3",
+      "issue": 847,
+      "status": "READY",
+      "docCases": [
+        "DOC-F3-01",
+        "DOC-F3-02"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#keep-a-small-local-helper-function",
+        "website/content/cli/convert.mdx#local-functions",
+        "website/content/syntax-reference/structure-tags.mdx#local-functions"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F3-local-functions converted output (one native, one capturing and preserved)",
+        "cli/convert.mdx and syntax-reference/structure-tags.mdx: the existing local-function programs"
+      ],
+      "transcripts": [
+        "W1-F3-local-functions"
+      ],
+      "claimsCorrected": [
+        "the bounded slice also excludes ref returns, attributed parameters and value uses outside calls, call arguments, binding initializers, returns and simple assignments"
+      ],
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f3-847/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "5bab93c8dac95630e25024e82f40aa66e2b4854f6234e39bdb31f59067611338"
+      }
+    },
+    {
+      "family": "F4",
+      "issue": 1139,
+      "status": "READY",
+      "docCases": [
+        "DOC-F4-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#convert-a-class-with-iterator-properties",
+        "website/content/cli/convert.mdx#iterator-properties-and-indexers"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F4-iterator-accessor converted output",
+        "cli/convert.mdx: the Countdown preserved and rewritten programs"
+      ],
+      "transcripts": [
+        "W1-F4-iterator-accessor"
+      ],
+      "claimsCorrected": [
+        "docs/cli/feature-check.md said yield-return is not supported; iterator methods are Full and iterator accessors are iterator-accessor (NotSupported)"
+      ],
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f4-1139/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "a18ab6fd5a7857b812b7b5f473c1cdee96ab7feac7095a8a94ef18cd7a0359f0"
+      }
+    },
+    {
+      "family": "F5",
+      "issue": 1132,
+      "status": "READY",
+      "docCases": [
+        "DOC-F5-01"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#build-arrays-inside-expressions",
+        "website/content/cli/convert.mdx#array-expressions"
+      ],
+      "examples": [
+        "guides/csharp-interoperability.mdx: W1-F5-arrays converted output (native arrays plus one array-element-block statement)",
+        "cli/convert.mdx: the Grids program"
+      ],
+      "transcripts": [
+        "W1-F5-arrays"
+      ],
+      "claimsCorrected": [
+        "multi-line elements are preserved only in rectangular array rows; one-dimensional multi-line elements stay native"
+      ],
+      "registryGaps": [
+        "multidim-array says 'fully supported' (Full) while array-element-block shapes are preserved"
+      ],
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f5-1132/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "27d6da9fe0e6ca9e2caad28361c8059b909eaed8d829f841a0cbed43a9ebcee2"
+      }
+    },
+    {
+      "family": "F6",
+      "issue": 1144,
+      "status": "READY",
+      "docCases": [
+        "DOC-F6-01",
+        "DOC-F6-02"
+      ],
+      "pages": [
+        "website/content/guides/csharp-interoperability.mdx#which-mechanism-kept-the-c",
+        "website/content/cli/convert.mdx#counts-partial-results-and-the-json-envelope",
+        "website/content/cli/mcp.mdx#defaults-counts-and-partial-failures",
+        "website/content/cli/migrate.mdx#migration-reports",
+        "website/content/cli/structured-output.mdx#conversion-output"
+      ],
+      "examples": [
+        "cli/convert.mdx: the Counter rescue output (pinned by ConversionPathReportingTests.F6_REPORT_12)",
+        "cli/mcp.mdx: the passthroughOnError payload (pinned by F6_REPORT_13)"
+      ],
+      "transcripts": [
+        "W1-F6-rescue",
+        "W1-F6-project"
+      ],
+      "claimsCorrected": [
+        "native counts include constructs of a type a rescue later replaced; pages now say to read conversionPaths.outcome",
+        "calor_batch in lossless mode refuses every file when one fails (failedFiles 2 in W1-F6-project); a draft claim that the rest still convert was removed before review",
+        "calor convert --format json --verbose wrote progress lines to stdout before the envelope (fixed by #1570; W1-F6-rescue cli-convert-json-verbose now records stdoutIsOneJsonDocument true)",
+        "MCP diagnostics: calor_convert issues[], calor_migrate perFile[].errors/warnings, calor_batch files[].issues",
+        "post-validation-fallback is a mechanism label, not a feature-check registry entry"
+      ],
+      "readyRecord": {
+        "path": "docs/plans/evidence/v0.25-f6-1144/ready/d1d7afde/a1/ready-record.json",
+        "sha256": "b98afbabb1354525a711c6a9fc4675eee1bc096a07837fdac8582cc0cedf0fe4"
+      }
+    }
+  ]
+}

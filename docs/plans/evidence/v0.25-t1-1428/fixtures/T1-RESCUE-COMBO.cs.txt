@@ -1,0 +1,59 @@
+// 0.25 T1 (#1428) shared control: rescue combinations. One file mixes a member whose native
+// output fails the C# round trip (a label before the last statement), a member whose native
+// output does not parse (a switch expression as an array element), an iterator accessor the
+// converter preserves (#1139), and plain native members. Whatever path each member takes, the
+// program must behave like the original, and a surface without rescue must refuse rather than
+// change behavior.
+using System;
+using System.Collections.Generic;
+
+public class Mixed
+{
+    public static string log = "";
+
+    public int Labelled(int x)
+    {
+        log = log + "l";
+        done:
+        return x + 1;
+    }
+
+    public int Switched(int x)
+    {
+        int[] a = { x switch { 1 => 2, _ => 3 } };
+        return a[0];
+    }
+
+    public IEnumerable<int> Lazy
+    {
+        get
+        {
+            log = log + "y";
+            yield return 4;
+        }
+    }
+
+    public int Native(int x)
+    {
+        log = log + "n";
+        return x * 2;
+    }
+}
+
+public static class Probe
+{
+    public static string Run()
+    {
+        var m = new Mixed();
+        var lazy = m.Lazy;
+        int a = m.Labelled(1);
+        int b = m.Switched(1) * 10 + m.Switched(5);
+        int c = m.Native(3);
+        int d = 0;
+        foreach (var y in lazy)
+        {
+            d = d + y;
+        }
+        return a + "|" + b + "|" + c + "|" + d + "|" + Mixed.log;
+    }
+}

@@ -1,0 +1,16 @@
+VERDICT: REQUEST CHANGES
+
+1. **BLOCKING — `scripts/check_release_credentials.py:381` and `:417`: contradictory API JSON can produce CLOSED.** Both response loaders still use ordinary `json.loads`, which silently keeps the last duplicate member. I reproduced a workflow-permissions response containing `"default_workflow_permissions":"write"` followed by `"default_workflow_permissions":"read"`, and PR approval `true` followed by `false`. Both loaders accepted it; `check_settings` returned no findings, allowing CLOSED with otherwise passing checks. This concerns malformed responses, not a demonstrated live credential bypass. **Fix:** use `object_pairs_hook=unique_members` for both loaders, convert rejection to `Unreadable`, and test duplicate members through saved responses and mocked `gh` responses.
+
+2. **MINOR — `.github/workflows/publish-nuget.yml:478`: the comment incorrectly promises failure until GitHub settings are complete.** With the NuGet policy active, an unrestricted or automatically recreated `nuget-release` environment can still supply the matching environment claim. Missing branch restrictions do not themselves stop the exchange. **Fix:** state that those settings are required security controls; reserve the fail-closed claim for missing or mismatched NuGet policy claims.
+
+Verified:
+
+- Round 1’s omitted-environment fix rejects empty and partial inventories and still reads release-environment secrets. Invalid name variants also fail closed.
+- Attestations reject duplicate members, including escaped duplicates, and impossible dates. An unattested 403 produces V001; API answers override attestations.
+- The README now correctly explains that clearing the NuGet policy’s environment broadens trust.
+- The [NuGet validator](https://raw.githubusercontent.com/NuGet/NuGetGallery/main/src/NuGetGallery.Services/Authentication/Federated/GitHubTokenPolicyValidator.cs) confirms filename matching without ref matching and rejection of a missing required environment claim. Under the stated settings, I found no direct credential bypass.
+- The pin matches [v1.2.0](https://github.com/NuGet/login/releases/tag/v1.2.0); its [source](https://raw.githubusercontent.com/NuGet/login/8d196754b4036150537f80ac539e15c2f1028841/src/index.ts) confirms `user`, masking, `NUGET_API_KEY`, and exchange failure handling.
+- Workflow changes are confined to credential handling. Earlier checks remain, with S006 appropriately retired.
+
+The sandbox denied creating `/tmp` venv, and PyYAML is unavailable. I inspected the 42-test suite and ran in-memory settings/attestation probes; I could not execute the full YAML tests. No files were modified, live checker run, or workflow dispatched.

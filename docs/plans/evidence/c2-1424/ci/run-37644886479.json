@@ -1,0 +1,912 @@
+{
+ "runId": 37644886479,
+ "workflow": "Tests",
+ "title": "Tests",
+ "event": "workflow_dispatch",
+ "headBranch": "c2-1424/candidate-696ab824",
+ "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+ "runAttempt": 1,
+ "status": "completed",
+ "conclusion": "success",
+ "createdAt": "2026-10-07T15:33:39Z",
+ "updatedAt": "2026-10-07T16:14:25Z",
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/37644886479",
+ "runnerMinutes": 175,
+ "jobCounts": {
+  "completed/skipped": 2,
+  "completed/success": 35
+ },
+ "jobs": [
+  {
+   "id": 112872994292,
+   "name": "snapshot-diff-heuristic",
+   "status": "completed",
+   "conclusion": "skipped",
+   "startedAt": "2026-10-07T15:33:43Z",
+   "completedAt": "2026-10-07T15:33:43Z",
+   "runnerMinutes": 0,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": null,
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112872996446,
+   "name": "z3-consumer-matrix (win-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:41:34Z",
+   "runnerMinutes": 8,
+   "labels": [
+    "windows-11-arm"
+   ],
+   "runnerName": "GitHub Actions 1000056421",
+   "environmentObserved": {
+    "imageOS": "windows-11-vs2026-arm64",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056421",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996446-z3-consumer-matrix_win-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996475,
+   "name": "z3-consumer-matrix (linux-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:51Z",
+   "completedAt": "2026-10-07T15:39:18Z",
+   "runnerMinutes": 6,
+   "labels": [
+    "ubuntu-24.04-arm"
+   ],
+   "runnerName": "GitHub Actions 1000056417",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04-arm",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056417",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996475-z3-consumer-matrix_linux-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996503,
+   "name": "z3-consumer-matrix (osx-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:37Z",
+   "completedAt": "2026-10-07T15:41:01Z",
+   "runnerMinutes": 6,
+   "labels": [
+    "macos-14"
+   ],
+   "runnerName": "GitHub Actions 1000056436",
+   "environmentObserved": {
+    "imageOS": "macos-14-arm64",
+    "imageVersion": "20260828.587",
+    "runnerName": "GitHub Actions 1000056436",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996503-z3-consumer-matrix_osx-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996535,
+   "name": "phase2-gate-dryrun",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:34:14Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056426",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056426",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37644886479/112872996535-phase2-gate-dryrun.log.gz"
+   }
+  },
+  {
+   "id": 112872996553,
+   "name": "id-validation",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:38Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056423",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056423",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996553-id-validation.log.gz"
+   }
+  },
+  {
+   "id": 112872996576,
+   "name": "verify-phase1",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:36:28Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056425",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056425",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996576-verify-phase1.log.gz"
+   }
+  },
+  {
+   "id": 112872996617,
+   "name": "conversion-scorecard",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:36:10Z",
+   "completedAt": "2026-10-07T15:38:40Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056446",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056446",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996617-conversion-scorecard.log.gz"
+   }
+  },
+  {
+   "id": 112872996630,
+   "name": "z3-consumer-matrix (win-x64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:39:58Z",
+   "runnerMinutes": 7,
+   "labels": [
+    "windows-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056414",
+   "environmentObserved": {
+    "imageOS": "windows-2025-vs2026",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056414",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996630-z3-consumer-matrix_win-x64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996653,
+   "name": "cli-tool-consumer (win-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:37:27Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "windows-11-arm"
+   ],
+   "runnerName": "GitHub Actions 1000056422",
+   "environmentObserved": {
+    "imageOS": "windows-11-vs2026-arm64",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056422",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996653-cli-tool-consumer_win-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996685,
+   "name": "cli-tool-consumer (win-x64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:48Z",
+   "completedAt": "2026-10-07T15:36:06Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "windows-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056415",
+   "environmentObserved": {
+    "imageOS": "windows-2025-vs2026",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056415",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996685-cli-tool-consumer_win-x64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996686,
+   "name": "d-s1.5-fixtures",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:26Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056429",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056429",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996686-d-s1.5-fixtures.log.gz"
+   }
+  },
+  {
+   "id": 112872996695,
+   "name": "test",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:38:40Z",
+   "runnerMinutes": 5,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056428",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056428",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996695-test.log.gz"
+   }
+  },
+  {
+   "id": 112872996748,
+   "name": "cli-tool-consumer (osx-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:41Z",
+   "completedAt": "2026-10-07T15:37:02Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "macos-14"
+   ],
+   "runnerName": "GitHub Actions 1000056438",
+   "environmentObserved": {
+    "imageOS": "macos-14-arm64",
+    "imageVersion": "20260828.587",
+    "runnerName": "GitHub Actions 1000056438",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996748-cli-tool-consumer_osx-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996749,
+   "name": "cli-tool-consumer (linux-x64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:36:08Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056424",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056424",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996749-cli-tool-consumer_linux-x64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996835,
+   "name": "quality-ratchets",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:36:31Z",
+   "completedAt": "2026-10-07T16:14:25Z",
+   "runnerMinutes": 38,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056448",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056448",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996835-quality-ratchets.log.gz"
+   }
+  },
+  {
+   "id": 112872996857,
+   "name": "phase1-corpus-clean",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:36:09Z",
+   "completedAt": "2026-10-07T15:36:19Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056445",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056445",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37644886479/112872996857-phase1-corpus-clean.log.gz"
+   }
+  },
+  {
+   "id": 112872996917,
+   "name": "sdk-package-consumer (win-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:50Z",
+   "completedAt": "2026-10-07T15:37:09Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "windows-11-arm"
+   ],
+   "runnerName": "GitHub Actions 1000056420",
+   "environmentObserved": {
+    "imageOS": "windows-11-vs2026-arm64",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056420",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996917-sdk-package-consumer_win-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996930,
+   "name": "cli-tool-consumer (linux-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:51Z",
+   "completedAt": "2026-10-07T15:35:31Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-24.04-arm"
+   ],
+   "runnerName": "GitHub Actions 1000056418",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04-arm",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056418",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996930-cli-tool-consumer_linux-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996947,
+   "name": "sdk-package-consumer (linux-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:57Z",
+   "completedAt": "2026-10-07T15:35:47Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-24.04-arm"
+   ],
+   "runnerName": "GitHub Actions 1000056419",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04-arm",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056419",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996947-sdk-package-consumer_linux-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996974,
+   "name": "sdk-package-consumer (linux-x64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:42Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056427",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056427",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872996974-sdk-package-consumer_linux-x64_.log.gz"
+   }
+  },
+  {
+   "id": 112872996980,
+   "name": "detect-changes",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:37:05Z",
+   "completedAt": "2026-10-07T15:37:18Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056449",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056449",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37644886479/112872996980-detect-changes.log.gz"
+   }
+  },
+  {
+   "id": 112872997020,
+   "name": "sdk-package-consumer (win-x64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:50Z",
+   "completedAt": "2026-10-07T15:35:52Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "windows-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056416",
+   "environmentObserved": {
+    "imageOS": "windows-2025-vs2026",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056416",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997020-sdk-package-consumer_win-x64_.log.gz"
+   }
+  },
+  {
+   "id": 112872997046,
+   "name": "calor-first-guard",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:36:22Z",
+   "completedAt": "2026-10-07T15:46:04Z",
+   "runnerMinutes": 10,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056447",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056447",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37644886479/112872997046-calor-first-guard.log.gz"
+   }
+  },
+  {
+   "id": 112872997062,
+   "name": "sdk-package-consumer (osx-arm64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:34Z",
+   "completedAt": "2026-10-07T15:37:04Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "macos-14"
+   ],
+   "runnerName": "GitHub Actions 1000056435",
+   "environmentObserved": {
+    "imageOS": "macos-14-arm64",
+    "imageVersion": "20260828.587",
+    "runnerName": "GitHub Actions 1000056435",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997062-sdk-package-consumer_osx-arm64_.log.gz"
+   }
+  },
+  {
+   "id": 112872997182,
+   "name": "tests (experimental)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:56Z",
+   "completedAt": "2026-10-07T15:37:09Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056443",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056443",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997182-tests_experimental_.log.gz"
+   }
+  },
+  {
+   "id": 112872997301,
+   "name": "tests (conversion)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:30Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056432",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056432",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997301-tests_conversion_.log.gz"
+   }
+  },
+  {
+   "id": 112872997353,
+   "name": "tests (verification)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:41Z",
+   "completedAt": "2026-10-07T15:37:38Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056440",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056440",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997353-tests_verification_.log.gz"
+   }
+  },
+  {
+   "id": 112872997360,
+   "name": "tests (semantics)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:45Z",
+   "completedAt": "2026-10-07T15:37:10Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056441",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056441",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997360-tests_semantics_.log.gz"
+   }
+  },
+  {
+   "id": 112872997391,
+   "name": "tests (il-analysis)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:51Z",
+   "completedAt": "2026-10-07T15:37:09Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056442",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056442",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997391-tests_il-analysis_.log.gz"
+   }
+  },
+  {
+   "id": 112872997431,
+   "name": "tests (roundtrip-harness)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:36:13Z",
+   "completedAt": "2026-10-07T15:44:54Z",
+   "runnerMinutes": 9,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056439",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056439",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997431-tests_roundtrip-harness_.log.gz"
+   }
+  },
+  {
+   "id": 112872997446,
+   "name": "tests (language-server)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:36:00Z",
+   "completedAt": "2026-10-07T15:37:22Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056444",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056444",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997446-tests_language-server_.log.gz"
+   }
+  },
+  {
+   "id": 112872997448,
+   "name": "tests (enforcement)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:34Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056433",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056433",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997448-tests_enforcement_.log.gz"
+   }
+  },
+  {
+   "id": 112872997454,
+   "name": "tests (compiler)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:35:34Z",
+   "completedAt": "2026-10-07T16:02:04Z",
+   "runnerMinutes": 27,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056437",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056437",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997454-tests_compiler_.log.gz"
+   }
+  },
+  {
+   "id": 112872997458,
+   "name": "tests (tasks)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:57Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056431",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056431",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997458-tests_tasks_.log.gz"
+   }
+  },
+  {
+   "id": 112872997494,
+   "name": "tests (evaluation)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:33:49Z",
+   "completedAt": "2026-10-07T15:35:34Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056430",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056430",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37644886479/112872997494-tests_evaluation_.log.gz"
+   }
+  },
+  {
+   "id": 112875326979,
+   "name": "roundtrip-verification",
+   "status": "completed",
+   "conclusion": "skipped",
+   "startedAt": "2026-10-07T15:38:41Z",
+   "completedAt": "2026-10-07T15:38:41Z",
+   "runnerMinutes": 0,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": null,
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  }
+ ]
+}

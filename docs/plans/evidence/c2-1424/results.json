@@ -1,0 +1,471 @@
+{
+ "schema": "c2-1424/results/1",
+ "issue": 1424,
+ "candidate": "696ab82470626164979a07792ed74932ab88d9e6",
+ "statusVocabulary": {
+  "REGENERATED": "the producer ran on the candidate and its output is retained",
+  "BYTES-MATCH": "two or more independent regenerations, and the committed artifact where one exists, are byte-identical",
+  "VERDICTS-AGREE": "two or more regenerations agree on every pass/fail verdict and count; bytes not compared or differing (timestamps, durations)",
+  "SINGLE-RUN": "exactly one successful regeneration exists; no agreement shown",
+  "PASS-ONLY": "only a job or test conclusion exists; no output to compare",
+  "VALIDATED": "the source is the artifact (inventory); its validator ran on the candidate and passed",
+  "RE-MATERIALIZED-VERIFIED": "pinned input fetched again and verified against its pins; never rebuilt",
+  "NOT-REPRODUCIBLE": "independent regenerations differ in bytes",
+  "REGENERATED-FAILING": "regenerated on the candidate; the producer reports failure",
+  "BLOCKED": "a required producer, input, or gate failed, or the output cannot serve its consumer; needs a decision",
+  "NOT-REGENERATED-BY-RULE": "the inventory or contract forbids or excludes regeneration",
+  "STALE-CLASSIFICATION": "the frozen inventory still classifies the artifact stale; any output here is a candidate output only",
+  "HISTORICAL": "historical-only; not regenerated",
+  "IMPORTED-HASH-VERIFIED": "a record produced before the candidate, committed here unchanged; its hashes equal the C1 manifest's; it establishes nothing for the candidate"
+ },
+ "note": "These are C2 regeneration statuses, not #1408 adjudication outcomes. Every row keeps every attempt (ledger.json). A row may carry two statuses.",
+ "artifacts": [
+  {
+   "id": "verifier-runtime-differential",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "Regenerated 4 times on the candidate: worktree (macOS arm64), fresh clone (macOS arm64), test.yml runs 37642277928 and 37644886479 (ubuntu-24.04 oracle upload). All equal the committed bytes and the amendment-1.3.2 pins: json aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9, md 24901f2176fb3157dedcb79f40564f2bfe9bcd10db94018f5c8942c56c20b2d5. Totals 429 Proven / 156 Assumed / 585 Refuted. The test job's oracle gate and tests (verification) passed in both CI runs.",
+   "limits": "Not the registered determinism protocol. Its platform and repeat-run determinism on the candidate is BLOCKED (see determinism-protocol-on-candidate).",
+   "files": [
+    "regenerated/verifier-runtime-differential/",
+    "regenerated/tests/vrd-regen.trx",
+    "regenerated/tests/vrd-check.trx",
+    "ci/artifacts-37644886479/verifier-runtime-differential.tar.gz"
+   ]
+  },
+  {
+   "id": "modeled-forms-whitelist",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "ModeledFormsTests 9 passed (worktree, fresh clone); tests (verification) passed in CI run 37644886479.",
+   "files": [
+    "regenerated/tests/modeled-forms.trx",
+    "fresh-clone/modeled.log"
+   ]
+  },
+  {
+   "id": "release-test-suites",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "All 13 releaseCritical projects pass on the candidate with exactly the manifest's counts. CI run 37644886479 (ubuntu-24.04): Compiler 12,947 (7,358 + 5,589 shards, 3 not executed = expectedSkipped 3), Conversion 476, Enforcement 695 (1 not executed), Evaluation 235, Experimental 25, ILAnalysis 46, LanguageServer 532, RoundTrip.Harness 295, Semantics 55, Tasks 134, Verification 473; failed 0. Locally in the fresh clone (macOS arm64): Ids 394, Performance 25, failed 0. The candidate's suite excludes C1's 86 tests (C1-TEST-COUNT-DELTA).",
+   "limits": "Ids and Performance ran on macOS, not in CI: test.yml's remaining-tests matrix has no ids or performance shard (publish-nuget.yml's test matrix has both). The nightly performance.yml run on the candidate (37629089909, not C2's) failed Binding_MediumModule_Under500ms on ubuntu-24.04 (see release-quality-reports).",
+   "files": [
+    "ci/artifacts-37644886479/",
+    "regenerated/tests/fresh-Calor.Ids.Tests.trx",
+    "regenerated/tests/fresh-Calor.Performance.Tests.trx"
+   ]
+  },
+  {
+   "id": "ci-test-reports",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "VERDICTS-AGREE"
+   ],
+   "evidence": "Every Actions artifact of both test.yml dispatches is committed as a deterministic tar.gz, raw coverage XML included. Every job that ran in both runs has the same conclusion, and the TRX totals are equal where both runs produced them.",
+   "limits": "TRX timestamps and durations differ run to run; bytes are not compared. Run 1 lacks the 17 jobs that never started.",
+   "files": [
+    "ci/artifacts-37642277928/",
+    "ci/artifacts-37644886479/"
+   ]
+  },
+  {
+   "id": "test-manifest",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "check_test_quality.py exit 0 (release-quality attempts 1 and 2); CI 'Enforce test inventory' (check_trx.py) passed in every remaining-tests shard of run 37644886479.",
+   "files": [
+    "regenerated/release-quality/attempt-2/test-quality.log"
+   ]
+  },
+  {
+   "id": "z3-upstream-pins",
+   "classification": "authoritative",
+   "status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "evidence": "download-z3.sh verified every archive and extracted asset against the pins (worktree and fresh clone); every CI Z3 bootstrap passed.",
+   "files": [
+    "regenerated/pins/01-download-z3.log",
+    "fresh-clone/download-z3.log"
+   ]
+  },
+  {
+   "id": "z3-release-binaries",
+   "classification": "authoritative",
+   "status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "evidence": "gh release download z3-binaries-4.15.7: 7 of 7 assets match .github/z3-binaries-4.15.7.sha256 (SHA-256 and size). Nothing rebuilt or republished.",
+   "files": [
+    "regenerated/pins/z3-release-binaries.json"
+   ]
+  },
+  {
+   "id": "toolchain-pins",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "dotnet restore --locked-mode succeeded (worktree, fresh clone, every CI restore). Environment observed, not pinned (decision ENVIRONMENT-OBSERVED-NOT-PINNED): CI used SDK 10.0.401 / runtime 10.0.12 on every job that logged setup-dotnet; images in ledger.json.",
+   "files": [
+    "regenerated/pins/02-restore-locked.log",
+    "fresh-clone/restore.log",
+    "ledger.json"
+   ]
+  },
+  {
+   "id": "corpus-submodules",
+   "classification": "authoritative",
+   "status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "evidence": "git submodule update --init checks out exactly the candidate's gitlinks (worktree and fresh clone).",
+   "files": [
+    "regenerated/pins/submodule-status-fresh-clone.txt"
+   ]
+  },
+  {
+   "id": "roundtrip-reports",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "SINGLE-RUN"
+   ],
+   "evidence": "Local (fresh clone, .NET 10 SDK + .NET 8 runtime): run --all exit 0, all 5 projects Pass. test.yml roundtrip-verification was skipped on both dispatches by its has_non_docs_changes condition (dorny/paths-filter compared main with the temporary branch; the candidate is an ancestor of main, so it found no change: 'Filter non_docs = false'), so no CI round-trip report exists for the candidate.",
+   "limits": "One successful regeneration (local, macOS, with the .NET 8 runtime). Release-quality attempt 2's round-trip step on the same tree failed only because the machine had no .NET 8 runtime (recorded). No CI round-trip report exists for the candidate.",
+   "files": [
+    "regenerated/roundtrip-net8/",
+    "regenerated/release-quality/attempt-2/roundtrip.log"
+   ]
+  },
+  {
+   "id": "roundtrip-baselines",
+   "classification": "derived",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "scripts/roundtrip_delta.py --baseline eng/roundtrip-baselines.json against the regenerated reports: 'No regressions vs baseline'. The committed baseline file is not edited (it stays the hand-seeded file the inventory describes).",
+   "files": [
+    "regenerated/roundtrip-net8/roundtrip-delta.md"
+   ]
+  },
+  {
+   "id": "quality-ratchet-baselines",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED",
+    "BLOCKED"
+   ],
+   "evidence": "Coverage and mutation ratchets pass (CI quality-ratchets in both test.yml runs; local release-quality attempt 2). Flake gate: 10 of 10 in CI, 100 of 100 locally.",
+   "blocked": "Performance ratchet fails on the candidate in both places it ran: nightly performance.yml 37629089909 on ubuntu-24.04 (Binding_MediumModule_Under500ms failed in warmup; not a C2 run) and locally (median 47.110 s > 24.000 s on a loaded Mac). The CI failure is the same failure class that stopped the v0.22.0 publish. publish-nuget.yml's release-quality job (needed by publish) runs run_performance_gate.py.",
+   "files": [
+    "ci/artifacts-37644886479/quality-ratchet-reports.tar.gz",
+    "regenerated/release-quality/attempt-2/",
+    "ci/observed-not-charged/"
+   ]
+  },
+  {
+   "id": "release-quality-reports",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "REGENERATED-FAILING",
+    "BLOCKED"
+   ],
+   "evidence": "Every step of publish-nuget.yml release-quality ran locally in order (attempt 2): self-tests, test quality, coverage, mutation, flake 100, scorecard exit 0; performance exit 1; round-trip exit 1 (no .NET 8 runtime; passes with it, L11). Attempt 1 aborted (worktree removed).",
+   "blocked": "Performance gate fails (see quality-ratchet-baselines). Not run on ubuntu-latest: no workflow runs this job without reaching the adjudication gate.",
+   "files": [
+    "regenerated/release-quality/"
+   ]
+  },
+  {
+   "id": "sdk-consumer-check",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "evidence": "test.yml sdk-package-consumer, all 5 RIDs (linux-x64, linux-arm64, osx-arm64, win-x64, win-arm64) succeeded in run 37644886479 (linux-x64 also in 37642277928); cli-tool-consumer and z3-consumer-matrix also succeeded on every RID.",
+   "limits": "Tests a self-packed SDK in CI, not the candidate packages in publication/ (inventory open defect).",
+   "files": [
+    "ci/run-37644886479.json",
+    "ci/logs-37644886479/"
+   ]
+  },
+  {
+   "id": "ledger-provenance-index",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "LedgerCommitStampTests 5 passed (worktree, with origin/main fetched at fd34f41f); also in CI tests (compiler).",
+   "files": [
+    "regenerated/tests/ledger-stamps.trx"
+   ]
+  },
+  {
+   "id": "benchmark-corpus",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "B1 packet validator (BenchmarkResultsTests, BenchmarkRegistrationTests) 58 passed; pair files hash-checked by it.",
+   "files": [
+    "regenerated/tests/b1-validator.trx"
+   ]
+  },
+  {
+   "id": "nuget-packages",
+   "classification": "authoritative",
+   "status": [
+    "NOT-REGENERATED-BY-RULE"
+   ],
+   "evidence": "Contract section 7: #1424 never regenerates nuget-packages; candidate-packages instead."
+  },
+  {
+   "id": "candidate-packages",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "NOT-REPRODUCIBLE",
+    "BLOCKED"
+   ],
+   "evidence": "Packed unpublished with the publish job's steps; check-packaged-z3.py --all-rids passed for both packages; no forbidden wording in any package text entry. Worktree pack 1: calor.0.24.0.nupkg 7ca79f334f2a83b7a7d53b612e1a2957b96e7203c3d918a90d742e72b0e6910c (60,298,411 bytes), Calor.Sdk.0.24.0.nupkg 3b828897426764ebce7a7ec40038fbcb5306742d2db019ac8315a6bc3038101e (57,981,330 bytes).",
+   "blocked": "Not byte-reproducible. Two packs of the same build differ only in zip entry timestamps (all 65 and 32 entries have equal contents). A build in a different checkout path (fresh clone) also changes calor.dll, Calor.Runtime.dll, Calor.Tasks.dll and the PDBs: the DLLs embed the absolute PDB path (no ContinuousIntegrationBuild or PathMap in the build). Per the maintainer decision 'Store hashes only' (2026-10-07) the .nupkg bytes are not committed; publication/candidate-packages.json keeps each file's SHA-256 and size and every zip entry's SHA-256, size, and timestamp, and publication/40-pack-1.log and 41-pack-2.log (with plan.json) keep the commands that produced them. The decision is to make the build reproducible and re-freeze.",
+   "files": [
+    "publication/candidate-packages.json",
+    "publication/40-pack-1.log",
+    "publication/41-pack-2.log",
+    "fresh-clone/comparison.json"
+   ]
+  },
+  {
+   "id": "release-metadata",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "NOT-REPRODUCIBLE"
+   ],
+   "evidence": "generate-release-metadata.py from worktree pack 1: provenance 3e01e4a2e0e9a4657e0604ee467dbeb9e0979c2585b4656589e36cffa2e428ca, SBOM 51047a92ddacf53d5bfb59df891d91939ada75e48d3588c9795b14894a140251. Generating twice from the same packages gives the same bytes; it embeds the package hashes, so it inherits candidate-packages' non-reproducibility (fresh clone differs). Both JSON files are committed.",
+   "files": [
+    "publication/release-metadata/"
+   ]
+  },
+  {
+   "id": "evidence-contract",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "EvidenceContractTests 322 passed (worktree, fresh clone), including PacketHashesMatchSha256Manifest.",
+   "files": [
+    "regenerated/tests/evidence-contract.trx",
+    "fresh-clone/contract.log"
+   ]
+  },
+  {
+   "id": "tier1-verification",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "evidence": "Candidate output only: test.yml verify-phase1 passed in both runs (tier1-verification artifact committed). The inventory still classifies the artifact stale (no amendment names G4 #1241's repair), so A1 can only adjudicate it BLOCKED (section 8).",
+   "files": [
+    "ci/artifacts-37644886479/tier1-verification.tar.gz"
+   ]
+  },
+  {
+   "id": "tier2-corpus-verification",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "REGENERATED",
+    "REGENERATED-FAILING",
+    "VERDICTS-AGREE"
+   ],
+   "evidence": "Candidate output only: tier2.yml 37644891085 (ubuntu) and local fresh clone (macOS) both report 428 passed / 51 expected-negative / 30 known-failure, all else 0, verdict FAIL by design (G4). Same counts on both platforms. Classification stale, as above.",
+   "files": [
+    "ci/artifacts-37644891085/tier2-verification.tar.gz",
+    "regenerated/tier2/"
+   ]
+  },
+  {
+   "id": "benchmark-results",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "The legacy statistical output is not regenerated (inventory note). The B1 registered generator, which B2 made the only publishable source, regenerated results.json, pair-manifest.json, metrics-run-1/2.json byte-identical to docs/plans/evidence/b1-1276/results in the worktree and the fresh clone (results.json ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f).",
+   "files": [
+    "regenerated/benchmark/b1-regen/"
+   ]
+  },
+  {
+   "id": "benchmark-provenance",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "NOT-REGENERATED-BY-RULE"
+   ],
+   "evidence": "Hand-edited; no generator."
+  },
+  {
+   "id": "benchmark-results-md",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "NOT-REGENERATED-BY-RULE"
+   ],
+   "evidence": "Inherits the stale legacy results."
+  },
+  {
+   "id": "website-benchmark-pages",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION"
+   ],
+   "evidence": "Hand-edited; built inside the website candidate (publication/)."
+  },
+  {
+   "id": "benchmark-workflow-output",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "BLOCKED"
+   ],
+   "evidence": "B2 headline producer (benchmark_publication_gate.py check, benchmark.yml step methodology) run locally on the candidate: REFUSED, B2-08 'tests/Calor.Compiler.Tests/EvidenceContract at HEAD differs from refs/remotes/origin/main'. Main gained C1's classifier and manifest tests in that directory after the candidate, and C1's files are frozen after the landing, so the gate refuses the candidate against main from now on. Diagnostic only: in the fresh clone with refs/remotes/origin/main set to the candidate, the gate passes and writes benchmark-headline.json db1a6fd289319fce94e9a54640fa13601330c9c8e95b428d726f75fb73001c3b and commit-stamp-index.json d429144777a4fc398f6d710ffc3b031df35699820d43a268fd04038a8c97688e, identical on two runs (no run timestamp in the headline; 'no headline is published yet; nothing is compared'). These are not the bytes a release run would produce while main differs.",
+   "blocked": "The benchmark surface cannot publish from this candidate. R2's record schema still requires a benchmark-results files block (FILE_SURFACES). The release notes say 'No benchmark results are published with this release.'",
+   "files": [
+    "regenerated/benchmark/"
+   ]
+  },
+  {
+   "id": "benchmark-publication-pr",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "NOT-REGENERATED-BY-RULE"
+   ],
+   "evidence": "Opening it would be publication."
+  },
+  {
+   "id": "website-deployment",
+   "classification": "stale",
+   "status": [
+    "STALE-CLASSIFICATION",
+    "REGENERATED",
+    "NOT-REPRODUCIBLE",
+    "BLOCKED"
+   ],
+   "evidence": "Built, never deployed (Node 20.20.2, npm ci, next build): 253 files each time. R2 tree digests: worktree build 1 8b2ba26a733a5617fd5fdbb0a1066926d51b68502bd95fccf6ae53c40f597cbf, build 2 67c85b87aaa2ebb2bce8e0774af78804f50d5659f4042a54c43a03981471d5f9, fresh clone differs again. Next.js assigns a random build id per build (no generateBuildId), so every build has a different tree. Build 1 is committed as publication/website-worktree-build-1.tar.gz with all three tree listings.",
+   "blocked": "(1) Not reproducible; nextjs-gh-pages.yml at the candidate rebuilds the site and compares its tree digest with the record, so a rebuild cannot match, and the retained archive does not change that (a fix changes the candidate). (2) R2's wording scan (G012) fails on the built site: docs/changelog/index.html and index.txt ('independently adjudicated', 'independently verified') and search-index.json ('independently verified').",
+   "files": [
+    "publication/website-worktree-build-1.tar.gz",
+    "publication/website-tree-worktree-build-1.sha256",
+    "publication/website-tree-worktree-build-2.sha256",
+    "publication/website-tree-fresh-clone-build.sha256"
+   ]
+  },
+  {
+   "id": "llm-and-agent-results",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "changelog",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ],
+   "evidence": "Not regenerated; its 0.24.0 section is rendered as the release-notes candidate."
+  },
+  {
+   "id": "github-release-notes",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL",
+    "REGENERATED",
+    "BYTES-MATCH",
+    "BLOCKED"
+   ],
+   "evidence": "Rendered unpublished with publish-nuget.yml's awk extract: byte-identical in worktree and fresh clone, raw sha256 3d3e53d0df15aa4f8e5b07aa0c2d0ac9be9f1849125ef4b29340ea1e1ca67b1c, R2 text digest d79bda0ed83c4131d3c1cafac6af9805ada5dcb1f8ceebdea751bec1ac210a38. Nothing posted.",
+   "blocked": "R2's own scan_text (scripts/verify_release_adjudication.py at the candidate) reports G012 on the rendered notes: line 12 'It is not independently adjudicated or independently verified' negates only the first phrase; the 12 characters before 'independently verified' are 'adjudicated or '. The publish job's notes check (--release-notes) and the release body check would fail.",
+   "files": [
+    "publication/release-notes.md",
+    "publication/wording-scan.json"
+   ]
+  },
+  {
+   "id": "v019-audit-disposition",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "pre-cut-evidence-packets",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  }
+ ],
+ "gates": [
+  {
+   "id": "determinism-protocol-on-candidate",
+   "status": [
+    "BLOCKED"
+   ],
+   "evidence": "Dispatched once (run 37642265108, execution id c2-1424-regen-1). The plan job accepted it; no attempt job was ever listed and the run concluded failure at 15:12:01Z (cause not confirmed; see ledger.json). Not an execution (protocol.json workflow.deviations[2]); 2 runner-minutes.",
+   "blocked": "DETERMINISM-REGISTRY-DRIFT. The registered case registry (docs/plans/evidence/g2-1421/cases.json, unchanged since registration) lists 411 Calor.Verification.Tests results; the candidate has 473 (62 new names, 0 removed, 0 multiplicity changes; all from S2 repairs merged after G3 execution 2). The verification-full profile runs the whole project, so each attempt reports unregistered tests, and the decider rejects such a record ('reported unregistered'), so no execution on the candidate can be DETERMINISTIC. A run would spend up to 655 runner-minutes and use the protocol's last execution slot (2 of maxExecutions 3 are used). Fixing it needs a protocol amendment re-deriving cases.json, which changes docs/plans/evidence/g2-1421/ and so invalidates the candidate (C1 classifier). Not dispatched again; maintainer decision.",
+   "files": [
+    "determinism-registry-drift.json",
+    "regenerated/tests/verification-list-tests.txt.gz",
+    "ci/run-37642265108.json"
+   ]
+  },
+  {
+   "id": "g3-execution-2-records",
+   "status": [
+    "IMPORTED-HASH-VERIFIED"
+   ],
+   "evidence": "Committed from evidence/g3-1135-exec-2 (f2d02af6); result.json and attempts.tar.gz hashes equal C1's g3Execution2 entry. DETERMINISTIC on d42d0313 only.",
+   "files": [
+    "g3-exec-2/"
+   ]
+  }
+ ],
+ "freshClone": {
+  "clone": "git clone --no-checkout https://github.com/juanmicrosoft/calor.git; git checkout --detach 696ab824...",
+  "deterministicSubsetReproduced": [
+   "verifier-runtime-differential (json, md)",
+   "B1 generator outputs (4 files)",
+   "rendered release notes",
+   "B2 headline under the simulated main (2 runs)"
+  ],
+  "differed": [
+   "candidate-packages (.nupkg and DLL/PDB entries)",
+   "release-metadata",
+   "website tree"
+  ],
+  "record": "fresh-clone/comparison.json"
+ },
+ "recordOf": "Regeneration 1 of 2 on candidate 696ab824 (incomplete). Maintainer decisions 2026-10-07 after this record: (1) 'Fix all 5, re-freeze, regenerate': fix PRs for the five causes, a second C1 freeze (which also registers the 62 new Verification tests), then a second and last C2 regeneration; (2) 'Store hashes only': the package binaries are not kept in git.",
+ "archivedFilesNote": "Files over about 1 MB (14 files, 119,726,710 bytes: the large .tar.gz archives, four CI job logs, two TRX files) are not on main. They live on the orphan branch evidence/v0.24-archives, commit 63e6a4a0a3f1d684f134035780aeaa7e463da469, at the same paths; archives.json maps each path to its SHA-256 and size (maintainer decision 2026-10-08)."
+}

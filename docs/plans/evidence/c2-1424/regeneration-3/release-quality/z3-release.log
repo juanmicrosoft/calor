@@ -1,0 +1,1 @@
+MATCH {'Microsoft.Z3.dll': 'MATCH', 'libz3-linux-arm64.so': 'MATCH', 'libz3-linux-x64.so': 'MATCH', 'libz3-osx-arm64.dylib': 'MATCH', 'libz3-win-arm64.dll': 'MATCH', 'libz3-win-x64.dll': 'MATCH', 'libz3-win-x86.dll': 'MATCH'}

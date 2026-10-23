@@ -1,0 +1,2829 @@
+{
+ "schema": "calor.adjudication-terminal-record/1",
+ "issue": 1408,
+ "epic": 1409,
+ "milestone": "0.24",
+ "outcome": "MILESTONE-FAILED",
+ "failedConditions": [
+  3,
+  7,
+  9
+ ],
+ "outcomeBasis": "Every required subject is adjudicated once (75 rows), none SUPPORTED. Conditions 2, 4, 5, 6, and 8 hold; condition 1 holds once the listed child issues are closed. Condition 9 does not hold: review-rounds-per-pr was exceeded without an amendment (AD-4). Condition 3 does not hold: under stopping rule 1 the seven gates with an unamended overrun are BLOCKED, and two claims are BLOCKED on their evidence. Condition 7 does not hold under the frozen text. §8 records MILESTONE-FAILED unless every condition holds. A MILESTONE-FAILED record never passes the #1410 gate (G006), so this record authorizes no publication of 0.24.0.",
+ "adjudicator": "@juanmicrosoft",
+ "adjudicationIndependence": "reduced",
+ "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+ "epicIndependentAdjudicationMet": false,
+ "independenceStatement": "Contract §9 deviation: the adjudicator is the maintainer who directed, reviewed, and merged the repairs. Every row is at most BOUNDED. The epic's outcome sentence about independence is not met, and this record authorizes no public claim of independent review of 0.24 evidence.",
+ "signature": "The adjudicator signs by merging the pull request that adds this file to main. That merge commit is the adjudication commit, and the identity is calor-adjudication:v1:<adjudication commit>:<SHA-256 of this file's exact bytes>. An A1 agent prepared this record and proposed every outcome; merging adopts them, including the sign-off decisions below.",
+ "contract": {
+  "version": "1.5.0",
+  "files": {
+   "docs/plans/v0.24-evidence-contract.md": "38b9303115d058977cd03216e7e9d0a6d77dc7d51a3d627724f1dba444a0adc4",
+   "docs/plans/evidence/evidence-contract-1407/contract.json": "91bcfff0f21bd04437de90bd7cd7cc221e3982051007b47b52985ca7b32ebfb8",
+   "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "db013ef25998dc0b571b490209dc59591180763e2d310adfaaa493688c719155"
+  }
+ },
+ "candidate": {
+  "commit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+  "version": "0.24.0"
+ },
+ "evidenceManifests": [
+  {
+   "role": "candidate-manifest",
+   "path": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+   "sha256": "dccdf0a52ba32083959e19c3b0c57ce7b0141a02bf238aab443dbb7454151601",
+   "landing": "b04e963f69a5a1016159cfcf8c5199eeea329fdb"
+  },
+  {
+   "role": "raw-artifact-freeze",
+   "path": "docs/plans/evidence/c2-1424/regeneration-3/raw-artifact-freeze.json",
+   "sha256": "8570b9d800e3cc2fe377290646fc12b626d6d400640cff50fb676d88313a85b4",
+   "landing": "12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e"
+  }
+ ],
+ "claimRegistry": {
+  "path": "docs/plans/evidence/c2-1424/regeneration-3/claim-registry.json",
+  "sha256": "b8966d1eaf0040bcca2a33c227fe08601d98bee6130a86617eedd2460f9250b8"
+ },
+ "evidenceCommit": "12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e",
+ "hashRule": "Every evidence sha256 is over the blob's exact bytes at evidenceCommit; a directory's treeSha256 is over sorted '<sha256>  <relative path>' lines of its files there.",
+ "regeneration": {
+  "issue": 1424,
+  "number": 3,
+  "pr": 1542,
+  "mergeCommit": "12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e",
+  "record": "docs/plans/evidence/c2-1424/regeneration-3/",
+  "results": {
+   "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+   "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+  },
+  "ledger": {
+   "path": "docs/plans/evidence/c2-1424/regeneration-3/ledger.json",
+   "sha256": "e1c557df8cc6cab94b5dc86f1fbb516aba1f40ab930b4b8ff2fd8fd66da604bb"
+  }
+ },
+ "terminalPredicate": [
+  {
+   "condition": 1,
+   "text": "Every child other than #1408 is closed with its closure evidence (§10).",
+   "holds": "AT-SIGN-OFF",
+   "basis": "Each gate row above records its §10 closure evidence and merged PRs. At this record's preparation only #1276 is closed; sign-off step 1 closes the other 12 contract children (and R0 #1407, a sub-issue of the epic) before this record merges. The record must not merge while any is open.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+     "sha256": "dccdf0a52ba32083959e19c3b0c57ce7b0141a02bf238aab443dbb7454151601"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "condition": 2,
+   "text": "Every #1419-registered release-critical row, for B1 and for N1, has an outcome or row status, none BLOCKED, not-investigated, or unclassified.",
+   "holds": true,
+   "basis": "88 release-critical rows per baseline: 74 CLEAN-WITHIN-BUDGET, 10 FINDING, 4 FALSE-PROOF, 0 INCOMPLETE. The 7 NOT-INVESTIGATED rows per baseline are the excluded XCL-* rows, none release-critical.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/s1-1311/combined-row-status.json",
+     "sha256": "d8c7ad549f06f35c6a2d04950f9c291bde2261dd7c8e42c11ad137f671f9d93d"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/gate-status.json",
+     "sha256": "a0e3af326da6f2e3fe07504e60dbc5dcb014257bd58762d324b81d261114e75d"
+    },
+    {
+     "path": "docs/plans/evidence/r1-1419/registration.json",
+     "sha256": "e77db9643cbefa02169b854be31cbd6595764eb162cbae824a366518ea34c9f9"
+    }
+   ]
+  },
+  {
+   "condition": 3,
+   "text": "No #1408 adjudication row for any release-critical artifact, gate, or claim is BLOCKED.",
+   "holds": false,
+   "basis": "9 rows are BLOCKED (rowCounts): 7 gates under stopping rule 1 (review-rounds overrun with no amendment) and 2 claims whose evidence contradicts them. No artifact row is BLOCKED: every authoritative or derived artifact's evidence is present on the candidate (regeneration 3), and no inventory artifact is stale.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/raw-artifact-freeze.json",
+     "sha256": "8570b9d800e3cc2fe377290646fc12b626d6d400640cff50fb676d88313a85b4"
+    }
+   ]
+  },
+  {
+   "condition": 4,
+   "text": "Zero unresolved false unconditional proofs; each is fixed or visibly demoted under #1413.",
+   "holds": true,
+   "basis": "The 4 FALSE-PROOF rows (7 findings) per baseline and the discovery D-NUM-WHILE-BOUND are each FIX-IN-0.24 or DEMOTE-IN-0.24 with a regression witness; S2 closure CLOSED/SUCCESS.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/findings.json",
+     "sha256": "57c04eb3a0d1a2789b0a7b48dd5bf90ae41566c0ce925e032039bd46f3fad31b"
+    }
+   ]
+  },
+  {
+   "condition": 5,
+   "text": "Every #1413 finding has a disposition other than NOT-INVESTIGATED or MILESTONE-FAILED.",
+   "holds": true,
+   "basis": "B1: 34 findings (13 FIX, 21 DEMOTE); N1: 34 (13 FIX, 21 DEMOTE); discoveries: 4 (1 FIX, 3 DEMOTE). None NOT-INVESTIGATED or MILESTONE-FAILED.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    }
+   ]
+  },
+  {
+   "condition": 6,
+   "text": "Every authoritative and derived inventory artifact was regenerated by #1424 on the frozen #1423 candidate, with no stale input (publication surfaces as unpublished candidates, §7).",
+   "holds": true,
+   "basis": "Regeneration 3 on 04e61f18: every authoritative and derived artifact is REGENERATED, VALIDATED (the source is the artifact), or RE-MATERIALIZED-VERIFIED (pinned inputs), except nuget-packages, which §7 forbids #1424 to regenerate; candidate-packages stands for it. No artifact is stale (amendment 1.4.0). Nothing was published.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ledger.json",
+     "sha256": "e1c557df8cc6cab94b5dc86f1fbb516aba1f40ab930b4b8ff2fd8fd66da604bb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/raw-artifact-freeze.json",
+     "sha256": "8570b9d800e3cc2fe377290646fc12b626d6d400640cff50fb676d88313a85b4"
+    }
+   ]
+  },
+  {
+   "condition": 7,
+   "text": "Every release surface in §7 consumes one matching adjudication identity (#1410 negative tests pass).",
+   "holds": false,
+   "basis": "Under the frozen text this is not met. NuGet, the GitHub release and notes, release metadata, website, benchmark publication, and the installed-tool check each run verify_release_adjudication.py on the identity, and the #1410 negative tests pass on the candidate. But the release PR (a §7 surface) precedes the candidate and cannot consume an identity (R2 release-gate.md §6, C1 open item R2-RELEASE-PR-CONDITION-7, never decided by amendment), and older tags keep an ungated publish path to the repository-scoped NuGet credential (release-gate.md §5). #1408 cannot waive either after the freeze.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/r2-1410/release-gate.md",
+     "sha256": "7d04d9137c3a87f0ea7d2f63d56796be1db8f86ee6e2ffb2de9e4438abe04af9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/r2-dry-run/success/gate.txt",
+     "sha256": "a6898e245e9a54581e7c50d19a1b1110f89ea9b83cc84033aed8f1341796ddd8"
+    }
+   ]
+  },
+  {
+   "condition": 8,
+   "text": "Every adjudication row records independence = reduced-maintainer-adjudicated, and no row is SUPPORTED while the deviation stands.",
+   "holds": true,
+   "basis": "By construction of this record; checked by R2 (G008) and EvidenceContractValidator.ValidateTerminalRecord (T002).",
+   "evidence": []
+  },
+  {
+   "condition": 9,
+   "text": "No §9 ceiling was exceeded without a merged amendment raising it.",
+   "holds": false,
+   "basis": "review-rounds-per-pr (3; exceptions only for #1496, #1502, #1503) was exceeded without an amendment. C1 PR #1508: rounds 1-3, then 5 more Codex passes, 4 of which requested changes and were followed by fixes (verification-pass, refreeze-verification, -2, -3), and the PR was not closed and re-scoped. G2 PR #1479: rounds 1-3, then 2 change-requesting passes, each followed by a fix, then a clean third pass. Amendments 1.3.0 and 1.3.1 counted exactly this pattern as an overrun that needed a registered exception, and 1.3.0 states that no other PR gets an overrun allowance. Even under the looser budget some records assumed (3 rounds plus 1 verification pass), #1508 (8 passes) and #1479 (6) exceed it. One change-requesting pass after round 3 followed by a fix also occurred on #1473, #1480, #1474/#1475, #1499, #1527, and #1507. Supporting, not decisive: ordinary-ci (15,000 runner-minutes) is recorded nowhere, and the A1 audit's Actions API sum is about 29,500 job-minutes on 0.24 PR branches; the maintainer-review hours (40 total, 2 per PR) are recorded nowhere. §9 forbids an amendment between the #1424 raw-artifact freeze and #1408's close, and §8 forbids #1408 to weaken a condition. Details: capacity-audit.md.",
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/evidence-contract-1407/contract.json",
+     "sha256": "91bcfff0f21bd04437de90bd7cd7cc221e3982051007b47b52985ca7b32ebfb8"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/reviews/round-3-codex.md",
+     "sha256": "997ec34ae3111bfca70562b0fd2ae481fea53b25f1f9e95a9da506df318be4c8"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/reviews/verification-pass-codex.md",
+     "sha256": "2bbe29183f8c7148f1c53e5db9215093e83bf60da9fe7635e61af225ef8c25af"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/reviews/refreeze-verification-codex.md",
+     "sha256": "4116f036c641de23176da945d8478b1d665b53e35796f07863b360fe30467fdc"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/reviews/refreeze-verification-2-codex.md",
+     "sha256": "dc578cf7ae9326288bc240ede055cfab1c22acfa32e3dc0b65be2dc87c34390a"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/reviews/refreeze-verification-3-codex.md",
+     "sha256": "ed200bee8ffc8e81e4da946be05f0ff82138fef7a49bf4cbb4852d7358eb2331"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/reviews/refreeze-verification-4-codex.md",
+     "sha256": "96b685eeb81de71045c937db2d1004ceb9e3790e430a3a0d6cf4b68c01c339ce"
+    },
+    {
+     "path": "docs/plans/evidence/g2-1421/reviews/round-3-codex.md",
+     "sha256": "4c0764a115a129a6483a28cd057fd55cd1a468f5af9979dbf159b713ca7d4d52"
+    },
+    {
+     "path": "docs/plans/evidence/g2-1421/reviews/verification-pass-codex.md",
+     "sha256": "191b0519d1aa3dee649fdf8debd0a1c1925a8002d2499a3e3fd686589c36cea5"
+    },
+    {
+     "path": "docs/plans/evidence/g2-1421/reviews/verification-pass-2-codex.md",
+     "sha256": "5df17d5b259a848522c9a5090ea7c53fe7f32ea545173db8f67afb420732ad2b"
+    },
+    {
+     "path": "docs/plans/evidence/g2-1421/reviews/verification-pass-3-codex.md",
+     "sha256": "9141a5d313a8c7a574f21304948a3795e66314b1aafc1a8a8e04d2705d7a57a6"
+    },
+    {
+     "path": "docs/plans/evidence/b1-1276/reviews/verification-pass-codex.md",
+     "sha256": "edc1b3d9add1ac2c6ad1879aebe8e97f87d79ddf4340e7c81ff4285c7f76e26c"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/reviews/round-verification.json",
+     "sha256": "c0d3a3a225d330c665b7307e85ac631efc78ce3b5384f6bc86664f4234ac02af"
+    },
+    {
+     "path": "docs/plans/evidence/r2-1410/reviews/verification-pass-codex.md",
+     "sha256": "ed7849fa87872317710363ad82e96df92c01eba5d11823db50c651230a63b360"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/reviews/dispositions/verification-codex.md",
+     "sha256": "38ba13e46e55f9971b59f409f025a890f4ab7c4e48e2b139200c09f0917a9a1f"
+    },
+    {
+     "path": "docs/plans/evidence/b2-1422/reviews/pr2-verification-pass-codex.md",
+     "sha256": "cbc9ff1c67fd8630f5832becd5faac6c159eae4bdabef71e715459997d0c5762"
+    },
+    {
+     "path": "docs/plans/evidence/evidence-contract-1407/reviews/amendment-1.3.2-report-totals-correction-verification-pass-codex.md",
+     "sha256": "d7cbe46385fe5a5e497dbb61608d52ed2f19f6bb746cdcc5ee18063bf780617b"
+    }
+   ]
+  }
+ ],
+ "signOffDecisionsNote": "AD-4 decides the outcome. AD-1, AD-2, AD-3, and AD-5 record how the remaining rows and conditions were adjudicated.",
+ "signOffDecisions": [
+  {
+   "id": "AD-1",
+   "subject": "Release PR and §8 condition 7 (C1 open item R2-RELEASE-PR-CONDITION-7)",
+   "decision": "Not waived. The gate checks the release PR's products (version G009, notes G011/G013), but the frozen condition requires every §7 surface to consume the identity, and #1408 cannot amend it after the freeze. Condition 7 is recorded as not met."
+  },
+  {
+   "id": "AD-2",
+   "subject": "Cutoff defects with no defectResolutions entry in the frozen inventory",
+   "decision": "For verifier-runtime-differential, benchmark-corpus, nuget-packages, and release-quality-reports, the row names the resolving PRs. For toolchain-pins, quality-ratchet-baselines, and sdk-consumer-check, the unresolved residual is the row's published limitation, and the row is BOUNDED, not BLOCKED, because its required evidence on the candidate is present and conclusive.",
+   "ifRejected": "Each such artifact row becomes BLOCKED; the outcome stays MILESTONE-FAILED."
+  },
+  {
+   "id": "AD-3",
+   "subject": "claim:no-benchmark-results-published",
+   "decision": "BLOCKED. On the designed release path benchmark.yml pushes the B2 headline to a public branch and opens a publication PR, which exposes a benchmark result whether or not the PR merges."
+  },
+  {
+   "id": "AD-4",
+   "subject": "Terminal condition 9 (capacity ceilings)",
+   "decision": "Condition 9 does not hold: review-rounds-per-pr was exceeded without a merged amendment on #1508 and #1479 (and, by the counting amendments 1.3.0 and 1.3.1 used, on #1473, #1480, #1474/#1475, #1499, #1527, and #1507). No amendment can be made in the §9 window, and #1408 cannot weaken a condition. Under stopping rule 1 the affected gates are BLOCKED. The terminal outcome is therefore MILESTONE-FAILED. No reading of the frozen text available to #1408 makes condition 9 hold: #1508 exceeds even a budget of 3 rounds plus one verification pass."
+  },
+  {
+   "id": "AD-5",
+   "subject": "#1276 closed before its closure evidence merged",
+   "decision": "Accept the closure: the issue closed at 2026-10-03T16:32:38Z, and its §10 closure evidence (#1473, #1482) merged the same day and is on main.",
+   "ifRejected": "Reopen #1276 and close it again; this does not change the record."
+  }
+ ],
+ "rowCounts": {
+  "artifact": {
+   "BOUNDED": 24,
+   "HISTORICAL-ONLY": 10
+  },
+  "gate": {
+   "BOUNDED": 6,
+   "BLOCKED": 7
+  },
+  "claim": {
+   "BOUNDED": 26,
+   "BLOCKED": 2
+  }
+ },
+ "adjudications": [
+  {
+   "subject": "verifier-runtime-differential",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "rowLimitations": [
+    "Totals 429 Proven / 156 Assumed / 585 refuted over 1,170 cells of the 65 whitelisted forms only; no claim beyond the whitelist.",
+    "Determinism is bounded by 30 attempts per environment on 5 platforms; rare non-determinism is not excluded."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd/verifier-runtime-differential.json",
+     "sha256": "aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd/verifier-runtime-differential.md",
+     "sha256": "24901f2176fb3157dedcb79f40564f2bfe9bcd10db94018f5c8942c56c20b2d5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd-check.log",
+     "sha256": "84329c54287d27d55787efdada8c6c5a37971da221444aa756e5cdc119ef780d"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/verifier-runtime-differential.tar.gz",
+     "sha256": "1165c8538b6b659f0d7968d03aae15a219105edcf3bcd0a97fd398ce0b6d1ac7"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/result.json",
+     "sha256": "d4d054ca4d01e26fe31c9c36d5d62d165b7bcea26877ea2f7d2e2620f135a530"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/attempt-timing.json",
+     "sha256": "dc19cd01dba52f35c371883dc878aa60dad78a79e9dcb6e97f058920341e9394"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965084091.json",
+     "sha256": "77e89d3f513bd91b28c59de3f0cafc24e83438a9dd8c2937036229e09c6278c7"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1135: verdict changed on a byte-identical tree (runs 33137941806 success, 33139062112 failure, commit 04b32afa).",
+     "adjudication": "Resolved by G3 PRs #1492 and #1500 (fresh Z3 context per query, platform-independent bytes) and confirmed on the candidate by determinism protocol 1.5.0, run 37965084091: DETERMINISTIC, 2,304 AGREE-PASS, all four determinism rows RESOLVED (C2 #1542). Adjudicated here: the frozen inventory has no defectResolutions entry for it."
+    }
+   ]
+  },
+  {
+   "subject": "modeled-forms-whitelist",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Validated (ModeledFormsTests 9 passed in two fresh clones); the whitelist bounds what the differential covers."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/modeled-forms.log",
+     "sha256": "e66cdd0e4dfe13613949b386d9580888d70c0a4d39a9f43f7ed09b2aa2362fb0"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/modeled-forms.trx",
+     "sha256": "6f0c553b3daac4879cdea3cfe1c61035115fc344ee6db4e78bddacb8e31a403c"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "release-test-suites",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "13 of 13 release-critical projects at the manifest's counts, one CI run (ubuntu-24.04) plus Ids and Performance locally on macOS.",
+    "Enforcement executed 694 of 695 in CI (the manifest's 1 expected skip) and 695 of 695 locally; the two runs disagree on that one skip."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-conversion.tar.gz",
+     "sha256": "d52a708c9850deae4aafaa1b6db0d07861e1a4482724d79b7e29f33305d540e6"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-enforcement.tar.gz",
+     "sha256": "126885780f05c4eea29397ff507e3138ff43dc3ec17e9f2ac20608d8ce5164b3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-evaluation.tar.gz",
+     "sha256": "5987db2cf98fde682ab8f40298918c7ada6b250c16d007cd74244338b85f3c0b"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-experimental.tar.gz",
+     "sha256": "7a4be47844b9561db3e9164bc7abe07789d4c7b59409e8e92c66f68d7120f322"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-il-analysis.tar.gz",
+     "sha256": "b8a8a30a243738e5196bdd1e3352ff768c968dfa65c0662b8987fcf91dfab468"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-language-server.tar.gz",
+     "sha256": "b237df7a1c98fd38aabc4907049a91a14f7e592f48cf1e29576828322a5fb5ce"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-roundtrip-harness.tar.gz",
+     "sha256": "7fdefc82c68bd803c9ce0227f12e41ff1c9fabdff15f8f96743b546a70545e79"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-semantics.tar.gz",
+     "sha256": "37e7ecc6d05c3388a13ea67a6c833fe6315dee0c88f894e1dd8f59576bcee436"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-tasks.tar.gz",
+     "sha256": "fa6bed5cd8078d713650796078e7615651615a625c659a823ed0df51704cd49d"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-verification.tar.gz",
+     "sha256": "c089951bd9824cdb563ba138dddcf91ef2695f3ab50b369c8745947e24119dd3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/Calor.Ids.Tests.trx",
+     "sha256": "44b250984cdec461f7403ab7f324a5ec1d934bbba12fc42c97baefff1c0c0196"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/Calor.Performance.Tests.trx",
+     "sha256": "ab7ce190acb031409058c136f774d1af61f10e1bcb1116dd088a370ca2864665"
+    }
+   ]
+  },
+  {
+   "subject": "ci-test-reports",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "rowLimitations": [
+    "PASS-ONLY: a single CI run's reports, retained in git and on evidence/v0.24-archives. Enforcement 694/695 in CI vs 695/695 locally."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-conversion.tar.gz",
+     "sha256": "d52a708c9850deae4aafaa1b6db0d07861e1a4482724d79b7e29f33305d540e6"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-enforcement.tar.gz",
+     "sha256": "126885780f05c4eea29397ff507e3138ff43dc3ec17e9f2ac20608d8ce5164b3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-evaluation.tar.gz",
+     "sha256": "5987db2cf98fde682ab8f40298918c7ada6b250c16d007cd74244338b85f3c0b"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-experimental.tar.gz",
+     "sha256": "7a4be47844b9561db3e9164bc7abe07789d4c7b59409e8e92c66f68d7120f322"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-il-analysis.tar.gz",
+     "sha256": "b8a8a30a243738e5196bdd1e3352ff768c968dfa65c0662b8987fcf91dfab468"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-language-server.tar.gz",
+     "sha256": "b237df7a1c98fd38aabc4907049a91a14f7e592f48cf1e29576828322a5fb5ce"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-roundtrip-harness.tar.gz",
+     "sha256": "7fdefc82c68bd803c9ce0227f12e41ff1c9fabdff15f8f96743b546a70545e79"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-semantics.tar.gz",
+     "sha256": "37e7ecc6d05c3388a13ea67a6c833fe6315dee0c88f894e1dd8f59576bcee436"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-tasks.tar.gz",
+     "sha256": "fa6bed5cd8078d713650796078e7615651615a625c659a823ed0df51704cd49d"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-verification.tar.gz",
+     "sha256": "c089951bd9824cdb563ba138dddcf91ef2695f3ab50b369c8745947e24119dd3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/archives.json",
+     "sha256": "73cf9cc741a46a2d14aca7d0329ba7671c6728a65b71bec3b6b4fa03816337ce"
+    }
+   ]
+  },
+  {
+   "subject": "test-manifest",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Validated: every observed count equals expectedTotal/expectedSkipped (Compiler 13,038 with 3 skipped)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/test-quality.log",
+     "sha256": "f3a0b5b922bbc430a6a757ce2edb96cb0b3e4fdca02ff3f3813a885e418ffd41"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "The LedgerCommitStampTests _comment says the test job runs at fetch-depth 0 and shards stay shallow; test.yml does the reverse (#1417).",
+     "adjudication": "Resolved by #1472 (The comment is removed together with the runtime skip site it described.)."
+    }
+   ]
+  },
+  {
+   "subject": "z3-upstream-pins",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "rowLimitations": [
+    "Re-materialized and verified, never rebuilt."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/download-z3.log",
+     "sha256": "c593b5e8e32142d2fbd94d2a6931188a772afa8f81c1bf0412b86b22ecff6b7a"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/download-z3.log",
+     "sha256": "493c2b164d581dc85683829d45f3986e772a05835e33f9593d48bb42006be60c"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "Two asset provenance paths (this one and z3-release-binaries) with separate pins (#1420).",
+     "adjudication": "Resolved by #1471 (One acquisition path for builds, tests, and packing. Both pin files remain; the bootstrap checks archives against this file and extracted outputs against the asset pins.)."
+    }
+   ]
+  },
+  {
+   "subject": "z3-release-binaries",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "rowLimitations": [
+    "7 of 7 mirror assets match .github/z3-binaries-4.15.7.sha256; the release is a pinned mirror, not rebuilt."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/z3-release-binaries.json",
+     "sha256": "a711a06d7dc6b2c6cabc01bcca08aad16159800d13f634f9cfe1c7a8320cec46"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/z3-release.log",
+     "sha256": "9a421c5b4c5c6ae611a802b0e705ef2fdc47d6467976c2c7e3265836a50465d0"
+    }
+   ]
+  },
+  {
+   "subject": "toolchain-pins",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Lockfiles verified by restore --locked-mode in two clones and every CI restore.",
+    "The exact SDK is observed, not pinned: CI requests setup-dotnet '10.0.x'. Every regeneration-3 job observed Microsoft SDK 10.0.401 / runtime 10.0.12. Byte reproducibility of the packages holds only with Microsoft's SDK 10.0.401 build."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/restore.log",
+     "sha256": "f6135189186ebd4762bbb2d2f1ddc997951f07fa9651ebfbb03b57555973d736"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ledger.json",
+     "sha256": "e1c557df8cc6cab94b5dc86f1fbb516aba1f40ab930b4b8ff2fd8fd66da604bb"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+     "sha256": "dccdf0a52ba32083959e19c3b0c57ce7b0141a02bf238aab443dbb7454151601"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "Workflows request setup-dotnet 10.0.x, so the exact SDK patch is not pinned by CI; the 0.22 Stage B packet recorded SDK 10.0.401 / runtime 10.0.12 after the fact.",
+     "adjudication": "Not resolved. Accepted as observed-not-pinned by maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED (2026-10-07, candidate-manifest maintainerDecisions; no amendment). Carried as this row's limitation and as publish-time risk P2 in the sign-off packet."
+    }
+   ]
+  },
+  {
+   "subject": "corpus-submodules",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "rowLimitations": [
+    "Re-materialized: the candidate's gitlinks MediatR fb309026, serilog 0597ddfb, FluentValidation 71b3c60c."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/submodule-status.txt",
+     "sha256": "3ab1407ad052ff503bc90484ed132b07e921da0dc9f52925cc636cfdd515e370"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/submodules.log",
+     "sha256": "cda082a98f058c54e2016f43b70ff8e4e3d0aa0305f332dba6aa2d3ff6a15b41"
+    }
+   ]
+  },
+  {
+   "subject": "roundtrip-reports",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "SINGLE-RUN"
+   ],
+   "rowLimitations": [
+    "SINGLE-RUN on macOS (clone A); test.yml's roundtrip-verification job skipped itself by its change filter."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/roundtrip.log",
+     "sha256": "f27c9fb8c145f1444c9f2f81ea0e5bfff67bc50b0acc8d4baaa8db5157ffa2e6"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/roundtrip-delta.md",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "subject": "roundtrip-baselines",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "No regression against eng/roundtrip-baselines.json, which records the current state, not a known-good state."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/roundtrip-delta.log",
+     "sha256": "5dc627a737de380627174a6af60532d032ca3b26c1afbc7d8ebc323a233c7396"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/roundtrip-delta.md",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "subject": "quality-ratchet-baselines",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Performance ratchet passed on macOS (median 12.869 s against 24.000 s). It was not run on ubuntu for the candidate.",
+    "Nightly performance.yml on ubuntu at candidate-equivalent code measured 16.081 s (run 37936442529, 7eca4868, pass) and 24.923 s (run 38052678011, b04e963f, fail); #1536 records the overrun and the maintainer's decision to fix it after 0.24.0 without changing the candidate. publish-nuget.yml's release-quality job can therefore fail on a slow runner and need a re-dispatch."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/performance.log",
+     "sha256": "63e658577187576136622dda83fa3bcc3912f180b0fc5b225306691c02489e36"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/coverage.log",
+     "sha256": "d91bd6d4a03c0d9f839043df319b1c8b5768bf8af62372be4097ec83def7c7c9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/mutation.log",
+     "sha256": "b4c90f656557411d57022c2b2be2032c679059554b9d4729546187dc8bfd93f6"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/flake.log",
+     "sha256": "c019d4ced1e5770d5a095aaf8266a556f63c4c24e29e96b3394e05b8b62196c9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937312892-quality-ratchets.log.gz",
+     "sha256": "9f11dc49e654a5faca88f00c54ff7aec976f2ce6f8f9f7ae2c89150bfb923511"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "The v0.22.0 release-event publish run 34999741476 failed in release-quality ('performance test run failed'), so no 0.22.0 package was published.",
+     "adjudication": "The regression behind that failure (quadratic binding) is fixed by #1525; the candidate's ratchets pass locally. Not fully resolved on ubuntu runners: see #1536 and publish-time risk P3. The 0.22.0 failure itself stays historical."
+    }
+   ]
+  },
+  {
+   "subject": "release-quality-reports",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED"
+   ],
+   "rowLimitations": [
+    "Every release-quality step ran once, locally in clone A on macOS, in order, all exit 0; not on ubuntu-latest (no workflow runs that job without the adjudication gate). The coverage step used Homebrew's dotnet host (planned)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/",
+     "files": 19,
+     "treeSha256": "f8781d3af686b50e2b6b39921fb82b7d209165b2eb69b59a89690fe8911a5d07"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "The failing report of release run 34999741476 expires with the Actions artifact and is not retained durably.",
+     "adjudication": "For 0.24 the reports are retained durably in git by C2 (#1542, release-quality/). The 0.22.0 report itself is lost and stays history."
+    }
+   ]
+  },
+  {
+   "subject": "sdk-consumer-check",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "rowLimitations": [
+    "PASS-ONLY: five RID job conclusions on the candidate; the job logs are retained in git by C2.",
+    "The job tests a Calor.Sdk it packs itself; no hash ties that package to the adjudicated Calor.Sdk.0.24.0.nupkg (157fc9ca...). The tie is indirect: both come from the candidate, Z3 natives come from the one verified bootstrap (#1471), and the pack is byte-reproducible with Microsoft SDK 10.0.401 (#1526)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313181-sdk-package-consumer_linux-x64_.log.gz",
+     "sha256": "9471de9c350fab5066dfd9cad7c083e5f4ae587d9656cb736bd4b54ecad41bbf"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313178-sdk-package-consumer_linux-arm64_.log.gz",
+     "sha256": "f2b2c67051fe1c888a46fa03d367a8b003b25e897efebb1581f7c0190c4d117b"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313241-sdk-package-consumer_osx-arm64_.log.gz",
+     "sha256": "265d9bff30279f01ea2a14759a521ab2f6dad00b86fdea63df10742ad112a9af"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313182-sdk-package-consumer_win-x64_.log.gz",
+     "sha256": "7accd3e175713f8d12845c47ebb503e8b4d8d8590c09e7c839dc59a5e0eed686"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313396-sdk-package-consumer_win-arm64_.log.gz",
+     "sha256": "90447a07a10c95a83dcf4618e8b04d26e2c01ace3427b3a67f5cc55f6343193b"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "No result record is emitted, so a release cannot later show which consumer results it relied on (#1410).",
+     "adjudication": "Partly resolved for 0.24: C2 committed the five job logs of run 37965086841 (#1542), and publish-nuget's publish job needs sdk-consumer on the candidate checkout. The job itself still emits no result record; carried as this row's limitation."
+    },
+    {
+     "defect": "The check tests a package it packs itself with upstream-bootstrapped Z3 natives, while the publish job packs separately with z3-binaries release assets; no hash ties the tested package or natives to the published one (#1420, #1410).",
+     "adjudication": "Z3 part resolved by #1471 (one verified bootstrap for every job, including publish). Package part not resolved: no hash ties the tested package to the published one; carried as this row's limitation."
+    }
+   ]
+  },
+  {
+   "subject": "tier1-verification",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "rowLimitations": [
+    "PASS-ONLY: one CI job (verify-phase1) on the candidate; no AST round-trip claim is made (#1481)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/tier1-verification.tar.gz",
+     "sha256": "d98424cac79e664eabe92cc872b1b773120bc4d4c89ce63a5e6c94f0be15703c"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313360-verify-phase1.log.gz",
+     "sha256": "13d936de37a129351188c46d7f889c305a32aa7b5e5dea8cfc53e4060c5d60da"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1241",
+     "adjudication": "Resolved by #1481 (No AST round-trip claim (fixture_compile_check.py reports astRoundTrip false, and a guard test enforces it); no empty test selection; the checkout-built compiler only. Residuals recorded by #1481: build freshness is judged by mtime, and deleting a root build file is not detected.)."
+    }
+   ]
+  },
+  {
+   "subject": "tier2-corpus-verification",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "VERDICTS-AGREE",
+    "PRODUCER-FAILS-BY-DESIGN"
+   ],
+   "rowLimitations": [
+    "Registered FAIL verdict: 428 compile / 51 rejected / 30 known failures on ubuntu and macOS, matching eng/tier2-fixture-expectations.json. The 30 known failures stay failures and never count as passes."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/tier2-fixtures-37965089769.json",
+     "sha256": "345d3570b87b1cf4bab3c1be619b14eec6dea04de2cce3e67bf45cbab8639a23"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965089769/tier2-verification.tar.gz",
+     "sha256": "cc79bed2ebabf7eb458b43f68d1ff0fea80352950190e28c1de5f3e6e92c6d0c"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/tier2/",
+     "files": 2,
+     "treeSha256": "035133f654de765a16d31cf9895f5ed60a5c61503d7991c3a753ca4c5a6a2b04"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1241",
+     "adjudication": "Resolved by #1481 (Tracked fixtures only, expected negatives judged by exact signature, the checkout-built compiler only, and no AST round-trip claim. The 30 registered known failures are not fixed; they stay failures in every result. Residuals recorded by #1481: build freshness is judged by mtime, and deleting a root build file is not detected.)."
+    }
+   ]
+  },
+  {
+   "subject": "ledger-provenance-index",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Validated: LedgerCommitStampTests 5 passed in two clones against origin/main b04e963f."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/ledger-stamps.log",
+     "sha256": "5fb55ef0d6859ed1b0b63036c99251d99e74b2343e4195a2ad17237930e2a2f4"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/ledger-stamps.trx",
+     "sha256": "6d367bc10c21de5a7290534fe9b65bbc590197da9cb61ff954e9d34debbeadf8"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/ledger-stamps.log",
+     "sha256": "01c5122b501c836dc69835638151838c4f75f089e75aab94a4f5e32e40cc20b8"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "Reachability tested against HEAD, shallow clones skip, identical-src-tree not verified by the test (#1417).",
+     "adjudication": "Resolved by #1472 (All three parts: only fetched origin/main counts (P005), shallow fails (P006), identical-src-tree verified at both commits (P009).)."
+    }
+   ]
+  },
+  {
+   "subject": "benchmark-corpus",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Validated by the B1 packet validator (58 passed in two clones). Only 17 of 226 registered pairs are EQUIVALENT; equivalence never means either side is correct (contract §5)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b1-validator.log",
+     "sha256": "6ba15e111b144f9d2f2cebf4edc5dbe9ccdda5c27262d75c952c25708934a29b"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/b1-validator.trx",
+     "sha256": "9fbdb3d00641310fba6f09ab648c6da6bf6b70b1e3f882c69ed497f28a7bf219"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b1-regen/pair-manifest.json",
+     "sha256": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813"
+    },
+    {
+     "path": "docs/plans/evidence/b1-1276/results/pair-manifest.json",
+     "sha256": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1276: pairs are not all equivalent (witness DomainProblems/CsvParser at 3a452b094bc53086adc25bf51ac7787eb4986fc3); no pair manifest exists.",
+     "adjudication": "Resolved by B1 #1473 and #1482: a content-addressed pair manifest with an oracle disposition for every registered pair (17 EQUIVALENT, 192 NOT-EQUIVALENT, 8 UNCLASSIFIED, 9 excluded pre-registered). Non-equivalent pairs are dispositioned, not made equivalent. Adjudicated here: the inventory has no defectResolutions entry."
+    }
+   ]
+  },
+  {
+   "subject": "benchmark-results",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1276",
+     "adjudication": "Not adjudicated as evidence: the artifact is historical-only."
+    },
+    {
+     "defect": "#1422",
+     "adjudication": "Not adjudicated as evidence: the artifact is historical-only."
+    }
+   ]
+  },
+  {
+   "subject": "benchmark-provenance",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "Short SHA identity (#1417).",
+     "adjudication": "Not adjudicated as evidence: the artifact is historical-only."
+    }
+   ]
+  },
+  {
+   "subject": "benchmark-results-md",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "subject": "website-benchmark-pages",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "subject": "benchmark-workflow-output",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "rowLimitations": [
+    "The headline bytes depend only on the candidate (no headline exists at the candidate). If main later carries headline or stamp bytes other than these, a publish-time run refuses (B2-07); it never writes other bytes.",
+    "Headline content: 17 EQUIVALENT pairs, geometric-mean r 1.235 (a corpus-resampling interval for this fixed corpus, not a population claim). Publishing it is governed by sign-off decision AD-3."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b2-headline/benchmark-headline.json",
+     "sha256": "312912fd3d8e02a22476e0d3fc41854c327e326ec989ece8c99faae28b05696a"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b2-headline/commit-stamp-index.json",
+     "sha256": "c943954bb471092b670f9089f6527e5d40c232b9842de454787315f21f914731"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/b2-headline/benchmark-headline.json",
+     "sha256": "312912fd3d8e02a22476e0d3fc41854c327e326ec989ece8c99faae28b05696a"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/benchmark-gate-report.txt",
+     "sha256": "d883f1d2fcdc790af4bcb35ec132e082fe5131557a1f7443763719fc25a8e356"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1422",
+     "adjudication": "Resolved by #1487 (The refusal gate replaces the masked methodology check, and the headline is the only publishable output. #1527 scopes the freshness check to the headline's inputs and makes the bytes depend only on the candidate.)."
+    }
+   ]
+  },
+  {
+   "subject": "benchmark-publication-pr",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1422",
+     "adjudication": "Not adjudicated as evidence: the artifact is historical-only."
+    }
+   ]
+  },
+  {
+   "subject": "llm-and-agent-results",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "subject": "changelog",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "subject": "github-release-notes",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL",
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3).",
+    "Historical-only by the inventory. The 0.24.0 notes candidate is rendered byte-identically (R2 digest 05b8c219...) and passes the G012 wording scan; it is adjudicated as a publication surface below, not as evidence."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/wording-scan.json",
+     "sha256": "a3d4b29cba94fbf7b8172190b97acce2a5da366f9b15ab42419e779cd2e3ee35"
+    }
+   ]
+  },
+  {
+   "subject": "nuget-packages",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "NOT-REGENERATED-BY-RULE"
+   ],
+   "rowLimitations": [
+    "Not regenerated by rule (contract §7); nothing is on nuget.org for 0.24.0 yet (newest: 0.21.0). The 0.24.0 bytes that may be pushed are exactly the adjudicated candidate-packages hashes, through the #1410 gate."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/publication-candidates.json",
+     "sha256": "1faaa489211e31564986121ec0f8ef1871f704f7ccd7768aea2f8592ef3f10eb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/build-hashes.json",
+     "sha256": "f781c1719c5a31df7a430022df40e20399b1015fd2b5d2d0f10adfcd1f666bd7"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "A workflow_dispatch version override and a dispatch from a non-tag commit can publish a package whose source differs from its release tag (#1410).",
+     "adjudication": "Resolved by R2 #1474 and #1475: publish-nuget.yml runs only by dispatch from main with an adjudication identity, has no version override, checks out the adjudicated candidate in every job, and compares any version already on nuget.org. Adjudicated here: the inventory has no defectResolutions entry."
+    }
+   ]
+  },
+  {
+   "subject": "candidate-packages",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "rowLimitations": [
+    "Byte-identical in two macOS clones and two Linux CI builds, all with Microsoft's SDK 10.0.401 build. Homebrew's source-built 10.0.401 packs different bytes (#1526). Bytes are not committed; hashes only."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/build-hashes.json",
+     "sha256": "f781c1719c5a31df7a430022df40e20399b1015fd2b5d2d0f10adfcd1f666bd7"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/build-hashes.json",
+     "sha256": "f781c1719c5a31df7a430022df40e20399b1015fd2b5d2d0f10adfcd1f666bd7"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/packages.log",
+     "sha256": "41bd45ca5db3ff3d1195941983f50deea664518615e674a7f10b5e227ffeb99f"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/reproducible-builds-37965092627/reproducible-packages-hashes/packages-1.json",
+     "sha256": "f9a45706c05bd3e0e55e380364d3dcdc03ff9f5abf20b346b39a7a51121e4177"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/reproducible-builds-37965092627/reproducible-packages-hashes/packages-2.json",
+     "sha256": "f9a45706c05bd3e0e55e380364d3dcdc03ff9f5abf20b346b39a7a51121e4177"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-a-b.md",
+     "sha256": "85259595875e8375d126498f4fff15823f97c759f1a1eca5dd8d230a3608bcaa"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-local-ci-packages.md",
+     "sha256": "ad90caf8826c2053b2e5e04124da5885666342271dee8825cfde51d769adf8fb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-local-ci-website.md",
+     "sha256": "9a4e68845dfd446cada54eb2294c55cb6bb8d8dabd22365b51d15960e7326152"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965092627.json",
+     "sha256": "666d6b9126d44b407105c90eb52d522d35794c086adbcbe2d2dd3975e20e6a7a"
+    }
+   ]
+  },
+  {
+   "subject": "release-metadata",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "rowLimitations": [
+    "Generated from the candidate packages; identical in A, B, and Linux CI. Inherits the SDK-build bound of candidate-packages."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-metadata/calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.provenance.json",
+     "sha256": "1f00791f712d85811ab9ad3906dbba87eb1724957068ce3645d3dff1450af79d"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-metadata/calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.sbom.spdx.json",
+     "sha256": "eb2abecab68965c07cf0e41d99cd268b8a8c7c06494971aa046dd6c48cd1d9e3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/release-metadata/calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.provenance.json",
+     "sha256": "1f00791f712d85811ab9ad3906dbba87eb1724957068ce3645d3dff1450af79d"
+    }
+   ]
+  },
+  {
+   "subject": "website-deployment",
+   "kind": "artifact",
+   "classification": "derived",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "rowLimitations": [
+    "Built, never deployed: 253 files, tree digest e684dcab... in A, B, and Linux CI.",
+    "The build downloads four Google Fonts at build time; a font change, or a failed fetch (seen once in #1542's CI), changes the tree or fails the build, and the gate then refuses the deploy (#1526 residual)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/website-tree.sha256",
+     "sha256": "e684dcab33d98ab1ca25d0a1e4c04ebaa9325f29cd9cd8ecc5c67888b9dc6323"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-local-ci-website.md",
+     "sha256": "9a4e68845dfd446cada54eb2294c55cb6bb8d8dabd22365b51d15960e7326152"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/reproducible-builds-37965092627/reproducible-website-hashes/website-1.json",
+     "sha256": "9ab3283971c612774a018f568c63229b0e88f38a37917770ba4f958d35fca3c2"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/wording-scan.json",
+     "sha256": "a3d4b29cba94fbf7b8172190b97acce2a5da366f9b15ab42419e779cd2e3ee35"
+    }
+   ],
+   "cutoffDefects": [
+    {
+     "defect": "#1410",
+     "adjudication": "Resolved by #1475 (With #1474: no deployment without one matching adjudication identity and an equal tree digest. #1526 makes that comparison satisfiable by a rebuild.)."
+    }
+   ]
+  },
+  {
+   "subject": "v019-audit-disposition",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "subject": "pre-cut-evidence-packets",
+   "kind": "artifact",
+   "classification": "historical-only",
+   "outcome": "HISTORICAL-ONLY",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "HISTORICAL"
+   ],
+   "rowLimitations": [
+    "Historical-only by the inventory (amendment 1.4.0 where reclassified). Withdrawn from 0.24 evidence: it establishes no 0.24 claim, and this outcome does not make its numbers valid (contract §3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    }
+   ]
+  },
+  {
+   "subject": "evidence-contract",
+   "kind": "artifact",
+   "classification": "authoritative",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "c2Status": [
+    "VALIDATED"
+   ],
+   "rowLimitations": [
+    "Validated: EvidenceContractTests 324 passed in two clones, including the packet-hash check for contract 1.5.0. No amendment was made after the #1424 raw-artifact freeze."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/evidence-contract.log",
+     "sha256": "4b747bd1acdec379a199313b5af7ac0b19ab2fc27fffa99e51ec1b861a418d0c"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/evidence-contract.trx",
+     "sha256": "33d53a2b5444ec6ac96202756cf631d1d114343988dc59c2fac10c19028ecdb9"
+    },
+    {
+     "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
+     "sha256": "129fc1b74d5cc5ee23a6d876e1d25a95707468ec2042bf695c8c3fe96795bafd"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1419",
+   "kind": "gate",
+   "gate": "R1",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Merged versioned registration and a complete initial row manifest for each investigated baseline, B1 and N1 as separate rows that are never pooled (entry points, case IDs, source hashes, oracle, controls, row classes, release-critical marks, timebox and compute within s1 ceilings) committed before any decision-bearing sweep result.",
+   "mergedPrs": [
+    {
+     "pr": 1476,
+     "mergeCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67"
+    }
+   ],
+   "rowLimitations": [
+    "Registration only: it fixes what S1 runs; it establishes no verdict."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/r1-1419/registration.json",
+     "sha256": "e77db9643cbefa02169b854be31cbd6595764eb162cbae824a366518ea34c9f9"
+    },
+    {
+     "path": "docs/plans/evidence/r1-1419/manifest-B1.json",
+     "sha256": "eef324d77f1980670e3ad7c9b09ecd28166febbdd39596ccbf3a880fe5ea749f"
+    },
+    {
+     "path": "docs/plans/evidence/r1-1419/manifest-N1.json",
+     "sha256": "81a7fa8bbcf87ec561f6b8ec528f72b5bb753c7c3d368957f40c07f67a8f6399"
+    },
+    {
+     "path": "docs/plans/evidence/r1-1419/sha256.json",
+     "sha256": "8ea1a8451d98b5a476a5a01ce364a8f7919638b17cd76bafec2e904eb652b1f9"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1311",
+   "kind": "gate",
+   "gate": "S1",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. S1 PR #1480: 1 change-requesting pass after round 3 followed by fixes in e7cbce77 (s1-1311/reviews/round-verification.json).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Every registered row for both B1 and N1 executed or recorded not-investigated within the s1 ceilings, which cover the combined B1 and N1 work; archived probes, independent-oracle results, controls, and a reproducible report, including zero-finding and timebox-stopped outcomes. Under the s1-generated-cases exception for #1311, one conforming re-run of the unchanged registration also captures in-process, for every baseline, the libz3 image the sweep loaded, before case 1 and after the last case; run 1 stays on record and its findings stay findings (amendment 1.2.0).",
+   "mergedPrs": [
+    {
+     "pr": 1480,
+     "mergeCommit": "0a68bee223dcb49a4d8dc74e37e97518cf2da8e8"
+    }
+   ],
+   "rowLimitations": [
+    "MET within its ceilings: 3,008 of 3,008 case executions; run 2 provenance-confirmed, run 1 provenance-unconfirmed and on record.",
+    "One platform (macOS arm64); 88 release-critical rows per baseline, 74 CLEAN-WITHIN-BUDGET (none found, not none exist), 10 FINDING, 4 FALSE-PROOF; 7 excluded XCL rows NOT-INVESTIGATED and not release-critical.",
+    "Open S1 item O2 (partial replay in GEN-REFUSAL-002/-004) was never decided; the registered row status does not use it."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/s1-1311/gate-status.json",
+     "sha256": "a0e3af326da6f2e3fe07504e60dbc5dcb014257bd58762d324b81d261114e75d"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/combined-row-status.json",
+     "sha256": "d8c7ad549f06f35c6a2d04950f9c291bde2261dd7c8e42c11ad137f671f9d93d"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/pins.json",
+     "sha256": "e11e7adb7159e7d9c47f6636454cdc11c28cd0a389f5834dd0567b722668b95c"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/sha256.json",
+     "sha256": "092b8c7da45b3e985da967f4a8d857e4628df0895ce84811ba35e9b6c2923bfe"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1413",
+   "kind": "gate",
+   "gate": "S2",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. S2 record PR #1499: 1 change-requesting pass after round 3 followed by a test change (s2-1413/reviews/dispositions/verification-codex.md).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "One reviewed disposition per row and witness from findingDispositions; accepted repairs within s2 ceilings attached to #1409 and blocking #1423; no unresolved false unconditional proof keeps guard-removal or claim eligibility.",
+   "mergedPrs": [
+    {
+     "pr": 1494,
+     "mergeCommit": "ef89c027dd933f4991fd3a85db4b1d1fd707c8db"
+    },
+    {
+     "pr": 1495,
+     "mergeCommit": "eb12fef4122b88a22f3ec62f374de341dc7f4e06"
+    },
+    {
+     "pr": 1496,
+     "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06"
+    },
+    {
+     "pr": 1497,
+     "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b"
+    },
+    {
+     "pr": 1498,
+     "mergeCommit": "275902c3c597d049eb74f319ca0ab68805e2cccc"
+    },
+    {
+     "pr": 1502,
+     "mergeCommit": "aa23d58915b1f591a82852391633b5609c9bb2f9"
+    },
+    {
+     "pr": 1503,
+     "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3"
+    },
+    {
+     "pr": 1499,
+     "mergeCommit": "dfc581d4c3ffb108b0d08da3b3a1039cfe8e02d7"
+    }
+   ],
+   "rowLimitations": [
+    "Closure CLOSED/SUCCESS: 34 findings per baseline dispositioned (13 FIX-IN-0.24, 21 DEMOTE-IN-0.24) plus 4 discoveries; 7 accepted repairs (s2-repairs 7 by amendment 1.3.0).",
+    "A demotion withdraws a wrong claim; it proves nothing new. Repair contents are bound to their PRs by the maintainer's merge review, not by a validator (dispositions.json validatorLimitations).",
+    "Recorded deviation DEV-R-NUM-MERGE-MECHANICS (maintainer-accepted merge conflict resolution in #1502)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-verification.tar.gz",
+     "sha256": "c089951bd9824cdb563ba138dddcf91ef2695f3ab50b369c8745947e24119dd3"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1420",
+   "kind": "gate",
+   "gate": "G1",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Consumer and RID inventory; no unowned Z3 seeding workaround; no implicit network download; discriminating fresh-checkout tests for absent, wrong, and propagated assets.",
+   "mergedPrs": [
+    {
+     "pr": 1471,
+     "mergeCommit": "24a9b0bad4749d723814d7b320a5f7c8d2f38f77"
+    }
+   ],
+   "rowLimitations": [
+    "Consumer and RID inventory eng/z3-consumers.json; check-packaged-z3.py --all-rids passed on the candidate packages; the consumer matrices passed in one CI run."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/z3-release-binaries.json",
+     "sha256": "a711a06d7dc6b2c6cabc01bcca08aad16159800d13f634f9cfe1c7a8320cec46"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/packages.log",
+     "sha256": "41bd45ca5db3ff3d1195941983f50deea664518615e674a7f10b5e227ffeb99f"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313181-sdk-package-consumer_linux-x64_.log.gz",
+     "sha256": "9471de9c350fab5066dfd9cad7c083e5f4ae587d9656cb736bd4b54ecad41bbf"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313008-z3-consumer-matrix_linux-arm64_.log.gz",
+     "sha256": "c55b6e0598b2c61222d04788a92f87e92b9d33155bea3fb0814dee5a7b1146f2"
+    },
+    {
+     "path": "docs/plans/evidence/g1-1420/README.md",
+     "sha256": "b20e79c1b565526af9891c7e8f0f4bf0a7311d33297295a9d17cff1dee757023"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1421",
+   "kind": "gate",
+   "gate": "G2",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. G2 PR #1479: 2 change-requesting passes after round 3, each followed by a fix; no exception (g2-1421/reviews/verification-pass, -2).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Merged machine-readable determinism protocol (case IDs, environment pins, run count, timeouts, retry and failure rules) within the determinism-compute ceiling, before decision-bearing runs. The protocol treats platform as a determinism dimension and registers every determinismRows entry (amendment 1.1.0). Its candidate-time execution during #1424 is charged to regeneration-compute, not determinism-compute, under capacity.chargeRules (amendment 1.2.0).",
+   "mergedPrs": [
+    {
+     "pr": 1479,
+     "mergeCommit": "7d37bf8d84662a79eb41efcf241b264a55d1e82d"
+    },
+    {
+     "pr": 1486,
+     "mergeCommit": "f5e9ffee0535f098d7f830ae2ed9dcdcd7e677dc"
+    }
+   ],
+   "rowLimitations": [
+    "Protocol 1.5.0 executed once on the candidate (the 4th and last execution). Determinism-compute 1,608 of 3,200 runner-minutes.",
+    "Thirty attempts per environment bound, but cannot exclude, rare non-determinism (protocol limitation)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/g2-1421/protocol.json",
+     "sha256": "c360412f603df5930d0330c948c3f4425a4d3229040fa41fa2b5e7190f8f700e"
+    },
+    {
+     "path": "docs/plans/evidence/g2-1421/sha256.json",
+     "sha256": "bb29e2d496065bc94e1f45c50becd9ab24873265aa9c7f2f8a128ae87436f18d"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/result.json",
+     "sha256": "d4d054ca4d01e26fe31c9c36d5d62d165b7bcea26877ea2f7d2e2620f135a530"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/attempt-timing.json",
+     "sha256": "dc19cd01dba52f35c371883dc878aa60dad78a79e9dcb6e97f058920341e9394"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965084091.json",
+     "sha256": "77e89d3f513bd91b28c59de3f0cafc24e83438a9dd8c2937036229e09c6278c7"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1135",
+   "kind": "gate",
+   "gate": "G3",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule. It runs on every platform the protocol registers, and every determinismRows entry is resolved under rules.platformDeterminism (amendment 1.1.0).",
+   "mergedPrs": [
+    {
+     "pr": 1492,
+     "mergeCommit": "0142438f42278021d95c6169dfe397a7f63eea3c"
+    },
+    {
+     "pr": 1500,
+     "mergeCommit": "d42d031352f2d8d5c1df56fffc19d901186bb94d"
+    }
+   ],
+   "rowLimitations": [
+    "Closed on the candidate by execution c2-1424-regen-3: DETERMINISTIC, complete, every determinism row RESOLVED. Executions 1-3 stay on record and establish nothing.",
+    "Same 30-attempts-per-environment bound as #1421."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/result.json",
+     "sha256": "d4d054ca4d01e26fe31c9c36d5d62d165b7bcea26877ea2f7d2e2620f135a530"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/attempt-timing.json",
+     "sha256": "dc19cd01dba52f35c371883dc878aa60dad78a79e9dcb6e97f058920341e9394"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965084091.json",
+     "sha256": "77e89d3f513bd91b28c59de3f0cafc24e83438a9dd8c2937036229e09c6278c7"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd/verifier-runtime-differential.json",
+     "sha256": "aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9"
+    },
+    {
+     "path": "docs/plans/evidence/g3-1135/README.md",
+     "sha256": "64a872bee41d1182de5a223db56bdfc6efe0493d4c808a9a1a1fd8a50f7d6927"
+    },
+    {
+     "path": "docs/plans/evidence/g3-1135/ledger.json",
+     "sha256": "0239b926aaa49288dcd4e96d25f6c7debfb16be40732b346069214d8abcbc574"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1241",
+   "kind": "gate",
+   "gate": "G4",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Checkout-pinned Tier 2 run with explicit positive/negative/multifile expectations, no build-output duplicates, no empty advertised selections, AST-roundtrip claims matching the work performed, and negative self-tests.",
+   "mergedPrs": [
+    {
+     "pr": 1481,
+     "mergeCommit": "31e834cc84eaf3fe32b82b1df366bfa999eaaf48"
+    }
+   ],
+   "rowLimitations": [
+    "Tier 2's verdict is FAIL by registered design (428/51/30); the gate's closure is the truthful, checkout-pinned run, not a pass."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/tier2-fixtures-37965089769.json",
+     "sha256": "345d3570b87b1cf4bab3c1be619b14eec6dea04de2cce3e67bf45cbab8639a23"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/tier2/",
+     "files": 2,
+     "treeSha256": "035133f654de765a16d31cf9895f5ed60a5c61503d7991c3a753ca4c5a6a2b04"
+    },
+    {
+     "path": "docs/plans/evidence/g4-1241/README.md",
+     "sha256": "92a902eff9b6cef1da8985bc681bfc3146dc026c013c504598120b458e672829"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1417",
+   "kind": "gate",
+   "gate": "P1",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Fresh-clone resolution of every authoritative identity after squash merge; failing tests for branch-only replacement, false identical-tree claims, and shallow-clone skips; historical stamps unchanged.",
+   "mergedPrs": [
+    {
+     "pr": 1472,
+     "mergeCommit": "39b5edecc505bdefcd8811c8a8c073fbf1241361"
+    }
+   ],
+   "rowLimitations": [
+    "Identities resolve in a fresh clone against fetched main; existing short stamps stay as history beside their durable identities."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/ledger-stamps.log",
+     "sha256": "5fb55ef0d6859ed1b0b63036c99251d99e74b2343e4195a2ad17237930e2a2f4"
+    },
+    {
+     "path": "docs/plans/evidence/p1-1417/fresh-clone.log",
+     "sha256": "bb2aa8f38dcc38f41f5374f355a45b62c3c3b2b920b653186bc259986cd0a0d2"
+    },
+    {
+     "path": "docs/plans/evidence/p1-1417/README.md",
+     "sha256": "c77ee618864782a3d264ee9616d5606f38cf2c1ffd101e43b00da5f3054ca23b"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1276",
+   "kind": "gate",
+   "gate": "B1",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. B1 PR #1473: 1 change-requesting pass after round 3 followed by a fix; amendment 1.1.0 raised only its PR size (b1-1276/reviews/verification-pass-codex.md).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "A benchmark registration per benchmarkEquivalence.registrationRule merged before any repair, differential check, or recomputation; then a content-addressed pair manifest with every benchmarkEquivalence pair field and a disposition produced by the registered oracle for every registered pair, the declared sampling unit and population, and historical artifacts left historical.",
+   "mergedPrs": [
+    {
+     "pr": 1473,
+     "mergeCommit": "f0e0eb682a8658364170ad49aff2d2c433d570f8"
+    },
+    {
+     "pr": 1482,
+     "mergeCommit": "f621d5518d8ac19dee2d20422f94e9edcc1cb7b8"
+    }
+   ],
+   "rowLimitations": [
+    "The issue was closed (2026-10-03T16:32:38Z) before its PRs merged (18:03Z and 21:08Z); the closure evidence now exists on main (sign-off decision AD-5).",
+    "17 of 226 pairs EQUIVALENT; the sampling unit is the program pair; equivalence is not correctness."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/b1-1276/registration/registration.json",
+     "sha256": "15db2b1ee375eae1f160db506e746eccd3d5e0249979c391df94edebe40b71b6"
+    },
+    {
+     "path": "docs/plans/evidence/b1-1276/registration/sha256.json",
+     "sha256": "ad81f033b4f090438560d55d1786ce179b6e73300f5c99117efbb1853b478e43"
+    },
+    {
+     "path": "docs/plans/evidence/b1-1276/results/sha256.json",
+     "sha256": "bc2c6f173b1327da3b4989d06a04749fe9456d31613accf3ea1934c9b7ada575"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b1-regen/results.json",
+     "sha256": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b1-validator.log",
+     "sha256": "6ba15e111b144f9d2f2cebf4edc5dbe9ccdda5c27262d75c952c25708934a29b"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1422",
+   "kind": "gate",
+   "gate": "B2",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. B2 PR #1527: 1 change-requesting pass after round 3 followed by fix bca13caf (b2-1422/reviews/pr2-verification-pass-codex.md).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "End-to-end tests: refusal fails the workflow and leaves no publication PR; unclassified or changed pairs block headlines; methodology change needs a prior amendment, not a workflow input.",
+   "mergedPrs": [
+    {
+     "pr": 1487,
+     "mergeCommit": "40708acaabbc4995d0c8d5ca27b3f09273eb8f25"
+    },
+    {
+     "pr": 1527,
+     "mergeCommit": "b48abb39b9272b669714a2fd233138f1171fa5f3"
+    }
+   ],
+   "rowLimitations": [
+    "End-to-end refusal tests pass; the B2 gate passed on the candidate against the real main. B2-07: a publish-time run refuses if main carries other headline or stamp bytes."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/benchmark-gate-report.txt",
+     "sha256": "d883f1d2fcdc790af4bcb35ec132e082fe5131557a1f7443763719fc25a8e356"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b2-headline/benchmark-headline.json",
+     "sha256": "312912fd3d8e02a22476e0d3fc41854c327e326ec989ece8c99faae28b05696a"
+    },
+    {
+     "path": "docs/plans/evidence/b2-1422/README.md",
+     "sha256": "db6e09f05f8b1b49e6ef09ccc3658b8c395ccae72e8d6f40d2bd7adf15c2522d"
+    },
+    {
+     "path": "docs/plans/evidence/b2-1422/local-e2e-pr2.md",
+     "sha256": "1115814ff922882d77841c4348e3097ed0b0e99f5ee0b4e46e8452eaa389d275"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1410",
+   "kind": "gate",
+   "gate": "R2",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. R2 PRs #1474/#1475: 1 change-requesting pass after round 3 followed by a fix (r2-1410/reviews/verification-pass-codex.md).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Negative tests proving release, package, website, notes, and benchmark publication cannot proceed without one matching successful adjudication identity; GitHub release created only after adjudication.",
+   "mergedPrs": [
+    {
+     "pr": 1474,
+     "mergeCommit": "9ca52196baf0faedb91a947659c5e6a4c4966e30"
+    },
+    {
+     "pr": 1475,
+     "mergeCommit": "5ebdbee2fee7fc87d0db187ea81024c3aadcbc54"
+    }
+   ],
+   "rowLimitations": [
+    "Every surface in contract §7 is wired to the one identity; the negative controls (ReleaseAdjudicationGateTests, ReleaseWorkflowGateTests) pass in tests (compiler) on the candidate.",
+    "The release PR cannot consume an identity (it precedes the candidate); the gate checks only its products, which the frozen condition 7 does not accept (AD-1).",
+    "Repository settings in release-gate.md §5 (environment-scoped NUGET_API_KEY, no admin bypass, v* tag ruleset, Pages environment) are recommendations a workflow cannot enforce."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/r2-1410/release-gate.md",
+     "sha256": "7d04d9137c3a87f0ea7d2f63d56796be1db8f86ee6e2ffb2de9e4438abe04af9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/r2-dry-run/success/gate.txt",
+     "sha256": "a6898e245e9a54581e7c50d19a1b1110f89ea9b83cc84033aed8f1341796ddd8"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/r2-dry-run/with-blocked-determinism/gate.txt",
+     "sha256": "081de478bd04b5fd9808bbe65877bfb63b56f636718c9ff43bcc6473d7492f9e"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1423",
+   "kind": "gate",
+   "gate": "C1",
+   "outcome": "BLOCKED",
+   "blockedBy": "Contract §8 stopping rule 1: a §9 ceiling (review-rounds-per-pr, 3) was exceeded and no amendment raised it, so the gate is recorded BLOCKED. C1 PR #1508: 4 change-requesting passes after round 3, each followed by a fix; no exception (c1-1423/reviews/verification-pass, refreeze-verification, -2, -3).",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Committed immutable candidate manifest including the SHA-256 of this contract packet (sha256.json) and its amendment log; tested invalidation classifier.",
+   "mergedPrs": [
+    {
+     "pr": 1508,
+     "mergeCommit": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff"
+    },
+    {
+     "pr": 1534,
+     "mergeCommit": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9"
+    },
+    {
+     "pr": 1539,
+     "mergeCommit": "b04e963f69a5a1016159cfcf8c5199eeea329fdb"
+    }
+   ],
+   "rowLimitations": [
+    "Third freeze (agent-prs-per-gate 3 for #1423 by amendment 1.5.0). The classifier is not a required check on later merges; A1 ran it on its own branch (NOT-INVALIDATED, reviews/classifier.txt in this directory)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+     "sha256": "dccdf0a52ba32083959e19c3b0c57ce7b0141a02bf238aab443dbb7454151601"
+    },
+    {
+     "path": "docs/plans/evidence/c1-1423/refreeze-3-classifier.md",
+     "sha256": "683fae225699581951d48efcbc0e42991bda0142e9f37a288d4c94ae2f4654bd"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/classifier.txt",
+     "sha256": "768fdf166f28a2cfc891536f93922cb8a5eeacfcc1535f7026f355ff1716bd92"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/classifier-record.json",
+     "sha256": "b8c202f46074bd89ad0b04583aefdcc6bfea833db09b67efc3ea2826985cae0b"
+    }
+   ]
+  },
+  {
+   "subject": "gate:#1424",
+   "kind": "gate",
+   "gate": "C2",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "closureEvidenceRequired": "Every authoritative and derived inventory artifact regenerated on the candidate (publication surfaces only as unpublished candidates per releasePath.publicationSeparation; #1424 publishes nothing) within the regeneration ceilings, all attempts retained in durable storage, fresh-clone reproduction of the deterministic subset. The #1421 protocol execution on the candidate counts toward that regeneration's regeneration-compute ceiling under capacity.chargeRules (amendment 1.2.0).",
+   "mergedPrs": [
+    {
+     "pr": 1517,
+     "mergeCommit": "d2288bf934dcda609e8719856dc6ed9e0a9cca3b"
+    },
+    {
+     "pr": 1542,
+     "mergeCommit": "12200dd7cf84cffd33a7bbe133b65b3cd03c3c2e"
+    }
+   ],
+   "rowLimitations": [
+    "Regeneration 3 of 3 complete: no BLOCKED or FAILED row; 583 of 1,500 regeneration runner-minutes. Regenerations 1 and 2 stay as history; regeneration 2 (PR #1535) was closed unmerged.",
+    "Fresh-clone reproduction on macOS arm64 (two clones) plus Linux CI; nothing was published."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/results.json",
+     "sha256": "cac5406e2040b32ea5fa2fb7784e03c3311bf048028d748c8f9111ff6e4ff365"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ledger.json",
+     "sha256": "e1c557df8cc6cab94b5dc86f1fbb516aba1f40ab930b4b8ff2fd8fd66da604bb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/raw-artifact-freeze.json",
+     "sha256": "8570b9d800e3cc2fe377290646fc12b626d6d400640cff50fb676d88313a85b4"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/regeneration.md",
+     "sha256": "96f33fbff0c15e214493dd67e1f2f9b33feae3f24d0048e0e4406196af157df1"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-a-b.md",
+     "sha256": "85259595875e8375d126498f4fff15823f97c759f1a1eca5dd8d230a3608bcaa"
+    }
+   ]
+  },
+  {
+   "subject": "claim:release-adds-no-syntax",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "3-4",
+   "claimText": "Calor 0.24 is a soundness release ... It adds no new syntax.",
+   "rowLimitations": [
+    "Checked against v0.22.0 (72a0a855): no new token kind or AST node; Token.cs, Lexer.cs, and ExpressionNodes.cs only add the internal WidthInferred flag (R-NUM). Parser.cs changes are the #1485 fix, which changes how existing programs with an empty clause body parse."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:release-history-0.22-0.23",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "6-9",
+   "claimText": "First release on NuGet since 0.21.0; 0.22.0 never reached NuGet (publish skipped after performance tests failed); milestone 0.23 shipped no code.",
+   "rowLimitations": [
+    "Contract §2 row B1 records the failed 0.22.0 publish run 34999741476. nuget.org lists calor and Calor.Sdk up to 0.21.0 only (checked 2026-10-10). No v0.23.0 tag exists."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/evidence-contract-1407/contract.json",
+     "sha256": "91bcfff0f21bd04437de90bd7cd7cc221e3982051007b47b52985ca7b32ebfb8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:evidence-bounded-not-independent",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "11-13",
+   "claimText": "The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs; no independent party adjudicated or verified it; every 0.24 evidence claim is at most bounded.",
+   "rowLimitations": [
+    "Holds by this record: every row is BOUNDED or HISTORICAL-ONLY with independence reduced-maintainer-adjudicated."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/evidence-contract-1407/contract.json",
+     "sha256": "91bcfff0f21bd04437de90bd7cd7cc221e3982051007b47b52985ca7b32ebfb8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:no-benchmark-results-published",
+   "kind": "claim",
+   "outcome": "BLOCKED",
+   "blockedBy": "On the designed release path, publish-nuget.yml dispatches benchmark.yml, which pushes the B2 headline (17 pairs, geometric-mean r 1.235) to a public branch and opens a publication PR (contract §7 benchmark publication surface). That exposes a benchmark result whether or not the PR merges, so the claim does not hold for the release path the record would authorize.",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "13",
+   "claimText": "No benchmark results are published with this release.",
+   "rowLimitations": [
+    "True of the release's adjudicated packages, notes, metadata, and website tree: none carries a 0.24 benchmark result, and no website source reads benchmark-headline.json.",
+    "publish-nuget.yml dispatches benchmark.yml, which pushes the B2 headline (a benchmark result) to a public branch and opens a PR, so the claim fails on the release path (AD-3)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/website-tree.sha256",
+     "sha256": "e684dcab33d98ab1ca25d0a1e4c04ebaa9325f29cd9cd8ecc5c67888b9dc6323"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/b2-headline/benchmark-headline.json",
+     "sha256": "312912fd3d8e02a22476e0d3fc41854c327e326ec989ece8c99faae28b05696a"
+    }
+   ]
+  },
+  {
+   "subject": "claim:advisory-7-false-proofs-in-4-areas",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "15-44",
+   "claimText": "The sweep found 7 false proofs in 4 areas in each of 0.21.0 (NuGet) and v0.22.0 (source); 3 removed runtime checks, 4 wrong interface acceptances; the published 0.21.0 package is unchanged.",
+   "rowLimitations": [
+    "4 FALSE-PROOF rows per baseline holding the 7 false-proof findings; each fixed or demoted by S2. Found by a sampled sweep on one platform; other false proofs may exist."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/findings.json",
+     "sha256": "57c04eb3a0d1a2789b0a7b48dd5bf90ae41566c0ce925e032039bd46f3fad31b"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/combined-row-status.json",
+     "sha256": "d8c7ad549f06f35c6a2d04950f9c291bde2261dd7c8e42c11ad137f671f9d93d"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    }
+   ]
+  },
+  {
+   "subject": "claim:sweep-limits",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "54-65",
+   "claimText": "710 cases per build, macOS arm64, run twice with the same verdicts and findings (one counterexample differed, both violating); 79 of 100 rows found no counterexample, 44 of those contain no proven case; 7 rows not run; whole-compiler soundness not established.",
+   "rowLimitations": [
+    "The numbers restate the S1 record; whole-compiler soundness is not established."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/results-summary.json",
+     "sha256": "d278a3c38f5b73af655c0ac28e4cb07f35c71ab134d88b364d1ae35a7dea0e72"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/combined-row-status.json",
+     "sha256": "d8c7ad549f06f35c6a2d04950f9c291bde2261dd7c8e42c11ad137f671f9d93d"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/gate-status.json",
+     "sha256": "a0e3af326da6f2e3fe07504e60dbc5dcb014257bd58762d324b81d261114e75d"
+    }
+   ]
+  },
+  {
+   "subject": "claim:all-34-findings-fixed-or-demoted",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "67-72",
+   "claimText": "The other 27 findings per build (8 true proofs of forbidden forms, 17 spurious refutations, 2 stale cache verdicts) plus the 7 false proofs: 0.24.0 fixes or visibly demotes all 34; a demoted form keeps its runtime check.",
+   "rowLimitations": [
+    "34 findings per baseline: 13 FIX-IN-0.24, 21 DEMOTE-IN-0.24; regression witnesses run in the candidate's suites. A demotion withdraws a claim; it does not prove the property."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:obligation-stale-facts-demoted",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "24-28, 255-271",
+   "claimText": "Obligations no longer use facts an assignment made stale; the obligation is Unsupported (Calor1124) and the runtime check stays; new facts for else/elseif and named refinement parameters.",
+   "rowLimitations": [
+    "R-OBL #1496 and R-OBL-RESIDUALS #1503 with their witnesses; demotion only."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-verification.tar.gz",
+     "sha256": "c089951bd9824cdb563ba138dddcf91ef2695f3ab50b369c8745947e24119dd3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:cache-literal-width-fixed",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "29-32, 291-296",
+   "claimText": "The verification cache key includes literal width, signedness, and real kind; INT:1 vs LONG:1 is refuted as it should be.",
+   "rowLimitations": [
+    "R-CACHE #1494; witness S2CacheLiteralWidthTests passes on the candidate."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:interface-checks-throwing-preconditions",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "33-44, 272-289",
+   "claimText": "Interface contract checks model throwing preconditions: null-string cases are Assumed with Calor0819, the remainder case is refuted with Calor0810 (x = 3, y = 0); Calor0816/Calor0814 behavior as described.",
+   "rowLimitations": [
+    "R-IMPL #1495; quantifier-free integer contracts only; string, array, and user-type cases are Assumed (Calor0819)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-verification.tar.gz",
+     "sha256": "c089951bd9824cdb563ba138dddcf91ef2695f3ab50b369c8745947e24119dd3"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:non-ascii-solver-symbols-escaped",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "46-48, 185-188",
+   "claimText": "Z3 symbol names for non-ASCII identifiers are escaped to ASCII (#1493); the Windows collision was not observed in practice.",
+   "rowLimitations": [
+    "R-TEXT #1497 (#1493). The Windows collision was never observed; the fix is by construction, and the determinism protocol passed on win-x64 and win-arm64."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/result.json",
+     "sha256": "d4d054ca4d01e26fe31c9c36d5d62d165b7bcea26877ea2f7d2e2620f135a530"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/attempt-timing.json",
+     "sha256": "dc19cd01dba52f35c371883dc878aa60dad78a79e9dcb6e97f058920341e9394"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965084091.json",
+     "sha256": "77e89d3f513bd91b28c59de3f0cafc24e83438a9dd8c2937036229e09c6278c7"
+    }
+   ]
+  },
+  {
+   "subject": "claim:warning-calor0819-added",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "76-78",
+   "claimText": "New warning Calor0819 ('Assumed, not proven') for interface contract checks.",
+   "rowLimitations": [
+    "Added by R-IMPL #1495; present in the candidate's diagnostics and tests."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:reproducible-release-evidence-and-gate",
+   "kind": "claim",
+   "outcome": "BLOCKED",
+   "blockedBy": "The claim says a release can be published only through the #1410 gate. R2's own record (release-gate.md §5 item 1) says older tags still hold an ungated publish-nuget.yml that can read the repository-scoped NUGET_API_KEY, and that the gate covers only the workflow files on main until that credential moves to a main-only environment. No evidence shows that change was made, so the exclusive-publication claim is not supported.",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "79-82",
+   "claimText": "The repository records the evidence contract, the registered sweep and results, a disposition for every finding, and a determinism protocol; a release can be published only through a gate that checks one adjudication record (#1410).",
+   "rowLimitations": [
+    "The gate covers the workflow files on main only; repository settings in release-gate.md §5 are not enforced by it."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
+     "sha256": "129fc1b74d5cc5ee23a6d876e1d25a95707468ec2042bf695c8c3fe96795bafd"
+    },
+    {
+     "path": "docs/plans/evidence/r1-1419/sha256.json",
+     "sha256": "8ea1a8451d98b5a476a5a01ce364a8f7919638b17cd76bafec2e904eb652b1f9"
+    },
+    {
+     "path": "docs/plans/evidence/s1-1311/sha256.json",
+     "sha256": "092b8c7da45b3e985da967f4a8d857e4628df0895ce84811ba35e9b6c2923bfe"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/g2-1421/sha256.json",
+     "sha256": "bb29e2d496065bc94e1f45c50becd9ab24873265aa9c7f2f8a128ae87436f18d"
+    },
+    {
+     "path": "docs/plans/evidence/r2-1410/release-gate.md",
+     "sha256": "7d04d9137c3a87f0ea7d2f63d56796be1db8f86ee6e2ffb2de9e4438abe04af9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/r2-dry-run/success/gate.txt",
+     "sha256": "a6898e245e9a54581e7c50d19a1b1110f89ea9b83cc84033aed8f1341796ddd8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:benchmark-publication-refuses-incomparable",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "86-102",
+   "claimText": "The benchmark workflow proposes one headline built only from the B1 packet and fails, opening no PR, on non-EQUIVALENT included pairs, changed pairs, an unamended method change, a differing regenerated packet, or a provenance commit that is not a full SHA on main; allow_weaker_methodology removed. The gate's freshness check covers only the headline's inputs (B1 packet and results, contract, sealed files, the 452 registered pair files and the benchmark corpus, the generator, the validator, the gate); the headline bytes depend only on the release commit.",
+   "rowLimitations": [
+    "Refusal paths are tested end to end; the freshness check covers only the headline's inputs, as the notes say."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/b2-1422/README.md",
+     "sha256": "db6e09f05f8b1b49e6ef09ccc3658b8c395ccae72e8d6f40d2bd7adf15c2522d"
+    },
+    {
+     "path": "docs/plans/evidence/b2-1422/local-e2e-pr2.md",
+     "sha256": "1115814ff922882d77841c4348e3097ed0b0e99f5ee0b4e46e8452eaa389d275"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/benchmark-gate-report.txt",
+     "sha256": "d883f1d2fcdc790af4bcb35ec132e082fe5131557a1f7443763719fc25a8e356"
+    }
+   ]
+  },
+  {
+   "subject": "claim:agent-refactoring-job-no-commit",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "127-128",
+   "claimText": "The agent refactoring job no longer commits to main and fails when it cannot read a pass rate.",
+   "rowLimitations": [
+    "benchmark.yml at the candidate: the job is contents: read with no commit step; ReleaseWorkflowGateTests.EveryPublishingCommandFollowsTheGateInItsJob passes."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/b2-1422/README.md",
+     "sha256": "db6e09f05f8b1b49e6ef09ccc3658b8c395ccae72e8d6f40d2bd7adf15c2522d"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:historical-benchmark-numbers-labeled",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "129-130",
+   "claimText": "Older website benchmark numbers stay published, labeled not comparable under the 0.24 method.",
+   "rowLimitations": [
+    "The old numbers stay published as history (inventory: website-benchmark-pages historical-only); the label does not make them valid."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/wording-scan.json",
+     "sha256": "a3d4b29cba94fbf7b8172190b97acce2a5da366f9b15ab42419e779cd2e3ee35"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/website-tree.sha256",
+     "sha256": "e684dcab33d98ab1ca25d0a1e4c04ebaa9325f29cd9cd8ecc5c67888b9dc6323"
+    }
+   ]
+  },
+  {
+   "subject": "claim:z3-single-verified-path-five-rids",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "131-135",
+   "claimText": "Z3 natives reach every consumer through one verified build step; packages carry linux-x64, linux-arm64, osx-arm64, win-x64, win-arm64.",
+   "rowLimitations": [
+    "check-packaged-z3.py --all-rids passed on the candidate packages; consumer matrices passed in one CI run."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/packages.log",
+     "sha256": "41bd45ca5db3ff3d1195941983f50deea664518615e674a7f10b5e227ffeb99f"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/z3-release-binaries.json",
+     "sha256": "a711a06d7dc6b2c6cabc01bcca08aad16159800d13f634f9cfe1c7a8320cec46"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313008-z3-consumer-matrix_linux-arm64_.log.gz",
+     "sha256": "c55b6e0598b2c61222d04788a92f87e92b9d33155bea3fb0814dee5a7b1146f2"
+    }
+   ]
+  },
+  {
+   "subject": "claim:fixture-checks-truthful",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "136-140",
+   "claimText": "The fixture script says it compiles each fixture once; explicit expectations for 509 tracked .calr fixtures: 428 compile, 51 must be rejected, 30 known failures never count as passes.",
+   "rowLimitations": [
+    "428 + 51 + 30 = 509 tracked fixtures; Tier 2's overall verdict is FAIL by design."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/tier2-fixtures-37965089769.json",
+     "sha256": "345d3570b87b1cf4bab3c1be619b14eec6dea04de2cce3e67bf45cbab8639a23"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/tier2/",
+     "files": 2,
+     "treeSha256": "035133f654de765a16d31cf9895f5ed60a5c61503d7991c3a753ca4c5a6a2b04"
+    }
+   ]
+  },
+  {
+   "subject": "claim:numeric-forms-refused-or-demoted",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "144-171",
+   "claimText": "Narrow (<32-bit) arithmetic Unsupported (D1); out-of-range INT: literals Unsupported (D2), including whole-loop k-induction; checked-arithmetic postconditions Assumed unless a fixed operand-width rule shows no overflow (no solver query).",
+   "rowLimitations": [
+    "R-NUM #1502 (amendment 1.3.2 rule, no solver query); D-NUM-WHILE-BOUND demoted."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd/verifier-runtime-differential.json",
+     "sha256": "aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:differential-totals-429-156-585",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "167-169",
+   "claimText": "In the verifier-runtime differential report, 6 of 1,170 cases move from Proven to Assumed; totals 429 Proven, 156 Assumed, 585 refuted.",
+   "rowLimitations": [
+    "Byte-equal in two clones and ubuntu CI; totals over the whitelisted forms only."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd/verifier-runtime-differential.json",
+     "sha256": "aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd/verifier-runtime-differential.md",
+     "sha256": "24901f2176fb3157dedcb79f40564f2bfe9bcd10db94018f5c8942c56c20b2d5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/vrd-check.log",
+     "sha256": "84329c54287d27d55787efdada8c6c5a37971da221444aa756e5cdc119ef780d"
+    }
+   ]
+  },
+  {
+   "subject": "claim:text-utf16-code-units",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "175-193",
+   "claimText": "String literals reach Z3 as UTF-16 code units; backslash not a Z3 escape; Substring range conditions; IndexOf with a start index Unsupported; null-satisfiable precondition sets are Unsupported, not vacuous.",
+   "rowLimitations": [
+    "R-TEXT #1497; proofs touching strings stay Assumed and keep their runtime checks."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:nested-quantifier-unsupported",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "194-203",
+   "claimText": "A quantifier nested in another is not verified (Unsupported, runtime check kept, never cached); a k-induction invariant with an unparseable conjunct is not reported proven.",
+   "rowLimitations": [
+    "R-QNT #1498; a conservative restriction, also for nested forms the compiler could check at run time."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:determinism-causes-fixed",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "205-228",
+   "claimText": "Three causes of run-to-run and platform-dependent verdicts are fixed (fresh Z3 context per query, Windows string encoding, USERPROFILE for the user-level cache); whether the verifier is deterministic on every supported platform is decided by the registered determinism protocol (#1421), which runs after this change.",
+   "rowLimitations": [
+    "The three causes are fixed by G3 #1492/#1500; protocol 1.5.0 on the candidate returned DETERMINISTIC (30 attempts per environment; rare non-determinism not excluded)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/result.json",
+     "sha256": "d4d054ca4d01e26fe31c9c36d5d62d165b7bcea26877ea2f7d2e2620f135a530"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/determinism/attempt-timing.json",
+     "sha256": "dc19cd01dba52f35c371883dc878aa60dad78a79e9dcb6e97f058920341e9394"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965084091.json",
+     "sha256": "77e89d3f513bd91b28c59de3f0cafc24e83438a9dd8c2937036229e09c6278c7"
+    },
+    {
+     "path": "docs/plans/evidence/g3-1135/README.md",
+     "sha256": "64a872bee41d1182de5a223db56bdfc6efe0493d4c808a9a1a1fd8a50f7d6927"
+    }
+   ]
+  },
+  {
+   "subject": "claim:unreachable-counterexamples-withheld",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "230-253",
+   "claimText": "Failed obligations are reported as Calor1124 (unsupported, runtime check kept) when something evaluated before may throw or the obligation reads a property; these checks never make an obligation proven or discharged.",
+   "rowLimitations": [
+    "R-OBL #1496 and #1503; withholding may also hide real counterexamples, as the notes say."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/s2-1413/dispositions.json",
+     "sha256": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:empty-clause-body-fixed",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "298-312",
+   "claimText": "An empty clause body no longer swallows the next statement (#1485), for every construct with an indented body.",
+   "rowLimitations": [
+    "#1491 (issue #1485, closed); the regression tests run in the candidate's compiler suite."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    },
+    {
+     "path": "docs/plans/evidence/fix-1485/reviews/",
+     "files": 4,
+     "treeSha256": "bf4e10b4942c7e603a6c354b34ebfad9bcfeb35512d4eab22d943ded9b121576"
+    }
+   ]
+  },
+  {
+   "subject": "claim:cache-format-1.22",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "51-52, 173-174, 192-193, 224-225, 295-296",
+   "claimText": "The verification cache format is 1.22; older entries are invalidated and recomputed.",
+   "rowLimitations": [
+    "VerificationCacheEntry.CurrentFormatVersion is \"1.22\" at the candidate."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965086841.json",
+     "sha256": "4357ce61541132913f48946aadf1ff16aad74300ed48cb0346ba69a881fe14d8"
+    }
+   ]
+  },
+  {
+   "subject": "claim:packages-and-website-reproducible",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "103-126",
+   "claimText": "The NuGet packages, the release metadata, and the website build byte-for-byte the same from one commit when both builds use the same .NET SDK build (Microsoft's SDK 10.0.401 and Homebrew's differ); the site still downloads fonts from Google Fonts at build time; six causes fixed (fixed pack timestamp, /_/ source paths, build id calor-<version>-<commit12>, path-free webpack module ids, [contenthash] entry names, sorted docs listing); reproducible-builds.yml builds twice and fails on any difference.",
+   "rowLimitations": [
+    "Only with Microsoft's SDK 10.0.401 build; the Google Fonts fetch at build time can change the website bytes or fail the build (it failed once in #1542's CI)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-a-b.md",
+     "sha256": "85259595875e8375d126498f4fff15823f97c759f1a1eca5dd8d230a3608bcaa"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-local-ci-packages.md",
+     "sha256": "ad90caf8826c2053b2e5e04124da5885666342271dee8825cfde51d769adf8fb"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/compare-local-ci-website.md",
+     "sha256": "9a4e68845dfd446cada54eb2294c55cb6bb8d8dabd22365b51d15960e7326152"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/ci/run-37965092627.json",
+     "sha256": "666d6b9126d44b407105c90eb52d522d35794c086adbcbe2d2dd3975e20e6a7a"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/build-hashes.json",
+     "sha256": "f781c1719c5a31df7a430022df40e20399b1015fd2b5d2d0f10adfcd1f666bd7"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/website-tree.sha256",
+     "sha256": "e684dcab33d98ab1ca25d0a1e4c04ebaa9325f29cd9cd8ecc5c67888b9dc6323"
+    }
+   ]
+  },
+  {
+   "subject": "claim:binding-performance-restored",
+   "kind": "claim",
+   "outcome": "BOUNDED",
+   "independence": "reduced-maintainer-adjudicated",
+   "limitation": "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated",
+   "notesLines": "314-325",
+   "claimText": "Name binding no longer copies the module-wide symbol table at every loop: the 200x200 synthetic module binds in 0.2 s (was 14.5 s); bound tree, diagnostics, symbol ids and order, and generated C# unchanged; fixes Binding_MediumModule_Under500ms; two smaller module-wide costs remain.",
+   "rowLimitations": [
+    "#1525; Binding_MediumModule_Under500ms passes on the candidate. The suite-median ratchet still exceeds 24 s on some ubuntu runners (#1536, not a release claim; fix after 0.24.0)."
+   ],
+   "evidence": [
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/release-notes.md",
+     "sha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/Calor.Performance.Tests.trx",
+     "sha256": "ab7ce190acb031409058c136f774d1af61f10e1bcb1116dd088a370ca2864665"
+    },
+    {
+     "path": "docs/plans/evidence/c2-1424/regeneration-3/release-quality/performance.log",
+     "sha256": "63e658577187576136622dda83fa3bcc3912f180b0fc5b225306691c02489e36"
+    },
+    {
+     "path": "docs/plans/evidence/fix-perf-binding/reviews/",
+     "files": 2,
+     "treeSha256": "f5f05058545a7f73b61e9cae60d15022b714003ef04b0317d134bbec5f409c3b"
+    }
+   ]
+  }
+ ],
+ "publication": {
+  "release-notes": {
+   "sha256": "05b8c2194efdd9756b1e92e197ae3de9d4c9c10d13c2c4b3465d54b62bdb192f",
+   "rawSha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5"
+  },
+  "nuget-packages": {
+   "files": {
+    "Calor.Sdk.0.24.0.nupkg": "157fc9cab9db1fe095c0b77a9ff264c8ea6186585bea6b964fb53afed41053bb",
+    "calor.0.24.0.nupkg": "d59aea56abb0e89125805686c59b616e47614ecea9a1c9b5fcbc9fb929401cc5"
+   }
+  },
+  "release-metadata": {
+   "files": {
+    "calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.provenance.json": "1f00791f712d85811ab9ad3906dbba87eb1724957068ce3645d3dff1450af79d",
+    "calor-nuget-04e61f188e85a710a91242e1ddbf35fcd50e329e.sbom.spdx.json": "eb2abecab68965c07cf0e41d99cd268b8a8c7c06494971aa046dd6c48cd1d9e3"
+   }
+  },
+  "website": {
+   "treeSha256": "e684dcab33d98ab1ca25d0a1e4c04ebaa9325f29cd9cd8ecc5c67888b9dc6323"
+  },
+  "benchmark-results": {
+   "files": {
+    "website/public/data/benchmark-headline.json": "312912fd3d8e02a22476e0d3fc41854c327e326ec989ece8c99faae28b05696a",
+    "bench/phase0-agent-native/commit-stamp-index.json": "c943954bb471092b670f9089f6527e5d40c232b9842de454787315f21f914731"
+   }
+  }
+ }
+}

@@ -1,0 +1,352 @@
+{
+ "corpus-binder-ratchet": {
+  "total": 8,
+  "executed": 8,
+  "passed": 8,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "BinderIncompleteRatchetTests"
+  ]
+ },
+ "corpus-calor0425-ledger": {
+  "total": 14,
+  "executed": 14,
+  "passed": 14,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "Calor0425CorpusLedgerTests"
+  ]
+ },
+ "d1-refout-contract": {
+  "total": 28,
+  "executed": 28,
+  "passed": 28,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "RefOutContractTests"
+  ]
+ },
+ "f1-refout-impl": {
+  "total": 371,
+  "executed": 371,
+  "passed": 371,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "RefOutImplementationTests"
+  ]
+ },
+ "f2-interpolation": {
+  "total": 53,
+  "executed": 53,
+  "passed": 53,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "InterpolationTargetTypingTests"
+  ]
+ },
+ "f3-local-conversion": {
+  "total": 91,
+  "executed": 91,
+  "passed": 91,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "LocalFunctionConversionTests"
+  ]
+ },
+ "f3-local-language": {
+  "total": 33,
+  "executed": 33,
+  "passed": 33,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "LocalFunctionLanguageTests"
+  ]
+ },
+ "f3-local-verification": {
+  "total": 0,
+  "executed": 0,
+  "passed": 0,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": []
+ },
+ "f4-iterator-accessor": {
+  "total": 50,
+  "executed": 50,
+  "passed": 50,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "IteratorAccessorConversionTests"
+  ]
+ },
+ "f5-array-expression": {
+  "total": 253,
+  "executed": 253,
+  "passed": 253,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "ArrayExpressionConversionTests",
+   "ArrayMemberEffectParityTests",
+   "ConditionalEvaluationMigrationTests"
+  ]
+ },
+ "f6-conversion-paths": {
+  "total": 36,
+  "executed": 36,
+  "passed": 36,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "ConversionPathReportingTests"
+  ]
+ },
+ "regen-binder-baseline": {
+  "total": 8,
+  "executed": 8,
+  "passed": 8,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "BinderIncompleteRatchetTests"
+  ]
+ },
+ "regen-t1-controls": {
+  "total": 133,
+  "executed": 133,
+  "passed": 133,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "SharedInteropControlsTests"
+  ]
+ },
+ "regen-w1-transcripts": {
+  "total": 13,
+  "executed": 13,
+  "passed": 13,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "W1GuideTranscriptTests"
+  ]
+ },
+ "release-gate-scope-packet": {
+  "total": 63,
+  "executed": 63,
+  "passed": 63,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "ReleaseGateScopePacketTests"
+  ]
+ },
+ "s2-dispositions": {
+  "total": 53,
+  "executed": 53,
+  "passed": 53,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "DispositionTests"
+  ]
+ },
+ "scope-validator": {
+  "total": 114,
+  "executed": 114,
+  "passed": 114,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "InteropScopeTests"
+  ]
+ },
+ "t1-controls": {
+  "total": 134,
+  "executed": 134,
+  "passed": 134,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "SharedInteropControlsTests"
+  ]
+ },
+ "t1-register": {
+  "total": 30,
+  "executed": 30,
+  "passed": 30,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "T1RegisterTests"
+  ]
+ },
+ "v025-manifest": {
+  "total": 0,
+  "executed": 0,
+  "passed": 0,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": []
+ },
+ "w-R-CACHE": {
+  "total": 15,
+  "executed": 15,
+  "passed": 15,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2CacheLiteralWidthTests"
+  ]
+ },
+ "w-R-IMPL-compiler": {
+  "total": 18,
+  "executed": 18,
+  "passed": 18,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2ImplicationDefinednessTests"
+  ]
+ },
+ "w-R-IMPL-verification": {
+  "total": 6,
+  "executed": 6,
+  "passed": 6,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2ImplicationProverDefinednessTests"
+  ]
+ },
+ "w-R-NUM-compiler": {
+  "total": 9,
+  "executed": 9,
+  "passed": 9,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2NumericDeterminismTests"
+  ]
+ },
+ "w-R-NUM-verification": {
+  "total": 25,
+  "executed": 25,
+  "passed": 25,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2NumericRefusalTests"
+  ]
+ },
+ "w-R-OBL-RESIDUALS": {
+  "total": 21,
+  "executed": 21,
+  "passed": 21,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2ObligationResidualTests"
+  ]
+ },
+ "w-R-OBL": {
+  "total": 41,
+  "executed": 41,
+  "passed": 41,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2ObligationStateTests"
+  ]
+ },
+ "w-R-QNT-compiler": {
+  "total": 3,
+  "executed": 3,
+  "passed": 3,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2NestedQuantifierChannelTests"
+  ]
+ },
+ "w-R-QNT-verification": {
+  "total": 7,
+  "executed": 7,
+  "passed": 7,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2NestedQuantifierTests"
+  ]
+ },
+ "w-R-TEXT": {
+  "total": 24,
+  "executed": 24,
+  "passed": 24,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "S2Z3TextEncodingTests"
+  ]
+ },
+ "w0-website-examples": {
+  "total": 58,
+  "executed": 58,
+  "passed": 58,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "WebsiteExampleCheckerTests"
+  ]
+ },
+ "w1-transcripts": {
+  "total": 13,
+  "executed": 13,
+  "passed": 13,
+  "failed": 0,
+  "notExecuted": 0,
+  "outcome": "Completed",
+  "classes": [
+   "W1GuideTranscriptTests"
+  ]
+ }
+}

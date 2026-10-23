@@ -1,0 +1,718 @@
+{
+  "project": "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n    <CalorTasksAssembly><REPO>/src/Calor.Tasks/bin/Debug/net10.0/Calor.Tasks.dll</CalorTasksAssembly>\n    <CalorSdkImportRuntime>false</CalorSdkImportRuntime>\n    <CalorVerbose>true</CalorVerbose>\n  </PropertyGroup>\n  <Import Project=\"<REPO>/src/Calor.Sdk/Sdk/Sdk.props\" />\n  <Import Project=\"<REPO>/src/Calor.Sdk/Sdk/Sdk.targets\" />\n  <ItemGroup>\n    <Reference Include=\"Calor.Runtime\">\n      <HintPath><REPO>/src/Calor.Runtime/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>\n    </Reference>\n  </ItemGroup>\n</Project>\n",
+  "rows": [
+    {
+      "index": 0,
+      "case": "bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/sdk/N0.csproj (in 25 ms).\n  Compiling Calor files...\n  Calor: global invalidation [missing-cache] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 39 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    1 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:04.39\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "e7d96db2dbf43d2476a425a2c4ab5a65ebad7dd8679ff899c039bbc9142db5a5",
+            "lastModified": "2026-09-11T16:59:52.0970775Z",
+            "fileSize": 143,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "83c9c43de6303f59f1e12d6d5272918fcd9b2d538013f03452a244d955e1bed6",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 1,
+      "case": "bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Generated 1 C# files from Calor\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:00.88\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "e7d96db2dbf43d2476a425a2c4ab5a65ebad7dd8679ff899c039bbc9142db5a5",
+            "lastModified": "2026-09-11T16:59:52.0970775Z",
+            "fileSize": 143,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "83c9c43de6303f59f1e12d6d5272918fcd9b2d538013f03452a244d955e1bed6",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 2,
+      "case": "return-bcl-nullable",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: file cache miss [source-content-changed]: <REPO>/.n0-evidence/tmp/sdk/Input.calr\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 34 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    1 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:01.30\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "971db84a338931ad1bfc66b1a5f8a48eb0ecd6781cfa2ac4a4d35dbedc8cc0a4",
+            "lastModified": "2026-09-11T16:59:57.71645Z",
+            "fileSize": 135,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "173e0e01a77b403e3bd8a8b4f590d30e66de2ff099d1c97006286c098bb41411",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 3,
+      "case": "argument-bcl-expression",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: file cache miss [source-content-changed]: <REPO>/.n0-evidence/tmp/sdk/Input.calr\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 40 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    1 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:02.93\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "e9cb0a7994a34423df1bff2823a643a40ced002c2d2732e5c82ae77b4069a77f",
+            "lastModified": "2026-09-11T16:59:59.1496573Z",
+            "fileSize": 168,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Int32.Parse",
+                      "isConstructor": false
+                    },
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "df04f94d52701632a09798e47d51af3445562a56522d5fc016bf92a018f9619f",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 4,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: file cache miss [source-content-changed]: <REPO>/.n0-evidence/tmp/sdk/Input.calr\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 45 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n\nBuild FAILED.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.54\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {}
+      }
+    },
+    {
+      "index": 5,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal",
+        "-p:CalorTypeCheck=false"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n\nBuild FAILED.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.51\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "e34f07b8ccc1d4ebdd9cbdd88dfb7bbaad0ca0710532edbea8c943fc7db162a1",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {}
+      }
+    },
+    {
+      "index": 6,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal",
+        "-p:CalorTranspileOnly=true"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n\nBuild FAILED.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.52\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "e34f07b8ccc1d4ebdd9cbdd88dfb7bbaad0ca0710532edbea8c943fc7db162a1",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {}
+      }
+    },
+    {
+      "index": 7,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal",
+        "-p:CalorPermissiveEffects=true",
+        "-p:CalorVerify=true"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 45 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n\nBuild FAILED.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.55\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "ea509b00fcf1f7caba05d299d8954c397149f455a6f3550c9517e9ca132f1e12",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {}
+      }
+    },
+    {
+      "index": 8,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 1,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n\nBuild FAILED.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(5,3): Calor error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Asdk%2FInput.calr/module/m1/function/ast%3Af1'. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.54\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "e34f07b8ccc1d4ebdd9cbdd88dfb7bbaad0ca0710532edbea8c943fc7db162a1",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {}
+      }
+    },
+    {
+      "index": 9,
+      "case": "bind-literal-nullable-target",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 33 tokens\nParsing completed successfully\nType checking completed\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,5): Calor warning Calor0200: Type 'inner=STRING' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,5): Calor error Calor0202: Cannot assign str to variable of type Option<inner=STRING> [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n\nBuild FAILED.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,5): Calor warning Calor0200: Type 'inner=STRING' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path. [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,5): Calor error Calor0202: Cannot assign str to variable of type Option<inner=STRING> [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    1 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.51\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {}
+      }
+    },
+    {
+      "index": 10,
+      "case": "bind-literal-nullable-target",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 33 tokens\nParsing completed successfully\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,21): warning CS0219: The variable 'x' is assigned but its value is never used [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n\n<REPO>/.n0-evidence/tmp/sdk/Input.calr(4,21): warning CS0219: The variable 'x' is assigned but its value is never used [<REPO>/.n0-evidence/tmp/sdk/N0.csproj]\n    1 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:02.56\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "e34f07b8ccc1d4ebdd9cbdd88dfb7bbaad0ca0710532edbea8c943fc7db162a1",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "f9a87866dc843f96d0d613cf45abb60b9ae8601af9e1ba3d04fc771a867f79ac",
+            "lastModified": "2026-09-11T17:00:06.1423892Z",
+            "fileSize": 75,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "fa8b05c8d46dcaf2a9b74c94d18978ffb0d09d9f3210ff156ed0b3ba4bbbf2c3",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 11,
+      "case": "bind-literal",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 34 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:00.98\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "343602825745e171f34963eac6a86e3544d48d01f4bec0767668b4661d335a98",
+            "lastModified": "2026-09-11T17:00:08.8482379Z",
+            "fileSize": 83,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "fa6a42e265faf6eefa72e114c89c325f70cc5f433a4fea951b97f2a7572f0914",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 12,
+      "case": "bind-literal",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Generated 1 C# files from Calor\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:00.85\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "25aae7b9f8920cc305b972f9b7b03a00c6f97434ae2af6a5aa61af7dcb249730",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "343602825745e171f34963eac6a86e3544d48d01f4bec0767668b4661d335a98",
+            "lastModified": "2026-09-11T17:00:08.8482379Z",
+            "fileSize": 83,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "fa6a42e265faf6eefa72e114c89c325f70cc5f433a4fea951b97f2a7572f0914",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 13,
+      "case": "bind-literal",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal",
+        "-p:Nullable=disable"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 34 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:00.99\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "fdbdbe15cb684df34d89f67daf75a3929bed7ecc3b369caf0089a8ecb75980e4",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "343602825745e171f34963eac6a86e3544d48d01f4bec0767668b4661d335a98",
+            "lastModified": "2026-09-11T17:00:10.9241307Z",
+            "fileSize": 83,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "fa6a42e265faf6eefa72e114c89c325f70cc5f433a4fea951b97f2a7572f0914",
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "index": 14,
+      "case": "bind-literal",
+      "command": [
+        "dotnet",
+        "build",
+        "<REPO>/.n0-evidence/tmp/sdk/N0.csproj",
+        "--nologo",
+        "-v:minimal",
+        "-p:CalorTypeCheck=false"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "log": "  Determining projects to restore...\n  All projects are up-to-date for restore.\n  Compiling Calor files...\n  Calor: global invalidation [options-or-inputs-changed] \u2014 recompiling all files.\n  Compiling Calor: <REPO>/.n0-evidence/tmp/sdk/Input.calr -> obj/Debug/net10.0/calor/Input.g.cs\nLexer produced 34 tokens\nParsing completed successfully\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\n  Generated 1 C# files from Calor\n  N0 -> <REPO>/.n0-evidence/tmp/sdk/bin/Debug/net10.0/N0.dll\n\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:00.98\n",
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "fd623e51a246fa2b07d0d9016df29b0b39cb8f99b41cb2c5aea6b3033de9509b",
+        "optionsHash": "e34f07b8ccc1d4ebdd9cbdd88dfb7bbaad0ca0710532edbea8c943fc7db162a1",
+        "manifestHash": "",
+        "outputDirectory": "obj/Debug/net10.0/calor",
+        "files": {
+          "Input.calr": {
+            "contentHash": "343602825745e171f34963eac6a86e3544d48d01f4bec0767668b4661d335a98",
+            "lastModified": "2026-09-11T17:00:12.047966Z",
+            "fileSize": 83,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "fa6a42e265faf6eefa72e114c89c325f70cc5f433a4fea951b97f2a7572f0914",
+            "diagnostics": []
+          }
+        }
+      }
+    }
+  ]
+}

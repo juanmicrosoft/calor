@@ -1,0 +1,506 @@
+Test run for /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/artifacts/coverage/raw/Calor.Compiler.Tests/Calor.Compiler.Tests-1.trx
+
+Passed!  - Failed:     0, Passed:  7356, Skipped:     2, Total:  7358, Duration: 9 m 45 s - Calor.Compiler.Tests.dll (net10.0)
+
+Attachments:
+  /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/artifacts/coverage/raw/Calor.Compiler.Tests/02e6c372-b9bc-4213-a5d9-641e645b9c9a/coverage.cobertura.xml
+Test run for /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:32.43]     Calor.Compiler.Tests.IncrementalCliEndToEndTests.CacheFlag_WithExplicitOutput_StillDoesNotUseIncrementalBuildCache [FAIL]
+[xUnit.net 00:00:32.57]     Calor.Compiler.Tests.VerificationCacheTests.E2E_NoCacheFlagDisablesCache [FAIL]
+[xUnit.net 00:00:32.60]     Calor.Compiler.Tests.VerificationCacheTests.E2E_CachedResultsMatchFreshResults [FAIL]
+[xUnit.net 00:00:32.61]     Calor.Compiler.Tests.VerificationCacheTests.E2E_ClearCacheFlagWorks [FAIL]
+[xUnit.net 00:00:32.64]     Calor.Compiler.Tests.VerificationCacheTests.E2E_CachePopulatesOnFirstRun [FAIL]
+[xUnit.net 00:00:32.66]     Calor.Compiler.Tests.VerificationCacheTests.E2E_CacheHitOnSecondRun [FAIL]
+[xUnit.net 00:00:33.52]     Calor.Compiler.Tests.McpRegistryValidationTests.AgentsMdTemplate_ReferencesOnlyRegisteredTools [FAIL]
+[xUnit.net 00:00:33.52]     Calor.Compiler.Tests.McpRegistryValidationTests.ClaudeMdTemplate_ReferencesOnlyRegisteredTools [FAIL]
+[xUnit.net 00:00:33.52]     Calor.Compiler.Tests.McpRegistryValidationTests.Templates_ReferenceOnlyRegisteredResources(templateName: "AGENTS.md.template") [FAIL]
+[xUnit.net 00:00:33.52]     Calor.Compiler.Tests.McpRegistryValidationTests.Templates_ReferenceOnlyRegisteredResources(templateName: "CLAUDE.md.template") [FAIL]
+[xUnit.net 00:00:33.52]     Calor.Compiler.Tests.McpRegistryValidationTests.Templates_ReferenceOnlyRegisteredResources(templateName: "GEMINI.md.template") [FAIL]
+[xUnit.net 00:00:33.52]     Calor.Compiler.Tests.McpRegistryValidationTests.ServerInstructions_ReferenceOnlyRegisteredTools [FAIL]
+[xUnit.net 00:00:33.53]     Calor.Compiler.Tests.McpRegistryValidationTests.GeminiMdTemplate_ReferencesOnlyRegisteredTools [FAIL]
+[xUnit.net 00:00:33.53]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.SynthesizedReturnNames_AvoidMethodTypeParameters [FAIL]
+[xUnit.net 00:00:33.53]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.NegatedPattern_BindsResultOnFalseContinuation [FAIL]
+[xUnit.net 00:00:33.53]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.ResultPseudoVariable_RespectsLexicalBinders [FAIL]
+[xUnit.net 00:00:33.55]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.OperatorOverload_UsesSharedReturnLowering [FAIL]
+[xUnit.net 00:00:33.55]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.PatternBinder_DoesNotShadowResultOnFalseBranch [FAIL]
+[xUnit.net 00:00:33.55]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.AsyncTaskAndTaskOfT_UseValueResultsAndCheckOnce [FAIL]
+[xUnit.net 00:00:33.55]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.SynthesizedReturnNames_AvoidParametersLocalsAndLabels [FAIL]
+[xUnit.net 00:00:33.56]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.EnumExtension_UsesSharedReturnLowering [FAIL]
+[xUnit.net 00:00:33.56]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.ResultPseudoVariable_DoesNotAlterIdentifiersOrStrings [FAIL]
+[xUnit.net 00:00:33.56]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.Disjunction_BindsResultOnlyWhenEveryTruePathDoes [FAIL]
+[xUnit.net 00:00:33.56]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.StatementLambda_ReturnDoesNotInheritOuterLowering [FAIL]
+[xUnit.net 00:00:33.56]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.ExceptionalExit_DoesNotRunPostcondition [FAIL]
+[xUnit.net 00:00:33.57]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.SynthesizedReturnNames_AvoidPostconditionBinders [FAIL]
+[xUnit.net 00:00:33.57]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.ClassMethodAndOperatorMethod_ShareReturnLowering [FAIL]
+[xUnit.net 00:00:33.58]     Calor.Compiler.Tests.PostconditionReturnLoweringRuntimeTests.NestedIfLoopTryFinallyUsing_PreservesTraceAndChecksOnce [FAIL]
+[xUnit.net 00:00:36.06]     Calor.Compiler.Tests.Mcp.ConvertValidatedToolTests.ExecuteAsync_ReturnsStats [FAIL]
+[xUnit.net 00:00:36.07]     Calor.Compiler.Tests.Mcp.ConvertValidatedToolTests.ExecuteAsync_WithForbiddenPattern_ReturnsCompatStage [FAIL]
+[xUnit.net 00:00:36.07]     Calor.Compiler.Tests.Mcp.ConvertValidatedToolTests.ExecuteAsync_WithSimpleClass_ReturnsComplete [FAIL]
+[xUnit.net 00:00:36.08]     Calor.Compiler.Tests.Mcp.ConvertValidatedToolTests.ExecuteAsync_WithExpectedPatterns_ChecksCompat [FAIL]
+[xUnit.net 00:00:36.08]     Calor.Compiler.Tests.Mcp.ConvertValidatedToolTests.ExecuteAsync_WithInteropMode_Succeeds [FAIL]
+[xUnit.net 00:00:36.08]     Calor.Compiler.Tests.Mcp.McpMemoryAdmissionTests.StdioServer_DoesGateHeavyToolsOnProcessMemory [FAIL]
+[xUnit.net 00:00:36.08]     Calor.Compiler.Tests.Mcp.McpMemoryAdmissionTests.EmbeddedHandler_DoesNotGateHeavyToolsOnProcessMemory [FAIL]
+[xUnit.net 00:00:36.08]     Calor.Compiler.Tests.Mcp.McpMemoryAdmissionTests.EnabledPolicy_StillRefusesHeavyToolsOverTheCeiling [FAIL]
+[xUnit.net 00:00:36.09]     Calor.Compiler.Tests.Mcp.DiagnoseToolFixTests.ExecuteAsync_WithNameof_CompilesSuccessfully [FAIL]
+[xUnit.net 00:00:36.09]     Calor.Compiler.Tests.Mcp.DiagnoseToolFixTests.ExecuteAsync_WithFourFieldHeader_Apply_HealsToReturningSource [FAIL]
+[xUnit.net 00:00:36.10]     Calor.Compiler.Tests.Mcp.DiagnoseToolFixTests.ExecuteAsync_WithValidCode_NoSuggestions [FAIL]
+[xUnit.net 00:00:36.10]     Calor.Compiler.Tests.Mcp.DiagnoseToolFixTests.ExecuteAsync_WithLegacyClosers_Apply_HealsToCompilingSource [FAIL]
+[xUnit.net 00:00:36.13]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.ApplyFix_VariousTypos_ProducesValidCode(source: "§M{m001:Test} §F{f001:Fn} §O{str} §R (lowwer \"HEL"···, typo: "lowwer", expected: "lower") [FAIL]
+[xUnit.net 00:00:36.13]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.ApplyFix_VariousTypos_ProducesValidCode(source: "§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello"···, typo: "uper", expected: "upper") [FAIL]
+[xUnit.net 00:00:36.13]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.ApplyFix_VariousTypos_ProducesValidCode(source: "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"h"···, typo: "cotains", expected: "contains") [FAIL]
+[xUnit.net 00:00:36.13]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.ApplyFix_VariousTypos_ProducesValidCode(source: "§M{m001:Test} §F{f001:Fn} §O{str} §R (substrr \"he"···, typo: "substrr", expected: "substr") [FAIL]
+[xUnit.net 00:00:36.14]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.Parser_NameofOperator_CompilesSuccessfully [FAIL]
+[xUnit.net 00:00:36.14]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.AgentSimulation_SingleTypoFix_ProducesValidCode [FAIL]
+[xUnit.net 00:00:36.15]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.ApplyFix_OperatorTypo_ProducesValidCode [FAIL]
+[xUnit.net 00:00:36.15]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.AgentSimulation_ApplyOperatorFixes_ProducesValidCode [FAIL]
+[xUnit.net 00:00:36.16]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.AgentSimulation_McpWorkflow_ProducesValidCode [FAIL]
+[xUnit.net 00:00:36.16]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.Parser_ExactMatchOperator_NoError [FAIL]
+[xUnit.net 00:00:36.16]     Calor.Compiler.Tests.Diagnostics.SuggestionTests.AgentSimulation_IterativeFixes_EventuallyConverges [FAIL]
+[xUnit.net 00:00:36.17]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.FullyQualifiedCrossNamespaceTypeReferences_RoundTrip [FAIL]
+[xUnit.net 00:00:36.17]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.MismatchedPrivateSiblingSignature_DoesNotFallBackToExternalFunction [FAIL]
+[xUnit.net 00:00:36.17]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.CalorAndFormatterReemission_PreserveNullScopeDeclarationsByIdentity [FAIL]
+[xUnit.net 00:00:36.18]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.SimplifiableContracts_PreserveOneNamespaceAndDeclarationMetadata [FAIL]
+[xUnit.net 00:00:36.20]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.RealGlobalNamedNamespace_RoundTripsWithoutSentinelCollision [FAIL]
+[xUnit.net 00:00:36.20]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.LossyConversion_EmptyInterfaceBeforeNestedNamespace_RemainsNative [FAIL]
+[xUnit.net 00:00:36.20]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespaceScope_MultilineEnumValue_DoesNotCaptureFollowingClass [FAIL]
+[xUnit.net 00:00:36.21]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.EmptyNamespace_DoesNotReparentFollowingSibling [FAIL]
+[xUnit.net 00:00:36.21]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.AllTopLevelTypeKinds_CarryFullyQualifiedIdentity [FAIL]
+[xUnit.net 00:00:36.22]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespaceLocalStaticUsings_StayInTheirLexicalScopes [FAIL]
+[xUnit.net 00:00:36.22]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.LossyConversion_EmptyClassBeforeNestedNamespace_RemainsNative [FAIL]
+[xUnit.net 00:00:36.22]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.ExplicitTopology_UnscopedDeclarationWithoutIdentity_ReportsDiagnostic [FAIL]
+[xUnit.net 00:00:36.23]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.PostValidationRecovery_UsesFullyQualifiedIdentity [FAIL]
+[xUnit.net 00:00:36.23]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NestedAndFileScopedNamespaces_PreserveHierarchyAndStyle [FAIL]
+[xUnit.net 00:00:36.24]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.SimplifiableContracts_PreserveMultipleNamespaceScopes [FAIL]
+[xUnit.net 00:00:36.24]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.CrossModuleCalls_TargetEmittedNamespaceAndGlobalModuleClass [FAIL]
+[xUnit.net 00:00:36.25]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespaceLocalAliases_DoNotLeakAcrossScopes [FAIL]
+[xUnit.net 00:00:36.25]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.LosslessMultiNamespaceFile_UsesWholeFileInterop [FAIL]
+[xUnit.net 00:00:36.25]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.PrivateSameScopeModuleFunction_RemainsBareAndRuns [FAIL]
+[xUnit.net 00:00:36.26]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.GlobalAndNamespaceLocalUsings_KeepTheirVisibility [FAIL]
+[xUnit.net 00:00:36.26]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.AmbiguousLocalName_IsNeverReboundToExternalFunction [FAIL]
+[xUnit.net 00:00:36.26]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespacedOverride_PreservesProtectedAccessibilityDuringSingleFileReplacement(accessibility: "protected internal", calorVisibility: "prot-int", expectedAccessibility: ProtectedOrInternal) [FAIL]
+[xUnit.net 00:00:36.27]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespacedOverride_PreservesProtectedAccessibilityDuringSingleFileReplacement(accessibility: "private protected", calorVisibility: "priv-prot", expectedAccessibility: ProtectedAndInternal) [FAIL]
+[xUnit.net 00:00:36.27]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespacedOverride_PreservesProtectedAccessibilityDuringSingleFileReplacement(accessibility: "protected", calorVisibility: "prot", expectedAccessibility: Protected) [FAIL]
+[xUnit.net 00:00:36.28]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.IntraModuleCrossNamespaceCalls_BindEmitCompileAndRun [FAIL]
+[xUnit.net 00:00:36.28]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.ProgramCompile_MixedNamespaceAndDirectModuleDeclaration_IsValid [FAIL]
+[xUnit.net 00:00:36.29]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.LossyConversion_PreservesSameNamedTypesAcrossNamespaces [FAIL]
+[xUnit.net 00:00:36.29]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.PartialMerge_EmptyDonorNamespace_DoesNotCaptureSecondNamespace [FAIL]
+[xUnit.net 00:00:36.30]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.PrivateSiblingModuleFunction_IsQualifiedAndRuns [FAIL]
+[xUnit.net 00:00:36.30]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.GlobalDeclarations_StayGlobalThroughExplicitAndSyntheticScopes [FAIL]
+[xUnit.net 00:00:37.59]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.NamespaceTopology_PlanningAndAccounting_AreNotFullyNative [FAIL]
+[xUnit.net 00:00:37.60]     Calor.Compiler.Tests.Issue769NamespaceTopologyTests.CrossFilePublicSameName_CannotRebindPrivateSiblingCall [FAIL]
+[xUnit.net 00:00:37.64]     Calor.Compiler.Tests.PostValidationFallbackTests.CrossNamespaceSameNameTypes_RemainNativeAndDistinct [FAIL]
+[xUnit.net 00:00:37.70]     Calor.Compiler.Tests.IndexedTypeTests.BoundsCheckTool_WithFunctionIdFilter_AcceptsParameter [FAIL]
+[xUnit.net 00:00:37.71]     Calor.Compiler.Tests.IndexedTypeTests.BoundsCheckTool_NoIndexedTypes_ReturnsEmptyAccessSites [FAIL]
+[xUnit.net 00:00:37.93]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "NamedSafe", source: "§M{m1:NamedSafe}\n  §F{f1:Choose:pub} (str:require"···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:37.94]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "PatternSafe", source: "§M{m1:PatternSafe}\n  §F{f1:Name:pub} (?str:input)"···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:37.94]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ArgumentSafe", source: "§M{m1:ArgumentSafe}\n  §F{f1:Take:pub} (str:value)"···, mode: "default") [FAIL]
+[xUnit.net 00:00:37.94]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "PatternSafe", source: "§M{m1:PatternSafe}\n  §F{f1:Name:pub} (?str:input)"···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:38.02]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "EnvironmentSafe", source: "§M{m1:EnvironmentSafe}\n  §F{f1:Name:pub} () -> st"···, mode: "default") [FAIL]
+[xUnit.net 00:00:38.09]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "EnvironmentSafe", source: "§M{m1:EnvironmentSafe}\n  §F{f1:Name:pub} () -> st"···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.12]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "EnvironmentSafe", source: "§M{m1:EnvironmentSafe}\n  §F{f1:Name:pub} () -> st"···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:38.13]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "PatternSafe", source: "§M{m1:PatternSafe}\n  §F{f1:Name:pub} (?str:input)"···, mode: "default") [FAIL]
+[xUnit.net 00:00:38.20]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "EnvironmentSafe", source: "§M{m1:EnvironmentSafe}\n  §F{f1:Name:pub} () -> st"···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:38.20]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "NamedSafe", source: "§M{m1:NamedSafe}\n  §F{f1:Choose:pub} (str:require"···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.20]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "InitSafe", source: "§M{m1:InitSafe}\n  §F{f1:Copy:pub} (?str:input) ->"···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:38.20]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ReturnSafe", source: "§M{m1:ReturnSafe}\n  §F{f1:Name:pub} (?str:input) "···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:38.21]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ThrowSafe", source: "§M{m1:ThrowSafe}\n  §F{f1:Require:pub} (?str:input"···, mode: "default") [FAIL]
+[xUnit.net 00:00:38.21]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "PatternSafe", source: "§M{m1:PatternSafe}\n  §F{f1:Name:pub} (?str:input)"···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.21]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ArgumentSafe", source: "§M{m1:ArgumentSafe}\n  §F{f1:Take:pub} (str:value)"···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.21]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ThrowSafe", source: "§M{m1:ThrowSafe}\n  §F{f1:Require:pub} (?str:input"···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:38.21]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "InitSafe", source: "§M{m1:InitSafe}\n  §F{f1:Copy:pub} (?str:input) ->"···, mode: "default") [FAIL]
+[xUnit.net 00:00:38.21]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ThrowSafe", source: "§M{m1:ThrowSafe}\n  §F{f1:Require:pub} (?str:input"···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:38.22]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ReturnSafe", source: "§M{m1:ReturnSafe}\n  §F{f1:Name:pub} (?str:input) "···, mode: "default") [FAIL]
+[xUnit.net 00:00:38.22]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ReturnSafe", source: "§M{m1:ReturnSafe}\n  §F{f1:Name:pub} (?str:input) "···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.22]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "NamedSafe", source: "§M{m1:NamedSafe}\n  §F{f1:Choose:pub} (str:require"···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:38.29]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "InitSafe", source: "§M{m1:InitSafe}\n  §F{f1:Copy:pub} (?str:input) ->"···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ThrowSafe", source: "§M{m1:ThrowSafe}\n  §F{f1:Require:pub} (?str:input"···, mode: "verify") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ArgumentSafe", source: "§M{m1:ArgumentSafe}\n  §F{f1:Take:pub} (str:value)"···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ReturnSafe", source: "§M{m1:ReturnSafe}\n  §F{f1:Name:pub} (?str:input) "···, mode: "effects-off") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "InitSafe", source: "§M{m1:InitSafe}\n  §F{f1:Copy:pub} (?str:input) ->"···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "ArgumentSafe", source: "§M{m1:ArgumentSafe}\n  §F{f1:Take:pub} (str:value)"···, mode: "type-off") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Compiler.Tests.NullabilityDocumentationTests.CompleteGuideExampleUsesProductionDiagnosticsAndEmission(name: "NamedSafe", source: "§M{m1:NamedSafe}\n  §F{f1:Choose:pub} (str:require"···, mode: "default") [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Tests.Shared.Z3ConsumerGuardTests.ManagedWrapperInOutputMatchesItsPin [FAIL]
+[xUnit.net 00:00:38.30]     Calor.Tests.Shared.Z3ConsumerGuardTests.HostNativeInOutputMatchesItsPin [FAIL]
+[xUnit.net 00:00:38.68]     Calor.Compiler.Tests.Mcp.TolerantParseTests.SessionOpen_FifoNamedCalr_DoesNotHang [FAIL]
+[xUnit.net 00:00:39.96]     Calor.Compiler.Tests.Mcp.TolerantParseTests.FileWrite_TargetIsFifo_DoesNotHang [FAIL]
+[xUnit.net 00:00:39.96]     Calor.Compiler.Tests.NamespaceEmissionTests.Compile_SimpleNamespace_NoDotsToPreserve [FAIL]
+[xUnit.net 00:00:39.97]     Calor.Compiler.Tests.NamespaceEmissionTests.Compile_DottedNamespace_ModuleClassUsesLastSegment [FAIL]
+[xUnit.net 00:00:39.98]     Calor.Compiler.Tests.NamespaceEmissionTests.Compile_DottedNamespace_PreservesDots [FAIL]
+[xUnit.net 00:00:39.98]     Calor.Compiler.Tests.NamespaceEmissionTests.Convert_CSharpWithDottedNamespace_PreservesDots_Roundtrip [FAIL]
+[xUnit.net 00:00:39.98]     Calor.Compiler.Tests.NamespaceEmissionTests.Compile_DeepDottedNamespace_PreservesAllDots [FAIL]
+[xUnit.net 00:00:40.00]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.Verification_CannotElideOverflowingIdentityGuard(predicate: "(== (- (- value 1) -1) value)", boundary: -2147483648) [FAIL]
+[xUnit.net 00:00:40.01]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.Verification_CannotElideOverflowingIdentityGuard(predicate: "(== (- (+ value 1) 1) value)", boundary: 2147483647) [FAIL]
+[xUnit.net 00:00:40.02]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.Verification_CannotElideOverflowingIdentityGuard(predicate: "(== (* value 2) (* 2 value))", boundary: 2147483647) [FAIL]
+[xUnit.net 00:00:40.03]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.Verification_CannotElideOverflowingIdentityGuard(predicate: "(== (- (- value)) value)", boundary: -2147483648) [FAIL]
+[xUnit.net 00:00:40.03]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "long", body: "return (int)value;", input: 2147483648) [FAIL]
+[xUnit.net 00:00:40.04]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "unchecked { return value + 1; }", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.05]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "return checked(value + 1);", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.05]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "return checked(unchecked(value + 1) - 1);", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.05]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "checked { return value + 1; }", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.06]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "return unchecked(value + 1);", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.06]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "return value + 1;", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.06]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "return value * 2;", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.07]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "return value - 1;", input: -2147483648) [FAIL]
+[xUnit.net 00:00:40.07]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "value++; return value;", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.07]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.LosslessMigration_PreservesCSharpOverflowContext(type: "int", body: "value += 1; return value;", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.08]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.NarrowingConversions_TrapAtBoundaries(inputType: "i32", outputType: "u8", overflow: 256, safeInput: 255, expected: 255) [FAIL]
+[xUnit.net 00:00:40.08]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.NarrowingConversions_TrapAtBoundaries(inputType: "f64", outputType: "i32", overflow: 2147483648, safeInput: 2147483647, expected: 2147483647) [FAIL]
+[xUnit.net 00:00:40.08]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.NarrowingConversions_TrapAtBoundaries(inputType: "i32", outputType: "u8", overflow: -1, safeInput: 0, expected: 0) [FAIL]
+[xUnit.net 00:00:40.08]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.NarrowingConversions_TrapAtBoundaries(inputType: "i64", outputType: "i32", overflow: 2147483648, safeInput: 2147483647, expected: 2147483647) [FAIL]
+[xUnit.net 00:00:40.09]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.UnsignedConditional_IdentityCannotElideOverflowingCheck [FAIL]
+[xUnit.net 00:00:40.09]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.NegationAndCharacterNarrowing_Trap [FAIL]
+[xUnit.net 00:00:40.09]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GloballyCheckedNativeAndExplicitContexts_PreserveRuntimeSemantics(body: "return unchecked(value + 1);") [FAIL]
+[xUnit.net 00:00:40.10]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GloballyCheckedNativeAndExplicitContexts_PreserveRuntimeSemantics(body: "return checked(value + 1);") [FAIL]
+[xUnit.net 00:00:40.10]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GloballyCheckedNativeAndExplicitContexts_PreserveRuntimeSemantics(body: "return value + 1;") [FAIL]
+[xUnit.net 00:00:40.10]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GloballyCheckedNativeAndExplicitContexts_PreserveRuntimeSemantics(body: "unchecked { return value + 1; }") [FAIL]
+[xUnit.net 00:00:40.10]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GloballyCheckedNativeAndExplicitContexts_PreserveRuntimeSemantics(body: "checked { return value + 1; }") [FAIL]
+[xUnit.net 00:00:40.11]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.UnsignedConditional_BodySafetyCannotExcludeValidNormalReturns [FAIL]
+[xUnit.net 00:00:40.12]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow(predicate: "(-> (< value 2147483647) (== (- (+ value 1) 1) val"···) [FAIL]
+[xUnit.net 00:00:40.13]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow(predicate: "(== (? (< value 2147483647) (== (- (+ value 1) 1) "···) [FAIL]
+[xUnit.net 00:00:40.14]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow(predicate: "(|| (== value 2147483647) (== (- (+ value 1) 1) va"···) [FAIL]
+[xUnit.net 00:00:40.14]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.DynamicArithmetic_TrapsWithOrdinaryRoslynSettings(operation: "-", overflowLeft: -2147483648, overflowRight: 1, safeLeft: 7, safeRight: 4, expected: 3) [FAIL]
+[xUnit.net 00:00:40.14]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.DynamicArithmetic_TrapsWithOrdinaryRoslynSettings(operation: "*", overflowLeft: 2147483647, overflowRight: 2, safeLeft: 7, safeRight: 4, expected: 28) [FAIL]
+[xUnit.net 00:00:40.14]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.DynamicArithmetic_TrapsWithOrdinaryRoslynSettings(operation: "+", overflowLeft: 2147483647, overflowRight: 1, safeLeft: 3, safeRight: 4, expected: 7) [FAIL]
+[xUnit.net 00:00:40.15]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.ObligationSolver_CannotElideOverflowingIdentity [FAIL]
+[xUnit.net 00:00:40.18]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.VerifiedBody_NormalReturnProofDoesNotSuppressBodyOverflow [FAIL]
+[xUnit.net 00:00:40.18]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.IncrementAndDecrement_Trap(operation: "dec", input: -2147483648) [FAIL]
+[xUnit.net 00:00:40.18]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.IncrementAndDecrement_Trap(operation: "inc", input: 2147483647) [FAIL]
+[xUnit.net 00:00:40.19]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.QuantifiedIdentity_KeepsOverflowingRuntimePredicate(predicate: "(exists ((i i32)) (&& (&& (>= i 0) (< i 1)) (== (-"···) [FAIL]
+[xUnit.net 00:00:40.20]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.QuantifiedIdentity_KeepsOverflowingRuntimePredicate(predicate: "(forall ((i i32)) (-> (&& (>= i 0) (< i 1)) (== (-"···) [FAIL]
+[xUnit.net 00:00:40.21]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.OverflowPolicy_RoundTripsAndSeparatesWarmProofCaches [FAIL]
+[xUnit.net 00:00:40.22]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.IntLocalPromotions_CannotExcludeUnsignedNormalReturnStates [FAIL]
+[xUnit.net 00:00:40.23]     Calor.Compiler.Tests.ProductionOverflowRuntimeTests.ShippedExecutionProject_TrapsNativeOverflowAndPreservesCSharpInterop [FAIL]
+[xUnit.net 00:00:40.35]     Calor.Compiler.Tests.EditScriptIdentityTests.CacheReuseMatchesTheScriptsRegisteredExpectation(scriptName: "ES-07-persistent-finding") [FAIL]
+[xUnit.net 00:00:41.17]     Calor.Compiler.Tests.AgentTaskReferenceTests.Extraction_HandlesBareAndCalorFencesAndExplicitFragments [FAIL]
+[xUnit.net 00:00:41.17]     Calor.Compiler.Tests.AgentTaskReferenceTests.ActualReference_AllCompleteExamplesCompile [FAIL]
+[xUnit.net 00:00:41.18]     Calor.Compiler.Tests.AgentTaskReferenceTests.WindowsNewlines_PreserveReferenceExtraction [FAIL]
+[xUnit.net 00:00:41.55]     Calor.Compiler.Tests.MalformedFunctionHeaderTests.ApplyingFix_HeaderOnly_HealsToReturningFunction [FAIL]
+[xUnit.net 00:00:42.26]     Calor.Compiler.Tests.Analysis.TaintAnalysisCfgTests.RegressionCorpusInventory_EnforcesCommittedPrecisionRecallTargets [FAIL]
+[xUnit.net 00:00:42.37]     Calor.Compiler.Tests.Analysis.TaintAnalysisCfgTests.N3_SelectedBclSink_CliAnalyzeRetainsTaintFindings(expression: False, tainted: True) [FAIL]
+[xUnit.net 00:00:42.48]     Calor.Compiler.Tests.Analysis.TaintAnalysisCfgTests.N3_SelectedBclSink_CliAnalyzeRetainsTaintFindings(expression: True, tainted: True) [FAIL]
+[xUnit.net 00:00:42.58]     Calor.Compiler.Tests.Analysis.TaintAnalysisCfgTests.N3_SelectedBclSink_CliAnalyzeRetainsTaintFindings(expression: False, tainted: False) [FAIL]
+[xUnit.net 00:00:42.68]     Calor.Compiler.Tests.Analysis.TaintAnalysisCfgTests.N3_SelectedBclSink_CliAnalyzeRetainsTaintFindings(expression: True, tainted: False) [FAIL]
+[xUnit.net 00:00:43.13]     Calor.Compiler.Tests.MigrateCommandE2ETests.MigrateCli_OnFixtureProject_ProducesRealCalrAndCompilesEndToEnd [FAIL]
+[xUnit.net 00:00:43.29]     Calor.Compiler.Tests.EffectsSuggestCliTests.Suggest_Json_ManifestPath_CarriesUntypedReceiversAndDiagnostic [FAIL]
+[xUnit.net 00:00:43.39]     Calor.Compiler.Tests.EffectsSuggestCliTests.Suggest_Text_UntypedReceiver_IsWarnedAndKeptOutOfManifest [FAIL]
+[xUnit.net 00:00:43.49]     Calor.Compiler.Tests.EffectsSuggestCliTests.Suggest_Json_AllResolvedPath_CarriesUntypedReceiversAndDiagnostics [FAIL]
+[xUnit.net 00:00:43.50]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesConstructorEntryOrderAndExceptionTiming(body: "var d = new Dictionary<int, int>(Capacity()) { {Ke"···, expected: "throws:ArgumentException:CKVKV") [FAIL]
+[xUnit.net 00:00:43.51]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesConstructorEntryOrderAndExceptionTiming(body: "var d = new Dictionary<int, int>(Capacity()) { [Ke"···, expected: "CKVKV:2") [FAIL]
+[xUnit.net 00:00:43.52]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesConstructorEntryOrderAndExceptionTiming(body: "var d = new Dictionary<int, int> { {Key(), Value()"···, expected: "KVV") [FAIL]
+[xUnit.net 00:00:43.53]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new SD { [1] = 2 }; return d.Count.ToStrin"···, expected: "1", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.54]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "Dictionary<string, int> d = new(StringComparer.Ord"···, expected: "2", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.55]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = false ? new Dictionary<int, int> { {1, 2},"···, expected: "0", preserved: True, preservedFeature: "conditional-expression-hoisting") [FAIL]
+[xUnit.net 00:00:43.55]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new Dictionary<int, int> { {1, 2}, {2, 3} "···, expected: "3", preserved: False, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.56]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new ConcurrentDictionary<int, int> { [1] ="···, expected: "ConcurrentDictionary`2:1:3", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.57]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new SortedDictionary<string, int>(StringCo"···, expected: "A,b:3", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.57]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new D { [1] = 2 }; return string.Join(\",\"···, expected: "1", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.58]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "Dictionary<int, int> d = null; d = new Dictionary<"···, expected: "throws:ArgumentException", preserved: False, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.59]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new D { {1, 2}, {1, 3} }; return d[1].ToSt"···, expected: "throws:ArgumentException", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.59]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new Dictionary<int, int>(new Dictionary<in"···, expected: "throws:ArgumentException", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.60]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new D { [1] = 2 }; return string.Join(\",\"···, expected: "2", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.61]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new Dictionary<string, int>(StringComparer"···, expected: "1:2", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.62]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new Dictionary<int, int> { {1, 2}, {1, 3} "···, expected: "throws:ArgumentException", preserved: False, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.62]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new System.Collections.Generic.Dictionary<"···, expected: "3", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.63]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new Dictionary<string, int>(StringComparer"···, expected: "throws:ArgumentException", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.64]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = (object)new Dictionary<int, int> { {1, 2},"···, expected: "throws:ArgumentException", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.64]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new CD { [1] = 2 }; return d.Count.ToStrin"···, expected: "1", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.65]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new D { [1] = 2 }; return d.Count.ToString"···, expected: "1", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.66]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "Dictionary<int, int> d = new() { [1] = 2, [1] = 3 "···, expected: "3", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.66]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new SortedDictionary<int, int> { {2, 20}, "···, expected: "SortedDictionary`2:1,2:10,20", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.67]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDictionaryObservations(body: "var d = new Dictionary<int, int> { [1] = 2, [1] = "···, expected: "3", preserved: True, preservedFeature: "dictionary-initializer") [FAIL]
+[xUnit.net 00:00:43.67]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "(object)new Dictionary<int, int> { [1] = 2 }", binding: "§B{d}") [FAIL]
+[xUnit.net 00:00:43.68]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new Dictionary<int, int?> { [1] = 2 }", binding: "§B{d}") [FAIL]
+[xUnit.net 00:00:43.68]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new SD { [1] = 2 }", binding: "§B{System.Collections.Generic.SortedDictionary<i32"···) [FAIL]
+[xUnit.net 00:00:43.69]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new SortedDictionary<int, int> { [1] = 2 }", binding: "§B{System.Collections.Generic.SortedDictionary<i32"···) [FAIL]
+[xUnit.net 00:00:43.69]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new Dictionary<(int, int), int> { [(1, 2)] = 3 }", binding: "§B{d}") [FAIL]
+[xUnit.net 00:00:43.70]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new D { [1] = 2 }", binding: "§B{System.Collections.Generic.Dictionary<i32, i32>"···) [FAIL]
+[xUnit.net 00:00:43.71]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new CD { [1] = 2 }", binding: "§B{System.Collections.Concurrent.ConcurrentDiction"···) [FAIL]
+[xUnit.net 00:00:43.71]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new Dictionary<int, int> { [1] = 2 }", binding: "§B{System.Collections.Generic.Dictionary<i32, i32>"···) [FAIL]
+[xUnit.net 00:00:43.71]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.PreservedDictionaryLocalType_IsBoundedAndSpellable(initializer: "new Dictionary<dynamic, int> { [1] = 2 }", binding: "§B{d}") [FAIL]
+[xUnit.net 00:00:43.72]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private int Before = Capacity(); private Dictionar"···, expected: "CKVC") [FAIL]
+[xUnit.net 00:00:43.73]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private static Dictionary<int, int> D { get; } = n"···, expected: "1") [FAIL]
+[xUnit.net 00:00:43.74]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private static Dictionary<int, int> D = new Dictio"···, expected: "1") [FAIL]
+[xUnit.net 00:00:43.74]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private static Dictionary<int, int> D = new Dictio"···, expected: "throws:TypeInitializationException") [FAIL]
+[xUnit.net 00:00:43.75]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private static int Before { get; } = Capacity(); p"···, expected: "CKVC") [FAIL]
+[xUnit.net 00:00:43.76]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private static int Before = Capacity(); private st"···, expected: "CKVC") [FAIL]
+[xUnit.net 00:00:43.76]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private static int Before { get; } = Capacity(); p"···, expected: "CKVC") [FAIL]
+[xUnit.net 00:00:43.77]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesTypeInitializerOrder(members: "private int Before { get; } = Capacity(); private "···, expected: "CKVC") [FAIL]
+[xUnit.net 00:00:43.77]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDeclaredLocalTypeAndOverloadResolution(type: "IDictionary<int, int>") [FAIL]
+[xUnit.net 00:00:43.78]     Calor.Compiler.Tests.DictionaryInitializerSemanticsTests.Migration_PreservesDeclaredLocalTypeAndOverloadResolution(type: "object") [FAIL]
+[xUnit.net 00:00:43.79]     Calor.Compiler.Tests.EndToEndTests.Compile_MultipleFunctions_GeneratesAll [FAIL]
+[xUnit.net 00:00:43.79]     Calor.Compiler.Tests.EndToEndTests.Compile_LispExpressions_GeneratesCorrectCode [FAIL]
+[xUnit.net 00:00:43.79]     Calor.Compiler.Tests.EndToEndTests.Compile_ImplicitClosing_GeneratesCorrectCall [FAIL]
+[xUnit.net 00:00:43.79]     Calor.Compiler.Tests.EndToEndTests.Compile_FloatLiteral_GeneratesCorrectValue [FAIL]
+[xUnit.net 00:00:43.79]     Calor.Compiler.Tests.EndToEndTests.Compile_WithParameters_GeneratesCorrectSignature [FAIL]
+[xUnit.net 00:00:43.80]     Calor.Compiler.Tests.EndToEndTests.Compile_PrintAlias_GeneratesConsoleWriteLine [FAIL]
+[xUnit.net 00:00:43.80]     Calor.Compiler.Tests.EndToEndTests.Compile_WithStringEscapes_GeneratesCorrectLiteral [FAIL]
+[xUnit.net 00:00:43.80]     Calor.Compiler.Tests.EndToEndTests.Compile_UnaryNot_GeneratesCorrectCode [FAIL]
+[xUnit.net 00:00:43.80]     Calor.Compiler.Tests.EndToEndTests.Compile_BoolLiteral_GeneratesCorrectValue [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.EndToEndTests.Compile_InternalVisibility_GeneratesCorrectModifier [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.EndToEndTests.Compile_ChainedOperators_GeneratesCorrectCode [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.EndToEndTests.Compile_HelloWorld_GeneratesValidCSharp [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.EndToEndTests.Compile_GeneratesAutoGeneratedHeader [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.EndToEndTests.Compile_PrintWithLispExpression_GeneratesCorrectCode [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.EndToEndTests.ValidateCodegen_ValidProgram_NoRoslynParseErrors [FAIL]
+[xUnit.net 00:00:43.81]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.CoalescingArithmeticAndCasts_PreserveComposition(expression: "(* INT:2 (?? x INT:1))", present: 10, absent: 2) [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.CoalescingArithmeticAndCasts_PreserveComposition(expression: "(cast i32 (+ (cast f64 (?? x INT:1)) FLOAT:0.75))", present: 5, absent: 1) [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.CoalescingArithmeticAndCasts_PreserveComposition(expression: "(+ (?? x INT:1) INT:2)", present: 7, absent: 3) [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.CoalescingArithmeticAndCasts_PreserveComposition(expression: "(- INT:20 (+ (?? x INT:1) INT:2))", present: 13, absent: 17) [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.InstanceReceivers_UseCompleteChildExpression(expression: "(char-at (+ a b) INT:1)", returnType: "char", a: "a", b: "b", expected: 'b') [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.InstanceReceivers_UseCompleteChildExpression(expression: "(lower (+ a b))", returnType: "str", a: "A", b: "B", expected: "ab") [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.InstanceReceivers_UseCompleteChildExpression(expression: "(len (+ a b))", returnType: "i32", a: "a", b: "b", expected: 2) [FAIL]
+[xUnit.net 00:00:43.82]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.InstanceReceivers_UseCompleteChildExpression(expression: "(upper (+ a b))", returnType: "str", a: "a", b: "b", expected: "AB") [FAIL]
+[xUnit.net 00:00:43.83]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.GroupedReceiversAndCoalescing_EvaluateChildrenOnceInOrder [FAIL]
+[xUnit.net 00:00:43.83]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.NestedPatterns_MatchBooleanOracleAcrossBoundedDomain [FAIL]
+[xUnit.net 00:00:43.83]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.CastAndUnaryComposition_PreserveCompleteOperands [FAIL]
+[xUnit.net 00:00:43.83]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.AwaitCoalescedTask_AwaitsSelectedReceiver(configuration: "") [FAIL]
+[xUnit.net 00:00:43.83]     Calor.Compiler.Tests.NativeExpressionGroupingRuntimeTests.AwaitCoalescedTask_AwaitsSelectedReceiver(configuration: "{false}") [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§R §C{Math.Clamp}\n  §A[value] 7\n  §A[min] 0\n  §"···, expected: 5) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§R §C{Math.Max}\n  §A (+ 1 §C{Math.Min}\n    §A 8\"···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7\n§/C\n§"···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§B{value:i32} §C{Math.Max} §A 3\n  §A 7\n§/C\n§R v"···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§R (+ 1 §C{Math.Max}\n  §A 3\n  §A 7\n§/C)", expected: 8) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§R §C{Math.Max}\n  §A 3\n  §A 7\n§/C", expected: 7) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7 §/C\n§R"···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.84]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§R §C{Math.Max}\n  §A 3\n  §A 7", expected: 7) [FAIL]
+[xUnit.net 00:00:43.85]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§R §C{Math.Max}\n  §A §C{Math.Min}\n    §A 8\n    "···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.85]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§B{value:i32} §C{Math.Max}\n§A 3\n§A 7\n§/C\n§R va"···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.85]     Calor.Compiler.Tests.MultilineCallExpressionTests.Arguments_CompileExecuteAndRoundTrip(body: "§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7\n§R val"···, expected: 7) [FAIL]
+[xUnit.net 00:00:43.85]     Calor.Compiler.Tests.MultilineCallExpressionTests.NestedArgumentLists_LeaveLoopAndFollowingFunctionIntact [FAIL]
+[xUnit.net 00:00:43.96]     Calor.Compiler.Tests.MultilineCallExpressionTests.ElidedHeaderAndLispCalls_LeaveStatementsAndSiblingOperandsIntact [FAIL]
+[xUnit.net 00:00:43.96]     Calor.Compiler.Tests.MultilineCallExpressionTests.OriginalFileReadRepro_ExecutesAndRoundTrips [FAIL]
+[xUnit.net 00:00:44.03]     Calor.Compiler.Tests.AttributeConversionTests.Parser_Roundtrip_NameofWithKeywordArg_ToCSharp [FAIL]
+[xUnit.net 00:00:44.06]     Calor.Compiler.Tests.ExemplarCompilesTests.EveryCompleteProgram_CompilesToValidCSharp [FAIL]
+[xUnit.net 00:00:44.06]     Calor.Compiler.Tests.ExpressionMatchBlockSafetyTests.StatementMatchBlocks_KeepPrintMutationBindingsAndNestedReturns [FAIL]
+[xUnit.net 00:00:44.07]     Calor.Compiler.Tests.ExpressionMatchBlockSafetyTests.SingleReturnExpressionArms_ExecuteBothSourceForms [FAIL]
+[xUnit.net 00:00:44.09]     Calor.Compiler.Tests.HigherOrderDemandLedgerTests.DA_CalorNative_MatchesLedgerExactly [FAIL]
+[xUnit.net 00:00:44.09]     Calor.Compiler.Tests.HigherOrderDemandLedgerTests.Ledger_DeclaresFloor25_AndMeasuredCommitIsFullSha [FAIL]
+[xUnit.net 00:00:44.12]     Calor.Compiler.Tests.Mcp.AnalyzeDirectoryTests.ExecuteAsync_WithDirectoryRecursive_FindsNestedFiles [FAIL]
+[xUnit.net 00:00:44.12]     Calor.Compiler.Tests.Mcp.AnalyzeDirectoryTests.ExecuteAsync_WithoutDirectoryPath_FallsBackToSource [FAIL]
+[xUnit.net 00:00:44.13]     Calor.Compiler.Tests.Mcp.AnalyzeDirectoryTests.ExecuteAsync_WithDirectoryContainingCalrFiles_ReturnsAggregateResults [FAIL]
+[xUnit.net 00:00:44.13]     Calor.Compiler.Tests.WritePathRobustnessTests.CheckTool_DiagnoseApply_HealsSourceWhenFixEditsAreNotEnough [FAIL]
+[xUnit.net 00:00:44.14]     Calor.Compiler.Tests.WritePathRobustnessTests.CheckTool_DiagnoseApply_CleanSource_DoesNotHeal [FAIL]
+The active test run was aborted. Reason: Test host process crashed : WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z3.log)
+  type_check (bool) (default: true)
+  unsat_core (bool) (default: false)
+  well_sorted_check (bool) (default: false)
+WARNING: unknown parameter 'random_seed'
+Legal parameters are:
+  auto_config (bool) (default: true)
+  ctrl_c (bool) (default: true)
+  debug_ref_count (bool) (default: false)
+  dot_proof_file (string) (default: proof.dot)
+  dump_models (bool) (default: false)
+  encoding (string) (default: unicode)
+  model (bool) (default: true)
+  model_validate (bool) (default: false)
+  proof (bool) (default: false)
+  rlimit (unsigned int) (default: 0)
+  smtlib2_compliant (bool) (default: false)
+  stats (bool) (default: false)
+  timeout (unsigned int) (default: 4294967295)
+  trace (bool) (default: false)
+  trace_file_name (string) (default: z
+Results File: /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/artifacts/coverage/raw/Calor.Compiler.Tests/Calor.Compiler.Tests-2.trx
+
+Failed!  - Failed:   274, Passed:  2099, Skipped:     2, Total:  2375, Duration: 43 s - Calor.Compiler.Tests.dll (net10.0)
+Test Run Aborted.

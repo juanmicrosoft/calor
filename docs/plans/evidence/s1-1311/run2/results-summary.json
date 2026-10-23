@@ -1,0 +1,156 @@
+{
+  "run": 2,
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "resultRoot": "bench/correctness/false-established/v024/run2",
+  "runValidity": "VALID: no invalid-run record; pins equal run 1; every in-process libz3 capture present and equal to the registered hash",
+  "baselines": {
+    "B1": {
+      "rowStatusAllRows": {
+        "CLEAN-WITHIN-BUDGET": 79,
+        "FALSE-PROOF": 4,
+        "FINDING": 10,
+        "NOT-INVESTIGATED": 7
+      },
+      "rowStatusReleaseCritical": {
+        "CLEAN-WITHIN-BUDGET": 74,
+        "FINDING": 10,
+        "FALSE-PROOF": 4
+      },
+      "rowsByStatus": {
+        "FALSE-PROOF": [
+          "OBL-MUTATION-KILL",
+          "IMPL-ASSUMPTION-FORMS",
+          "IMPL-DIVISION-TOTALIZED",
+          "CACHE-LITERAL-WIDTH"
+        ],
+        "FINDING": [
+          "NUM-NARROW-ARITH",
+          "NUM-LITERAL-OVERSIZE",
+          "NUM-OVERFLOW-CHECKED",
+          "QNT-NESTED",
+          "STR-OPS-COUNT-INDEX",
+          "STR-NULL-NONASCII",
+          "OBL-BRANCH-FACTS",
+          "OBL-REFINEMENT-RETURN",
+          "OBL-SUBTYPE",
+          "OBL-SELFREF"
+        ],
+        "INCOMPLETE": []
+      },
+      "rowsWithBlockingCasesInsideFindingRows": {
+        "NUM-OVERFLOW-CHECKED": [
+          "1 timed-out"
+        ],
+        "STR-OPS-COUNT-INDEX": [
+          "1 timed-out"
+        ]
+      },
+      "cleanModeledRowsWithZeroValidatedProofs": [
+        "QNT-BOUND-TYPES",
+        "VAC-UNSAT-PRECONDITIONS",
+        "OBL-LOOP-FACTS",
+        "OBL-INDEX-BOUNDS",
+        "OBL-UNGATED-FORMS",
+        "INH-INHERITED-GUARD-EMISSION",
+        "CACHE-BODY-CHANGE",
+        "CACHE-PRECONDITION-CHANGE",
+        "CACHE-SEMANTICS-VERSION",
+        "SIMP-H1-UNARY-FOLD",
+        "CTRL-NEGATIVE"
+      ],
+      "caseClassCounts": {
+        "false-unconditional-proof": 7,
+        "no-claim": 430,
+        "refusal-validated": 144,
+        "required-demotion-absent": 8,
+        "spurious-refutation": 17,
+        "timed-out": 2,
+        "validated-proof": 102
+      },
+      "findings": 34,
+      "findingsByClass": {
+        "required-demotion-absent": 8,
+        "spurious-refutation": 17,
+        "false-unconditional-proof": 7,
+        "stale-cache-proof": 2
+      },
+      "otherBaselineRerun": {
+        "reproduces": 34
+      }
+    },
+    "N1": {
+      "rowStatusAllRows": {
+        "CLEAN-WITHIN-BUDGET": 79,
+        "FALSE-PROOF": 4,
+        "FINDING": 10,
+        "NOT-INVESTIGATED": 7
+      },
+      "rowStatusReleaseCritical": {
+        "CLEAN-WITHIN-BUDGET": 74,
+        "FINDING": 10,
+        "FALSE-PROOF": 4
+      },
+      "rowsByStatus": {
+        "FALSE-PROOF": [
+          "OBL-MUTATION-KILL",
+          "IMPL-ASSUMPTION-FORMS",
+          "IMPL-DIVISION-TOTALIZED",
+          "CACHE-LITERAL-WIDTH"
+        ],
+        "FINDING": [
+          "NUM-NARROW-ARITH",
+          "NUM-LITERAL-OVERSIZE",
+          "NUM-OVERFLOW-CHECKED",
+          "QNT-NESTED",
+          "STR-OPS-COUNT-INDEX",
+          "STR-NULL-NONASCII",
+          "OBL-BRANCH-FACTS",
+          "OBL-REFINEMENT-RETURN",
+          "OBL-SUBTYPE",
+          "OBL-SELFREF"
+        ],
+        "INCOMPLETE": []
+      },
+      "rowsWithBlockingCasesInsideFindingRows": {
+        "NUM-OVERFLOW-CHECKED": [
+          "1 timed-out"
+        ],
+        "STR-OPS-COUNT-INDEX": [
+          "1 timed-out"
+        ]
+      },
+      "cleanModeledRowsWithZeroValidatedProofs": [
+        "QNT-BOUND-TYPES",
+        "VAC-UNSAT-PRECONDITIONS",
+        "OBL-LOOP-FACTS",
+        "OBL-INDEX-BOUNDS",
+        "OBL-UNGATED-FORMS",
+        "INH-INHERITED-GUARD-EMISSION",
+        "CACHE-BODY-CHANGE",
+        "CACHE-PRECONDITION-CHANGE",
+        "CACHE-SEMANTICS-VERSION",
+        "SIMP-H1-UNARY-FOLD",
+        "CTRL-NEGATIVE"
+      ],
+      "caseClassCounts": {
+        "false-unconditional-proof": 7,
+        "no-claim": 430,
+        "refusal-validated": 144,
+        "required-demotion-absent": 8,
+        "spurious-refutation": 17,
+        "timed-out": 2,
+        "validated-proof": 102
+      },
+      "findings": 34,
+      "findingsByClass": {
+        "required-demotion-absent": 8,
+        "spurious-refutation": 17,
+        "false-unconditional-proof": 7,
+        "stale-cache-proof": 2
+      },
+      "otherBaselineRerun": {
+        "reproduces": 34
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{s001:Counter:pub:struct}
+      §FLD{i32:N:pub}
+
+
+    §CL{c002:Ext:pub:stat}
+      §CSHARP{public static void Inc(this ref Counter c) { c.N++; } }§/CSHARP
+
+
+    §CL{c004:Probe:pub:stat}
+      §MT{m005:Run:pub:stat} () -> str
+        §E{alloc}
+        §B{c} §NEW{Counter} §/NEW
+        §RAW
+        c.Inc();
+        §/RAW
+        §R (str c.N)
+
+
+

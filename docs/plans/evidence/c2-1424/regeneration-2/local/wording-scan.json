@@ -1,0 +1,15 @@
+{
+ "scanner": "scripts/verify_release_adjudication.py scan_text at 5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "surfaces": {
+  "release-notes": [],
+  "candidate-packages": [],
+  "website": [],
+  "benchmark-headline": []
+ },
+ "verdict": {
+  "release-notes": "clean",
+  "candidate-packages": "clean",
+  "website": "clean",
+  "benchmark-headline": "clean"
+ }
+}

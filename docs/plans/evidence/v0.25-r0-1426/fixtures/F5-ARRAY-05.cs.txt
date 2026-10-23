@@ -1,0 +1,32 @@
+// 0.25 R0 (#1426) baseline fixture F5-ARRAY-05 (#1132): rank and initializer matrix in
+// expression position: a jagged array, a rank-3 array, a sized array with an initializer,
+// an implicitly typed array, and an array nested inside another array's initializer.
+using System;
+
+public static class Probe
+{
+    public static int[][] Jagged()
+    {
+        return new int[][] { new int[] { 1 }, new int[] { 2, 3 } };
+    }
+
+    public static int[,,] Cube()
+    {
+        return new int[,,] { { { 1, 2 } }, { { 3, 4 } } };
+    }
+
+    public static int[] Sized()
+    {
+        return new int[3] { 7, 8, 9 };
+    }
+
+    public static string Run()
+    {
+        var implicitArr = new[] { "a", "b" };
+        var nested = new object[] { new int[] { 5, 6 }, "s" };
+        var j = Jagged();
+        var c = Cube();
+        var s = Sized();
+        return j[1][1] + "|" + c[1, 0, 1] + "|" + c.Rank + "|" + s[2] + "|" + implicitArr[1] + "|" + ((int[])nested[0])[1];
+    }
+}

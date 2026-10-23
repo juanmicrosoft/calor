@@ -1,0 +1,65 @@
+{
+  "base": "e299f2462b813a0c7e7049eb3a66f40b9f95e1c9",
+  "candidate": "5fabf1ec4bf21c1d39737369d6d0a8a5364ca347",
+  "sourceKeys": 364,
+  "changedRows": [
+    {
+      "source": "serilog/src/Serilog/Capturing/PropertyValueConverter.cs",
+      "changedFields": [
+        "BindingErrorCount",
+        "BindingErrorIdentityHash"
+      ],
+      "sourceHash": "231053e6bc7e8a6c271b75c95fa74eefa7a68659b02252e1f1319146a572a14e",
+      "calorSourceHash": "b28ee6d71c23c5fe1cd2d574c5fabd7b54a44c6a852e307bfe7d24919fb2655b",
+      "beforeCount": 59,
+      "afterCount": 58,
+      "propagatedCount": 7,
+      "removed": [
+        {
+          "Code": "Calor0274",
+          "Message": "Argument to parameter 'value' declares non-nullable 'any' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?any' or add an explicit non-null check at the interop boundary.",
+          "Start": 4750,
+          "Length": 5,
+          "Line": 90,
+          "Column": 28,
+          "Propagated": false
+        }
+      ],
+      "added": []
+    },
+    {
+      "source": "serilog/src/Serilog/Context/EnricherStack.cs",
+      "changedFields": [
+        "BindingErrorCount",
+        "BindingErrorIdentityHash"
+      ],
+      "sourceHash": "cfcd64ece0d72941d40c1e63047daef5a1d8fc3818be05b45918f1bcf16deb19",
+      "calorSourceHash": "7926ff2b13fe4f244eda1c57281b62695afab56184570890d3429b87286b2a76",
+      "beforeCount": 10,
+      "afterCount": 8,
+      "propagatedCount": 1,
+      "removed": [
+        {
+          "Code": "Calor0273",
+          "Message": "Return declares non-nullable 'ILogEventEnricher' but the returned value may be null (source annotation: 'Annotated'). Change the return type to '?ILogEventEnricher' or add an explicit non-null check at the interop boundary.",
+          "Start": 516,
+          "Length": 4,
+          "Line": 16,
+          "Column": 14,
+          "Propagated": false
+        },
+        {
+          "Code": "Calor0273",
+          "Message": "Return declares non-nullable 'ILogEventEnricher' but the returned value may be null (source annotation: 'Annotated'). Change the return type to '?ILogEventEnricher' or add an explicit non-null check at the interop boundary.",
+          "Start": 1713,
+          "Length": 8,
+          "Line": 54,
+          "Column": 16,
+          "Propagated": false
+        }
+      ],
+      "added": []
+    }
+  ],
+  "interpretation": "Removed unsupported nominal findings are not non-null or resolved classifications. No propagation, conversion success, source, opacity or denominator coordinate changed."
+}

@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "base": {
+    "mergedRevision": "894c591e9baf86958a6d7476f9793a08fe6cfb50",
+    "tree": "0b952b23ccca7a530415ecb23441cfb0c1ed0c9d",
+    "ciRun": 34889695512,
+    "ciMergeRevision": "5eb07272b5d14812abf11683288adf78bcadf414",
+    "artifactId": 10365614707
+  },
+  "candidate": {
+    "mergedRevision": "e3a84766dcc9f34c104445d1150552499c3d3ce3",
+    "implementationHead": "562259c528494ace7d5130dd6382f46b3b3f4a29",
+    "tree": "cc8caed0d4a897ca8bda3c7979b28e1fb8baa23b",
+    "ciRun": 34930956008,
+    "ciMergeRevision": "915bfb37181f0b18aa990ef5cc2c75b166c5b2ae",
+    "artifactId": 10381548516
+  },
+  "equivalence": {
+    "baseCiTreeEqualsMergedBase": true,
+    "candidateCiTreeEqualsMergedCandidate": true,
+    "host": ".NET 10.0.12; Ubuntu 24.04.5 LTS; X64",
+    "sdk": "10.0.401",
+    "roslynSha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+    "sameHost": true,
+    "sameRoslyn": true,
+    "sameSubjectOptions": true,
+    "sameInputPathsAndSourceHashes": true,
+    "sameCorpusSubmoduleRevisions": true,
+    "retryRule": "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. Compare paired attempts and retain every test identity/outcome. Any failed, missing, skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.",
+    "declaredAttemptsPerLeg": 1
+  },
+  "corpusRevisions": {
+    "MediatR": "fb309026775ef953a64fb5339d074426c1ad2c37",
+    "Serilog": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
+    "FluentValidation": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c"
+  },
+  "subjects": [
+    {
+      "project": "Synthetic",
+      "baseCounts": {"inventory": 5, "attempted": 5, "accepted": 5, "rejected": 0, "skipped": 0, "crashed": 0, "reverted": 0},
+      "candidateCounts": {"inventory": 5, "attempted": 5, "accepted": 5, "rejected": 0, "skipped": 0, "crashed": 0, "reverted": 0},
+      "baseFidelity": {"native": 5, "withLosses": 0, "failed": 0, "excluded": 0},
+      "candidateFidelity": {"native": 5, "withLosses": 0, "failed": 0, "excluded": 0},
+      "tests": {"baseline": {"passed": 52, "failed": 0, "skipped": 0}, "candidate": {"passed": 52, "failed": 0, "skipped": 0}},
+      "regressions": 0,
+      "verdict": "pass"
+    },
+    {
+      "project": "Synthetic2",
+      "baseCounts": {"inventory": 1, "attempted": 1, "accepted": 1, "rejected": 0, "skipped": 0, "crashed": 0, "reverted": 0},
+      "candidateCounts": {"inventory": 1, "attempted": 1, "accepted": 1, "rejected": 0, "skipped": 0, "crashed": 0, "reverted": 0},
+      "baseFidelity": {"native": 1, "withLosses": 0, "failed": 0, "excluded": 0},
+      "candidateFidelity": {"native": 1, "withLosses": 0, "failed": 0, "excluded": 0},
+      "tests": {"baseline": {"passed": 20, "failed": 0, "skipped": 0}, "candidate": {"passed": 20, "failed": 0, "skipped": 0}},
+      "regressions": 0,
+      "verdict": "pass"
+    },
+    {
+      "project": "MediatR",
+      "baseCounts": {"inventory": 32, "attempted": 32, "accepted": 30, "rejected": 2, "skipped": 0, "crashed": 0, "reverted": 0},
+      "candidateCounts": {"inventory": 32, "attempted": 32, "accepted": 30, "rejected": 2, "skipped": 0, "crashed": 0, "reverted": 0},
+      "baseFidelity": {"native": 18, "withLosses": 6, "failed": 8, "excluded": 0},
+      "candidateFidelity": {"native": 18, "withLosses": 6, "failed": 8, "excluded": 0},
+      "tests": {"baseline": {"passed": 155, "failed": 0, "skipped": 2}, "candidate": {"passed": 155, "failed": 0, "skipped": 2}},
+      "regressions": 0,
+      "verdict": "pass"
+    },
+    {
+      "project": "Serilog",
+      "baseCounts": {"inventory": 112, "attempted": 106, "accepted": 95, "rejected": 11, "skipped": 6, "crashed": 0, "reverted": 0},
+      "candidateCounts": {"inventory": 112, "attempted": 106, "accepted": 96, "rejected": 10, "skipped": 6, "crashed": 0, "reverted": 0},
+      "baseFidelity": {"native": 44, "withLosses": 13, "failed": 49, "excluded": 6},
+      "candidateFidelity": {"native": 44, "withLosses": 13, "failed": 49, "excluded": 6},
+      "tests": {"baseline": {"passed": 811, "failed": 0, "skipped": 0}, "candidate": {"passed": 811, "failed": 0, "skipped": 0}},
+      "regressions": 0,
+      "verdict": "pass"
+    },
+    {
+      "project": "FluentValidation",
+      "baseCounts": {"inventory": 139, "attempted": 139, "accepted": 119, "rejected": 20, "skipped": 0, "crashed": 0, "reverted": 0},
+      "candidateCounts": {"inventory": 139, "attempted": 139, "accepted": 120, "rejected": 19, "skipped": 0, "crashed": 0, "reverted": 0},
+      "baseFidelity": {"native": 92, "withLosses": 4, "failed": 43, "excluded": 0},
+      "candidateFidelity": {"native": 93, "withLosses": 4, "failed": 42, "excluded": 0},
+      "tests": {"baseline": {"passed": 865, "failed": 0, "skipped": 1}, "candidate": {"passed": 865, "failed": 0, "skipped": 1}},
+      "regressions": 0,
+      "verdict": "pass"
+    }
+  ],
+  "changedFiles": [
+    {
+      "subject": "FluentValidation",
+      "path": "src/FluentValidation/Validators/RegularExpressionValidator.cs",
+      "baseStatus": "CompileError",
+      "candidateStatus": "Replaced",
+      "baseDiagnostic": {
+        "code": "Calor0208",
+        "severity": "Error",
+        "line": 35,
+        "column": 45,
+        "endLine": 35,
+        "endColumn": 95,
+        "bindingDisposition": "CompilationError"
+      },
+      "classification": "preexisting-overload-resolution-failure-resolved",
+      "blocking": false
+    },
+    {
+      "subject": "Serilog",
+      "path": "src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs",
+      "baseStatus": "CompileError",
+      "candidateStatus": "EmitCompilationError",
+      "baseDiagnostic": {
+        "code": "Calor0208",
+        "severity": "Error",
+        "line": 115,
+        "column": 12,
+        "endLine": 115,
+        "endColumn": 66,
+        "bindingDisposition": "CompilationError"
+      },
+      "candidateProjectDiagnosticCounts": {
+        "CS8917": 6,
+        "CS0119": 2
+      },
+      "classification": "preexisting-failed-file-advanced-to-project-validation",
+      "blocking": false
+    }
+  ],
+  "diagnosticOnlyDeltas": [
+    {
+      "subject": "FluentValidation",
+      "path": "src/FluentValidation/IValidationContext.cs",
+      "status": "CompileError",
+      "baseErrors": [
+        "duplicate property Failures",
+        "duplicate property InstanceToValidate"
+      ],
+      "candidateAdditionalErrors": [
+        "Calor0208 constructor no-match at converted 83:9-83:14"
+      ],
+      "classification": "additional-diagnostic-inside-preexisting-rejected-file",
+      "blocking": false,
+      "disposition": "The file remains outside the accepted and converted denominators because of independent duplicate-property failures. The added constructor mismatch is retained as a Stage B/nominal-conversion limitation; it does not establish a new supported-file rejection or a scalar receiving-boundary regression."
+    },
+    {
+      "subject": "FluentValidation",
+      "path": "src/FluentValidation/Internal/MessageFormatter.cs",
+      "status": "CompileError",
+      "baseErrors": [
+        "untyped binding value"
+      ],
+      "candidateAdditionalErrors": [
+        "Calor0208 AppendArgument no-match at converted 29:12-29:58",
+        "Calor0208 AppendArgument no-match at converted 34:12-34:60"
+      ],
+      "classification": "additional-diagnostics-inside-preexisting-rejected-file",
+      "blocking": false,
+      "disposition": "The file remains rejected by its independent untyped-binding failure. Nullable-context preservation changes the modeled nullable signatures and exposes two unresolved Option/nullable-any overload mappings; these are retained inactive-shape conversion limitations, not newly rejected scalar Stage A controls."
+    }
+  ],
+  "diagnosticRenderingSubstitutions": {
+    "classification": "same-count-diagnostic-rendering-movement-inside-preexisting-rejected-files",
+    "blocking": false,
+    "files": [
+      "MediatR/Mediator.cs",
+      "FluentValidation/AssemblyScanner.cs",
+      "FluentValidation/TestHelper/ValidatorTestExtensions.cs",
+      "FluentValidation/ValidationException.cs",
+      "FluentValidation/Validators/EnumValidator.cs"
+    ],
+    "disposition": "Nullable-context preservation changes rendered signatures or source positions without adding an error identity, changing file status, or changing any accepted/rejected/coverage denominator. Retained for mechanism-level completeness."
+  },
+  "sourceArtifactSha256": {
+    "base": {
+      "FluentValidation": "a4a06de7e515a47bc78f2443afa204a1fa80585aada7ef7164b239c56a62ef13",
+      "MediatR": "efb60666bc1edbfbf3d9545de368294d61c4b25b0d4adf3eedb6f2f2b362a5ca",
+      "Serilog": "12fd5f6c7387043b883e9e0d9a988ec1ddacd9be2edb382884df95cfa460d152",
+      "Synthetic": "50c818ccb933e335180a2d2da62e314985b01c86be0b25ab24574d01a6e2003b",
+      "Synthetic2": "b6f6e075c197ffdfc9fb75217bba1a8ff7d96118220fe759eb1cd17729957d38"
+    },
+    "candidate": {
+      "FluentValidation": "37f5442ca30d4ed4cc3a0345c824c3417ba18a57d0e7f365ced2089b048e73e6",
+      "MediatR": "8b0ba57b0eb5f32bc0e8cc850c3570aebdcad8da87c0b5755b9eb796d3f72cc8",
+      "Serilog": "39d87739bce9446d1a2495e007266f211a3acb0b92e6663c00f0e66233f26a58",
+      "Synthetic": "60406948d4d5cd6cb66f77b8f94eaf3bb8d529513ccfe91af7ecc1ecb1e676fc",
+      "Synthetic2": "edb7819114a02652908c1fef2c0646bbb31e93c0666f59258fdad9394adc4260"
+    }
+  },
+  "artifactLimitation": "The immutable candidate reports retain an inherited sentence saying Calor0272/0273/0274 are AnalysisOnly. That sentence is stale for scalar STRING; the routing matrix and production tests are authoritative for the active scalar rows."
+}

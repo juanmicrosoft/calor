@@ -1,0 +1,1193 @@
+{
+ "schema": "calor/reproducible-build-hashes/2",
+ "packages": {
+  "Calor.Sdk.0.24.0.nupkg": {
+   "sha256": "157fc9cab9db1fe095c0b77a9ff264c8ea6186585bea6b964fb53afed41053bb",
+   "size": 59645118,
+   "entries": {
+    "Calor.Sdk.nuspec": {
+     "sha256": "aee1e336f52f6c6d78d80e248a074821e667a012dc96683ca8d563dcaf4a35a2",
+     "size": 1008,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "README.md": {
+     "sha256": "678fd3eaad08d42fd0952413ec1348bbda7675904fdd2130fded78a56b59632e",
+     "size": 8690,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "Sdk/Sdk.props": {
+     "sha256": "2d6888a348695b81d80289cd0d51557e4e007838471d8816ede82611e87b8bcf",
+     "size": 1148,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "Sdk/Sdk.targets": {
+     "sha256": "5f6672b238d32fe915e8f6a17de3735c64a80bd9bbb243cfbe8fdf9f019f44d9",
+     "size": 7344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "[Content_Types].xml": {
+     "sha256": "948d8d88e5115cc16ff93c3d7dec43b1406b60ccfb682bfdf603ec11268294b5",
+     "size": 838,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "_rels/.rels": {
+     "sha256": "46943ad4ac735745e356d24b0b3ea4703c68492c4b38775990faf39f50a2317e",
+     "size": 472,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "package/services/metadata/core-properties/nuget.psmdcp": {
+     "sha256": "1507b59ff0aea36970851a84d2ef63f166dee51ad0e6ea7ae1b049ee1d8b14ae",
+     "size": 803,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Calor.Runtime.dll": {
+     "sha256": "0cdadffc7c741a4496933d8e19423b69d14b84329ba0978cc3e671692488fbc2",
+     "size": 21504,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Calor.Tasks.deps.json": {
+     "sha256": "7afdafd8c6a42fd007e1749b9f9152575500dd2e6619baa063e238613e7b7efe",
+     "size": 15039,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Calor.Tasks.dll": {
+     "sha256": "eece68d163c7e429fd21483c3bda919866b663c0557e7d6812b4b5c414d9096b",
+     "size": 47104,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/DiffPlex.dll": {
+     "sha256": "421fd7d16c00206d6539ef4da7f2f64ef8a86e4b4f51e58fa0852907710eedbf",
+     "size": 22016,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.ApplicationInsights.dll": {
+     "sha256": "e91f818572b881c3907138927b2d81f7a0b71e74a52796ddb6e03db424ad35f3",
+     "size": 385976,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.CodeAnalysis.CSharp.dll": {
+     "sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+     "size": 6895408,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.CodeAnalysis.dll": {
+     "sha256": "ad857f1ce7f8e26c2722ade705fac3f90502a47590c14075df1327210f10b1ef",
+     "size": 3066128,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.Extensions.FileSystemGlobbing.dll": {
+     "sha256": "1769b1b6b291c2aa7038ae9f4eeb4727caf4943a9559f192a4ab567a0cb8cfad",
+     "size": 48432,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.NET.StringTools.dll": {
+     "sha256": "5d0784e9bc4756906fe69e51bbefef7a1348c3717510c1d365a31099d25ea44a",
+     "size": 33544,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.Z3.dll": {
+     "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+     "size": 260608,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.CommandLine.dll": {
+     "sha256": "2158cfc2c484ebdec95fd9959c7eecaebe44657e1e1dee5abb78fc971276829f",
+     "size": 205216,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.Configuration.ConfigurationManager.dll": {
+     "sha256": "df795025f207b4940ec9a48deddaedab3333b031b15303fda4f148b09c456d6d",
+     "size": 443168,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.Diagnostics.EventLog.dll": {
+     "sha256": "803ba4a0bd41b63b64248fee8c96ccfcecde72a16dc538d00fe1fd1db7517295",
+     "size": 53528,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.Security.Cryptography.ProtectedData.dll": {
+     "sha256": "e82875c8fdc739b3636fc1926012fa335bb706a7eefe05621b848f997a9b49e9",
+     "size": 38696,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Ulid.dll": {
+     "sha256": "7a59894feb2b3dd90cfc0cf605a81cfafe701ed718bf4bac94bdcb011a43fc51",
+     "size": 20992,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/calor.deps.json": {
+     "sha256": "8a136025fa99904c4f1f4892bde868917b077e7a92318e6824e9e913019ccc54",
+     "size": 9778,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/calor.dll": {
+     "sha256": "fd33e6fac11f21229246a3f7435a289bcacf16d23e576dc60239bd3047647325",
+     "size": 5277184,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/calor.runtimeconfig.json": {
+     "sha256": "9950d4583cfc9a106857c0d5b8a75b53e8774852b57b80bc3823a74d44a4d87f",
+     "size": 330,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/linux-arm64/native/libz3.so": {
+     "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+     "size": 30884960,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/linux-x64/native/libz3.so": {
+     "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+     "size": 34714776,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/osx-arm64/native/libz3.dylib": {
+     "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+     "size": 25891768,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win-arm64/native/libz3.dll": {
+     "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+     "size": 17616896,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win-x64/native/libz3.dll": {
+     "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+     "size": 17730560,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win/lib/net9.0/System.Diagnostics.EventLog.Messages.dll": {
+     "sha256": "aa8cb35d10093fe4bda643acd30efb70ab539b7d079249414340f03aa8d641e3",
+     "size": 801064,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win/lib/net9.0/System.Diagnostics.EventLog.dll": {
+     "sha256": "2b887c2df82ea96bdc1a48b15ad448f7fd4d384732c6bf7050397598c078c412",
+     "size": 174896,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  "calor.0.24.0.nupkg": {
+   "sha256": "d59aea56abb0e89125805686c59b616e47614ecea9a1c9b5fcbc9fb929401cc5",
+   "size": 61983255,
+   "entries": {
+    "README.md": {
+     "sha256": "68f973d959bbe91b5c8a34c42671899b7672f0645f57098cc39a40e57c507a0f",
+     "size": 1519,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "[Content_Types].xml": {
+     "sha256": "7b7f0ad0e64f6e809c667c23a9598f01c6db3c9a78c4eeddad5d48b3f6ea0b85",
+     "size": 894,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "_rels/.rels": {
+     "sha256": "32f4842c16dd4aabbfe3a22f7db9259aed861c6f6c9b2ee14461146783b8d3b0",
+     "size": 468,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "calor.nuspec": {
+     "sha256": "a0e93e53e723dbaa02a683f5661c6bb72a348c3b48cd5167bdaf0db0fa9d4404",
+     "size": 909,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "icon.png": {
+     "sha256": "f853d4a794d85a98dfdd6877b4d892d2d10b34130557a9ecb73778936d1dab5a",
+     "size": 42542,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "package/services/metadata/core-properties/nuget.psmdcp": {
+     "sha256": "42fcbd72a3be178f9561b84dd69b132c6ff222ccdd3593c3e53357f004096896",
+     "size": 698,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Calor.Runtime.dll": {
+     "sha256": "0cdadffc7c741a4496933d8e19423b69d14b84329ba0978cc3e671692488fbc2",
+     "size": 21504,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Calor.Runtime.pdb": {
+     "sha256": "9e2295ee5697b62d25aa4e5bf9878533605f48786161418ebd96a6007a228966",
+     "size": 15060,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/DiffPlex.dll": {
+     "sha256": "421fd7d16c00206d6539ef4da7f2f64ef8a86e4b4f51e58fa0852907710eedbf",
+     "size": 22016,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/DotnetToolSettings.xml": {
+     "sha256": "a9987971e3a9ebc0c73cdaefc8ca4cf1bafa412632526b4e99d6e481ca4c54e9",
+     "size": 181,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.ApplicationInsights.dll": {
+     "sha256": "e91f818572b881c3907138927b2d81f7a0b71e74a52796ddb6e03db424ad35f3",
+     "size": 385976,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.CodeAnalysis.CSharp.dll": {
+     "sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+     "size": 6895408,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.CodeAnalysis.dll": {
+     "sha256": "ad857f1ce7f8e26c2722ade705fac3f90502a47590c14075df1327210f10b1ef",
+     "size": 3066128,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.Extensions.FileSystemGlobbing.dll": {
+     "sha256": "1769b1b6b291c2aa7038ae9f4eeb4727caf4943a9559f192a4ab567a0cb8cfad",
+     "size": 48432,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.Z3.dll": {
+     "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+     "size": 260608,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/System.CommandLine.dll": {
+     "sha256": "2158cfc2c484ebdec95fd9959c7eecaebe44657e1e1dee5abb78fc971276829f",
+     "size": 205216,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Ulid.dll": {
+     "sha256": "7a59894feb2b3dd90cfc0cf605a81cfafe701ed718bf4bac94bdcb011a43fc51",
+     "size": 20992,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.deps.json": {
+     "sha256": "8a136025fa99904c4f1f4892bde868917b077e7a92318e6824e9e913019ccc54",
+     "size": 9778,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.dll": {
+     "sha256": "fd33e6fac11f21229246a3f7435a289bcacf16d23e576dc60239bd3047647325",
+     "size": 5277184,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.pdb": {
+     "sha256": "388b5046043ec58101f33790d5295167817d9fd2826a3ca816a3f026f471781b",
+     "size": 1371460,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.runtimeconfig.json": {
+     "sha256": "9950d4583cfc9a106857c0d5b8a75b53e8774852b57b80bc3823a74d44a4d87f",
+     "size": 330,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/cs/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "96841406a8fffdc7e4f82048939eb5193d0e53454119368a4e8266bdddfedea3",
+     "size": 446216,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/cs/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "8640bd05a77d031c3e106b98a368e4f51618e2aacf1027f9e0e28b260997839f",
+     "size": 40752,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/cs/System.CommandLine.resources.dll": {
+     "sha256": "80a66497a01e9ea5be7d68ce19069719751c4b720f9774660c09ab33ac8f8e6e",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/de/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "f2ef12aae4aff749ed5963075da86aa8fd3dec43890e5fd7b00bc227daad28b6",
+     "size": 476936,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/de/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "94d6757fb39d637408cae00569779a58ed5ba91cfe17484b7d9c37b5e686ea85",
+     "size": 42248,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/de/System.CommandLine.resources.dll": {
+     "sha256": "3dfa07de8267c771be47a10217e2eafd0e57e68933c536a239b65284dc6f09da",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/es/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "be4dc7f5d2b6c074601d4acf1404350fad40196d8edb0a4e3d04d59ea3dd530d",
+     "size": 466704,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/es/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "99940d1871054ae5bbd831d93f827bf3f46cfac13ec637d630be4490ce80e537",
+     "size": 41736,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/es/System.CommandLine.resources.dll": {
+     "sha256": "4283743428f7abb509eab0d523d8000ee7a89fd354dc1db96dc8424b37ce714f",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/fr/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "cb54a8579e7d85a17e08bb72b1a675264ee92f51b00a1d5e9a3b88367da85ef9",
+     "size": 480016,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/fr/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "6034effb82164c43030f0452400b537d8955b1e9a84b7ae76e5f7a1f7fecf728",
+     "size": 42288,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/fr/System.CommandLine.resources.dll": {
+     "sha256": "e52478e38b6ac9ecd85999aa5ad181097c41833c9adba62b87bd9fa443b2a8ea",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/it/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "683c808be9efd6c87ce6a7de06d7fc8df152324db3d72bdcffce209a382a75ae",
+     "size": 472848,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/it/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "d1ed76fd23fac3e03ba72ebb66b129f7dc2771cdf9d8ba441b2dd4046dccb769",
+     "size": 42256,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/it/System.CommandLine.resources.dll": {
+     "sha256": "291da56b4c02bded6ad0e707999370b1e6ad592b74c4691e299c8097fbe44f97",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ja/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "dddc1b5e4a5492699e66596d5398e3ba7aeff0c1a4417baede5a44f8419f8967",
+     "size": 521488,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ja/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "06baf68aeeee8eed6a6d6e8ce9036ef3edcfeb12de876583eddb8eaec60db2bb",
+     "size": 44848,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ja/System.CommandLine.resources.dll": {
+     "sha256": "8b03127957ea51ca2c4e17512d9b84fb545b6c6995047e96c7c1b674d2a3fc83",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ko/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "3d6defb5ce07fd17cb00ca5633e57a3a65e5ab7967732d506af1a16e09f0baa0",
+     "size": 477968,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ko/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "0166f80f1a55d947ca4151cb70f36f0cead39fad1fcf648ebe2419c3de1f9538",
+     "size": 42288,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ko/System.CommandLine.resources.dll": {
+     "sha256": "b4d7904ec3b87b632cec7fd479c6feb063caa7394c79c7f5165df506a45ee0ba",
+     "size": 19344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pl/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "a9387ec315713a7e32861425159954939e6139b6dee171feb785b27d1d31ca85",
+     "size": 479536,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pl/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "f87d2a495d891868696e24c725d2c480779757df7e3bd22bc66ae927228f181a",
+     "size": 42288,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pl/System.CommandLine.resources.dll": {
+     "sha256": "5a51caed53a75d8339df176c8f5118cf609f38e73e39097c6d7edf73721678a0",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "a7c1c4307ac34be111639f5addfa1729725fe7748703ff24add55d4bda35851b",
+     "size": 458512,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pt-BR/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "95f373f7055ac0342c2a116710688015ea3a662cc19b8aa66c5484409aa49369",
+     "size": 41272,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pt-BR/System.CommandLine.resources.dll": {
+     "sha256": "8fd9272f780e6d46d69ff25bf320e7a5caf5d61fbfb0c89781fbc8f64dab6596",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ru/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "e180f350d6b38a19464045c2b1f0c3e409d303843e02321b8bfcf61d0616d513",
+     "size": 629512,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ru/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "34b77c23625160b340098b33045997138ff042ca87fccf90f9bfab9deb132f8a",
+     "size": 50448,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ru/System.CommandLine.resources.dll": {
+     "sha256": "a56ee9d0fd2254b0581f256495b61cc24135a3f1fffdb4edd70db87eff6db3ab",
+     "size": 19344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/linux-arm64/native/libz3.so": {
+     "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+     "size": 30884960,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/linux-x64/native/libz3.so": {
+     "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+     "size": 34714776,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/osx-arm64/native/libz3.dylib": {
+     "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+     "size": 25891768,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/win-arm64/native/libz3.dll": {
+     "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+     "size": 17616896,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/win-x64/native/libz3.dll": {
+     "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+     "size": 17730560,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/tr/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "c31ef90f3205755bac7b531c92d2ce790f78950a360f438856222593ebddc784",
+     "size": 453392,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/tr/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "32cb2b00f6460aaa372930b25adc772709e9d93ea983a6ca295ff5bc1c6b7472",
+     "size": 41264,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/tr/System.CommandLine.resources.dll": {
+     "sha256": "795abf08b10483a5d58a95dda7190fa62cfa56bfe91fba84dc71ff4918f6ef21",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "b8b3c8a39143420dfecb2f64e51bb53613f554f1847a23245e8edd402a3cc9b1",
+     "size": 404232,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hans/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "2555883f0feefe4491755e37feb6cb03e75d2448a88081270b5f240f5673e8d0",
+     "size": 38160,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hans/System.CommandLine.resources.dll": {
+     "sha256": "b964e741986ad049f2a66daffdfb4a44a1d2a63852245ee95ffc429ee6887891",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "a1b9563e0b16da3afa1bb80514bb3d93282208b9ac14d4afa9a429369a7d89a0",
+     "size": 404232,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hant/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "d8fb1c7d7135620d9d5ac330cc97face8912cd0afdd53c72ebd7875d3534b559",
+     "size": 38672,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hant/System.CommandLine.resources.dll": {
+     "sha256": "5536a72bf99553442693acd0bdfa5d0f8f892a422f088e3b4c612ea284c85fb9",
+     "size": 19344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  }
+ },
+ "releaseMetadata": {
+  "calor-nuget-5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d.provenance.json": "8e4be880a4f0b7dcf323150395ae06b70e3f864a6c26a966c1da9302b0a5a516",
+  "calor-nuget-5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d.sbom.spdx.json": "ebbd1f2b60a18f0f1d4886c68447d79cca6b6f101701258f9ab68da5323ba77e"
+ },
+ "website": null,
+ "toolchain": {
+  "os": "Linux x86_64",
+  "dotnet": "10.0.401",
+  "dotnetSdkBuild": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465",
+  "node": "v22.23.3",
+  "npm": "10.9.9"
+ }
+}

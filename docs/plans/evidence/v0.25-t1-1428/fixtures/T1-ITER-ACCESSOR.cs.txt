@@ -1,0 +1,83 @@
+// 0.25 T1 (#1428) shared control: iterator-accessor fallback. An iterator property and an
+// iterator indexer log when their bodies run, so laziness (nothing runs before the first
+// MoveNext), interleaving with the consumer, finally-on-dispose after an early break, and an
+// exception on a later MoveNext are all observable. A plain method in the same class must
+// still convert.
+using System;
+using System.Collections.Generic;
+
+public class Feed
+{
+    public static string log = "";
+
+    public int Plain(int x)
+    {
+        return x + 1;
+    }
+
+    public IEnumerable<int> Items
+    {
+        get
+        {
+            log = log + "<";
+            try
+            {
+                yield return 1;
+                log = log + "m";
+                yield return 2;
+                yield return 3;
+            }
+            finally
+            {
+                log = log + ">";
+            }
+        }
+    }
+
+    public IEnumerable<string> this[int n]
+    {
+        get
+        {
+            for (int i = 0; i < n; i++)
+            {
+                log = log + "i";
+                if (i == 2)
+                {
+                    throw new InvalidOperationException("late" + i);
+                }
+                yield return "v" + i;
+            }
+        }
+    }
+}
+
+public static class Probe
+{
+    public static string Run()
+    {
+        var feed = new Feed();
+        var lazy = feed.Items;
+        Feed.log = Feed.log + "c";
+        foreach (var x in lazy)
+        {
+            Feed.log = Feed.log + x;
+            if (x == 2)
+            {
+                break;
+            }
+        }
+        string seen = "";
+        try
+        {
+            foreach (var s in feed[5])
+            {
+                seen = seen + s;
+            }
+        }
+        catch (InvalidOperationException e)
+        {
+            seen = seen + ":" + e.Message;
+        }
+        return feed.Plain(1) + "|" + seen + "|" + Feed.log;
+    }
+}

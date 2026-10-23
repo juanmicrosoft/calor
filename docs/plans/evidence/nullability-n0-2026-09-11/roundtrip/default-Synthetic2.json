@@ -1,0 +1,169 @@
+{
+  "project": "Synthetic2",
+  "calor_version": "0.20.0",
+  "timestamp": "2026-09-11T16:18:00.8078890\u002B00:00",
+  "duration_seconds": 15.452376,
+  "verdict": "pass",
+  "gate_failures": [],
+  "inconclusive": false,
+  "baseline": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0
+  },
+  "round_trip": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0
+  },
+  "regressions": 0,
+  "ignored_upstream_flakes": {
+    "regressions": [],
+    "baseline_failures": []
+  },
+  "files": {
+    "total": 1,
+    "replaced": 1,
+    "reverted": 0,
+    "conversion_failed": 0,
+    "conversion_timed_out": 0,
+    "emit_error": 0,
+    "emit_compilation_error": 0,
+    "compile_error": 0,
+    "crashed": 0,
+    "excluded_by_pattern": 0
+  },
+  "avg_conversion_rate": 1,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 1,
+      "converted_native": 1,
+      "converted_with_losses": 0,
+      "reverted": 0,
+      "failed_conversion": 0,
+      "excluded_files": 0,
+      "coverage_fraction": 1,
+      "native_fraction": 1,
+      "loss_kind_counts": {},
+      "total_interop_blocks": 0,
+      "distinct_gaps": [],
+      "minimum_coverage_fraction": 0.25,
+      "minimum_native_fraction": 0.25
+    },
+    "build": {
+      "baseline_succeeded": true,
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 0,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 20,
+      "baseline_passed": 20,
+      "baseline_failed": 0,
+      "baseline_trx_files": 1,
+      "baseline_console_fallback": false,
+      "round_trip_total": 20,
+      "round_trip_passed": 20,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 1,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 0,
+      "ignored_flaky_regressions": 0,
+      "ignored_flaky_baseline_failures": 0,
+      "ignored_flaky_round_trip_failures": 0,
+      "comparison_status": "Pass"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "GeoLib/Grid.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net10.0",
+      "language_version": "CSharp14",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET10_0",
+        "NET10_0_OR_GREATER",
+        "NET5_0_OR_GREATER",
+        "NET6_0_OR_GREATER",
+        "NET7_0_OR_GREATER",
+        "NET8_0_OR_GREATER",
+        "NET9_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/68da903d/GeoLib/GeoLib.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net10.0",
+          "LanguageVersion": "CSharp14",
+          "DocumentationMode": "Parse",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET10_0",
+            "NET10_0_OR_GREATER",
+            "NET5_0_OR_GREATER",
+            "NET6_0_OR_GREATER",
+            "NET7_0_OR_GREATER",
+            "NET8_0_OR_GREATER",
+            "NET9_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/68da903d/GeoLib.Tests/GeoLib.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/68da903d/GeoLib/GeoLib.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/68da903d/GeoLib/GeoLib.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net10.0",
+              "GlobalProperties": {
+                "Configuration": "Debug"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/68da903d/GeoLib.Tests/GeoLib.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/68da903d/GeoLib/GeoLib.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    }
+  ]
+}

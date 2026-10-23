@@ -1,0 +1,161 @@
+{
+ "schema": "c2-1424/claim-registry/2",
+ "issue": 1424,
+ "status": "REGISTERED",
+ "statusNote": "The section 8 claim registry for candidate 5e52d8ab. It becomes frozen when this PR (the #1424 raw-artifact freeze of regeneration 2) merges; #1408 cannot add, drop, or rename a claim after that. It supersedes the regeneration-1 draft (docs/plans/evidence/c2-1424/claim-registry.json, candidate 696ab824, never frozen).",
+ "candidate": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "rule": "Contract 1.4.0 section 8 Required subjects: at the #1424 raw-artifact freeze, #1424 commits the claim registry (every public or release claim the milestone intends to make); #1408 cannot add, drop, or rename a claim. R2 reads {\"claims\": [\"claim:<id>\", ...]} (scripts/verify_release_adjudication.py claim_registry).",
+ "scope": "The claims the 0.24.0 release makes, taken from the candidate's CHANGELOG.md [0.24.0] section (rendered byte-identically as the GitHub release-notes candidate and as the website changelog page). Each substantive statement of fact or behavior is one claim; restatements of the same behavior share an id. Pre-0.24 website and changelog content is historical (inventory: changelog historical-only) and is not registered as a 0.24 claim. Drafted by the C2 agent from the final notes; the maintainer reviews it in this PR.",
+ "source": {
+  "path": "CHANGELOG.md",
+  "section": "## [0.24.0] - 2026-10-07",
+  "renderedNotesSha256": "578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5",
+  "renderedNotesR2TextDigest": "05b8c2194efdd9756b1e92e197ae3de9d4c9c10d13c2c4b3465d54b62bdb192f",
+  "lineCoordinates": "details.*.lines are 1-based line numbers in the rendered notes (local/clone-a/release-notes.md, the awk extract of the CHANGELOG.md [0.24.0] section; its first line is CHANGELOG.md line 7)."
+ },
+ "claims": [
+  "claim:release-adds-no-syntax",
+  "claim:release-history-0.22-0.23",
+  "claim:evidence-bounded-not-independent",
+  "claim:no-benchmark-results-published",
+  "claim:advisory-7-false-proofs-in-4-areas",
+  "claim:sweep-limits",
+  "claim:all-34-findings-fixed-or-demoted",
+  "claim:obligation-stale-facts-demoted",
+  "claim:cache-literal-width-fixed",
+  "claim:interface-checks-throwing-preconditions",
+  "claim:non-ascii-solver-symbols-escaped",
+  "claim:warning-calor0819-added",
+  "claim:reproducible-release-evidence-and-gate",
+  "claim:benchmark-publication-refuses-incomparable",
+  "claim:agent-refactoring-job-no-commit",
+  "claim:historical-benchmark-numbers-labeled",
+  "claim:z3-single-verified-path-five-rids",
+  "claim:fixture-checks-truthful",
+  "claim:numeric-forms-refused-or-demoted",
+  "claim:differential-totals-429-156-585",
+  "claim:text-utf16-code-units",
+  "claim:nested-quantifier-unsupported",
+  "claim:determinism-causes-fixed",
+  "claim:unreachable-counterexamples-withheld",
+  "claim:empty-clause-body-fixed",
+  "claim:cache-format-1.22",
+  "claim:packages-and-website-reproducible",
+  "claim:binding-performance-restored"
+ ],
+ "details": {
+  "claim:release-adds-no-syntax": {
+   "lines": "3-4",
+   "text": "Calor 0.24 is a soundness release ... It adds no new syntax."
+  },
+  "claim:release-history-0.22-0.23": {
+   "lines": "6-9",
+   "text": "First release on NuGet since 0.21.0; 0.22.0 never reached NuGet (publish skipped after performance tests failed); milestone 0.23 shipped no code."
+  },
+  "claim:evidence-bounded-not-independent": {
+   "lines": "11-13",
+   "text": "The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs; no independent party adjudicated or verified it; every 0.24 evidence claim is at most bounded."
+  },
+  "claim:no-benchmark-results-published": {
+   "lines": "13",
+   "text": "No benchmark results are published with this release."
+  },
+  "claim:advisory-7-false-proofs-in-4-areas": {
+   "lines": "15-44",
+   "text": "The sweep found 7 false proofs in 4 areas in each of 0.21.0 (NuGet) and v0.22.0 (source); 3 removed runtime checks, 4 wrong interface acceptances; the published 0.21.0 package is unchanged."
+  },
+  "claim:sweep-limits": {
+   "lines": "54-65",
+   "text": "710 cases per build, macOS arm64, run twice with the same verdicts and findings (one counterexample differed, both violating); 79 of 100 rows found no counterexample, 44 of those contain no proven case; 7 rows not run; whole-compiler soundness not established."
+  },
+  "claim:all-34-findings-fixed-or-demoted": {
+   "lines": "67-72",
+   "text": "The other 27 findings per build (8 true proofs of forbidden forms, 17 spurious refutations, 2 stale cache verdicts) plus the 7 false proofs: 0.24.0 fixes or visibly demotes all 34; a demoted form keeps its runtime check."
+  },
+  "claim:obligation-stale-facts-demoted": {
+   "lines": "24-28, 255-271",
+   "text": "Obligations no longer use facts an assignment made stale; the obligation is Unsupported (Calor1124) and the runtime check stays; new facts for else/elseif and named refinement parameters."
+  },
+  "claim:cache-literal-width-fixed": {
+   "lines": "29-32, 291-296",
+   "text": "The verification cache key includes literal width, signedness, and real kind; INT:1 vs LONG:1 is refuted as it should be."
+  },
+  "claim:interface-checks-throwing-preconditions": {
+   "lines": "33-44, 272-289",
+   "text": "Interface contract checks model throwing preconditions: null-string cases are Assumed with Calor0819, the remainder case is refuted with Calor0810 (x = 3, y = 0); Calor0816/Calor0814 behavior as described."
+  },
+  "claim:non-ascii-solver-symbols-escaped": {
+   "lines": "46-48, 185-188",
+   "text": "Z3 symbol names for non-ASCII identifiers are escaped to ASCII (#1493); the Windows collision was not observed in practice."
+  },
+  "claim:warning-calor0819-added": {
+   "lines": "76-78",
+   "text": "New warning Calor0819 ('Assumed, not proven') for interface contract checks."
+  },
+  "claim:reproducible-release-evidence-and-gate": {
+   "lines": "79-82",
+   "text": "The repository records the evidence contract, the registered sweep and results, a disposition for every finding, and a determinism protocol; a release can be published only through a gate that checks one adjudication record (#1410)."
+  },
+  "claim:benchmark-publication-refuses-incomparable": {
+   "lines": "86-102",
+   "text": "The benchmark workflow proposes one headline built only from the B1 packet and fails, opening no PR, on non-EQUIVALENT included pairs, changed pairs, an unamended method change, a differing regenerated packet, or a provenance commit that is not a full SHA on main; allow_weaker_methodology removed. The gate's freshness check covers only the headline's inputs (B1 packet and results, contract, sealed files, the 452 registered pair files and the benchmark corpus, the generator, the validator, the gate); the headline bytes depend only on the release commit."
+  },
+  "claim:agent-refactoring-job-no-commit": {
+   "lines": "127-128",
+   "text": "The agent refactoring job no longer commits to main and fails when it cannot read a pass rate."
+  },
+  "claim:historical-benchmark-numbers-labeled": {
+   "lines": "129-130",
+   "text": "Older website benchmark numbers stay published, labeled not comparable under the 0.24 method."
+  },
+  "claim:z3-single-verified-path-five-rids": {
+   "lines": "131-135",
+   "text": "Z3 natives reach every consumer through one verified build step; packages carry linux-x64, linux-arm64, osx-arm64, win-x64, win-arm64."
+  },
+  "claim:fixture-checks-truthful": {
+   "lines": "136-140",
+   "text": "The fixture script says it compiles each fixture once; explicit expectations for 509 tracked .calr fixtures: 428 compile, 51 must be rejected, 30 known failures never count as passes."
+  },
+  "claim:numeric-forms-refused-or-demoted": {
+   "lines": "144-171",
+   "text": "Narrow (<32-bit) arithmetic Unsupported (D1); out-of-range INT: literals Unsupported (D2), including whole-loop k-induction; checked-arithmetic postconditions Assumed unless a fixed operand-width rule shows no overflow (no solver query)."
+  },
+  "claim:differential-totals-429-156-585": {
+   "lines": "167-169",
+   "text": "In the verifier-runtime differential report, 6 of 1,170 cases move from Proven to Assumed; totals 429 Proven, 156 Assumed, 585 refuted."
+  },
+  "claim:text-utf16-code-units": {
+   "lines": "175-193",
+   "text": "String literals reach Z3 as UTF-16 code units; backslash not a Z3 escape; Substring range conditions; IndexOf with a start index Unsupported; null-satisfiable precondition sets are Unsupported, not vacuous."
+  },
+  "claim:nested-quantifier-unsupported": {
+   "lines": "194-203",
+   "text": "A quantifier nested in another is not verified (Unsupported, runtime check kept, never cached); a k-induction invariant with an unparseable conjunct is not reported proven."
+  },
+  "claim:determinism-causes-fixed": {
+   "lines": "205-228",
+   "text": "Three causes of run-to-run and platform-dependent verdicts are fixed (fresh Z3 context per query, Windows string encoding, USERPROFILE for the user-level cache); whether the verifier is deterministic on every supported platform is decided by the registered determinism protocol (#1421), which runs after this change.",
+   "c2Note": "The candidate-time protocol execution is C2's lane ci-determinism; see ledger.json."
+  },
+  "claim:unreachable-counterexamples-withheld": {
+   "lines": "230-253",
+   "text": "Failed obligations are reported as Calor1124 (unsupported, runtime check kept) when something evaluated before may throw or the obligation reads a property; these checks never make an obligation proven or discharged."
+  },
+  "claim:empty-clause-body-fixed": {
+   "lines": "298-312",
+   "text": "An empty clause body no longer swallows the next statement (#1485), for every construct with an indented body."
+  },
+  "claim:cache-format-1.22": {
+   "lines": "51-52, 173-174, 192-193, 224-225, 295-296",
+   "text": "The verification cache format is 1.22; older entries are invalidated and recomputed."
+  },
+  "claim:packages-and-website-reproducible": {
+   "lines": "103-126",
+   "text": "The NuGet packages, the release metadata, and the website build byte-for-byte the same from one commit when both builds use the same .NET SDK build (Microsoft's SDK 10.0.401 and Homebrew's differ); the site still downloads fonts from Google Fonts at build time; six causes fixed (fixed pack timestamp, /_/ source paths, build id calor-<version>-<commit12>, path-free webpack module ids, [contenthash] entry names, sorted docs listing); reproducible-builds.yml builds twice and fails on any difference."
+  },
+  "claim:binding-performance-restored": {
+   "lines": "314-325",
+   "text": "Name binding no longer copies the module-wide symbol table at every loop: the 200x200 synthetic module binds in 0.2 s (was 14.5 s); bound tree, diagnostics, symbol ids and order, and generated C# unchanged; fixes Binding_MediumModule_Under500ms; two smaller module-wide costs remain."
+  }
+ }
+}

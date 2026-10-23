@@ -1,0 +1,324 @@
+{
+  "description": "Copy-time SHA-256 of retained contributor artifacts and parent validation before editorial qualifications; not final-tree hashes. The full failed TRX is losslessly gzipped.",
+  "files": [
+    {
+      "path": "N4-corpus-delta-classification.md",
+      "sha256": "518c7d993c3b2d358628c3a74f8f85d94f99bc84d16b1d8bede0b124650dbbab",
+      "bytes": 19191
+    },
+    {
+      "path": "delta-summary.json",
+      "sha256": "caf9599a70b1328f8eae75089ce6de1faf0ecd7fd7f55fe797ed08fbc717b06e",
+      "bytes": 4579
+    },
+    {
+      "path": "PUBLICATION-SELECTION.md",
+      "sha256": "919bc04aa11e0d875d48154e339b699dc429f5fceb72414531cc4661430fb85c",
+      "bytes": 5857
+    },
+    {
+      "path": "baseline/binder-incomplete-baseline.actual8f.json",
+      "sha256": "f8baeede338ddea42dcec2cfe20a30941872f5a5c16e352b0c2b8f196f0f9cf6",
+      "bytes": 2278
+    },
+    {
+      "path": "baseline/binder-source-coverage.actual8f.json",
+      "sha256": "528963b54195e7a3f82cee0f437960ccdf920a661cebfe5011fc3d42263aeabe",
+      "bytes": 572063
+    },
+    {
+      "path": "baseline/calor0425-corpus-ledger.actual8f.json",
+      "sha256": "8e5f6ba4a3818f4eee65f311c6d3ce25b27c3c4723d526317eac6668f208a411",
+      "bytes": 12010
+    },
+    {
+      "path": "candidate-pre/binder-incomplete-baseline.json",
+      "sha256": "f8baeede338ddea42dcec2cfe20a30941872f5a5c16e352b0c2b8f196f0f9cf6",
+      "bytes": 2278
+    },
+    {
+      "path": "candidate-pre/binder-source-coverage.json",
+      "sha256": "528963b54195e7a3f82cee0f437960ccdf920a661cebfe5011fc3d42263aeabe",
+      "bytes": 572063
+    },
+    {
+      "path": "candidate-pre/calor0425-corpus-ledger.json",
+      "sha256": "cfeb9eb02c2cae1cd455bce1884decd3f1527e3123e38a2d993fa9167a61da5f",
+      "bytes": 12010
+    },
+    {
+      "path": "candidate-post/binder-incomplete-baseline.json",
+      "sha256": "f8baeede338ddea42dcec2cfe20a30941872f5a5c16e352b0c2b8f196f0f9cf6",
+      "bytes": 2278
+    },
+    {
+      "path": "candidate-post/binder-source-coverage.json",
+      "sha256": "fdc5b517320a4a058139d9594f133e4f007d9f07f3ddeab1d17181a5b6b5e88f",
+      "bytes": 572063
+    },
+    {
+      "path": "candidate-post/calor0425-corpus-ledger.json",
+      "sha256": "7773fc9f05f2fa01c1bc2e04b448d4054f611f42a67586a2ab4efd65798da247",
+      "bytes": 11954
+    },
+    {
+      "path": "probe/CorpusProbe.csproj",
+      "sha256": "345f90c1e2fbbb84280a0680b17bcf5291e7ab279b37ecfe3859f4b953c971a6",
+      "bytes": 414
+    },
+    {
+      "path": "probe/Program.cs",
+      "sha256": "4d27f4532f712ce35b82321ed29f0acf15bf19b20081a2edeb6143f6562b44ac",
+      "bytes": 9920
+    },
+    {
+      "path": "probe-results-v2/corpus-probes-v2-summary.json",
+      "sha256": "8921a4030fd631dc3d426a5f2f980f1ebb329e5f1dbe2b9d01a872dff8770e66",
+      "bytes": 1908
+    },
+    {
+      "path": "probe-results-v2/baseline-LogEventProperty-v2.json",
+      "sha256": "0f79ca73dc13307f3af572beec8d26272c0e2c89e5e30f16a321fc256c85604e",
+      "bytes": 10000
+    },
+    {
+      "path": "probe-results-v2/candidate-LogEventProperty-v2.json",
+      "sha256": "e0e755f63b1d23b3af4cc1ab871fc249595e3a2ffaae6e4cb405ad56925e8749",
+      "bytes": 13941
+    },
+    {
+      "path": "probe-results-v2/baseline-JsonValueFormatter-v2.json",
+      "sha256": "258183ba49fb411daf7a6088bd5be1346041d2938f187a01ea4709a4af1acf76",
+      "bytes": 277129
+    },
+    {
+      "path": "probe-results-v2/candidate-JsonValueFormatter-v2.json",
+      "sha256": "667ff23d845c82b362872aa1282adfbc9759d275157baf7a08e200453e6471af",
+      "bytes": 281441
+    },
+    {
+      "path": "logs/baseline-LogEventProperty-probe-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "logs/candidate-LogEventProperty-probe-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "logs/baseline-JsonValueFormatter-probe-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "logs/candidate-JsonValueFormatter-probe-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "native-controls/NativeBoundaryProbe.csproj",
+      "sha256": "345f90c1e2fbbb84280a0680b17bcf5291e7ab279b37ecfe3859f4b953c971a6",
+      "bytes": 414
+    },
+    {
+      "path": "native-controls/Program.cs",
+      "sha256": "7fa5d48459f32164d360b725a1a3f811aaa67573d7829a78e34bedca9b6a75d1",
+      "bytes": 13547
+    },
+    {
+      "path": "control-results-v2/native-boundary-controls-v2-summary.json",
+      "sha256": "c0a1bc308b26d9dfceea757ae6f5823a307a0e02040e15274714be529109d01a",
+      "bytes": 53339
+    },
+    {
+      "path": "control-results-v2/baseline-native-boundary-controls-v2.json",
+      "sha256": "d254ca01fb4133a9fc234c2855e392f83f3268d94296f9973b3792e3b3bc397d",
+      "bytes": 46232
+    },
+    {
+      "path": "control-results-v2/candidate-native-boundary-controls-v2.json",
+      "sha256": "c3e65d124b990735512e5f45eb5fb392d22c96e63431c9901f5c8be3fc380504",
+      "bytes": 48131
+    },
+    {
+      "path": "logs/baseline-native-boundary-controls-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "logs/candidate-native-boundary-controls-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "metadata/README.md",
+      "sha256": "3409f77a528959b568f079b7e834a661ba4975ea854863517f77fb315ad14848",
+      "bytes": 455
+    },
+    {
+      "path": "metadata/baseline-metadata-reference-profile.json",
+      "sha256": "8ca8fccf87558390d3099bc65728db84ac7ba8a3a9cd3d18e9f762e0e1bedcde",
+      "bytes": 30239
+    },
+    {
+      "path": "metadata/candidate-metadata-reference-profile.json",
+      "sha256": "72d760123849e63dca3a8e080df7fd42b23be9550d17a8c144c6d129de91b01f",
+      "bytes": 30240
+    },
+    {
+      "path": "metadata-realized-probe/MetadataRealizedProbe.csproj",
+      "sha256": "345f90c1e2fbbb84280a0680b17bcf5291e7ab279b37ecfe3859f4b953c971a6",
+      "bytes": 414
+    },
+    {
+      "path": "metadata-realized-probe/Program.cs",
+      "sha256": "225734305b4020a53a5c83d69ed43995e686efa2a571705023abb35d8446de63",
+      "bytes": 4734
+    },
+    {
+      "path": "metadata-realized/metadata-realized-summary.json",
+      "sha256": "06793b1e9c01ff784e42eb87c75251980bdd18938b326c547d425c337f7b0eef",
+      "bytes": 2878
+    },
+    {
+      "path": "metadata-realized/baseline-metadata-realized-references.json",
+      "sha256": "9a1bff0595cfcd2de2c1b9fa6838e1352d936f8f8cff0ed2216ca8c0b5c8fbb3",
+      "bytes": 184339
+    },
+    {
+      "path": "metadata-realized/candidate-metadata-realized-references.json",
+      "sha256": "66704abacd5cc5b31dcbfa9e0f2689fec7b3f991a0bdab337dfacbb13ed27001",
+      "bytes": 184339
+    },
+    {
+      "path": "logs/baseline-metadata-realized-references.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "logs/candidate-metadata-realized-references.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "logs/n4-baseline-regenerate.log",
+      "sha256": "a6dfb5f18f36490104b09fe8eec661875520fa8850098fd1b3e3e40e57426158",
+      "bytes": 1929656
+    },
+    {
+      "path": "logs/n4-candidate-regenerate.log",
+      "sha256": "dce45c4af9b556226b11958c26499932ca5f8be24466737e6b43a6361c85475a",
+      "bytes": 810474
+    },
+    {
+      "path": "logs/n4-moved-pins-final.log",
+      "sha256": "544908ad08b5630c1ad30fa66550cd431136895a2f8d18126db21b66b15446f9",
+      "bytes": 555028
+    },
+    {
+      "path": "logs/n4-corpus-final.log",
+      "sha256": "b007473f6a575de83301f169b33acb3dbc4766bb24d5acb094d849e5974dde22",
+      "bytes": 830991
+    },
+    {
+      "path": "logs/n4-baseline-LogEventProperty-cli.log",
+      "sha256": "e1aa8067991ef59fd57cfc2bf51e9b030345ff5f61c3ab96667ddc62783d4682",
+      "bytes": 408
+    },
+    {
+      "path": "logs/n4-candidate-LogEventProperty-cli.log",
+      "sha256": "699b263975098b3144b22ed8834069c26d78994c02f43eee34957bf3bd0ecc18",
+      "bytes": 2197
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/corpus-probe-initial/CorpusProbe.csproj",
+      "sha256": "345f90c1e2fbbb84280a0680b17bcf5291e7ab279b37ecfe3859f4b953c971a6",
+      "bytes": 414
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/corpus-probe-initial/Program.cs",
+      "sha256": "a1d2a3d68603e879795b471f6cc6d8930b09b00a42e6255c2ee909567e41610a",
+      "bytes": 9386
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/native-controls-initial/NativeBoundaryProbe.csproj",
+      "sha256": "345f90c1e2fbbb84280a0680b17bcf5291e7ab279b37ecfe3859f4b953c971a6",
+      "bytes": 414
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/native-controls-initial/Program.cs",
+      "sha256": "59f7ca013b3355025bb709e81cf8482441f85b31d8b0b50143356842ceb81a00",
+      "bytes": 8744
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/probe-results-initial/baseline-LogEventProperty.json",
+      "sha256": "62976d9ca26afcb83bd35c0c531dc038b1f69e85c56203f12fecfeb3f2180108",
+      "bytes": 10026
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/probe-results-initial/candidate-LogEventProperty.json",
+      "sha256": "abff9968f61336df118b901bbc3967acd8b5bdf6d4ae3b108f83dd7c8d69a940",
+      "bytes": 13967
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/probe-results-initial/baseline-JsonValueFormatter.json",
+      "sha256": "ea43cac4d30657f98655874591b350516ea3b54f0de00fdb0d9bb46b4be67cf4",
+      "bytes": 277155
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/probe-results-initial/candidate-JsonValueFormatter.json",
+      "sha256": "064424a758c758640e0626948bf88e049c949292e84c01cf29647fd0259a294b",
+      "bytes": 281467
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/control-results-initial/native-boundary-controls-summary.json",
+      "sha256": "16e3a51077c9069cb07b6c0efdcb4ef33e903d3be7f8b174c3a511b58d3cd7ea",
+      "bytes": 13944
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/control-results-initial/baseline-native-boundary-controls.json",
+      "sha256": "3a83bf2e330454ca11043dac2d9f6e0fedb45a826ebcd62f816414cbc81421f6",
+      "bytes": 12435
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/control-results-initial/candidate-native-boundary-controls.json",
+      "sha256": "317f02ae885a6fc960f1224e366030037c39974022abcaf90f328530d4d5e0d4",
+      "bytes": 16354
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/manifest-only-metadata-initial/baseline-metadata-reference-profile.json",
+      "sha256": "b171ea9a12ba15a7ec3c252559088e98d6a68b96fcab37cab9922184fa5111d0",
+      "bytes": 29919
+    },
+    {
+      "path": "historical-initial-attempts-20260912T0625/manifest-only-metadata-initial/candidate-metadata-reference-profile.json",
+      "sha256": "27f5cdc186f5d82d7913c76898141733a1e43a12fcbf380b1e2521f49494896b",
+      "bytes": 29920
+    },
+    {
+      "path": "validation/final-ratchets.log",
+      "sha256": "c94589e4c2b31674fbfdb0ee08bbd74ec313d5306855240a8e95619410d46030",
+      "bytes": 543,
+      "uncompressedSha256": "c94589e4c2b31674fbfdb0ee08bbd74ec313d5306855240a8e95619410d46030"
+    },
+    {
+      "path": "validation/n4-final-ratchets.trx",
+      "sha256": "b143f77d5db885af7d5c949f6179fbe81d4d1978f13c0b0c1610c4bb53dced27",
+      "bytes": 584862,
+      "uncompressedSha256": "b143f77d5db885af7d5c949f6179fbe81d4d1978f13c0b0c1610c4bb53dced27"
+    },
+    {
+      "path": "validation/full-compiler.log",
+      "sha256": "f78f89731b3b6a36c0316dd6009d0b21aea3103d8eafe470d3be5530dcae380f",
+      "bytes": 661,
+      "uncompressedSha256": "f78f89731b3b6a36c0316dd6009d0b21aea3103d8eafe470d3be5530dcae380f"
+    },
+    {
+      "path": "validation/n4-full.trx.gz",
+      "sha256": "4ac521c97190b71dd35a149e8674b3be8a7846c4697bec5a982e00256eca51ab",
+      "bytes": 2492770,
+      "uncompressedSha256": "dde9b2e2d763b296833e254e124428c595af5c495334c5d63a399a6ecde53a5a"
+    }
+  ]
+}

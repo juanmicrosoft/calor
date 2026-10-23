@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "observationDateUtc": "2026-09-12",
+  "observer": "Copilot/GPT-6 Astra e9c6935e-da28-4a3b-94d4-0a5bbb596332",
+  "baselineCommit": "e299f2462b813a0c7e7049eb3a66f40b9f95e1c9",
+  "historicalN3Commit": "47c651b477640d9b87e285cbe5026b530d71e17d",
+  "measurementContext": "Actual combined worktree before its merge commit; source content hashes below pin the tested production files. No historical captures relabeled. Final commit/reviews/CI are recorded on PR1445.",
+  "productionSourceSha256": {
+    "src/Calor.Compiler/Binding/Binder.cs": "94afad580aa82e6efcdb4960dd960131a344720fe482fb63fd8587c89d1dbd99",
+    "src/Calor.Compiler/Binding/Scope.cs": "af760cb0283dda4b950ba921cfe7a6e7753e610c60cd5047d9f26e0c75fd5a62",
+    "src/Calor.Compiler/Binding/BoundNodes.cs": "530e0fa779b74a92760da402dbe4473a9aeb5b8e415e645e42544d90c642fc27",
+    "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs": "70a32be309fe7858f6c3a70dbf9b7ac769da46f7ee60243ba4f09f7121577293",
+    "src/Calor.Compiler/Binding/Metadata/MetadataContext.cs": "d166095081aa1590992ba66a55746ae1b0619caaa78c9de01ee9166cb6b99c60",
+    "src/Calor.Compiler/Analysis/Security/TaintAnalysis.cs": "fc3a143d19b3acb6e9a28c6d2c48b1ffe99b1d55fe59840f1d6b1a75b53aeadf"
+  },
+  "sourceFileCount": 364,
+  "binderAttempts": 35179,
+  "deltaFromAcceptedT1": {
+    "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+      "BindingErrorCount": {
+        "before": 52,
+        "after": 56
+      },
+      "BindingErrorIdentityHash": {
+        "before": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42",
+        "after": "2b1d449e0c39fb15d136f7176980fe63311effadcc8dded0297ff9c467cdfaf9"
+      }
+    }
+  },
+  "inheritedT1DeltaFromHistoricalN3": {
+    "FluentValidation/src/FluentValidation/Internal/AccessorCache.cs": {
+      "BindingErrorIdentityHash": {
+        "before": "24800b0dc4d25341239f998005a7d0c257848ff65e53ce39f7e1871f5aa3f036",
+        "after": "357b5e0460ab8f0a83301f99dcbb17ef838e0553db2da74e90f70387ca11dec6"
+      }
+    },
+    "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs": {
+      "BindingErrorCount": {
+        "before": 12,
+        "after": 10
+      },
+      "BindingErrorIdentityHash": {
+        "before": "508958da0897d55594bce039005dd4cd8a4ff952e00ce19c5fee30c082aff999",
+        "after": "7cf4ff9ba9998ebc0bbff487117d2f126ebda2d8002609177e5a1e2a65c61256"
+      }
+    },
+    "FluentValidation/src/FluentValidation/Resources/LanguageManager.cs": {
+      "BindingErrorIdentityHash": {
+        "before": "620dff3c73f391dd798591d7e0062a4da5c5321b6878f5f30897b41fd3593135",
+        "after": "7643203273a19326e91253aeb8ebf3fa1b1911c6b0704de817fa6b5d7efa3c5d"
+      }
+    },
+    "MediatR/src/MediatR/Mediator.cs": {
+      "BindingErrorIdentityHash": {
+        "before": "75441612e4d907b0a953a0ef5f8db0e657bb4cf7ae617aca9b9e96922ce5c667",
+        "after": "f91e837ef9a3628d5a01c174b5ac21c27be222d72b5fe1106e005fb92c9b9a0e"
+      }
+    },
+    "serilog/src/Serilog/Core/Sinks/AggregateSink.cs": {
+      "BindingErrorIdentityHash": {
+        "before": "48e8c00221edd25d5699491089bc4b24cfb38a5589351b2e89704175cc4cf583",
+        "after": "08825dd869697214282ace005788e2971e0c1424b079860b8cb56bc707542ae5"
+      }
+    },
+    "serilog/src/Serilog/Core/Sinks/DisposingAggregateSink.cs": {
+      "BindingErrorIdentityHash": {
+        "before": "01458e104dc15de2bece43ea337d8d899d8962962204e3346e344c17acfaa6de",
+        "after": "6c2b344794c15f49bf3962ae03746c7047c40a44136cca1777aa3f993a062790"
+      }
+    }
+  },
+  "otherSourceCoverageOpacityOutcomeAndPropagationFieldsUnchanged": true,
+  "regeneration": {
+    "command": "CALOR_UPDATE_BINDER_ERROR_EMISSION_CATALOG=1 CALOR_UPDATE_BINDER_BASELINE=1 dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj --no-build --filter \"FullyQualifiedName~BinderErrorEmissionCatalogTests|FullyQualifiedName~ConversionLeg_IncompleteCount_MatchesBaseline\"",
+    "passed": 14,
+    "sourceCoverageRegenerationChangedContent": false,
+    "catalogRoutes": 33,
+    "catalogRegenerationChange": "Canonical ordering only; all actual per-site fields/fingerprints match automatic merge.",
+    "normalModeFollowUp": "Included in532 passing affected compiler/runtime/taint/corpus tests, with49 editor tests passing separately."
+  },
+  "classification": "Four N3 corpus findings remain AnalysisOnly/Unresolved. Existing historical identity-level classification is unchanged; matching regenerated identity hashes are not a new compatibility acceptance.",
+  "scope": "1444 remains required in0.22 for source-array annotations/independent predicates, blocked on N3 acceptance and a separate parent start. No activation."
+}

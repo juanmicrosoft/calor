@@ -1,0 +1,119 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "F4-ITER-02",
+ "family": "F4",
+ "role": "residual",
+ "expected": "preserved",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "744dd5acdbd86bd94dd086c5e6cc8cec8fb6953f7c518a7e91cd8396d6d9c858",
+ "result": "passed",
+ "cells": {},
+ "cellEvidence": {},
+ "judgement": "F4 driver: cli-default preserved-match, cli-passthrough preserved-match, cli-migrate preserved-match, mcp-default preserved-match, mcp-passthroughOnError preserved-match, mcp-passthroughOnError-moduleName preserved-match",
+ "measurements": [
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f4-1139/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f4-1139/results.json",
+   "case": "F4-ITER-02",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "cli-passthrough": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "cli-no-fallback": {
+     "outcome": "rejected",
+     "category": "rejected",
+     "driverOutcome": null
+    },
+    "cli-migrate": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "mcp-default": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "mcp-passthroughOnError": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "mcp-passthroughOnError-moduleName": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": null
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence",
+   "reportingOnlyDifferences": {
+    "surfaces": [
+     "cli-no-fallback"
+    ],
+    "note": "the --no-fallback refusal is unchanged (exit, success, error codes); on the candidate its JSON envelope also carries the counts and loss features (F6's reporting, which landed after the F4 branch measured)",
+    "detail": [
+     {
+      "case": "F4-ITER-02",
+      "surface": "cli-no-fallback",
+      "committed": {
+       "convertExit": 1,
+       "success": false,
+       "nativeConversionCount": null,
+       "interopPreservationCount": null,
+       "lossySubstitutionCount": null,
+       "dropCount": null,
+       "lossFeatures": [],
+       "errorCodes": [
+        "Calor1343"
+       ]
+      },
+      "candidate": {
+       "convertExit": 1,
+       "success": false,
+       "nativeConversionCount": 14,
+       "interopPreservationCount": 2,
+       "lossySubstitutionCount": 0,
+       "dropCount": 0,
+       "lossFeatures": [
+        "iterator-accessor"
+       ],
+       "errorCodes": [
+        "Calor1343"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f4-iterator-accessor.trx.gz",
+     "match": "IteratorAccessorConversionTests",
+     "count": 50,
+     "passed": 50,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

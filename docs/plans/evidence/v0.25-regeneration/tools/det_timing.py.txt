@@ -1,0 +1,28 @@
+import glob, json, statistics, sys, collections
+D = "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25/ci/det-39323628059"
+run = json.load(open(sys.argv[2]))
+jobmins = {j["name"]: j["runnerMinutes"] for j in run["jobs"]}
+out = {"schema": "v0.25-regeneration/determinism-attempt-timing/1", "run": run["id"], "jobs": []}
+for d in sorted(glob.glob(f"{D}/attempts-*")):
+    recs = []
+    for f in sorted(glob.glob(f"{d}/attempt-*.json")):
+        r = json.load(open(f))
+        recs.append(r)
+    if not recs:
+        continue
+    env, job = recs[0]["environment"], recs[0]["job"]
+    prof = collections.defaultdict(list); statuses = collections.Counter()
+    for r in recs:
+        statuses[r.get("status")] += 1
+        for p in r["profiles"]:
+            if isinstance(p.get("seconds"), (int, float)):
+                prof[p["profile"]].append(p["seconds"])
+    name = f"attempts ({env} job {job})"
+    out["jobs"].append({"environment": env, "job": job, "attemptRecords": len(recs), "attemptStatuses": dict(statuses),
+                        "runnerMinutes": jobmins.get(name), "imageVersion": recs[0]["environmentCheck"]["observed"].get("imageVersion"),
+                        "logicalProcessors": recs[0]["environmentCheck"]["observed"].get("logicalProcessors"),
+                        "profileMedianSeconds": {k: round(statistics.median(v), 1) for k, v in sorted(prof.items())},
+                        "profileMaxSeconds": {k: round(max(v), 1) for k, v in sorted(prof.items())}})
+json.dump(out, open(sys.argv[1], "w"), indent=1)
+for j in out["jobs"]:
+    print(j["environment"], j["job"], j["attemptRecords"], j["attemptStatuses"], j["runnerMinutes"], j["profileMedianSeconds"].get("verification-full"))

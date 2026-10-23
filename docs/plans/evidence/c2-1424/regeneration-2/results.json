@@ -1,0 +1,385 @@
+{
+ "schema": "c2-1424/results/2",
+ "issue": 1424,
+ "candidate": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "contractVersion": "1.4.0",
+ "regeneration": 2,
+ "statusVocabulary": {
+  "REGENERATED": "the producer ran on the candidate and its output is retained",
+  "BYTES-MATCH": "two or more independent regenerations, and the committed artifact where one exists, are byte-identical",
+  "VERDICTS-AGREE": "two or more regenerations agree on every verdict and count; bytes not compared",
+  "SINGLE-RUN": "exactly one successful regeneration",
+  "PASS-ONLY": "only a job or test conclusion exists",
+  "VALIDATED": "the source is the artifact; its validator ran on the candidate and passed",
+  "RE-MATERIALIZED-VERIFIED": "pinned input fetched again and verified against its pins; never rebuilt",
+  "PRODUCER-FAILS-BY-DESIGN": "the producer exits non-zero for a registered reason the inventory records; counts are as registered",
+  "FAILED": "the producer's own verdict is a failure that is not registered as expected; needs a maintainer decision",
+  "NOT-REGENERATED-BY-RULE": "the inventory or contract forbids or excludes regeneration",
+  "HISTORICAL": "historical-only; not regenerated"
+ },
+ "note": "C2 regeneration statuses, not #1408 outcomes. Every attempt is in ledger.json.",
+ "artifacts": [
+  {
+   "id": "verifier-runtime-differential",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "Regenerated in clone A and clone B (macOS) and by test.yml's oracle step (ubuntu); all equal the committed reports: json aa1f86f9ae5e6e9c6eedea1970b4080f8e347271c0ba99434a1afa3203b9c9e9, md 24901f2176fb3157dedcb79f40564f2bfe9bcd10db94018f5c8942c56c20b2d5 (429 / 156 / 585). Cross-platform repeat determinism under the protocol: see gates determinism-protocol-on-candidate (FAILED).",
+   "files": [
+    "local/clone-a/vrd/",
+    "local/clone-b/vrd/",
+    "ci/artifacts-37826947313/verifier-runtime-differential.tar.gz"
+   ]
+  },
+  {
+   "id": "modeled-forms-whitelist",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "ModeledFormsTests 9 passed in clone A and clone B; tests (verification) passed in CI."
+  },
+  {
+   "id": "release-test-suites",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "13 of 13 release-critical projects pass with the manifest's counts. CI run 37826947313 (ubuntu-24.04): Compiler 13,036 (7,360 + 5,676; 3 not executed = expectedSkipped 3), Conversion 476, Enforcement 695 (1 not executed), Evaluation 235, Experimental 25, ILAnalysis 46, LanguageServer 532, RoundTrip.Harness 295, Semantics 55, Tasks 134, Verification 473; failed 0. Locally (clones A and B, macOS): Ids 394, Performance 26; failed 0. The candidate's suite excludes C1 PR 2's 1 tamper control (C1-TEST-COUNT-DELTA)."
+  },
+  {
+   "id": "ci-test-reports",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "evidence": "Every Actions artifact of test.yml run 37826947313 is retained (archives.json for the large ones). One CI run; the local release-quality coverage attempt 2 agrees on every count (Compiler, Conversion, Enforcement, Semantics, Verification)."
+  },
+  {
+   "id": "test-manifest",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "check_test_quality.py exit 0 (release-quality); every CI shard's check_trx.py inventory check passed; every observed count equals expectedTotal / expectedSkipped."
+  },
+  {
+   "id": "z3-upstream-pins",
+   "classification": "authoritative",
+   "status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "evidence": "download-z3.sh verified every archive and asset in clones A and B; every CI Z3 bootstrap passed."
+  },
+  {
+   "id": "z3-release-binaries",
+   "classification": "authoritative",
+   "status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "evidence": "gh release download z3-binaries-4.15.7: 7 of 7 assets match .github/z3-binaries-4.15.7.sha256 (second attempt; the first had no GitHub login under the isolated HOME and downloaded nothing).",
+   "files": [
+    "local/z3-release-binaries.json"
+   ]
+  },
+  {
+   "id": "toolchain-pins",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "dotnet restore --locked-mode succeeded in clones A and B and in every CI restore. Environment observed, not pinned: CI SDK 10.0.401 / runtime 10.0.12 on every job that logged setup-dotnet; images in ledger.json."
+  },
+  {
+   "id": "corpus-submodules",
+   "classification": "authoritative",
+   "status": [
+    "RE-MATERIALIZED-VERIFIED"
+   ],
+   "evidence": "git submodule update --init checks out exactly the candidate's gitlinks (MediatR fb309026, serilog 0597ddfb, FluentValidation 71b3c60c).",
+   "files": [
+    "release-quality/submodule-status.txt"
+   ]
+  },
+  {
+   "id": "roundtrip-reports",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "SINGLE-RUN"
+   ],
+   "evidence": "release-quality round-trip step in clone A (with the .NET 8 runtime): Synthetic, Synthetic2, MediatR, Serilog, FluentValidation all Pass. test.yml's roundtrip-verification skipped itself (change filter).",
+   "files": [
+    "release-quality/roundtrip.log",
+    "release-quality/attempt-1-artifacts.tar.gz"
+   ]
+  },
+  {
+   "id": "roundtrip-baselines",
+   "classification": "derived",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "roundtrip_delta.py against eng/roundtrip-baselines.json: no regressions vs baseline."
+  },
+  {
+   "id": "quality-ratchet-baselines",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "Coverage (attempt 2), mutation, performance (median 12.304 s, maximum 24.000 s), flake 100/100 locally; coverage, mutation, flake 10/10 in CI quality-ratchets."
+  },
+  {
+   "id": "release-quality-reports",
+   "classification": "derived",
+   "status": [
+    "REGENERATED"
+   ],
+   "evidence": "Every release-quality step ran locally in clone A, in order. All exit 0 except the coverage step's first attempt, which failed one test only because the private dotnet root path contains 'calor' (SoundnessRegistrationTests.EveryCaseOracleCompilesAgainstBclOnly rejects such BCL paths); attempt 2 with Homebrew's host passed, and the same test passed in CI. Both attempts recorded.",
+   "limits": "Ran on macOS, not ubuntu-latest (no workflow runs this job without the adjudication gate).",
+   "files": [
+    "release-quality/"
+   ]
+  },
+  {
+   "id": "sdk-consumer-check",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "evidence": "test.yml sdk-package-consumer: all 5 RIDs succeeded; cli-tool-consumer and z3-consumer-matrix too."
+  },
+  {
+   "id": "tier1-verification",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "PASS-ONLY"
+   ],
+   "evidence": "test.yml verify-phase1 succeeded; its tier1-verification artifact is retained.",
+   "files": [
+    "ci/artifacts-37826947313/tier1-verification.tar.gz"
+   ]
+  },
+  {
+   "id": "tier2-corpus-verification",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "VERDICTS-AGREE",
+    "PRODUCER-FAILS-BY-DESIGN"
+   ],
+   "evidence": "tier2.yml run 37826951096 (ubuntu) and clone A (macOS): 428 passed / 51 expected-negative / 30 known-failure, all else 0, verdict FAIL, head 5e52d8ab, worktree clean. The inventory records that the 30 registered known failures stay failures in every result.",
+   "files": [
+    "ci/tier2-fixtures-37826951096.json",
+    "release-quality/tier2/"
+   ]
+  },
+  {
+   "id": "ledger-provenance-index",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "LedgerCommitStampTests 5 passed in clones A and B (origin/main 7eca4868)."
+  },
+  {
+   "id": "benchmark-corpus",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "B1 packet validator 58 passed in clones A and B."
+  },
+  {
+   "id": "benchmark-results",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "benchmark-provenance",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "benchmark-results-md",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "website-benchmark-pages",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "benchmark-workflow-output",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "benchmark.yml's two steps run locally against the real refs/remotes/origin/main (7eca4868): the B1 generator outputs equal the committed packet byte for byte (clones A and B); the B2 gate passes ('OK: comparabilityKeySha256 35ee7f8e...'; 'no headline is published yet; nothing is compared') and writes benchmark-headline.json 6af1adefdc49bc81f6d1faa147d1e0ff2afb8a7a5180d25df557b549815de698 and commit-stamp-index.json 91d63dcd5b09d9fdbda04fe4c4859be24a79a93009270bc67847a27983feedeb, identical in A and B.",
+   "limits": "The headline embeds its comparison with the headline on main at the gate step; main has none today. A headline merged to main before publication would change the bytes.",
+   "files": [
+    "local/clone-a/b2-headline/",
+    "local/clone-a/benchmark-gate-report.txt"
+   ]
+  },
+  {
+   "id": "benchmark-publication-pr",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "llm-and-agent-results",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "changelog",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "github-release-notes",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL",
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "Rendered with publish-nuget.yml's awk extract in A and B: byte-identical, raw 578e4abcc250c55b8933c3b85257e29e605a4de54b85d8718856859f7b6d24e5, R2 text digest 05b8c2194efdd9756b1e92e197ae3de9d4c9c10d13c2c4b3465d54b62bdb192f; R2 wording scan clean. Nothing posted.",
+   "files": [
+    "local/clone-a/release-notes.md"
+   ]
+  },
+  {
+   "id": "nuget-packages",
+   "classification": "authoritative",
+   "status": [
+    "NOT-REGENERATED-BY-RULE"
+   ]
+  },
+  {
+   "id": "candidate-packages",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "scripts/reproducible-build.sh packages (the publish job's commands) in clone A and clone B (macOS, Microsoft SDK 10.0.401) and in reproducible-builds.yml (Linux, Microsoft SDK 10.0.401, two builds): every .nupkg, every entry (97, contents and zip timestamps) identical. calor.0.24.0.nupkg d59aea56abb0e89125805686c59b616e47614ecea9a1c9b5fcbc9fb929401cc5, Calor.Sdk.0.24.0.nupkg 157fc9cab9db1fe095c0b77a9ff264c8ea6186585bea6b964fb53afed41053bb. check-packaged-z3.py --all-rids and the SDK inspection passed. No forbidden wording in any package text entry. Bytes not committed (hashes only).",
+   "limits": "Reproducible only with Microsoft's SDK 10.0.401 build (dotnetSdkBuild recorded); Homebrew's source-built SDK packs different bytes (#1526).",
+   "files": [
+    "local/clone-a/build-hashes.json",
+    "local/compare-a-b.md",
+    "local/compare-local-ci-packages.md"
+   ]
+  },
+  {
+   "id": "release-metadata",
+   "classification": "authoritative",
+   "status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "Generated by reproducible-build.sh in A, B, and Linux CI: provenance 8e4be880a4f0b7dcf323150395ae06b70e3f864a6c26a966c1da9302b0a5a516, SBOM ebbd1f2b60a18f0f1d4886c68447d79cca6b6f101701258f9ab68da5323ba77e, identical everywhere; both files committed.",
+   "files": [
+    "local/clone-a/release-metadata/"
+   ]
+  },
+  {
+   "id": "website-deployment",
+   "classification": "derived",
+   "status": [
+    "REGENERATED",
+    "BYTES-MATCH"
+   ],
+   "evidence": "Built, never deployed (npm ci, next build) in A, B, and Linux CI: 253 files, R2 tree digest 13de7f6e6c90ca467cac7744f1369f45bf30f39980edf1efab1702730ff8a270 everywhere. R2 wording scan clean.",
+   "limits": "The site downloads four Google Fonts at build time; a font change between adjudication and publication would change the tree (#1526 residual).",
+   "files": [
+    "local/clone-a/website-tree.sha256",
+    "local/compare-local-ci-website.md",
+    "local/wording-scan.json"
+   ]
+  },
+  {
+   "id": "v019-audit-disposition",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "pre-cut-evidence-packets",
+   "classification": "historical-only",
+   "status": [
+    "HISTORICAL"
+   ]
+  },
+  {
+   "id": "evidence-contract",
+   "classification": "authoritative",
+   "status": [
+    "VALIDATED"
+   ],
+   "evidence": "EvidenceContractTests 323 passed in clones A and B, including PacketHashesMatchSha256Manifest (contract 1.4.0)."
+  }
+ ],
+ "gates": [
+  {
+   "id": "determinism-protocol-on-candidate",
+   "status": [
+    "FAILED"
+   ],
+   "evidence": "Run 37826943308, protocol 1.4.0, execution c2-1424-regen-2, the 3rd and last execution slot: verdict NON-DETERMINISTIC, complete false; 660 AGREE-PASS, 470 DISAGREE, 1,174 INCOMPLETE; attempts 149 completed, 1 invalid; all four determinism rows OPEN.",
+   "cause": "One invocation was cut by the harness's own job deadline: win-x64 job 1, attempt 15, verification-full ('the job deadline cut an invocation'). That runner (windows-2025, image 20260925.250.1, 4 CPUs, same as job 2) ran verification-full in a median 233.0 s against 149.5 s for win-x64 job 2 and 136.6-145.6 s on win-arm64 (determinism/attempt-timing.json), so its invocations alone took 4,117 s (about 69 minutes) and the 75-minute job left no room for the last one. The cut invocation filled every case it had not observed with Timeout; under the registered rule, values from an invalid attempt are compared, so each such case reads DISAGREE (this is the protocol's recorded 'harnessCutInconsistency'). All 470 DISAGREE cases are that one attempt's Timeout fill against identical observed values (Passed, or 0|Completed) in all 149 completed attempts on all five platforms. The 1,174 INCOMPLETE cases are the 1,170 cells, the 3 generated artifacts, and invocation:oracle-isolated: the cut verification-full invocation had already recorded all 1,170 cells and the 3 artifact hashes, all equal to every other attempt's, but values from an invalid attempt never count toward agreement, and the cut attempt never ran oracle-isolated. No two observed values differ anywhere. This bounds nothing under the protocol: only DETERMINISTIC establishes anything.",
+   "consequence": "G3 is not closed on the candidate, and the protocol has no execution slot left (maxExecutions 3). Not re-run (retryPolicy; no slot). Decision for the maintainer.",
+   "files": [
+    "determinism/result.json",
+    "determinism/attempt-timing.json",
+    "determinism/win-x64-j1-a15-raw.tar.gz",
+    "determinism/attempts.tar.gz (archives.json)",
+    "ci/run-37826943308.json"
+   ]
+  },
+  {
+   "id": "classifier",
+   "status": [
+    "SEE classifier.txt"
+   ]
+  },
+  {
+   "id": "r2-dry-run",
+   "status": [
+    "SEE r2-dry-run/"
+   ]
+  }
+ ],
+ "freshClone": {
+  "clones": [
+   "r2/cand (clone A)",
+   "r2/second/nested/fresh (clone B, other path)"
+  ],
+  "result": "0 differences across both packages (97 entries), both metadata files, the website tree (253 files), the differential reports, the B1 outputs, the B2 headline and stamp index, and the rendered notes",
+  "record": "local/compare-a-b.md"
+ }
+}

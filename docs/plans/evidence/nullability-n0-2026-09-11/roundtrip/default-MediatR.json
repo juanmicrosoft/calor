@@ -1,0 +1,2762 @@
+{
+  "project": "MediatR",
+  "calor_version": "0.20.0",
+  "timestamp": "2026-09-11T16:18:16.2610130\u002B00:00",
+  "duration_seconds": 36.254164,
+  "verdict": "fail",
+  "gate_failures": [
+    "test comparison is Incomplete",
+    "one or more test runs produced no parseable TRX files",
+    "one or more TRX files were unparseable",
+    "baseline tests exited with 1",
+    "round-trip tests exited with 1"
+  ],
+  "inconclusive": false,
+  "baseline": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "round_trip": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "regressions": 0,
+  "ignored_upstream_flakes": {
+    "regressions": [],
+    "baseline_failures": []
+  },
+  "files": {
+    "total": 32,
+    "replaced": 24,
+    "reverted": 0,
+    "conversion_failed": 0,
+    "conversion_timed_out": 0,
+    "emit_error": 0,
+    "emit_compilation_error": 6,
+    "compile_error": 2,
+    "crashed": 0,
+    "excluded_by_pattern": 0
+  },
+  "avg_conversion_rate": 0.9373475609756098,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 32,
+      "converted_native": 18,
+      "converted_with_losses": 6,
+      "reverted": 0,
+      "failed_conversion": 8,
+      "excluded_files": 0,
+      "coverage_fraction": 0.75,
+      "native_fraction": 0.5625,
+      "loss_kind_counts": {
+        "InteropPreserved": 11
+      },
+      "total_interop_blocks": 11,
+      "distinct_gaps": [],
+      "minimum_coverage_fraction": 0.55,
+      "minimum_native_fraction": 0.4
+    },
+    "build": {
+      "baseline_succeeded": true,
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 0,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 0,
+      "baseline_passed": 0,
+      "baseline_failed": 0,
+      "baseline_trx_files": 0,
+      "baseline_console_fallback": false,
+      "round_trip_total": 0,
+      "round_trip_passed": 0,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 0,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 0,
+      "ignored_flaky_regressions": 0,
+      "ignored_flaky_baseline_failures": 0,
+      "ignored_flaky_round_trip_failures": 0,
+      "comparison_status": "Incomplete"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "src/MediatR/IMediator.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/INotificationHandler.cs",
+      "status": "EmitCompilationError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/INotificationHandler.cs(16,60): error CS0535: \u0027NotificationHandler\u003CTNotification\u003E\u0027 does not implement interface member \u0027INotificationHandler\u003CTNotification\u003E.Handle(TNotification, CancellationToken)\u0027 [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/INotificationHandler.cs(16,60): error CS0535: \u0027NotificationHandler\u003CTNotification\u003E\u0027 does not implement interface member \u0027INotificationHandler\u003CTNotification\u003E.Handle(TNotification, CancellationToken)\u0027 [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/INotificationPublisher.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IPipelineBehavior.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "delegate-semantics",
+          "Description": "Other preserved as \u00A7CSHARP interop: public delegate Task\u003CTResponse\u003E RequestHandlerDelegate\u003CTResponse\u003E();",
+          "Line": 12
+        }
+      ],
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IPublisher.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IRequestHandler.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/ISender.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IStreamPipelineBehavior.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "delegate-semantics",
+          "Description": "Other preserved as \u00A7CSHARP interop: public delegate IAsyncEnumerable\u003CTResponse\u003E StreamHandlerDelegate\u003Cout TRespon...",
+          "Line": 12
+        }
+      ],
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IStreamRequestHandler.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Internal/HandlersOrderer.cs",
+      "status": "EmitCompilationError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(17,30): error CS0026: Keyword \u0027this\u0027 is not valid in a static property, static method, or static field initializer [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(49,52): error CS1061: \u0027int\u0027 does not contain a definition for \u0027IsOverridden\u0027 and no accessible extension method \u0027IsOverridden\u0027 accepting a first argument of type \u0027int\u0027 could be found (are you missing a using directive or an assembly reference?) [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(49,84): error CS1061: \u0027int\u0027 does not contain a definition for \u0027IsOverridden\u0027 and no accessible extension method \u0027IsOverridden\u0027 accepting a first argument of type \u0027int\u0027 could be found (are you missing a using directive or an assembly reference?) [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(60,41): error CS0103: The name \u0027_idx022\u0027 does not exist in the current context [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(17,30): error CS0026: Keyword \u0027this\u0027 is not valid in a static property, static method, or static field initializer [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(49,52): error CS1061: \u0027int\u0027 does not contain a definition for \u0027IsOverridden\u0027 and no accessible extension method \u0027IsOverridden\u0027 accepting a first argument of type \u0027int\u0027 could be found (are you missing a using directive or an assembly reference?) [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(49,84): error CS1061: \u0027int\u0027 does not contain a definition for \u0027IsOverridden\u0027 and no accessible extension method \u0027IsOverridden\u0027 accepting a first argument of type \u0027int\u0027 could be found (are you missing a using directive or an assembly reference?) [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Internal/HandlersOrderer.cs(60,41): error CS0103: The name \u0027_idx022\u0027 does not exist in the current context [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/Internal/ObjectDetails.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Mediator.cs",
+      "status": "EmitCompilationError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/Mediator.cs(29,79): error CS0103: The name \u0027_newForeachAwaitPublishe004\u0027 does not exist in the current context [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(40,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(60,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(79,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(138,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(157,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(177,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/Mediator.cs(29,79): error CS0103: The name \u0027_newForeachAwaitPublishe004\u0027 does not exist in the current context [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(40,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Mediator.cs(60,23): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs",
+      "status": "EmitCompilationError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(104,95): error CS0305: Using the generic type \u0027IPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(107,101): error CS0305: Using the generic type \u0027IPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(144,54): error CS0305: Using the generic type \u0027IPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(148,99): error CS0305: Using the generic type \u0027IPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(197,95): error CS0305: Using the generic type \u0027IStreamPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(200,101): error CS0305: Using the generic type \u0027IStreamPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(222,54): error CS0305: Using the generic type \u0027IStreamPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(226,99): error CS0305: Using the generic type \u0027IStreamPipelineBehavior\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(353,95): error CS0305: Using the generic type \u0027IRequestPostProcessor\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs(356,101): error CS0305: Using the generic type \u0027IRequestPostProcessor\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/NotificationHandlerExecutor.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "record",
+          "Description": "Class preserved as \u00A7CSHARP interop: public record NotificationHandlerExecutor(object HandlerInstance, Func\u003CINotif...",
+          "Line": 7
+        }
+      ],
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/NotificationPublishers/ForeachAwaitPublisher.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestExceptionAction.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestExceptionHandler.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestPostProcessor.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestPreProcessor.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs",
+      "status": "CompileError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "No overload of internal call \u0027GetExceptionTypes\u0027 matches (OBJECT). Candidates: MediatR.Pipeline.RequestExceptionActionProcessorBehavior\u00602.GetExceptionTypes(?Type) [calor://source/workspace%3Asrc%2FMediatR%2FPipeline%2FRequestExceptionActionProcessorBehavior.cs/module/m001/class/ast%3Ac002/method/ast%3Am024]"
+      ]
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionHandlerState.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionProcessorBehavior.cs",
+      "status": "CompileError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "No overload of internal call \u0027GetExceptionTypes\u0027 matches (OBJECT). Candidates: MediatR.Pipeline.RequestExceptionProcessorBehavior\u00602.GetExceptionTypes(?Type) [calor://source/workspace%3Asrc%2FMediatR%2FPipeline%2FRequestExceptionProcessorBehavior.cs/module/m001/class/ast%3Ac002/method/ast%3Am027]"
+      ]
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestPostProcessorBehavior.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestPreProcessorBehavior.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Registration/ServiceRegistrar.cs",
+      "status": "EmitCompilationError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 2
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "foreachvariable",
+          "Description": "Statement preserved as raw C#: foreach (var (Service, Implementation) in registrationTypes)\n            {\r\n ...",
+          "Line": 310
+        },
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "conditional-expression-hoisting",
+          "Description": "Conditional operand preserved in place as C#: pluggedType.BaseType!.GetGenericTypeDefinition()",
+          "Line": 363
+        }
+      ],
+      "interop_blocks": 2,
+      "gaps": [],
+      "errors": [
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(42,53): error CS0305: Using the generic type \u0027IStreamRequestHandler\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(43,53): error CS0305: Using the generic type \u0027IRequestExceptionHandler\u003CTRequest, TResponse, TException\u003E\u0027 requires 3 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(44,53): error CS0305: Using the generic type \u0027IRequestExceptionAction\u003CTRequest, TException\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(47,57): error CS0305: Using the generic type \u0027IRequestPostProcessor\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(48,100): error CS0305: Using the generic type \u0027IRequestExceptionHandler\u003CTRequest, TResponse, TException\u003E\u0027 requires 3 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(48,136): error CS0305: Using the generic type \u0027IRequestExceptionAction\u003CTRequest, TException\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(54,44): error CS0305: Using the generic type \u0027IRequestPostProcessor\u003CTRequest, TResponse\u003E\u0027 requires 2 type arguments [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(58,32): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(59,32): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Registration/ServiceRegistrar.cs(60,32): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/TypeForwardings.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "compilation-unit-attribute",
+          "Description": "Compilation-unit attributes and extern aliases are preserved through whole-unit passthrough",
+          "Line": 1
+        }
+      ],
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Wrappers/NotificationHandlerWrapper.cs",
+      "status": "EmitCompilationError",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 0,
+      "loss_kinds": {},
+      "losses": [],
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(21,29): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(22,51): error CS0411: The type arguments for method \u0027ServiceProviderServiceExtensions.GetServices\u003CT\u003E(IServiceProvider)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(21,29): error CS8917: The delegate type could not be inferred. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(22,51): error CS0411: The type arguments for method \u0027ServiceProviderServiceExtensions.GetServices\u003CT\u003E(IServiceProvider)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [<REPO>/.n0-evidence/tmp/calor-roundtrip-validation/MediatR/e4a135bd/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/Wrappers/RequestHandlerWrapper.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 2
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "method",
+          "Description": "Method preserved as \u00A7CSHARP interop: public override Task\u003CTResponse\u003E Handle(IRequest\u003CTResponse\u003E request, IServiceP...",
+          "Line": 34
+        },
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "method",
+          "Description": "Method preserved as \u00A7CSHARP interop: public override Task\u003CUnit\u003E Handle(IRequest request, IServiceProvider serviceP...",
+          "Line": 55
+        }
+      ],
+      "interop_blocks": 2,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs",
+      "status": "Replaced",
+      "preprocessor_mode": "SelectActiveBranchLossy",
+      "configuration": "Debug",
+      "target_framework": "net6.0",
+      "language_version": "CSharp10",
+      "defined_symbols": [
+        "DEBUG",
+        "NET",
+        "NET5_0_OR_GREATER",
+        "NET6_0",
+        "NET6_0_OR_GREATER",
+        "NETCOREAPP",
+        "NETCOREAPP1_0_OR_GREATER",
+        "NETCOREAPP1_1_OR_GREATER",
+        "NETCOREAPP2_0_OR_GREATER",
+        "NETCOREAPP2_1_OR_GREATER",
+        "NETCOREAPP2_2_OR_GREATER",
+        "NETCOREAPP3_0_OR_GREATER",
+        "NETCOREAPP3_1_OR_GREATER",
+        "TRACE"
+      ],
+      "context_selection_mode": "single-context-selected",
+      "validated_contexts": [
+        {
+          "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+          "Configuration": "Debug",
+          "Platform": "AnyCPU",
+          "TargetFramework": "net6.0",
+          "LanguageVersion": "CSharp10",
+          "DocumentationMode": "Diagnose",
+          "SourceCodeKind": "Regular",
+          "DefinedSymbols": [
+            "DEBUG",
+            "NET",
+            "NET5_0_OR_GREATER",
+            "NET6_0",
+            "NET6_0_OR_GREATER",
+            "NETCOREAPP",
+            "NETCOREAPP1_0_OR_GREATER",
+            "NETCOREAPP1_1_OR_GREATER",
+            "NETCOREAPP2_0_OR_GREATER",
+            "NETCOREAPP2_1_OR_GREATER",
+            "NETCOREAPP2_2_OR_GREATER",
+            "NETCOREAPP3_0_OR_GREATER",
+            "NETCOREAPP3_1_OR_GREATER",
+            "TRACE"
+          ],
+          "Provenance": [
+            "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj -\u003E <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+          ],
+          "BuildStates": [
+            {
+              "ProjectFile": "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj",
+              "Configuration": "Debug",
+              "Platform": "AnyCPU",
+              "TargetFramework": "net6.0",
+              "GlobalProperties": {
+                "Configuration": "Debug",
+                "TargetFramework": "net6.0",
+                "NuGetAudit": "false",
+                "TreatWarningsAsErrors": "false"
+              },
+              "ProjectGraphPath": [
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/test/MediatR.Tests/MediatR.Tests.csproj",
+                "<REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/ef9ffde6/src/MediatR/MediatR.csproj"
+              ]
+            }
+          ]
+        }
+      ],
+      "loss_count": 3,
+      "loss_kinds": {
+        "InteropPreserved": 3
+      },
+      "losses": [
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "await-foreach",
+          "Description": "Method preserved as \u00A7CSHARP interop: public override async IAsyncEnumerable\u003Cobject?\u003E Handle(object request, IServi...",
+          "Line": 29
+        },
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "method",
+          "Description": "Method preserved as \u00A7CSHARP interop: public override async IAsyncEnumerable\u003CTResponse\u003E Handle(IStreamRequest\u003CTResp...",
+          "Line": 37
+        },
+        {
+          "Kind": "InteropPreserved",
+          "Feature": "await-foreach",
+          "Description": "Method preserved as \u00A7CSHARP interop: private static async IAsyncEnumerable\u003CT\u003E NextWrapper\u003CT\u003E(\n        IAsyncEnumer...",
+          "Line": 64
+        }
+      ],
+      "interop_blocks": 3,
+      "gaps": [],
+      "errors": []
+    }
+  ]
+}

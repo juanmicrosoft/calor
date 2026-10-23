@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Build a SYNTHETIC #1408 terminal record for an R2 dry run (never committed to main).
+Usage: make_terminal.py <repo> <out-file> [success|with-blocked-determinism]"""
+import hashlib, json, sys
+from pathlib import Path
+
+repo, out, mode = Path(sys.argv[1]), Path(sys.argv[2]), (sys.argv[3] if len(sys.argv) > 3 else "success")
+pk = repo / "docs/plans/evidence/evidence-contract-1407"
+contract = json.loads((pk / "contract.json").read_text())
+inv = json.loads((pk / "artifact-inventory.json").read_text())
+files = json.loads((pk / "sha256.json").read_text())["files"]
+R2 = "docs/plans/evidence/c2-1424/regeneration-2/"
+sha = lambda p: hashlib.sha256((repo / p).read_bytes()).hexdigest()
+pub = json.loads((repo / (R2 + "publication-candidates.json")).read_text())["publication"]
+claims = json.loads((repo / (R2 + "claim-registry.json")).read_text())["claims"]
+ROW = "reduced-maintainer-adjudicated"
+rows = []
+for a in inv["artifacts"]:
+    rows.append({"subject": a["id"], "outcome": "HISTORICAL-ONLY" if a["classification"] == "historical-only" else "BOUNDED", "independence": ROW})
+for c in contract["children"]:
+    if c["issue"] != 1408:
+        outcome = "BLOCKED" if (mode == "with-blocked-determinism" and c["issue"] in (1135, 1424)) else "BOUNDED"
+        rows.append({"subject": f"gate:#{c['issue']}", "outcome": outcome, "independence": ROW})
+for c in claims:
+    rows.append({"subject": c, "outcome": "BOUNDED", "independence": ROW})
+record = {
+    "schema": "calor.adjudication-terminal-record/1",
+    "issue": 1408,
+    "SYNTHETIC": "C2 (#1424) R2 dry run only. Not an adjudication; every outcome is a placeholder.",
+    "outcome": "MILESTONE-SUCCEEDED",
+    "adjudicationIndependence": "reduced",
+    "limitation": contract["authorityCapacity"]["independence"]["publishedLimitation"],
+    "epicIndependentAdjudicationMet": False,
+    "contract": {"version": contract["contractVersion"], "files": files},
+    "candidate": {"commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d", "version": "0.24.0"},
+    "evidenceManifests": [
+        {"role": "candidate-manifest", "path": "docs/plans/evidence/c1-1423/candidate-manifest.json", "sha256": sha("docs/plans/evidence/c1-1423/candidate-manifest.json")},
+        {"role": "raw-artifact-freeze", "path": R2 + "raw-artifact-freeze.json", "sha256": sha(R2 + "raw-artifact-freeze.json")},
+    ],
+    "claimRegistry": {"path": R2 + "claim-registry.json", "sha256": sha(R2 + "claim-registry.json")},
+    "adjudications": rows,
+    "publication": pub,
+}
+out.write_text(json.dumps(record, indent=1) + "\n")
+print(len(rows), "rows")

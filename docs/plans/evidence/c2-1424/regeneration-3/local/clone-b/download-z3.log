@@ -1,0 +1,30 @@
+Z3 Library Downloader
+=====================
+Version: 4.15.7
+
+[Managed] Downloading Microsoft.Z3.dll...
+  [verified] z3-4.15.7-x64-glibc-2.39.zip
+[Managed] Done.
+[osx-arm64] Downloading...
+  [verified] z3-4.15.7-arm64-osx-15.7.3.zip
+[osx-arm64] Done.
+[win-arm64] Downloading...
+  [verified] z3-4.15.7-arm64-win.zip
+[win-arm64] Done.
+[win-x64] Downloading...
+  [verified] z3-4.15.7-x64-win.zip
+[win-x64] Done.
+[win-x86] Downloading...
+  [verified] z3-4.15.7-x86-win.zip
+[win-x86] Done.
+[linux-arm64] Downloading...
+  [verified] z3-4.15.7-arm64-glibc-2.38.zip
+[linux-arm64] Done.
+[linux-x64] Downloading...
+  [verified] z3-4.15.7-x64-glibc-2.39.zip
+[linux-x64] Done.
+Verified Z3 managed and native assets against committed size/hash pins.
+
+Z3 libraries ready.
+  Managed: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/second/nested/fresh/src/Calor.Compiler/scripts/../z3/Microsoft.Z3.dll
+  Natives: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/second/nested/fresh/src/Calor.Compiler/scripts/../runtimes/*/native/

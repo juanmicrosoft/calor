@@ -1,0 +1,137 @@
+Independent final-head review of juanmicrosoft/calor PR1443, issue1397.
+
+The invocation supplies your exact head and lens. Verify that head and a clean
+tracked worktree before and after reviewing. Base is
+88b5d38df97fd7e438882c956b9f9dcdc7a6cef5. Integrated measurement source is
+6ce32e261ec21df4d307a9a9288a5854e8b90a74 (normal merge of published main into
+07dd0158, preserving all ancestors). Product ledgers were generated at
+b2c435610c3aa34accc0f28f66d5eca834d7a129 and assert unchanged at6ce32e26. Worktree:
+/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/typing-1397
+
+Read LIVE1397/1082, PR1443, the COMPLETE actual base-to-head diff, the evidence
+README and original review briefs, and relevant callers. You are not the author
+or adjudicator. Return ACCEPT or BLOCK for bounded T1, exact checked head/base,
+high-confidence findings with source/reproducer, actual commands/results and
+honest gaps. Earlier approvals are not approval of the dictionary remediation.
+Parent adjudication and all actual final-head CI are separate required gates.
+Separate AI contexts are not human or statistically independent reviews.
+
+This is the explicitly accepted continuation of the existing T1 slot after
+product0.21 publication, NOT a new issue or release/study authority. Prior07dd
+reviews/36CI are historical, not approval of this head. The src tree is identical
+to07dd; version0.21 and recovery1449 are inherited from published main. Check
+that the MediatR config, two new tests and harness manifest291 remain unchanged
+relative to88b5d38d. Other T1 totals are8802/497/130/691. No release/version/public
+surface should differ from current published base. N3 has not been integrated.
+Read the complete actual88-to-head T1 diff, not only the merge/evidence delta.
+
+Contract: supported ?str/?string/registered ?Foo are nullable REFERENCES, not
+runtime Option<T>. Some/None and explicit Option remain wrappers. Shared
+normalization preserves nullable container/element differences, nominal/value
+exclusions, genuine type mismatches and no implicit unwrap. All0272/3/4 remain
+AnalysisOnly. Expanded-local0202 and native-call0208 preserve previously rejected
+unsafe flows; raw-inline/suffix nullable flows already accepted at baseline are
+not newly activated. New active0275 is a bounded representation mismatch at
+initialization/return, not a nullable predicate. Default TypeChecker can return
+0202 first. Object boxing retains the wrapper. C# can implicitly convert a
+reference to runtime Option; do not call reverse rejection universally CS0029.
+
+Compiler-integration lens: trace AttributeHelper/CalorType/TypeChecker,
+TypeIdentity/Binder/BoundNodes, TypeMapper, emitted C#, actual API/runtime and LSP.
+Attack aliases, Option/Some/None nesting, nominal/value/conflicting/conditional
+declarations, arrays/generics, BCL results and lambda return context. Review the
+19-code/34-route source catalog and primitive fingerprints. Examine all
+RoslynSyntaxVisitor dictionary bounds and getter manifests, not just assertions.
+
+Adversarial-compatibility lens: attack default/type-off/transpile/effect opt-outs,
+CLI/environment/watch/cache/MSBuild/editor propagation, effective cache keys,
+unsupported-major fail-closed and unchanged row/runtime guards. Review corpus
+delta meanings and numerical denominators. Challenge whether previously accepted
+known dictionary/base/conditional receivers still work without laundering
+unknowns through Option purity. Challenge exclusions and allocation charges.
+
+Historical failures are retained, not dismissed:
+- Initial19d18274 integration BLOCK had two missing-profile annotation failures.
+  Existing MetadataContext tests also threw FileNotFoundException. Copying the
+  unchanged repository manifest into the external artifacts root, without
+  rebuilding, made60 tests pass. The test now requires that context explicitly;
+  no production fallback, Oblivious policy or annotation assertion was weakened.
+  Arbitrary installed/default contexts remain unproved.
+- Removing unknown sentinel ? -> Option purity exposed base/conditional receiver
+  typing. Known fields resolve; getters are charged; unknown coalesced receivers
+  still reject0411/0410. Initial CI also exposed typed-None, source-coverage,
+  formatter and0425 product data changes. Read their actual audited dispositions.
+-687c0368 review pair accepted; CI exposed a stale product stamp index.
+-25161a3 review pair accepted; actual CI34652725411 had34 success/2 failed jobs.
+  Four dictionary runtime cases plus the key ledger failed and were reproduced.
+  No claim is made that earlier failing CI ran every later internal test leg.
+-b2c43561 retains semantic type for preserved var initializers ONLY when the
+  result is a real metadata BCL Dictionary/SortedDictionary/ConcurrentDictionary
+  with two spellable supported arguments. Source lookalikes, tuple/error/dynamic/
+  anonymous/nullable arguments and non-dictionary results are excluded. Verify
+  the implementation, not merely this description. Existing invocation typing
+  remains separate. Count is pure; Dictionary/SortedDictionary Keys/Values
+  allocate. SortedDictionary has no blanket default or method purity. Existing
+  ConcurrentDictionary manifest is reused. Unknowns must not become safe.
+-3bdb8e40 final reviews disagreed: integration03177048 BLOCK on a real dictionary
+  alias initializer (new D) losing type before its semantic guard; compatibility
+  c14ac50d ACCEPT. All36CIgreen at3b did NOT override this reproduced blocker.
+-1edc709e removes only the syntactic name filter, retaining initializer syntax
+  and semantic actual-BCL/spellability gates. Eight alias runtime/typing cases
+  reproduced the failure, two nullable/dynamic exclusions remained green. An
+  alias-only ConcurrentDictionary case then exposed missing namespace import
+  caused by minimally qualified emitted types. Qualified Roslyn type/argument
+  display fixes that actual error without adding imports to the fixture. All46
+  dictionary cases now pass. Independently challenge alias semantics, namespace
+  retention, guards and the full prior diff; do not only review the small delta.
+
+Current product data:0425 remains117 diagnostics/47modules/326enforced,38
+propagated-bind exclusions.0411 sites297/551/7932 inside unchanged12/61/115
+unknown-module sets. Key origins265bound/826string (old822string), floor200,
+file denominators/scope/notMeasured unchanged. Three additional binder hashes
+move only with inferredmut row offsets: ordered codes/messages/span lengths/
+columns unchanged (AccessorCache10,LanguageManager82,Mediator17). Earlier lambda
+false0273 removal and two Serilog offsets remain separately documented.
+Formatter11-05 already failed baseCLI1002/CS0246; now fails earlier0411/0410.
+No safety denominator reduction or improved-general-resolution claim.
+Both affected product index entries pinb2c43561; all other/frozen entries unchanged.
+Normal merge commit is required to preserve the indexed production ancestor.
+The generic null-conditional Dict receiver d?.Keys can still report0411 rather
+than resolving alloc; this disclosed fail-closed broader receiver limitation is
+not repaired or counted resolved. Dictionary's pre-existing default manifest
+purity is unchanged; SortedDictionary has no new default.
+
+The ordinary nullable nominal member-read still fails0411/0410. Its effect-off
+typing probe is not an ordinary safe/resolved control, nor evidence that the same
+effect diagnostic was measured at baseline.1398 owns safe-consumer transfer;
+1382selectedmapping;1383nativeSTRINGcalls;1380/1381/1384broadernominal/member/
+annotations;1401projectcontext. No whole adjacent issue is included. E1/harness
+files and its capacity row are untouched. No activation or suppression.
+
+Tracked tree READ-ONLY: no edits/commits/push/merge. Current normal build outputs
+exist; use existing product tests with --no-build --no-restore. Do not build
+concurrently or overwrite prior artifacts. Avoid external artifacts layout
+unless explicitly arranging and documenting its metadata prerequisite. Your own
+scratch only under session files/t1-b2-integration-probes or
+files/t1-b2-compatibility-probes according to lens. No new test framework.
+Author's latest results:589compiler,11LSP,105tasks,282productenforcement,
+156conversion,4RunConfigOverrideTests; no skips. Binaries rebuilt at6ce32e26
+report0.21.0; exact hashes are recorded in the README. Evidence-only later
+commits do not claim a new binary measurement. The README gives selectors; run
+useful tests/counterexamples rather than echoing results. Do not relabel the
+earlier63-case external-profile result as current.
+
+Known unrelated local baseline: parent reports
+Evidence_ActualBuildRecoveryPreservesOriginalCandidateDiagnostics line167
+fails identically on macOS at b1d23d7d and88b5d38d (empty recovery diagnostics);
+release LinuxCI passed unwaived. Author has NOT rerun/reproduced this baseline
+in the continuation and does NOT claim full291 local harness passes. Do not hide
+it, invent a local pass, or make source/skip edits. If you run it, report the
+actual result and distinguish baseline evidence from any demonstrated T1 cause.
+Full final CI remains required. Only four affected config cases were run locally.
+
+RESEARCH FULLY PAUSED: no new proofs/paid calls/study tests, no
+SpikeVerdictTests/EffectRowExperimentHarnessTests, no .git/ppw-budget,
+I0b87/ppw-v018/ledger464ace/private bundles/drafts1438or1078, no version/tag/release.
+Do not inspect protected root plan or sibling worktrees. Only product tests and
+corpus needed for this diff. Return findings and blockers, not merge authorization.

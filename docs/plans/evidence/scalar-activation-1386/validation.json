@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "candidate": "e3a84766dcc9f34c104445d1150552499c3d3ce3",
+  "ci": {
+    "run": 34930956008,
+    "url": "https://github.com/juanmicrosoft/calor/actions/runs/34930956008",
+    "jobs": {"total": 31, "success": 31, "other": 0},
+    "prHeadChecks": {
+      "head": "562259c528494ace7d5130dd6382f46b3b3f4a29",
+      "total": 36,
+      "success": 36,
+      "other": 0,
+      "runs": [
+        {"id": 34930956008, "workflow": "Tests", "jobs": 31, "success": 31},
+        {"id": 34930955964, "workflow": "Website regressions", "jobs": 3, "success": 3},
+        {"id": 34930955947, "workflow": "Experiment Registry Tamper Check", "jobs": 2, "success": 2}
+      ]
+    },
+    "testArtifacts": [
+      {"project": "Compiler shard 1", "passed": 4892, "failed": 0, "skipped": 2},
+      {"project": "Compiler shard 2", "passed": 4841, "failed": 0, "skipped": 1},
+      {"project": "Conversion", "passed": 470, "failed": 0, "skipped": 0},
+      {"project": "Semantics", "passed": 51, "failed": 0, "skipped": 0},
+      {"project": "Language Server", "passed": 519, "failed": 0, "skipped": 0},
+      {"project": "Verification", "passed": 406, "failed": 0, "skipped": 0},
+      {"project": "Round-trip harness", "passed": 291, "failed": 0, "skipped": 0}
+    ],
+    "qualityRatchets": {
+      "binderLineCoveragePercent": 92.8,
+      "binderBranchCoveragePercent": 84.81,
+      "typecheckingLineCoveragePercent": 85.88,
+      "typecheckingBranchCoveragePercent": 82.84,
+      "lspFlakeProbeRuns": 10,
+      "lspFlakeProbePassed": 10
+    }
+  },
+  "local": {
+    "toolchain": ".NET SDK 10.0.400; runtime 10.0.11; macOS 26.6 arm64",
+    "build": {
+      "command": "dotnet build src/Calor.Compiler/Calor.Compiler.csproj --no-restore --nologo",
+      "passed": true,
+      "warnings": 0,
+      "errors": 0
+    },
+    "tests": [
+      {
+        "command": "dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj --filter 'FullyQualifiedName~BindingDiagnosticPolicyTests|FullyQualifiedName~BindingRoutingCliTests|FullyQualifiedName~NullabilityIntegrationTests|FullyQualifiedName~SafeConsumptionRuntimeTests|FullyQualifiedName~IncrementalCliBuildTests|FullyQualifiedName~WatchSessionIntegrationTests|FullyQualifiedName~Issue1401NullableContextConversionTests'",
+        "passed": 331,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj --filter 'FullyQualifiedName~IncrementalCliEndToEndTests.Cache_NoTypeCheckCannotBypassActiveScalarBinding|FullyQualifiedName~IncrementalCliEndToEndTests.Cache_EnvironmentOptOutCannotBypassActiveScalarBinding'",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj --filter 'FullyQualifiedName~BindingDiagnosticRoutingTests|FullyQualifiedName~NullableReferenceTypingTests|FullyQualifiedName~BclMemberAnnotationTests|FullyQualifiedName~DocumentStateTests'",
+        "passed": 63,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj --filter 'FullyQualifiedName~CompileCalorIntegrationTests|FullyQualifiedName~BuildStateCacheTests'",
+        "passed": 105,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj --filter 'FullyQualifiedName~W1Slice1SoundnessTests|FullyQualifiedName~ArrayLengthSoundnessTests|FullyQualifiedName~MethodElisionCursorTests|FullyQualifiedName~IntegrationTests'",
+        "passed": 106,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj",
+        "passed": 470,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj",
+        "passed": 51,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "dotnet test tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj",
+        "passed": 291,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "manual": [
+      {"name": "root CLI mode matrix", "rows": 99, "passed": true, "replayedOnCandidate": "e3a84766dcc9f34c104445d1150552499c3d3ce3", "compilerSha256": "2f2553aa9afad80e873f7967802208914f4e45480c3c7db08b68c332cbef1f49"},
+      {"name": "run/test/verify entrypoint matrix", "rows": 14, "passed": true, "replayedOnCandidate": "e3a84766dcc9f34c104445d1150552499c3d3ce3"},
+      {"name": "SDK/MSBuild matrix", "rows": 15, "passed": true, "finalCandidateTestReplay": {"passed": 105, "failed": 0, "skipped": 0}},
+      {
+        "name": "root cache safe-to-invalid transition",
+        "rows": 3,
+        "passed": true,
+        "result": "All three boundaries recompiled and rejected with the expected code, did not report a cache hit, and removed the prior generated output."
+      },
+      {"name": "mutable assignment counterexample", "exitCode": 0, "stdout": "NULL", "stderr": ""},
+      {
+        "name": "full compiler suite after repair",
+        "passed": 9733,
+        "failed": 0,
+        "skipped": 3
+      },
+      {
+        "name": "final local corpus reruns after installing required .NET 8 runtime",
+        "passed": true,
+        "results": [
+          "MediatR 155/157, 2 skipped, 24/32 converted",
+          "Serilog 811/811, 57/112 converted",
+          "FluentValidation 865/866, 1 skipped, 97/139 converted"
+        ],
+        "preflightFailure": "The first local --all attempt lacked Microsoft.NETCore.App 8.0 and produced empty TRX files for MediatR and FluentValidation on both legs. Formal one-attempt evidence comes from CI run 34930956008."
+      }
+    ]
+  },
+  "requiredNamedControls": [
+    "SafeConsumptionRuntimeTests.Coalesce_AllConsumersAgreeWithActualRuntimeAndCli",
+    "SafeConsumptionRuntimeTests.ConvertedDefaultString_FallbackRetainsNull",
+    "SafeConsumptionRuntimeTests.SuccessfulTypedPattern_IsNonNullAndDoesNotNarrowTheInput",
+    "BindingDiagnosticRoutingTests.ActiveScalarFindings_AreLabeledWithoutChangingBinderSeverityOrSpanAsync",
+    "WatchSessionIntegrationTests.EnvironmentTypeCheckTransition_DoesNotBypassActiveScalarBinding",
+    "IncrementalCliEndToEndTests.Cache_NoTypeCheckCannotBypassActiveScalarBinding",
+    "IncrementalCliEndToEndTests.Cache_EnvironmentOptOutCannotBypassActiveScalarBinding",
+    "IntegrationTests.StringInBodyOnly_StillNeverElides",
+    "MethodElisionCursorTests.MethodPostcondition_StringModelCarried_StaysAssumed_GuardKept",
+    "MethodElisionCursorTests.ProvenPostcondition_Default_ElidesGuard"
+  ]
+}

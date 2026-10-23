@@ -1,0 +1,154 @@
+{
+  "rule": "Amendment 1.2.0 condition 8: a case whose run-2 claim token, result class, or finding differs from run 1's reported result on the same baseline is a determinism finding (routed to #1421 and #1135). Run 1's reported result is its final case-results.jsonl (after HC1-HC5). Compared per baseline and bucket; the per-attempt token list (retries) and O1 verdict are compared too.",
+  "baselines": {
+    "B1": {
+      "casesCompared": 710,
+      "agreements": 710,
+      "disagreements": [],
+      "retriedCasesRun1": [
+        "R1-NUM-OVERFLOW-CHECKED-004",
+        "R1-STR-OPS-COUNT-INDEX-001"
+      ],
+      "retriedCasesRun2": [
+        "R1-NUM-OVERFLOW-CHECKED-004",
+        "R1-STR-OPS-COUNT-INDEX-001"
+      ],
+      "rowStatusesEqual": true,
+      "findingsEqual": true,
+      "newFindingsInRun2": [],
+      "run1FindingsAbsentInRun2": [],
+      "crossBaselineReruns": {
+        "run1Executed": 28,
+        "run1NotRun": [
+          "R1-OBL-SUBTYPE-002",
+          "R1-STR-NULL-NONASCII-001",
+          "R1-STR-NULL-NONASCII-004",
+          "R1-STR-OPS-COUNT-INDEX-003"
+        ],
+        "run2Executed": 32,
+        "disagreementsOnRun1Executed": [],
+        "previouslyUnexecuted": {
+          "R1-OBL-SUBTYPE-002": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          },
+          "R1-STR-NULL-NONASCII-001": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          },
+          "R1-STR-NULL-NONASCII-004": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          },
+          "R1-STR-OPS-COUNT-INDEX-003": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          }
+        }
+      }
+    },
+    "N1": {
+      "casesCompared": 710,
+      "agreements": 710,
+      "disagreements": [],
+      "retriedCasesRun1": [
+        "R1-NUM-OVERFLOW-CHECKED-004",
+        "R1-STR-OPS-COUNT-INDEX-001"
+      ],
+      "retriedCasesRun2": [
+        "R1-NUM-OVERFLOW-CHECKED-004",
+        "R1-STR-OPS-COUNT-INDEX-001"
+      ],
+      "rowStatusesEqual": true,
+      "findingsEqual": true,
+      "newFindingsInRun2": [],
+      "run1FindingsAbsentInRun2": [],
+      "crossBaselineReruns": {
+        "run1Executed": 28,
+        "run1NotRun": [
+          "R1-OBL-SUBTYPE-002",
+          "R1-STR-NULL-NONASCII-001",
+          "R1-STR-NULL-NONASCII-004",
+          "R1-STR-OPS-COUNT-INDEX-003"
+        ],
+        "run2Executed": 32,
+        "disagreementsOnRun1Executed": [],
+        "previouslyUnexecuted": {
+          "R1-OBL-SUBTYPE-002": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          },
+          "R1-STR-NULL-NONASCII-001": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          },
+          "R1-STR-NULL-NONASCII-004": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          },
+          "R1-STR-OPS-COUNT-INDEX-003": {
+            "status": "executed",
+            "token": "Failed",
+            "class": "spurious-refutation",
+            "addedFindings": []
+          }
+        }
+      }
+    },
+    "P845": {
+      "casesCompared": 20,
+      "agreements": 20,
+      "disagreements": [],
+      "retriedCasesRun1": [],
+      "retriedCasesRun2": []
+    }
+  },
+  "determinismFindings": [],
+  "determinismObservationsNotFindings": [
+    {
+      "baseline": "B1",
+      "caseId": "R1-NUM-ARITH-SUB-006",
+      "attempt": "B1/attempts/R1-NUM-ARITH-SUB-006/sweep-attempt-1.json",
+      "field": "claim.modelReplay (solver counterexample model replayed under O1)",
+      "run1": {
+        "input": "(4194307, -574621698)",
+        "o1": "violated"
+      },
+      "run2": {
+        "input": "(3, -998244352)",
+        "o1": "violated"
+      },
+      "run2Counterexample": [
+        {
+          "name": "x",
+          "value": "3"
+        },
+        {
+          "name": "y",
+          "value": "3296722944"
+        },
+        {
+          "name": "result",
+          "value": "0"
+        }
+      ],
+      "tokenBoth": "Failed",
+      "classBoth": "no-claim",
+      "note": "Same token (Failed), class (no-claim), and findings (none) in both runs; only the solver's counterexample model differs. Not a condition-8 disagreement (not a token, class, or finding); recorded as a determinism observation for #1421/#1135."
+    }
+  ]
+}

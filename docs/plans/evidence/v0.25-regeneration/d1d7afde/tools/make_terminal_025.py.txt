@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Build a SYNTHETIC #1430 terminal record, claim registry and approval-URL stand-ins for an R2 dry run in a
+scratch clone (never committed to main, never pushed). usage: make_terminal_025.py <repo> <mode: success|with-blocked>
+
+success: every READY family READY (their ready/d1d7afde/ READY records get a placeholder approval URL in the scratch
+clone only) and any other family PENDING; outcome ACCEPTED when all six are READY (PARTIAL_READY otherwise); every
+re-proof check PASSED; gaps CLOSED; one synthetic claim BOUNDED.
+with-blocked: the same record with reproof:provenance-determinism BLOCKED, a synthetic negative control the gate must
+refuse."""
+import hashlib, json, sys
+from pathlib import Path
+
+repo, mode = Path(sys.argv[1]), sys.argv[2]
+CAND = "d1d7afde672691613f7bb34d253e63401ee423ac"
+REGEN = "docs/plans/evidence/v0.25-regeneration/d1d7afde"
+scope = json.loads((repo / "docs/plans/evidence/v0.25-r0-1426/scope.json").read_text())
+lf = lambda p: hashlib.sha256((repo / p).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+raw = lambda p: hashlib.sha256((repo / p).read_bytes()).hexdigest()
+ROW = "reduced-maintainer-adjudicated"
+FAMDIR = {f["id"]: f["readiness"]["evidence"].rsplit("/", 1)[0] for f in scope["families"]}
+
+# Placeholder approver URLs, scratch clone only: the real URL is A1's.
+for fid, d in FAMDIR.items():
+    p = repo / d / "ready/d1d7afde/ready-record.json"
+    r = json.loads(p.read_text())
+    if r["status"] == "READY":
+        r["approver"]["approvalUrl"] = "https://github.com/juanmicrosoft/calor/pull/1#pullrequestreview-1"
+        r["approver"]["note"] = "SYNTHETIC placeholder for the R2 dry run (scratch clone only)"
+        p.write_text(json.dumps(r, indent=1, ensure_ascii=False) + "\n")
+
+claims_path = "docs/plans/evidence/adjudication-1430/claim-registry.json"
+(repo / claims_path).parent.mkdir(parents=True, exist_ok=True)
+(repo / claims_path).write_text(json.dumps({"schema": "synthetic", "SYNTHETIC": "R2 dry run only; A1 writes the real registry.",
+                                             "claims": ["claim:synthetic-dry-run"]}, indent=1) + "\n")
+rows = []
+for fid, d in FAMDIR.items():
+    r = json.loads((repo / d / "ready/d1d7afde/ready-record.json").read_text())
+    if r["status"] == "READY":
+        p = f"{d}/ready/d1d7afde/ready-record.json"
+        rows.append({"subject": f"family:{fid}", "outcome": "READY", "independence": ROW, "readyRecord": {"path": p, "sha256": raw(p)}})
+    else:
+        rows.append({"subject": f"family:{fid}", "outcome": "PENDING" if mode == "success" else "BLOCKED", "independence": ROW})
+for c in scope["acceptancePreconditions"]["reproof"]["checks"]:
+    blocked = mode != "success" and c["id"] == "provenance-determinism"  # synthetic negative control
+    rows.append({"subject": f"reproof:{c['id']}", "outcome": "BLOCKED" if blocked else "PASSED", "independence": ROW})
+for g in scope["acceptancePreconditions"]["releaseGaps"]:
+    rows.append({"subject": f"gap:#{g['issue']}", "outcome": "CLOSED", "independence": ROW})
+rows.append({"subject": "claim:synthetic-dry-run", "outcome": "BOUNDED", "independence": ROW})
+pub = json.loads((repo / f"{REGEN}/publication-candidates.json").read_text())["publication"]
+pub["benchmark-results"]["approved"] = True  # A1's explicit benchmark-publication approval (G015), synthetic here
+# The READY records cite the re-proof PR's review record; when the base commit predates it, a placeholder stands in
+# (scratch clone only) and make-terminal.txt says so.
+review = repo / f"{REGEN}/reviews/round-1.md"
+if not review.exists():
+    review.parent.mkdir(parents=True, exist_ok=True)
+    review.write_text("SYNTHETIC placeholder for the R2 dry run: the real review record is not in the base commit.\n")
+    print("placeholder review record written (base commit has none)")
+record = {
+    "schema": "calor.adjudication-terminal-record/1",
+    "issue": 1430,
+    "SYNTHETIC": f"0.25 re-proof R2 dry run ({mode}). Not an adjudication; every outcome is a placeholder.",
+    "outcome": "ACCEPTED" if all(r["outcome"] == "READY" for r in rows if r["subject"].startswith("family:")) else "PARTIAL_READY",
+    "adjudicationIndependence": "reduced",
+    "limitation": scope["independence"]["statement"],
+    "epicIndependentAdjudicationMet": False,
+    "contract": {"version": scope["scopeVersion"], "files": {p: lf(p) for p in ("docs/plans/evidence/v0.25-r0-1426/scope.json",
+                 "docs/plans/evidence/v0.25-t1-1428/register.json", "docs/plans/evidence/v0.25-w1-1429/records.json")}},
+    "candidate": {"commit": CAND, "version": "0.25.0"},
+    "evidenceManifests": [
+        {"role": "candidate-manifest", "path": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json", "sha256": raw("docs/plans/evidence/v0.25-candidate/candidate-manifest.json")},
+        {"role": "raw-artifact-freeze", "path": f"{REGEN}/raw-artifact-freeze.json", "sha256": raw(f"{REGEN}/raw-artifact-freeze.json")},
+    ],
+    "claimRegistry": {"path": claims_path, "sha256": raw(claims_path)},
+    "adjudications": rows,
+    "publication": pub,
+}
+(repo / "docs/plans/evidence/adjudication-1430/terminal-record.json").write_text(json.dumps(record, indent=1) + "\n")
+m = json.loads((repo / "eng/release-adjudication-map.json").read_text())
+for e in m["releases"]:
+    if e["version"] == "0.25.x":
+        e["status"] = "adjudicated"
+(repo / "eng/release-adjudication-map.json").write_text(json.dumps(m, indent=1) + "\n")
+print(len(rows), "rows", mode)

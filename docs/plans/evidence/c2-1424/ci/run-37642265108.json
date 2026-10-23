@@ -1,0 +1,41 @@
+{
+ "runId": 37642265108,
+ "workflow": "determinism execution c2-1424-regen-1",
+ "title": "determinism execution c2-1424-regen-1",
+ "event": "workflow_dispatch",
+ "headBranch": "c2-1424/candidate-696ab824",
+ "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+ "runAttempt": 1,
+ "status": "completed",
+ "conclusion": "failure",
+ "createdAt": "2026-10-07T15:06:21Z",
+ "updatedAt": "2026-10-07T15:12:01Z",
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/37642265108",
+ "runnerMinutes": 2,
+ "jobCounts": {
+  "completed/success": 1
+ },
+ "jobs": [
+  {
+   "id": 112864058402,
+   "name": "plan",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:26Z",
+   "completedAt": "2026-10-07T15:07:28Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-24.04"
+   ],
+   "runnerName": "GitHub Actions 1000056377",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056377",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37642265108/112864058402-plan.log.gz"
+   }
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+C25=/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c25
+for x in a:a b:second/nested/fresh; do
+  n=${x%%:*}; p=$C25/${x#*:}
+  mkdir -p $C25/out/clone-$n/b2-headline
+  cp $p/website/public/data/benchmark-headline.json $p/bench/phase0-agent-native/commit-stamp-index.json $C25/out/clone-$n/b2-headline/
+  shasum -a 256 $C25/out/clone-$n/b2-headline/*
+done
+diff -r $C25/out/clone-a/b2-headline $C25/out/clone-b/b2-headline && echo b2-equal

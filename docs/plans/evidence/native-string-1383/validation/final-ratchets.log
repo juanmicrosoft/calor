@@ -1,0 +1,5 @@
+Test run for /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/tests/Calor.Compiler.Tests/bin/Debug/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-final-validation/n4-final-ratchets.trx
+
+Passed!  - Failed:     0, Passed:    25, Skipped:     0, Total:    25, Duration: 59 s - Calor.Compiler.Tests.dll (net10.0)

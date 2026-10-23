@@ -1,0 +1,187 @@
+diff --git a/src/Calor.Compiler/Ast/ExpressionNodes.cs b/src/Calor.Compiler/Ast/ExpressionNodes.cs
+index 3fd8d11d..d9d88f5d 100644
+--- a/src/Calor.Compiler/Ast/ExpressionNodes.cs
++++ b/src/Calor.Compiler/Ast/ExpressionNodes.cs
+@@ -23,6 +23,13 @@ public sealed class IntLiteralNode : ExpressionNode
+     public IntegerLiteralWidth Width { get; private init; }
+     public IntegerLiteralSignedness Signedness { get; }
+     public bool IsHex => Base == IntegerLiteralBase.Hexadecimal;
++
++    /// <summary>
++    /// #1413: true for an <c>INT:</c> literal whose value is outside the int32 range, so its
++    /// 64-bit width was inferred rather than spelled (<c>LONG:</c>). The verifier refuses it
++    /// (divergence D2); code generation is unchanged.
++    /// </summary>
++    public bool WidthInferred { get; init; }
+     public bool IsUnsigned => Signedness == IntegerLiteralSignedness.Unsigned;
+     public ulong UnsignedValue => Magnitude;
+     public bool IsLong
+diff --git a/src/Calor.Compiler/Parsing/Lexer.cs b/src/Calor.Compiler/Parsing/Lexer.cs
+index badbb6a4..e9c3f6f4 100644
+--- a/src/Calor.Compiler/Parsing/Lexer.cs
++++ b/src/Calor.Compiler/Parsing/Lexer.cs
+@@ -2327,6 +2327,8 @@ public sealed class Lexer
+         else
+         {
+             info = InferTypedSignedInteger(magnitude, sign, literalBase);
++            if (info is { Width: IntegerLiteralWidth.Bits64 } inferred)
++                info = inferred with { WidthInferred = true };
+         }
+ 
+         if (info is { } validInfo)
+diff --git a/src/Calor.Compiler/Parsing/Parser.cs b/src/Calor.Compiler/Parsing/Parser.cs
+index 690960fe..69e92600 100644
+--- a/src/Calor.Compiler/Parsing/Parser.cs
++++ b/src/Calor.Compiler/Parsing/Parser.cs
+@@ -4895,7 +4895,10 @@ public sealed class Parser
+                 info.Sign,
+                 info.Base,
+                 info.Width,
+-                info.Signedness);
++                info.Signedness)
++            {
++                WidthInferred = info.WidthInferred,
++            };
+         }
+         var value = token.Value switch
+         {
+diff --git a/src/Calor.Compiler/Parsing/Token.cs b/src/Calor.Compiler/Parsing/Token.cs
+index 39cead63..10056234 100644
+--- a/src/Calor.Compiler/Parsing/Token.cs
++++ b/src/Calor.Compiler/Parsing/Token.cs
+@@ -443,7 +443,8 @@ internal readonly record struct IntLiteralInfo(
+     IntegerLiteralSign Sign,
+     IntegerLiteralBase Base,
+     IntegerLiteralWidth Width,
+-    IntegerLiteralSignedness Signedness)
++    IntegerLiteralSignedness Signedness,
++    bool WidthInferred = false)
+ {
+     public bool IsNegative => Sign == IntegerLiteralSign.Negative;
+     public bool IsHex => Base == IntegerLiteralBase.Hexadecimal;
+diff --git a/src/Calor.Compiler/Verification/Z3/Cache/ContractHasher.cs b/src/Calor.Compiler/Verification/Z3/Cache/ContractHasher.cs
+index 3f4171bb..3a84b048 100644
+--- a/src/Calor.Compiler/Verification/Z3/Cache/ContractHasher.cs
++++ b/src/Calor.Compiler/Verification/Z3/Cache/ContractHasher.cs
+@@ -172,6 +172,11 @@ public sealed class ContractHasher
+ 
+     private void AppendExpression(StringBuilder sb, ExpressionNode expr)
+     {
++        // #1413: INT:-inferred 64-bit literals are refused by the verifier while the same
++        // value spelled LONG: is modeled; they must never share a cached verdict.
++        if (expr is IntLiteralNode { WidthInferred: true })
++            sb.Append("INFERRED-WIDTH:");
++
+         switch (expr)
+         {
+             case IntLiteralNode intLit:
+diff --git a/src/Calor.Compiler/Verification/Z3/ContractTranslator.cs b/src/Calor.Compiler/Verification/Z3/ContractTranslator.cs
+index f5de8e5b..4fcda0fd 100644
+--- a/src/Calor.Compiler/Verification/Z3/ContractTranslator.cs
++++ b/src/Calor.Compiler/Verification/Z3/ContractTranslator.cs
+@@ -490,8 +490,16 @@ public sealed class ContractTranslator
+         return null;
+     }
+ 
+-    private BitVecExpr TranslateIntLiteral(IntLiteralNode literal)
++    private BitVecExpr? TranslateIntLiteral(IntLiteralNode literal)
+     {
++        if (literal.WidthInferred)
++        {
++            // #1413 (S1 NUM-LITERAL-OVERSIZE, registered unsupported-refused): divergence D2 —
++            // an INT: literal outside the int32 range is refused. LONG:/UINT:/ULONG: spell an
++            // explicit width and stay modeled.
++            Refuse($"INT: literal {literal.Value} is outside the int32 range (D2); spell it LONG:");
++            return null;
++        }
+         if (literal.IsUnsigned)
+         {
+             var width = literal.IsLong || literal.UnsignedValue > uint.MaxValue ? 64u : 32u;
+@@ -680,6 +688,18 @@ public sealed class ContractTranslator
+     /// </summary>
+     private string? DiagnoseUnmodeledBitVecTyping(BinaryOperator op, BitVecExpr left, BitVecExpr right)
+     {
++        // #1413 (S1 NUM-NARROW-ARITH, registered unsupported-refused): divergence D1 is closed
++        // by refusal in docs/verification-modeled-forms.md — arithmetic and shifts whose
++        // operands are BOTH narrower than 32 bits are Unsupported. The promotion model made
++        // them Proven, a claim the registered row does not allow.
++        if (op is BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
++                or BinaryOperator.Divide or BinaryOperator.Modulo
++                or BinaryOperator.LeftShift or BinaryOperator.RightShift
++            && left.SortSize < 32 && right.SortSize < 32)
++        {
++            return "arithmetic with both operands narrower than 32 bits is refused (D1)";
++        }
++
+         // Shift counts wider than 32 bits have no C# typing (the count operand
+         // must convert to int); refuse rather than guess (review #833 C3).
+         if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift
+@@ -794,6 +814,12 @@ public sealed class ContractTranslator
+ 
+     private Expr? TranslateUnaryNegation(BitVecExpr operand)
+     {
++        if (operand.SortSize < 32)
++        {
++            // #1413: D1's unary form (docs/verification-modeled-forms.md: narrow negation refused).
++            return Refuse("negation of an operand narrower than 32 bits is refused (D1)");
++        }
++
+         if (!IsSigned(operand) && operand.SortSize == 64)
+         {
+             return Refuse(
+diff --git a/src/Calor.Compiler/Verification/Z3/Z3Verifier.cs b/src/Calor.Compiler/Verification/Z3/Z3Verifier.cs
+index 20677d50..9410e60c 100644
+--- a/src/Calor.Compiler/Verification/Z3/Z3Verifier.cs
++++ b/src/Calor.Compiler/Verification/Z3/Z3Verifier.cs
+@@ -73,6 +73,17 @@ public sealed class Z3Verifier : IDisposable
+     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
+     private bool _disposed;
+ 
++    private static bool ContainsNestedQuantifier(ExpressionNode expression)
++    {
++        static bool IsQuantifier(AstNode node) => node is ForallExpressionNode or ExistsExpressionNode;
++        static IEnumerable<AstNode> Descendants(AstNode node)
++            => Analysis.RecursiveAstWalker.GetAllChildren(node)
++                .SelectMany(child => Descendants(child).Prepend(child));
++        return Descendants(expression).Prepend(expression)
++            .Where(IsQuantifier)
++            .Any(quantifier => Descendants(quantifier).Any(IsQuantifier));
++    }
++
+     internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
+     {
+         var safety = IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray()));
+@@ -209,6 +220,17 @@ public sealed class Z3Verifier : IDisposable
+ 
+         var translator = CreateTranslator();
+ 
++        // #1413 (S1 QNT-NESTED, registered unsupported-refused): a quantifier inside another
++        // quantifier's body has no runtime lowering (the emitter rejects it, Calor0326), so the
++        // verifier claims nothing about it.
++        if (preconditions.Select(p => p.Condition).Append(postcondition.Condition).Any(ContainsNestedQuantifier))
++        {
++            return ContractVerificationResult.FromOutcome(
++                ProofOutcome.Assign(ProofEvidence.Unsupported(
++                    "nested quantifiers are refused: the runtime check cannot evaluate them (Calor0326). Runtime check kept.")),
++                Duration: sw.Elapsed);
++        }
++
+         // A parameter named `result` collides with the postcondition result variable:
+         // DeclareVariable("result") would silently overwrite it, aliasing the two into one
+         // solver constant — a contradictory body binding (e.g. `result == result + 1`) then
+@@ -492,7 +514,14 @@ public sealed class Z3Verifier : IDisposable
+ 
+             if (bodyArithmeticSafety != null)
+                 solver.Assert(bodyArithmeticSafety);
+-            var checkedArithmeticAssumed = !ArithmeticSafetyEntailed(_ctx, solver, checkedArithmeticConditions);
++            // #1413 (S1 NUM-OVERFLOW-CHECKED, registered assumed): a contract whose checked
++            // arithmetic can overflow on SOME input of its types is an overflow-sensitive shape,
++            // and Assumed is the strongest outcome the registration allows for it — even when
++            // the preconditions rule the overflow out (the entailment the solver used to accept
++            // as an unconditional Proven). Only arithmetic that cannot overflow at all stays
++            // unconditional.
++            var checkedArithmeticAssumed = !IsolatedSolver.Simplify(
++                _ctx, _ctx.MkAnd(checkedArithmeticConditions.ToArray())).IsTrue;
+             foreach (var condition in checkedArithmeticConditions)
+                 solver.Assert(condition);
+             if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })

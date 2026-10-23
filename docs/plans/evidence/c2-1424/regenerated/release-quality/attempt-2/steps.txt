@@ -1,0 +1,11 @@
+start 2026-10-07T15:41:35Z
+STEP build-performance-tests exit 0 at 2026-10-07T15:41:36Z
+STEP negative-gate-self-tests exit 0 at 2026-10-07T15:41:41Z
+STEP check-manifest-skips-assertions-sample-ids exit 0 at 2026-10-07T15:41:46Z
+STEP collect-and-enforce-coverage exit 0 at 2026-10-07T15:57:50Z
+STEP mutation-gate exit 0 at 2026-10-07T15:59:00Z
+STEP performance-gate exit 1 at 2026-10-07T16:02:11Z
+STEP flake-gate-100 exit 0 at 2026-10-07T16:05:32Z
+STEP roundtrip-run-all exit 1 at 2026-10-07T16:07:42Z
+STEP migration-scorecard exit 0 at 2026-10-07T16:07:48Z
+end 2026-10-07T16:07:49Z

@@ -1,0 +1,24 @@
+{
+  "schema": "calor.maintainer-override/1",
+  "version": "0.24.0",
+  "tag": "v0.24.0",
+  "publishCommit": "dispatch-ref",
+  "publishCommitRule": "The commit published is the main commit that publish-nuget.yml is dispatched at (github.sha). scripts/verify_maintainer_override.py requires that commit to be on fetched protected main, to contain this file, to contain the terminal record below with the recorded sha256, and to declare <Version>0.24.0</Version> in Directory.Build.props. Every later surface binds to the v0.24.0 tag that the publish job creates at that commit.",
+  "terminalRecord": {
+    "path": "docs/plans/evidence/adjudication-1408/terminal-record.json",
+    "sha256": "adc24ef5a38aecc8a5e2d5b58f861fb68d7db5fd36100ab8a13a5b2f4dfaddbd",
+    "outcome": "MILESTONE-FAILED",
+    "pr": 1543
+  },
+  "decisionDate": "2026-10-10",
+  "decidedBy": "@juanmicrosoft",
+  "authorization": "I authorize changing the release gate",
+  "gated": false,
+  "statement": "Calor 0.24.0 is released as an explicit maintainer override outside the #1410 adjudication gate. This release is ungated: the #1408 terminal record is MILESTONE-FAILED, no successful adjudication identity exists, and the record stays unchanged. The override changes neither the record's outcome nor any of its rows.",
+  "requiredNoteText": [
+    "MILESTONE-FAILED",
+    "docs/plans/evidence/adjudication-1408/terminal-record.json",
+    "maintainer override"
+  ],
+  "benchmarkPublication": "none"
+}

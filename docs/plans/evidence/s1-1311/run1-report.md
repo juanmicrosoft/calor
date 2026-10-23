@@ -1,0 +1,101 @@
+<!-- Run 1 record (contract amendment 1.2.0 condition 7). This is docs/plans/v0.24-s1-soundness-results.md exactly as committed at d1e476b5, kept verbatim. Paths are as of run 1: the harness has since moved (path only) to bench/Calor.Soundness.Sweep/, and run 1's gate status (BLOCKED) is preserved in run1-gate-status.json; gate-status.json now holds the current status. -->
+# v0.24 S1 — released-verifier soundness sweep results (#1311)
+
+Executes #1419 registration 1.0.0 (frozen by `6a1a78db71b04bee3f2d42268e92800d94333f67`, PR #1476)
+under contract 1.1.0. Raw results: `bench/correctness/false-established/v024/{B1,N1,P845}/`. Packet:
+`docs/plans/evidence/s1-1311/` (`sha256.json` covers it and every raw file). Harness:
+`tools/Calor.Soundness.Sweep/` (registered generator and oracle linked unmodified). S2 (#1413)
+dispositions every finding; none is dispositioned here.
+
+**Gate status: BLOCKED** (contract §8 stopping condition 1; `gate-status.json`). The 1,500 case-execution
+ceiling was reached. Every registered sweep, control, and P845 case ran, but 8 registered
+cross-baseline re-runs did not. S1 stays BLOCKED unless a reviewed amendment raises the ceiling by at
+least 8. The results are also **provenance-unconfirmed** for one pin (§4). Both need a maintainer
+decision. The row statuses below are the mechanical per-baseline results either way.
+
+## 1. What was and was not established
+
+- B1 (v0.22.0 built from `72a0a855`) and N1 (nuget.org `calor 0.21.0`) each ran the full frozen list:
+  678 sweep cases and 32 controls, as separate sweeps. All counts are per baseline. The two
+  baselines produced the same token and class on all 710 cases; that is an observation, not pooling.
+- **The released verifier produced false unconditional proofs on both baselines:** 7 cases in 4
+  release-critical rows each. Under contract §4 and §8 each is release-blocking for its form until
+  S2 fixes or visibly demotes it.
+- 10 more release-critical rows per baseline have other findings. 74 of 88 are
+  `CLEAN-WITHIN-BUDGET`, which means only **no counterexample within this matrix and budget**; 10 of
+  those are modeled rows with zero `validated-proof` cases and support no claim relying on
+  `Proven`/`Discharged` (`results-summary.json`). No row is `INCOMPLETE`. Two cases per
+  baseline stayed `TimeoutOrUnavailable` after their retry; both are in rows that already have a
+  finding, so those rows are `FINDING`.
+- Not established: whole-compiler soundness; other platforms (osx-arm64 only); solver determinism
+  (#1421/#1135); the 7 excluded `XCL-*` rows.
+
+| Release-critical rows | FALSE-PROOF | FINDING | INCOMPLETE | CLEAN-WITHIN-BUDGET |
+|---|---|---|---|---|
+| B1 | 4 | 10 | 0 | 74 |
+| N1 | 4 | 10 | 0 | 74 |
+
+**FALSE-PROOF (both):** `OBL-MUTATION-KILL`, `IMPL-ASSUMPTION-FORMS`, `IMPL-DIVISION-TOTALIZED`,
+`CACHE-LITERAL-WIDTH`. **FINDING (both):** `NUM-NARROW-ARITH`, `NUM-LITERAL-OVERSIZE`,
+`NUM-OVERFLOW-CHECKED` (+1 timed-out), `QNT-NESTED`, `STR-OPS-COUNT-INDEX` (+1 timed-out),
+`STR-NULL-NONASCII`, `OBL-BRANCH-FACTS`, `OBL-REFINEMENT-RETURN`, `OBL-SUBTYPE`, `OBL-SELFREF`.
+
+## 2. Findings (34 per baseline; `F-B1-0nn` and `F-N1-0nn` are the same case)
+
+Records (`<baseline>/findings/`, registered format, `disposition: null`) carry the registered case
+text as the minimized source, an executed BCL-only C# reproduction, and the affected guarantee.
+
+| Finding | Case | Token | What is false |
+|---|---|---|---|
+| 014, 015 | `OBL-MUTATION-KILL-001`, `-003` | Discharged | `§PROOF` restates the entry `§Q` after `§ASSIGN x` changes x; the stale fact discharges it and the guard is elided (witness x=0 → −408872766; x=MAX → 0) |
+| 027, 029 | `IMPL-ASSUMPTION-FORMS-001`, `-005` | Proven (weakening) | implementer `§Q (>= (len s) 0)` throws on the null string the interface admits |
+| 028 | `IMPL-ASSUMPTION-FORMS-003` | Proven | implementer `§Q (\|\| (! (isempty s)) (== s ""))` is false for null |
+| 030 | `IMPL-DIVISION-TOTALIZED-001` | Proven | implementer `§Q (> (% x y) -2)` throws at y=0, which the interface admits |
+| 031 (+032 stale-cache-proof) | `CACHE-LITERAL-WIDTH-001` | Proven (warm) | the warm compile reuses the `LONG:1` prime's proof for `INT:1` under `overflow=unchecked`; x=MAX violates it; the cold compile does not prove it |
+
+Other findings: `required-demotion-absent` 8 (`NUM-NARROW-ARITH-005`, `NUM-LITERAL-OVERSIZE-003`,
+`NUM-OVERFLOW-CHECKED-007/008/009`, `QNT-NESTED-001/003/004`); `spurious-refutation` 17;
+`stale-cache-proof` 2. `NUM-OVERFLOW-CHECKED` is titled "Assumed unless entailed", but the frozen
+table classifies every `Proven` on an assumed row as `required-demotion-absent`; S2 decides. The
+`QNT-NESTED` proofs come before the front end rejects the case (Calor0326) and are adjudicated as
+registered. Three `spurious-refutation` cases (`STR-OPS-COUNT-INDEX-003`, `OBL-BRANCH-FACTS-006`,
+`OBL-MUTATION-KILL-004`) have a property that is really false; the registered rule still classifies
+them by the solver model, which fails the entry hypothesis. Their witness field shows the model.
+
+**Other baseline.** 56 reserve re-runs (false proofs first) all reproduce; the ceiling stopped 8
+(`OBL-SUBTYPE-002`, `STR-NULL-NONASCII-001`/`-004`, `STR-OPS-COUNT-INDEX-003` on each baseline).
+
+## 3. Controls
+
+Oracle controls 13/13; solver availability 14/14 on B1, N1, and P845; mutation pairs M1, M2 equal.
+All 6 #845 cases and 8 post-fix vectors matched `expectedOutcome` on B1 and on N1. P845 matched all 6
+`p845ExpectedOutcome` values (Proven on the violated width cases), so the #845 control discriminates
+on each baseline. No CLI cross-check contradiction; no `control-mismatch` (`controls.json`).
+
+## 4. Execution, corrections, and gaps
+
+- Preflight passed (`derive-manifests.py --check`, packet hashes, 26 registration tests, case index,
+  N1 nupkg and catalog hashes, B1/P845 builds; `preflight.json`, `pins.json`). Order as registered,
+  sequential. 4 retries, all `TimeoutOrUnavailable` twice; no flaky, crashed, harness-invalid, or
+  over-time case. Every attempt is retained; `ledger.jsonl` lists all 1,500 executions.
+- **Harness corrections after inspecting results** (`harness-corrections.json`; no registered rule
+  changed; run-time values retained in every attempt and in `case-results.runtime-8e33f080.jsonl`):
+  HC1 adjudicates only the implication template's own direction (removed 13 false proofs per
+  baseline, all `IMPL-*`, whose own direction was an LSP-violation error); HC2 fixes obligation guard
+  markers (removed 5 spurious `guard-elided-without-proof`); HC3 replays string models (added 1
+  `spurious-refutation`); HC4/HC5 fix O2 entry values and O2 driver types. HC1–HC3 re-apply the mapping
+  to retained observations; HC4/HC5 re-run O2 from the retained forced emission. No verifier channel
+  was re-executed. Per baseline (distinct cases): O2 ran fully on 671, partially on 2 (`GEN-REFUSAL-002`,
+  `-004`: the frozen input `new object()` cannot be passed to the emitted `double[]`; a maintainer
+  decision), not at all on 9 the compiler rejected (Calor1002); 28 are not applicable. No divergence.
+- **Provenance gap:** the native `libz3` image the sweep process mapped was not captured in-run, as
+  the registration requires. File hashes were taken before case 1, and a post-run process with the
+  same layout maps each baseline's own `libz3.dylib`, all hashing `8d1f5438…59ada` (the registered
+  value); no other `libz3` exists on the search paths. That supports, but does not prove, the
+  original mapping (`pins.json`, `native-z3-check.json`). A conforming re-run needs new capacity.
+
+## 5. Capacity (contract §9)
+
+Case executions 1,500 of 1,500 (B1 710, N1 710, P845 20, reserve 74 of 74). Reaching this ceiling
+stopped the re-runs and blocks the gate (see top). Timebox (2026-10-13T00:36:51Z) met: finished 2026-10-03. About 3 of 20 agent-hours; 0 of
+600 CI runner-minutes (PR CI is ordinary PR CI); under 1 of 10 local machine-hours; $0.

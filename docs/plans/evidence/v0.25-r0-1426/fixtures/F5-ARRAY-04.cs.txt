@@ -1,0 +1,45 @@
+// 0.25 R0 (#1426) baseline fixture F5-ARRAY-04 (#1132): generated-name collisions and exception
+// order. In Grid, parameters are named exactly like the id and the name the converter gives the
+// returned 2-D array (arr2d005, arr2d006 at the measured commit). In Run, a user local named
+// _hoist000 shares the scope where the converter hoists array elements into _hoist000.., and an
+// element initializer throws after earlier elements were evaluated. The output observes every
+// user value, so a generated name that captures or shadows user storage changes the result.
+using System;
+
+public static class Probe
+{
+    private static string log = "";
+
+    public static int Note(int v)
+    {
+        log = log + v;
+        return v;
+    }
+
+    public static int Boom()
+    {
+        throw new InvalidOperationException("boom");
+    }
+
+    public static int[,] Grid(int arr2d005, int arr2d006)
+    {
+        return new int[,] { { Note(arr2d005), Note(arr2d006) } };
+    }
+
+    public static string Run()
+    {
+        var g = Grid(1, 2);
+        int _hoist000 = 50;
+        string thrown = "";
+        try
+        {
+            var xs = new int[] { Note(3), Boom(), Note(4) };
+            thrown = "none" + xs.Length;
+        }
+        catch (InvalidOperationException e)
+        {
+            thrown = e.Message;
+        }
+        return g[0, 0] + "|" + g[0, 1] + "|" + _hoist000 + "|" + thrown + "|" + log;
+    }
+}

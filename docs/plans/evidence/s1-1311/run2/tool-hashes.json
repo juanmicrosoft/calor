@@ -1,0 +1,43 @@
+{
+  "note": "Byte-level SHA-256 of every harness file. The path move (0bfc414c) is git mv only: all six files hash identically before and after it. The run-2 harness (ff2daf95) differs from e7cbce77 in exactly the two ways amendment 1.2.1 condition 4 permits: (a) the capture (new LoadedImageCapture.cs, 8 added lines in Program.cs; d17674dd), (b) ExecutionCeiling 1500 -> 1508 in Program.cs (ff2daf95). harness-diff.patch is the full diff.",
+  "e7cbce77 (run 1 final harness, tools/Calor.Soundness.Sweep/)": {
+    "BaselineHost.cs": "111b8d597189f985c4865ca18fecf7dd33cf2cbd19aafb063a670e4a706853eb",
+    "Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
+    "CaseExecutor.cs": "afa2ce43f83d6a706ee9ff1cb543ecdf68a7d37d13c8ff32052d0c7a8512cacf",
+    "OracleRuntime.cs": "86cc1d392ed4cd84149b8227c58f802d554a8f86cdd84596002c77dda10ae40e",
+    "Program.cs": "c78949b501a58b08fe824d180a3c761200aa5281bbc0c2005dc79aa1dae8c631",
+    "Report.cs": "19a7488ea76c8658ebc02bd306e50b34ab9b5abb84440885aa73889f9d5b3b33"
+  },
+  "0bfc414c (after the path-only move, bench/Calor.Soundness.Sweep/)": {
+    "BaselineHost.cs": "111b8d597189f985c4865ca18fecf7dd33cf2cbd19aafb063a670e4a706853eb",
+    "Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
+    "CaseExecutor.cs": "afa2ce43f83d6a706ee9ff1cb543ecdf68a7d37d13c8ff32052d0c7a8512cacf",
+    "OracleRuntime.cs": "86cc1d392ed4cd84149b8227c58f802d554a8f86cdd84596002c77dda10ae40e",
+    "Program.cs": "c78949b501a58b08fe824d180a3c761200aa5281bbc0c2005dc79aa1dae8c631",
+    "Report.cs": "19a7488ea76c8658ebc02bd306e50b34ab9b5abb84440885aa73889f9d5b3b33"
+  },
+  "ff2daf95 (run-2 harness, bench/Calor.Soundness.Sweep/)": {
+    "BaselineHost.cs": "111b8d597189f985c4865ca18fecf7dd33cf2cbd19aafb063a670e4a706853eb",
+    "Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
+    "CaseExecutor.cs": "afa2ce43f83d6a706ee9ff1cb543ecdf68a7d37d13c8ff32052d0c7a8512cacf",
+    "OracleRuntime.cs": "86cc1d392ed4cd84149b8227c58f802d554a8f86cdd84596002c77dda10ae40e",
+    "Program.cs": "c865e6b0d4d3da1afcaa6b11612187cfdc61582ec311bba732c31a3146d855e9",
+    "Report.cs": "19a7488ea76c8658ebc02bd306e50b34ab9b5abb84440885aa73889f9d5b3b33",
+    "LoadedImageCapture.cs": "ef703a2ac332ed7b3626b642c15ab644ea1acbd7cfcedc5b9b8bd1248c164f2c"
+  },
+  "changedFromE7cbce77": [
+    "Program.cs (capture calls + ExecutionCeiling)",
+    "LoadedImageCapture.cs (new)"
+  ],
+  "linkedRegisteredSources": {
+    "tests/Calor.Compiler.Tests/SoundnessRegistration/SweepCaseGenerator.cs": {
+      "e7cbce77": "13e83d228096488912eae873d116da2edec87a59bda82d8169973d9f316ea623",
+      "ff2daf95": "13e83d228096488912eae873d116da2edec87a59bda82d8169973d9f316ea623"
+    },
+    "tests/Calor.Compiler.Tests/SoundnessRegistration/IndependentOracle.cs": {
+      "e7cbce77": "7e74f305453a44a39ab9427eb6a99dc95b2677c86d9d69ed5558c82a500147b6",
+      "ff2daf95": "7e74f305453a44a39ab9427eb6a99dc95b2677c86d9d69ed5558c82a500147b6"
+    }
+  },
+  "harnessDllSha256AtRun": "782c7652ce7a617531792068f6295d9309a730986f9eb748670410186a8bddf6 (bench/Calor.Soundness.Sweep/bin/Release/net10.0/Calor.Soundness.Sweep.dll, built at ff2daf95)"
+}

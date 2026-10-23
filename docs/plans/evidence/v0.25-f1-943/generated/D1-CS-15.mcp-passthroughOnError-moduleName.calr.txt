@@ -1,0 +1,11 @@
+§M{m001:Custom:overflow=unchecked}
+  §CL{c001:Probe:pub:stat}
+    §CSHARP{    public static string Run()
+    {
+        int _ = 5;
+        int.TryParse("42", out _);
+        return _.ToString();
+    }
+    }§/CSHARP
+
+

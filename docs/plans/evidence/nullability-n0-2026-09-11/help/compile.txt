@@ -1,0 +1,67 @@
+Description:
+  Calor Compiler - Compiles Calor source to C# and migrates between languages
+
+Usage:
+  calor [command] [options]
+
+Options:
+  -i, --input <input>                             The Calor source file(s) to compile. Pass multiple files to enable cross-module effect enforcement.
+  -o, --output <output>                           The output C# file path
+  -r, --reference <reference>                     Assembly reference used to validate generated C# (repeatable)
+  -v, --verbose                                   Enable verbose output
+  --strict-api                                    Enable strict API mode: requires §BREAKING markers for public API changes
+  --require-docs                                  Require documentation on public functions and types
+  --enforce-effects                               Enforce effect declarations (default: true as of v0.11; use --no-enforce-effects to opt out) [default: True]
+  --no-enforce-effects                            Disable effect enforcement (opt out of the v0.11 default-on behavior) [default: False]
+  --no-type-check                                 Disable the type checker (opt out of the v0.12 default-on behavior) [default: False]
+  --transpile-only                                UNSAFE: emit C# without type checking or Roslyn validation; no validated-success claim or incremental cache entry is produced [default: False]
+  --strict-effects                                Promote unknown external call warnings (Calor0411) to errors [default: False]
+  --permissive-effects                            Permissive effect mode: unknown calls assumed pure, forbidden effects demoted to warnings. Designed for converted code. [default: False]
+  --contract-mode <contract-mode>                 Contract enforcement mode: off, debug, or release (default: debug) [default: debug]
+  --verify                                        Enable static contract verification with Z3 SMT solver
+  --elide-proven-guards                           Drop runtime contract guards on clean Proven verdicts (default since v0.15 — roadmap §4.5; accepted for compatibility). Use --keep-proven-guards to opt out. [default: True]
+  --keep-proven-guards, --no-elide-proven-guards  Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; verification stays diagnostic) [default: False]
+  --cache                                         Enable the incremental-build cache (.calor-build-state.json next to the outputs): unchanged files are skipped and report 'Up-to-date (cached)'. Opt-in for plain compiles; 'calor watch' always caches.
+  --no-cache                                      Disable caching (verification results and the incremental-build cache; overrides --cache)
+  --clear-cache                                   Clear caches before compiling (verification cache and .calor-build-state.json)
+  --verification-timeout <verification-timeout>   Z3 solver timeout per contract in milliseconds (default: 5000) [default: 5000]
+  --analyze                                       Enable advanced verification analyses (dataflow, bug patterns, taint tracking)
+  --all-findings                                  Report all analysis findings including inconclusive and low-confidence results (default: only report verified findings)
+  --strict-bind-inference                         Enable strict bind-inference diagnostics Calor0251-0253 (null/none, generic factory, ambiguous-numeric). Default-on as of v0.6.3. [default: True]
+  --no-strict-bind-inference                      Disable the strict bind-inference diagnostics Calor0251-0253 (opt-out of the v0.6.3 default). [default: False]
+  --experimental <experimental>                   Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.
+  -f, --format <json|sarif|text>                  Diagnostic output format: text (human-readable, stderr), json, or sarif (machine-readable, stdout) [default: text]
+  --no-telemetry                                  Force-disable anonymous usage telemetry (telemetry is OPT-IN and off by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)
+  --telemetry-preview                             Print schema-approved telemetry payloads locally to stderr without network transmission
+  --version                                       Show version information
+  -?, -h, --help                                  Show help and usage information
+
+Commands:
+  convert <input>                Convert a single file between C# and Calor
+  migrate <path>                 Migrate an entire project between C# and Calor
+  benchmark <project>            Compare Calor vs C# across 7 evaluation categories
+  init                           Initialize the current directory for Calor development with AI coding agents
+  format <files>                 Format Calor source files to canonical style
+  rename <path>                  Rename a symbol and every reference to it
+  index                          Build and inspect the project index
+  query                          Ask the project index about your code
+  lint <files>                   Check and fix Calor code for agent-optimal format
+  analyze, assess <path>         Assess C# files for Calor migration potential
+  analyze-convertibility <path>  Analyze how likely C# code is to successfully convert to Calor
+  hook                           AI agent hook commands for Calor-first enforcement
+  ids                            Manage Calor declaration IDs
+  fix <root>                     Apply mechanical, reversible source rewrites
+  effects                        Work with effect declarations and manifests
+  import <package>               Generate effect manifests (and assumed-provenance contract facts) for a package's public surface
+  verify <files>                 Verify contracts in Calor files using Z3 SMT solver
+  review-packet <files>          Assemble a per-change review packet that leads with the unproven remainder
+  lsp                            Start the Calor Language Server (stdio transport)
+  mcp                            Start the Calor MCP server for AI coding agents
+  feature-check <feature>        Check if a C# feature is supported in Calor conversion
+  coverage <file>                Analyze a C# file for Calor conversion coverage and blockers
+  self-test                      Verify compiler correctness by compiling embedded reference files and diffing output against golden files
+  self-check                     Verify that agent-facing artifacts stay in sync with the implementation
+  evaluation                     Evaluation harness for the Calor-native type-system research plan (Phase 0+).
+  run <path>                     Compile and execute a Calor program (no project file required)
+  test <path>                    Compile Calor sources and run tests against them (no project file required)
+  watch <paths>                  Watch Calor sources and recompile incrementally on change (compile-only)

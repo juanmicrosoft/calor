@@ -1,0 +1,239 @@
+{
+ "schema": "v0.25-regeneration/f6-aggregates/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "rows": [
+  {
+   "tool": "calor_migrate",
+   "project": "mixed",
+   "isError": true,
+   "totalFiles": 2,
+   "successCount": 0,
+   "failureCount": 2,
+   "perFile": [
+    {
+     "path": "F5ARRAY02.cs",
+     "status": "failed",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "refused",
+      "interop": 0,
+      "rescue": 1,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {
+       "parse-failure": 1
+      },
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    },
+    {
+     "path": "RoundTripFailure.cs",
+     "status": "failed",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "refused",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    }
+   ],
+   "derived": {
+    "files": 2,
+    "statuses": [
+     "failed",
+     "failed"
+    ],
+    "refused": 2
+   },
+   "consistent": true
+  },
+  {
+   "tool": "calor_migrate",
+   "project": "clean",
+   "isError": false,
+   "totalFiles": 2,
+   "successCount": 1,
+   "failureCount": 0,
+   "perFile": [
+    {
+     "path": "F5ARRAY02.cs",
+     "status": "partial",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 0,
+      "rescue": 1,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {
+       "parse-failure": 1
+      },
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    },
+    {
+     "path": "F1REFOUT01.cs",
+     "status": "success",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    }
+   ],
+   "derived": {
+    "files": 2,
+    "statuses": [
+     "partial",
+     "success"
+    ],
+    "refused": 0
+   },
+   "consistent": true
+  },
+  {
+   "tool": "calor_batch",
+   "project": "mixed",
+   "isError": true,
+   "aggregate": {
+    "summary": {
+     "totalFiles": 2,
+     "successfulFiles": 0,
+     "partialFiles": 0,
+     "failedFiles": 2,
+     "skippedFiles": 0,
+     "timedOutFiles": 0,
+     "successRate": 0,
+     "totalDurationMs": 44,
+     "totalCsharpBlocks": 0
+    }
+   },
+   "files": [
+    {
+     "path": "F5ARRAY02.cs",
+     "status": "failed",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "refused",
+      "interop": 0,
+      "rescue": 1,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {
+       "parse-failure": 1
+      },
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    },
+    {
+     "path": "RoundTripFailure.cs",
+     "status": "failed",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "refused",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    }
+   ],
+   "derived": {
+    "files": 2,
+    "statuses": [
+     "failed",
+     "failed"
+    ],
+    "refused": 2
+   },
+   "consistent": true
+  },
+  {
+   "tool": "calor_batch",
+   "project": "clean",
+   "isError": false,
+   "aggregate": {
+    "summary": {
+     "totalFiles": 2,
+     "successfulFiles": 1,
+     "partialFiles": 1,
+     "failedFiles": 0,
+     "skippedFiles": 0,
+     "timedOutFiles": 0,
+     "successRate": 50,
+     "totalDurationMs": 35,
+     "totalCsharpBlocks": 1
+    }
+   },
+   "files": [
+    {
+     "path": "F5ARRAY02.cs",
+     "status": "partial",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "preserved",
+      "interop": 0,
+      "rescue": 1,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {
+       "parse-failure": 1
+      },
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    },
+    {
+     "path": "F1REFOUT01.cs",
+     "status": "success",
+     "conversionPaths": {
+      "schemaVersion": 1,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false
+     }
+    }
+   ],
+   "derived": {
+    "files": 2,
+    "statuses": [
+     "partial",
+     "success"
+    ],
+    "refused": 0
+   },
+   "consistent": true
+  }
+ ],
+ "allConsistent": true
+}

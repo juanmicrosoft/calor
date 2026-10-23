@@ -1,0 +1,14 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Run:pub:stat} () -> str
+        §B{i32:x} 9
+        §B{str:dollar} "\${x}"
+        §B{str:braces} "{x}"
+        §B{str:real} "${x}"
+        §R (+ (+ (+ (+ dollar "|") braces) "|") real)
+
+
+

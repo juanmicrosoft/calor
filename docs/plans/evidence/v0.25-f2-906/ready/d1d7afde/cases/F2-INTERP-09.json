@@ -1,0 +1,81 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "F2-INTERP-09",
+ "family": "F2",
+ "role": "residual",
+ "expected": "native",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "4047ac60402e91acc1e1374732f2705b1e76d8b1841c4d33c009eb4cb22e07d6",
+ "result": "passed",
+ "cells": {},
+ "cellEvidence": {},
+ "judgement": "incomplete diagnostics 0 (conversion 0); bound 4828; ratchet regenerates byte-identically; every count equals the 'after' value T1 register 1.0.3 re-registered on the candidate (D-F2-INTERP-09-RECANDIDATE, scope 1.5.0); the ratchet regenerates the baseline byte-identically, so the counts are preserved",
+ "measurements": [
+  {
+   "kind": "corpus-counts",
+   "instrument": "tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs with corpus submodules at the candidate's gitlinks",
+   "regeneration": "CALOR_UPDATE_BINDER_BASELINE=1 rewrote bench/phase0-agent-native/ byte-identically (git diff empty)",
+   "log": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/regen-binder-diff.log",
+   "candidate": {
+    "incompleteDiagnostics": 0,
+    "conversionIncomplete": 0,
+    "inRepoExpressionsBound": 4828,
+    "conversionVisits": 34371,
+    "opaqueBoundaries": 148,
+    "opaqueExpressions": 7746
+   },
+   "registerCounts": {
+    "incompleteDiagnostics": {
+     "before": 0,
+     "after": 0
+    },
+    "inRepoExpressionsBound": {
+     "before": 4820,
+     "after": 4828
+    },
+    "conversionVisits": {
+     "before": 35159,
+     "after": 34371
+    },
+    "opaqueBoundaries": {
+     "before": 129,
+     "after": 148
+    },
+    "opaqueExpressions": {
+     "before": 6944,
+     "after": 7746
+    }
+   },
+   "note": "T1 register 1.0.3 (D-F2-INTERP-09-RECANDIDATE, scope 1.5.0) re-registered the 'after' counts to the candidate values measured on 48cae911 (src/ identical at d1d7afde), with per-PR attribution; this record compares the candidate's regenerated counts with them.",
+   "registerAfterPreserved": {
+    "inRepoExpressionsBound": true,
+    "conversionVisits": true,
+    "opaqueBoundaries": true,
+    "opaqueExpressions": true,
+    "incompleteDiagnostics": true
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/corpus-binder-ratchet.trx.gz",
+     "match": "BinderIncompleteRatchetTests",
+     "count": 8,
+     "passed": 8,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

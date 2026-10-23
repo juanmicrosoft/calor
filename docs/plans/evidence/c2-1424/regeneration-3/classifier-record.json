@@ -1,0 +1,20 @@
+{
+ "schema": "c2-1424/classifier-record/1",
+ "issue": 1424,
+ "regeneration": 3,
+ "candidate": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+ "supplements": ["docs/plans/evidence/c2-1424/regeneration-3/ledger.json", "docs/plans/evidence/c2-1424/regeneration-3/raw-artifact-freeze.json"],
+ "classifier": {
+  "test": "Calor.Compiler.Tests.EvidenceContract.CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated",
+  "anchor": "b04e963f69a5a1016159cfcf8c5199eeea329fdb",
+  "anchorCheckout": "fresh clone of https://github.com/juanmicrosoft/calor.git, detached at the anchor",
+  "target": "0ceff9d49f9cf5fdd241a45d25444df9d4803cb1",
+  "originMainAtRun": "b04e963f69a5a1016159cfcf8c5199eeea329fdb",
+  "landingFound": "b04e963f69a5a1016159cfcf8c5199eeea329fdb",
+  "verdict": "NOT-INVALIDATED",
+  "output": {"path": "docs/plans/evidence/c2-1424/regeneration-3/classifier.txt", "sha256": "768fdf166f28a2cfc891536f93922cb8a5eeacfcc1535f7026f355ff1716bd92"},
+  "range": "Both commits on the branch: b951d1c4 (regeneration-2 history, 211 added files) and 0ceff9d49f9cf5fdd241a45d25444df9d4803cb1 (regeneration 3, 193 added files).",
+  "laterCommits": "The next commit adds only new data files under regeneration-3/ (this record, classifier.txt, r2-dry-run/, reviews/); the final branch head is classified again before push and its verdict is in the PR description.",
+  "earlierRuns": "Pre-push draft 9ceadff0 was also NOT-INVALIDATED; it is not on the branch."
+ }
+}

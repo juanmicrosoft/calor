@@ -1,0 +1,56 @@
+{
+ "schema": "c2-1424/plan/3",
+ "issue": 1424,
+ "regeneration": {
+  "number": 3,
+  "of": 3,
+  "note": "The last regeneration allowed (contract 1.5.0 exception). Regenerations 1 (696ab824) and 2 (5e52d8ab, PR #1535, never merged) are history in ../ and ../regeneration-2/; under stopping rule 4 none of their results carry over."
+ },
+ "contractVersion": "1.5.0",
+ "candidate": {
+  "commit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+  "version": "0.24.0",
+  "manifest": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+  "c1Landing": "b04e963f69a5a1016159cfcf8c5199eeea329fdb",
+  "supersedes": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d"
+ },
+ "writtenAtUtc": "2026-10-09T17:50:00Z",
+ "writtenNote": "Written after the four CI dispatches (17:16Z), the two local lanes, and release-quality (17:17-17:48Z). The commands are regeneration 2's (../regeneration-2/plan.json) with the changes below; none was chosen after seeing a result. Before dispatching, the candidate's own plan guard (determinism_runner.plan_problems with the live run inventory and the PR #1537 merge lookup) was run locally and returned no problem.",
+ "lanes": [
+  {
+   "id": "ci-determinism",
+   "command": "gh workflow run determinism-protocol.yml --ref c2-1424/candidate-04e61f18 -f mode=execution -f execution_id=c2-1424-regen-3",
+   "charge": "regeneration-compute (chargeRule c2-candidate-determinism-protocol)"
+  },
+  {
+   "id": "ci-test",
+   "command": "gh workflow run test.yml --ref c2-1424/candidate-04e61f18"
+  },
+  {
+   "id": "ci-tier2",
+   "command": "gh workflow run tier2.yml --ref c2-1424/candidate-04e61f18"
+  },
+  {
+   "id": "ci-reproducible-builds",
+   "command": "gh workflow run reproducible-builds.yml --ref c2-1424/candidate-04e61f18"
+  },
+  {
+   "id": "local-clone-a",
+   "where": "git clone https://github.com/juanmicrosoft/calor.git <scratch>/r3/cand; checkout --detach 04e61f18",
+   "script": "local.sh then rq.sh (as regeneration 2, changes above)"
+  },
+  {
+   "id": "local-clone-b",
+   "where": "a second fresh clone at <scratch>/r3/second/nested/fresh",
+   "script": "local.sh"
+  }
+ ],
+ "rules": "As regeneration 1 (../plan.json rules), plus the stopping rule of the coordinator's instruction: a BLOCKED or FAILED row is recorded with its exact cause; the candidate is not changed.",
+ "changesFromRegeneration2": [
+  "Determinism protocol 1.5.0, execution id c2-1424-regen-3: the 4th execution, accepted only on the #1537 merge commit 04e61f18; Windows job timeouts 110 minutes; a harness-cut attempt gives INCOMPLETE, never a filled-in DISAGREE; budget ceiling 3,200 runner-minutes.",
+  "The release-quality coverage step uses Homebrew's dotnet host from the start (planned): regeneration 2 showed that SoundnessRegistrationTests.EveryCaseOracleCompilesAgainstBclOnly rejects BCL paths containing 'calor', and the private Microsoft root sits under the C2 scratch path. Same Release binaries (--no-build).",
+  "The Z3 mirror download passes GH_TOKEN explicitly (the isolated HOME has no gh login).",
+  "Records under docs/plans/evidence/c2-1424/regeneration-3/; regeneration 2's files are brought in unchanged under regeneration-2/ as history.",
+  "Temporary dispatch branch c2-1424/candidate-04e61f18."
+ ]
+}

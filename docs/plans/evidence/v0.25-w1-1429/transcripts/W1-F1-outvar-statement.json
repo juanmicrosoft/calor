@@ -1,0 +1,112 @@
+{
+  "cli-convert": {
+    "command": "calor convert Parser.cs -o Parser.calr",
+    "exit": 0,
+    "stdout": [
+      "✓ Conversion successful",
+      "Warnings (1):",
+      "  ⚠ Feature 'out-var' is partially supported. Declare the variable before the statement and pass it with out",
+      "Output: <dir>/Parser.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Parser:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Parser:pub:stat}\n      §MT{m002:ParseOrZero:pub:stat} (str:text) -> i32\n        §B{~n:i32} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Parser.cs -o Parser.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 4,
+    "interopPreservationCount": 0,
+    "lossCount": 0,
+    "losses": [],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": [
+      "Calor1343 x1"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Parser.calr --output Parser.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "deferred"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 4,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Parser:pub:stat}\n      §MT{m002:ParseOrZero:pub:stat} (str:text) -> i32\n        §B{~n:i32} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 4,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Parser:pub:stat}\n      §MT{m002:ParseOrZero:pub:stat} (str:text) -> i32\n        §B{~n:i32} `default`\n        §C{int.TryParse} §A text §A{out} n §/C\n        §R n\n\n\n\n"
+  }
+}

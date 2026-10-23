@@ -1,0 +1,115 @@
+{
+ "F1": {
+  "topLevelDiffs": {
+   "measuredCommit": [
+    "b56377a8bae8ff7a26cfd35ae12f771303a00414",
+    "48cae911700ceb0dfc358e00933650445d81604f"
+   ]
+  },
+  "caseCount": 43,
+  "behaviorDiffs": []
+ },
+ "F3": {
+  "topLevelDiffs": {
+   "measuredCommit": [
+    "283f330150593e83f922196eaa575b596c0003cf",
+    "48cae911700ceb0dfc358e00933650445d81604f"
+   ],
+   "srcTree": [
+    "f0bc816ae835e70c43ae6154dce74c559af02003",
+    "507fceeaf5e49ee1846ed1cba09647c16c76ad41"
+   ]
+  },
+  "caseCount": 5,
+  "behaviorDiffs": []
+ },
+ "F4": {
+  "topLevelDiffs": {
+   "measuredCommit": [
+    "c8f8b8f49e0822035bdba489a71b46bfe343ced1",
+    "48cae911700ceb0dfc358e00933650445d81604f"
+   ],
+   "srcTree": [
+    "c520e4450163a9cce4df0a5cf4ff4d6d4cfd22ed",
+    "507fceeaf5e49ee1846ed1cba09647c16c76ad41"
+   ]
+  },
+  "caseCount": 2,
+  "behaviorDiffs": [
+   {
+    "case": "F4-ITER-01",
+    "surface": "cli-no-fallback",
+    "committed": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": null,
+     "interopPreservationCount": null,
+     "lossySubstitutionCount": null,
+     "dropCount": null,
+     "lossFeatures": [],
+     "errorCodes": [
+      "Calor1343"
+     ]
+    },
+    "candidate": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 14,
+     "interopPreservationCount": 2,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ]
+    }
+   },
+   {
+    "case": "F4-ITER-02",
+    "surface": "cli-no-fallback",
+    "committed": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": null,
+     "interopPreservationCount": null,
+     "lossySubstitutionCount": null,
+     "dropCount": null,
+     "lossFeatures": [],
+     "errorCodes": [
+      "Calor1343"
+     ]
+    },
+    "candidate": {
+     "convertExit": 1,
+     "success": false,
+     "nativeConversionCount": 14,
+     "interopPreservationCount": 2,
+     "lossySubstitutionCount": 0,
+     "dropCount": 0,
+     "lossFeatures": [
+      "iterator-accessor"
+     ],
+     "errorCodes": [
+      "Calor1343"
+     ]
+    }
+   }
+  ]
+ },
+ "F5": {
+  "topLevelDiffs": {
+   "measuredCommit": [
+    "f0c71cfb50e66b9c9440653a76ca4473a86d514b",
+    "48cae911700ceb0dfc358e00933650445d81604f"
+   ],
+   "srcTree": [
+    "8076d4a3f4e2c0476618d18d18ab9db22585f15b",
+    "507fceeaf5e49ee1846ed1cba09647c16c76ad41"
+   ]
+  },
+  "caseCount": 5,
+  "behaviorDiffs": []
+ }
+}

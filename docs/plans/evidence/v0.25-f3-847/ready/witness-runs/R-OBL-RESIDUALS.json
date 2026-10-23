@@ -1,0 +1,31 @@
+{
+ "schema": "calor.v0.25-ready-witness-run/1",
+ "candidate": "48cae911700ceb0dfc358e00933650445d81604f",
+ "repair": "R-OBL-RESIDUALS",
+ "pr": 1503,
+ "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+ "witnesses": [
+  "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
+ ],
+ "result": "passed",
+ "runs": [
+  {
+   "lane": "w-R-OBL-RESIDUALS",
+   "classes": [
+    "S2ObligationResidualTests"
+   ],
+   "total": 21,
+   "passed": 21,
+   "failed": 0,
+   "notExecuted": 0,
+   "trx": "docs/plans/evidence/v0.25-regeneration/measure/tests/w-R-OBL-RESIDUALS.trx.gz"
+  }
+ ],
+ "command": "dotnet test tests/<project>/<project>.csproj -c Release --no-build --filter FullyQualifiedName~<witness class>",
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c25/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/measure/"
+ }
+}

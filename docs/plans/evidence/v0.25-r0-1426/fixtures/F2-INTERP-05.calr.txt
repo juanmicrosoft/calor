@@ -1,0 +1,3 @@
+§M{m001:InterpBinding}
+  §F{f001:Show:pub} (i32:n) -> str
+    §R "value=${nope}"

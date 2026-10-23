@@ -1,0 +1,25 @@
+"""Download the z3-binaries-4.15.7 release assets and verify each against the candidate's pin file
+(.github/z3-binaries-4.15.7.sha256: '<sha256>  <asset>  <size>'). usage: z3rel.py <pin file> <out json> <scratch dir>"""
+import hashlib, json, os, subprocess, sys, shutil
+pin, out, d = sys.argv[1:4]
+shutil.rmtree(d, ignore_errors=True); os.makedirs(d)
+subprocess.run(["gh", "release", "download", "z3-binaries-4.15.7", "-R", "juanmicrosoft/calor", "-D", d], check=True)
+pins = {}
+for line in open(pin, encoding="utf-8"):
+    line = line.strip()
+    if line and not line.startswith("#"):
+        sha, name, size = line.split()
+        pins[name] = (sha, int(size))
+rows, ok = [], True
+for name, (sha, size) in sorted(pins.items()):
+    p = os.path.join(d, name)
+    if not os.path.exists(p):
+        rows.append({"asset": name, "result": "MISSING"}); ok = False; continue
+    b = open(p, "rb").read(); h = hashlib.sha256(b).hexdigest()
+    r = "MATCH" if h == sha and size == len(b) else "MISMATCH"; ok &= r == "MATCH"
+    rows.append({"asset": name, "sha256": h, "size": len(b), "pinnedSha256": sha, "pinnedSize": size, "result": r})
+extra = sorted(set(os.listdir(d)) - set(pins))
+json.dump({"pinFile": ".github/z3-binaries-4.15.7.sha256", "release": "z3-binaries-4.15.7", "verdict": "MATCH" if ok else "MISMATCH",
+           "assets": rows, "unpinnedAssetsInRelease": extra}, open(out, "w"), indent=1)
+shutil.rmtree(d, ignore_errors=True)
+print("verdict", "MATCH" if ok else "MISMATCH", len(rows), "unpinned", extra)

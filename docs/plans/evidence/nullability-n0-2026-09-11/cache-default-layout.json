@@ -1,0 +1,563 @@
+{
+  "candidate": "1ea8fe0bfddfb4bddac85fe5698d750c2a1939c4",
+  "reason": "Explicit -o intentionally disables root incremental cache; this supplemental run uses the supported default output layout.",
+  "rows": [
+    {
+      "index": 0,
+      "case": "bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry",
+        "--clear-cache"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\nLexer produced 39 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "e7d96db2dbf43d2476a425a2c4ab5a65ebad7dd8679ff899c039bbc9142db5a5",
+            "lastModified": "2026-09-11T17:15:43.0755972Z",
+            "fileSize": 143,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "55cbff443574bde3ce0a41d2f18d8f657fbe0ce967cf65dff816e38b91dc91c2",
+            "diagnostics": null
+          }
+        }
+      }
+    },
+    {
+      "index": 1,
+      "case": "bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Up-to-date (cached): <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "e7d96db2dbf43d2476a425a2c4ab5a65ebad7dd8679ff899c039bbc9142db5a5",
+            "lastModified": "2026-09-11T17:15:43.0755972Z",
+            "fileSize": 143,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "55cbff443574bde3ce0a41d2f18d8f657fbe0ce967cf65dff816e38b91dc91c2",
+            "diagnostics": null
+          }
+        }
+      }
+    },
+    {
+      "index": 2,
+      "case": "bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry",
+        "--no-type-check"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Up-to-date (cached): <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "e7d96db2dbf43d2476a425a2c4ab5a65ebad7dd8679ff899c039bbc9142db5a5",
+            "lastModified": "2026-09-11T17:15:43.0755972Z",
+            "fileSize": 143,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": [
+                {
+                  "callerId": "f1",
+                  "displayName": "Probe",
+                  "diagnosticLine": 3,
+                  "diagnosticColumn": 5,
+                  "declaredEffects": [
+                    {
+                      "kind": "IO",
+                      "value": "environment"
+                    }
+                  ],
+                  "calls": [
+                    {
+                      "target": "System.Environment.GetEnvironmentVariable",
+                      "isConstructor": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "outputContentHash": "55cbff443574bde3ce0a41d2f18d8f657fbe0ce967cf65dff816e38b91dc91c2",
+            "diagnostics": null
+          }
+        }
+      }
+    },
+    {
+      "index": 3,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry",
+        "--no-type-check"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0206\",\n      \"message\": \"Duplicate signature \\u0027Probe()\\u0027. Conflicts with \\u0027calor://source/workspace%3Adefault-layout-cache%2FInput.calr/module/m1/function/ast%3Af1\\u0027.\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\",\n        \"line\": 5,\n        \"column\": 3,\n        \"length\": 49\n      },\n      \"declarationId\": \"f2\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 1,\n    \"errors\": 1,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {}
+      }
+    },
+    {
+      "index": 4,
+      "case": "active-duplicate",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry",
+        "--transpile-only"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0206\",\n      \"message\": \"Duplicate signature \\u0027Probe()\\u0027. Conflicts with \\u0027calor://source/workspace%3Adefault-layout-cache%2FInput.calr/module/m1/function/ast%3Af1\\u0027.\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\",\n        \"line\": 5,\n        \"column\": 3,\n        \"length\": 49\n      },\n      \"declarationId\": \"f2\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 1,\n    \"errors\": 1,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "warning: --transpile-only is unsafe; generated C# is not type-checked or Roslyn-validated and will not be cached.\nCompiling: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {}
+      }
+    },
+    {
+      "index": 5,
+      "case": "bind-literal-nullable-target",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry",
+        "--no-type-check"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\nLexer produced 33 tokens\nParsing completed successfully\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "f9a87866dc843f96d0d613cf45abb60b9ae8601af9e1ba3d04fc771a867f79ac",
+            "lastModified": "2026-09-11T17:15:45.178533Z",
+            "fileSize": 75,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "6fb92a013b55f690f586cd4d2d6f406e947fb76cc1a0b7daa275bbef1cade74d",
+            "diagnostics": null
+          }
+        }
+      }
+    },
+    {
+      "index": 6,
+      "case": "bind-literal-nullable-target",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Up-to-date (cached): <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "f9a87866dc843f96d0d613cf45abb60b9ae8601af9e1ba3d04fc771a867f79ac",
+            "lastModified": "2026-09-11T17:15:45.178533Z",
+            "fileSize": 75,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "6fb92a013b55f690f586cd4d2d6f406e947fb76cc1a0b7daa275bbef1cade74d",
+            "diagnostics": null
+          }
+        }
+      }
+    },
+    {
+      "index": 7,
+      "case": "bind-literal-nullable-target",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry",
+        "--clear-cache"
+      ],
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0200\",\n      \"message\": \"Type \\u0027inner=STRING\\u0027 is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.\",\n      \"severity\": \"warning\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\",\n        \"line\": 4,\n        \"column\": 5,\n        \"length\": 17\n      },\n      \"declarationId\": \"f1\"\n    },\n    {\n      \"code\": \"Calor0202\",\n      \"message\": \"Cannot assign str to variable of type Option\\u003Cinner=STRING\\u003E\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\",\n        \"line\": 4,\n        \"column\": 5,\n        \"length\": 17\n      },\n      \"declarationId\": \"f1\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 2,\n    \"errors\": 1,\n    \"warnings\": 1,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\nLexer produced 33 tokens\nParsing completed successfully\nType checking completed\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {}
+      }
+    },
+    {
+      "index": 8,
+      "case": "bind-literal",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr\nLexer produced 34 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "343602825745e171f34963eac6a86e3544d48d01f4bec0767668b4661d335a98",
+            "lastModified": "2026-09-11T17:15:46.2593836Z",
+            "fileSize": 83,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "ade91ea2cde16647c84e2008be9c54f9b9ff814698a55032f6910269174302d1",
+            "diagnostics": null
+          }
+        }
+      }
+    },
+    {
+      "index": 9,
+      "case": "bind-literal",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/default-layout-cache/Input.calr",
+        "--cache",
+        "--verbose",
+        "--format",
+        "json",
+        "--no-telemetry"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Up-to-date (cached): <REPO>/.n0-evidence/tmp/default-layout-cache/Input.g.cs\n",
+      "cacheExists": true,
+      "cache": {
+        "formatVersion": "4.0",
+        "compilerSemanticsVersion": "calor-compile-semantics-v1",
+        "crossModuleMapHash": null,
+        "compilerHash": "e70a9f01d0efb623897227353c0e08ecb10783cb244a1d328db5ce8988a16336",
+        "optionsHash": "de9228aa9b9830ed355f78ba3540a548cba7b37dacb9bc29b8e8d01df982c415",
+        "manifestHash": "",
+        "outputDirectory": ".",
+        "files": {
+          "Input.calr": {
+            "contentHash": "343602825745e171f34963eac6a86e3544d48d01f4bec0767668b4661d335a98",
+            "lastModified": "2026-09-11T17:15:46.2593836Z",
+            "fileSize": 83,
+            "effectSummary": {
+              "moduleName": "N0",
+              "publicFunctions": [
+                {
+                  "name": "Probe",
+                  "className": null,
+                  "hasEffectDeclaration": true,
+                  "declaredEffects": [],
+                  "declarationLine": 2,
+                  "declarationColumn": 3
+                }
+              ],
+              "publicMethods": [],
+              "internalFunctionNames": [
+                "Probe"
+              ],
+              "internalMethodNames": [],
+              "callers": []
+            },
+            "outputContentHash": "ade91ea2cde16647c84e2008be9c54f9b9ff814698a55032f6910269174302d1",
+            "diagnostics": null
+          }
+        }
+      }
+    }
+  ]
+}

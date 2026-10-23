@@ -1,0 +1,20 @@
+§M{m001:P2-OUTVAR-DEFAULT-MEMBER:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{i32:reads:pub:stat}
+
+      §PROP{p002:`default`:i32:pub:stat}
+        §GET{pub}
+          §ASSIGN reads (+ reads 1)
+          §R 0
+
+      §CSHARP{
+    public static string Run()
+    {
+        bool ok = int.TryParse("5", out var n);
+        return reads + ":" + n + ":" + ok;
+    }
+      }§/CSHARP
+
+
+

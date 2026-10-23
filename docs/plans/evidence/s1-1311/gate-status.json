@@ -1,0 +1,13 @@
+{
+  "gate": "S1 (#1311)",
+  "status": "MET",
+  "reason": "Run 2, the one conforming re-run authorized by contract amendment 1.2.0 (condition 4 as amended by 1.2.1), is valid and complete: same binaries as run 1 (pins equal), every in-process libz3 capture present and equal to the registered hash before case 1 and after the last case for B1, N1, and P845 (and for B1 and N1 in the crossrun process), the whole registered set executed on B1 and N1 plus P845, and all 64 registered cross-baseline re-runs executed, in 1,508 of 1,508 run-2 case executions (3,008 of 3,008 for #1311). Every registered row for B1 and N1 is executed or recorded NOT-INVESTIGATED. Run 2 agrees with run 1 on every case token, class, and finding, so there is no condition-8 determinism finding.",
+  "whatMetMeans": "The S1 sweep is complete and reproducible within its ceilings. It does not mean the verifier is sound: 4 release-critical rows per baseline are FALSE-PROOF and 10 are FINDING (combined-row-status.json); S2 (#1413) dispositions all 34 findings per baseline.",
+  "run1": "Stays on record unchanged: gate status BLOCKED at the 1,500 ceiling (run1-gate-status.json, verbatim from d1e476b5), provenance-unconfirmed, report run1-report.md (verbatim from d1e476b5). Run 2's capture does not confirm run 1's provenance; every run-1 finding remains a finding.",
+  "rowStatusesAreMechanical": "Per-run, per-baseline statuses are in bench/correctness/false-established/v024/<baseline>/row-status.json (run 1) and v024/run2/<baseline>/row-status.json (run 2); combined-row-status.json applies the condition-7 rule.",
+  "openItemsForMaintainer": [
+    "O2 completeness (not decided by amendment 1.2.0/1.2.1, condition 10): in GEN-REFUSAL-002 and -004 (both baselines, both runs) the frozen input new object() cannot be passed to the emitted double[] parameter, so 1 replay input per case did not execute (status partial). The registered rowStatus does not use O2.",
+    "Determinism observation for #1421/#1135 (not a condition-8 finding): B1 R1-NUM-ARITH-SUB-006 returned a different solver counterexample model in run 2 than in run 1, with the same token (Failed), class (no-claim), and no finding (run2/comparison.json).",
+    "Run-2 finding records carry environment.z3NativeSource \"not captured\": the unchanged e7cbce77 report reads the run-1-style native-z3-check.json, which run 2 does not produce. The run-2 native image is recorded by the in-process capture (run2/pins.json loadedImageCapture), not by that field."
+  ]
+}

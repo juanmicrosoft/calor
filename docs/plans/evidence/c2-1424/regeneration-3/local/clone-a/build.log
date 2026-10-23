@@ -1,0 +1,36 @@
+  TestAssembly.Scenarios -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.Scenarios/bin/Release/net10.0/TestAssembly.Scenarios.dll
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  TestAssembly.DataAccess -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.DataAccess/bin/Release/net10.0/TestAssembly.DataAccess.dll
+  Contracts -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/samples/Contracts/bin/Release/net10.0/Contracts.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  ILAnalysisBench -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/bench/ILAnalysisBench/bin/Release/net10.0/ILAnalysisBench.dll
+  McpBenchHarness -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/bench/mcp/harness/bin/Release/net10.0/McpBenchHarness.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Experimental.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Experimental.Tests/bin/Release/net10.0/Calor.Experimental.Tests.dll
+  Calor.Semantics.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Semantics.Tests/bin/Release/net10.0/Calor.Semantics.Tests.dll
+  Compiling Calor files...
+  Compiling Calor files...
+  IncrementalBuildBench -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/bench/IncrementalBuildBench/bin/Release/net10.0/IncrementalBuildBench.dll
+  Generated 1 C# files from Calor
+  Generated 1 C# files from Calor
+  Calor.Conversion.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Conversion.Tests/bin/Release/net10.0/Calor.Conversion.Tests.dll
+  Calor.Enforcement.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Enforcement.Tests/bin/Release/net10.0/Calor.Enforcement.Tests.dll
+  SdkSample -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/samples/SdkSample/bin/Release/net10.0/SdkSample.dll
+  CalorAllowlistAudit -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tools/calor-allowlist-audit/bin/Release/net10.0/calor-allowlist-audit.dll
+  Calor.Verification.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll
+  Calor.Evaluation -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Evaluation/bin/Release/net10.0/Calor.Evaluation.dll
+  Calor.ILAnalysis.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.ILAnalysis.Tests/bin/Release/net10.0/Calor.ILAnalysis.Tests.dll
+  Calor.LanguageServer -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/src/Calor.LanguageServer/bin/Release/net10.0/calor-lsp.dll
+  Calor.RoundTrip.Harness -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tools/Calor.RoundTrip.Harness/bin/Release/net10.0/Calor.RoundTrip.Harness.dll
+  Calor.Sdk -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
+  Calor.Tasks.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Tasks.Tests/bin/Release/net10.0/Calor.Tasks.Tests.dll
+  Calor.RoundTrip.Harness.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.RoundTrip.Harness.Tests/bin/Release/net10.0/Calor.RoundTrip.Harness.Tests.dll
+  Calor.LanguageServer.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.LanguageServer.Tests/bin/Release/net10.0/Calor.LanguageServer.Tests.dll
+  Calor.Compiler.Tests -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:12.72

@@ -1,0 +1,36 @@
+  Calor.Runtime -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  TestAssembly.Scenarios -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.Scenarios/bin/Release/net10.0/TestAssembly.Scenarios.dll
+  TestAssembly.DataAccess -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.DataAccess/bin/Release/net10.0/TestAssembly.DataAccess.dll
+  Contracts -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/Contracts/bin/Release/net10.0/Contracts.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Experimental.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Experimental.Tests/bin/Release/net10.0/Calor.Experimental.Tests.dll
+  Calor.Enforcement.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Enforcement.Tests/bin/Release/net10.0/Calor.Enforcement.Tests.dll
+  ILAnalysisBench -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/bench/ILAnalysisBench/bin/Release/net10.0/ILAnalysisBench.dll
+  Compiling Calor files...
+  Compiling Calor files...
+  Calor.Verification.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll
+  Calor.Sdk -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
+  Calor.Conversion.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Conversion.Tests/bin/Release/net10.0/Calor.Conversion.Tests.dll
+  Calor.Semantics.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Semantics.Tests/bin/Release/net10.0/Calor.Semantics.Tests.dll
+  McpBenchHarness -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/bench/mcp/harness/bin/Release/net10.0/McpBenchHarness.dll
+  Calor.RoundTrip.Harness -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tools/Calor.RoundTrip.Harness/bin/Release/net10.0/Calor.RoundTrip.Harness.dll
+  Calor.Evaluation -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Evaluation/bin/Release/net10.0/Calor.Evaluation.dll
+  IncrementalBuildBench -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/bench/IncrementalBuildBench/bin/Release/net10.0/IncrementalBuildBench.dll
+  Calor.Tasks.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Tasks.Tests/bin/Release/net10.0/Calor.Tasks.Tests.dll
+  Calor.LanguageServer -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.LanguageServer/bin/Release/net10.0/calor-lsp.dll
+  Generated 1 C# files from Calor
+  Generated 1 C# files from Calor
+  CalorAllowlistAudit -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tools/calor-allowlist-audit/bin/Release/net10.0/calor-allowlist-audit.dll
+  SdkSample -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/SdkSample/bin/Release/net10.0/SdkSample.dll
+  Calor.RoundTrip.Harness.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.RoundTrip.Harness.Tests/bin/Release/net10.0/Calor.RoundTrip.Harness.Tests.dll
+  Calor.LanguageServer.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.LanguageServer.Tests/bin/Release/net10.0/Calor.LanguageServer.Tests.dll
+  Calor.ILAnalysis.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.ILAnalysis.Tests/bin/Release/net10.0/Calor.ILAnalysis.Tests.dll
+  Calor.Compiler.Tests -> /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:06.08

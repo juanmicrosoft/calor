@@ -1,0 +1,7 @@
+- **MAJOR — Round-2 resolution 1 remains incomplete.** [scripts/verify_maintainer_override.py:206](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a5acf8485cf58ba1e/scripts/verify_maintainer_override.py:206) flattens SBOM files through their checksums, silently dropping entries with `checksums: []`. In-memory controls adding either a duplicate package entry or `wrong-package.nupkg` with no checksums both passed. This defeats the promised rejection of duplicate entries and requirement that every file carry exactly one SHA256 checksum. Validate each file before flattening, and add both negative controls.
+
+Round-2 resolution 2 passes the disabled-verifier controls. Identity verifier arguments and order remain unchanged; all three release test jobs remain unchanged and gate publish. Override requires the explicit input and committed record. The terminal hash and notes corrections agree with the recorded evidence.
+
+Validation was read-only; no filesystem-writing xUnit tests were run.
+
+REQUEST-CHANGES

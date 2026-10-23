@@ -1,0 +1,6 @@
+website/content/guides/zz-negative-control.mdx(5,26): error Calor1321: Documented diagnostic code 'Calor9999' is not defined in DiagnosticCode (if this is intentional meta-notation, put '{/* drift:ignore */}' on the preceding line)
+website/content/guides/zz-negative-control.mdx(11,1): error Calor1332: Complete calor example does not compile: Calor0200: Undefined variable 'x' (fix the example; an intended negative example declares its codes with `expect=`)
+website/content/guides/zz-negative-control.mdx(14,1): error Calor1332: Negative calor example declares expect=Calor0201 but the compiler reports [error Calor0200: Undefined variable 'x']
+website/content/guides/zz-negative-control.mdx(14,1): error Calor1334: Negative example expects Calor0201 but the adjacent prose (nearest heading to the next fence) never cites it
+website/content/guides/zz-negative-control.mdx(21,1): error Calor1333: Fence looks like tool output but is labelled neither `output` (checked against the preceding example) nor `illustrative` (not real output); add one to the fence info string
+exit=1

@@ -1,0 +1,43 @@
+
+Welcome to .NET 10.0!
+---------------------
+SDK Version: 10.0.401
+
+----------------
+Installed an ASP.NET Core HTTPS development certificate.
+To trust the certificate, run 'dotnet dev-certs https --trust'
+Learn about HTTPS: https://aka.ms/dotnet-https
+
+----------------
+Write your first app: https://aka.ms/dotnet-hello-world
+Find out what's new: https://aka.ms/dotnet-whats-new
+Explore documentation: https://aka.ms/dotnet-docs
+Report issues and find source on GitHub: https://github.com/dotnet/core
+Use 'dotnet --help' to see available commands or visit: https://aka.ms/dotnet-cli
+--------------------------------------------------------------------------------------
+  Determining projects to restore...
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/SdkSample/SdkSample.csproj (in 50 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Sdk/Calor.Sdk.csproj (in 45 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tools/calor-allowlist-audit/CalorAllowlistAudit.csproj (in 50 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.Scenarios/TestAssembly.Scenarios.csproj (in 0.9 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/Contracts/Contracts.csproj (in 1 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/bench/ILAnalysisBench/ILAnalysisBench.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/bench/mcp/harness/McpBenchHarness.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Tasks/Calor.Tasks.csproj (in 2.33 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tools/Calor.RoundTrip.Harness/Calor.RoundTrip.Harness.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj (in 2.33 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.DataAccess/TestAssembly.DataAccess.csproj (in 2 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Compiler/Calor.Compiler.csproj (in 7 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj (in 8 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.LanguageServer/Calor.LanguageServer.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj (in 2.4 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Evaluation/Calor.Evaluation.csproj (in 2.39 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj (in 2.4 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/bench/IncrementalBuildBench/IncrementalBuildBench.csproj (in 6 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/src/Calor.Runtime/Calor.Runtime.csproj (in 1 ms).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj (in 2.34 sec).
+  Restored /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj (in 2 ms).

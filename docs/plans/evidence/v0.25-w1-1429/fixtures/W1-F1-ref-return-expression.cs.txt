@@ -1,0 +1,9 @@
+public static class Cells
+{
+    public static ref int First(int[] a) => ref a[0];
+
+    public static ref int Last(int[] a)
+    {
+        return ref a[a.Length - 1];
+    }
+}

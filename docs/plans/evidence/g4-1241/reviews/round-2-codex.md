@@ -1,0 +1,27 @@
+# G4 review round 2 — Codex (adversarial)
+
+Reviewed: `git diff origin/main...47d79d96`. Command: `codex exec -s read-only --ephemeral -c model_reasoning_effort="high"` with the diff on stdin.
+
+## Findings (verbatim)
+
+1. **MAJOR — Pinning still accepts builds predating deleted inputs.** `scripts/checkout_compiler.py:85–92` discovers inputs from the current index. After `git rm` or a committed deletion, the removed source appears in neither `ls-files --deleted` nor the current input list, so its old implementation can remain in the accepted DLL. The deletion control at `scripts/test_tier2_verification.py:270–275` tests only an unstaged unlink. The resolver also omits linked resources embedded by `src/Calor.Compiler/Calor.Compiler.csproj:163–167`, including the binding metadata manifest. **Fix:** record the complete input set at build time and compare it with the current checkout, covering removed paths and linked resources; add staged-deletion, committed-deletion, and linked-resource controls.
+
+2. **MAJOR — Wrong-cause negatives still pass within the same file.** `scripts/fixture_compile_check.py:95–103` discards declaration identity and message constraints. E3’s cited consumer requires `f001` and `cw` (`tests/Calor.Enforcement.Tests/Scenarios/Effects/E3_call_chain.expected.json:5–6`), but its registration at `eng/tier2-fixture-expectations.json:283–286` checks only `E3_call_chain.calr|Calor0410`. I reproduced `expected-negative` with an error on the valid `Callee/f002` for effect `db`. File names and multiplicity therefore do not fully close round 1’s wrong-cause finding. **Fix:** register declaration IDs and stable cause constraints, and add a same-file diagnostic-substitution control.
+
+3. **MAJOR — Driver tests still mask missing failure aggregation.** `scripts/test_tier2_verification.py:324–329` makes every step return the same failure. The first failing step keeps the driver red even when later failures are ignored. I removed both migrator failure-aggregation branches from `verify_corpus.main` in memory; this regression test still passed. **Fix:** fail each mandatory step individually while every other step succeeds, for exits 1, 2, and 3. Cover Tier 1’s self-test path separately and assert the required steps were invoked.
+
+4. **MINOR — The dry-run control is not actually required.** `scripts/migrator_corpus_dryrun.py:117–122` accepts any `files_changed >= 1`; it never establishes that `__control__/control.calr` received a proposed rewrite. A dry-run returning `files_changed=1` with unchanged files exits 0, which I reproduced. This contradicts the control-file claim in `docs/plans/evidence/g4-1241/README.md:53`. **Fix:** use the existing `fix --json` per-file summary and require a positive control-file entry; test a positive aggregate count with the control omitted.
+
+5. **MINOR — The archived run contradicts its provenance description.** `docs/plans/evidence/g4-1241/README.md:115` describes a clean local worktree, but `docs/plans/evidence/g4-1241/tier2-fixtures-local.json:6452–6453` records HEAD `19d44ff1c386635716e2a072b7965e413c14ce9f` and `"worktreeDirty": true`. **Fix:** correct the README to describe the archived run accurately; retain the historical report unchanged.
+
+Verdict: **REQUEST CHANGES — checkout pinning, diagnostic cause matching, and discriminating driver controls remain incomplete.**
+
+## Response
+
+1. **Fixed (mtime-based).** The resolver now also checks every directory under the two projects that holds an input, so a staged or committed deletion fails because the deletion updates the directory's mtime. It also checks the files a project links in with `Include="..\.."`, such as `bench/phase0-agent-native/metadata-references-manifest.json`. The `ls-files --deleted` path is removed because the directory check covers it. New controls cover an edited source, an edited untracked resource, an edited linked resource, an unstaged deletion, and a committed deletion. Not done: a build-time input manifest. Freshness is still judged by mtime, and the README says so.
+2. **Fixed.** Each signature entry is now `file|code|declarationId|message`, with whitespace collapsed. All 60 negative and known-failure entries were re-registered from a fresh run, and the (file, code) multiset was checked unchanged for every one. E3 now pins `f001` and the `cw` message. A new control rejects a same-file, same-code error that has another cause.
+3. **Fixed.** `test_each_failed_or_unavailable_step_fails_its_driver` first records the steps of `verify_phase1` (default and `--self-test`) and `verify_corpus`. It then fails each step alone with exit 1, 2, and 3. The driver must exit 1 unless that step is informational. This test also caught a real regression introduced while trimming: the token-delta spot step pointed at a non-existent sample, so that step silently stopped running.
+4. **Fixed.** The dry run now runs `calor fix --format json` and requires `__control__/control.calr` with a positive count in `data.fixes`. A new control has the fake list a change only for a corpus file and not for the control, and the dry run fails.
+5. **Fixed.** The worktree was dirty because the tracked report was deleted before being regenerated. The report is now generated outside the worktree and copied in, so its provenance shows a clean worktree. The README no longer asserts cleanliness; it points at the provenance instead.
+
+Mutation check: 28 of 28 killed, now including the input-directory, linked-input, declaration/message, and control-identity mutations.

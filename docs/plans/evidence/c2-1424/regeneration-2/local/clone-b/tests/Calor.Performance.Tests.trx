@@ -1,0 +1,291 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="3df7342c-92ff-4e66-b0e7-67fc0dcaa67e" name="@Juans-Mac-Studio 2026-10-08 14:51:33" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-08T14:51:33.3471470-04:00" queuing="2026-10-08T14:51:33.3471470-04:00" start="2026-10-08T14:51:31.6963430-04:00" finish="2026-10-08T14:51:44.4473050-04:00" />
+  <TestSettings name="default" id="502e1a78-d287-429c-a122-ec28a39d0b8c">
+    <Deployment runDeploymentRoot="_Juans-Mac-Studio_2026-10-08_14_51_33" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="cdba3d4e-a754-4b9b-9bfd-31f21240df1e" testId="17e23072-612b-037f-6b1f-515a3ee866b7" testName="Calor.Performance.Tests.VerificationPerformanceTests.CFGConstruction_ComplexFunction_Under50ms" computerName="Juans-Mac-Studio" duration="00:00:00.0016889" startTime="2026-10-08T14:51:36.5334290-04:00" endTime="2026-10-08T14:51:36.5334290-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cdba3d4e-a754-4b9b-9bfd-31f21240df1e">
+      <Output>
+        <StdOut>Complex CFG construction avg time: 0.10ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="51e3a38a-d580-429d-bf4b-c29aac839452" testId="a3e7cdb9-f76d-f77b-5a34-8f5e8118b7b4" testName="Calor.Performance.Tests.IndexPerformanceTests.IndexBuildStaysWithinItsBudget" computerName="Juans-Mac-Studio" duration="00:00:00.5752437" startTime="2026-10-08T14:51:33.3766040-04:00" endTime="2026-10-08T14:51:33.3766040-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="51e3a38a-d580-429d-bf4b-c29aac839452">
+      <Output>
+        <StdOut>index build: 0.57s over 106 files, 5445 declarations, 587 call edges (budget 30s)</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c45cdc0b-afcb-4030-802a-2399bf260d2d" testId="b9c3d033-5a94-5462-0e70-695cc1d50f7c" testName="Calor.Performance.Tests.VerificationPerformanceTests.Scalability_LinearWithFunctions" computerName="Juans-Mac-Studio" duration="00:00:00.6315906" startTime="2026-10-08T14:51:35.4671890-04:00" endTime="2026-10-08T14:51:35.4671890-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c45cdc0b-afcb-4030-802a-2399bf260d2d">
+      <Output>
+        <StdOut>Functions: 10, Time: 35ms
+Functions: 20, Time: 85ms
+Functions: 40, Time: 153ms
+Functions: 80, Time: 288ms
+Time ratio (80/20 functions): 3.39x</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="8076dd8a-b8bb-458a-afb5-fbecf16521fc" testId="8c16d8b4-f975-8269-ef0c-05a001b7d65f" testName="Calor.Performance.Tests.VerificationPerformanceTests.Memory_MediumModule_Under50MB" computerName="Juans-Mac-Studio" duration="00:00:00.6889402" startTime="2026-10-08T14:51:34.6901900-04:00" endTime="2026-10-08T14:51:34.6901900-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8076dd8a-b8bb-458a-afb5-fbecf16521fc">
+      <Output>
+        <StdOut>Medium module memory: 0.01 MB</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5c2f891f-8bef-4284-b489-e3018ebb8071" testId="f5dbd653-edb7-0644-77c1-de87c6fb81ed" testName="Calor.Performance.Tests.IndexPerformanceTests.WarmQueriesStayWithinTheirBudget" computerName="Juans-Mac-Studio" duration="00:00:00.0024514" startTime="2026-10-08T14:51:33.3789960-04:00" endTime="2026-10-08T14:51:33.3789960-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5c2f891f-8bef-4284-b489-e3018ebb8071">
+      <Output>
+        <StdOut>warm query symbol: 0.0ms (budget 500ms)
+warm query callers: 0.0ms (budget 500ms)
+warm query callees: 0.2ms (budget 500ms)
+warm query impact: 0.2ms (budget 500ms)
+warm query contracts: 0.0ms (budget 500ms)
+warm query assumptions: 0.0ms (budget 500ms)</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="417e223e-90f2-407a-aa13-167ff89406ff" testId="50417a3c-8938-814a-0de2-bc04a157d603" testName="Calor.Performance.Tests.VerificationPerformanceTests.Scalability_LinearWithStatements" computerName="Juans-Mac-Studio" duration="00:00:00.7693354" startTime="2026-10-08T14:51:37.3028150-04:00" endTime="2026-10-08T14:51:37.3028150-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="417e223e-90f2-407a-aa13-167ff89406ff">
+      <Output>
+        <StdOut>Statements/function: 25, Time: 32ms
+Statements/function: 50, Time: 86ms
+Statements/function: 100, Time: 251ms
+Statements/function: 200, Time: 358ms
+Time ratio (200/50 statements): 4.16x</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="48de700f-23ce-4186-abb4-e3d5eea17255" testId="de863556-05cc-fd4f-8d8d-43e5d27d8a7d" testName="Calor.Tests.Shared.Z3ConsumerGuardTests.Z3LoadsWithThePinnedVersion" computerName="Juans-Mac-Studio" duration="00:00:00.2063698" startTime="2026-10-08T14:51:32.1353960-04:00" endTime="2026-10-08T14:51:32.1353960-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="48de700f-23ce-4186-abb4-e3d5eea17255" />
+    <UnitTestResult executionId="514cf1a1-e6b8-443d-8610-ede14b7935e4" testId="4597fd90-fe19-71ba-63ee-f47bc5d4120f" testName="Calor.Performance.Tests.VerificationPerformanceTests.Memory_LargeModule_Under100MB" computerName="Juans-Mac-Studio" duration="00:00:03.4594628" startTime="2026-10-08T14:51:41.0264910-04:00" endTime="2026-10-08T14:51:41.0264910-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="514cf1a1-e6b8-443d-8610-ede14b7935e4">
+      <Output>
+        <StdOut>Large module memory: -0.02 MB</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="31e72ef5-d98d-471f-b8af-c20ed995efbb" testId="90ce7136-5eb0-f228-f8c0-6cb708e0fff1" testName="Calor.Performance.Tests.VerificationPerformanceTests.Binding_SmallModule_Under100ms" computerName="Juans-Mac-Studio" duration="00:00:00.0049431" startTime="2026-10-08T14:51:33.9997710-04:00" endTime="2026-10-08T14:51:33.9997710-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="31e72ef5-d98d-471f-b8af-c20ed995efbb">
+      <Output>
+        <StdOut>Small module binding: 2ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d41f4237-c748-45c3-a3ab-f90cad697e7c" testId="4285a824-444b-0f1d-2e2e-c763d8dbc2fa" testName="Calor.Tests.Shared.Z3ConsumerGuardTests.HostNativeInOutputMatchesItsPin" computerName="Juans-Mac-Studio" duration="00:00:00.0271317" startTime="2026-10-08T14:51:31.9288760-04:00" endTime="2026-10-08T14:51:31.9288760-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d41f4237-c748-45c3-a3ab-f90cad697e7c" />
+    <UnitTestResult executionId="66b44df2-5dca-467b-89c6-3aae8af221cf" testId="b5991f06-1209-29e4-79cc-04a763eb79ac" testName="Calor.Performance.Tests.VerificationPerformanceTests.Memory_SmallModule_Under10MB" computerName="Juans-Mac-Studio" duration="00:00:00.0453210" startTime="2026-10-08T14:51:34.7355650-04:00" endTime="2026-10-08T14:51:34.7355650-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="66b44df2-5dca-467b-89c6-3aae8af221cf">
+      <Output>
+        <StdOut>Small module memory: 0.13 MB</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="cdc23521-a5b8-44d8-a606-c21192ece9b5" testId="ff9e6423-90a0-3a03-f432-d61f0c85bed8" testName="Calor.Performance.Tests.VerificationPerformanceTests.DataflowAnalysis_ComplexCFG_Under2Seconds" computerName="Juans-Mac-Studio" duration="00:00:00.0114342" startTime="2026-10-08T14:51:34.7470170-04:00" endTime="2026-10-08T14:51:34.7470170-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cdc23521-a5b8-44d8-a606-c21192ece9b5">
+      <Output>
+        <StdOut>CFG construction (complex control flow): 5ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f5f1ca0c-402b-4472-88aa-adc167a68419" testId="be40609b-db05-dff1-e1d1-b6b382a18a69" testName="Calor.Performance.Tests.VerificationPerformanceTests.CFGConstruction_SmallFunction_Under10ms" computerName="Juans-Mac-Studio" duration="00:00:00.0014149" startTime="2026-10-08T14:51:34.0012000-04:00" endTime="2026-10-08T14:51:34.0012000-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f5f1ca0c-402b-4472-88aa-adc167a68419">
+      <Output>
+        <StdOut>CFG construction avg time: 0.01ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="ebe8a9ed-f17b-4190-9640-ea6a7fa537f0" testId="c64edfc9-452d-0f73-7e7d-66c3857c0c44" testName="Calor.Performance.Tests.VerificationPerformanceTests.FullAnalysis_LargeModule_Under30Seconds" computerName="Juans-Mac-Studio" duration="00:00:03.4015670" startTime="2026-10-08T14:51:44.4281280-04:00" endTime="2026-10-08T14:51:44.4281280-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ebe8a9ed-f17b-4190-9640-ea6a7fa537f0">
+      <Output>
+        <StdOut>Large module full analysis: 3127ms
+Functions: 200</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="add55a5c-3da5-4a56-ba0f-71f93e800f9d" testId="78aadb74-4ad9-fc8c-8521-32da8addec96" testName="Calor.Performance.Tests.VerificationPerformanceTests.TaintAnalysis_DeepDataFlow_Under1Second" computerName="Juans-Mac-Studio" duration="00:00:00.2277750" startTime="2026-10-08T14:51:33.9948040-04:00" endTime="2026-10-08T14:51:33.9948040-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="add55a5c-3da5-4a56-ba0f-71f93e800f9d">
+      <Output>
+        <StdOut>Taint analysis (deep data flow): 215ms
+Warnings found: 6</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="b1252b41-9259-4ab6-baea-b78dbe8797bd" testId="567a5402-6308-e3a6-4193-e39d77cf88d7" testName="Calor.Performance.Tests.VerificationPerformanceTests.Parsing_MediumModule_Under500ms" computerName="Juans-Mac-Studio" duration="00:00:00.0283842" startTime="2026-10-08T14:51:33.4075490-04:00" endTime="2026-10-08T14:51:33.4075490-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b1252b41-9259-4ab6-baea-b78dbe8797bd">
+      <Output>
+        <StdOut>Medium module parsing: 27ms
+Functions: 50, Statements/function: 100</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c05b2d14-af76-4626-9b51-4e7be42fce9e" testId="f7377d30-1d3f-c10a-4b2f-9ba95155a394" testName="Calor.Performance.Tests.VerificationPerformanceTests.DataflowAnalysis_NestedLoops_Under3Seconds" computerName="Juans-Mac-Studio" duration="00:00:00.0093139" startTime="2026-10-08T14:51:34.7563490-04:00" endTime="2026-10-08T14:51:34.7563490-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c05b2d14-af76-4626-9b51-4e7be42fce9e">
+      <Output>
+        <StdOut>CFG construction (nested loops): 4ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="8c912b84-99c6-4d88-9755-37da04764cdc" testId="cf529fc1-dcfa-66b2-f49d-c1ab85be67c5" testName="Calor.Performance.Tests.VerificationPerformanceTests.Binding_ScalesLinearlyWithFunctionCount" computerName="Juans-Mac-Studio" duration="00:00:01.0644559" startTime="2026-10-08T14:51:36.5317180-04:00" endTime="2026-10-08T14:51:36.5317180-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8c912b84-99c6-4d88-9755-37da04764cdc">
+      <Output>
+        <StdOut>Binding 40 functions: 14.5ms, 320 functions: 147.7ms, ratio 10.21x</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f8d60625-8301-494a-a48d-72586653e2ff" testId="4d353171-2cde-f7b1-9a74-c468720ac576" testName="Calor.Tests.Shared.Z3ConsumerGuardTests.HostRidIsASupportedZ3Rid" computerName="Juans-Mac-Studio" duration="00:00:00.0055176" startTime="2026-10-08T14:51:31.8996340-04:00" endTime="2026-10-08T14:51:31.8996420-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f8d60625-8301-494a-a48d-72586653e2ff" />
+    <UnitTestResult executionId="38e005d8-bbc9-4dcb-a6e3-2b7c719fdb77" testId="1c084b80-cff8-e5ab-644f-d4e88ed65954" testName="Calor.Tests.Shared.Z3ConsumerGuardTests.ManagedWrapperInOutputMatchesItsPin" computerName="Juans-Mac-Studio" duration="00:00:00.0022849" startTime="2026-10-08T14:51:31.9017450-04:00" endTime="2026-10-08T14:51:31.9017450-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="38e005d8-bbc9-4dcb-a6e3-2b7c719fdb77" />
+    <UnitTestResult executionId="ce378786-666d-4efc-b2c9-962f3a5a017a" testId="f1c4f5a1-7458-2e25-750d-a6c11a771f2c" testName="Calor.Performance.Tests.VerificationPerformanceTests.Binding_MediumModule_Under500ms" computerName="Juans-Mac-Studio" duration="00:00:00.0969147" startTime="2026-10-08T14:51:33.7669670-04:00" endTime="2026-10-08T14:51:33.7669670-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ce378786-666d-4efc-b2c9-962f3a5a017a">
+      <Output>
+        <StdOut>Medium module binding: 61ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="14add489-c62d-4259-bbcb-88c97a21336d" testId="33c7e2f4-efc3-e928-2979-d537950d118e" testName="Calor.Performance.Tests.VerificationPerformanceTests.FullAnalysis_MediumModule_Under5Seconds" computerName="Juans-Mac-Studio" duration="00:00:00.2476758" startTime="2026-10-08T14:51:37.5505550-04:00" endTime="2026-10-08T14:51:37.5505550-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="14add489-c62d-4259-bbcb-88c97a21336d">
+      <Output>
+        <StdOut>Medium module full analysis: 224ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="47f08691-7363-401b-8fad-326456cff881" testId="e854a17a-73b7-d687-0ac4-464b9cd5f7c0" testName="Calor.Performance.Tests.VerificationPerformanceTests.Parsing_LargeModule_Under2000ms" computerName="Juans-Mac-Studio" duration="00:00:00.2624029" startTime="2026-10-08T14:51:33.6700190-04:00" endTime="2026-10-08T14:51:33.6700190-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="47f08691-7363-401b-8fad-326456cff881">
+      <Output>
+        <StdOut>Large module parsing: 259ms
+Functions: 200, Statements/function: 200</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="cc051a81-25a4-41ef-b8b1-2cbacee6bcc4" testId="317d7e96-d849-fe78-440b-ac3093da8562" testName="Calor.Performance.Tests.VerificationPerformanceTests.FullAnalysis_SmallModule_Under1Second" computerName="Juans-Mac-Studio" duration="00:00:00.0156494" startTime="2026-10-08T14:51:37.5669550-04:00" endTime="2026-10-08T14:51:37.5669550-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cc051a81-25a4-41ef-b8b1-2cbacee6bcc4">
+      <Output>
+        <StdOut>Small module full analysis: 14ms</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="af1147f8-d30f-4f22-9c90-abe8a8c43bce" testId="f82a1e4f-5b49-bd3d-401c-b47d5fcbb6cb" testName="Calor.Performance.Tests.VerificationPerformanceTests.Parsing_SmallModule_Under100ms" computerName="Juans-Mac-Studio" duration="00:00:00.0006945" startTime="2026-10-08T14:51:37.5512810-04:00" endTime="2026-10-08T14:51:37.5512810-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="af1147f8-d30f-4f22-9c90-abe8a8c43bce">
+      <Output>
+        <StdOut>Small module parsing: 0ms
+Functions: 10, Statements/function: 50</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="7c59198f-86d0-4695-84e6-d7c3a8eee0d6" testId="0b23e987-0e14-d091-d828-a39db3f466b7" testName="Calor.Performance.Tests.VerificationPerformanceTests.TaintAnalysis_ManyFunctions_Under2Seconds" computerName="Juans-Mac-Studio" duration="00:00:00.0791805" startTime="2026-10-08T14:51:34.8355450-04:00" endTime="2026-10-08T14:51:34.8355450-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7c59198f-86d0-4695-84e6-d7c3a8eee0d6">
+      <Output>
+        <StdOut>Taint analysis (many functions): 65ms
+Functions: 100</StdOut>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Binding_ScalesLinearlyWithFunctionCount" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="cf529fc1-dcfa-66b2-f49d-c1ab85be67c5">
+      <Execution id="8c912b84-99c6-4d88-9755-37da04764cdc" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Binding_ScalesLinearlyWithFunctionCount" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.TaintAnalysis_ManyFunctions_Under2Seconds" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="0b23e987-0e14-d091-d828-a39db3f466b7">
+      <Execution id="7c59198f-86d0-4695-84e6-d7c3a8eee0d6" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="TaintAnalysis_ManyFunctions_Under2Seconds" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Scalability_LinearWithFunctions" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="b9c3d033-5a94-5462-0e70-695cc1d50f7c">
+      <Execution id="c45cdc0b-afcb-4030-802a-2399bf260d2d" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Scalability_LinearWithFunctions" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Binding_SmallModule_Under100ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="90ce7136-5eb0-f228-f8c0-6cb708e0fff1">
+      <Execution id="31e72ef5-d98d-471f-b8af-c20ed995efbb" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Binding_SmallModule_Under100ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Memory_MediumModule_Under50MB" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="8c16d8b4-f975-8269-ef0c-05a001b7d65f">
+      <Execution id="8076dd8a-b8bb-458a-afb5-fbecf16521fc" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Memory_MediumModule_Under50MB" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.FullAnalysis_SmallModule_Under1Second" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="317d7e96-d849-fe78-440b-ac3093da8562">
+      <Execution id="cc051a81-25a4-41ef-b8b1-2cbacee6bcc4" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="FullAnalysis_SmallModule_Under1Second" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.DataflowAnalysis_ComplexCFG_Under2Seconds" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="ff9e6423-90a0-3a03-f432-d61f0c85bed8">
+      <Execution id="cdc23521-a5b8-44d8-a606-c21192ece9b5" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="DataflowAnalysis_ComplexCFG_Under2Seconds" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Parsing_LargeModule_Under2000ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="e854a17a-73b7-d687-0ac4-464b9cd5f7c0">
+      <Execution id="47f08691-7363-401b-8fad-326456cff881" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Parsing_LargeModule_Under2000ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.DataflowAnalysis_NestedLoops_Under3Seconds" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="f7377d30-1d3f-c10a-4b2f-9ba95155a394">
+      <Execution id="c05b2d14-af76-4626-9b51-4e7be42fce9e" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="DataflowAnalysis_NestedLoops_Under3Seconds" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Memory_LargeModule_Under100MB" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="4597fd90-fe19-71ba-63ee-f47bc5d4120f">
+      <Execution id="514cf1a1-e6b8-443d-8610-ede14b7935e4" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Memory_LargeModule_Under100MB" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.TaintAnalysis_DeepDataFlow_Under1Second" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="78aadb74-4ad9-fc8c-8521-32da8addec96">
+      <Execution id="add55a5c-3da5-4a56-ba0f-71f93e800f9d" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="TaintAnalysis_DeepDataFlow_Under1Second" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.FullAnalysis_MediumModule_Under5Seconds" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="33c7e2f4-efc3-e928-2979-d537950d118e">
+      <Execution id="14add489-c62d-4259-bbcb-88c97a21336d" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="FullAnalysis_MediumModule_Under5Seconds" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Binding_MediumModule_Under500ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="f1c4f5a1-7458-2e25-750d-a6c11a771f2c">
+      <Execution id="ce378786-666d-4efc-b2c9-962f3a5a017a" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Binding_MediumModule_Under500ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Tests.Shared.Z3ConsumerGuardTests.HostNativeInOutputMatchesItsPin" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="4285a824-444b-0f1d-2e2e-c763d8dbc2fa">
+      <Execution id="d41f4237-c748-45c3-a3ab-f90cad697e7c" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Tests.Shared.Z3ConsumerGuardTests" name="HostNativeInOutputMatchesItsPin" />
+    </UnitTest>
+    <UnitTest name="Calor.Tests.Shared.Z3ConsumerGuardTests.ManagedWrapperInOutputMatchesItsPin" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="1c084b80-cff8-e5ab-644f-d4e88ed65954">
+      <Execution id="38e005d8-bbc9-4dcb-a6e3-2b7c719fdb77" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Tests.Shared.Z3ConsumerGuardTests" name="ManagedWrapperInOutputMatchesItsPin" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Parsing_SmallModule_Under100ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="f82a1e4f-5b49-bd3d-401c-b47d5fcbb6cb">
+      <Execution id="af1147f8-d30f-4f22-9c90-abe8a8c43bce" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Parsing_SmallModule_Under100ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Parsing_MediumModule_Under500ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="567a5402-6308-e3a6-4193-e39d77cf88d7">
+      <Execution id="b1252b41-9259-4ab6-baea-b78dbe8797bd" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Parsing_MediumModule_Under500ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Scalability_LinearWithStatements" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="50417a3c-8938-814a-0de2-bc04a157d603">
+      <Execution id="417e223e-90f2-407a-aa13-167ff89406ff" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Scalability_LinearWithStatements" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.IndexPerformanceTests.WarmQueriesStayWithinTheirBudget" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="f5dbd653-edb7-0644-77c1-de87c6fb81ed">
+      <Execution id="5c2f891f-8bef-4284-b489-e3018ebb8071" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.IndexPerformanceTests" name="WarmQueriesStayWithinTheirBudget" />
+    </UnitTest>
+    <UnitTest name="Calor.Tests.Shared.Z3ConsumerGuardTests.HostRidIsASupportedZ3Rid" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="4d353171-2cde-f7b1-9a74-c468720ac576">
+      <Execution id="f8d60625-8301-494a-a48d-72586653e2ff" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Tests.Shared.Z3ConsumerGuardTests" name="HostRidIsASupportedZ3Rid" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.Memory_SmallModule_Under10MB" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="b5991f06-1209-29e4-79cc-04a763eb79ac">
+      <Execution id="66b44df2-5dca-467b-89c6-3aae8af221cf" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="Memory_SmallModule_Under10MB" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.CFGConstruction_SmallFunction_Under10ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="be40609b-db05-dff1-e1d1-b6b382a18a69">
+      <Execution id="f5f1ca0c-402b-4472-88aa-adc167a68419" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="CFGConstruction_SmallFunction_Under10ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Tests.Shared.Z3ConsumerGuardTests.Z3LoadsWithThePinnedVersion" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="de863556-05cc-fd4f-8d8d-43e5d27d8a7d">
+      <Execution id="48de700f-23ce-4186-abb4-e3d5eea17255" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Tests.Shared.Z3ConsumerGuardTests" name="Z3LoadsWithThePinnedVersion" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.CFGConstruction_ComplexFunction_Under50ms" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="17e23072-612b-037f-6b1f-515a3ee866b7">
+      <Execution id="cdba3d4e-a754-4b9b-9bfd-31f21240df1e" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="CFGConstruction_ComplexFunction_Under50ms" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.IndexPerformanceTests.IndexBuildStaysWithinItsBudget" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="a3e7cdb9-f76d-f77b-5a34-8f5e8118b7b4">
+      <Execution id="51e3a38a-d580-429d-bf4b-c29aac839452" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.IndexPerformanceTests" name="IndexBuildStaysWithinItsBudget" />
+    </UnitTest>
+    <UnitTest name="Calor.Performance.Tests.VerificationPerformanceTests.FullAnalysis_LargeModule_Under30Seconds" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/calor.performance.tests/bin/release/net10.0/calor.performance.tests.dll" id="c64edfc9-452d-0f73-7e7d-66c3857c0c44">
+      <Execution id="ebe8a9ed-f17b-4190-9640-ea6a7fa537f0" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/second/nested/fresh/tests/Calor.Performance.Tests/bin/Release/net10.0/Calor.Performance.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Performance.Tests.VerificationPerformanceTests" name="FullAnalysis_LargeModule_Under30Seconds" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="17e23072-612b-037f-6b1f-515a3ee866b7" executionId="cdba3d4e-a754-4b9b-9bfd-31f21240df1e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a3e7cdb9-f76d-f77b-5a34-8f5e8118b7b4" executionId="51e3a38a-d580-429d-bf4b-c29aac839452" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b9c3d033-5a94-5462-0e70-695cc1d50f7c" executionId="c45cdc0b-afcb-4030-802a-2399bf260d2d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8c16d8b4-f975-8269-ef0c-05a001b7d65f" executionId="8076dd8a-b8bb-458a-afb5-fbecf16521fc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f5dbd653-edb7-0644-77c1-de87c6fb81ed" executionId="5c2f891f-8bef-4284-b489-e3018ebb8071" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="50417a3c-8938-814a-0de2-bc04a157d603" executionId="417e223e-90f2-407a-aa13-167ff89406ff" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="de863556-05cc-fd4f-8d8d-43e5d27d8a7d" executionId="48de700f-23ce-4186-abb4-e3d5eea17255" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4597fd90-fe19-71ba-63ee-f47bc5d4120f" executionId="514cf1a1-e6b8-443d-8610-ede14b7935e4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="90ce7136-5eb0-f228-f8c0-6cb708e0fff1" executionId="31e72ef5-d98d-471f-b8af-c20ed995efbb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4285a824-444b-0f1d-2e2e-c763d8dbc2fa" executionId="d41f4237-c748-45c3-a3ab-f90cad697e7c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b5991f06-1209-29e4-79cc-04a763eb79ac" executionId="66b44df2-5dca-467b-89c6-3aae8af221cf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ff9e6423-90a0-3a03-f432-d61f0c85bed8" executionId="cdc23521-a5b8-44d8-a606-c21192ece9b5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="be40609b-db05-dff1-e1d1-b6b382a18a69" executionId="f5f1ca0c-402b-4472-88aa-adc167a68419" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c64edfc9-452d-0f73-7e7d-66c3857c0c44" executionId="ebe8a9ed-f17b-4190-9640-ea6a7fa537f0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="78aadb74-4ad9-fc8c-8521-32da8addec96" executionId="add55a5c-3da5-4a56-ba0f-71f93e800f9d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="567a5402-6308-e3a6-4193-e39d77cf88d7" executionId="b1252b41-9259-4ab6-baea-b78dbe8797bd" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f7377d30-1d3f-c10a-4b2f-9ba95155a394" executionId="c05b2d14-af76-4626-9b51-4e7be42fce9e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cf529fc1-dcfa-66b2-f49d-c1ab85be67c5" executionId="8c912b84-99c6-4d88-9755-37da04764cdc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4d353171-2cde-f7b1-9a74-c468720ac576" executionId="f8d60625-8301-494a-a48d-72586653e2ff" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1c084b80-cff8-e5ab-644f-d4e88ed65954" executionId="38e005d8-bbc9-4dcb-a6e3-2b7c719fdb77" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f1c4f5a1-7458-2e25-750d-a6c11a771f2c" executionId="ce378786-666d-4efc-b2c9-962f3a5a017a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="33c7e2f4-efc3-e928-2979-d537950d118e" executionId="14add489-c62d-4259-bbcb-88c97a21336d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e854a17a-73b7-d687-0ac4-464b9cd5f7c0" executionId="47f08691-7363-401b-8fad-326456cff881" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="317d7e96-d849-fe78-440b-ac3093da8562" executionId="cc051a81-25a4-41ef-b8b1-2cbacee6bcc4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f82a1e4f-5b49-bd3d-401c-b47d5fcbb6cb" executionId="af1147f8-d30f-4f22-9c90-abe8a8c43bce" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0b23e987-0e14-d091-d828-a39db3f466b7" executionId="7c59198f-86d0-4695-84e6-d7c3a8eee0d6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="26" executed="26" passed="26" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.12)
+[xUnit.net 00:00:00.02]   Discovering: Calor.Performance.Tests
+[xUnit.net 00:00:00.03]   Discovered:  Calor.Performance.Tests
+[xUnit.net 00:00:00.04]   Starting:    Calor.Performance.Tests
+[xUnit.net 00:00:12.58]   Finished:    Calor.Performance.Tests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

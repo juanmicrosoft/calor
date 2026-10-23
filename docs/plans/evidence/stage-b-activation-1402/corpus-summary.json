@@ -1,0 +1,1951 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+  "ciRun": 34988156401,
+  "artifactId": 10405320561,
+  "acceptance": "Unadjudicated",
+  "projects": [
+    {
+      "project": "FluentValidation",
+      "verdict": "pass",
+      "sourceDeclaredVersion": "0.21.0",
+      "files": {
+        "total": 139,
+        "replaced": 97,
+        "reverted": 0,
+        "conversion_failed": 0,
+        "conversion_timed_out": 0,
+        "emit_error": 3,
+        "emit_compilation_error": 20,
+        "compile_error": 19,
+        "crashed": 0,
+        "not_attempted": 0,
+        "excluded_by_pattern": 0
+      },
+      "evidenceCounts": {
+        "inventory": 139,
+        "attempted": 139,
+        "context_resolved": 139,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 139,
+        "compilation_accepted": 120,
+        "compilation_rejected": 19,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "fidelity": {
+        "coverage": {
+          "total_convertible_files": 139,
+          "converted_native": 93,
+          "converted_with_losses": 4,
+          "reverted": 0,
+          "failed_conversion": 42,
+          "excluded_files": 0,
+          "coverage_fraction": 0.697841726618705,
+          "native_fraction": 0.6690647482014388,
+          "loss_kind_counts": {
+            "InteropPreserved": 30,
+            "PreprocessorStripped": 18
+          },
+          "total_interop_blocks": 30,
+          "distinct_gaps": [
+            "preprocessor-directive"
+          ],
+          "minimum_coverage_fraction": 0.5,
+          "minimum_native_fraction": 0.48
+        },
+        "build": {
+          "baseline_succeeded": true,
+          "succeeded": true,
+          "exit_code": 0,
+          "recovery_reverted_files": 0,
+          "error_count": 0
+        },
+        "tests": {
+          "baseline_total": 866,
+          "baseline_passed": 865,
+          "baseline_failed": 0,
+          "baseline_trx_files": 1,
+          "baseline_console_fallback": false,
+          "round_trip_total": 866,
+          "round_trip_passed": 865,
+          "round_trip_failed": 0,
+          "round_trip_trx_files": 1,
+          "round_trip_console_fallback": false,
+          "inventory_delta": 0,
+          "regressions": 0,
+          "new_passes": 0,
+          "ignored_flaky_regressions": 0,
+          "ignored_flaky_baseline_failures": 0,
+          "ignored_flaky_round_trip_failures": 0,
+          "comparison_status": "Pass"
+        }
+      },
+      "regressions": 0,
+      "gateFailures": [],
+      "provenance": {
+        "RepositoryRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "RepositoryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "CorpusRevision": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c",
+        "CorpusDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Host": ".NET 10.0.12; Ubuntu 24.04.5 LTS; X64",
+        "DotnetInfo": ".NET SDK:\n Version:           10.0.401\n Commit:            e34a38d2ae\n Workload version:  10.0.400-manifests.63b36e85\n MSBuild version:   18.9.11+e34a38d2a\n\nRuntime Environment:\n OS Name:     ubuntu\n OS Version:  24.04\n OS Platform: Linux\n RID:         linux-x64\n Base Path:   /usr/share/dotnet/sdk/10.0.401/\n\n.NET workloads installed:\nThere are no installed workloads to display.\nConfigured to use workload sets when installing new manifests.\nNo workload sets are installed. Run \"dotnet workload restore\" to install a workload set.\n\nHost:\n  Version:      10.0.12\n  Architecture: x64\n  Commit:       95017c711e\n\n.NET SDKs installed:\n  8.0.130 [/usr/share/dotnet/sdk]\n  8.0.206 [/usr/share/dotnet/sdk]\n  8.0.319 [/usr/share/dotnet/sdk]\n  8.0.424 [/usr/share/dotnet/sdk]\n  8.0.425 [/usr/share/dotnet/sdk]\n  9.0.120 [/usr/share/dotnet/sdk]\n  9.0.205 [/usr/share/dotnet/sdk]\n  9.0.317 [/usr/share/dotnet/sdk]\n  10.0.111 [/usr/share/dotnet/sdk]\n  10.0.204 [/usr/share/dotnet/sdk]\n  10.0.303 [/usr/share/dotnet/sdk]\n  10.0.400 [/usr/share/dotnet/sdk]\n  10.0.401 [/usr/share/dotnet/sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n\nOther architectures found:\n  None\n\nEnvironment variables:\n  DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER     [1]\n  DOTNET_MULTILEVEL_LOOKUP                 [0]\n  DOTNET_NOLOGO                            [1]\n  DOTNET_ROOT                              [/usr/share/dotnet]\n  DOTNET_ROOT_X64                          [/usr/share/dotnet]\n  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]\n\nglobal.json file:\n  /home/runner/work/calor/calor/global.json\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download\n",
+        "Compiler": {
+          "Identity": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "723754c1a7225f92686a70991fa6f63dafa7dee241db1a8b7d1ae95c719782c6",
+          "InformationalVersion": "0.21.0"
+        },
+        "Harness": {
+          "Identity": "Calor.RoundTrip.Harness, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "3d9a42565053678753ac0f2356f51664fc63eea3b3e74985af66d60f06b9f5b9",
+          "InformationalVersion": "0.21.0"
+        },
+        "Roslyn": {
+          "Identity": "Microsoft.CodeAnalysis.CSharp, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+          "Sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+          "InformationalVersion": "5.3.0-2.26078.5+16f9bd284cd49604ac82998bfe778a8eb16d4347"
+        },
+        "HarnessOptions": {
+          "BisectMaxRegressions": 50,
+          "BuildTimeout": "00:15:00",
+          "CaptureBindingAnalysis": false,
+          "Configuration": "Debug",
+          "ConversionTimeout": "00:00:30",
+          "DotnetPath": "dotnet",
+          "EnableBisect": false,
+          "ExcludePatterns": [
+            "**/AssemblyInfo.cs",
+            "**/GlobalUsings.cs",
+            "**/*.g.cs",
+            "**/*.generated.cs",
+            "**/*.Designer.cs",
+            "**/obj/**",
+            "**/bin/**"
+          ],
+          "ExpectedFlakyTestFullyQualifiedNames": [],
+          "ExtraBuildProperties": "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
+          "LibrarySourceRelativePath": "src/FluentValidation",
+          "LooseDirectoryMode": false,
+          "MinimumCoverageFraction": 0.5,
+          "MinimumNativeFraction": 0.48,
+          "OriginalProjectPath": "/home/runner/work/calor/calor/bench/corpus/FluentValidation",
+          "ParseContextProjectFile": "src/FluentValidation/FluentValidation.csproj",
+          "ProjectName": "FluentValidation",
+          "SolutionOrProjectFile": "src/FluentValidation.Tests/FluentValidation.Tests.csproj",
+          "TargetFramework": "net8.0",
+          "TestAttemptsPerLeg": 1,
+          "TestFilter": null,
+          "TestTimeout": "00:10:00",
+          "WorkingDirectory": null
+        }
+      },
+      "retryRule": "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. Compare paired attempts and retain every test identity/outcome. Any failed, missing, skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.",
+      "declaredAttemptsPerLeg": 1,
+      "failures": [],
+      "attempts": [
+        {
+          "Leg": "baseline",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 865,
+            "Skipped": 1,
+            "TotalTests": 866,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        },
+        {
+          "Leg": "candidate",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 865,
+            "Skipped": 1,
+            "TotalTests": 866,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        }
+      ]
+    },
+    {
+      "project": "MediatR",
+      "verdict": "pass",
+      "sourceDeclaredVersion": "0.21.0",
+      "files": {
+        "total": 32,
+        "replaced": 23,
+        "reverted": 0,
+        "conversion_failed": 0,
+        "conversion_timed_out": 0,
+        "emit_error": 0,
+        "emit_compilation_error": 6,
+        "compile_error": 3,
+        "crashed": 0,
+        "not_attempted": 0,
+        "excluded_by_pattern": 0
+      },
+      "evidenceCounts": {
+        "inventory": 32,
+        "attempted": 32,
+        "context_resolved": 32,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 32,
+        "compilation_accepted": 29,
+        "compilation_rejected": 3,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "fidelity": {
+        "coverage": {
+          "total_convertible_files": 32,
+          "converted_native": 17,
+          "converted_with_losses": 6,
+          "reverted": 0,
+          "failed_conversion": 9,
+          "excluded_files": 0,
+          "coverage_fraction": 0.71875,
+          "native_fraction": 0.53125,
+          "loss_kind_counts": {
+            "InteropPreserved": 15
+          },
+          "total_interop_blocks": 15,
+          "distinct_gaps": [],
+          "minimum_coverage_fraction": 0.55,
+          "minimum_native_fraction": 0.4
+        },
+        "build": {
+          "baseline_succeeded": true,
+          "succeeded": true,
+          "exit_code": 0,
+          "recovery_reverted_files": 0,
+          "error_count": 0
+        },
+        "tests": {
+          "baseline_total": 157,
+          "baseline_passed": 155,
+          "baseline_failed": 0,
+          "baseline_trx_files": 1,
+          "baseline_console_fallback": false,
+          "round_trip_total": 157,
+          "round_trip_passed": 155,
+          "round_trip_failed": 0,
+          "round_trip_trx_files": 1,
+          "round_trip_console_fallback": false,
+          "inventory_delta": 0,
+          "regressions": 0,
+          "new_passes": 0,
+          "ignored_flaky_regressions": 0,
+          "ignored_flaky_baseline_failures": 0,
+          "ignored_flaky_round_trip_failures": 0,
+          "comparison_status": "Pass"
+        }
+      },
+      "regressions": 0,
+      "gateFailures": [],
+      "provenance": {
+        "RepositoryRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "RepositoryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "CorpusRevision": "fb309026775ef953a64fb5339d074426c1ad2c37",
+        "CorpusDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Host": ".NET 10.0.12; Ubuntu 24.04.5 LTS; X64",
+        "DotnetInfo": ".NET SDK:\n Version:           10.0.401\n Commit:            e34a38d2ae\n Workload version:  10.0.400-manifests.63b36e85\n MSBuild version:   18.9.11+e34a38d2a\n\nRuntime Environment:\n OS Name:     ubuntu\n OS Version:  24.04\n OS Platform: Linux\n RID:         linux-x64\n Base Path:   /usr/share/dotnet/sdk/10.0.401/\n\n.NET workloads installed:\nThere are no installed workloads to display.\nConfigured to use workload sets when installing new manifests.\nNo workload sets are installed. Run \"dotnet workload restore\" to install a workload set.\n\nHost:\n  Version:      10.0.12\n  Architecture: x64\n  Commit:       95017c711e\n\n.NET SDKs installed:\n  8.0.130 [/usr/share/dotnet/sdk]\n  8.0.206 [/usr/share/dotnet/sdk]\n  8.0.319 [/usr/share/dotnet/sdk]\n  8.0.424 [/usr/share/dotnet/sdk]\n  8.0.425 [/usr/share/dotnet/sdk]\n  9.0.120 [/usr/share/dotnet/sdk]\n  9.0.205 [/usr/share/dotnet/sdk]\n  9.0.317 [/usr/share/dotnet/sdk]\n  10.0.111 [/usr/share/dotnet/sdk]\n  10.0.204 [/usr/share/dotnet/sdk]\n  10.0.303 [/usr/share/dotnet/sdk]\n  10.0.400 [/usr/share/dotnet/sdk]\n  10.0.401 [/usr/share/dotnet/sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n\nOther architectures found:\n  None\n\nEnvironment variables:\n  DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER     [1]\n  DOTNET_MULTILEVEL_LOOKUP                 [0]\n  DOTNET_NOLOGO                            [1]\n  DOTNET_ROOT                              [/usr/share/dotnet]\n  DOTNET_ROOT_X64                          [/usr/share/dotnet]\n  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]\n\nglobal.json file:\n  /home/runner/work/calor/calor/global.json\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download\n",
+        "Compiler": {
+          "Identity": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "723754c1a7225f92686a70991fa6f63dafa7dee241db1a8b7d1ae95c719782c6",
+          "InformationalVersion": "0.21.0"
+        },
+        "Harness": {
+          "Identity": "Calor.RoundTrip.Harness, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "3d9a42565053678753ac0f2356f51664fc63eea3b3e74985af66d60f06b9f5b9",
+          "InformationalVersion": "0.21.0"
+        },
+        "Roslyn": {
+          "Identity": "Microsoft.CodeAnalysis.CSharp, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+          "Sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+          "InformationalVersion": "5.3.0-2.26078.5+16f9bd284cd49604ac82998bfe778a8eb16d4347"
+        },
+        "HarnessOptions": {
+          "BisectMaxRegressions": 50,
+          "BuildTimeout": "00:15:00",
+          "CaptureBindingAnalysis": false,
+          "Configuration": "Debug",
+          "ConversionTimeout": "00:00:30",
+          "DotnetPath": "dotnet",
+          "EnableBisect": false,
+          "ExcludePatterns": [
+            "**/AssemblyInfo.cs",
+            "**/GlobalUsings.cs",
+            "**/*.g.cs",
+            "**/*.generated.cs",
+            "**/*.Designer.cs",
+            "**/obj/**",
+            "**/bin/**"
+          ],
+          "ExpectedFlakyTestFullyQualifiedNames": [
+            "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs"
+          ],
+          "ExtraBuildProperties": "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false -p:VSTestCLIRunSettings=xUnit.ParallelizeTestCollections=false",
+          "LibrarySourceRelativePath": "src/MediatR",
+          "LooseDirectoryMode": false,
+          "MinimumCoverageFraction": 0.55,
+          "MinimumNativeFraction": 0.4,
+          "OriginalProjectPath": "/home/runner/work/calor/calor/bench/corpus/MediatR",
+          "ParseContextProjectFile": null,
+          "ProjectName": "MediatR",
+          "SolutionOrProjectFile": "test/MediatR.Tests/MediatR.Tests.csproj",
+          "TargetFramework": "net8.0",
+          "TestAttemptsPerLeg": 1,
+          "TestFilter": null,
+          "TestTimeout": "00:10:00",
+          "WorkingDirectory": null
+        }
+      },
+      "retryRule": "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. Compare paired attempts and retain every test identity/outcome. Any failed, missing, skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.",
+      "declaredAttemptsPerLeg": 1,
+      "failures": [],
+      "attempts": [
+        {
+          "Leg": "baseline",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 155,
+            "Skipped": 2,
+            "TotalTests": 157,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        },
+        {
+          "Leg": "candidate",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 155,
+            "Skipped": 2,
+            "TotalTests": 157,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        }
+      ]
+    },
+    {
+      "project": "Serilog",
+      "verdict": "pass",
+      "sourceDeclaredVersion": "0.21.0",
+      "files": {
+        "total": 112,
+        "replaced": 57,
+        "reverted": 0,
+        "conversion_failed": 0,
+        "conversion_timed_out": 0,
+        "emit_error": 0,
+        "emit_compilation_error": 39,
+        "compile_error": 10,
+        "crashed": 0,
+        "not_attempted": 0,
+        "excluded_by_pattern": 6
+      },
+      "evidenceCounts": {
+        "inventory": 112,
+        "attempted": 106,
+        "context_resolved": 0,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 106,
+        "compilation_accepted": 96,
+        "compilation_rejected": 10,
+        "compilation_not_reached": 0,
+        "skipped": 6,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "fidelity": {
+        "coverage": {
+          "total_convertible_files": 112,
+          "converted_native": 44,
+          "converted_with_losses": 13,
+          "reverted": 0,
+          "failed_conversion": 49,
+          "excluded_files": 6,
+          "coverage_fraction": 0.5089285714285714,
+          "native_fraction": 0.39285714285714285,
+          "loss_kind_counts": {
+            "InteropPreserved": 70,
+            "EmitterFallback": 1
+          },
+          "total_interop_blocks": 71,
+          "distinct_gaps": [],
+          "minimum_coverage_fraction": 0.3,
+          "minimum_native_fraction": 0.25
+        },
+        "build": {
+          "baseline_succeeded": true,
+          "succeeded": true,
+          "exit_code": 0,
+          "recovery_reverted_files": 0,
+          "error_count": 0
+        },
+        "tests": {
+          "baseline_total": 811,
+          "baseline_passed": 811,
+          "baseline_failed": 0,
+          "baseline_trx_files": 1,
+          "baseline_console_fallback": false,
+          "round_trip_total": 811,
+          "round_trip_passed": 811,
+          "round_trip_failed": 0,
+          "round_trip_trx_files": 1,
+          "round_trip_console_fallback": false,
+          "inventory_delta": 0,
+          "regressions": 0,
+          "new_passes": 0,
+          "ignored_flaky_regressions": 0,
+          "ignored_flaky_baseline_failures": 0,
+          "ignored_flaky_round_trip_failures": 0,
+          "comparison_status": "Pass"
+        }
+      },
+      "regressions": 0,
+      "gateFailures": [],
+      "provenance": {
+        "RepositoryRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "RepositoryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "CorpusRevision": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
+        "CorpusDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Host": ".NET 10.0.12; Ubuntu 24.04.5 LTS; X64",
+        "DotnetInfo": ".NET SDK:\n Version:           10.0.401\n Commit:            e34a38d2ae\n Workload version:  10.0.400-manifests.63b36e85\n MSBuild version:   18.9.11+e34a38d2a\n\nRuntime Environment:\n OS Name:     ubuntu\n OS Version:  24.04\n OS Platform: Linux\n RID:         linux-x64\n Base Path:   /usr/share/dotnet/sdk/10.0.401/\n\n.NET workloads installed:\nThere are no installed workloads to display.\nConfigured to use workload sets when installing new manifests.\nNo workload sets are installed. Run \"dotnet workload restore\" to install a workload set.\n\nHost:\n  Version:      10.0.12\n  Architecture: x64\n  Commit:       95017c711e\n\n.NET SDKs installed:\n  8.0.130 [/usr/share/dotnet/sdk]\n  8.0.206 [/usr/share/dotnet/sdk]\n  8.0.319 [/usr/share/dotnet/sdk]\n  8.0.424 [/usr/share/dotnet/sdk]\n  8.0.425 [/usr/share/dotnet/sdk]\n  9.0.120 [/usr/share/dotnet/sdk]\n  9.0.205 [/usr/share/dotnet/sdk]\n  9.0.317 [/usr/share/dotnet/sdk]\n  10.0.111 [/usr/share/dotnet/sdk]\n  10.0.204 [/usr/share/dotnet/sdk]\n  10.0.303 [/usr/share/dotnet/sdk]\n  10.0.400 [/usr/share/dotnet/sdk]\n  10.0.401 [/usr/share/dotnet/sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n\nOther architectures found:\n  None\n\nEnvironment variables:\n  DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER     [1]\n  DOTNET_MULTILEVEL_LOOKUP                 [0]\n  DOTNET_NOLOGO                            [1]\n  DOTNET_ROOT                              [/usr/share/dotnet]\n  DOTNET_ROOT_X64                          [/usr/share/dotnet]\n  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]\n\nglobal.json file:\n  /home/runner/work/calor/calor/global.json\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download\n",
+        "Compiler": {
+          "Identity": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "723754c1a7225f92686a70991fa6f63dafa7dee241db1a8b7d1ae95c719782c6",
+          "InformationalVersion": "0.21.0"
+        },
+        "Harness": {
+          "Identity": "Calor.RoundTrip.Harness, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "3d9a42565053678753ac0f2356f51664fc63eea3b3e74985af66d60f06b9f5b9",
+          "InformationalVersion": "0.21.0"
+        },
+        "Roslyn": {
+          "Identity": "Microsoft.CodeAnalysis.CSharp, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+          "Sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+          "InformationalVersion": "5.3.0-2.26078.5+16f9bd284cd49604ac82998bfe778a8eb16d4347"
+        },
+        "HarnessOptions": {
+          "BisectMaxRegressions": 50,
+          "BuildTimeout": "00:15:00",
+          "CaptureBindingAnalysis": false,
+          "Configuration": "Debug",
+          "ConversionTimeout": "00:00:30",
+          "DotnetPath": "dotnet",
+          "EnableBisect": false,
+          "ExcludePatterns": [
+            "**/AssemblyInfo.cs",
+            "**/GlobalUsings.cs",
+            "**/*.g.cs",
+            "**/*.generated.cs",
+            "**/*.Designer.cs",
+            "**/obj/**",
+            "**/bin/**",
+            "**/Core/Logger.cs",
+            "**/Core/Sinks/RestrictedSink.cs",
+            "**/Core/Sinks/SecondaryLoggerSink.cs",
+            "**/Rendering/ReusableStringWriter.cs"
+          ],
+          "ExpectedFlakyTestFullyQualifiedNames": [],
+          "ExtraBuildProperties": "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
+          "LibrarySourceRelativePath": "src/Serilog",
+          "LooseDirectoryMode": false,
+          "MinimumCoverageFraction": 0.3,
+          "MinimumNativeFraction": 0.25,
+          "OriginalProjectPath": "/home/runner/work/calor/calor/bench/corpus/serilog",
+          "ParseContextProjectFile": "src/Serilog/Serilog.csproj",
+          "ProjectName": "Serilog",
+          "SolutionOrProjectFile": "test/Serilog.Tests/Serilog.Tests.csproj",
+          "TargetFramework": "net10.0",
+          "TestAttemptsPerLeg": 1,
+          "TestFilter": null,
+          "TestTimeout": "00:10:00",
+          "WorkingDirectory": null
+        }
+      },
+      "retryRule": "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. Compare paired attempts and retain every test identity/outcome. Any failed, missing, skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.",
+      "declaredAttemptsPerLeg": 1,
+      "failures": [],
+      "attempts": [
+        {
+          "Leg": "baseline",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 811,
+            "Skipped": 0,
+            "TotalTests": 811,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        },
+        {
+          "Leg": "candidate",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 811,
+            "Skipped": 0,
+            "TotalTests": 811,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        }
+      ]
+    },
+    {
+      "project": "Synthetic",
+      "verdict": "pass",
+      "sourceDeclaredVersion": "0.21.0",
+      "files": {
+        "total": 5,
+        "replaced": 5,
+        "reverted": 0,
+        "conversion_failed": 0,
+        "conversion_timed_out": 0,
+        "emit_error": 0,
+        "emit_compilation_error": 0,
+        "compile_error": 0,
+        "crashed": 0,
+        "not_attempted": 0,
+        "excluded_by_pattern": 0
+      },
+      "evidenceCounts": {
+        "inventory": 5,
+        "attempted": 5,
+        "context_resolved": 5,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 5,
+        "compilation_accepted": 5,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "fidelity": {
+        "coverage": {
+          "total_convertible_files": 5,
+          "converted_native": 5,
+          "converted_with_losses": 0,
+          "reverted": 0,
+          "failed_conversion": 0,
+          "excluded_files": 0,
+          "coverage_fraction": 1,
+          "native_fraction": 1,
+          "loss_kind_counts": {},
+          "total_interop_blocks": 0,
+          "distinct_gaps": [],
+          "minimum_coverage_fraction": 0.625,
+          "minimum_native_fraction": 0.625
+        },
+        "build": {
+          "baseline_succeeded": true,
+          "succeeded": true,
+          "exit_code": 0,
+          "recovery_reverted_files": 0,
+          "error_count": 0
+        },
+        "tests": {
+          "baseline_total": 52,
+          "baseline_passed": 52,
+          "baseline_failed": 0,
+          "baseline_trx_files": 1,
+          "baseline_console_fallback": false,
+          "round_trip_total": 52,
+          "round_trip_passed": 52,
+          "round_trip_failed": 0,
+          "round_trip_trx_files": 1,
+          "round_trip_console_fallback": false,
+          "inventory_delta": 0,
+          "regressions": 0,
+          "new_passes": 0,
+          "ignored_flaky_regressions": 0,
+          "ignored_flaky_baseline_failures": 0,
+          "ignored_flaky_round_trip_failures": 0,
+          "comparison_status": "Pass"
+        }
+      },
+      "regressions": 0,
+      "gateFailures": [],
+      "provenance": {
+        "RepositoryRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "RepositoryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "CorpusRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "CorpusDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Host": ".NET 10.0.12; Ubuntu 24.04.5 LTS; X64",
+        "DotnetInfo": ".NET SDK:\n Version:           10.0.401\n Commit:            e34a38d2ae\n Workload version:  10.0.400-manifests.63b36e85\n MSBuild version:   18.9.11+e34a38d2a\n\nRuntime Environment:\n OS Name:     ubuntu\n OS Version:  24.04\n OS Platform: Linux\n RID:         linux-x64\n Base Path:   /usr/share/dotnet/sdk/10.0.401/\n\n.NET workloads installed:\nThere are no installed workloads to display.\nConfigured to use workload sets when installing new manifests.\nNo workload sets are installed. Run \"dotnet workload restore\" to install a workload set.\n\nHost:\n  Version:      10.0.12\n  Architecture: x64\n  Commit:       95017c711e\n\n.NET SDKs installed:\n  8.0.130 [/usr/share/dotnet/sdk]\n  8.0.206 [/usr/share/dotnet/sdk]\n  8.0.319 [/usr/share/dotnet/sdk]\n  8.0.424 [/usr/share/dotnet/sdk]\n  8.0.425 [/usr/share/dotnet/sdk]\n  9.0.120 [/usr/share/dotnet/sdk]\n  9.0.205 [/usr/share/dotnet/sdk]\n  9.0.317 [/usr/share/dotnet/sdk]\n  10.0.111 [/usr/share/dotnet/sdk]\n  10.0.204 [/usr/share/dotnet/sdk]\n  10.0.303 [/usr/share/dotnet/sdk]\n  10.0.400 [/usr/share/dotnet/sdk]\n  10.0.401 [/usr/share/dotnet/sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n\nOther architectures found:\n  None\n\nEnvironment variables:\n  DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER     [1]\n  DOTNET_MULTILEVEL_LOOKUP                 [0]\n  DOTNET_NOLOGO                            [1]\n  DOTNET_ROOT                              [/usr/share/dotnet]\n  DOTNET_ROOT_X64                          [/usr/share/dotnet]\n  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]\n\nglobal.json file:\n  /home/runner/work/calor/calor/global.json\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download\n",
+        "Compiler": {
+          "Identity": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "723754c1a7225f92686a70991fa6f63dafa7dee241db1a8b7d1ae95c719782c6",
+          "InformationalVersion": "0.21.0"
+        },
+        "Harness": {
+          "Identity": "Calor.RoundTrip.Harness, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "3d9a42565053678753ac0f2356f51664fc63eea3b3e74985af66d60f06b9f5b9",
+          "InformationalVersion": "0.21.0"
+        },
+        "Roslyn": {
+          "Identity": "Microsoft.CodeAnalysis.CSharp, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+          "Sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+          "InformationalVersion": "5.3.0-2.26078.5+16f9bd284cd49604ac82998bfe778a8eb16d4347"
+        },
+        "HarnessOptions": {
+          "BisectMaxRegressions": 50,
+          "BuildTimeout": "00:15:00",
+          "CaptureBindingAnalysis": false,
+          "Configuration": "Debug",
+          "ConversionTimeout": "00:00:30",
+          "DotnetPath": "dotnet",
+          "EnableBisect": false,
+          "ExcludePatterns": [
+            "**/AssemblyInfo.cs",
+            "**/GlobalUsings.cs",
+            "**/*.g.cs",
+            "**/*.generated.cs",
+            "**/*.Designer.cs",
+            "**/obj/**",
+            "**/bin/**"
+          ],
+          "ExpectedFlakyTestFullyQualifiedNames": [],
+          "ExtraBuildProperties": "",
+          "LibrarySourceRelativePath": "SyntheticLib",
+          "LooseDirectoryMode": false,
+          "MinimumCoverageFraction": 0.625,
+          "MinimumNativeFraction": 0.625,
+          "OriginalProjectPath": "/home/runner/work/calor/calor/tests/Calor.RoundTrip.Synthetic",
+          "ParseContextProjectFile": null,
+          "ProjectName": "Synthetic",
+          "SolutionOrProjectFile": "SyntheticLib.Tests/SyntheticLib.Tests.csproj",
+          "TargetFramework": "net10.0",
+          "TestAttemptsPerLeg": 1,
+          "TestFilter": null,
+          "TestTimeout": "00:10:00",
+          "WorkingDirectory": null
+        }
+      },
+      "retryRule": "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. Compare paired attempts and retain every test identity/outcome. Any failed, missing, skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.",
+      "declaredAttemptsPerLeg": 1,
+      "failures": [],
+      "attempts": [
+        {
+          "Leg": "baseline",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 52,
+            "Skipped": 0,
+            "TotalTests": 52,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        },
+        {
+          "Leg": "candidate",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 52,
+            "Skipped": 0,
+            "TotalTests": 52,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        }
+      ]
+    },
+    {
+      "project": "Synthetic2",
+      "verdict": "pass",
+      "sourceDeclaredVersion": "0.21.0",
+      "files": {
+        "total": 1,
+        "replaced": 1,
+        "reverted": 0,
+        "conversion_failed": 0,
+        "conversion_timed_out": 0,
+        "emit_error": 0,
+        "emit_compilation_error": 0,
+        "compile_error": 0,
+        "crashed": 0,
+        "not_attempted": 0,
+        "excluded_by_pattern": 0
+      },
+      "evidenceCounts": {
+        "inventory": 1,
+        "attempted": 1,
+        "context_resolved": 1,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 1,
+        "compilation_accepted": 1,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "fidelity": {
+        "coverage": {
+          "total_convertible_files": 1,
+          "converted_native": 1,
+          "converted_with_losses": 0,
+          "reverted": 0,
+          "failed_conversion": 0,
+          "excluded_files": 0,
+          "coverage_fraction": 1,
+          "native_fraction": 1,
+          "loss_kind_counts": {},
+          "total_interop_blocks": 0,
+          "distinct_gaps": [],
+          "minimum_coverage_fraction": 0.25,
+          "minimum_native_fraction": 0.25
+        },
+        "build": {
+          "baseline_succeeded": true,
+          "succeeded": true,
+          "exit_code": 0,
+          "recovery_reverted_files": 0,
+          "error_count": 0
+        },
+        "tests": {
+          "baseline_total": 20,
+          "baseline_passed": 20,
+          "baseline_failed": 0,
+          "baseline_trx_files": 1,
+          "baseline_console_fallback": false,
+          "round_trip_total": 20,
+          "round_trip_passed": 20,
+          "round_trip_failed": 0,
+          "round_trip_trx_files": 1,
+          "round_trip_console_fallback": false,
+          "inventory_delta": 0,
+          "regressions": 0,
+          "new_passes": 0,
+          "ignored_flaky_regressions": 0,
+          "ignored_flaky_baseline_failures": 0,
+          "ignored_flaky_round_trip_failures": 0,
+          "comparison_status": "Pass"
+        }
+      },
+      "regressions": 0,
+      "gateFailures": [],
+      "provenance": {
+        "RepositoryRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "RepositoryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "CorpusRevision": "032834238d7c2b68675cae06a68e55935ddc3747",
+        "CorpusDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Host": ".NET 10.0.12; Ubuntu 24.04.5 LTS; X64",
+        "DotnetInfo": ".NET SDK:\n Version:           10.0.401\n Commit:            e34a38d2ae\n Workload version:  10.0.400-manifests.63b36e85\n MSBuild version:   18.9.11+e34a38d2a\n\nRuntime Environment:\n OS Name:     ubuntu\n OS Version:  24.04\n OS Platform: Linux\n RID:         linux-x64\n Base Path:   /usr/share/dotnet/sdk/10.0.401/\n\n.NET workloads installed:\nThere are no installed workloads to display.\nConfigured to use workload sets when installing new manifests.\nNo workload sets are installed. Run \"dotnet workload restore\" to install a workload set.\n\nHost:\n  Version:      10.0.12\n  Architecture: x64\n  Commit:       95017c711e\n\n.NET SDKs installed:\n  8.0.130 [/usr/share/dotnet/sdk]\n  8.0.206 [/usr/share/dotnet/sdk]\n  8.0.319 [/usr/share/dotnet/sdk]\n  8.0.424 [/usr/share/dotnet/sdk]\n  8.0.425 [/usr/share/dotnet/sdk]\n  9.0.120 [/usr/share/dotnet/sdk]\n  9.0.205 [/usr/share/dotnet/sdk]\n  9.0.317 [/usr/share/dotnet/sdk]\n  10.0.111 [/usr/share/dotnet/sdk]\n  10.0.204 [/usr/share/dotnet/sdk]\n  10.0.303 [/usr/share/dotnet/sdk]\n  10.0.400 [/usr/share/dotnet/sdk]\n  10.0.401 [/usr/share/dotnet/sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 8.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.22 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.30 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 8.0.31 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.6 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 9.0.19 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.8 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.11 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.NETCore.App]\n\nOther architectures found:\n  None\n\nEnvironment variables:\n  DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER     [1]\n  DOTNET_MULTILEVEL_LOOKUP                 [0]\n  DOTNET_NOLOGO                            [1]\n  DOTNET_ROOT                              [/usr/share/dotnet]\n  DOTNET_ROOT_X64                          [/usr/share/dotnet]\n  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]\n\nglobal.json file:\n  /home/runner/work/calor/calor/global.json\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download\n",
+        "Compiler": {
+          "Identity": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "723754c1a7225f92686a70991fa6f63dafa7dee241db1a8b7d1ae95c719782c6",
+          "InformationalVersion": "0.21.0"
+        },
+        "Harness": {
+          "Identity": "Calor.RoundTrip.Harness, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+          "Sha256": "3d9a42565053678753ac0f2356f51664fc63eea3b3e74985af66d60f06b9f5b9",
+          "InformationalVersion": "0.21.0"
+        },
+        "Roslyn": {
+          "Identity": "Microsoft.CodeAnalysis.CSharp, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+          "Sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+          "InformationalVersion": "5.3.0-2.26078.5+16f9bd284cd49604ac82998bfe778a8eb16d4347"
+        },
+        "HarnessOptions": {
+          "BisectMaxRegressions": 50,
+          "BuildTimeout": "00:15:00",
+          "CaptureBindingAnalysis": false,
+          "Configuration": "Debug",
+          "ConversionTimeout": "00:00:30",
+          "DotnetPath": "dotnet",
+          "EnableBisect": false,
+          "ExcludePatterns": [
+            "**/AssemblyInfo.cs",
+            "**/GlobalUsings.cs",
+            "**/*.g.cs",
+            "**/*.generated.cs",
+            "**/*.Designer.cs",
+            "**/obj/**",
+            "**/bin/**"
+          ],
+          "ExpectedFlakyTestFullyQualifiedNames": [],
+          "ExtraBuildProperties": "",
+          "LibrarySourceRelativePath": "GeoLib",
+          "LooseDirectoryMode": false,
+          "MinimumCoverageFraction": 0.25,
+          "MinimumNativeFraction": 0.25,
+          "OriginalProjectPath": "/home/runner/work/calor/calor/tests/Calor.RoundTrip.Synthetic2",
+          "ParseContextProjectFile": null,
+          "ProjectName": "Synthetic2",
+          "SolutionOrProjectFile": "GeoLib.Tests/GeoLib.Tests.csproj",
+          "TargetFramework": "net10.0",
+          "TestAttemptsPerLeg": 1,
+          "TestFilter": null,
+          "TestTimeout": "00:10:00",
+          "WorkingDirectory": null
+        }
+      },
+      "retryRule": "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. Compare paired attempts and retain every test identity/outcome. Any failed, missing, skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.",
+      "declaredAttemptsPerLeg": 1,
+      "failures": [],
+      "attempts": [
+        {
+          "Leg": "baseline",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 20,
+            "Skipped": 0,
+            "TotalTests": 20,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        },
+        {
+          "Leg": "candidate",
+          "Attempt": 1,
+          "result": {
+            "ExitCode": 0,
+            "Failed": 0,
+            "Passed": 20,
+            "Skipped": 0,
+            "TotalTests": 20,
+            "ParseErrors": [],
+            "UsedConsoleFallback": false
+          }
+        }
+      ]
+    }
+  ],
+  "referencePool": [
+    {
+      "Identity": "Calor.RoundTrip.Harness, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+      "Sha256": "3d9a42565053678753ac0f2356f51664fc63eea3b3e74985af66d60f06b9f5b9",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Calor.Runtime, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+      "Sha256": "b5b6dd8adfa76fff306e6a643f6a896852e45b45b0b613435bcf50df12658753",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "DiffPlex, Version=1.7.2.0, Culture=neutral, PublicKeyToken=1d35e91d1bd7bc0f",
+      "Sha256": "421fd7d16c00206d6539ef4da7f2f64ef8a86e4b4f51e58fa0852907710eedbf",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.ApplicationInsights, Version=2.22.0.997, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "e91f818572b881c3907138927b2d81f7a0b71e74a52796ddb6e03db424ad35f3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.CodeAnalysis.CSharp, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.CodeAnalysis, Version=5.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "ad857f1ce7f8e26c2722ade705fac3f90502a47590c14075df1327210f10b1ef",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.Extensions.FileSystemGlobbing, Version=10.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60",
+      "Sha256": "1769b1b6b291c2aa7038ae9f4eeb4727caf4943a9559f192a4ab567a0cb8cfad",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.Z3, Version=4.15.7.0, Culture=neutral, PublicKeyToken=9c8d792caae602a2",
+      "Sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.CommandLine, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "2158cfc2c484ebdec95fd9959c7eecaebe44657e1e1dee5abb78fc971276829f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Ulid, Version=1.3.4.0, Culture=neutral, PublicKeyToken=5635ede1d450abf5",
+      "Sha256": "7a59894feb2b3dd90cfc0cf605a81cfafe701ed718bf4bac94bdcb011a43fc51",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "calor, Version=0.21.0.0, Culture=neutral, PublicKeyToken=null",
+      "Sha256": "723754c1a7225f92686a70991fa6f63dafa7dee241db1a8b7d1ae95c719782c6",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.CSharp, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "97a53bfcb115cc6d1e21113834d3aa19367bc65b38e5e5035f101348693afcf5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.VisualBasic.Core, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "05ecd6e7b7259db9a1c8cdf0f6913096f7c0c693b48a1cf03aa728ace93c584e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.VisualBasic, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "eddab17dc146592312ee34c0e19e079504d77274c5cb8b1e338d32e77f9f0b2d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.Win32.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "5cbfa551ec9f3fe950c5cd56f7e4fe5ece9059b069e5fc8a8c8a4f0f496107ef",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "Microsoft.Win32.Registry, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "8ec13543088372f231e02db3dbf32e83f65ae1dd645113b43774c86aeeeda3f5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.AppContext, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "6dd78a4f44728ca5d441091fddfb8fefa6d710f4b663fd1cd75831e40b6b055d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Buffers, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "6417e59418f6dc6b7b35dd095c2914e746f017335991022bc8835a2f1866a131",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Collections.Concurrent, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "d5b3117fe23618b0b366724c63a9faf558b5f7d1d4e5f8c933f920c4038ed31e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "8c8ddc0f0de5b22cd4b11ae86b3b5791754d61868f76c64b05e5a3cfdafcd3ce",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Collections.NonGeneric, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "efdf694fef2e2b7508a1f807f6ed9381daf90c1f601b001d616a3ab8086a6494",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Collections.Specialized, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "f0b89c879d6afcaeaf9e82f25c47553ed80e61f2de2269c909d4d7dcd6f61999",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "ff0b05dd9578d11089c52e0ab8a35765e9be49dce9bc849b4e0574815f3fac8e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ComponentModel.Annotations, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "d1d07c9844f5487f775d31fd88b5ae112c6339ee62459c61ac28e7438aaaa952",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ComponentModel.DataAnnotations, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "ef76542454c23e8dd078c9449178c82c3fddff5d21da002744662625d2683e28",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ComponentModel.EventBasedAsync, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "3273718d2e46a1a43ba51597f1484f8141e1d029e5adf7ecf88593ed52adb7d3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ComponentModel.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9e5973eaa2671813a50c40e7d99e10e6f4f5bd927ee591d506dc40729c0b2d62",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ComponentModel.TypeConverter, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2dac19c80351c8b6988577a4c033d2adbdfb4760773754c4834848250488c506",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ComponentModel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "7785198f700fd053ee35b7c298db0dfdd8aefbc6e32cb44034775329aa7148df",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Configuration, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "5086800774ce17c65c417e9a3fcb9aa5820d04a94e286009e31b5c8b702765b8",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Console, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "30c185a09e4fd99069af832f40dc087bd3569f5497af8baf921aa4dbbba56984",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "0110db8612d4f29c87937da411ab29c4b340811ccf46787c577ecd245ea2118c",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Data.Common, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2c447bc8f9288889382b15e208fc342343986bd9f51bd52130410e9e5650edc8",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Data.DataSetExtensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "fc657d9490e5a3505698bf0888be50ba933751d6ead853352ce01023c6716d95",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "00cd74a3dfd69ae8a90a7bb34c3a4f1946931ed4b556fc4e8faf44ff6d81f9bd",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.Contracts, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "dd12b503bf96733a7391d2efefdf142750886134c205402bc9d5a43d9e020f2e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.Debug, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "1e2aeaa9ee0f240c219bba9000d9071788fef6b05f27b6e239433327d32f0bcb",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.DiagnosticSource, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "4b6ee5a5f7fad00b9c9221105b94c683058d31ed45339ac306158a1211850436",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.FileVersionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "812a61e8f33d615469b06211595dfaa5ff4bd2d3ac9519ed50ebd3c2935d4f08",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.Process, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "973c1bc1159c04ac215517c95d24e2790ffea186e384cb3ed3d5e0d22979f1b4",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.StackTrace, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "ef2b214ead155daf232b0d710b690038c2be0988f35821fb35ea3aba58d5b26d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.TextWriterTraceListener, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "dd1233fadf0992e64223dffbd082ef43841718015a47eadc72f6170e2e2e86ea",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.Tools, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a78fca2d76cbe71f8080fc530656d191f340ed81a7b6ffd0b2765658b01deda5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.TraceSource, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "8dbdd83d3991630181539eb630d6ce3dc63eb15ac812a6c403987650eb3e2f6e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Diagnostics.Tracing, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "6b6ec2ad08a3a7244814f705227a8e8169fce45f5afe30700cd2bc394c82a783",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Drawing.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a6d1b7589c4665b086e2ee01908eb079562a0273b289cce9cee9b82c19025f58",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "69bb06c026c43fc6a887acaf612ff4227c7f4fe5b549b875580ea0811710f444",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Dynamic.Runtime, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "14954f261adb86f30292900d263ef74041a8760068b42dbb507818ac64d0c454",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Formats.Asn1, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "fd364b4e7417a703d9f900b98203ef458ad7061433b738640315e0ac376596e6",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Formats.Tar, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "8cf1e228df01856e28f5a67212387c57623fd1991e528be6636b46ac9bba9b77",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Globalization.Calendars, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2c7d90eb45372764e659afe13a837ae0a54c57d2acd27b562762b1bab19d0960",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Globalization.Extensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9746d9dfdc879b8e4e62d2890504e27d535549612fd2f06836f76b16344bfeda",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Globalization, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "e1cd2225ce9f55b62fff49811d8b9bb778e300d5e8c2667ce9a001663027796e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Compression.Brotli, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "e9164c332d35e4fbc9c983b5a79fac55834fcd107fcc69c474ef488eaaa3d655",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Compression.FileSystem, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "9767a046d9f544298f80d3b4dc98d32f5840749280aaec174f25a1bde3f659a9",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Compression.ZipFile, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "4dc7768a7dfd770149df88e346975a155ebb0816dfe0bea9282e8076ad8f4c23",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Compression, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "00fc0309e170f7fa5b14e6a9be4ffb3dc1d1c2c492bdc7fcf4236e998013c5e4",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.FileSystem.AccessControl, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2a72f7af70168035b28dc87b5a987f7ddee851fde5db3c784956b9e5d4071a8d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.FileSystem.DriveInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "91eb3d717517f1387cfef62bc832dbb76db66eab1e62deab908837b5ce6ab824",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.FileSystem.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9f4d2179595c4b1097698a71a1ab52f7b26f05baca2b348c92c6bcad2f6f97b1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.FileSystem.Watcher, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "294506d875aa2778d61af9d3aab0207231539a4a04e08a00413f7c01738bd823",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.FileSystem, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "739691aa3a6defe83930d2a48173a64d52d19bd64f25cdd9ede35f546be7571f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.IsolatedStorage, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "5bd8b8a4d6b12e9cec63f5a256a3e5e295c330a3d7358ba4215704dbb9f82c38",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.MemoryMappedFiles, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "4e66d0ca8edd6e459762e6b9a142641a7f4070583a3db1d63d0472879716d2c5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Pipelines, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "1721d366ae1e2b525e0dc6c24a6262ed560dd968d7fdcda740e26d93c0619674",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Pipes.AccessControl, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "0ece9ba6a4b82366a41a4f5d66ea78fc9858f723dfcd8a0fd69d34f310448dfb",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.Pipes, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "7a5570703ec9a431c6ff8fcb0c77a9b74e2af3b7c43d1efc430bb48f5400a536",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO.UnmanagedMemoryStream, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a9ed5854b76fbed6179c2d9767729a2f8742b250b5ed1aefe141d570e597ab53",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.IO, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9f5282371d7826ba62545364b1d9d90085aeb03dd3babfc295b14678536c4236",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Linq.AsyncEnumerable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a47cbda2710e8d8bc794bd5fe1e7f3675a5487124a650a3195f0b604c1659ba0",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Linq.Expressions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "d8345995a8f5af5cb11cf39aa318ac98e21ce258d54d2acb6b4bda73693b3c1e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Linq.Parallel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "4e336d780129712a4b257db3ab5d65e160535e92c3cad9e4f647339b9ad50138",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Linq.Queryable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "28b8814c4396c394fb1febcd56e2402ee6facac1460fdd953f932d3d8ab78cc3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Linq, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a0c910f6b9eb2468e9a8dfa07dd59c7fd609b3098e57d96fb8c74e89fe1aeee0",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Memory, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "c1ec113101642ec2e3b2421115d14de02897049eac7307490c5c9ab70af0f36a",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Http.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "267e50e2aeb70cb1f98d0930ff731933fc7ecb78c13092aef9a99677b5e42b1d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Http, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "e8beeb63db39e7d540aa711c701860c5ddb8826f2bfff62af2abfa74eaa7a055",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.HttpListener, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "cefc8fa7aa314652e34667e00932593e2034d788f7554e319e4b585b46d72928",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Mail, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "6b48ecabba2375287d528c7a7cefc32f81c45da718772f63788675cc44065db1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.NameResolution, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "85cceda5f5af651b0c64e15a066bd58373be8b7748ac315aeb39bd59afe662bc",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.NetworkInformation, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "75dc8406f57d71ef2cbaaa66c67b1081129197cc1f942009f7b3ae5a670f7466",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Ping, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "c6cca25f07589b5b7cad34127068135cf2a2c16ef795f875e213b0d168c15f4b",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "83fac648e328b2e32bfe41dfd698145209b89932f08f4f6d128a78045ce32ba6",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Quic, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2f84fafbc261236d86393d707382888bde50c0f49abe65db8fc20d2b9ee7eeb4",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Requests, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "65976d61d5d676bbdb98b14c77b19dc11be8e3ee209c805f73f42c160252dfb0",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Security, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "f26e72b283df1689f1df471bbb57626115042c3922c3b6d18a288cb93f45512f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.ServerSentEvents, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "d279689551b3ad5fd09af99cda9ac8778171b3876d9c2f23dbc5d185485b4cd3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.ServicePoint, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "d5e0e16a3cdd33a31181c86376e604cd9c903ddf9afa9fd627fb6d0bcac13bcf",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.Sockets, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "e4ccca6427f9bd3c38f46e30a90c4e66463c9a6165c9da40b099f03eb814b0fb",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.WebClient, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "e0c7f39cdc6e6e4b6b272c03b5634751cf851efe85c2683cc6a92ddec7ad1336",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.WebHeaderCollection, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "72f56ae7ca2f106f333b3b2c6fd08f4a8dd1afd1456bab31fd24f1f2cc847ca3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.WebProxy, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "12f985e1b5d05e5a1b6c911f118196884bb4034bf9a1ed1865c829cf7933c369",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.WebSockets.Client, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "f0ae347894788710aec8b5a03bb42a00ccc1520dfb42e34350cbbe7d5d619235",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net.WebSockets, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "e5886cb1604159f990dfbf0f4ed1606f9f2607226288c56abe86447509c7eac5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Net, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "ac8b7facb325a0df7d23cab7ee8232e76abcc269382caf7a93b6558885c68877",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Numerics.Vectors, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a530b7505c54e6bd48d8ba6f4d4828ab9821e6748e4728ee09b620e3518a912a",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Numerics, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "1e2330ed932fac7b4dec0e5fb7c5e832a5bef292c3a038474aa911c8e9fe0bc5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ObjectModel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "105caabc2e3559738c686a2f7384c105ca4c98c0c1e8108294a15c5d5f011d9f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Sha256": "26304a2985357b9ee277f273667fcd9c892edae3ee6eba76f739033e95eb39b3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Sha256": "26304a2985357b9ee277f273667fcd9c892edae3ee6eba76f739033e95eb39b3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Private.DataContractSerialization, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "b1cd35e0f5d42fb57e36793429ea627cd3d2f275b11ab560248e9ca0607cbe05",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Private.Uri, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "dce56b911dec93cfaeaa759fb069714d397663ead3a8cac855f66bd72098aff1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Private.Xml.Linq, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "dc9fe6577572f71bad36520652fa7a185f36040dc8b4c3f471711c6a76cbc1a2",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Private.Xml, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "61702d155227bfd6317170cce55dcdbfea69ba129e9b173ee2cadd1f5b5cde74",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.DispatchProxy, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9dcce37ea2461915d6a6898296c97083ac0de012d279df2443617ef7b1e5cc1e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.Emit.ILGeneration, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "7cb9c3d071d13c99434c859d09513f180c244473bcba9f944d0d02c3d5e553a9",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.Emit.Lightweight, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "5deb353aab6f52dc6696752330656e50d1b37e3037950b9c2ecebc59344c9fc0",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.Emit, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "e2971d8e858ed8a49cac9d588185f34ad3f78f5052b67397f44f85076a9e82ac",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.Extensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "f52d1476a670ad22db3005f3dc4fb934dc25778431e5350872478dee1547131f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.Metadata, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "3316bd0c5a36335cac98cd8747919444e3316452466c0448ecbcd2ea89ca5437",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "315440cb2b82bf3af9abc683ac3bf8b82767ed87dc3f5e5475c6b01af44b9325",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection.TypeExtensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9667e5ee7ec895bf2943157f980ad848ede86e490eff80e87157ccef78d9eec1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Reflection, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "8e92c92a4dd0e2710381bcec62f58c7e93a51ba753142876f1c97edfd7310d87",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Resources.Reader, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "78bc2de89ab76cede1a93f1801678fc4c360c02f48b8788d59876c0f7cd7f4b3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Resources.ResourceManager, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9f716dbafd1eb4276bd62c1cb94b9a4497fbb18e2a3a6e75aaf5562a4e63331e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Resources.Writer, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "11fbac0f4af99a2511534f050216df6c1e377dbbe33a88eed526fec55547eeb9",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.CompilerServices.Unsafe, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "b9e1d28ab1fce0daf257f37a2e8ca013724f007219d2e11e211e00e66716dfdb",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.CompilerServices.VisualC, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "780f24c435eb621f7c85bf0473b14a204241d27d4b943ac9e6dfdf103feff6b9",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Extensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "97880257a98e4edbf4ef634cdd3a691d4a4956250424b9366613cd7d7b766ec5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Handles, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "3781ef2645961cf3fe1c004ccd8538365932ae9a18ae17994887ff34e1c7b2bb",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.InteropServices.JavaScript, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "034dd556644586ddaf9af0ca6497a4d89e4109b92d87aa3bb345b2aa4e99e5fe",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.InteropServices.RuntimeInformation, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "0b676e573f05f95fb99248552ab21e379d2ab969cc91ce898125d3a208b536dc",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.InteropServices, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "82286a808b40f176a758a1ad0faeadcf170d92a90043aca046160c90e5d54c74",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Intrinsics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "96f5e7ed6f59ae9076cabfaf7c94c7e213c6b219f0deee1b013abb16d0028f26",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Loader, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "20bb43ccadc7d94801a150a8d5caaf74584f5c4709a02eb0c618a426b04e0f6c",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Numerics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "15c7d5bd5f5a5dae5bc836f32fb732a2c75c1fbae7523ebc2f33914d9951256c",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Serialization.Formatters, Version=8.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "4c28fd31b302007f9d5c12b2c95edf3c602eb800c9e3a9bf769902df4a3a9399",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Serialization.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2ad79d215ff13034b5b93df35cbf02f768d7fc6affad3ca9e868c3dc109411a1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Serialization.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "07d4c45dff08f1f785253f2f20f8100b43dee51a22a9913428b97db162204ea6",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Serialization.Xml, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "31dba4287f061744842ff9ea164309787fc75fa42223540a442f69613df5fb67",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime.Serialization, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "8923e7a18e412b157d0528145a46bb8afd44d726afca4c66fc4ec74f0117c082",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Runtime, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "417e7882e2a2689aafbf86bd6256db906357afa775f58e3c86a94a9f119cc3ef",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.AccessControl, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "cf2306b9abba94aaf118d134015c888b53c7f5e2e79cf2912d984355d18257ca",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Claims, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "453efd61e975a71e1f8c55233cbe84d9fb1d730d2e333e444880b6c54f85af0d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.Algorithms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "b006bdb5d674bb1bcce2eeddd0579c759af505186cd6bfbe363cde52c95fda32",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.Cng, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "c32d90051344b516d7e8bd6dfafb340423aecc6af5e36fec783b081e5aeb9cc5",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.Csp, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "5ec5184cb28c364a64b02ad1b21598fd7c3b38604e436ded2d88f433980b0126",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.Encoding, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "3b886128bed993d3314d17da2360bd542cb8d2f15c2743c95b4d480ac58fe153",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.OpenSsl, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "e941697331d126eb78dd9bd7c908350ba08d4ac60cb6b9645de5887f3f3cc06a",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.Primitives, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "c0e6d3112e1cc32b95d7388a98bfe82be73aab32d72dd0c1483b2decc8282e93",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography.X509Certificates, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "8b4347fc3ee1de3c9e41508cc20e19db917a1c76fafd488e935d40e32743e2a6",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Cryptography, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "49c7a0f1657dc1da331fbe5dcca5fd13700c692514528380eaff4cf15ddc64a1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Principal.Windows, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "b4f2cf5b003ae782cfcd2a0200c62066d91ae1820b5f316dce07f689fec1d137",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.Principal, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "dc00a1eb6cf21e90b9348a957f4a15d0e6502ee0c69ae4d47d470c770d0045ce",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security.SecureString, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "120bcd756cb7d5fe8a3f4b041b904d60039684fbb77743d48876a54b0283f5af",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Security, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "07b9d7238d70c6485d346db48f96549858d36b976c2b8f9e26c0677e994bb211",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ServiceModel.Web, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "8405cd0a93554b7d46399b0717e225f68264e7781c7a2f2246501b8bc211a6c8",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ServiceProcess, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "788aa2111b93079cec34c68bf4a8548cc5241d5ecbcf7d6662b447c7ded5b6d1",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Text.Encoding.CodePages, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "37d1f9d9bbd47222623e9671dec54093c21b8da3f9307f88fd0c05b0e81ad75a",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Text.Encoding.Extensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "695cdbbd45618531ba86378263bd9494afa05c61609a2892b2d9f89fb17a5d32",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Text.Encoding, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "434d617c869368a5de8c99ea7bdb2f7ac2b3e2393ccfeeab5a018d07a7a1cc12",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Text.Encodings.Web, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "ef22e097dccd6da7dd0f4cb053a3441a7f5dd2f0e47d2a856428c7356e089d9d",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Text.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "50724e46049548a8efdb3e56ddaf6efaf7c9acb510c3fb5581c10c85577189ea",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Text.RegularExpressions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "258c27c22aeace5c0f6ba236c848bde98f891f1ef403f05da0f3f7dfdf9fa4d4",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.AccessControl, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "bc67fbaf499d156cfab13533dedae7111d332f89a9893533ac711d398b769770",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Channels, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "12851a5c154305257f927ff6ec6a73323dc3bff77079fc06a49d91248222593e",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Overlapped, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "9ce39c248b055340a10aeae9fc9acd65f23220c025605a1daf5657e76d8f861f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Tasks.Dataflow, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "2bbf794649310745609f6adf5f355b014e96064aa3bbedc964226d79eb10983c",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Tasks.Extensions, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "63fa5d1d1bac873d234d4c84d20c097f70f74f7391651492453bc34e9d7e0111",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Tasks.Parallel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "cd506f66345b044a1313705dd08f31bb5593d3e8ada6da7100d5a1127fad71d2",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Tasks, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "c378af98deaafe40e115bf0058a87cf27a45cb533bfcfb17f2ff9120ed74fa5b",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Thread, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "62ce305385b7ddf6ad3925780435785c2a05d666d4ad325fa4aaf411a091bf2b",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.ThreadPool, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "4d96518ec71bfa274eec5b8caf978ff754edef7c3da56e92cf729c6995d01e38",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading.Timer, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "6d5a9766dc5652719dd648cedf5f145ec0e0a2abbdca280b0fd53f72abb9fcdf",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Threading, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "477cd5447cef676bf036307029196287ca58b6ee95dc64e3c759926cdd6f59c3",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Transactions.Local, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "639ab89d129ae1e8056ebb7cc3fd862250b03d2270ddfae6ac0570a3b8c99c42",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Transactions, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "4e4cafbc3e4981ef34fe5f7f938b0f209f3e7f0e61de115cae7251b0dd1929ea",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.ValueTuple, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "b2a92ea2b1325436624f38c57a67aeb6c5aa60a4c293e556535b896749eafa4a",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Web.HttpUtility, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "9a6afb4be81174b359805ab10596aa29c3272f264872f8926141699e4c9c35af",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Web, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "a43d1c705cdeb11f778395429a3302212e81a63416898bb3a9018b50038d4956",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Windows, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "91f73b914443d9513fe5380c5f298a8614f0e4e764efe1192e1d77de9d40090a",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.Linq, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "c046958f1801600b1cd18a3675b8ffd258cc53ae714f7bb9606f5114eaf58347",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.ReaderWriter, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "6e296482fd53d1e298162b05ae04c9d98b1f4bb39c825790e0784647a5a49ee0",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.Serialization, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "1e213f859bce5d881614bdb08da591f1fe6095227da3e828ad60b2cda68d381f",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.XDocument, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "4cfeadbc2d6938ce25080b52558003d92d81242e0e9866495d8bd49a12968b71",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.XPath.XDocument, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "577b9d8185d3d0a0946f430c4484da6842c0dbdcd9655a3b662d79be27eab8db",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.XPath, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "4c0cc081a35c577937c2e85fbc1d6cbdc838e011cfda32b6cd73bb71426dc8d6",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.XmlDocument, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "1c54b79229390937ac388266dc97280f75047c7c8be67af047803566bdd8ef91",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml.XmlSerializer, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Sha256": "d93a042717ceacb7119dda214f6b72edcbbe7ae050279827148c747e78aad06b",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System.Xml, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "67f1797c3c3ff39a76d7ba521f5ef5a652e707f597992ed81faea214d36348bb",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "a6e5c6c4d8ff0ca6fc55242c00939d0bda47e3ad3861a5a12e89e1c066904907",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "WindowsBase, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+      "Sha256": "12d5155648e135ac8b1ea2e03f1f4e6f0b1e0f5d38948a027b1622be637e1221",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089",
+      "Sha256": "9202a746165bca489856331f898bfb0a14cbcf9342673d89355434a86d29a231",
+      "Aliases": [],
+      "Properties": {}
+    },
+    {
+      "Identity": "netstandard, Version=2.1.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Sha256": "ff49fd22c96d383744a104b03249befc1f27a9912dbc891c96fc8e7cc3bf10c2",
+      "Aliases": [],
+      "Properties": {}
+    }
+  ]
+}

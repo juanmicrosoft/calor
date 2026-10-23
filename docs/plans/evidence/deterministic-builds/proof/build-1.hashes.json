@@ -1,0 +1,1458 @@
+{
+ "schema": "calor/reproducible-build-hashes/2",
+ "packages": {
+  "Calor.Sdk.0.24.0.nupkg": {
+   "sha256": "939ff0ce1f6ab2ad61d78a3ed999c3ca86f5b517c3ba535c0f6a66f01ad6cdc9",
+   "size": 57981130,
+   "entries": {
+    "Calor.Sdk.nuspec": {
+     "sha256": "aee1e336f52f6c6d78d80e248a074821e667a012dc96683ca8d563dcaf4a35a2",
+     "size": 1008,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "README.md": {
+     "sha256": "678fd3eaad08d42fd0952413ec1348bbda7675904fdd2130fded78a56b59632e",
+     "size": 8690,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "Sdk/Sdk.props": {
+     "sha256": "2d6888a348695b81d80289cd0d51557e4e007838471d8816ede82611e87b8bcf",
+     "size": 1148,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "Sdk/Sdk.targets": {
+     "sha256": "5f6672b238d32fe915e8f6a17de3735c64a80bd9bbb243cfbe8fdf9f019f44d9",
+     "size": 7344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "[Content_Types].xml": {
+     "sha256": "948d8d88e5115cc16ff93c3d7dec43b1406b60ccfb682bfdf603ec11268294b5",
+     "size": 838,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "_rels/.rels": {
+     "sha256": "46943ad4ac735745e356d24b0b3ea4703c68492c4b38775990faf39f50a2317e",
+     "size": 472,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "package/services/metadata/core-properties/nuget.psmdcp": {
+     "sha256": "5de8f721700a0a090ac4fa6317e5cb447807ed8469458bff588388da92ce3d35",
+     "size": 804,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Calor.Runtime.dll": {
+     "sha256": "2dc196d8ba1a47331e0a435770f0efd6531a1b3a998f08b27a5e757e227f599b",
+     "size": 21504,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Calor.Tasks.deps.json": {
+     "sha256": "7afdafd8c6a42fd007e1749b9f9152575500dd2e6619baa063e238613e7b7efe",
+     "size": 15039,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Calor.Tasks.dll": {
+     "sha256": "4881e23ec9e428be4d5f54167162ddf11bf6cc389756c83ba4a6561bcc4877c9",
+     "size": 47104,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/DiffPlex.dll": {
+     "sha256": "421fd7d16c00206d6539ef4da7f2f64ef8a86e4b4f51e58fa0852907710eedbf",
+     "size": 22016,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.ApplicationInsights.dll": {
+     "sha256": "e91f818572b881c3907138927b2d81f7a0b71e74a52796ddb6e03db424ad35f3",
+     "size": 385976,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.CodeAnalysis.CSharp.dll": {
+     "sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+     "size": 6895408,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.CodeAnalysis.dll": {
+     "sha256": "ad857f1ce7f8e26c2722ade705fac3f90502a47590c14075df1327210f10b1ef",
+     "size": 3066128,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.Extensions.FileSystemGlobbing.dll": {
+     "sha256": "1769b1b6b291c2aa7038ae9f4eeb4727caf4943a9559f192a4ab567a0cb8cfad",
+     "size": 48432,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.NET.StringTools.dll": {
+     "sha256": "5d0784e9bc4756906fe69e51bbefef7a1348c3717510c1d365a31099d25ea44a",
+     "size": 33544,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Microsoft.Z3.dll": {
+     "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+     "size": 260608,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.CommandLine.dll": {
+     "sha256": "2158cfc2c484ebdec95fd9959c7eecaebe44657e1e1dee5abb78fc971276829f",
+     "size": 205216,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.Configuration.ConfigurationManager.dll": {
+     "sha256": "df795025f207b4940ec9a48deddaedab3333b031b15303fda4f148b09c456d6d",
+     "size": 443168,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.Diagnostics.EventLog.dll": {
+     "sha256": "803ba4a0bd41b63b64248fee8c96ccfcecde72a16dc538d00fe1fd1db7517295",
+     "size": 53528,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/System.Security.Cryptography.ProtectedData.dll": {
+     "sha256": "e82875c8fdc739b3636fc1926012fa335bb706a7eefe05621b848f997a9b49e9",
+     "size": 38696,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/Ulid.dll": {
+     "sha256": "7a59894feb2b3dd90cfc0cf605a81cfafe701ed718bf4bac94bdcb011a43fc51",
+     "size": 20992,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/calor.deps.json": {
+     "sha256": "8a136025fa99904c4f1f4892bde868917b077e7a92318e6824e9e913019ccc54",
+     "size": 9778,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/calor.dll": {
+     "sha256": "e5f0513be0f45f264ddc32ed36a2c144a5ef047ec4dab9d33034b2e3615ceea7",
+     "size": 5276672,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/calor.runtimeconfig.json": {
+     "sha256": "9950d4583cfc9a106857c0d5b8a75b53e8774852b57b80bc3823a74d44a4d87f",
+     "size": 330,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/linux-arm64/native/libz3.so": {
+     "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+     "size": 30884960,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/linux-x64/native/libz3.so": {
+     "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+     "size": 34714776,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/osx-arm64/native/libz3.dylib": {
+     "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+     "size": 25891768,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win-arm64/native/libz3.dll": {
+     "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+     "size": 17616896,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win-x64/native/libz3.dll": {
+     "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+     "size": 17730560,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win/lib/net9.0/System.Diagnostics.EventLog.Messages.dll": {
+     "sha256": "aa8cb35d10093fe4bda643acd30efb70ab539b7d079249414340f03aa8d641e3",
+     "size": 801064,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tasks/net10.0/runtimes/win/lib/net9.0/System.Diagnostics.EventLog.dll": {
+     "sha256": "2b887c2df82ea96bdc1a48b15ad448f7fd4d384732c6bf7050397598c078c412",
+     "size": 174896,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
+  "calor.0.24.0.nupkg": {
+   "sha256": "2e8b842777b59fcf99877c3b7a467366dc8ed3b4050935680b31e92461cc14f1",
+   "size": 60297990,
+   "entries": {
+    "README.md": {
+     "sha256": "68f973d959bbe91b5c8a34c42671899b7672f0645f57098cc39a40e57c507a0f",
+     "size": 1519,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "[Content_Types].xml": {
+     "sha256": "7b7f0ad0e64f6e809c667c23a9598f01c6db3c9a78c4eeddad5d48b3f6ea0b85",
+     "size": 894,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "_rels/.rels": {
+     "sha256": "32f4842c16dd4aabbfe3a22f7db9259aed861c6f6c9b2ee14461146783b8d3b0",
+     "size": 468,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "calor.nuspec": {
+     "sha256": "a0e93e53e723dbaa02a683f5661c6bb72a348c3b48cd5167bdaf0db0fa9d4404",
+     "size": 909,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "icon.png": {
+     "sha256": "f853d4a794d85a98dfdd6877b4d892d2d10b34130557a9ecb73778936d1dab5a",
+     "size": 42542,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "package/services/metadata/core-properties/nuget.psmdcp": {
+     "sha256": "70fe100e286d90194fa3cffbb7569222ab3f5b9ba56233ba571a2be4f8ac3523",
+     "size": 699,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Calor.Runtime.dll": {
+     "sha256": "2dc196d8ba1a47331e0a435770f0efd6531a1b3a998f08b27a5e757e227f599b",
+     "size": 21504,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Calor.Runtime.pdb": {
+     "sha256": "6c283c35dc2e53678850479158a8c3e249cf306e43fc204af84abb67697a7323",
+     "size": 15060,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/DiffPlex.dll": {
+     "sha256": "421fd7d16c00206d6539ef4da7f2f64ef8a86e4b4f51e58fa0852907710eedbf",
+     "size": 22016,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/DotnetToolSettings.xml": {
+     "sha256": "a9987971e3a9ebc0c73cdaefc8ca4cf1bafa412632526b4e99d6e481ca4c54e9",
+     "size": 181,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.ApplicationInsights.dll": {
+     "sha256": "e91f818572b881c3907138927b2d81f7a0b71e74a52796ddb6e03db424ad35f3",
+     "size": 385976,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.CodeAnalysis.CSharp.dll": {
+     "sha256": "54142770a00e594942ee8923726ea49126303d0c523932886c2417eb66dc07f8",
+     "size": 6895408,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.CodeAnalysis.dll": {
+     "sha256": "ad857f1ce7f8e26c2722ade705fac3f90502a47590c14075df1327210f10b1ef",
+     "size": 3066128,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.Extensions.FileSystemGlobbing.dll": {
+     "sha256": "1769b1b6b291c2aa7038ae9f4eeb4727caf4943a9559f192a4ab567a0cb8cfad",
+     "size": 48432,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Microsoft.Z3.dll": {
+     "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+     "size": 260608,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/System.CommandLine.dll": {
+     "sha256": "2158cfc2c484ebdec95fd9959c7eecaebe44657e1e1dee5abb78fc971276829f",
+     "size": 205216,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/Ulid.dll": {
+     "sha256": "7a59894feb2b3dd90cfc0cf605a81cfafe701ed718bf4bac94bdcb011a43fc51",
+     "size": 20992,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.deps.json": {
+     "sha256": "8a136025fa99904c4f1f4892bde868917b077e7a92318e6824e9e913019ccc54",
+     "size": 9778,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.dll": {
+     "sha256": "e5f0513be0f45f264ddc32ed36a2c144a5ef047ec4dab9d33034b2e3615ceea7",
+     "size": 5276672,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.pdb": {
+     "sha256": "ed2b3fbf8e01b8a6bacab82582b7745d4f0372b2136082665758b9443af0440d",
+     "size": 1368416,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/calor.runtimeconfig.json": {
+     "sha256": "9950d4583cfc9a106857c0d5b8a75b53e8774852b57b80bc3823a74d44a4d87f",
+     "size": 330,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/cs/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "96841406a8fffdc7e4f82048939eb5193d0e53454119368a4e8266bdddfedea3",
+     "size": 446216,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/cs/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "8640bd05a77d031c3e106b98a368e4f51618e2aacf1027f9e0e28b260997839f",
+     "size": 40752,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/cs/System.CommandLine.resources.dll": {
+     "sha256": "80a66497a01e9ea5be7d68ce19069719751c4b720f9774660c09ab33ac8f8e6e",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/de/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "f2ef12aae4aff749ed5963075da86aa8fd3dec43890e5fd7b00bc227daad28b6",
+     "size": 476936,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/de/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "94d6757fb39d637408cae00569779a58ed5ba91cfe17484b7d9c37b5e686ea85",
+     "size": 42248,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/de/System.CommandLine.resources.dll": {
+     "sha256": "3dfa07de8267c771be47a10217e2eafd0e57e68933c536a239b65284dc6f09da",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/es/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "be4dc7f5d2b6c074601d4acf1404350fad40196d8edb0a4e3d04d59ea3dd530d",
+     "size": 466704,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/es/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "99940d1871054ae5bbd831d93f827bf3f46cfac13ec637d630be4490ce80e537",
+     "size": 41736,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/es/System.CommandLine.resources.dll": {
+     "sha256": "4283743428f7abb509eab0d523d8000ee7a89fd354dc1db96dc8424b37ce714f",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/fr/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "cb54a8579e7d85a17e08bb72b1a675264ee92f51b00a1d5e9a3b88367da85ef9",
+     "size": 480016,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/fr/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "6034effb82164c43030f0452400b537d8955b1e9a84b7ae76e5f7a1f7fecf728",
+     "size": 42288,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/fr/System.CommandLine.resources.dll": {
+     "sha256": "e52478e38b6ac9ecd85999aa5ad181097c41833c9adba62b87bd9fa443b2a8ea",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/it/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "683c808be9efd6c87ce6a7de06d7fc8df152324db3d72bdcffce209a382a75ae",
+     "size": 472848,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/it/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "d1ed76fd23fac3e03ba72ebb66b129f7dc2771cdf9d8ba441b2dd4046dccb769",
+     "size": 42256,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/it/System.CommandLine.resources.dll": {
+     "sha256": "291da56b4c02bded6ad0e707999370b1e6ad592b74c4691e299c8097fbe44f97",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ja/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "dddc1b5e4a5492699e66596d5398e3ba7aeff0c1a4417baede5a44f8419f8967",
+     "size": 521488,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ja/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "06baf68aeeee8eed6a6d6e8ce9036ef3edcfeb12de876583eddb8eaec60db2bb",
+     "size": 44848,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ja/System.CommandLine.resources.dll": {
+     "sha256": "8b03127957ea51ca2c4e17512d9b84fb545b6c6995047e96c7c1b674d2a3fc83",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ko/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "3d6defb5ce07fd17cb00ca5633e57a3a65e5ab7967732d506af1a16e09f0baa0",
+     "size": 477968,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ko/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "0166f80f1a55d947ca4151cb70f36f0cead39fad1fcf648ebe2419c3de1f9538",
+     "size": 42288,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ko/System.CommandLine.resources.dll": {
+     "sha256": "b4d7904ec3b87b632cec7fd479c6feb063caa7394c79c7f5165df506a45ee0ba",
+     "size": 19344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pl/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "a9387ec315713a7e32861425159954939e6139b6dee171feb785b27d1d31ca85",
+     "size": 479536,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pl/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "f87d2a495d891868696e24c725d2c480779757df7e3bd22bc66ae927228f181a",
+     "size": 42288,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pl/System.CommandLine.resources.dll": {
+     "sha256": "5a51caed53a75d8339df176c8f5118cf609f38e73e39097c6d7edf73721678a0",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "a7c1c4307ac34be111639f5addfa1729725fe7748703ff24add55d4bda35851b",
+     "size": 458512,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pt-BR/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "95f373f7055ac0342c2a116710688015ea3a662cc19b8aa66c5484409aa49369",
+     "size": 41272,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/pt-BR/System.CommandLine.resources.dll": {
+     "sha256": "8fd9272f780e6d46d69ff25bf320e7a5caf5d61fbfb0c89781fbc8f64dab6596",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ru/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "e180f350d6b38a19464045c2b1f0c3e409d303843e02321b8bfcf61d0616d513",
+     "size": 629512,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ru/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "34b77c23625160b340098b33045997138ff042ca87fccf90f9bfab9deb132f8a",
+     "size": 50448,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/ru/System.CommandLine.resources.dll": {
+     "sha256": "a56ee9d0fd2254b0581f256495b61cc24135a3f1fffdb4edd70db87eff6db3ab",
+     "size": 19344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/linux-arm64/native/libz3.so": {
+     "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+     "size": 30884960,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/linux-x64/native/libz3.so": {
+     "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+     "size": 34714776,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/osx-arm64/native/libz3.dylib": {
+     "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+     "size": 25891768,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/win-arm64/native/libz3.dll": {
+     "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+     "size": 17616896,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/runtimes/win-x64/native/libz3.dll": {
+     "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+     "size": 17730560,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/tr/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "c31ef90f3205755bac7b531c92d2ce790f78950a360f438856222593ebddc784",
+     "size": 453392,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/tr/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "32cb2b00f6460aaa372930b25adc772709e9d93ea983a6ca295ff5bc1c6b7472",
+     "size": 41264,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/tr/System.CommandLine.resources.dll": {
+     "sha256": "795abf08b10483a5d58a95dda7190fa62cfa56bfe91fba84dc71ff4918f6ef21",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "b8b3c8a39143420dfecb2f64e51bb53613f554f1847a23245e8edd402a3cc9b1",
+     "size": 404232,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hans/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "2555883f0feefe4491755e37feb6cb03e75d2448a88081270b5f240f5673e8d0",
+     "size": 38160,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hans/System.CommandLine.resources.dll": {
+     "sha256": "b964e741986ad049f2a66daffdfb4a44a1d2a63852245ee95ffc429ee6887891",
+     "size": 19360,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll": {
+     "sha256": "a1b9563e0b16da3afa1bb80514bb3d93282208b9ac14d4afa9a429369a7d89a0",
+     "size": 404232,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hant/Microsoft.CodeAnalysis.resources.dll": {
+     "sha256": "d8fb1c7d7135620d9d5ac330cc97face8912cd0afdd53c72ebd7875d3534b559",
+     "size": 38672,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    },
+    "tools/net10.0/any/zh-Hant/System.CommandLine.resources.dll": {
+     "sha256": "5536a72bf99553442693acd0bdfa5d0f8f892a422f088e3b4c612ea284c85fb9",
+     "size": 19344,
+     "zipDateTime": [
+      2000,
+      1,
+      1,
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  }
+ },
+ "releaseMetadata": {
+  "calor-nuget-1be1a95d620988e966564b0b4ffe2a5632773d97.provenance.json": "9d9fbb25706092864579e27f2a13242821562bf59e06969a7849186e88f7c714",
+  "calor-nuget-1be1a95d620988e966564b0b4ffe2a5632773d97.sbom.spdx.json": "f933aee8b1181191960b353a09296ca5b7e0dc5cb4d316a2f73f162b188ec9fa"
+ },
+ "website": {
+  "treeSha256": "4ed4ca5492c61779fcfeda44970a2f2949ae36e6596b0e6047d5d4e4d9aa7981",
+  "fileCount": 253,
+  "files": {
+   "404.html": "c051f9473addac1b8832357b1d608110beef88f82974a6c92274f31cdffeb080",
+   "404/index.html": "c051f9473addac1b8832357b1d608110beef88f82974a6c92274f31cdffeb080",
+   "_next/static/calor-0.24.0-1be1a95d6209/_buildManifest.js": "16fd42f05001c4e5670bda6b5dc82ad7ef63e27242098d71347ac07ea17263ae",
+   "_next/static/calor-0.24.0-1be1a95d6209/_ssgManifest.js": "836c3d0466e0795b58a5776c92f370b8def0080c3c6a26b20a497680eda2e765",
+   "_next/static/chunks/117-531fcaea7756ac14.js": "e50b6fc0c46f9ec6e8b9829e76685e1d9129dbd3010e6ae902476f7fd0280730",
+   "_next/static/chunks/131-a76edd5ba1601608.js": "d8530b38cc66512e9d4833461879ba1f5042b5a369c4e8dd8daade6502422d67",
+   "_next/static/chunks/259-cd847540b2b7ea82.js": "fe1d2e73ca8afce17e140362ca6fd65ad8ac26d5f6f123b4e3122aeb43dd1264",
+   "_next/static/chunks/711-9f7325283ae11f90.js": "9b4dbcfa35a59188b3999df62ec27186d9e16fff71340ae57206d029610c1379",
+   "_next/static/chunks/965-96e6e815bece36ac.js": "2b497ec1ef93c70dc6dab1f08a22ccbd356bf97840683e9c58041f627604aedd",
+   "_next/static/chunks/app/_not-found/page-7675908cfa67af69.js": "a91bd27589372af373f0bdf11ae83674d94d83d324523db785a569202ea7e551",
+   "_next/static/chunks/app/docs/[[...slug]]/page-f9f8512ca6362f37.js": "110e3fb66231d578679113a50f41349cb172f501cfeabd57f8dbd7790da4f92f",
+   "_next/static/chunks/app/layout-8ba6850f8b18528e.js": "efe75c6d2f2b819a79e6bdd84bfb946d87edc619f13041daf9da811d0866625c",
+   "_next/static/chunks/app/page-9292da308b84b837.js": "982ec43259337a2f53340b6d57a2cf14acaa9ec2cd92a8b3a22ea49a5c5290e5",
+   "_next/static/chunks/fd9d1056-8e5c1cc36a160d8c.js": "104697005a3d64d13ace82670d924755778a011299147e68c2b33aa38edf2c62",
+   "_next/static/chunks/framework-44f73b0b242eb24e.js": "fd059e8cc9d976a9561b63707fda7a72c5cd0b6cfbf8d0889d3ae8c0ec7d5941",
+   "_next/static/chunks/main-abc091095da0af32.js": "630b6ebca56be49622f3f84cbeca97cf6bfd350b6ab31bb1e014fe2c95c2eb42",
+   "_next/static/chunks/main-app-24920d39135d8dfa.js": "c64154ef2251c150d2466e658634d3b8ba0b5f283eb9e3f96a0b78263583d49d",
+   "_next/static/chunks/pages/_app-b0f1b02c8b5f45bb.js": "8dbadd00c541658fe6ba9125b45b5595511d96f58995872bc97921a4d30feecc",
+   "_next/static/chunks/pages/_error-3e88d46381d3065c.js": "577c010737193516ea5466ec1edf9a3b21d65347df5ff3bf0866ccdfb5705ea5",
+   "_next/static/chunks/polyfills-42372ed130431b0a.js": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683",
+   "_next/static/chunks/webpack-1e66f1d9fd625f01.js": "8abac2f1097bd4a1fca5d2333b63166c27261f2e0d86da33dd8f4c839d94347e",
+   "_next/static/css/f4cc9c45ece6f227.css": "c16521f712ea7def7d7986f05db8270068fd60212f1f3ee95a8b079c841325ff",
+   "_next/static/media/0aa834ed78bf6d07-s.woff2": "af7486955880be1c2b972e9c766acffb776768d669b6576ed9a0919ce72e7ca6",
+   "_next/static/media/10dadb2e82d03733-s.woff2": "97aac100e723d66bf1ec1a2fefa395777d005d047823ee432a258de1c14d127c",
+   "_next/static/media/13971731025ec697-s.p.woff2": "468d56b6b25b05b70190b6c233d773f6f1770e8579827ce022a57f03fa8002fb",
+   "_next/static/media/200388358b398524-s.woff2": "ae1f0cb889737109badd1ad17e1acf8bb0cbdb80e2fc3c9577ac6fd769335939",
+   "_next/static/media/630c17af355fa44e-s.p.woff2": "10f1a0ef3f3497901c1c3e9987d0cb97d092a6ce1ff45669a1aed503cf67e6ef",
+   "_next/static/media/67957d42bae0796d-s.woff2": "3edf363dbf9d5fa0cdc784ae2b431a8a4152f4055a8a8858028c0bd668808273",
+   "_next/static/media/6e67fad4fa881005-s.woff2": "efd187f5d8edf6519c273933dc638bbf16ded674f26c295376c9d6f09685babc",
+   "_next/static/media/751eccb0decf5e18-s.woff2": "0ee3d783a89f050280fb48f7fec8602c6922da1716856f75089e4c77d61de9c7",
+   "_next/static/media/7ab938503e4547a1-s.woff2": "219b02c7d8884817d3d6ad4c8771f2c000ce4c5669a67ef4e2e5617ffa25c4cc",
+   "_next/static/media/886030b0b59bc5a7-s.woff2": "992eea2f70210457ddd1196de4df3240919ffe068ad188c79d985fba4565d3bf",
+   "_next/static/media/939c4f875ee75fbb-s.woff2": "7db7affbce1fdee69c1ffc2641bbca289b049867f524c9d861fe35ab6670bf29",
+   "_next/static/media/95d1875af7c44e92-s.woff2": "5730d3e0b43947bf35e7816fdbc1564a3017ba4f9f3e185e91f4095ed6af8838",
+   "_next/static/media/b7bd7951037de757-s.p.woff2": "043a60145af2ddbcd0a6452625cb0bfc4e18b222c76dcd1d4a0106715472faba",
+   "_next/static/media/bb3ef058b751a6ad-s.p.woff2": "1e06740a02a443fb7f3eeda8fcaa685a0f6c620e3f01e6666e847295469ce3ad",
+   "_next/static/media/f6590a0f07a97750-s.woff2": "dcbaf698a44537496c6d2774f775af8b6f382d9f1773f1b408bd01fe515ae8bc",
+   "_next/static/media/f911b923c6adde36-s.woff2": "1390e86cc2823e759358918c01c4fcc1b6e4f01bca915bdbeb6d68eb5c244405",
+   "calor-back-long.mp4": "088ee73be513c40058c19bf5a68e5f7206649acf995238099d84dd0e7b206516",
+   "calor-lava-poster.jpg": "78bf46c0ab440e3963eefd68e1b0bb68c7eced06e9cab195bccff2cb3c779651",
+   "calor-lava.mp4": "b089be7b9e221858ae0bca02e8d5b91238fbab9e7b5afda6d5dba17bbe0a780a",
+   "calor-logo-256.webp": "ed18cb2114215a54dad6b48c2d22a655c64436caeea7a1b42798d12dd33f3ae3",
+   "calor-logo-64.webp": "78dac4824cb53826432ebb7e7dcbea14a8801c83b396e644ce33ab92a12d2433",
+   "calor-logo.png": "9e7edd7faeb2ae03a1a208b9bfc56ba8a17b573ea9a48946ccb1114418990434",
+   "data/agent-benchmark-results.json": "bdf19ba2bba772a44e14c6d22cc3b74330f0d7f868babde7466fa99f1d947260",
+   "data/agent-refactoring-results.json": "5441af1237a92c2d13f2cf812b8bb78748ef417b798cd3d84f8e7377c9321129",
+   "data/benchmark-provenance.json": "d399e0fe677da113612e5818aa2e81cce2f0b23b8bb278c9a5aef3a3046779dd",
+   "data/benchmark-results.json": "c38a0c1935ddb71fd023943b6964c49bbce22c9ef4cf25d6e8f5630fce2162f6",
+   "data/effect-discipline-results.json": "a0b490eee8815bdb63b83f609eed68691cddfb212757091c845ce051ff8ea7a3",
+   "data/llm-results.json": "94cfc6894f4bb05cc1df6d4f94274b6b9ab5c214e12c4669bbdf0e0e076406a0",
+   "data/safety-results.json": "3a343ba0a79fb011d1a627575d80cf711f7c3da7575b609b2382ff7632155d16",
+   "docs/benchmarking/agent-tasks/index.html": "f1923d7bb9606e540fccd9baa463947cf4263012f5071afed0513cdc1155afa6",
+   "docs/benchmarking/agent-tasks/index.txt": "a07034602bdca81b5f8fdf4f47f0f785ce482824d56658cba3250ee501232225",
+   "docs/benchmarking/effect-rows-study/index.html": "329354b03591a3ef08eaa6c487883e10b291bfa5c11db65437d8c4ba0d8614bb",
+   "docs/benchmarking/effect-rows-study/index.txt": "cff6db5b1b2e1d8d1d179507209d1a04d4ae677507768d221b36738a0e843837",
+   "docs/benchmarking/evidence-status/index.html": "aa06eb6e33dc6bfb0ce8ef1ff3f6d9f7394cd51c3a8f6be5825f7119e956a10a",
+   "docs/benchmarking/evidence-status/index.txt": "cc44cc7a38de4c878309f62c72af425b6c727906b061d95d58e840dae591b85f",
+   "docs/benchmarking/index.html": "c03d54534c4aa5eb51f1fba22ef9eefeabe8dcde016788b26bd30da1c762760e",
+   "docs/benchmarking/index.txt": "83303ba7268106643211e06b9c82d35387dc7d7ee96fd6df56012c17e0cdd7c8",
+   "docs/benchmarking/methodology/index.html": "a100d6880a3f790c2765687bc4274314ef43658055d548f618560b1e752dc2bc",
+   "docs/benchmarking/methodology/index.txt": "716a2561cef4a6f0a65ece3e7afc2d606a4feb5ceb9165820c347c1e0fe8943f",
+   "docs/benchmarking/metrics/comprehension/index.html": "c08e894dbe167e7f0fe776c2c5bbb42005ec7e03bd602ad0341cae6f380ce35d",
+   "docs/benchmarking/metrics/comprehension/index.txt": "849dd685714c8deb2e241d747e01e668533d85713954a474f7a80f8a35e689fc",
+   "docs/benchmarking/metrics/contract-verification/index.html": "2d295c9d5981cc47d6f918f8db68781aa08088c2a2834b2770f7160ab36258db",
+   "docs/benchmarking/metrics/contract-verification/index.txt": "3137b4c3f6cf40d6f8cd9e9b0370317cb307a932bf3c0210188f0e79223bb1c2",
+   "docs/benchmarking/metrics/correctness/index.html": "9734bd7d8c54dfa1480fb2bd73bd8efa4ed0e3d9b2e97e0600a168bcd6d2be29",
+   "docs/benchmarking/metrics/correctness/index.txt": "e3108e58cf841b93866a144e77bc0944fdd032c8a880042ed27ed204ca8e48b0",
+   "docs/benchmarking/metrics/edit-precision/index.html": "0e7245fe4095ac8184293c1f2a1de1cc8c1ab8e3636a43bff378951e4bafad21",
+   "docs/benchmarking/metrics/edit-precision/index.txt": "38ff4b610b4535de5b97d1c6a6d0e43eb25b372a0350b9a081d77e0d26d9f486",
+   "docs/benchmarking/metrics/effect-discipline/index.html": "ed1f4a1c30c5b63aafda2d3acbe635c6fa6b93dcb68e85fb59d9713d68cc597a",
+   "docs/benchmarking/metrics/effect-discipline/index.txt": "dd731fc386211cdb7c305b5d6c36abfc326ee25e09141eb2ec5d13063a51536a",
+   "docs/benchmarking/metrics/effect-soundness/index.html": "1a399f40d06fe16d7eafa3fccd33fddbb29454e7d4cb43634e8fd2c985073d72",
+   "docs/benchmarking/metrics/effect-soundness/index.txt": "af6a526e4fc2f32c1a338dc2a307d1d1c65f8c0729e281dc488772a85b9d8572",
+   "docs/benchmarking/metrics/error-detection/index.html": "60795427332fb05d40728385cbc29e6a2a57901b2e6a8407669f5f8900ef46f5",
+   "docs/benchmarking/metrics/error-detection/index.txt": "3774c38fd1cbb923066e7942d57fbd94c077c6c2667f33862d6fa58d047662ee",
+   "docs/benchmarking/metrics/generation-accuracy/index.html": "e7d331bdc28b15eeb4cf65ee12d69e1dc35584d8ffcf7be11b9e54ced3030ab4",
+   "docs/benchmarking/metrics/generation-accuracy/index.txt": "835180cbd91ce976176d5822f2e6be805b30b712d7aa5b4f2de9e663296318bc",
+   "docs/benchmarking/metrics/information-density/index.html": "0b77bd499bc6bc883de3b3487e6eb32fdea39ae39578e9b9376f82435438bc2f",
+   "docs/benchmarking/metrics/information-density/index.txt": "4e91e2657070dc9c9632bb400a91f11b73f642d1e111684fa7fee68c57c6c4a7",
+   "docs/benchmarking/metrics/refactoring-stability/index.html": "e79fb22ff973f710cf9fda671f89dbb20c0327a5054d4aaf07836d32bef4102c",
+   "docs/benchmarking/metrics/refactoring-stability/index.txt": "4d75ef95351c296b874c42fdbbd7f2417b9c755d42849a9baedf02f46980dab7",
+   "docs/benchmarking/metrics/safety/index.html": "2353a9d914fce7aa772f5bc95d5d26c767c09ed699082af4360beaeeff8cfdbf",
+   "docs/benchmarking/metrics/safety/index.txt": "61f07dac64816203b66e430b92550ec00a1c2a213dccc4c2ec26adce81de67e3",
+   "docs/benchmarking/metrics/task-completion/index.html": "ff2d699248fba6ff4250f6981fd0a5c43889a997ce7e9fc6c37a5ea9f41fc084",
+   "docs/benchmarking/metrics/task-completion/index.txt": "f808da2d2f0ce452d958c8adfc17976020bc0889969e41fd7432b733d2fc0804",
+   "docs/benchmarking/metrics/token-economics/index.html": "4bf5ab09e813198f3bcda56839b37807ad5d6b9795998de38d6c03a2214b6b00",
+   "docs/benchmarking/metrics/token-economics/index.txt": "03d0b0472668aca444ce040de10a7f8cd1a222f9cc494e9f22ba33a7bf0b455b",
+   "docs/benchmarking/results/index.html": "c471f1eae0b09a2e367a2fa08cc71bb966caad5d43f3503ac27d6a78b77d6f4e",
+   "docs/benchmarking/results/index.txt": "3bb35213867b9185c408a98ace21ae15faeac076e90df0e54632220e9289f54f",
+   "docs/changelog/index.html": "8010e5ec0a55ff0e78ac0f82b72f14dcac24da7bdfc8e45b0c7f3cb1992bb01f",
+   "docs/changelog/index.txt": "e6bae68f8e5d75edad4f15a363a051b8b4841765e886dd3dd503e06f8d103e26",
+   "docs/cli/analyze-convertibility/index.html": "ebb9c38443f301adf1e01e433b667787504b8d38765612b372a13f0932625db9",
+   "docs/cli/analyze-convertibility/index.txt": "2ac284eb5848c9d4b590db7ce7545c05450a8a1cf9a13228bed2cbe0f4a9e6f8",
+   "docs/cli/analyze/index.html": "c519b2b69ea47b45752ca56cc44dca12e52ef7509aed7968f3864abf12fcc595",
+   "docs/cli/analyze/index.txt": "05dff72c4f38174836738fc98aa02b1a92bb45cbf72e99ae452bdb989f189866",
+   "docs/cli/benchmark/index.html": "19e498c15051e11c92e39264e23538fd523dae660b763ed44997013dcdcce112",
+   "docs/cli/benchmark/index.txt": "cfb06f849dee0099343dbbfaa796404688aa367a349a0a77b24c42e8eca288b9",
+   "docs/cli/compile/index.html": "737ae382327281bbc2a4d54fe8ac383fbf72c549f26ad69a6d9bead7e9c6c012",
+   "docs/cli/compile/index.txt": "95eb62845a318c7f7d227a13533de3a0144fbb422902dda04e30e87732085347",
+   "docs/cli/convert/index.html": "cbdb88e839bbf6eaad98ecbea4fcf2d7c7c1f3a7ca50a835e433fe938c0b7d0e",
+   "docs/cli/convert/index.txt": "82df6684de7f382ba6fd81056b8bd243ac03b9392092384904c7968cc3ed14e2",
+   "docs/cli/coverage/index.html": "87cda09b6876711c925b3f62ce11cc1bc75a4a4e378c01a4496f63f4d93e000e",
+   "docs/cli/coverage/index.txt": "9b0aeae0ac983f1a531cc6036ddccaab9b2ed22659a29c4d6c81810509d9ab61",
+   "docs/cli/effects/index.html": "2104ac91e726e12e8395d91c41b4f28e14ceee7cdc15b17e36d9c562d35627eb",
+   "docs/cli/effects/index.txt": "2890de15174395f57744d77b4347099e4f4e8029fbe2401075a8449551c61035",
+   "docs/cli/envelope-schema/index.html": "35ad78e11ed96f0f7bda8de1eeb103a0f5182b9f5fc06c04ad233a972c81b599",
+   "docs/cli/envelope-schema/index.txt": "2918c8965b5e80fceca5cc598e4102a673f3fa08e67448087fbe54103e836da3",
+   "docs/cli/evaluation/index.html": "2ba73a8f5bf5eb84f69dbd5b60d744f5fcc072b99bb508525b366cb27b828d13",
+   "docs/cli/evaluation/index.txt": "4902562219febda70591a8a092fc7ab2dbeeb0b14345ec78d62f1540d5c98eb8",
+   "docs/cli/feature-check/index.html": "0fb1b92997a7f588281fd989641df043ec7b69d1b1f1f05bda5d21f6f914b0be",
+   "docs/cli/feature-check/index.txt": "27fffa5b4f7d7d9f50d65032b646247bafe9034f6c1759ace09d29356cb3cfca",
+   "docs/cli/fix/index.html": "a0d2ca6b303b7d810100ed9343dd01a82ce47bdd5118c7acbf43bc6237d9b960",
+   "docs/cli/fix/index.txt": "f9fef47fccf734f199a0d7ed247846ff5be189c60e37d168151aae2a73ba9532",
+   "docs/cli/format/index.html": "45dec156851a99ea47e18aa6c2a03cbf31154adc6e9238291d7ebeb98d6181ef",
+   "docs/cli/format/index.txt": "191f17813eea31db4ac5671e7d2a063c872043176fb793bb90390fa4f82f8aea",
+   "docs/cli/hook/index.html": "1f1b27d7ea269d0f59be69f88c8a8c5983e6e76b5ddac2c57d3d41c7d20607db",
+   "docs/cli/hook/index.txt": "2cc609c3f6159f4f192d102b2aace6c62f3ad5947786d4650f0f836c044e95a3",
+   "docs/cli/ids/index.html": "19ae1dccf227372568dae861f3c4b46d56f7c6bb6026d8778866c5719310813b",
+   "docs/cli/ids/index.txt": "a943bad80d9c4e96dd1e5a844e265276747c6b44335097e5eca11826eaee3efa",
+   "docs/cli/import/index.html": "4d8f45c3814f7cbc426f778a15c356bd1ae5f63f1ea45897a562d47482586456",
+   "docs/cli/import/index.txt": "6248fa9bfd759f8df01d3807cd0cb0a054e5fc7808814666b37ab168a9fe3911",
+   "docs/cli/index.html": "9d794a38d2f4d096a993f1bc802dcababe2965606c204784d34fe27d978db1be",
+   "docs/cli/index.txt": "9a1850ad7caf9238bcedf18afa8bec8e6bb26e86013c114b0819333d5ec19229",
+   "docs/cli/init/index.html": "367d6e584215130bdc39c5dc619935acb610719a9be0ac73239386c3f3e55533",
+   "docs/cli/init/index.txt": "b847196e41b6f75769137f5db69fa042a4ad69101c3d8f9ccc5f44eb859ce953",
+   "docs/cli/lint/index.html": "6e9ec98ea85c5591d63ca1511ae81a6e6dff2bc0d82ad5b6d5391a141b65d6ea",
+   "docs/cli/lint/index.txt": "1ab1ed7f5bdd3b8610eafcc8bbe7117e7ffb5977f394bcb3c61f5824816ad03e",
+   "docs/cli/lsp/index.html": "235b696f69afb84507fb8482710e191d471cf5da90c96febbcdbf4f67e68848c",
+   "docs/cli/lsp/index.txt": "bd2be7763948e82da7a919b3294e038fe5455b8247a1803be353b49802760e4f",
+   "docs/cli/mcp/index.html": "4ad10a8d1ef10091f5bc75c6ac71eef4c73fcd9c175fb7b1d72434bc96f05a90",
+   "docs/cli/mcp/index.txt": "5052f4f2475cf0a389a3aff889db3d660ce4635f4d2713192b9d02ab6a4bc6ad",
+   "docs/cli/migrate/index.html": "ac8571b0b568d7a3fcc4a23b513bd08b10c5c134c2ce259e05b9fd77d5973877",
+   "docs/cli/migrate/index.txt": "263f9c56f4e6909ed36820427bf0241e6b1abe696cf29345be5859d50573f18c",
+   "docs/cli/query/index.html": "3743b5c30de1b5c2cc583caa49099bb5133ed5f39992ecdbdaab77bff9a7e337",
+   "docs/cli/query/index.txt": "f8b3c4fd150f1f3ad126bbc7ac005a1933943970b21935c856a798a524691434",
+   "docs/cli/review-packet/index.html": "2a97db2d83fbdb7e04c543ccac70ee747cb2a39104f63e3cac272c2295977140",
+   "docs/cli/review-packet/index.txt": "bd3d73d74205e9f0165024ac79a37bc08cb9f92b95d5217c65a6242b16483006",
+   "docs/cli/run/index.html": "cb5833841e9bf0c46d362fabba525557a5f1cf5a9fc9e37c0188bfeff62d4972",
+   "docs/cli/run/index.txt": "0ab609d5fe0fce8e7203a6a0dac2d05c88d3d56d0871077aa86eb51763e0d91d",
+   "docs/cli/self-check/index.html": "ebf2b594644bcd22cceb45aea1b125adfffea2ce06e4fbe216cf8236e9ee5ca3",
+   "docs/cli/self-check/index.txt": "4d23d72a311d07f7feba64d591cd99906dfb6567bcc87edc257dacd4f55e24ca",
+   "docs/cli/self-test/index.html": "23ce93eab124bc05e119291351ede0b74c6fc7f0572679019fb6e0dbe205f549",
+   "docs/cli/self-test/index.txt": "ce3af515c008a0266d1f21cfd621914e42230abd0f5a207c086c93b511a20af5",
+   "docs/cli/static-analysis/index.html": "00ff12b4eb32a49980ff93dc18a75c41694c42bd46343748e4e8f2b127490576",
+   "docs/cli/static-analysis/index.txt": "c2b85eda407848cb3db18115abc5e33b2cc1e71e86e4d5081e8b41d4da6ecfdb",
+   "docs/cli/structured-output/index.html": "006739f8a0dc0c559bddf5ea3758596b5ec73fb3071bf4b0b8c6723930f391cd",
+   "docs/cli/structured-output/index.txt": "433942eac46486f74447632d783a1f5baf2be111a00eef97d341d8246d32b50d",
+   "docs/cli/test/index.html": "1876231f4ee137e48fd61707da713abf776563dc3ab19ca658371f5a1e5d941c",
+   "docs/cli/test/index.txt": "4e8707190a044d26020403efc4a737a1ec7fc1cb82dfd72236c03a9653c139c5",
+   "docs/cli/verify/index.html": "81dcad759a6b2c8fa046bbdd03b8923f2b025b6e681c34fd831a526ef0cf904e",
+   "docs/cli/verify/index.txt": "06dea0eb7852ac1468dc7775b13ef9909189a8bd60da847b0f1dc37b132aafff",
+   "docs/cli/watch/index.html": "aed02014db9e94654556d4dffc0a7868e07b65d9c25c86faeef0fc967105497c",
+   "docs/cli/watch/index.txt": "4b3aebe42722103417d24c6c17d0256209f4a37efd9d97b1d7ae15fd1ec6874b",
+   "docs/contributing/adding-benchmarks/index.html": "e243397a48596c0855dbd621c966f8927470bae0e252dd6fd5b7618a91e03938",
+   "docs/contributing/adding-benchmarks/index.txt": "1da91b3a332e89675b32402614c2058bb210dc60cc27047dabc6d17373fdf99b",
+   "docs/contributing/development-setup/index.html": "d4494803c3089f7e7d05df7e2073b8844a3e972e6c9bbefbcf8bda43bdafa3c2",
+   "docs/contributing/development-setup/index.txt": "8e41fe87c9a39695ae27764232f95b97724143f121522f88dc17b389dab3f765",
+   "docs/contributing/index.html": "45699ce350fe0f7bc6b7cbce10460b7972d19245c711cef895cdceae0f2dd1e2",
+   "docs/contributing/index.txt": "5928d3e5b85a6fc1e0bf76cc6368e5499bb95332edbed3dc58815f9d6484c4c0",
+   "docs/getting-started/claude-integration/index.html": "e5b7e215f0f3199da4b375fbb442256cbb2bf839a17dc2233e5aa51d0fa15a4f",
+   "docs/getting-started/claude-integration/index.txt": "319c0457e0a1f05138760299511f3ab90fc0c7226e47999d6fde403e415f55b3",
+   "docs/getting-started/codex-integration/index.html": "094d7a2774b8d168917150ef17eae9b9148233f27dfcc95d2a9bdd4a2cfd2b6c",
+   "docs/getting-started/codex-integration/index.txt": "02a66a21a3a48d84d4c5a3e9bd5040f787874d9de96a2164c98a8506b2176d76",
+   "docs/getting-started/gemini-integration/index.html": "99b42f0f7ece7328c3e9baa14b68bdf3c546d5321c8ed6b9055e516e968b9161",
+   "docs/getting-started/gemini-integration/index.txt": "d630c3da47ccee4f8096d180de4a564fc563c46d07e257f414a079fdd0ecca3d",
+   "docs/getting-started/github-integration/index.html": "aca5390f1e31254de248caef09e6b7d8a9fcdf2356cc2c957a888012f148266f",
+   "docs/getting-started/github-integration/index.txt": "f91f63f104a394836ebb3043f901bf71c79147456648af3dbdc2f11e5f712a57",
+   "docs/getting-started/hello-world/index.html": "3e1a6311445fbd88b0e6a0c7edfaccdc22efd14ddaa1132ee07e1e4a07cf0c0a",
+   "docs/getting-started/hello-world/index.txt": "213ddd1838ba212ace9edb729d6677a7bc994e14581c20943bb68c8f5c79cb17",
+   "docs/getting-started/how-it-works/index.html": "63ddd15df31cf200490a565930ca653d61b2e446a15e04ce0a63f84aa1c62fdb",
+   "docs/getting-started/how-it-works/index.txt": "ad8f42896907acbe1602e2d3e1a620d9a1751459701b0020fa4c84612c05bffa",
+   "docs/getting-started/index.html": "ea44325f41d9425a81ea8ec6cb15d7e414a83dd22af9464ac2ff69d9f7ef0155",
+   "docs/getting-started/index.txt": "6cdf99f478ae8e5048d26065742da16b9904abef55360147a76d6466947b9bc0",
+   "docs/getting-started/installation/index.html": "139c9b50861be51fc33662ad72dce5ba810c6b00c9e1c5a8f9fa44ba1213b257",
+   "docs/getting-started/installation/index.txt": "0fe9dccca8e2a8b52b170a1c798aee4213db897db0db0ce0dff109fb756b4204",
+   "docs/guides/adding-calor-to-existing-projects/index.html": "ee9ad4faabd552d1500cb5009021b221b530baf0bbc0ac8f204454af1c13a896",
+   "docs/guides/adding-calor-to-existing-projects/index.txt": "25cfdd67c81e7ea772e558f6b2c4072c73e07f301f5f6f6db1a45be5e46d96c3",
+   "docs/guides/adoption-playbook/index.html": "079d75948bf3dc838647ce17f98dd52cc0016bbf34d7fb318393d354b21260b9",
+   "docs/guides/adoption-playbook/index.txt": "12d7576a894595fd636507cb0fb74046d64bd7232d07708339f26a9635156e09",
+   "docs/guides/cross-module-effect-propagation/index.html": "7cc1c93cd16fe4895faf861fafcc1461fad34da483665f6b91c1736454bd6b8d",
+   "docs/guides/cross-module-effect-propagation/index.txt": "73d7d29f71667f041ce758754db11dae78bdf51bb0cfb35ecf750e83e9c54885",
+   "docs/guides/dependent-types-tutorial/index.html": "cfa59d7f5170f91b1b547cf28bdc61cbd6a59a57fca34c47e5b334e854e51ec3",
+   "docs/guides/dependent-types-tutorial/index.txt": "2705649ba697c1458272685e841ee9fe194965943620b7af92cf034aaa56c9a2",
+   "docs/guides/effect-manifests-dotnet-ecosystem/index.html": "6f4308a6e1df6ccdb9cffa367ae67ee898c1a646828fe68d5654f1559a025a9f",
+   "docs/guides/effect-manifests-dotnet-ecosystem/index.txt": "007255e9ba3adbf32c8d476fd69f7628258cbd528306545b6e10b6d7b4bf869d",
+   "docs/guides/il-analysis/index.html": "83c6aaf436f513e74c8b6b70ecc42d4c16b5d6b87ffae61694a0fbc29bf1a982",
+   "docs/guides/il-analysis/index.txt": "561436593d677113bc591dba8da8c963ca4f6f0a86872bbafc75a970de5a91eb",
+   "docs/guides/index.html": "2e05097c7707377ea2e185ad4630af3579435ef6c8c0962321da6040f0c3f9f1",
+   "docs/guides/index.txt": "03a893dde667d3c0f335a78ebf6496bae5e5a6100512a4cfdc84365ac17e9e25",
+   "docs/guides/nullability-and-dotnet-interop/index.html": "8b78d46a23a5e41dc97a797274de07bce7c57b37d100aa3556e543a4433088ac",
+   "docs/guides/nullability-and-dotnet-interop/index.txt": "09b76f40775850b1291498f1c48cd1ae2824b21cad39f92140a4fdc24d651589",
+   "docs/guides/project-intelligence-for-agents/index.html": "a8b9984236b846cf77b2009c87017ed609f20ee342a0c78c2663c07f921b5f21",
+   "docs/guides/project-intelligence-for-agents/index.txt": "be6564ca641244199c3a41e2c971cac3be000f43d458b110438d7d57d86fef01",
+   "docs/guides/telemetry/index.html": "ad647d9b2373acd73d6fefb7407c6ad99ccfbac39b9991dc2e91b79a5321102b",
+   "docs/guides/telemetry/index.txt": "350882cf1ade202e43e66ba0d61f5b1117dd701764f3eb504259e386fb0335db",
+   "docs/guides/verification-guarantees/index.html": "cbd46cca0f60710a09d5567d23ad11c73dd5022306443f915d78aa17280e98bd",
+   "docs/guides/verification-guarantees/index.txt": "d0502e1c7b720584dabf9969b010bdc3da4511d694d5a7639f2fc62b11f3e0d0",
+   "docs/index.html": "c714c0aa19e31b5cfe2cac72279a88ef42717ffbad7385b4a70c2732aaee2f6f",
+   "docs/index.txt": "4995463b4f20b1437b9289a262e86ff62f2cc7e76edea514b715a3a9a6263ba8",
+   "docs/philosophy/design-principles/index.html": "80476d9fa6050a3d2df865739c5f976947ecb2ea6c8f8b6408908940e7d7c3d4",
+   "docs/philosophy/design-principles/index.txt": "d285a55418efbd7846f1b818f4b28cd704054210e08a166f1426b9936a37ccc7",
+   "docs/philosophy/effects-contracts-enforcement/index.html": "904a666afc31324e47f0238286188a888299740eae6722a5a6ef61fde86b5df9",
+   "docs/philosophy/effects-contracts-enforcement/index.txt": "31baafc86ad86a3e7f76d3c1aadfbd9879d26208739196120b20fec2214b208d",
+   "docs/philosophy/index.html": "2174aacdad1d1f4cac5c875bb1a8953c2a21607990e59790972367453f968e03",
+   "docs/philosophy/index.txt": "611d76d6e2a7ec455fca05971586e56ab427101bcbc9da270b61010b3ccbaaf0",
+   "docs/philosophy/stable-identifiers/index.html": "8e05db20551174d04ebfa0779ed1840c31cac2c3c9408d93ad8526f97640c1b6",
+   "docs/philosophy/stable-identifiers/index.txt": "bb8d4e2a8ddb2e05bc15cbfdbc606e2a62169486cbf9bd4bec8253e5f4a71bf0",
+   "docs/philosophy/static-verification/index.html": "83957456aec88b17a3f4a06bff53c09d625f2358700800e9c44164ec89b3438d",
+   "docs/philosophy/static-verification/index.txt": "b7dd8a25aff2d478346d40ca6e21278f05ef3cd66afc138884911545fa8b3130",
+   "docs/philosophy/tradeoffs/index.html": "94e1c7612e4328867c56e9d297a64ea083336bbc9d5b64ca764e89011344b537",
+   "docs/philosophy/tradeoffs/index.txt": "8a3ebf2afb71b1f8a93293df83db83f81ea7be28fabd392257e94e3606d8a60e",
+   "docs/semantics/core/index.html": "7960bdd322aadd406480daf024409573f4fdb614413809c5d140eb72c27f6ce9",
+   "docs/semantics/core/index.txt": "dc1cbffe3726fff9dc10bf902a65bb801fc9bbb0c597217914728e3bcdf7b4cc",
+   "docs/semantics/dotnet-backend/index.html": "40ff1293e4939f5d6825c90c926185ddf7086063ebfaf16b63362e255a6ab563",
+   "docs/semantics/dotnet-backend/index.txt": "19d850047089ef695287feaadd7ed56292e64712cf8fb34282748178b122ac5b",
+   "docs/semantics/index.html": "38cdadad10c652224cac243d005aca6c01747155d2e3048e7bba273f3bb66ac5",
+   "docs/semantics/index.txt": "a84bb3646f905f672446cba29b861dab15c18eca79b2f71a1e3a1b0546e0380d",
+   "docs/semantics/normal-form/index.html": "6b0ac57653d96118af6e44864633f7b41c1ec611a81527224eb0b9dd7ef90b82",
+   "docs/semantics/normal-form/index.txt": "7b12e135dd5eda3852f139c599958d880482d1f111a95a4ffa35860ee340ecab",
+   "docs/semantics/versioning/index.html": "a508b472b69f29f53c0714da107149a2d6fa45578b97dd7c849e035b0aa01ef7",
+   "docs/semantics/versioning/index.txt": "d05043777d6fa87409007144c5a4b264bdf2ea1b9ef23957b565535c243ad960",
+   "docs/syntax-reference/binding/index.html": "25a6f8125257385ba0c63fd10d604be0e1b78d023a4938f811cda403ff94f02e",
+   "docs/syntax-reference/binding/index.txt": "ed7169b0d3e180e314bbbabf849cfd3154880639684bfd726cbac98186ab40c5",
+   "docs/syntax-reference/calls/index.html": "b9b240d0b0d0eb7c5dc6b1c6077a466b399d734507a9a7360f90e798917d95e1",
+   "docs/syntax-reference/calls/index.txt": "16f9bad9f6d354f1703e5ed606a9de9d2c74e572a69b8dde814d98c08d81cbe3",
+   "docs/syntax-reference/contracts/index.html": "bcdd57d3c8c8a817b015bd7fc3daf3539ee62d717bb70e1ba0b2140bf296b670",
+   "docs/syntax-reference/contracts/index.txt": "7fdb2dc50f172a8448befe58c12ef4962eee25ce18d2acb1e1ea1e9cd64ce56e",
+   "docs/syntax-reference/control-flow/index.html": "f02f69da7df8af0cd2a17c847301c6aa6e9ae3184328a84ab529d99dc3e0e6ff",
+   "docs/syntax-reference/control-flow/index.txt": "8b3ac0e30263abde1387f20a3473894d807a2796eb113f441a66dc1725f6b377",
+   "docs/syntax-reference/effects/index.html": "33393ad3483dce7e17fbed81f6a1d8e48c11deb2d6f1272d228c45c1baee073a",
+   "docs/syntax-reference/effects/index.txt": "e751959ea57cc2cf5506ea0ec373c33d4f63013db663c02dab48d0429bc5319a",
+   "docs/syntax-reference/expressions/index.html": "be4d3238dfb05441eb0d18fee8b52c59d61450e6b211be0e68ef33ae732b95df",
+   "docs/syntax-reference/expressions/index.txt": "dc6ad6fd4cadd18795bbbb97bdeb99f2ad9e3e62a09965e7361a139d70450b82",
+   "docs/syntax-reference/index.html": "0ae856fb6ba2b808bbb33132cdc59b46080c065fc53da0284fd78b95b6e4abbd",
+   "docs/syntax-reference/index.txt": "dab732d762fe9c262172168dc9002a5e1d9b2c9f7bdd9b262a0e6abeb89fee80",
+   "docs/syntax-reference/inheritance/index.html": "8bd2bfb6edd4f68168053d8dd3b5bcf99f4fe039b13507458fa6013da49dba31",
+   "docs/syntax-reference/inheritance/index.txt": "28dfb40e906e6797119f56ca54e52b9c47ea34d1916164c9413f0dcacb8f8531",
+   "docs/syntax-reference/refinement-types/index.html": "36128b782909399c4331d0fde496adbda4223c157353b22f19ab51aa990c35b7",
+   "docs/syntax-reference/refinement-types/index.txt": "a4273018b4f390b26b70785110deaaadd5af76b327a4672656219a81cdaf12d4",
+   "docs/syntax-reference/string-operations/index.html": "a3bc3d47c2f5a6e627536a452cb47d184ad372d310b02afa14c05c1acf01a2f4",
+   "docs/syntax-reference/string-operations/index.txt": "0d518932e36c71fc0a7e6f2dc0654087e1748bbc3ef7bf526ad00900df2ebb8a",
+   "docs/syntax-reference/structure-tags/index.html": "993f41da66c0e66f4e0ca93ffc2ba2094fa6208f42681f463d1261ecb80826da",
+   "docs/syntax-reference/structure-tags/index.txt": "b4eb203b83ff0c12839d817a70d776c3f0a1b654bbebae6cfd7c70ac3207d259",
+   "docs/syntax-reference/types/index.html": "c4c7ce71ed25cc9a67093838fc4884cc8b920466feaa673b8dabfa8dc07395b3",
+   "docs/syntax-reference/types/index.txt": "a78379bfef07017fd5c5e0d97e7b0dc679d7a6d258a46f43536a263f39f4aa6b",
+   "favicon.ico": "39755a4b863b32ab0cf29b40fc393fa8b97fddfbb02eb47cfb74c29e067147cb",
+   "images/calor-vscode.png": "925fd3d05997d867aaf4e50596781051c53d9ce70827d76e0b10078cd2e15e6f",
+   "index.html": "f5242f4e487119320b320270715f95be5688da33ef0283a69bfa942c2c4540a8",
+   "index.txt": "73a324a7aed0d7f77e42d5477aa7fbec9cb4c6dcf6e851e2f848b56a662391a3",
+   "og-image.jpg": "00696adedd8462e1a5fbeb292dc3d302f50e24ab73589f1a9a5fd7942454956c",
+   "robots.txt": "9981bb5baacd7e029f6527a869b98ac1db3d55153bc016ca3a79fde28ff5dbe7",
+   "search-index.json": "3bfd54846a2a37aa3626a163438dbdacca886ce0bf376b0652a4149e085692b7",
+   "sitemap.xml": "812542f67c66b91ccd15c6ca8163b37f3534509ce4505adee4dc6c42fb655ffd"
+  }
+ },
+ "toolchain": {
+  "os": "Darwin arm64",
+  "dotnet": "10.0.401",
+  "node": "v26.10.0",
+  "npm": "11.19.1"
+ },
+ "build": "build-1",
+ "commit": "1be1a95d620988e966564b0b4ffe2a5632773d97",
+ "tree": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/a/calor",
+ "environment": {
+  "TZ": "UTC",
+  "LANG": "C.UTF-8",
+  "LC_ALL": "C.UTF-8"
+ }
+}

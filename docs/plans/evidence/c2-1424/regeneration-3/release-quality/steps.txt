@@ -1,0 +1,17 @@
+start 2026-10-09T17:21:08Z head 04e61f188e85a710a91242e1ddbf35fcd50e329e dotnet 10.0.401; runtimes: Microsoft.AspNetCore.App 10.0.12;Microsoft.NETCore.App 8.0.31;Microsoft.NETCore.App 10.0.12;; load 9.94 24.31 48.39
+STEP submodule-update-init exit 0 at 2026-10-09T17:21:14Z
+STEP build-performance-tests exit 0 at 2026-10-09T17:21:15Z
+STEP negative-gate-self-tests exit 0 at 2026-10-09T17:21:19Z
+STEP check-manifest-skips-assertions-sample-ids exit 0 at 2026-10-09T17:21:24Z
+STEP collect-and-enforce-coverage exit 0 at 2026-10-09T17:39:24Z
+STEP mutation-gate exit 0 at 2026-10-09T17:40:40Z
+load before performance gate: 17.45 32.05 39.51
+STEP performance-gate exit 0 at 2026-10-09T17:41:33Z
+STEP flake-gate-100 exit 0 at 2026-10-09T17:44:36Z
+STEP roundtrip-run-all exit 0 at 2026-10-09T17:47:08Z
+STEP migration-scorecard exit 0 at 2026-10-09T17:47:14Z
+STEP roundtrip-delta exit 0 at 2026-10-09T17:47:14Z
+STEP tier2-verify-corpus exit 1 at 2026-10-09T17:47:39Z
+STEP z3-release-download exit 0 at 2026-10-09T17:47:42Z
+STEP z3-release-verify exit 0 at 2026-10-09T17:47:42Z
+end 2026-10-09T17:47:42Z

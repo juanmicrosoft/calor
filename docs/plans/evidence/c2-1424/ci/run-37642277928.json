@@ -1,0 +1,760 @@
+{
+ "runId": 37642277928,
+ "workflow": "Tests",
+ "title": "Tests",
+ "event": "workflow_dispatch",
+ "headBranch": "c2-1424/candidate-696ab824",
+ "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+ "runAttempt": 1,
+ "status": "completed",
+ "conclusion": "failure",
+ "createdAt": "2026-10-07T15:06:27Z",
+ "updatedAt": "2026-10-07T15:33:46Z",
+ "url": "https://github.com/juanmicrosoft/calor/actions/runs/37642277928",
+ "runnerMinutes": 136,
+ "jobCounts": {
+  "completed/success": 18,
+  "completed/failure": 17,
+  "completed/skipped": 2
+ },
+ "jobs": [
+  {
+   "id": 112864096200,
+   "name": "id-validation",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:08:58Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056394",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056394",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096200-id-validation.log.gz"
+   }
+  },
+  {
+   "id": 112864096344,
+   "name": "calor-first-guard",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:16:35Z",
+   "runnerMinutes": 11,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056378",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056378",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37642277928/112864096344-calor-first-guard.log.gz"
+   }
+  },
+  {
+   "id": 112864096356,
+   "name": "tests (semantics)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:08:14Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056386",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056386",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096356-tests_semantics_.log.gz"
+   }
+  },
+  {
+   "id": 112864096376,
+   "name": "z3-consumer-matrix (linux-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:08:33Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-24.04-arm"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096420,
+   "name": "z3-consumer-matrix (osx-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:08:43Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "macos-14"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096424,
+   "name": "sdk-package-consumer (win-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:07:38Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "windows-11-arm"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096439,
+   "name": "verify-phase1",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:08:56Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056383",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056383",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096439-verify-phase1.log.gz"
+   }
+  },
+  {
+   "id": 112864096452,
+   "name": "d-s1.5-fixtures",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:07:15Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056379",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056379",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096452-d-s1.5-fixtures.log.gz"
+   }
+  },
+  {
+   "id": 112864096465,
+   "name": "detect-changes",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:06:44Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056389",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056389",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37642277928/112864096465-detect-changes.log.gz"
+   }
+  },
+  {
+   "id": 112864096480,
+   "name": "tests (roundtrip-harness)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:11:31Z",
+   "runnerMinutes": 5,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056388",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056388",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096480-tests_roundtrip-harness_.log.gz"
+   }
+  },
+  {
+   "id": 112864096523,
+   "name": "cli-tool-consumer (win-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:07Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "windows-11-arm"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096527,
+   "name": "sdk-package-consumer (osx-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:41Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "macos-14"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096546,
+   "name": "phase1-corpus-clean",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:06:45Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056384",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056384",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37642277928/112864096546-phase1-corpus-clean.log.gz"
+   }
+  },
+  {
+   "id": 112864096551,
+   "name": "test",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:50Z",
+   "completedAt": "2026-10-07T15:12:56Z",
+   "runnerMinutes": 7,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056396",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056396",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096551-test.log.gz"
+   }
+  },
+  {
+   "id": 112864096553,
+   "name": "phase2-gate-dryrun",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:07:23Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056392",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056392",
+    "dotnetSdk": [],
+    "dotnetRuntime": [],
+    "logFile": "logs-37642277928/112864096553-phase2-gate-dryrun.log.gz"
+   }
+  },
+  {
+   "id": 112864096570,
+   "name": "cli-tool-consumer (linux-x64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:08:37Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096595,
+   "name": "sdk-package-consumer (win-x64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:08:46Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "windows-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096600,
+   "name": "tests (experimental)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:08:24Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056382",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056382",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096600-tests_experimental_.log.gz"
+   }
+  },
+  {
+   "id": 112864096612,
+   "name": "quality-ratchets",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:33:46Z",
+   "runnerMinutes": 28,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056393",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056393",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096612-quality-ratchets.log.gz"
+   }
+  },
+  {
+   "id": 112864096613,
+   "name": "z3-consumer-matrix (win-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:30Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "windows-11-arm"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096635,
+   "name": "cli-tool-consumer (osx-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:08:18Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "macos-14"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096642,
+   "name": "conversion-scorecard",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:08:58Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056390",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056390",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096642-conversion-scorecard.log.gz"
+   }
+  },
+  {
+   "id": 112864096645,
+   "name": "tests (evaluation)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:10:00Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096651,
+   "name": "tests (conversion)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:08:23Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056387",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056387",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096651-tests_conversion_.log.gz"
+   }
+  },
+  {
+   "id": 112864096667,
+   "name": "tests (tasks)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:08:33Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056380",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056380",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096667-tests_tasks_.log.gz"
+   }
+  },
+  {
+   "id": 112864096673,
+   "name": "tests (verification)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:08:37Z",
+   "runnerMinutes": 3,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056385",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20261002.596",
+    "runnerName": "GitHub Actions 1000056385",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096673-tests_verification_.log.gz"
+   }
+  },
+  {
+   "id": 112864096680,
+   "name": "z3-consumer-matrix (win-x64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:34Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "windows-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096706,
+   "name": "cli-tool-consumer (win-x64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:08:16Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "windows-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096718,
+   "name": "tests (enforcement)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:32Z",
+   "completedAt": "2026-10-07T15:07:53Z",
+   "runnerMinutes": 2,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056381",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056381",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096718-tests_enforcement_.log.gz"
+   }
+  },
+  {
+   "id": 112864096743,
+   "name": "sdk-package-consumer (linux-x64)",
+   "status": "completed",
+   "conclusion": "success",
+   "startedAt": "2026-10-07T15:06:31Z",
+   "completedAt": "2026-10-07T15:07:31Z",
+   "runnerMinutes": 1,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "GitHub Actions 1000056391",
+   "environmentObserved": {
+    "imageOS": "ubuntu-24.04",
+    "imageVersion": "20260901.588",
+    "runnerName": "GitHub Actions 1000056391",
+    "dotnetSdk": [
+     "10.0.401"
+    ],
+    "dotnetRuntime": [
+     "10.0.12"
+    ],
+    "logFile": "logs-37642277928/112864096743-sdk-package-consumer_linux-x64_.log.gz"
+   }
+  },
+  {
+   "id": 112864096775,
+   "name": "cli-tool-consumer (linux-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:30Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "ubuntu-24.04-arm"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096795,
+   "name": "sdk-package-consumer (linux-arm64)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:50Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "ubuntu-24.04-arm"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096844,
+   "name": "tests (language-server)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:30Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096900,
+   "name": "tests (il-analysis)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:29Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864096968,
+   "name": "tests (compiler)",
+   "status": "completed",
+   "conclusion": "failure",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:09:38Z",
+   "runnerMinutes": 4,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": "",
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864098475,
+   "name": "snapshot-diff-heuristic",
+   "status": "completed",
+   "conclusion": "skipped",
+   "startedAt": "2026-10-07T15:06:28Z",
+   "completedAt": "2026-10-07T15:06:28Z",
+   "runnerMinutes": 0,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": null,
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  },
+  {
+   "id": 112864540680,
+   "name": "roundtrip-verification",
+   "status": "completed",
+   "conclusion": "skipped",
+   "startedAt": "2026-10-07T15:16:37Z",
+   "completedAt": "2026-10-07T15:08:58Z",
+   "runnerMinutes": 0,
+   "labels": [
+    "ubuntu-latest"
+   ],
+   "runnerName": null,
+   "environmentObserved": {
+    "log": "unavailable (job never started or log expired)"
+   }
+  }
+ ]
+}

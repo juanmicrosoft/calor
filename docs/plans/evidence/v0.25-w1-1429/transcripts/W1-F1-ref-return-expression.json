@@ -1,0 +1,165 @@
+{
+  "cli-convert": {
+    "command": "calor convert Cells.cs -o Cells.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 2 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 2",
+      "    <dir>/Cells.cs:3 [method]",
+      "    <dir>/Cells.cs:5 [method]",
+      "    {",
+      "        return ref a[a.Length - 1];...",
+      "  ⓘ 2 members preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.",
+      "  Preservation paths: 2 by converter interop (unsupported construct)",
+      "Warnings (4):",
+      "  ⚠ Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
+      "  ⚠ Unsupported feature [ref-parameter] escalated to §CSHARP interop preservation: ref a[0]",
+      "  ⚠ Nested oblivious reference semantics for 'int[]' are not modeled; preserving syntax-only type mapping.",
+      "  ⚠ Unsupported feature [ref-parameter] escalated to §CSHARP interop preservation: ref a[a.Length - 1]",
+      "Output: <dir>/Cells.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Cells:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n      }§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n      }§/CSHARP\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Cells.cs -o Cells.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 1,
+    "interopPreservationCount": 2,
+    "lossCount": 2,
+    "losses": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      },
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 2,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": [
+      "Calor1343 x6"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Cells.calr --output Cells.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 2,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "deferred"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 1,
+    "interopPreservations": 2,
+    "locations": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      },
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 2,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "info:Calor1343:method",
+      "warning:Calor1343:nullable-oblivious-nested-shape",
+      "warning:Calor1343:ref-parameter"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n      }§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n      }§/CSHARP\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 1,
+    "interopPreservations": 2,
+    "locations": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      },
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 2,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "info:Calor1343:method",
+      "warning:Calor1343:nullable-oblivious-nested-shape",
+      "warning:Calor1343:ref-parameter"
+    ],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n      }§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n      }§/CSHARP\n\n\n\n"
+  }
+}

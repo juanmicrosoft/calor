@@ -1,0 +1,20 @@
+Independent compiler-integration review of juanmicrosoft/calor PR1443.
+
+Worktree: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/typing-1397
+Exact head: 19d1827440af52f913ad96b947770e7c601593c5
+Base: 6a0000bbad93944c55e44d608a65781a4c0df09a
+Measured production commit: ef4227009f02ea13c3b2ab82719b625f4d10b197
+
+You are an independent reviewer, not the implementation author. Review the actual complete diff and relevant production callers, not merely this brief or passing tests. Read LIVE issues1397/1082 and the PR body/evidence. Report ACCEPT or BLOCK for the bounded T1 contract with high-confidence findings, exact source locations, reproduction evidence, and explicit coverage gaps. Do not claim human review or statistical independence.
+
+Contract: supported ?str/?string/?Foo are nullable references, distinct from explicit runtime Option/Some/None. No implicit unwrap, broad nullable-value acceptance, unknown-as-safe classification, or blanket0272/3/4 activation. Genuine unrelated mismatches and every previously rejected unsafe flow must remain rejected. Transitional0202 on expanded nullable locals and0208 on unresolved nullable native STRING calls must not disappear into filtered binder diagnostics. Existing raw-inline nullable flows that were previously accepted are not a new activation target. Some<string> must not become string?.
+
+Trace parser/AttributeHelper, CalorType/TypeChecker, TypeIdentity, Binder/BoundNodes, emitted C#, and actual API/editor/caller tests. Attack alias and array/container identity, Option/nullable nesting, known nominal/value/delegate classification, shadowed/conditional declarations, lambda return context, supported literals/parameters/BCL returns, genuine mismatches, and unrelated primitive/Option behavior. Check the active0275 representation rule and its bounds. Source catalog/golden and primitive reporter gates must remain honest. Look for rejected valid programs or accepted invalid supported programs beyond the supplied fixtures.
+
+Important limits: 1398 owns safe-consumer transfer;1382 selected mapping;1383 native nullable STRING call repair;1380/1381/1384 nominal identity/annotation/member work;1401 project context. Those are not silently included. General mutation/field writes/constructor inputs remain outside the receiving contract. The extra nominal member-read fixture still has an ordinary0411/0410 failure and only isolates typing with the existing effect opt-out; do not count it as a supported ordinary safe compile. TypeChecker BCL/member ErrorType boundaries are still unmodeled, not proof of resolution.
+
+Read-only tracked worktree: no edits, commits, pushes or merges. Existing product tests may run with --no-build --no-restore; no concurrent builds. If a new probe is necessary, use only your own scratch under /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/t1-integration-probes, never modify the reviewed tree. Record every command and outcome used for findings.
+
+RESEARCH IS PAUSED: do not read new research proofs, execute any study/research tests, inspect or alter .git/ppw-budget, frozen ppw-v018/I0b87/ledger/private bundles, draft1438/1078, benchmark study semantics, or root user plan. In particular, do not run SpikeVerdictTests or EffectRowExperimentHarnessTests. Product EffectResolverTests/EffectRowLatticeTests and the evidence's scoped selections are permitted. Do not inspect sibling E1/harness worktrees. No paid calls, release/version changes or activation.
+
+Return actual checked SHA, verdict, high-confidence findings/dispositions, commands/results, and remaining uncertainty. A clean review is not permission to merge: all final CI and delegated parent adjudication remain separate gates.

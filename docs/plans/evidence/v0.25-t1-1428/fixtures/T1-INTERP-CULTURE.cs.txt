@@ -1,0 +1,28 @@
+// 0.25 T1 (#1428) shared control: format and culture. A string target formats with the
+// current culture (de-DE here), FormattableString.Invariant and string.Create with an explicit
+// provider format with the invariant culture, and string.Format keeps its own semantics. The
+// current culture is restored afterwards.
+using System;
+using System.Globalization;
+
+public static class Probe
+{
+    public static string Run()
+    {
+        var saved = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+            double d = 1234.5;
+            string current = $"{d:N1}|{d}";
+            string invariant = FormattableString.Invariant($"{d:N1}|{d}");
+            string created = string.Create(CultureInfo.InvariantCulture, $"{d:N1}");
+            string formatted = string.Format(new CultureInfo("fr-FR"), "{0:N1}", d);
+            return current + "#" + invariant + "#" + created + "#" + formatted;
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = saved;
+        }
+    }
+}

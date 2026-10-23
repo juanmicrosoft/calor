@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "issue": 1386,
+  "date": "2026-09-15",
+  "scope": "Stage A scalar STRING receiving boundaries only",
+  "decision": "PASS",
+  "blockingFindings": [],
+  "nonBlockingDeltas": [
+    {
+      "subject": "FluentValidation",
+      "path": "src/FluentValidation/Validators/RegularExpressionValidator.cs",
+      "baseStatus": "CompileError",
+      "candidateStatus": "Replaced",
+      "classification": "preexisting-overload-resolution-failure-resolved"
+    },
+    {
+      "subject": "Serilog",
+      "path": "src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs",
+      "baseStatus": "CompileError",
+      "candidateStatus": "EmitCompilationError",
+      "classification": "preexisting-failed-file-advanced-to-project-validation",
+      "candidateErrorCodes": {
+        "CS8917": 6,
+        "CS0119": 2
+      }
+    }
+  ],
+  "acceptedObservations": {
+    "repairedBlockers": [
+      {
+        "subject": "Serilog",
+        "path": "src/Serilog/Events/LogEventPropertyValue.cs",
+        "result": "Replaced",
+        "repair": "A same-name method preserved in current-class interop keeps no-match and ambiguity outcomes opaque."
+      },
+      {
+        "subject": "Serilog",
+        "path": "src/Serilog/Formatting/Json/JsonValueFormatter.cs",
+        "result": "EmitCompilationError",
+        "repair": "The source null-forgiving expression is preserved verbatim instead of being erased before active nullability analysis."
+      }
+    ],
+    "activeBoundaries": [
+      "Initializer/ScalarString/Calor0272",
+      "NativeReturn/ScalarString/Calor0273",
+      "MethodArgument/ScalarString/Calor0274"
+    ],
+    "inactiveShapes": [
+      "None",
+      "Array",
+      "Generic",
+      "Nominal",
+      "Unsupported"
+    ],
+    "rootCliRows": 99,
+    "rootCliAllRejected": true,
+    "rootCliAllSingleExpectedError": true,
+    "rootCliAnyRequestedOutputCreated": false,
+    "subcommandRows": 14,
+    "subcommandAllRejectedWithCalor0272": true,
+    "sdkRows": 15,
+    "sdkAllRejectedWithExpectedCode": true,
+    "mutableAssignmentCounterexample": {
+      "exitCode": 0,
+      "stdout": "NULL",
+      "stderr": "",
+      "interpretation": "General mutable assignment remains unenforced and can place null in a declared str."
+    }
+  },
+  "governance": {
+    "technicalAdjudication": "PASS",
+    "maintainerAdjudication": "outstanding",
+    "evidenceOwner": "GitHub Copilot CLI session 183563e9-b822-44f0-843f-4ffee2c11e19",
+    "implementationPrAuthor": "juanmicrosoft",
+    "implementationPrMergedBy": "juanmicrosoft",
+    "repairPr": 1459,
+    "repairMerge": "e3a84766dcc9f34c104445d1150552499c3d3ce3"
+  },
+  "outOfScope": [
+    "Stage B",
+    "issues 1317 and 1318",
+    "version bump",
+    "package or tag creation",
+    "release"
+  ]
+}

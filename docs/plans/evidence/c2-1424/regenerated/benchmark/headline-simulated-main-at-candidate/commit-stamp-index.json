@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 2,
+  "issue": "#1159, #1417",
+  "what": "Provenance for every ledger under bench/phase0-agent-native/ that stamps a measuredCommit. Those stamps name PRE-SQUASH BRANCH commits: this repository squash-merges, so the squash discards them and no third party can resolve them — three of five are contained by zero remote branches and survive only as unreferenced objects in individual clones. Every roadmap since 0.15 cites them as the provenance of its published numbers.",
+  "publicationStampsWhat": "#1417: the website's benchmark data (website/public/data/*.json) stamps SHORT commits (c2a8816d, 107462e, 580e189). Those stamps stay exactly as published — they are historical records, and the inventory classifies the files stale (#1276, #1422). publicationStamps records, beside each one, the full commit its prefix uniquely expands to on main, with that commit's trees and manifest hashes. It identifies a commit; it does not make the published numbers valid.",
+  "history": "schemaVersion 1 (#1199) recorded resolvableOnMain and asserted each basis without verifying it, and checked reachability from HEAD. schemaVersion 2 (#1417) keeps every #1199 field unchanged and adds durableIdentity beside it; resolvableOnMain must equal durableIdentity.commit. No measuredCommit was changed.",
+  "whyNotJustRepointTheStamps": "Because measuredCommit is the experimental record, not a pointer. Repointing it would falsify what was measured, and effect-rows-benefit-ledger.json's stamp is additionally ARM_B_COMMIT — a frozen constant of a completed epoch, pinned by ppw-compile.py, ppw-analyze.py and PpWRowsRegistrationTests. Two of these ledgers are also byte-compared against their own generators, so a field added by hand would make them permanently 'stale'. The stamps stay; this file carries the resolvable equivalent beside them.",
+  "basisKinds": {
+    "identical-src-tree": "STRONGEST. A commit reachable from main whose `src/` tree is byte-identical to the measured commit's, verified with `git rev-parse <sha>:src` on both. Same compiler; a third party can check the numbers against it.",
+    "landing-commit-only": "WEAKER, and said so. No commit reachable from main has an identical `src/` tree, so the exact compiler state was never landed as such. The commit named is the squash that carried the LEDGER onto main — where the numbers landed, not the compiler that produced them.",
+    "measured-on-top-of": "The numbers were measured with the landing change APPLIED to the named commit, which is what regenerating a ledger inside the PR that moves it always means. The stamp its generator writes is HEAD at regeneration time, and the squash commit that will carry the change does not exist yet — the #1159 bootstrapping problem, and the reason this index exists rather than a rule that the stamp must equal the landing commit.",
+    "unique-prefix-expansion": "For a historical SHORT stamp (#1417). The stamp stays as written; the durable commit is the only object in a full clone whose id starts with it, verified with `git rev-parse --disambiguate`. It names a commit on main; it cannot show the files were produced from a clean checkout of that commit. Short stamps can collide (see effect-rows-benefit-ledger.json), which is why the expansion is re-checked for uniqueness rather than trusted.",
+    "post-merge-write-back": "Contract v0.24 §6(b), for a measurement whose final squash commit cannot exist before merge. Phase 1 (in the PR): durableIdentity {status: pending, phase1 {headCommit = the measuredCommit, pr, treeHashes, inputContentHashes, artifactSha256}}. phase1.treeHashes must claim src (the measured compiler), never \"/\"; the entry carries no resolvableOnMain. A pending identity is NEVER authoritative. Phase 2 (a write-back PR after merge): the commit on protected main that landed the artifact, with every phase-1 tree re-verified equal there; the phase-1 record is kept under writeBack and must equal the pending entry committed in this index AT the landing commit (so it cannot be rewritten later); every phase-1 tree and manifest is re-checked there on every run; the durable commit must be the one that landed the artifact, and the committed artifact must still be those bytes. If any tree or manifest differs the write-back fails and the numbers must be re-measured."
+  },
+  "identity": {
+    "contract": "docs/plans/v0.24-evidence-contract.md §6 (FROZEN 1.0.1)",
+    "shape": "durableIdentity {status, commit, resolvedVia, treeHashes, inputContentHashes}. measuredCommit is the historical stamp and never changes; the durable identity is recorded beside it.",
+    "commit": "Full 40-hex SHA that is an ancestor of fetched refs/remotes/origin/main (resolvedVia). HEAD, refs/pull/N/merge, branches, short SHAs, and tags are rejected. §6 also allows an immutable release tag; this repository's v* tags are lightweight and unprotected, so none qualifies and the stricter rule applies.",
+    "treeHashes": "Repository path -> git object id at commit (`git rev-parse <commit>:<path>`); \"/\" is the whole repository tree (`<commit>^{tree}`) and is required, so every repository-resident input (corpus gitlinks, fixtures, configuration) is covered, not only src. Re-read and compared on every run.",
+    "inputContentHashes": "Repository path -> SHA-256 of the manifest bytes at commit (`git cat-file blob <commit>:<path>`).",
+    "measuredTreeHashes": "identical-src-tree only: the trees claimed identical, verified at BOTH measuredCommit and the durable commit.",
+    "clone": "Validation fails, never skips, in a shallow clone or one without refs/remotes/origin/main.",
+    "writeBackCommand": "CALOR_PROVENANCE_WRITEBACK=1 dotnet test tests/Calor.Compiler.Tests --filter \"FullyQualifiedName~LedgerCommitStampTests.PendingIdentities\" (after `git fetch origin main`); commit the rewritten index in a write-back PR.",
+    "landing": "measured-on-top-of only: the commit that landed the artifact (holds its current bytes, its first parent does not), on main and descending from the stamped base, with its src tree."
+  },
+  "enforcedBy": "tests/Calor.Compiler.Tests/LedgerCommitStampTests.cs (this repository); tests/Calor.Compiler.Tests/Provenance/DurableProvenanceTests.cs (discriminating controls on throwaway repositories)",
+  "ledgers": [
+    {
+      "ledger": "calor0425-corpus-ledger.json",
+      "measuredCommit": "a00f4a525da7a88e784436fb75259b9606ca242b",
+      "resolvableOnMain": "a00f4a525da7a88e784436fb75259b9606ca242b",
+      "basis": "measured-on-top-of",
+      "note": "#1402 Stage B activation candidate: regenerated with callable branch, exception/filter, and diagnostic rollback repairs applied on top of a00f4a52, retained through the implementation PR merge. The three-subject effect-pass denominator remains 265 and Calor0425 remains 135/48. The earlier activation added one MediatR Calor0274 bind stop (266->265). Synthetic FizzBuzz is outside this ledger and is assessed separately in the five-subject round-trip evidence. This basis names the ancestor beneath the measured repair, not an identical src tree.",
+      "landing": {
+        "commit": "2a79dfdf60463508474119bd3bb8f7c60c74ec37",
+        "artifactSha256": "4776743f34afe0e999bb0a77585b107b3b4b25cee23e903e4add3b35174fe120",
+        "treeHashes": {
+          "src": "3e96f8d45405a97e5b4ebafd49d21293d4a770da"
+        },
+        "note": "#1417: the commit that committed this ledger together with the repairs it was regenerated with (PR #1461 branch; reachable from main through merge 84e3cf12). Its first parent 8e0a7e1d has the same src tree as a00f4a52. The working tree at measurement time was never recorded, so equality of the measured source with this src tree is inferred from the commit, not verified."
+      },
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "a00f4a525da7a88e784436fb75259b9606ca242b",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "8d7b4235351baaf2eaa07509dc4b13ed80557a31",
+          "src": "7b96264cddb7c45cecd461dc64175e2b81eb6718",
+          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
+          "Directory.Build.props": "976fefcb29ed9e72faac1d8992a9cf473ddf2d46",
+          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        }
+      }
+    },
+    {
+      "ledger": "higher-order-demand-ledger.json",
+      "measuredCommit": "b732c4abf8b78e2327f565886e6366e2d64644ea",
+      "resolvableOnMain": "b732c4abf8b78e2327f565886e6366e2d64644ea",
+      "basis": "identical-src-tree",
+      "note": "#1335: both legs regenerated onb732c4ab after adding expected.calr and test.calr for the surrogate-literal D-S1.5 fixture. D-A files940->942; its45 early-stop identities and total demand3123 are unchanged. D-B is unchanged. The exact measured commit remains reachable through the PR merge commit. Historical measurements remain in git history.",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "b732c4abf8b78e2327f565886e6366e2d64644ea",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "bb337f9a73ee5a80a7f9a4165863d1a10ee3838b",
+          "src": "4e0b13c9df53d9e8825f6e147f57284adef30f5d",
+          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
+          "Directory.Build.props": "5468043016a2f21b1b7eb5609d379445c756fcaa",
+          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        }
+      },
+      "measuredTreeHashes": {
+        "src": "4e0b13c9df53d9e8825f6e147f57284adef30f5d"
+      }
+    },
+    {
+      "ledger": "effect-rows-probe-ledger.json",
+      "measuredCommit": "72d060f400b5787ba4ec11cb4dd8860c95173da3",
+      "resolvableOnMain": "bb5bbdb478979abc006972b4a87028d3a6c5fb0a",
+      "basis": "identical-src-tree",
+      "note": "src/ tree b6ae250a… on both.",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "bb5bbdb478979abc006972b4a87028d3a6c5fb0a",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "f6b81fd494e09f827b6ccbeb742ba5cefcbaaa16",
+          "src": "b6ae250af9f3f11169ed1f2e34d668b336c1df15",
+          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
+          "Directory.Build.props": "f32a47a34701cec46a9028874a9aeb90e27a0997",
+          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        }
+      },
+      "measuredTreeHashes": {
+        "src": "b6ae250af9f3f11169ed1f2e34d668b336c1df15"
+      }
+    },
+    {
+      "ledger": "effect-resolver-key-ledger.json",
+      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "basis": "identical-src-tree",
+      "note": "#1397: regenerated onb2c43561 after receiver/member traversal changes. String-origin keys822->826 (bench620->624); bound-origin265, bench files380, the200 floor, scope and all notMeasured identities are unchanged. This is lookup provenance, not resolved-signature or nullability coverage. Preserve the exact measured ancestor with a merge commit. Historical measurements remain in git history; frozen research is unchanged.",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "d21825d61604442be97a6df160da8c7357fd3bea",
+          "src": "6f5a5641229d629ed757afcb65e1338ef8a19fa4",
+          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
+          "Directory.Build.props": "7811483a1ed6977c2a53f8a0e449e317f750183b",
+          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        }
+      },
+      "measuredTreeHashes": {
+        "src": "6f5a5641229d629ed757afcb65e1338ef8a19fa4"
+      }
+    },
+    {
+      "ledger": "effect-rows-benefit-ledger.json",
+      "measuredCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "resolvableOnMain": "82a7c653cbf1ea2f6231e38cc328c74a34e6589b",
+      "basis": "landing-commit-only",
+      "note": "The measured commit is not present in this clone at all, so no tree comparison is possible. It is also ARM_B_COMMIT and must not move. Worth recording: it shares its first EIGHT hex characters with main's real v0.15.0 release commit 3bb2601e3ff83597ddf2f27dcc334b6399ab97ea, which is why short shas looked right to every reader until now.",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "82a7c653cbf1ea2f6231e38cc328c74a34e6589b",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "9cb86a44a8fb8fd8775746735ef52ce78ee376ad",
+          "src": "38d681d433036b24d32ea70f0ed23ef80a559e3f",
+          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
+          "Directory.Build.props": "f32a47a34701cec46a9028874a9aeb90e27a0997",
+          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        }
+      }
+    }
+  ],
+  "publicationStamps": [
+    {
+      "path": "website/public/data/benchmark-results.json",
+      "stampPointer": "/commit",
+      "measuredCommit": "c2a8816d",
+      "basis": "unique-prefix-expansion",
+      "note": "Historical short stamp, left as written. The expansion is the only object with this prefix in a full clone; it identifies a commit on main, not the cleanliness of the tree the numbers were produced from, and says nothing about the validity of the published numbers (inventory: stale, #1276/#1422).",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "73469b898036e7523b6e9aba0613c40e9213fcd0",
+          "src": "c2cae15498ce780c44d5a3b25aeb0cdc0ea8e555",
+          "tests/TestData/Benchmarks": "3d29b2176c7b6da5556285befd2060edd3e017f0",
+          "Directory.Build.props": "976fefcb29ed9e72faac1d8992a9cf473ddf2d46",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          "tests/TestData/Benchmarks/manifest.json": "5dfe89d6a5d59757791bdb764b01f5d78495c2fea318ca50265ca0d1d95a018c"
+        }
+      }
+    },
+    {
+      "path": "website/public/data/benchmark-provenance.json",
+      "stampPointer": "/sourceCommit",
+      "measuredCommit": "c2a8816d",
+      "basis": "unique-prefix-expansion",
+      "note": "Historical short stamp, left as written. The expansion is the only object with this prefix in a full clone; it identifies a commit on main, not the cleanliness of the tree the numbers were produced from, and says nothing about the validity of the published numbers (inventory: stale, #1276/#1422).",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "c2a8816d1bd3864e70966120c9849e8f8d988cb2",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "73469b898036e7523b6e9aba0613c40e9213fcd0",
+          "src": "c2cae15498ce780c44d5a3b25aeb0cdc0ea8e555",
+          "tests/TestData/Benchmarks": "3d29b2176c7b6da5556285befd2060edd3e017f0",
+          "Directory.Build.props": "976fefcb29ed9e72faac1d8992a9cf473ddf2d46",
+          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
+        },
+        "inputContentHashes": {
+          "tests/TestData/Benchmarks/manifest.json": "5dfe89d6a5d59757791bdb764b01f5d78495c2fea318ca50265ca0d1d95a018c"
+        }
+      }
+    },
+    {
+      "path": "website/public/data/benchmark-provenance.json",
+      "stampPointer": "/agentTasks/sourceCommit",
+      "measuredCommit": "107462e",
+      "basis": "unique-prefix-expansion",
+      "note": "Historical short stamp, left as written. The expansion is the only object with this prefix in a full clone; it identifies a commit on main, not the cleanliness of the tree the numbers were produced from, and says nothing about the validity of the published numbers (inventory: stale, #1276/#1422).",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "107462e3b760aee49522677e1a45a080db241661",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "a636a59ce231561e6e825830077ecc3fdadec451",
+          "src": "c70d798ef905a785509c97ab75b8b139683d0dc6",
+          "tests/E2E/agent-tasks": "a21c0ad702bd02bd323d7765581c7101a20c3951",
+          "Directory.Build.props": "e1866bde8daa79b62acb975d98d072a3439b82ba",
+          "global.json": "f7fb55b4df0d9822fc23237d8c9413d05fcb1dbb"
+        },
+        "inputContentHashes": {
+          "tests/E2E/agent-tasks/run-agent-tests.sh": "794efb953b96ca7680ee49dc4e41e01ab85055f024c7433acd7e7e1125785ac4"
+        }
+      }
+    },
+    {
+      "path": "website/public/data/benchmark-provenance.json",
+      "stampPointer": "/agentRefactoring/sourceCommit",
+      "measuredCommit": "580e189",
+      "basis": "unique-prefix-expansion",
+      "note": "Historical short stamp, left as written. The expansion is the only object with this prefix in a full clone; it identifies a commit on main, not the cleanliness of the tree the numbers were produced from, and says nothing about the validity of the published numbers (inventory: stale, #1276/#1422).",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "580e18932b279a2eaf0641f3272a708af7bc4303",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "42e5e4b4d08adf4c4763e28a8cc2fa989cc0c26f",
+          "src": "7883e34ea5bc25e2ab267a6964477af9378b0862",
+          "tests/E2E/agent-tasks": "2cde6b801020daa83902395466b05f332d8eaee7",
+          "Directory.Build.props": "e1866bde8daa79b62acb975d98d072a3439b82ba",
+          "global.json": "f7fb55b4df0d9822fc23237d8c9413d05fcb1dbb"
+        },
+        "inputContentHashes": {
+          "tests/E2E/agent-tasks/run-agent-tests.sh": "794efb953b96ca7680ee49dc4e41e01ab85055f024c7433acd7e7e1125785ac4"
+        }
+      }
+    },
+    {
+      "path": "website/public/data/agent-benchmark-results.json",
+      "stampPointer": "/commit",
+      "measuredCommit": "107462e",
+      "basis": "unique-prefix-expansion",
+      "note": "Historical short stamp, left as written. The expansion is the only object with this prefix in a full clone; it identifies a commit on main, not the cleanliness of the tree the numbers were produced from, and says nothing about the validity of the published numbers (inventory: stale, #1276/#1422).",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "107462e3b760aee49522677e1a45a080db241661",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "a636a59ce231561e6e825830077ecc3fdadec451",
+          "src": "c70d798ef905a785509c97ab75b8b139683d0dc6",
+          "tests/E2E/agent-tasks": "a21c0ad702bd02bd323d7765581c7101a20c3951",
+          "Directory.Build.props": "e1866bde8daa79b62acb975d98d072a3439b82ba",
+          "global.json": "f7fb55b4df0d9822fc23237d8c9413d05fcb1dbb"
+        },
+        "inputContentHashes": {
+          "tests/E2E/agent-tasks/run-agent-tests.sh": "794efb953b96ca7680ee49dc4e41e01ab85055f024c7433acd7e7e1125785ac4"
+        }
+      }
+    },
+    {
+      "path": "website/public/data/agent-refactoring-results.json",
+      "stampPointer": "/commit",
+      "measuredCommit": "580e189",
+      "basis": "unique-prefix-expansion",
+      "note": "Historical short stamp, left as written. The expansion is the only object with this prefix in a full clone; it identifies a commit on main, not the cleanliness of the tree the numbers were produced from, and says nothing about the validity of the published numbers (inventory: stale, #1276/#1422).",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "580e18932b279a2eaf0641f3272a708af7bc4303",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "42e5e4b4d08adf4c4763e28a8cc2fa989cc0c26f",
+          "src": "7883e34ea5bc25e2ab267a6964477af9378b0862",
+          "tests/E2E/agent-tasks": "2cde6b801020daa83902395466b05f332d8eaee7",
+          "Directory.Build.props": "e1866bde8daa79b62acb975d98d072a3439b82ba",
+          "global.json": "f7fb55b4df0d9822fc23237d8c9413d05fcb1dbb"
+        },
+        "inputContentHashes": {
+          "tests/E2E/agent-tasks/run-agent-tests.sh": "794efb953b96ca7680ee49dc4e41e01ab85055f024c7433acd7e7e1125785ac4"
+        }
+      }
+    },
+    {
+      "path": "website/public/data/benchmark-headline.json",
+      "stampPointer": "/provenance/commit",
+      "measuredCommit": "696ab82470626164979a07792ed74932ab88d9e6",
+      "basis": "identical-src-tree",
+      "measuredTreeHashes": {
+        "src": "bb50f35e08a93aca984f4b0a53a6f11d5b1da693"
+      },
+      "note": "#1422: written by scripts/benchmark_publication_gate.py from the B1 results packet at this commit, which is on main; the headline is a projection of results.json, not a new measurement.",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "5c10403402566b474d5202caf9c0d51e4e2321cf",
+          "src": "bb50f35e08a93aca984f4b0a53a6f11d5b1da693",
+          "tests/Calor.Evaluation": "7e15772646a20dc55e564e5bfc728c1969f72b44",
+          "tests/TestData/Benchmarks": "3d29b2176c7b6da5556285befd2060edd3e017f0",
+          "docs/plans/evidence/b1-1276": "370c4616263c28e1bb67c3791ee3cdc3c871a0e9",
+          "scripts/benchmark_publication_gate.py": "ba43f38250bfcdea3d22c2c2407253e4cb6bd0d6"
+        },
+        "inputContentHashes": {
+          "docs/plans/evidence/b1-1276/results/results.json": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f",
+          "docs/plans/evidence/b1-1276/results/pair-manifest.json": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+          "docs/plans/evidence/b1-1276/registration/pairs.json": "0f0d760a3f247dc6c952c39d5499656ecd0b08b99e8c4148a809302e62a93a7f",
+          "docs/plans/evidence/evidence-contract-1407/contract.json": "2b87def646d572e6656cb96157f78dafd040fbb1b46b2cf45e0571cb3290cf12"
+        }
+      }
+    }
+  ]
+}

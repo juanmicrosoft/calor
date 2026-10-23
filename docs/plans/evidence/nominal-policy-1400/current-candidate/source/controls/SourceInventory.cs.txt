@@ -1,0 +1,255 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+if (args.Length != 3)
+    throw new ArgumentException("Usage: SourceInventory <raw-evidence-root> <pinned-repository> <output.json>");
+var evidenceRoot = Path.GetFullPath(args[0]);
+var repository = Path.GetFullPath(args[1]);
+var output = Path.GetFullPath(args[2]);
+if (File.Exists(output))
+    throw new IOException($"Refusing to replace {output}");
+var subjects = new[] { "Synthetic", "Synthetic2", "MediatR", "Serilog", "FluentValidation" };
+var results = new List<object>();
+var referenceHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+foreach (var subject in subjects)
+{
+    var reportPath = Path.Combine(evidenceRoot, "current", "e1-run1", "reports", subject + "-roundtrip.json");
+    using var report = JsonDocument.Parse(File.ReadAllBytes(reportPath));
+    var root = report.RootElement;
+    var details = root.GetProperty("file_detail").EnumerateArray().ToArray();
+    var contexts = details.SelectMany(file => file.GetProperty("validated_contexts").EnumerateArray())
+        .DistinctBy(context => context.GetRawText()).ToArray();
+    var sourceRoot = subject.StartsWith("Synthetic", StringComparison.Ordinal)
+        ? Path.Combine(repository, "tests", "Calor.RoundTrip." + subject)
+        : Path.Combine(repository, "bench", "corpus", subject);
+    if (subject == "Serilog")
+        sourceRoot = Path.Combine(repository, "bench", "corpus", "serilog");
+    var inputs = root.GetProperty("evidence").GetProperty("Inputs").EnumerateArray().ToArray();
+    var inputSources = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var input in inputs)
+    {
+        var relative = input.GetProperty("Path").GetString()!;
+        var path = Path.Combine(sourceRoot, relative);
+        var bytes = File.ReadAllBytes(path);
+        if (!string.Equals(Hash(bytes), input.GetProperty("Sha256").GetString(), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Original input hash differs: {path}");
+        inputSources.Add(relative, File.ReadAllText(path));
+    }
+
+    var contextRows = new List<object>();
+    foreach (var context in contexts)
+    {
+        var languageVersion = Enum.Parse<LanguageVersion>(context.GetProperty("LanguageVersion").GetString()!);
+        var documentationMode = Enum.Parse<DocumentationMode>(context.GetProperty("DocumentationMode").GetString()!);
+        var sourceKind = Enum.Parse<SourceCodeKind>(context.GetProperty("SourceCodeKind").GetString()!);
+        var symbols = context.GetProperty("DefinedSymbols").EnumerateArray().Select(symbol => symbol.GetString()!).ToArray();
+        var parseOptions = new CSharpParseOptions(languageVersion, documentationMode, sourceKind, symbols);
+        var nullable = context.GetProperty("CompilationProperties").GetProperty("Nullable").GetString()!;
+        var nullableOptions = nullable switch
+        {
+            "" or "disable" => NullableContextOptions.Disable,
+            "enable" => NullableContextOptions.Enable,
+            "annotations" => NullableContextOptions.Annotations,
+            "warnings" => NullableContextOptions.Warnings,
+            _ => throw new InvalidOperationException($"Unknown evaluated Nullable setting: {nullable}"),
+        };
+        var selectedFiles = details.Where(file => file.GetProperty("validated_contexts").EnumerateArray()
+            .Any(candidate => candidate.GetRawText() == context.GetRawText()))
+            .Select(file => file.GetProperty("path").GetString()!).ToArray();
+        var trees = selectedFiles.Select(relative => CSharpSyntaxTree.ParseText(
+            inputSources[relative], parseOptions, Path.Combine(sourceRoot, relative))).ToArray();
+        var references = new List<MetadataReference>();
+        var referenceRows = new List<object>();
+        foreach (var reference in context.GetProperty("References").EnumerateArray())
+        {
+            var path = reference.GetProperty("Path").GetString()!;
+            if (!referenceHashes.TryGetValue(path, out var hash))
+            {
+                hash = Hash(File.ReadAllBytes(path));
+                referenceHashes.Add(path, hash);
+            }
+            var earlierHash = reference.GetProperty("Sha256").GetString()!;
+            if (earlierHash.Length != 0 && !string.Equals(earlierHash, hash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Reported source reference bytes changed: {path}");
+            var aliases = reference.GetProperty("Aliases").EnumerateArray().Select(alias => alias.GetString()!).ToImmutableArray();
+            var properties = reference.GetProperty("Properties");
+            var embed = properties.TryGetProperty("EmbedInteropTypes", out var value) && bool.Parse(value.GetString()!);
+            references.Add(MetadataReference.CreateFromFile(path,
+                new MetadataReferenceProperties(MetadataImageKind.Assembly, aliases, embed)));
+            referenceRows.Add(new
+            {
+                path,
+                reportedIdentity = reference.GetProperty("Identity").GetString(),
+                earlierE1Sha256 = earlierHash.Length == 0 ? null : earlierHash,
+                inventoryTimeSha256 = hash,
+                aliases,
+                embedInteropTypes = embed,
+            });
+        }
+        var compilation = CSharpCompilation.Create("D1SourceInventory_" + subject, trees, references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: nullableOptions));
+        var files = new List<object>();
+        foreach (var tree in trees)
+        {
+            var model = compilation.GetSemanticModel(tree);
+            var syntax = tree.GetRoot();
+            var declarations = new List<object>();
+            foreach (var node in syntax.DescendantNodes())
+            {
+                ISymbol? symbol = node switch
+                {
+                    BaseTypeDeclarationSyntax declaration => model.GetDeclaredSymbol(declaration),
+                    MethodDeclarationSyntax declaration => model.GetDeclaredSymbol(declaration),
+                    PropertyDeclarationSyntax declaration => model.GetDeclaredSymbol(declaration),
+                    ParameterSyntax declaration => model.GetDeclaredSymbol(declaration),
+                    VariableDeclaratorSyntax declaration => model.GetDeclaredSymbol(declaration),
+                    _ => null,
+                };
+                if (symbol is null)
+                    continue;
+                ITypeSymbol? type = symbol switch
+                {
+                    INamedTypeSymbol named => named,
+                    IMethodSymbol method => method.ReturnType,
+                    IPropertySymbol property => property.Type,
+                    IParameterSymbol parameter => parameter.Type,
+                    IFieldSymbol field => field.Type,
+                    ILocalSymbol local => local.Type,
+                    _ => null,
+                };
+                if (type is null)
+                    continue;
+                var line = tree.GetLineSpan(node.Span).StartLinePosition;
+                declarations.Add(new
+                {
+                    nodeKind = node.Kind().ToString(),
+                    start = node.SpanStart,
+                    length = node.Span.Length,
+                    line = line.Line + 1,
+                    column = line.Character + 1,
+                    declarationId = DocumentationCommentId.CreateDeclarationId(symbol),
+                    symbol = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    name = symbol.Name,
+                    containingType = symbol.ContainingType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    nullableContext = model.GetNullableContext(node.SpanStart).ToString(),
+                    type = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    typeKind = type.TypeKind.ToString(),
+                    typeDeclarationId = DocumentationCommentId.CreateDeclarationId(type),
+                    isReferenceType = type.IsReferenceType,
+                    isNamedNonGenericReference = type is INamedTypeSymbol { IsReferenceType: true, IsGenericType: false },
+                    nullableAnnotation = type.NullableAnnotation.ToString(),
+                    typeSourceLocations = type.Locations.Where(location => location.IsInSource)
+                        .Select(location => new
+                        {
+                            file = location.SourceTree?.FilePath,
+                            start = location.SourceSpan.Start,
+                            length = location.SourceSpan.Length,
+                        }).ToArray(),
+                });
+            }
+            files.Add(new
+            {
+                path = tree.FilePath,
+                sha256 = Hash(File.ReadAllBytes(tree.FilePath)),
+                directives = Directives(syntax, true),
+                declarations,
+            });
+        }
+        contextRows.Add(new
+        {
+            measuredE1Context = context.Clone(),
+            evaluatedNullable = nullable,
+            sourceDeclarationReconstructionOnly = true,
+            completeOriginalBuild = false,
+            limitation = "Candidate source files and the E1 source-reference list are reconstructed. " +
+                "Generated trees and analyzers are not replayed. This is not a baseline build, " +
+                "a Binder private reference profile, or proof of every source expression's runtime behavior. " +
+                "Empty earlier E1 reference hashes remain unavailable; fresh hashes are inventory-time observations.",
+            references = referenceRows,
+            diagnostics = compilation.GetDiagnostics().Select(diagnostic => new
+            {
+                code = diagnostic.Id,
+                severity = diagnostic.Severity.ToString(),
+                message = diagnostic.GetMessage(),
+                file = diagnostic.Location.SourceTree?.FilePath,
+                start = diagnostic.Location.SourceSpan.Start,
+                length = diagnostic.Location.SourceSpan.Length,
+            }).ToArray(),
+            files,
+        });
+    }
+    object? standaloneQuery = null;
+    if (subject == "Serilog")
+    {
+        var workRoot = Path.Combine(evidenceRoot, "current", "e1-run1", "runtime", "calor-roundtrip", "Serilog");
+        var workDirectory = Directory.GetDirectories(workRoot).Single();
+        var project = Path.Combine(workDirectory, "src", "Serilog", "Serilog.csproj");
+        var start = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            WorkingDirectory = workDirectory,
+        };
+        var command = new[] { "msbuild", project, "-nologo", "-getProperty:Nullable", "-p:TargetFramework=net8.0",
+            "-p:Configuration=Debug", "-p:NuGetAudit=false", "-p:TreatWarningsAsErrors=false" };
+        foreach (var argument in command)
+            start.ArgumentList.Add(argument);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start MSBuild");
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        standaloneQuery = new
+        {
+            command = new[] { "dotnet" }.Concat(command).ToArray(),
+            projectSha256 = Hash(File.ReadAllBytes(project)),
+            exitCode = process.ExitCode,
+            stdout = await stdoutTask,
+            stderr = await stderrTask,
+            limitation = "Post-run property evaluation only, no restore/build. Failed E1 parse-context graph remains unavailable.",
+        };
+    }
+    results.Add(new
+    {
+        subject,
+        reportSha256 = Hash(File.ReadAllBytes(reportPath)),
+        originalInputCount = inputs.Length,
+        originalInputHashesMatched = true,
+        contexts = contextRows,
+        unavailableContextFiles = contexts.Length != 0 ? Array.Empty<object>() : inputs.Select(input => (object)new
+        {
+            path = input.GetProperty("Path").GetString(),
+            sha256 = input.GetProperty("Sha256").GetString(),
+            excluded = input.GetProperty("Excluded").GetBoolean(),
+            directives = Directives(CSharpSyntaxTree.ParseText(inputSources[input.GetProperty("Path").GetString()!]).GetRoot(), false),
+            reason = "E1 parse-context graph unavailable; directive text only, active/effective state unobserved.",
+        }).ToArray(),
+        standaloneNullablePropertyQuery = standaloneQuery,
+    });
+}
+await File.WriteAllTextAsync(output, JsonSerializer.Serialize(new
+{
+    schema = "d1-source-declaration-inventory-v1",
+    measuredAtUtc = DateTimeOffset.UtcNow,
+    sourceCommit = "8f9891a1a07f786a76a293017959c3edf28412bf",
+    observations = results,
+}, new JsonSerializerOptions { WriteIndented = true }));
+
+static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+static object[] Directives(SyntaxNode root, bool activeContextObserved) =>
+    root.DescendantTrivia(descendIntoTrivia: true).Select(trivia => trivia.GetStructure())
+        .OfType<NullableDirectiveTriviaSyntax>().Select(directive => (object)new
+        {
+            start = directive.SpanStart,
+            length = directive.Span.Length,
+            text = directive.ToFullString(),
+            active = activeContextObserved ? (bool?)directive.IsActive : null,
+            setting = directive.SettingToken.ValueText,
+            target = directive.TargetToken.ValueText,
+        }).ToArray();

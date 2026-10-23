@@ -1,0 +1,175 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "X-INT-05",
+ "family": "F1",
+ "role": "interaction",
+ "expected": "native-or-preserved",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "003d5aaead30b9e8767ac1c763e86a6515db81a31e955041a2e3c4f30e780733",
+ "result": "passed",
+ "cells": {
+  "cli-default": "passed",
+  "mcp-default": "passed",
+  "analysis-fact-kill": "passed"
+ },
+ "cellEvidence": {
+  "cli-default": "preserved-match",
+  "mcp-default": "preserved-match",
+  "analysis-fact-kill": "LocalFunction_ByReferenceArguments_FollowTheContract, ByReferenceWrite_NeverDischargesAStaleFact and the R-OBL witnesses (S2ObligationStateTests) pass on the candidate"
+ },
+ "judgement": "F1 driver: cli-default preserved-match, cli-passthrough preserved-match, cli-migrate preserved-match, mcp-default preserved-match, mcp-passthroughOnError preserved-match, mcp-passthroughOnError-moduleName preserved-match; F1 driver: cli-default preserved-match, mcp-default preserved-match, analysis-fact-kill LocalFunction_ByReferenceArguments_FollowTheContract, ByReferenceWrite_NeverDischargesAStaleFact and the R-OBL witnesses (S2ObligationStateTests) pass on the candidate",
+ "measurements": [
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f1-943/results.json",
+   "case": "X-INT-05",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "cli-passthrough": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "cli-migrate": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-default": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-passthroughOnError": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-passthroughOnError-moduleName": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence"
+  },
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f1-943/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f1-943/results.json",
+   "case": "X-INT-05",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    },
+    "mcp-default": {
+     "outcome": "preserved-match",
+     "category": "preserved",
+     "driverOutcome": "preserved"
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence"
+  },
+  {
+   "kind": "t1-control",
+   "control": "X-INT-05",
+   "results": "docs/plans/evidence/v0.25-t1-1428/controls-results.json",
+   "regeneratedOnCandidate": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/regen/controls-results.json",
+   "resultsSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "approvedSha256": "4f28f62c803cac8df2e0e07584cc6acd618da1f061327b7f5e834028e6d83318",
+   "surfaces": {
+    "library": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "cli-convert": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "cli-migrate": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-convert": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-convert-passthroughOnError": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-migrate": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    },
+    "mcp-batch": {
+     "outcome": "preserved",
+     "compile": "default",
+     "traceMatches": null
+    }
+   }
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f1-refout-impl.trx.gz",
+     "match": "RefOutImplementationTests",
+     "count": 371,
+     "passed": 371,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f1-refout-impl.trx.gz",
+     "match": "LocalFunction_ByReferenceArguments_FollowTheContract",
+     "count": 4,
+     "passed": 4,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f1-refout-impl.trx.gz",
+     "match": "ByReferenceWrite_NeverDischargesAStaleFact",
+     "count": 5,
+     "passed": 5,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-OBL.trx.gz",
+     "match": "S2ObligationStateTests",
+     "count": 38,
+     "passed": 38,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

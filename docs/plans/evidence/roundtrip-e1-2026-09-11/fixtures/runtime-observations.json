@@ -1,0 +1,22 @@
+{
+  "test": "Evidence_RealConversionRetainsNullableAnalysisResolutionErrorAndSafeControl",
+  "RepositoryRevision": "954aef5f0ec135d96eeac1977bf46649437a343f",
+  "Compiler": {
+    "Path": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/evidence-1399/tests/Calor.RoundTrip.Harness.Tests/bin/Debug/net10.0/calor.dll",
+    "Identity": "calor, Version=0.20.0.0, Culture=neutral, PublicKeyToken=null",
+    "Sha256": "b5d5cd0df014ebee53761a17ffc4547b93b709ab12b4570cb21133376102371e",
+    "InformationalVersion": "0.20.0",
+    "Error": null,
+    "Aliases": [],
+    "Properties": {}
+  },
+  "observations": {
+    "literal": "safe",
+    "nullable-absent": null,
+    "explicit-fallback-absent": "fallback",
+    "nullable-present": "present",
+    "explicit-fallback-present": "present"
+  },
+  "assembly_sha256": "bd532c7145950285a0622a204ea4f8002971fb5529c1aaff035941aaa3de81d7",
+  "migration": "Explicit, manually authored ?? \u0022fallback\u0022; not a converter insertion or activation."
+}

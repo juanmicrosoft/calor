@@ -1,0 +1,51 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Base:pub}
+      §MT{m002:Scale:pub} (i32:x) -> i32
+        §R (* x 1000)
+
+
+    §CL{c003:Derived:pub}
+      §EXT{Base}
+
+      §MT{m004:Pad:pub} (str:s) -> i32
+        §R (+ (len s) 500)
+
+      §CSHARP{
+    public int UseInherited()
+    {
+        int Scale(int x) => x * 2;
+        return Scale(3);
+    }
+      }§/CSHARP
+
+      §CSHARP{
+    public int UseOverload()
+    {
+        int Pad(int n) => n + 1;
+        return Pad(4);
+    }
+      }§/CSHARP
+
+      §CSHARP{
+    public int UseForwardAndDelegate()
+    {
+        int first = Later(5);
+        Func<int, int> f = Later;
+        return first + f(1);
+
+        int Later(int y) => y * 10;
+    }
+      }§/CSHARP
+
+
+    §CL{c008:Probe:pub:stat}
+      §MT{m009:Run:pub:stat} () -> str
+        §E{alloc}
+        §B{d} §NEW{Derived} §/NEW
+        §R (+ (+ (+ (+ (+ (+ (+ (+ §C{d.UseInherited} §/C "|") §C{d.UseOverload} §/C) "|") §C{d.UseForwardAndDelegate} §/C) "|") §C{d.Scale} §A 3 §/C) "|") §C{d.Pad} §A "ab" §/C)
+
+
+

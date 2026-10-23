@@ -1,0 +1,12 @@
+<Project>
+  <Target Name="N5AuditSources" BeforeTargets="AssignTargetPaths">
+    <ItemGroup Condition="'$(MSBuildProjectName)' == 'Calor.Compiler' and '$(N5Baseline)' == 'true'">
+      <Compile Remove="Binding/Binder.cs;Binding/BoundNodes.cs;Binding/Metadata/MetadataBinder.cs" />
+      <Compile Include="$(MSBuildThisFileDirectory)n5-base-Binder.cs;$(MSBuildThisFileDirectory)n5-base-BoundNodes.cs;$(MSBuildThisFileDirectory)n5-base-MetadataBinder.cs" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(MSBuildProjectName)' == 'Calor.Compiler.Tests'">
+      <Compile Remove="Binding/BclMemberAnnotation*.cs" />
+      <Compile Include="$(MSBuildThisFileDirectory)N5CorpusAudit.cs" />
+    </ItemGroup>
+  </Target>
+</Project>

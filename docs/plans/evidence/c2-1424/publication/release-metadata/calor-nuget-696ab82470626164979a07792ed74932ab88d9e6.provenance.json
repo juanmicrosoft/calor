@@ -1,0 +1,1219 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "https://github.com/juanmicrosoft/calor/release-workflow/v1",
+      "externalParameters": {
+        "artifactSet": "calor-nuget-696ab82470626164979a07792ed74932ab88d9e6",
+        "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+        "repository": "https://github.com/juanmicrosoft/calor"
+      },
+      "resolvedDependencies": [
+        {
+          "digest": {
+            "sha256": "dabee41164abf080ae3bc312d80d1d8700ef49fbfc593c8d8fa4f3cdaf7d6551"
+          },
+          "uri": "https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/z3-4.15.7-arm64-glibc-2.38.zip"
+        },
+        {
+          "digest": {
+            "sha256": "1f4aefb345bded8b6cd6a5a92b6bb2e34110b373779bfb38145200ceeb4fa626"
+          },
+          "uri": "https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/z3-4.15.7-arm64-osx-15.7.3.zip"
+        },
+        {
+          "digest": {
+            "sha256": "e6ef5a4f8749c0b3214a1ad72e6c5655bbda2eeebe9177277514df1fa7eed571"
+          },
+          "uri": "https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/z3-4.15.7-arm64-win.zip"
+        },
+        {
+          "digest": {
+            "sha256": "4436ab6381f0b9c68075a267ab13a5f3ad25f7c25f7626dec959c76805c9f2cb"
+          },
+          "uri": "https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/z3-4.15.7-x64-glibc-2.39.zip"
+        },
+        {
+          "digest": {
+            "sha256": "7b01f3987bcdab0d0622c417212ad37e7a486ea233e091a59f646e0118316187"
+          },
+          "uri": "https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/z3-4.15.7-x64-win.zip"
+        },
+        {
+          "digest": {
+            "sha256": "40f7cc9e69b51dd77e9131eeea62cf039b560629b76a2e87f27b15f3009f9d9c"
+          },
+          "uri": "https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/z3-4.15.7-x86-win.zip"
+        },
+        {
+          "digest": {
+            "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/Microsoft.Z3.dll"
+        },
+        {
+          "digest": {
+            "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/libz3-linux-arm64.so"
+        },
+        {
+          "digest": {
+            "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/libz3-linux-x64.so"
+        },
+        {
+          "digest": {
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/libz3-osx-arm64.dylib"
+        },
+        {
+          "digest": {
+            "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/libz3-win-arm64.dll"
+        },
+        {
+          "digest": {
+            "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/libz3-win-x64.dll"
+        },
+        {
+          "digest": {
+            "sha256": "89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9"
+          },
+          "uri": "https://github.com/juanmicrosoft/calor/releases/download/z3-binaries-4.15.7/libz3-win-x86.dll"
+        },
+        {
+          "uri": "pkg:npm/%40alloc/quick-lru@5.2.0"
+        },
+        {
+          "uri": "pkg:npm/%40babel/code-frame@7.28.6"
+        },
+        {
+          "uri": "pkg:npm/%40babel/helper-validator-identifier@7.28.5"
+        },
+        {
+          "uri": "pkg:npm/%40jridgewell/gen-mapping@0.3.13"
+        },
+        {
+          "uri": "pkg:npm/%40jridgewell/resolve-uri@3.1.2"
+        },
+        {
+          "uri": "pkg:npm/%40jridgewell/sourcemap-codec@1.5.5"
+        },
+        {
+          "uri": "pkg:npm/%40jridgewell/trace-mapping@0.3.31"
+        },
+        {
+          "uri": "pkg:npm/%40mdx-js/mdx@3.1.1"
+        },
+        {
+          "uri": "pkg:npm/%40mdx-js/react@3.1.1"
+        },
+        {
+          "uri": "pkg:npm/%40next/env@14.2.35"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-darwin-arm64@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-darwin-x64@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-linux-arm64-gnu@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-linux-arm64-musl@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-linux-x64-gnu@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-linux-x64-musl@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-win32-arm64-msvc@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-win32-ia32-msvc@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/swc-win32-x64-msvc@14.2.33"
+        },
+        {
+          "uri": "pkg:npm/%40next/third-parties@16.1.6"
+        },
+        {
+          "uri": "pkg:npm/%40nodelib/fs.scandir@2.1.5"
+        },
+        {
+          "uri": "pkg:npm/%40nodelib/fs.stat@2.0.5"
+        },
+        {
+          "uri": "pkg:npm/%40nodelib/fs.walk@1.2.8"
+        },
+        {
+          "uri": "pkg:npm/%40playwright/test@1.63.0"
+        },
+        {
+          "uri": "pkg:npm/%40radix-ui/react-compose-refs@1.1.2"
+        },
+        {
+          "uri": "pkg:npm/%40radix-ui/react-slot@1.2.4"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/core@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/engine-javascript@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/engine-oniguruma@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/langs@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/themes@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/types@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/%40shikijs/vscode-textmate@10.0.2"
+        },
+        {
+          "uri": "pkg:npm/%40swc/counter@0.1.3"
+        },
+        {
+          "uri": "pkg:npm/%40swc/helpers@0.5.5"
+        },
+        {
+          "uri": "pkg:npm/%40types/debug@4.1.12"
+        },
+        {
+          "uri": "pkg:npm/%40types/estree-jsx@1.0.5"
+        },
+        {
+          "uri": "pkg:npm/%40types/estree@1.0.8"
+        },
+        {
+          "uri": "pkg:npm/%40types/hast@3.0.4"
+        },
+        {
+          "uri": "pkg:npm/%40types/mdast@4.0.4"
+        },
+        {
+          "uri": "pkg:npm/%40types/mdx@2.0.13"
+        },
+        {
+          "uri": "pkg:npm/%40types/ms@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/%40types/node@20.19.30"
+        },
+        {
+          "uri": "pkg:npm/%40types/prop-types@15.7.15"
+        },
+        {
+          "uri": "pkg:npm/%40types/react-dom@18.3.7"
+        },
+        {
+          "uri": "pkg:npm/%40types/react@18.3.27"
+        },
+        {
+          "uri": "pkg:npm/%40types/unist@2.0.11"
+        },
+        {
+          "uri": "pkg:npm/%40types/unist@3.0.3"
+        },
+        {
+          "uri": "pkg:npm/%40ungap/structured-clone@1.3.0"
+        },
+        {
+          "uri": "pkg:npm/acorn-jsx@5.3.2"
+        },
+        {
+          "uri": "pkg:npm/acorn@8.15.0"
+        },
+        {
+          "uri": "pkg:npm/any-promise@1.3.0"
+        },
+        {
+          "uri": "pkg:npm/anymatch@3.1.3"
+        },
+        {
+          "uri": "pkg:npm/arg@5.0.2"
+        },
+        {
+          "uri": "pkg:npm/argparse@1.0.10"
+        },
+        {
+          "uri": "pkg:npm/astring@1.9.0"
+        },
+        {
+          "uri": "pkg:npm/autoprefixer@10.4.23"
+        },
+        {
+          "uri": "pkg:npm/bail@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/baseline-browser-mapping@2.9.19"
+        },
+        {
+          "uri": "pkg:npm/binary-extensions@2.3.0"
+        },
+        {
+          "uri": "pkg:npm/braces@3.0.3"
+        },
+        {
+          "uri": "pkg:npm/browserslist@4.28.1"
+        },
+        {
+          "uri": "pkg:npm/busboy@1.6.0"
+        },
+        {
+          "uri": "pkg:npm/camelcase-css@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/caniuse-lite@1.0.30001766"
+        },
+        {
+          "uri": "pkg:npm/ccount@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/character-entities-html4@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/character-entities-legacy@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/character-entities@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/character-reference-invalid@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/chokidar@3.6.0"
+        },
+        {
+          "uri": "pkg:npm/class-variance-authority@0.7.1"
+        },
+        {
+          "uri": "pkg:npm/client-only@0.0.1"
+        },
+        {
+          "uri": "pkg:npm/clsx@2.1.1"
+        },
+        {
+          "uri": "pkg:npm/collapse-white-space@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/comma-separated-tokens@2.0.3"
+        },
+        {
+          "uri": "pkg:npm/commander@4.1.1"
+        },
+        {
+          "uri": "pkg:npm/cssesc@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/csstype@3.2.3"
+        },
+        {
+          "uri": "pkg:npm/debug@4.4.3"
+        },
+        {
+          "uri": "pkg:npm/decode-named-character-reference@1.3.0"
+        },
+        {
+          "uri": "pkg:npm/dequal@2.0.3"
+        },
+        {
+          "uri": "pkg:npm/devlop@1.1.0"
+        },
+        {
+          "uri": "pkg:npm/didyoumean@1.2.2"
+        },
+        {
+          "uri": "pkg:npm/dlv@1.1.3"
+        },
+        {
+          "uri": "pkg:npm/electron-to-chromium@1.5.282"
+        },
+        {
+          "uri": "pkg:npm/emoji-regex-xs@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/esast-util-from-estree@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/esast-util-from-js@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/escalade@3.2.0"
+        },
+        {
+          "uri": "pkg:npm/escape-string-regexp@5.0.0"
+        },
+        {
+          "uri": "pkg:npm/esprima@4.0.1"
+        },
+        {
+          "uri": "pkg:npm/estree-util-attach-comments@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/estree-util-build-jsx@3.0.1"
+        },
+        {
+          "uri": "pkg:npm/estree-util-is-identifier-name@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/estree-util-scope@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/estree-util-to-js@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/estree-util-visit@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/estree-walker@3.0.3"
+        },
+        {
+          "uri": "pkg:npm/extend-shallow@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/extend@3.0.2"
+        },
+        {
+          "uri": "pkg:npm/fast-glob@3.3.3"
+        },
+        {
+          "uri": "pkg:npm/fastq@1.20.1"
+        },
+        {
+          "uri": "pkg:npm/fdir@6.5.0"
+        },
+        {
+          "uri": "pkg:npm/fill-range@7.1.1"
+        },
+        {
+          "uri": "pkg:npm/fraction.js@5.3.4"
+        },
+        {
+          "uri": "pkg:npm/fsevents@2.3.3"
+        },
+        {
+          "uri": "pkg:npm/function-bind@1.1.2"
+        },
+        {
+          "uri": "pkg:npm/glob-parent@5.1.2"
+        },
+        {
+          "uri": "pkg:npm/glob-parent@6.0.2"
+        },
+        {
+          "uri": "pkg:npm/graceful-fs@4.2.11"
+        },
+        {
+          "uri": "pkg:npm/gray-matter@4.0.3"
+        },
+        {
+          "uri": "pkg:npm/hasown@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/hast-util-to-estree@3.1.3"
+        },
+        {
+          "uri": "pkg:npm/hast-util-to-html@9.0.5"
+        },
+        {
+          "uri": "pkg:npm/hast-util-to-jsx-runtime@2.3.6"
+        },
+        {
+          "uri": "pkg:npm/hast-util-whitespace@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/html-void-elements@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/inline-style-parser@0.2.7"
+        },
+        {
+          "uri": "pkg:npm/is-alphabetical@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/is-alphanumerical@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/is-binary-path@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/is-core-module@2.16.1"
+        },
+        {
+          "uri": "pkg:npm/is-decimal@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/is-extendable@0.1.1"
+        },
+        {
+          "uri": "pkg:npm/is-extglob@2.1.1"
+        },
+        {
+          "uri": "pkg:npm/is-glob@4.0.3"
+        },
+        {
+          "uri": "pkg:npm/is-hexadecimal@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/is-number@7.0.0"
+        },
+        {
+          "uri": "pkg:npm/is-plain-obj@4.1.0"
+        },
+        {
+          "uri": "pkg:npm/jiti@1.21.7"
+        },
+        {
+          "uri": "pkg:npm/js-tokens@4.0.0"
+        },
+        {
+          "uri": "pkg:npm/js-yaml@3.14.2"
+        },
+        {
+          "uri": "pkg:npm/kind-of@6.0.3"
+        },
+        {
+          "uri": "pkg:npm/lilconfig@3.1.3"
+        },
+        {
+          "uri": "pkg:npm/lines-and-columns@1.2.4"
+        },
+        {
+          "uri": "pkg:npm/longest-streak@3.1.0"
+        },
+        {
+          "uri": "pkg:npm/loose-envify@1.4.0"
+        },
+        {
+          "uri": "pkg:npm/lucide-react@0.460.0"
+        },
+        {
+          "uri": "pkg:npm/markdown-extensions@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/markdown-table@3.0.4"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-find-and-replace@3.0.2"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-from-markdown@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-gfm-autolink-literal@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-gfm-footnote@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-gfm-strikethrough@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-gfm-table@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-gfm-task-list-item@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-gfm@3.1.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-mdx-expression@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-mdx-jsx@3.2.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-mdx@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-mdxjs-esm@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-phrasing@4.1.0"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-to-hast@13.2.1"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-to-markdown@2.1.2"
+        },
+        {
+          "uri": "pkg:npm/mdast-util-to-string@4.0.0"
+        },
+        {
+          "uri": "pkg:npm/merge2@1.4.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-core-commonmark@2.0.3"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm-autolink-literal@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm-footnote@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm-strikethrough@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm-table@2.1.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm-tagfilter@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm-task-list-item@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-gfm@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-mdx-expression@3.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-mdx-jsx@3.0.2"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-mdx-md@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-mdxjs-esm@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-extension-mdxjs@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-factory-destination@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-factory-label@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-factory-mdx-expression@2.0.3"
+        },
+        {
+          "uri": "pkg:npm/micromark-factory-space@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-factory-title@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-factory-whitespace@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-character@2.1.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-chunked@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-classify-character@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-combine-extensions@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-decode-numeric-character-reference@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-decode-string@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-encode@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-events-to-acorn@2.0.3"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-html-tag-name@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-normalize-identifier@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-resolve-all@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-sanitize-uri@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-subtokenize@2.1.0"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-symbol@2.0.1"
+        },
+        {
+          "uri": "pkg:npm/micromark-util-types@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/micromark@4.0.2"
+        },
+        {
+          "uri": "pkg:npm/micromatch@4.0.8"
+        },
+        {
+          "uri": "pkg:npm/ms@2.1.3"
+        },
+        {
+          "uri": "pkg:npm/mz@2.7.0"
+        },
+        {
+          "uri": "pkg:npm/nanoid@3.3.11"
+        },
+        {
+          "uri": "pkg:npm/next-mdx-remote@5.0.0"
+        },
+        {
+          "uri": "pkg:npm/next@14.2.35"
+        },
+        {
+          "uri": "pkg:npm/node-releases@2.0.27"
+        },
+        {
+          "uri": "pkg:npm/normalize-path@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/object-assign@4.1.1"
+        },
+        {
+          "uri": "pkg:npm/object-hash@3.0.0"
+        },
+        {
+          "uri": "pkg:npm/oniguruma-to-es@2.3.0"
+        },
+        {
+          "uri": "pkg:npm/parse-entities@4.0.2"
+        },
+        {
+          "uri": "pkg:npm/path-parse@1.0.7"
+        },
+        {
+          "uri": "pkg:npm/picocolors@1.1.1"
+        },
+        {
+          "uri": "pkg:npm/picomatch@2.3.1"
+        },
+        {
+          "uri": "pkg:npm/picomatch@4.0.3"
+        },
+        {
+          "uri": "pkg:npm/pify@2.3.0"
+        },
+        {
+          "uri": "pkg:npm/pirates@4.0.7"
+        },
+        {
+          "uri": "pkg:npm/playwright-core@1.63.0"
+        },
+        {
+          "uri": "pkg:npm/playwright@1.63.0"
+        },
+        {
+          "uri": "pkg:npm/postcss-import@15.1.0"
+        },
+        {
+          "uri": "pkg:npm/postcss-js@4.1.0"
+        },
+        {
+          "uri": "pkg:npm/postcss-load-config@6.0.1"
+        },
+        {
+          "uri": "pkg:npm/postcss-nested@6.2.0"
+        },
+        {
+          "uri": "pkg:npm/postcss-selector-parser@6.1.2"
+        },
+        {
+          "uri": "pkg:npm/postcss-value-parser@4.2.0"
+        },
+        {
+          "uri": "pkg:npm/postcss@8.4.31"
+        },
+        {
+          "uri": "pkg:npm/postcss@8.5.6"
+        },
+        {
+          "uri": "pkg:npm/property-information@7.1.0"
+        },
+        {
+          "uri": "pkg:npm/queue-microtask@1.2.3"
+        },
+        {
+          "uri": "pkg:npm/react-dom@18.3.1"
+        },
+        {
+          "uri": "pkg:npm/react@18.3.1"
+        },
+        {
+          "uri": "pkg:npm/read-cache@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/readdirp@3.6.0"
+        },
+        {
+          "uri": "pkg:npm/recma-build-jsx@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/recma-jsx@1.0.1"
+        },
+        {
+          "uri": "pkg:npm/recma-parse@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/recma-stringify@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/regex-recursion@5.1.1"
+        },
+        {
+          "uri": "pkg:npm/regex-utilities@2.3.0"
+        },
+        {
+          "uri": "pkg:npm/regex@5.1.1"
+        },
+        {
+          "uri": "pkg:npm/rehype-recma@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/remark-gfm@4.0.1"
+        },
+        {
+          "uri": "pkg:npm/remark-mdx@3.1.1"
+        },
+        {
+          "uri": "pkg:npm/remark-parse@11.0.0"
+        },
+        {
+          "uri": "pkg:npm/remark-rehype@11.1.2"
+        },
+        {
+          "uri": "pkg:npm/remark-stringify@11.0.0"
+        },
+        {
+          "uri": "pkg:npm/resolve@1.22.11"
+        },
+        {
+          "uri": "pkg:npm/reusify@1.1.0"
+        },
+        {
+          "uri": "pkg:npm/run-parallel@1.2.0"
+        },
+        {
+          "uri": "pkg:npm/scheduler@0.23.2"
+        },
+        {
+          "uri": "pkg:npm/section-matter@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/shiki@1.29.2"
+        },
+        {
+          "uri": "pkg:npm/source-map-js@1.2.1"
+        },
+        {
+          "uri": "pkg:npm/source-map@0.7.6"
+        },
+        {
+          "uri": "pkg:npm/space-separated-tokens@2.0.2"
+        },
+        {
+          "uri": "pkg:npm/sprintf-js@1.0.3"
+        },
+        {
+          "uri": "pkg:npm/streamsearch@1.1.0"
+        },
+        {
+          "uri": "pkg:npm/stringify-entities@4.0.4"
+        },
+        {
+          "uri": "pkg:npm/strip-bom-string@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/style-to-js@1.1.21"
+        },
+        {
+          "uri": "pkg:npm/style-to-object@1.0.14"
+        },
+        {
+          "uri": "pkg:npm/styled-jsx@5.1.1"
+        },
+        {
+          "uri": "pkg:npm/sucrase@3.35.1"
+        },
+        {
+          "uri": "pkg:npm/supports-preserve-symlinks-flag@1.0.0"
+        },
+        {
+          "uri": "pkg:npm/tailwind-merge@2.6.0"
+        },
+        {
+          "uri": "pkg:npm/tailwindcss@3.4.19"
+        },
+        {
+          "uri": "pkg:npm/thenify-all@1.6.0"
+        },
+        {
+          "uri": "pkg:npm/thenify@3.3.1"
+        },
+        {
+          "uri": "pkg:npm/third-party-capital@1.0.20"
+        },
+        {
+          "uri": "pkg:npm/tinyglobby@0.2.15"
+        },
+        {
+          "uri": "pkg:npm/to-regex-range@5.0.1"
+        },
+        {
+          "uri": "pkg:npm/trim-lines@3.0.1"
+        },
+        {
+          "uri": "pkg:npm/trough@2.2.0"
+        },
+        {
+          "uri": "pkg:npm/ts-interface-checker@0.1.13"
+        },
+        {
+          "uri": "pkg:npm/tslib@2.8.1"
+        },
+        {
+          "uri": "pkg:npm/typescript@5.9.3"
+        },
+        {
+          "uri": "pkg:npm/undici-types@6.21.0"
+        },
+        {
+          "uri": "pkg:npm/unified@11.0.5"
+        },
+        {
+          "uri": "pkg:npm/unist-util-is@5.2.1"
+        },
+        {
+          "uri": "pkg:npm/unist-util-is@6.0.1"
+        },
+        {
+          "uri": "pkg:npm/unist-util-position-from-estree@2.0.0"
+        },
+        {
+          "uri": "pkg:npm/unist-util-position@5.0.0"
+        },
+        {
+          "uri": "pkg:npm/unist-util-remove@3.1.1"
+        },
+        {
+          "uri": "pkg:npm/unist-util-stringify-position@4.0.0"
+        },
+        {
+          "uri": "pkg:npm/unist-util-visit-parents@5.1.3"
+        },
+        {
+          "uri": "pkg:npm/unist-util-visit-parents@6.0.2"
+        },
+        {
+          "uri": "pkg:npm/unist-util-visit@5.1.0"
+        },
+        {
+          "uri": "pkg:npm/update-browserslist-db@1.2.3"
+        },
+        {
+          "uri": "pkg:npm/util-deprecate@1.0.2"
+        },
+        {
+          "uri": "pkg:npm/vfile-matter@5.0.1"
+        },
+        {
+          "uri": "pkg:npm/vfile-message@4.0.3"
+        },
+        {
+          "uri": "pkg:npm/vfile@6.0.3"
+        },
+        {
+          "uri": "pkg:npm/yaml@2.8.2"
+        },
+        {
+          "uri": "pkg:npm/zwitch@2.0.4"
+        },
+        {
+          "uri": "pkg:nuget/DiffPlex@1.7.2"
+        },
+        {
+          "uri": "pkg:nuget/FSharp.Core@4.2.3"
+        },
+        {
+          "uri": "pkg:nuget/FsCheck.Xunit@2.16.6"
+        },
+        {
+          "uri": "pkg:nuget/FsCheck@2.16.6"
+        },
+        {
+          "uri": "pkg:nuget/MediatR@8.1.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.ApplicationInsights@2.22.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Bcl.AsyncInterfaces@7.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Build.Framework@18.0.2"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Build.Utilities.Core@18.0.2"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeAnalysis.Analyzers@3.3.4"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeAnalysis.Analyzers@5.3.0-2.25625.1"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeAnalysis.CSharp@4.8.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeAnalysis.CSharp@5.3.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeAnalysis.Common@4.8.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeAnalysis.Common@5.3.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.CodeCoverage@17.8.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Configuration.Abstractions@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Configuration.Binder@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Configuration@6.0.1"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.DependencyInjection.Abstractions@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.DependencyInjection@6.0.1"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.FileSystemGlobbing@10.0.3"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Logging.Abstractions@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Logging@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Options.ConfigurationExtensions@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Options@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.Primitives@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.Extensions.TimeProvider.Testing@9.0.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.NET.StringTools@18.0.2"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.NET.Test.Sdk@17.8.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.NETCore.Platforms@1.1.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.TestPlatform.ObjectModel@17.8.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.TestPlatform.TestHost@17.8.0"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.VisualStudio.Threading.Analyzers@17.6.40"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.VisualStudio.Threading@17.6.40"
+        },
+        {
+          "uri": "pkg:nuget/Microsoft.VisualStudio.Validation@17.6.11"
+        },
+        {
+          "uri": "pkg:nuget/NETStandard.Library@1.6.1"
+        },
+        {
+          "uri": "pkg:nuget/NETStandard.Library@2.0.3"
+        },
+        {
+          "uri": "pkg:nuget/Nerdbank.Streams@2.10.69"
+        },
+        {
+          "uri": "pkg:nuget/Newtonsoft.Json@13.0.1"
+        },
+        {
+          "uri": "pkg:nuget/Newtonsoft.Json@13.0.3"
+        },
+        {
+          "uri": "pkg:nuget/NuGet.Frameworks@6.5.0"
+        },
+        {
+          "uri": "pkg:nuget/OmniSharp.Extensions.JsonRpc.Generators@0.19.9"
+        },
+        {
+          "uri": "pkg:nuget/OmniSharp.Extensions.JsonRpc@0.19.9"
+        },
+        {
+          "uri": "pkg:nuget/OmniSharp.Extensions.LanguageProtocol@0.19.9"
+        },
+        {
+          "uri": "pkg:nuget/OmniSharp.Extensions.LanguageServer.Shared@0.19.9"
+        },
+        {
+          "uri": "pkg:nuget/OmniSharp.Extensions.LanguageServer@0.19.9"
+        },
+        {
+          "uri": "pkg:nuget/System.Buffers@4.5.1"
+        },
+        {
+          "uri": "pkg:nuget/System.Collections.Immutable@7.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.CommandLine@2.0.0-beta4.22272.1"
+        },
+        {
+          "uri": "pkg:nuget/System.Configuration.ConfigurationManager@9.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Diagnostics.EventLog@9.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Memory@4.5.5"
+        },
+        {
+          "uri": "pkg:nuget/System.Numerics.Vectors@4.4.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Reactive@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Reflection.Metadata@7.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Runtime.CompilerServices.Unsafe@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Security.Cryptography.ProtectedData@9.0.6"
+        },
+        {
+          "uri": "pkg:nuget/System.Text.Encoding.CodePages@7.0.0"
+        },
+        {
+          "uri": "pkg:nuget/System.Threading.Tasks.Extensions@4.5.4"
+        },
+        {
+          "uri": "pkg:nuget/Ulid@1.3.4"
+        },
+        {
+          "uri": "pkg:nuget/Validation@2.4.18"
+        },
+        {
+          "uri": "pkg:nuget/Xunit.SkippableFact@1.4.13"
+        },
+        {
+          "uri": "pkg:nuget/coverlet.collector@6.0.0"
+        },
+        {
+          "uri": "pkg:nuget/xunit.abstractions@2.0.3"
+        },
+        {
+          "uri": "pkg:nuget/xunit.analyzers@1.16.0"
+        },
+        {
+          "uri": "pkg:nuget/xunit.analyzers@1.6.0"
+        },
+        {
+          "uri": "pkg:nuget/xunit.assert@2.6.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.assert@2.9.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.core@2.6.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.core@2.9.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.extensibility.core@2.6.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.extensibility.core@2.9.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.extensibility.execution@2.6.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.extensibility.execution@2.9.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit.runner.visualstudio@2.5.4"
+        },
+        {
+          "uri": "pkg:nuget/xunit.runner.visualstudio@2.8.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit@2.6.2"
+        },
+        {
+          "uri": "pkg:nuget/xunit@2.9.2"
+        }
+      ]
+    },
+    "runDetails": {
+      "builder": {
+        "id": "https://github.com/juanmicrosoft/calor/actions"
+      },
+      "metadata": {
+        "invocationId": "696ab82470626164979a07792ed74932ab88d9e6"
+      }
+    }
+  },
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "subject": [
+    {
+      "digest": {
+        "sha256": "3b828897426764ebce7a7ec40038fbcb5306742d2db019ac8315a6bc3038101e"
+      },
+      "name": "Calor.Sdk.0.24.0.nupkg",
+      "size": 57981330
+    },
+    {
+      "digest": {
+        "sha256": "7ca79f334f2a83b7a7d53b612e1a2957b96e7203c3d918a90d742e72b0e6910c"
+      },
+      "name": "calor.0.24.0.nupkg",
+      "size": 60298411
+    }
+  ]
+}

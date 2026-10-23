@@ -1,0 +1,65 @@
+{
+ "schema": "v0.25-regeneration/archives/1",
+ "branch": "evidence/v0.25-archives",
+ "commit": "72df8e97848576c0441701c6ea37d7123a6e31c6",
+ "rule": "Maintainer rule 2026-10-19 (as 0.24's 2026-10-08 decision): evidence files over about 1 MB live on the orphan branch evidence/v0.25-archives (never merged), at the same relative paths; this index replaces them here.",
+ "verify": "git fetch origin evidence/v0.25-archives && git show <commit>:<path> | shasum -a 256",
+ "files": {
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-linux-arm64-j1-r1.tar.gz": {
+   "sha256": "3be4121acde3b9a7b8aba7b3ce4ea26092c999be6324ab255e5f875268dfb845",
+   "size": 5004270
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-linux-arm64-j2-r1.tar.gz": {
+   "sha256": "7099ce94e7ae27e1b524c0d9a2930e21f2af67fd1675ac43c5d99225b482254f",
+   "size": 5006069
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-linux-x64-j1-r1.tar.gz": {
+   "sha256": "8bcac082fdaef936a3c75fb173e1e094ddc5fc43ed24e110c7ed1e08c7b0c7b9",
+   "size": 7659448
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-linux-x64-j2-r1.tar.gz": {
+   "sha256": "2e7f4d35e791dd1e936c8ef0937b0458273d8e23d75aced620f9433d5de1619d",
+   "size": 7664401
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-osx-arm64-j1-r1.tar.gz": {
+   "sha256": "39e18c93b5d09afa2042d11efac5571571621fe3bef274916626f4c4b97fb3b2",
+   "size": 5009599
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-osx-arm64-j2-r1.tar.gz": {
+   "sha256": "9b27b4a6db4b5e4f0c2a28dccfccf389083f8fe66804e6c453a31db50bab7c8e",
+   "size": 5007794
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-win-arm64-j1-r1.tar.gz": {
+   "sha256": "eddc761b0f60824f8877ef6b4eaf6707da13479650cfe9c38b3ee6c51620c3bc",
+   "size": 5249816
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-win-arm64-j2-r1.tar.gz": {
+   "sha256": "71037c75cdf1a3fb9374360e2db622311ef1bdf4b015bfeaffc21d72785da821",
+   "size": 5248183
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-win-x64-j1-r1.tar.gz": {
+   "sha256": "be425a4e624caa5bb6b4bf7e64df5d9dc35b6767970103a43aa4bf66c7b5ba49",
+   "size": 5246704
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516185697/attempts-v025-reproof-2-win-x64-j2-r1.tar.gz": {
+   "sha256": "d3f4c55721de480580b64e42f0e08c7032b37db18d847fc49d39b1f8030a3d1f",
+   "size": 5247739
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516188077/quality-ratchet-reports.tar.gz": {
+   "sha256": "9426ef3d7037ecf270a7c348a83bfb4c9ff9141f153559bed8363835435b1a82",
+   "size": 21809351
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/artifacts-39516188077/test-report-compiler.tar.gz": {
+   "sha256": "1a58665b97795d36b6dd52d3c0d7205eccf2a632e2c750d2a4ba66cb36070c86",
+   "size": 3999372
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/logs-39516188077.tar.gz": {
+   "sha256": "38840d9ac18cf288ef21259f41b7fffea49c76290e503e5e4e2f0418609c5131",
+   "size": 16163402
+  },
+  "docs/plans/evidence/v0.25-regeneration/d1d7afde/release-quality/artifacts.tar.gz": {
+   "sha256": "dcc1c4a82cef91318a54f41f367fa1476096217584cbd20bb95dd999ea7bc82d",
+   "size": 33667006
+  }
+ }
+}

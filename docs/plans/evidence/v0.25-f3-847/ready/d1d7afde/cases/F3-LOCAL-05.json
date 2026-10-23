@@ -1,0 +1,80 @@
+{
+ "schema": "calor.v0.25-ready-case-result/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "caseId": "F3-LOCAL-05",
+ "family": "F3",
+ "role": "control",
+ "expected": "preserved",
+ "scopeVersion": "1.5.0",
+ "requirementSha256": "ad59b04b92aad001b40be89434e45578ad3f61e82c54c0d7551ca37604e51cbc",
+ "result": "passed",
+ "cells": {},
+ "cellEvidence": {},
+ "judgement": "F3 driver: cli-default preserved-match@permissive-effects, cli-passthrough preserved-match@permissive-effects, mcp-default preserved-match@permissive-effects, mcp-passthroughOnError preserved-match@permissive-effects, mcp-passthroughOnError-moduleName preserved-match@permissive-effects",
+ "measurements": [
+  {
+   "kind": "driver",
+   "driver": "docs/plans/evidence/v0.25-f3-847/reproduce/reproduce.py",
+   "output": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/drivers/v0.25-f3-847/results.json",
+   "case": "F3-LOCAL-05",
+   "surfaces": {
+    "cli-default": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "cli-passthrough": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "mcp-default": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "mcp-passthroughOnError": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": null
+    },
+    "mcp-passthroughOnError-moduleName": {
+     "outcome": "preserved-match@permissive-effects",
+     "category": "preserved",
+     "driverOutcome": null
+    }
+   },
+   "vsApprovedEvidence": "same behavior on every surface as the family's approved evidence"
+  },
+  {
+   "kind": "tests",
+   "tests": [
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f3-local-conversion.trx.gz",
+     "match": "LocalFunctionConversionTests",
+     "count": 91,
+     "passed": 91,
+     "outcomes": [
+      "Passed"
+     ]
+    },
+    {
+     "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/f3-local-language.trx.gz",
+     "match": "LocalFunctionLanguageTests",
+     "count": 33,
+     "passed": 33,
+     "outcomes": [
+      "Passed"
+     ]
+    }
+   ]
+  }
+ ],
+ "measuredIn": {
+  "clone": "fresh clone at the candidate (<scratch>/c26/m), isolated HOME and CALOR_HOME, corpus submodules at the candidate's gitlinks",
+  "platform": "macOS arm64",
+  "dotnet": "10.0.401 (Homebrew host, as 0.24 C2 regeneration 3's coverage step; see regeneration.md)",
+  "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/"
+ },
+ "independence": "reduced"
+}

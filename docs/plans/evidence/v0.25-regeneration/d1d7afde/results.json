@@ -1,0 +1,458 @@
+{
+ "schema": "v0.25-regeneration/results/1",
+ "candidate": "d1d7afde672691613f7bb34d253e63401ee423ac",
+ "version": "0.25.0",
+ "landing": "8f815f9e660d2d6a56ec50cffcb738f6b531d2df",
+ "scopeVersion": "1.5.0",
+ "statusVocabulary": {
+  "PASSED": "the check's requirement holds on the candidate's own SHA",
+  "BLOCKED": "the requirement does not hold or could not be completed; the exact cause is recorded"
+ },
+ "checks": [
+  {
+   "id": "proof-s2-witnesses",
+   "kind": "proof",
+   "gate": 1413,
+   "status": "PASSED",
+   "evidence": "All 7 S2 repairs' regression witnesses pass on the candidate, one run per class in a fresh clone; the S2 record (closure CLOSED/SUCCESS, every finding dispositioned) validates (DispositionTests 53). No false unconditional proof is unresolved: the S2 closure has no open row, and the verifier-runtime differential regenerates byte-identically to the committed reports in clones A and B (0 mismatches).",
+   "witnesses": {
+    "R-CACHE": [
+     {
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "classes": [
+       "S2CacheLiteralWidthTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-CACHE.trx.gz"
+     }
+    ],
+    "R-IMPL": [
+     {
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "classes": [
+       "S2ImplicationDefinednessTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-IMPL-compiler.trx.gz"
+     },
+     {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "classes": [
+       "S2ImplicationProverDefinednessTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-IMPL-verification.trx.gz"
+     }
+    ],
+    "R-OBL": [
+     {
+      "total": 41,
+      "passed": 41,
+      "failed": 0,
+      "classes": [
+       "S2ObligationStateTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-OBL.trx.gz"
+     }
+    ],
+    "R-TEXT": [
+     {
+      "total": 24,
+      "passed": 24,
+      "failed": 0,
+      "classes": [
+       "S2Z3TextEncodingTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-TEXT.trx.gz"
+     }
+    ],
+    "R-QNT": [
+     {
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "classes": [
+       "S2NestedQuantifierTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-QNT-verification.trx.gz"
+     },
+     {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "classes": [
+       "S2NestedQuantifierChannelTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-QNT-compiler.trx.gz"
+     }
+    ],
+    "R-NUM": [
+     {
+      "total": 25,
+      "passed": 25,
+      "failed": 0,
+      "classes": [
+       "S2NumericRefusalTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-NUM-verification.trx.gz"
+     },
+     {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "classes": [
+       "S2NumericDeterminismTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-NUM-compiler.trx.gz"
+     }
+    ],
+    "R-OBL-RESIDUALS": [
+     {
+      "total": 21,
+      "passed": 21,
+      "failed": 0,
+      "classes": [
+       "S2ObligationResidualTests"
+      ],
+      "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/w-R-OBL-RESIDUALS.trx.gz"
+     }
+    ]
+   },
+   "dispositions": {
+    "total": 53,
+    "passed": 53,
+    "failed": 0,
+    "classes": [
+     "DispositionTests"
+    ],
+    "trx": "docs/plans/evidence/v0.25-regeneration/d1d7afde/measure/tests/s2-dispositions.trx.gz"
+   }
+  },
+  {
+   "id": "provenance-candidate-manifest",
+   "kind": "provenance",
+   "gate": 1423,
+   "status": "PASSED",
+   "evidence": "docs/plans/evidence/v0.25-candidate/candidate-manifest.json is re-frozen for d1d7afde and landed in #1611 (8f815f9e). At the candidate the manifest file is still the first freeze's (the landing replaces it), so V025CandidateManifestTests and ReleaseCandidateInvalidationTests run from a fresh clone of the landing, with the classifier range check on this PR's head: classifier/ (added after the record commit, because a record cannot classify the commit that contains it)."
+  },
+  {
+   "id": "provenance-regeneration",
+   "kind": "provenance",
+   "gate": 1424,
+   "status": "PASSED",
+   "rows": {
+    "release-test-suites": {
+     "status": "PASSED",
+     "evidence": "13 of 13 release-critical projects at the manifest counts: 11 in test.yml run 39516188077 (ubuntu; failed 0; not-executed equal to expectedSkipped) and Ids 394 / Performance 26 in clones A and B.",
+     "totals": [
+      {
+       "project": "Calor.Compiler.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 14696,
+       "expectedSkipped": 3,
+       "ci": {
+        "total": 14696,
+        "executed": 14693,
+        "passed": 14693,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-compiler/compiler-1.trx",
+        "test-39516188077/test-report-compiler/compiler-2.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Conversion.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 475,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 475,
+        "executed": 475,
+        "passed": 475,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-conversion/conversion.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Enforcement.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 695,
+       "expectedSkipped": 1,
+       "ci": {
+        "total": 695,
+        "executed": 694,
+        "passed": 694,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-enforcement/enforcement.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Evaluation",
+       "releaseCritical": true,
+       "expectedTotal": 235,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 235,
+        "executed": 235,
+        "passed": 235,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-evaluation/evaluation.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Experimental.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 25,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 25,
+        "executed": 25,
+        "passed": 25,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-experimental/experimental.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Ids.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 394,
+       "expectedSkipped": 0,
+       "ci": null,
+       "trx": null,
+       "matches": false
+      },
+      {
+       "project": "Calor.ILAnalysis.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 46,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 46,
+        "executed": 46,
+        "passed": 46,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-il-analysis/il-analysis.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.LanguageServer.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 532,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 532,
+        "executed": 532,
+        "passed": 532,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-language-server/language-server.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Performance.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 26,
+       "expectedSkipped": 0,
+       "ci": null,
+       "trx": null,
+       "matches": false
+      },
+      {
+       "project": "Calor.RoundTrip.Harness.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 295,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 295,
+        "executed": 295,
+        "passed": 295,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-roundtrip-harness/roundtrip-harness.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Semantics.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 55,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 55,
+        "executed": 55,
+        "passed": 55,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-semantics/semantics.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Tasks.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 134,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 134,
+        "executed": 134,
+        "passed": 134,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-tasks/tasks.trx"
+       ],
+       "matches": true
+      },
+      {
+       "project": "Calor.Verification.Tests",
+       "releaseCritical": true,
+       "expectedTotal": 473,
+       "expectedSkipped": 0,
+       "ci": {
+        "total": 473,
+        "executed": 473,
+        "passed": 473,
+        "failed": 0,
+        "notExecuted": 0
+       },
+       "trx": [
+        "test-39516188077/test-report-verification/verification.trx"
+       ],
+       "matches": true
+      }
+     ]
+    },
+    "release-quality": {
+     "status": "PASSED",
+     "evidence": "Every release-quality step in a fresh clone (macOS arm64): negative self-tests, manifest/skip/assertion/sample-ID checks, coverage, mutation, performance (median: 13.549s (maximum 24.000s)), flake 100/100, round trip, scorecard. The coverage step used Homebrew's dotnet host.",
+     "record": "docs/plans/evidence/v0.25-regeneration/d1d7afde/release-quality/steps.txt"
+    },
+    "tier1": {
+     "status": "PASSED",
+     "evidence": "test.yml verify-phase1 succeeded on the candidate; tier1-verification artifact retained."
+    },
+    "tier2": {
+     "status": "PASSED",
+     "evidence": "428 passed / 51 expected-negative / 30 known-failure, 0 failed, 0 unexpected-pass, 0 unclassified, on ubuntu (tier2.yml run 39516190367) and macOS (release-quality lane): equal to the registered expectations. The verdict is FAIL by registered design (the 30 known failures).",
+     "files": [
+      "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/tier2-fixtures-39516190367.json",
+      "docs/plans/evidence/v0.25-regeneration/d1d7afde/release-quality/tier2/tier2-fixtures.json"
+     ]
+    },
+    "round-trip": {
+     "status": "PASSED",
+     "evidence": "tools/Calor.RoundTrip.Harness run --all: Synthetic, Synthetic2, MediatR, Serilog, FluentValidation all Pass; roundtrip_delta.py: no regressions vs baseline."
+    },
+    "verifier-runtime-differential": {
+     "status": "PASSED",
+     "evidence": "Regenerated in clones A and B byte-identical to the committed reports and to test.yml's ubuntu oracle step."
+    },
+    "benchmark": {
+     "status": "PASSED",
+     "evidence": "B1 validator (58) and generator (byte-identical to the committed packet) in A and B; the B2 gate passes; headline and stamp index identical in A and B."
+    },
+    "evidence-contract-and-ledgers": {
+     "status": "PASSED",
+     "evidence": "EvidenceContractTests 324, LedgerCommitStampTests 5, ModeledFormsTests 9 in A and B."
+    },
+    "pins": {
+     "status": "PASSED",
+     "evidence": "download-z3.sh verified every archive in every clone; z3-binaries-4.15.7: 7 of 7 assets MATCH; dotnet restore --locked-mode in every clone; submodules at the candidate's gitlinks."
+    },
+    "byte-identical-publication": {
+     "status": "PASSED",
+     "evidence": "Packages (97 entries), release metadata and the website (255 files) are byte-identical across two fresh clones at different paths (A, B) and Linux CI (reproducible-builds run 39516192814, two builds), on Microsoft SDK 10.0.401 with the compiler host on runtime 10.0.12 for the packages and metadata. The website is built by Node and runs no .NET; the CI website job's recorded .NET toolchain is the runner image's (10.0.402 / runtime 10.0.13).",
+     "publication": {
+      "release-notes": {
+       "sha256": "c20087ec6598c2a288a154b712b48f81871ed72acb077ef749d9ea4ca66e2757",
+       "rawSha256": "c20087ec6598c2a288a154b712b48f81871ed72acb077ef749d9ea4ca66e2757"
+      },
+      "nuget-packages": {
+       "files": {
+        "Calor.Sdk.0.25.0.nupkg": "c2260a5b3486d40929bce832fee543bc3ba60d17507de0e0d7ea6588baa539f0",
+        "calor.0.25.0.nupkg": "8acc92c4cd7c74eadca16b9fa2ec70da00d67b5cb20caab8738bb6554749866f"
+       }
+      },
+      "release-metadata": {
+       "files": {
+        "calor-nuget-d1d7afde672691613f7bb34d253e63401ee423ac.provenance.json": "cc5e1af8773a075301df4bd9ff3cdacdcf9934815711ac86ca227a8692f793b8",
+        "calor-nuget-d1d7afde672691613f7bb34d253e63401ee423ac.sbom.spdx.json": "efb88f7638429f2f444f8085a9b1beadc1fbc86877fbf6cfdc1aa9eafac12578"
+       }
+      },
+      "website": {
+       "treeSha256": "92b7d44e77989f83ac585374aa13ad95fb62dc043a0e12d6fe72c9091ef5d99e"
+      },
+      "benchmark-results": {
+       "files": {
+        "website/public/data/benchmark-headline.json": "ee41da6b241cc1644c704ffd304642565c400a16d008a6b175efe49661fe716b",
+        "bench/phase0-agent-native/commit-stamp-index.json": "7257c5429596203c461642bf58ed9cdb5857bb373db2fc59c00a9c09d55fe6df"
+       }
+      }
+     },
+     "dotnetSdkBuild": {
+      "macos-arm64": "sha256:52a28f7492be74775c4df0247515ec207597df76c8f37857d8e79d3070d7e053",
+      "linux-x64": "sha256:a5b223b4a6d67e85e803b56f2fc5fb52b042f2c27a73e872c3c899dd21bd8465"
+     },
+     "dotnetRuntime": {
+      "macos-arm64": "10.0.12",
+      "linux-x64": "10.0.12"
+     }
+    }
+   }
+  },
+  {
+   "id": "provenance-determinism",
+   "kind": "provenance",
+   "gate": 1421,
+   "status": "PASSED",
+   "evidence": "Run 39516185697, protocol 1.7.0, execution v025-reproof-2 (the window's first of 2), on d1d7afde: verdict DETERMINISTIC, complete True. Classes: {'AGREE-FAIL': 0, 'AGREE-PASS': 2304, 'DISAGREE': 0, 'INCOMPLETE': 0}; harness cuts: 0; all four determinism rows RESOLVED. 353 runner-minutes (epoch 750 of 2,100). No second execution: stop after the first DETERMINISTIC one.",
+   "files": [
+    "docs/plans/evidence/v0.25-regeneration/d1d7afde/determinism/result.json",
+    "docs/plans/evidence/v0.25-regeneration/d1d7afde/determinism/attempt-timing.json",
+    "docs/plans/evidence/v0.25-regeneration/d1d7afde/ci/run-39516185697.json"
+   ]
+  },
+  {
+   "id": "release-gate",
+   "kind": "release",
+   "gate": 1410,
+   "status": "PASSED",
+   "evidence": "R2 dry run in a scratch clone (never pushed) against synthetic 0.25 terminal records: see r2-dry-run/."
+  }
+ ],
+ "acceptance": "Every acceptancePreconditions re-proof check passed on the candidate's own SHA."
+}

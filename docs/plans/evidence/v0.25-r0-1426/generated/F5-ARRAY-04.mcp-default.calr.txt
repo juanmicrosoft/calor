@@ -1,0 +1,41 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{str:log:priv:stat} = ""
+
+      §MT{m002:Note:pub:stat} (i32:v) -> i32
+        §ASSIGN log (+ log v)
+        §R v
+
+      §MT{m003:Boom:pub:stat} () -> i32
+        §E{throw,alloc}
+        §TH §NEW{InvalidOperationException} §A "boom" §/NEW
+
+      §MT{m004:Grid:pub:stat} (i32:arr2d005, i32:arr2d006) -> i32[,]
+        §E{alloc}
+        §ARR2D{arr2d005:arr2d006:i32}
+          §ROW §C{Note} §A arr2d005 §/C §C{Note} §A arr2d006 §/C
+        §R arr2d006
+
+      §MT{m007:Run:pub:stat} () -> str
+        §E{throw,alloc}
+        §B{g} §C{Grid} §A 1 §A 2 §/C
+        §B{i32:_hoist000} 50
+        §B{~thrown:str} ""
+        §TR{try008}
+          §B{~_hoist000} §C{Note} 3
+          §B{~_hoist001} §C{Boom}
+          §B{~_hoist002} §C{Note} 4
+          §ARR{xs:i32}
+            _hoist000
+            _hoist001
+            _hoist002
+          §ASSIGN thrown (+ "none" (len xs))
+        §CA{InvalidOperationException:e}
+          §ASSIGN thrown e.Message
+        §R (+ (+ (+ (+ (+ (+ (+ (+ §IDX2D g 0 0 "|") §IDX2D g 0 1) "|") _hoist000) "|") thrown) "|") log)
+
+
+

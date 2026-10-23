@@ -1,0 +1,49 @@
+// 0.25 T1 (#1428) shared control: arrays in conditional branches. Only the selected branch's
+// element initializers may run; an initializer that throws in the selected branch surfaces
+// the exception, and one in the unselected branch must never run.
+using System;
+
+public static class Probe
+{
+    static string log = "";
+
+    static int Tag(string t, int v)
+    {
+        log = log + t;
+        return v;
+    }
+
+    static int Bomb()
+    {
+        log = log + "!";
+        throw new InvalidOperationException("bomb");
+    }
+
+    static int[] Pick(bool left)
+    {
+        return left ? new int[] { Tag("L1", 1), Tag("L2", 2) } : new int[] { Tag("R", 3) };
+    }
+
+    static int First(bool safe)
+    {
+        int[] xs = safe ? new int[] { Tag("s", 5) } : new int[] { Bomb(), Tag("x", 6) };
+        return xs[0];
+    }
+
+    public static string Run()
+    {
+        int[] a = Pick(true);
+        int[] b = Pick(false);
+        int f = First(true);
+        string err = "";
+        try
+        {
+            First(false);
+        }
+        catch (InvalidOperationException e)
+        {
+            err = e.Message;
+        }
+        return a.Length + ":" + a[1] + "|" + b.Length + ":" + b[0] + "|" + f + "|" + err + "|" + log;
+    }
+}

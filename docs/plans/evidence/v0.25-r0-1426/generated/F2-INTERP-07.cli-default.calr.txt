@@ -1,0 +1,18 @@
+§M{m001:F2-INTERP-07:overflow=unchecked}
+  §U{System}
+  §U{System.Globalization}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Run:pub:stat} () -> str
+        §E{alloc,mut}
+        §B{f64:d} 1234.5
+        §ASSIGN CultureInfo.CurrentCulture §NEW{CultureInfo} §A "de-DE" §/NEW
+        §B{str:current} "${d:N1}|${d}"
+        §B{FormattableString:f} "${d:N1}"
+        §B{str:invariant} §C{f.ToString} CultureInfo.InvariantCulture
+        §ASSIGN CultureInfo.CurrentCulture CultureInfo.InvariantCulture
+        §R (+ (+ current "|") invariant)
+
+
+
