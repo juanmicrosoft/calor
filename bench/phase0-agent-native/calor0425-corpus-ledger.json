@@ -38,8 +38,8 @@
         "ReachEffectPass": 33,
         "StopCalor0410": 11,
         "StopCalor0422Or0423": 0,
-        "StopCalor1002": 12,
-        "CompileClean": 10,
+        "StopCalor1002": 11,
+        "CompileClean": 11,
         "StoppedInCliOnlyPass": 0,
         "Calor0425Modules": 3,
         "Calor0425Sites": 3
@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
+  "MeasuredCommit": "216e3fcbd18810b9ee398d969732258c4231a2b1",
   "AggregateDiagnostics": 143,
   "AggregateModulesWithDiagnostics": 52,
   "AggregateModulesEnforced": 275,
@@ -112,7 +112,7 @@
         "Calor0208 MediatR/Pipeline/RequestExceptionProcessorBehavior.cs"
       ],
       "BindFailureMultiCause": 0,
-      "Calor0411Sites": 289,
+      "Calor0411Sites": 290,
       "Calor0411Modules": 11
     },
     {
@@ -266,7 +266,7 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 7867,
+      "Calor0411Sites": 7869,
       "Calor0411Modules": 113
     }
   ]
