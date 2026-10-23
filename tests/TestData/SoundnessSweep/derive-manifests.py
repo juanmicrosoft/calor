@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parents[3]
+ROOT = HERE.parents[2]  # tests/TestData/SoundnessSweep -> repository root (#1584 moved this file)
 TREES = ["src", "src/Calor.Compiler/Verification", "src/Calor.Compiler/Parsing", "src/Calor.Compiler/Binding",
          "src/Calor.Compiler/TypeChecking", "src/Calor.Compiler/CodeGen", "src/Calor.Runtime"]
 WHITELIST_DOC = "docs/verification-modeled-forms.md"

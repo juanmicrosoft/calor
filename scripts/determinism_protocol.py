@@ -178,6 +178,16 @@ def check_gates(protocol, text) -> list[str]:
             cmds = shell_commands(script)
             if gate.get("scriptSha256") != sha256_bytes("\n".join(ln for ln in script.splitlines() if ln.strip()).encode("utf-8")):
                 problems.append(f"{where}: shard script differs from its pinned hash")
+            # #1584 review round 2: the step must run exactly its registered dotnet test commands, and nothing may
+            # end it before the last one, negate a command, or put a test behind a constant or negated condition.
+            tests = [c for _, c in cmds if c.startswith("dotnet test ")]
+            if not gate.get("testCommands") or tests != gate["testCommands"]:
+                problems.append(f"{where}: shard dotnet test commands differ from the registered testCommands")
+            last = max((i for i, (_, c) in enumerate(cmds) if c.startswith("dotnet test ")), default=-1)
+            if any(re.match(r"^(exit|return)(\s+0)?\s*(;|$)", c) or (i < last and re.match(r"^(exit|return)\b", c))
+                   or c.startswith("!") or re.match(r"^(el)?if\s+(!|false\b|true\b|:(\s|;))", c)
+                   or re.match(r"^(while|until)\s+(false|true|:)\b", c) for i, (_, c) in enumerate(cmds)):
+                problems.append(f"{where}: shard script ends early, negates a command, or guards a test with a constant condition")
             masked = any(re.search(r"\|\|\s*(true|:|exit 0)\b|^set \+[a-z]*e", c) and not c.startswith("trap ") for _, c in cmds)
             if not cmds or cmds[0] != (0, "set -euo pipefail") or masked or not any("dotnet test" in c for _, c in cmds):
                 problems.append(f"{where}: shard script lacks set -euo pipefail, runs no dotnet test, or masks a status")
@@ -427,18 +437,28 @@ def vkey(version: str) -> tuple:
     return tuple(int(x) for x in version.split("."))
 
 
+LEGACY_PACKET = "/".join(("docs", "plans", "evidence", "g2-1421"))  # where protected main kept it before #1584
+# The two calor-first-guard steps that ran main's copy of the validator; #1584 retired them on purpose.
+RETIRED_GATES = {(".github/workflows/test.yml", "calor-first-guard", "Fetch main's determinism protocol validator (#1421)"),
+                 (".github/workflows/test.yml", "calor-first-guard", "Validate the determinism protocol with main's validator (#1421)")}
+
+
 def gates_weakened(old_p, protocol) -> bool:
     """D016: every gate on protected main is still registered under the same workflow, job and step, with
-    every earlier step it required, and (for a gate with a pinned script) every command and every script
-    line it had, unchanged. A gate may gain lines; a shard step's scriptSha256 may change (D014 still
-    checks its structure)."""
+    every earlier step it required, every command and script line it had, and (shard steps) every registered
+    dotnet test command. A gate may gain lines; a shard step's scriptSha256 may change, since D014 checks its
+    test commands and structure. The gates #1584 retired (RETIRED_GATES) are not required."""
+    retired = {step for _, _, step in RETIRED_GATES}
     for kind in ("steps", "shardSteps"):
         new = {(g["workflow"], g["job"], g["step"]): g for g in protocol.get("gates", {}).get(kind, [])}
         for old in old_p.get("gates", {}).get(kind, []):
+            if (old["workflow"], old["job"], old["step"]) in RETIRED_GATES:
+                continue
             now = new.get((old["workflow"], old["job"], old["step"]))
-            if now is None or not set(old.get("after", [])) <= set(now.get("after", [])) \
+            if now is None or not set(old.get("after", [])) - retired <= set(now.get("after", [])) \
                     or not set(old.get("commands", [])) <= set(now.get("commands", [])) \
-                    or not set(old.get("script", [])) <= set(now.get("script", [])):
+                    or not set(old.get("script", [])) <= set(now.get("script", [])) \
+                    or not set(old.get("testCommands", [])) <= set(now.get("testCommands", [])):
                 return True
     return False
 
@@ -837,18 +857,22 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
 
 
 def load_baseline(root: Path, ref: str):
-    """(protocol, cases) registered at ref; None only when ref verifiably has no packet."""
+    """(protocol, cases) registered at ref, at this location or, for a ref before #1584, at LEGACY_PACKET;
+    None only when ref verifiably has neither packet."""
     def git(*args):
         return subprocess.run(["git", *args], cwd=root, capture_output=True, check=False)
     if git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").returncode != 0:
         raise SystemExit(f"baseline ref {ref} does not resolve to a commit")
-    present = [git("cat-file", "-e", f"{ref}:{rel}").returncode == 0 for rel in (PROTOCOL, CASES)]
-    if not any(present) and git("ls-tree", "-d", ref, PACKET).stdout == b"":
-        return None
-    if not all(present):
-        raise SystemExit(f"baseline {ref} has a partial packet")
-    old = [json.loads(git("show", f"{ref}:{rel}").stdout) for rel in (PROTOCOL, CASES)]
-    return old[0], old[1]
+    for packet in (PACKET, LEGACY_PACKET):
+        rels = [f"{packet}/{n}" for n in ("protocol.json", "cases.json")]
+        present = [git("cat-file", "-e", f"{ref}:{rel}").returncode == 0 for rel in rels]
+        if not any(present) and git("ls-tree", "-d", ref, packet).stdout == b"":
+            continue
+        if not all(present):
+            raise SystemExit(f"baseline {ref} has a partial packet at {packet}")
+        old = [json.loads(git("show", f"{ref}:{rel}").stdout) for rel in rels]
+        return old[0], old[1]
+    return None
 
 
 def main(argv=None) -> int:

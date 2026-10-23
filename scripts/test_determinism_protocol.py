@@ -245,6 +245,43 @@ class NegativeRegistrationControls(unittest.TestCase):
         # A reviewed shard-script change only moves its pin; D014 still checks the script's structure.
         repinned = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64))
         self.assertNotIn("D016", codes(protocol=repinned, baseline=(PROTOCOL, CASES)))
+        # Review round 2 (#1584): a registered test command dropped from the protocol together with the workflow.
+        dropped = mutate(lambda p: p["gates"]["shardSteps"][0]["testCommands"].pop())
+        self.assertIn("D016", codes(protocol=dropped, baseline=(PROTOCOL, CASES)))
+
+    def test_d014_shard_step_cannot_skip_its_tests_even_when_re_pinned(self) -> None:
+        """Review round 2 (#1584): editing a shard script and re-pinning scriptSha256 to match must still fail
+        when the edit ends the script early, negates or guards a test, or changes a test command."""
+        test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        gate = next(g for g in PROTOCOL["gates"]["shardSteps"] if g["workflow"] == ".github/workflows/test.yml")
+        head = "      - name: Run project tests\n        run: |\n          set -euo pipefail\n"
+        self.assertIn(head, test_yml)
+        test_line = '          dotnet test "${{ matrix.project }}" -c Release \\\n'
+        self.assertIn(test_line, test_yml)
+        for mutated in (test_yml.replace(head, head + "          exit 0\n", 1),
+                        test_yml.replace(head, head + "          exit\n", 1),
+                        test_yml.replace(test_line, "          ! " + test_line[10:], 1),
+                        test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
+                                         'if false; then\n            eval', 1),
+                        test_yml.replace('--filter "$SHARD2_FILTER"', '--filter "$SHARD1_FILTER"', 1)):
+            self.assertNotEqual(test_yml, mutated)
+            step = next(s for s in dp.parse_workflow(mutated)[gate["job"]]["steps"] if s.get("name") == gate["step"])
+            pin = dp.sha256_bytes("\n".join(ln for ln in step["run"].splitlines() if ln.strip()).encode("utf-8"))
+            repinned = mutate(lambda p: next(g for g in p["gates"]["shardSteps"] if g["workflow"] == gate["workflow"]).update(scriptSha256=pin))
+            self.assertIn("D014", codes(protocol=repinned, texts={".github/workflows/test.yml": mutated}))
+        # The committed scripts pass, including the step's trailing `exit 1` after the last test.
+        self.assertEqual(set(), codes())
+
+    def test_d016_compares_with_the_packet_at_its_pre_1584_location(self) -> None:
+        """Review round 2 (#1584): a baseline from before the move is read from its old location, not skipped."""
+        legacy = "d89ffcbc840d4c1d90ee8dd3b445a5021b559eb4"
+        if dr.git("cat-file", "-e", f"{legacy}^{{commit}}").returncode != 0:
+            self.skipTest("the pre-#1584 commit is not in this clone")
+        baseline = dp.load_baseline(ROOT, legacy)
+        self.assertIsNotNone(baseline)
+        self.assertEqual("1.7.0", baseline[0]["protocolVersion"])
+        self.assertEqual(set(), codes(baseline=baseline))  # the retired main's-validator gates are allowed to go
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["determinismRows"].pop()), baseline=baseline))
         # #1584: a reviewed change that weakens nothing needs no amendment entry.
         reworded = mutate(lambda p: p["limitations"].append("an added limitation"))
         self.assertEqual(set(), codes(protocol=reworded, baseline=(PROTOCOL, CASES)))

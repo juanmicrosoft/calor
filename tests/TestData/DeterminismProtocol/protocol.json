@@ -564,7 +564,7 @@
     "rule": "The recorder and the CaseResult schema are reviewed with the protocol (#1584 removed their D015 hash freeze); the three call sites (DifferentialGate.Run, CommittedReportsMatchGeneratedOracle, TranslatorOutputMatchesCommittedBaseline) must stay (D014), and the decider rejects any record made under other protocol or harness bytes within a run."
   },
   "gates": {
-    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e. A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing a gate step is a weakening that D016 reports against protected main. A shard step's script is pinned by the SHA-256 of its non-blank lines (scriptSha256); a reviewed change to it updates the pin. Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
+    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e. A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing a gate step is a weakening that D016 reports against protected main. A shard step's script is pinned by the SHA-256 of its non-blank lines (scriptSha256); a reviewed change to it updates the pin. Its dotnet test commands must equal testCommands exactly, and nothing may end the script before the last one (exit or return), negate a command, or put a test behind a constant or negated condition. D016 requires every gate, prerequisite, command, script line and test command on protected main to remain (#1584 retired the two main's-validator steps). Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
     "steps": [
       {
         "workflow": ".github/workflows/test.yml",
@@ -608,7 +608,12 @@
         "after": [
           "Bootstrap verified Z3 assets"
         ],
-        "scriptSha256": "b2e788239d12b5dcd672635e4d08ed21ad657e56ffcf57be16ca8536fcd5d92c"
+        "scriptSha256": "b2e788239d12b5dcd672635e4d08ed21ad657e56ffcf57be16ca8536fcd5d92c",
+        "testCommands": [
+          "dotnet test \"${{ matrix.project }}\" -c Release --no-build  --filter \"$SHARD1_FILTER\"  --logger \"trx;LogFileName=${{ matrix.name }}-1.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee test-output.log",
+          "dotnet test \"${{ matrix.project }}\" -c Release --no-build  --filter \"$SHARD2_FILTER\"  --logger \"trx;LogFileName=${{ matrix.name }}-2.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
+          "dotnet test \"${{ matrix.project }}\" -c Release  --logger \"trx;LogFileName=${{ matrix.name }}.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee test-output.log"
+        ]
       },
       {
         "workflow": ".github/workflows/publish-nuget.yml",
@@ -617,7 +622,11 @@
         "after": [
           "Build"
         ],
-        "scriptSha256": "43af29422549f0b21c15e9ca0b7372795c2e7208bc868e4732249052a5be301e"
+        "scriptSha256": "43af29422549f0b21c15e9ca0b7372795c2e7208bc868e4732249052a5be301e",
+        "testCommands": [
+          "dotnet test \"${{ matrix.project }}\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=${{ matrix.name }}-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
+          "dotnet test \"${{ matrix.project }}\" -c Release  --logger \"trx;LogFileName=${{ matrix.name }}.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee test-output.log"
+        ]
       }
     ],
     "alwaysAllowed": [
