@@ -16,6 +16,7 @@ emit the corresponding .NET operations.
 | Trim | `(trim s)` | `s.Trim()` |
 | Search | `(contains s sub)`, `(starts s prefix)`, `(ends s suffix)` | Matching string methods |
 | Index | `(indexof s sub)` | `s.IndexOf(sub)` |
+| Index from | `(indexof s sub start)`, `(indexof s sub start count)` | `s.IndexOf(sub, start)`, `s.IndexOf(sub, start, count)` |
 | Slice | `(substr s start len)` | `s.Substring(start, len)` |
 | Replace | `(replace s old new)` | `s.Replace(old, new)` |
 | Concatenate | `(concat a b)` | `a + b` |
@@ -26,6 +27,15 @@ emit the corresponding .NET operations.
 §B{found:bool} (contains "hello world" "world")
 §B{sub:str} (substr "hello" 1 3)
 ```
+
+## Operand counts
+
+Every built-in operation checks its operand count. Too many or too few operands
+is error `Calor0110`, which names the allowed count. Before 0.27, extra operands
+to `contains`, `starts`, `ends`, `equals`, `indexof` and `str` were accepted and
+silently dropped, so `(indexof s "@" 3)` compiled to `s.IndexOf("@")`. Comparison
+operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) and `**` take exactly two operands;
+`(< a b c)` is `Calor0110` rather than `(a < b) < c`.
 
 ## Comparison Modes
 

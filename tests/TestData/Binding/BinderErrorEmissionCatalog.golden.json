@@ -466,6 +466,32 @@
     "reason": "Effect-row declaration placement is already enforced."
   },
   {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportWriteToReadOnlyLocal::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ReportWriteToReadOnlyLocal",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0213"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1550,
+    "reason": "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportWriteToReadOnlyLocal::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.ReportWriteToReadOnlyLocal",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0213"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1550,
+    "reason": "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1."
+  },
+  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveCall::DiagnosticBag.ReportError#01",
     "member": "Calor.Compiler.Binding.Binder.ResolveCall",
     "sink": "DiagnosticBag.ReportError",

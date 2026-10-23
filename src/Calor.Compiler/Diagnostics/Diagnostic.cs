@@ -102,6 +102,25 @@ public static class DiagnosticCode
     /// </summary>
     public const string BareBindingNextLineInitializer = "Calor0121";
 
+    /// <summary>
+    /// Error (#1607): a declaration's visibility slot holds a word that is not a
+    /// visibility (a typo such as <c>:bogus</c>, or a modifier in the wrong slot).
+    /// It used to compile silently as <c>private</c>. The message lists the valid
+    /// words: <c>pub</c>/<c>public</c>, <c>int</c>/<c>internal</c>,
+    /// <c>prot</c>/<c>pro</c>/<c>protected</c>, <c>priv</c>/<c>pri</c>/<c>private</c>,
+    /// <c>prot-int</c>/<c>protected-internal</c>, <c>priv-prot</c>/<c>private-protected</c>.
+    /// </summary>
+    public const string UnknownVisibility = "Calor0122";
+
+    /// <summary>
+    /// Error (#1635): a two-field immutable binding header <c>§B{W:t}</c> whose first
+    /// field names a type and whose second field does not. A two-field header is read
+    /// name-first unless the first field is a recognizable type spelling, so this header
+    /// declared a variable named <c>W</c> of type <c>t</c>, silently swapping the two.
+    /// Write the name first (<c>§B{t:W}</c>).
+    /// </summary>
+    public const string TypeFirstBindingHeader = "Calor0123";
+
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 
     /// <summary>
@@ -180,6 +199,15 @@ public static class DiagnosticCode
     /// binder before C# generation. (Calor0211 is #847's UnsupportedLocalFunction.)
     /// </summary>
     public const string InvalidByReferenceOperand = "Calor0212";
+
+    /// <summary>
+    /// Error (#1550, D1 RO-LV-1): a write to a local Calor declares read-only — an immutable
+    /// <c>§B</c> binding or a <c>§L</c> loop variable. Every write form is refused: <c>§ASSIGN</c>,
+    /// compound assignment, increment/decrement, a <c>§A{ref}</c>/<c>§A{out}</c> argument, and a
+    /// mutable rebind (<c>§B{~i}</c>) of a loop variable. These used to compile silently because
+    /// the generated C# local is not readonly. Declare the binding mutable (<c>§B{~x}</c>).
+    /// </summary>
+    public const string WriteToReadOnlyLocal = "Calor0213";
 
     // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
@@ -278,6 +306,7 @@ public static class DiagnosticCode
 
     /// <summary>
     /// Error: a mutable rebind targets a symbol that was not declared mutable.
+    /// (Other writes to an immutable binding or loop variable are Calor0213.)
     /// </summary>
     public const string BindReassignsImmutable = "Calor0260";
 

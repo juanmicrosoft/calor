@@ -23,6 +23,7 @@ Calor provides native string manipulation operations that compile directly to ef
 | Starts | `(starts s prefix)` | `s.StartsWith(prefix)` | Check if string starts with prefix |
 | Ends | `(ends s suffix)` | `s.EndsWith(suffix)` | Check if string ends with suffix |
 | IndexOf | `(indexof s sub)` | `s.IndexOf(sub)` | Find index of substring (-1 if not found) |
+| IndexOf from | `(indexof s sub start)`, `(indexof s sub start count)` | `s.IndexOf(sub, start)`, `s.IndexOf(sub, start, count)` | Search from `start`, optionally within `count` characters |
 | Substring | `(substr s start len)` | `s.Substring(start, len)` | Extract substring |
 | Replace | `(replace s old new)` | `s.Replace(old, new)` | Replace all occurrences |
 | Concat | `(concat a b)` | `a + b` | Concatenate strings |
@@ -220,6 +221,15 @@ Calor provides operations for working with individual characters.
 
 ---
 
+## Operand counts
+
+Every built-in operation checks its operand count. Too many or too few operands
+is error `Calor0110`, which names the allowed count. Before 0.27, extra operands
+to `contains`, `starts`, `ends`, `equals`, `indexof` and `str` were accepted and
+silently dropped, so `(indexof s "@" 3)` compiled to `s.IndexOf("@")`. Comparison
+operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) and `**` take exactly two operands;
+`(< a b c)` is `Calor0110` rather than `(a < b) < c`.
+
 ## StringBuilder Operations
 
 For building strings efficiently, Calor provides StringBuilder operations that compile to `System.Text.StringBuilder`.
@@ -228,6 +238,7 @@ For building strings efficiently, Calor provides StringBuilder operations that c
 |:----------|:-------|:--------------|:------------|
 | New | `(sb-new)` | `new StringBuilder()` | Create empty builder |
 | New with init | `(sb-new "text")` | `new StringBuilder("text")` | Create with initial value |
+| New with capacity | `(sb-new 64)`, `(sb-new "text" 64)` | `new StringBuilder(64)`, `new StringBuilder("text", 64)` | Every operand is passed to the constructor |
 | Append | `(sb-append sb text)` | `sb.Append(text)` | Append text |
 | Append Line | `(sb-appendline sb text)` | `sb.AppendLine(text)` | Append text with newline |
 | Insert | `(sb-insert sb index text)` | `sb.Insert(index, text)` | Insert at position |

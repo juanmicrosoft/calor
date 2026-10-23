@@ -376,7 +376,7 @@ public class NewFeatureRoundTripTests
     §I{i32:b}
     §O{i32}
     §R (- a b)
-  §F{f003:Multiply:prv}
+  §F{f003:Multiply:priv}
     §I{i32:a}
     §I{i32:b}
     §O{i32}

@@ -44,7 +44,7 @@ public class CallExpressionImplicitCloseTests
         // §B{x} §C{Identity} INT:1   ← NEW: no §/C
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:i32}
+  §F{f001:Foo:pub}
       §O{i32}
       §B{x} §C{Identity} INT:1
       §R x
@@ -65,7 +65,7 @@ public class CallExpressionImplicitCloseTests
         // §B{x} §C{Identity} INT:1 §/C   ← LEGACY: still accepted
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:i32}
+  §F{f001:Foo:pub}
       §O{i32}
       §B{x} §C{Identity} INT:1 §/C
       §R x
@@ -445,7 +445,7 @@ public class CallExpressionImplicitCloseTests
         // parse cleanly. The closer-elision change must not regress this.
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:i32}
+  §F{f001:Foo:pub}
       §O{i32}
       §B{x} (+ §C{f} §A INT:1 §/C §C{g} §A INT:2 §/C)
       §R x
@@ -1125,7 +1125,7 @@ public class CallExpressionImplicitCloseTests
         // produce (is §C{Foo} str) which re-parses with str as inline arg.
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:bool}
+  §F{f001:Foo:pub}
       §O{bool}
       §B{x} (is §C{Foo} §/C str)
       §R x
@@ -1232,7 +1232,7 @@ public class CallExpressionImplicitCloseTests
         // branch absorbs the member name.
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:i32}
+  §F{f001:Foo:pub}
       §O{i32}
       §B{x} (?. §C{Get} §/C "Length")
       §R x.unwrap

@@ -183,6 +183,22 @@ Functions are the primary code containers.
 | `pub` | Public | `public static` |
 | `pri` | Private to the Calor module | `private static` |
 
+Members of a class (`§MT`, `§FLD`, `§PROP`, `§CTOR`, `§EVT`, and so on) accept the full set
+of C# accessibility levels. Each has a short and a long spelling:
+
+| Short | Long | C# |
+|:------|:-----|:---|
+| `pub` | `public` | `public` |
+| `int` | `internal` | `internal` |
+| `prot`, `pro` | `protected` | `protected` |
+| `priv`, `pri` | `private` | `private` |
+| `prot-int` | `protected-internal` | `protected internal` |
+| `priv-prot` | `private-protected` | `private protected` |
+
+Any other word in a visibility slot is error `Calor0122`, and the message lists the
+words above. Before 0.27 an unknown word, such as the typo `:bogus`, compiled
+silently as `private`.
+
 Namespace scopes do not create separate Calor modules. A module function,
 including a private function, is callable from every `§NS` scope in the same
 `ModuleNode`; overload resolution still uses the declared signatures. Because

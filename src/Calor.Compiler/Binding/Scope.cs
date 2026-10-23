@@ -134,6 +134,8 @@ public static class BindingDiagnosticPolicy
             Active(DiagnosticCode.EffectVariableScope, "Unbound effect-row variables are already enforced."),
             new(DiagnosticCode.InvalidByReferenceOperand, BindingDiagnosticDisposition.CompilationError,
                 "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2.", 943),
+            new(DiagnosticCode.WriteToReadOnlyLocal, BindingDiagnosticDisposition.CompilationError,
+                "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1.", 1550),
             new(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticDisposition.CompilationError,
                 "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation.", 1397),
             Analysis(DiagnosticCode.ExpectedTypeName, "Parser owns the user-facing missing-type error; binder recovery is not a new activation.", 1396),
@@ -1189,6 +1191,20 @@ public sealed class VariableSymbol : Symbol
     internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
     internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
     internal VariableSymbol StorageIdentity { get; set; }
+
+    /// <summary>
+    /// #1550: an immutable <c>§B</c> binding. Calor refuses every write to it
+    /// (<c>§ASSIGN</c>, compound assignment, increment/decrement, <c>ref</c>/<c>out</c>).
+    /// Read through <see cref="StorageIdentity"/> so flow-narrowed copies agree.
+    /// </summary>
+    internal bool IsImmutableBinding { get; set; }
+
+    /// <summary>
+    /// #1550: a <c>§L</c> loop variable. The loop owns its updates, so the body
+    /// may not write it. The symbol stays <see cref="IsMutable"/> because the
+    /// loop itself advances it.
+    /// </summary>
+    internal bool IsLoopVariable { get; set; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the function type this variable

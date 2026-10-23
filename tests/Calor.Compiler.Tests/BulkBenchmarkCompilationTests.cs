@@ -20,7 +20,6 @@ public class BulkBenchmarkCompilationTests
         "TokenEconomics/CelsiusToKelvin.calr",
         "TokenEconomics/AreaOfCircle.calr",
         "TokenEconomics/CompoundInterest.calr",
-        "DataStructures/HashMap.calr",
         "TokenEconomics/TemperatureRange.calr",
         "DesignPatterns/Adapter.calr",
         "DomainProblems/VotingSystem.calr",
@@ -35,6 +34,21 @@ public class BulkBenchmarkCompilationTests
         "OOPGenerics/InterfaceImpl.calr",
         "OOPGenerics/Composition.calr",
         "OOPGenerics/Polymorphism.calr",
+    ];
+
+    /// <summary>
+    /// #1550: benchmarks that assign to an immutable binding. They compiled silently before and
+    /// are now Calor0213. They are registered B1 corpus inputs (#1276, hashed in
+    /// eng/benchmark-publication/b1-1276), so they stay byte for byte; fixing them is a new
+    /// benchmark registration, not part of the language fix.
+    /// </summary>
+    private static readonly HashSet<string> KnownWriteToReadOnlyLocal =
+    [
+        "ComplexAlgorithms/EditDistance.calr",
+        "DataStructures/HashMap.calr",
+        "DomainProblems/DistanceCalculator.calr",
+        "DomainProblems/PasswordValidator.calr",
+        "TokenEconomics/SumRange.calr",
     ];
 
     private readonly ITestOutputHelper _output;
@@ -89,6 +103,18 @@ public class BulkBenchmarkCompilationTests
 
         var result = Program.Compile(source, fullPath, options);
 
+        if (KnownWriteToReadOnlyLocal.Contains(calorFile))
+        {
+            Assert.True(result.HasErrors, $"Known Calor0213 fixture unexpectedly validated: {calorFile}");
+            Assert.All(
+                result.Diagnostics.Where(d => d.IsError),
+                diagnostic => Assert.Equal(
+                    Calor.Compiler.Diagnostics.DiagnosticCode.WriteToReadOnlyLocal,
+                    diagnostic.Code));
+            _output.WriteLine($"KNOWN CALOR0213 [{id}] {category}/{name}");
+            return;
+        }
+
         if (KnownGeneratedCSharpFailures.Contains(calorFile))
         {
             Assert.True(result.HasErrors, $"Known invalid fixture unexpectedly validated: {calorFile}");
@@ -134,6 +160,13 @@ public class BulkBenchmarkCompilationTests
         {
             var calrPath = Path.Combine(benchmarksDir, entry.calorFile);
             var gcsPath = calrPath.Replace(".calr", ".g.cs");
+
+            // #1550: a known Calor0213 benchmark has no fresh output; keep its committed .g.cs.
+            if (KnownWriteToReadOnlyLocal.Contains(entry.calorFile))
+            {
+                skipped++;
+                continue;
+            }
 
             // Skip if .g.cs already exists and is newer than .calr source
             if (File.Exists(gcsPath) && File.GetLastWriteTimeUtc(gcsPath) >= File.GetLastWriteTimeUtc(calrPath))

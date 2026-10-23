@@ -69,6 +69,22 @@ Functions are the primary code containers.
 | `pub` | Public | `public static` |
 | `pri` | Private | `private static` |
 
+Members of a class (`§MT`, `§FLD`, `§PROP`, `§CTOR`, `§EVT`, and so on) accept the full set
+of C# accessibility levels. Each has a short and a long spelling:
+
+| Short | Long | C# |
+|:------|:-----|:---|
+| `pub` | `public` | `public` |
+| `int` | `internal` | `internal` |
+| `prot`, `pro` | `protected` | `protected` |
+| `priv`, `pri` | `private` | `private` |
+| `prot-int` | `protected-internal` | `protected internal` |
+| `priv-prot` | `private-protected` | `private protected` |
+
+Any other word in a visibility slot is error `Calor0122`, and the message lists the
+words above. Before 0.27 an unknown word, such as the typo `:bogus`, compiled
+silently as `private`.
+
 ### Examples
 
 **Simple function:**

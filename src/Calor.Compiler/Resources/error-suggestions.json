@@ -27,10 +27,10 @@
       "title": "indexof Argument Count",
       "matchPatterns": ["indexof", "too many arguments", "3 arg"],
       "matchCodes": ["Calor0110"],
-      "description": "The indexof function only takes 2 arguments (string and search term). Use substr for offset searches.",
-      "wrongExample": "§B{next} (indexof s \"@\" (+ first 1))  // 3 args not supported",
-      "correctExample": "§B{first} (indexof s \"@\")\n§B{rest} (substr s (+ first 1))\n§B{next} (indexof rest \"@\")",
-      "explanation": "indexof only takes 2 arguments. To search from an offset, use substr to create a substring first, then search within it."
+      "description": "indexof takes 2 to 4 operands: (indexof s t), (indexof s t start) or (indexof s t start count). More operands are an error.",
+      "wrongExample": "§B{next} (indexof s \"@\" 1 4 9)  // 5 operands",
+      "correctExample": "§B{first} (indexof s \"@\")\n§B{next} (indexof s \"@\" (+ first 1))",
+      "explanation": "(indexof s t start) emits s.IndexOf(t, start) and (indexof s t start count) emits s.IndexOf(t, start, count); a trailing :ordinal-style keyword adds a StringComparison."
     },
     {
       "id": "variable-redeclaration",

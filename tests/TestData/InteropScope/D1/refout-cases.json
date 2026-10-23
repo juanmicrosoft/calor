@@ -7,6 +7,13 @@
       "allocatedBy": 943,
       "code": "Calor0212",
       "meaning": "A ref, out or in operand that C# cannot pass by reference, or a discard that C# would bind to a declared `_` (RO-LV-2, RO-DECL-2). Reported by the binder before C# generation. #943 sets `code` when it allocates one; expectations then resolve the symbol to that code."
+    },
+    {
+      "symbol": "WriteToReadOnlyLocal",
+      "range": "Calor0200-Calor0299",
+      "allocatedBy": 1550,
+      "code": "Calor0213",
+      "meaning": "A write (`§ASSIGN`, compound assignment, increment/decrement, or a ref/out operand) to an immutable `§B` binding or a `§L` loop variable (RO-LV-1 parity after #1550). Reported by the binder before C# generation."
     }
   ],
   "preludes": {
@@ -501,7 +508,7 @@
       "id": "D1-LV-06",
       "area": "lvalue",
       "shape": "immutable-binding",
-      "polarity": "positive",
+      "polarity": "negative",
       "kind": "calor",
       "rules": [
         "RO-LV-1"
@@ -515,22 +522,22 @@
       ],
       "verify": false,
       "expected": {
-        "outcome": "accepted",
-        "emits": [
-          "Bump(ref v)"
-        ]
+        "outcome": "rejected",
+        "diagnostic": "Calor0213"
       },
       "observed": {
-        "errors": []
+        "errors": [
+          "Calor0213"
+        ]
       },
       "status": "holds",
-      "note": "Parity: `§ASSIGN v 2` on the same immutable binding is accepted at the measured commit (D1-LV-07)."
+      "note": "#1550: an immutable binding is not writable, so `§A{ref} v` is rejected with Calor0213, in parity with `§ASSIGN v 2` (D1-LV-07). Accepted at the D1 measured commit."
     },
     {
       "id": "D1-LV-07",
       "area": "lvalue",
       "shape": "immutable-binding",
-      "polarity": "positive",
+      "polarity": "negative",
       "kind": "calor",
       "rules": [
         "RO-LV-1"
@@ -544,19 +551,22 @@
       ],
       "verify": false,
       "expected": {
-        "outcome": "accepted"
+        "outcome": "rejected",
+        "diagnostic": "Calor0213"
       },
       "observed": {
-        "errors": []
+        "errors": [
+          "Calor0213"
+        ]
       },
       "status": "holds",
-      "note": "Parity control for D1-LV-06."
+      "note": "#1550: parity control for D1-LV-06; `§ASSIGN` to an immutable binding is Calor0213. Accepted at the D1 measured commit."
     },
     {
       "id": "D1-LV-08",
       "area": "lvalue",
       "shape": "loop-variable",
-      "polarity": "positive",
+      "polarity": "negative",
       "kind": "calor",
       "rules": [
         "RO-LV-1"
@@ -569,16 +579,16 @@
       ],
       "verify": false,
       "expected": {
-        "outcome": "accepted",
-        "emits": [
-          "Bump(ref i)"
-        ]
+        "outcome": "rejected",
+        "diagnostic": "Calor0213"
       },
       "observed": {
-        "errors": []
+        "errors": [
+          "Calor0213"
+        ]
       },
       "status": "holds",
-      "note": "Parity: `§ASSIGN i 5` inside the same loop is accepted at the measured commit."
+      "note": "#1550: a §L loop variable is not writable, so `§A{ref} i` is rejected with Calor0213, in parity with `§ASSIGN i 5`. Accepted at the D1 measured commit."
     },
     {
       "id": "D1-LV-09",
