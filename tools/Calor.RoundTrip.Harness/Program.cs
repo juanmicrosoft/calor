@@ -142,7 +142,8 @@ async Task<int> OracleCommand(string[] args)
             config, options, baseline, expected, scope, shardIndex, shardCount, jobs).RunAsync();
         reports.Add(report);
         if (writeExpected && shardCount == 1 && report.Inconclusive is null)
-            expected.Projects[config.ProjectName] = report.Files.Where(f => f.Status == "exercised").Select(f => f.File).Order(StringComparer.Ordinal).ToList();
+            expected.Projects[config.ProjectName] = report.Files.Where(f => f.Status == "exercised").OrderBy(f => f.File, StringComparer.Ordinal)
+                .ToDictionary(f => f.File, Calor.RoundTrip.Harness.Oracle.OracleRunner.Compared);
         var suffix = shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "";
         await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}{suffix}-member-oracle.json"),
             System.Text.Json.JsonSerializer.Serialize(report, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");

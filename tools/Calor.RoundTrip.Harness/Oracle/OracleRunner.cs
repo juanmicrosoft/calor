@@ -47,7 +47,6 @@ public sealed record OracleProjectReport
     public string? TargetFramework { get; init; }
     public string? Inconclusive { get; set; }
     public double WallClockSeconds { get; set; }
-    public int MinimumComparedMembers { get; init; }
     public List<OracleFileReport> Files { get; init; } = [];
 
     /// <summary>failing (a difference with no recorded loss and no matching baseline entry, a file the oracle could not
@@ -88,7 +87,6 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
             Depth = options.Depth,
             Scope = scope,
             Shard = shardCount > 1 ? $"{shardIndex + 1}/{shardCount}" : null,
-            MinimumComparedMembers = config.OracleMinimumComparedMembers,
         };
         var scratch = Directory.CreateTempSubdirectory("calor-oracle-1587-").FullName;
         try
@@ -97,7 +95,7 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
             var workDir = pipeline.PrepareWorkingCopy(config with { WorkingDirectory = Path.Combine(scratch, "work") }, cancellationToken);
             var projectFile = FindProject(workDir);
             Console.WriteLine($"  [{config.ProjectName}] building {Path.GetRelativePath(workDir, projectFile)}");
-            var build = await SubjectBuild.CreateAsync(projectFile, config, cancellationToken);
+            var build = await SubjectBuild.CreateAsync(projectFile, workDir, config, cancellationToken);
             report = report with { TargetFramework = build.TargetFramework };
             // The in-process compile is only a fast swap check and the type-scope source; both arms the oracle runs are
             // real `dotnet build` outputs, so what it compares is exactly what the project builds.
@@ -110,12 +108,14 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
             var originalImage = build.RealOriginalImage();
 
             var libDir = Path.Combine(workDir, config.LibrarySourceRelativePath);
-            var all = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
+            var everyFile = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
                 .Select(Path.GetFullPath)
                 .Where(f => !IsBuildOutput(Path.GetRelativePath(workDir, f)))
                 .Order(StringComparer.Ordinal)
-                .Where((_, i) => i % shardCount == shardIndex)
                 .ToList();
+            // The full inventory (before sharding), so every shard can check that expected files still exist.
+            var inventory = everyFile.Select(f => ReportGenerator.RelativePath(workDir, f)).ToHashSet(StringComparer.Ordinal);
+            var all = everyFile.Where((_, i) => i % shardCount == shardIndex).ToList();
             var trees = build.Trees;
             Console.WriteLine($"  [{config.ProjectName}] {all.Count} file(s), target {build.TargetFramework}, {jobs} job(s), scope {scope}");
 
@@ -166,7 +166,7 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
                 });
             report.Files.AddRange(results);
             ApplyGate(config.ProjectName, baseline, expected, report, all.Select(f => ReportGenerator.RelativePath(workDir, f)).ToHashSet(StringComparer.Ordinal),
-                checkMemberFloor: shardCount == 1);
+                inventory);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -309,16 +309,37 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
 
     // ---- Gate ------------------------------------------------------------------------------------
 
-    /// <summary>File statuses that mean the oracle could not finish or trust a file: the gate fails each one.</summary>
+    /// <summary>
+    /// File statuses the gate fails whatever the conversion recorded: the oracle could not finish or trust the file, or
+    /// a conversion that succeeded produced code that does not compile (Calor to C#, the in-process swap, or the real
+    /// build). Only a conversion the converter itself refused is not a failure.
+    /// </summary>
     public static bool IsFailureStatus(string status) =>
-        status.StartsWith("oracle-", StringComparison.Ordinal) || status.StartsWith("candidate-build-", StringComparison.Ordinal);
+        status.StartsWith("oracle-", StringComparison.Ordinal) || status.StartsWith("candidate-build-", StringComparison.Ordinal)
+        || status is "swap-build-failed" or "calor-compile-failed";
+
+    /// <summary>A failure's identity for baselines: status, checkpoint, and the diagnostic codes and exception types in
+    /// its detail (paths and timings are left out, so the same failure keeps its fingerprint).</summary>
+    internal static string FailureFingerprint(OracleFileReport file)
+    {
+        var detail = file.Detail ?? "";
+        var codes = System.Text.RegularExpressions.Regex.Matches(detail, @"\b(?:CS|MSB|NU|NETSDK|Calor)\d{4}\b").Select(m => m.Value);
+        var exceptions = System.Text.RegularExpressions.Regex.Matches(detail, @"\b[A-Z][A-Za-z0-9]*Exception\b").Select(m => m.Value);
+        var exit = System.Text.RegularExpressions.Regex.Match(detail, @"\bexit -?\d+").Value;
+        return MemberDifferentialOracle.Hash(string.Join("\u0001", [file.Status, file.Checkpoint ?? "", exit,
+            .. codes.Concat(exceptions).Distinct().Order(StringComparer.Ordinal)]));
+    }
+
+    /// <summary>Member comparisons a file made: AGREE, DIFFERENT, and TIMEOUT / NONDETERMINISTIC with a compared prefix.</summary>
+    public static int Compared(OracleFileReport file) => file.Members.Count(m => m.Status is MemberStatus.Agree or MemberStatus.Different
+        || (m.Status is MemberStatus.Timeout or MemberStatus.Nondeterministic && m.Inputs > 0));
 
     /// <summary>
     /// Decides every difference and file failure, checks this shard's baseline entries for staleness, checks that every
     /// file <c>eng/member-oracle-expected.json</c> lists for this shard was exercised, and (unsharded) the member floor.
     /// </summary>
     internal static void ApplyGate(string project, OracleBaseline baseline, OracleExpected expected, OracleProjectReport report,
-        HashSet<string> filesInShard, bool checkMemberFloor = true)
+        HashSet<string> filesInShard, IReadOnlySet<string> inventory)
     {
         var entries = baseline.Entries.Where(e => e.Project == project && filesInShard.Contains(e.File))
             .ToDictionary(e => (e.File, e.Member));
@@ -345,7 +366,7 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         foreach (var file in report.Files)
         {
             if (IsFailureStatus(file.Status))
-                Decide(file, "<file>", MemberDifferentialOracle.Hash($"{file.Status}\u0001{file.Checkpoint}"), $"{file.Status} at {file.Checkpoint ?? "?"}: {file.Detail}", lossTolerated: false);
+                Decide(file, "<file>", FailureFingerprint(file), $"{file.Status} at {file.Checkpoint ?? "?"}: {file.Detail}", lossTolerated: false);
             foreach (var member in file.Members.Where(m => m.Status == MemberStatus.Different))
                 Decide(file, member.Key, member.Fingerprint, member.Witnesses.FirstOrDefault() ?? "", lossTolerated: true);
             foreach (var member in file.Members.Where(m => m.Status == MemberStatus.Inconclusive))
@@ -361,22 +382,29 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         }
         if (report.Inconclusive is not null)
             return;
-        // Coverage by file identity: every file expected to be exercised in this shard must be; new ones are reported.
+        // Coverage by file identity: every expected file of this shard must be exercised with at least 95% of the member
+        // comparisons it made when listed (a slower runner can time a member out before its first input); every expected
+        // file must still exist (checked against the full inventory, so it holds in every shard); new ones are reported.
         var expectedFiles = expected.For(project);
         foreach (var file in report.Files.Where(f => filesInShard.Contains(f.File)))
         {
-            var isExpected = expectedFiles.Contains(file.File);
-            if (isExpected && file.Status != "exercised" && !IsFailureStatus(file.Status))
-                report.Gate.Add(new OracleGateItem(file.File, "<coverage>", "failing",
-                    $"expected to be exercised (eng/member-oracle-expected.json); now {file.Status}: {file.Detail}"));
-            else if (!isExpected && file.Status == "exercised")
+            if (expectedFiles.TryGetValue(file.File, out var listed))
+            {
+                var floor = (int)Math.Floor(listed * 0.95);
+                if (file.Status != "exercised" && !IsFailureStatus(file.Status))
+                    report.Gate.Add(new OracleGateItem(file.File, "<coverage>", "failing",
+                        $"expected to be exercised (eng/member-oracle-expected.json); now {file.Status}: {file.Detail}"));
+                else if (file.Status == "exercised" && Compared(file) < floor)
+                    report.Gate.Add(new OracleGateItem(file.File, "<coverage>", "failing",
+                        $"{Compared(file)} member comparisons, floor {floor} (95% of the {listed} listed in eng/member-oracle-expected.json)"));
+            }
+            else if (file.Status == "exercised")
+            {
                 report.Gate.Add(new OracleGateItem(file.File, "<coverage>", "new-coverage", "exercised but not listed in eng/member-oracle-expected.json; add it"));
+            }
         }
-        foreach (var missing in expectedFiles.Where(f => filesInShard.Contains(f) is false && report.Shard is null))
+        foreach (var missing in expectedFiles.Keys.Where(f => !inventory.Contains(f)))
             report.Gate.Add(new OracleGateItem(missing, "<coverage>", "failing", "listed in eng/member-oracle-expected.json but no longer a library file"));
-        if (checkMemberFloor && report.ComparedMembers < report.MinimumComparedMembers)
-            report.Gate.Add(new OracleGateItem("*", "<coverage>", "failing",
-                $"{report.ComparedMembers} members compared, floor {report.MinimumComparedMembers} (ProjectConfigs.OracleMinimumComparedMembers)"));
     }
 
     public static readonly JsonSerializerOptions Json = new()
@@ -393,7 +421,7 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         sb.AppendLine("## Member differential oracle (#1587)").AppendLine();
         sb.AppendLine($"Inputs `{MemberOracleInputs.GeneratorId}`, state depth {reports.FirstOrDefault()?.Depth ?? StateRenderer.DefaultDepth}, scope `{reports.FirstOrDefault()?.Scope}`. ")
           .AppendLine("A member is compared when its inputs ran on both builds; it is skipped when it could not be driven, disagreed with its own re-run, or ran out of time.").AppendLine();
-        sb.AppendLine("| Project | Verdict | Files exercised | Members compared | Agree | Different | Skipped | Wall clock |");
+        sb.AppendLine("| Project | Verdict | Files exercised | Member comparisons | Agree | Different | Skipped | Wall clock |");
         sb.AppendLine("|---|---|---|---|---|---|---|---|");
         foreach (var r in reports)
         {
@@ -401,7 +429,7 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
             var skipped = totals.Where(kv => kv.Key is not (MemberStatus.Agree or MemberStatus.Different)).Sum(kv => kv.Value);
             var verdict = r.Inconclusive is not null ? "inconclusive" : r.Passed ? "pass" : "FAIL";
             sb.AppendLine($"| {r.Project}{(r.Shard is null ? "" : $" ({r.Shard})")} | {verdict} | {r.ExercisedFiles}/{r.Files.Count} | "
-                + $"{r.ComparedMembers} (floor {r.MinimumComparedMembers}) | {totals.GetValueOrDefault(MemberStatus.Agree)} | {totals.GetValueOrDefault(MemberStatus.Different)} | {skipped} | {r.WallClockSeconds:0}s |");
+                + $"{r.ComparedMembers} | {totals.GetValueOrDefault(MemberStatus.Agree)} | {totals.GetValueOrDefault(MemberStatus.Different)} | {skipped} | {r.WallClockSeconds:0}s |");
         }
         foreach (var r in reports)
         {
@@ -425,17 +453,18 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
     private static string Truncate(string s, int n) => s.Length <= n ? s.Replace("\n", " ") : s[..n].Replace("\n", " ") + "…";
 }
 
-/// <summary>#1587: the files each project must exercise (<c>eng/member-oracle-expected.json</c>), checked by identity.</summary>
+/// <summary>#1587: the files each project must exercise (<c>eng/member-oracle-expected.json</c>), checked by identity, each
+/// with the member comparisons it made when listed.</summary>
 public sealed record OracleExpected
 {
-    public const string Schema = "calor.member-oracle-expected/1";
+    public const string Schema = "calor.member-oracle-expected/2";
 
     [JsonPropertyName("schema")] public string SchemaId { get; init; } = Schema;
 
-    [JsonPropertyName("projects")] public Dictionary<string, List<string>> Projects { get; init; } = [];
+    [JsonPropertyName("projects")] public Dictionary<string, Dictionary<string, int>> Projects { get; init; } = [];
 
-    public IReadOnlySet<string> For(string project) =>
-        Projects.TryGetValue(project, out var files) ? files.ToHashSet(StringComparer.Ordinal) : new HashSet<string>();
+    public IReadOnlyDictionary<string, int> For(string project) =>
+        Projects.TryGetValue(project, out var files) ? files : new Dictionary<string, int>();
 
     public static string DefaultPath(string repoRoot) => Path.Combine(repoRoot, "eng", "member-oracle-expected.json");
 

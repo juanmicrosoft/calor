@@ -2,17 +2,15 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Calor.RoundTrip.Harness.Oracle;
 
 public static partial class MemberDifferentialOracle
 {
-    /// <summary>One member on one run: the observations of the inputs it finished, in input order, and every project
-    /// type's public statics after its last input (null when it did not finish).</summary>
-    private sealed record MemberRun(string[] Observations, int Completed, string? After);
+    /// <summary>One member on one run: the observations of the inputs it finished, in input order.</summary>
+    private sealed record MemberRun(string[] Observations, int Completed);
 
-    private sealed record Execution(string[] Observations, int Completed, bool TimedOut, string? After, double Seconds);
+    private sealed record Execution(string[] Observations, int Completed, bool TimedOut, double TargetSeconds);
 
     /// <summary>Runs every planned member, in plan order, in one fresh load context of one build.</summary>
     private static Dictionary<string, MemberRun> Run(ArmImage arm, string label, List<PlannedMember> plan, OracleOptions options)
@@ -27,16 +25,16 @@ public static partial class MemberDifferentialOracle
             var type = types.GetValueOrDefault(member.Type);
             if (type is null)
             {
-                results[member.Key] = new MemberRun(Enumerable.Repeat("<type missing>", limit).ToArray(), limit, null);
+                results[member.Key] = new MemberRun(Enumerable.Repeat("<type missing>", limit).ToArray(), limit);
                 continue;
             }
-            var run = Execute(type, member, OraclePlanner.Rebind(type, member), 0, limit, options, label, types, snapshotAfter: true);
+            var run = Execute(type, member, OraclePlanner.Rebind(type, member), limit, options, label, types);
             if (run.TimedOut)
             {
                 options.OnTimeout?.Invoke(member.Key, run.Completed);
                 throw new TimeoutRestart(member.Key, run.Completed);
             }
-            results[member.Key] = new MemberRun(run.Observations, run.Completed, run.After);
+            results[member.Key] = new MemberRun(run.Observations, run.Completed);
         }
         return results;
     }
@@ -45,32 +43,38 @@ public static partial class MemberDifferentialOracle
         Math.Min(member.Inputs.Count, options.Limits.TryGetValue(member.Key, out var l) ? l : int.MaxValue);
 
     /// <summary>
-    /// Drives inputs [from, to) of one member on a worker thread with the member's budget, in a private working
-    /// directory with captured console. With <paramref name="snapshotAfter"/>, also renders every project type's public
-    /// statics after the last input, inside the same budget.
+    /// Drives inputs [0, count) of one member on a worker thread with the member's budget, in one private working
+    /// directory with captured console (shared by all its inputs, as each input sees the files earlier ones wrote).
+    /// <paramref name="target"/> is an input index the caller times separately (a probe), calling
+    /// <see cref="OracleOptions.OnProbeInput"/> right before it.
     /// </summary>
-    private static Execution Execute(Type type, PlannedMember member, MemberInfo? info, int from, int to, OracleOptions options,
-        string label, IReadOnlyDictionary<string, Type> types, bool snapshotAfter)
+    private static Execution Execute(Type type, PlannedMember member, MemberInfo? info, int count, OracleOptions options,
+        string label, IReadOnlyDictionary<string, Type> types, int target = -1)
     {
-        var observations = new string[to - from];
+        var observations = new string[count];
         var sandbox = Directory.CreateTempSubdirectory("calor-oracle-1587-");
         var (originalOut, originalErr, originalIn, originalDir) = (Console.Out, Console.Error, Console.In, Environment.CurrentDirectory);
         var abandoned = new StrongBox<bool>(false);
         var done = new StrongBox<int>(0);
-        string? after = null;
+        var targetClock = new Stopwatch();
         var traced = options.TraceMember == member.Key ? options.OnInputStart : null;
         var thread = new Thread(() =>
         {
             try
             {
-                for (var i = from; i < to && !Volatile.Read(ref abandoned.Value); i++)
+                for (var i = 0; i < count && !Volatile.Read(ref abandoned.Value); i++)
                 {
                     traced?.Invoke(label, i);
-                    observations[i - from] = Observe(type, member, info, member.Inputs[i], options.Depth, sandbox.FullName);
-                    Volatile.Write(ref done.Value, i - from + 1);
+                    if (i == target)
+                    {
+                        options.OnProbeInput?.Invoke();
+                        targetClock.Start();
+                    }
+                    observations[i] = Observe(type, member, info, member.Inputs[i], options.Depth, sandbox.FullName, types);
+                    if (i == target)
+                        targetClock.Stop();
+                    Volatile.Write(ref done.Value, i + 1);
                 }
-                if (snapshotAfter && !Volatile.Read(ref abandoned.Value))
-                    after = ProjectStatics(types, options.Depth);
             }
             catch (Exception ex) when (Volatile.Read(ref abandoned.Value))
             {
@@ -78,7 +82,6 @@ public static partial class MemberDifferentialOracle
                 GC.KeepAlive(ex);
             }
         }, 16 * 1024 * 1024) { IsBackground = true, CurrentCulture = CultureInfo.InvariantCulture, CurrentUICulture = CultureInfo.InvariantCulture };
-        var clock = Stopwatch.StartNew();
         var timedOut = false;
         try
         {
@@ -99,36 +102,24 @@ public static partial class MemberDifferentialOracle
             Environment.CurrentDirectory = originalDir;
             try { sandbox.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        return new Execution(observations, Volatile.Read(ref done.Value), timedOut, timedOut ? null : after, clock.Elapsed.TotalSeconds);
-    }
-
-    private static string ProjectStatics(IReadOnlyDictionary<string, Type> types, int depth)
-    {
-        try
-        {
-            return StateRenderer.RenderProjectStatics(types, depth);
-        }
-        catch (Exception ex)
-        {
-            return SetupFailed + "(project statics: " + StateRenderer.Unwrap(ex).GetType().FullName + ")";
-        }
+        return new Execution(observations, Volatile.Read(ref done.Value), timedOut, targetClock.Elapsed.TotalSeconds);
     }
 
     /// <summary>
     /// Replays one member up to input <paramref name="input"/> from clean state on one build: a fresh load context, every
-    /// member before it in plan order with the same limits (and the same after-member snapshots) as the main runs, the
-    /// member's own inputs before <paramref name="input"/>, then that input under the member budget. The plan is the one
-    /// the main runs used (receivers chosen in the original build). A replay that fails before reaching the input is
-    /// <see cref="ProbeOutcome.Infrastructure"/>, never a behavioral observation. A hung input's thread is abandoned, so
-    /// callers that must not leak threads run this in a process they then exit.
+    /// member before it in plan order with the same limits as the main runs, then the member's inputs 0 to
+    /// <paramref name="input"/> in one execution (same sandbox, same budget), exactly as the main run drove them. The
+    /// plan is the one the main runs used (receivers chosen in the original build). A replay that does not reach the
+    /// input is <see cref="ProbeOutcome.Infrastructure"/>, never a behavioral observation. A hung input's thread is
+    /// abandoned, so callers that must not leak threads run this in a process they then exit.
     /// </summary>
     public static ProbeResult Probe(ArmImage original, ArmImage candidate, IReadOnlyCollection<string> typeScope, string memberKey, int input,
         bool onCandidate, OracleOptions options)
     {
         var (_, plan) = SharedPlan(original, candidate, typeScope, options);
         var runnable = plan.Where(m => m.Kind != "hierarchy" && m.SkipReason is null).ToList();
-        var target = runnable.FirstOrDefault(m => m.Key == memberKey);
-        if (target is null || input >= target.Inputs.Count)
+        var targetMember = runnable.FirstOrDefault(m => m.Key == memberKey);
+        if (targetMember is null || input >= targetMember.Inputs.Count)
             return new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<{memberKey} input {input} is not in the plan>");
         using var loaded = (onCandidate ? candidate : original).Load("probe");
         var types = OraclePlanner.UsableTypes(loaded.Assembly);
@@ -136,21 +127,23 @@ public static partial class MemberDifferentialOracle
         {
             if (types.GetValueOrDefault(member.Type) is not { } t)
                 continue;
-            if (Execute(t, member, OraclePlanner.Rebind(t, member), 0, Limit(member, options), options, "probe", types, snapshotAfter: true).TimedOut)
+            if (Execute(t, member, OraclePlanner.Rebind(t, member), Limit(member, options), options, "probe", types).TimedOut)
                 return new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<replay of {member.Key} timed out>");
         }
-        if (types.GetValueOrDefault(target.Type) is not { } type)
+        if (types.GetValueOrDefault(targetMember.Type) is not { } type)
             return new ProbeResult(ProbeOutcome.Infrastructure, 0, "<type missing>");
-        var info = OraclePlanner.Rebind(type, target);
-        if (input > 0 && Execute(type, target, info, 0, input, options, "probe", types, snapshotAfter: false).TimedOut)
-            return new ProbeResult(ProbeOutcome.Infrastructure, 0, "<replay of the earlier inputs timed out>");
-        options.OnProbeInput?.Invoke();
-        var run = Execute(type, target, info, input, input + 1, options, "probe", types, snapshotAfter: false);
-        return run.Completed == 1 ? new ProbeResult(ProbeOutcome.Finished, run.Seconds, run.Observations[0]) : new ProbeResult(ProbeOutcome.Hung, run.Seconds, null);
+        var run = Execute(type, targetMember, OraclePlanner.Rebind(type, targetMember), input + 1, options, "probe", types, target: input);
+        if (run.Completed == input + 1)
+            return new ProbeResult(ProbeOutcome.Finished, run.TargetSeconds, run.Observations[input]);
+        return run.Completed == input
+            ? new ProbeResult(ProbeOutcome.Hung, options.MemberTimeout.TotalSeconds, null)
+            : new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<replay timed out at earlier input {run.Completed}>");
     }
 
-    /// <summary>One invocation on fresh arguments and (for instance members) a fresh receiver.</summary>
-    private static string Observe(Type type, PlannedMember member, MemberInfo? info, object?[] tuple, int depth, string sandbox)
+    /// <summary>One invocation on fresh arguments and (for instance members) a fresh receiver, then every project type's
+    /// public statics, so a change the call made anywhere in the project is part of this input's observation.</summary>
+    private static string Observe(Type type, PlannedMember member, MemberInfo? info, object?[] tuple, int depth, string sandbox,
+        IReadOnlyDictionary<string, Type> types)
     {
         var stdout = new StringWriter(CultureInfo.InvariantCulture);
         Console.SetOut(stdout);
@@ -159,14 +152,15 @@ public static partial class MemberDifferentialOracle
         try
         {
             ObserveInto(sink, type, member, info, tuple, depth);
+            sink.Append(" project=");
+            StateRenderer.AppendProjectStatics(sink, types, depth);
         }
         catch (Exception ex)
         {
             // The oracle failed to observe (not the member): a structured setup failure, never agreement on its own.
             var inner = StateRenderer.Unwrap(ex);
-            var failed = new StateRenderer.Sink();
-            failed.Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {inner.Message})");
-            sink = failed;
+            sink = new StateRenderer.Sink();
+            sink.Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {inner.Message})");
         }
         sink.Append(" stdout=");
         StateRenderer.Append(sink, stdout.ToString(), 0);
@@ -187,7 +181,8 @@ public static partial class MemberDifferentialOracle
                     (n, v) => n + "=" + Convert.ToString(v, CultureInfo.InvariantCulture))));
                 return;
             case "statics":
-                sb.Append("statics=" + StateRenderer.RenderStatics(type, depth));
+                sb.Append("statics=");
+                StateRenderer.AppendStatics(sb, type, depth);
                 return;
             case "construct":
             {
@@ -214,7 +209,8 @@ public static partial class MemberDifferentialOracle
                 // Arguments and static state are observed whether the constructor returned or threw.
                 sb.Append(" args=");
                 StateRenderer.Append(sb, args, depth);
-                sb.Append(" statics=" + StateRenderer.RenderStatics(type, depth));
+                sb.Append(" statics=");
+                StateRenderer.AppendStatics(sb, type, depth);
                 return;
             }
         }
@@ -274,6 +270,7 @@ public static partial class MemberDifferentialOracle
             sb.Append(" this=");
             StateRenderer.Append(sb, receiver, depth);
         }
-        sb.Append(" statics=" + StateRenderer.RenderStatics(type, depth));
+        sb.Append(" statics=");
+        StateRenderer.AppendStatics(sb, type, depth);
     }
 }

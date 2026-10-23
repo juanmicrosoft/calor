@@ -126,9 +126,6 @@ public sealed record RoundTripConfig
     /// <summary>Minimum fraction of all candidate files that must be converted natively with zero losses.</summary>
     public double MinimumNativeFraction { get; init; }
 
-    /// <summary>#1587 member-oracle floor: member comparisons (a member counted once per swapped file) across both builds.</summary>
-    public int OracleMinimumComparedMembers { get; init; }
-
     /// <summary>Conversion options this run uses. Defaults to the historical Lossy leg.</summary>
     public HarnessConversionMode ConversionMode { get; init; } = HarnessConversionMode.Lossy;
 

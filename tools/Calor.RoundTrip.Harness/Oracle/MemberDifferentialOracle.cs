@@ -10,7 +10,7 @@ namespace Calor.RoundTrip.Harness.Oracle;
 /// plans on both and compares what it observes: construction state to <see cref="OracleOptions.Depth"/>;
 /// return value, thrown exception type, argument state after the call (including <c>ref</c>/<c>out</c>),
 /// the receiver's state, the type's public static state, console output and created files; the public
-/// static state of every project type after each member; static state after type initialization; enum
+/// static state of every project type after each input; static state after type initialization; enum
 /// values; and the surface (members, kind, visibility, base chain and interfaces). A member present in only
 /// one build is a difference.
 ///
@@ -129,11 +129,6 @@ public static partial class MemberDifferentialOracle
         var executed = stable.Where(i => !NotEvidence(a1[i], b1[i])).ToList();
         var differing = executed.Where(i => a1[i] != b1[i])
             .Select(i => (Label: MemberOracleInputs.Render(member.Inputs[i]), A: a1[i], B: b1[i])).ToList();
-
-        // Every project type's public statics after the member: a change made to another type shows here.
-        var afterStable = r.All(x => x.After is not null) && r[0].After == r[2].After && r[1].After == r[3].After;
-        if (afterStable && r[0].After != r[1].After && !NotEvidence(r[0].After!, r[1].After!))
-            differing.Add(("<project statics after the member>", r[0].After!, r[1].After!));
         if (differing.Count > 0)
         {
             return verdict with
@@ -144,17 +139,15 @@ public static partial class MemberDifferentialOracle
             };
         }
         var unstable = Enumerable.Range(0, n).Except(stable).ToList();
-        if (unstable.Count > 0 || (r.All(x => x.After is not null) && !afterStable))
+        if (unstable.Count > 0)
         {
-            var u = unstable.Count > 0 ? unstable[0] : -1;
-            var originalUnstable = u >= 0 ? a1[u] != a2[u] : r[0].After != r[2].After;
+            var u = unstable[0];
+            var originalUnstable = a1[u] != a2[u];
             return verdict with
             {
                 Status = MemberStatus.Nondeterministic, Inputs = executed.Count,
-                Reason = $"a build disagreed with its own re-run on {unstable.Count} of {n} inputs{(afterStable ? "" : " (or on project statics after the member)")}; the {executed.Count} stable inputs agree",
-                Witnesses = [u >= 0
-                    ? Witness(member.Member, MemberOracleInputs.Render(member.Inputs[u]), originalUnstable ? a1[u] : b1[u], originalUnstable ? a2[u] : b2[u], "run1", "run2")
-                    : Witness(member.Member, "<project statics after the member>", originalUnstable ? r[0].After! : r[1].After!, originalUnstable ? r[2].After! : r[3].After!, "run1", "run2")],
+                Reason = $"a build disagreed with its own re-run on {unstable.Count} of {n} inputs; the {executed.Count} stable inputs agree",
+                Witnesses = [Witness(member.Member, MemberOracleInputs.Render(member.Inputs[u]), originalUnstable ? a1[u] : b1[u], originalUnstable ? a2[u] : b2[u], "run1", "run2")],
             };
         }
         var notRun = n - executed.Count;
@@ -182,6 +175,10 @@ public static partial class MemberDifferentialOracle
         if (prefix.LimitedAt is not { } k)
             return prefix;
         var (outcome, classified) = Classify(prefix, k, original, converted, options);
+        // A replay that never reached the input is inconclusive even when the prefix already differs: the gate fails it
+        // whatever the conversion recorded.
+        if (classified.Status == MemberStatus.Inconclusive)
+            return classified with { Witnesses = [.. prefix.Witnesses, $"input #{k}: {outcome}"] };
         if (prefix.Status == MemberStatus.Different)
             return prefix with { Fingerprint = Hash(prefix.Fingerprint + "\u0003" + outcome), Witnesses = [.. prefix.Witnesses, $"input #{k}: {outcome}"] };
         return classified;

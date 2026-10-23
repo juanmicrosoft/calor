@@ -42,9 +42,6 @@ public sealed partial class OracleRunner
 
     private sealed record Attempt(string Status, OracleFileReport? Report, string Detail, Checkpoint? At);
 
-    /// <summary>Clean-state replays of the original build, shared by every file of the project (the original never changes).</summary>
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string, int), Task<ProbeResult[]>> _originalProbes = new();
-
     /// <summary>The original compared with itself over every type (any prepared file's stem supplies the plan inputs).</summary>
     private async Task<ChildState> CalibrateAsync(string relative, string specPath, string originalPath, string fileStem, string stem,
         string workDir, CancellationToken cancellationToken)
@@ -64,7 +61,8 @@ public sealed partial class OracleRunner
             var status = attempt.Status == "ok" ? "oracle-error" : attempt.Status.StartsWith("oracle-", StringComparison.Ordinal) ? attempt.Status : "oracle-" + attempt.Status;
             return new OracleFileReport
             {
-                File = relative, Status = status, Detail = attempt.Report?.Detail ?? attempt.Detail, Checkpoint = attempt.At?.ToString(),
+                File = relative, Status = status, Detail = attempt.Report?.Detail ?? attempt.Detail,
+                Checkpoint = (attempt.At ?? ReadCheckpoint(stem + ".progress"))?.ToString(),
                 Restarts = restarts, Seconds = Seconds(clock),
             };
         }
@@ -78,7 +76,8 @@ public sealed partial class OracleRunner
             var v = verdict;
             if (v.LimitedAt is { } k)
             {
-                var original = await _originalProbes.GetOrAdd((v.Key, k), _ => ProbeTwiceAsync(stem, specPath, originalPath, v.Key, k, onCandidate: false, state, workDir, cancellationToken));
+                // Replays use this file's plan, limits and bans: the original's replay is not shared across files.
+                var original = await ProbeTwiceAsync(stem, specPath, originalPath, v.Key, k, onCandidate: false, state, workDir, cancellationToken);
                 var converted = await ProbeTwiceAsync(stem, specPath, originalPath, v.Key, k, onCandidate: true, state, workDir, cancellationToken);
                 v = MemberDifferentialOracle.ClassifyTimeout(v, original, converted, options);
             }

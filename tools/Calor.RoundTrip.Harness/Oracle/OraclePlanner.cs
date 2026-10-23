@@ -27,8 +27,8 @@ internal sealed record PlannedMember(string Type, string Member, string Kind, IR
 /// <item>every public constructor (construction state), and a struct's default value;</item>
 /// <item>every public method, property setter and indexer the type declares, plus public instance methods of its base
 /// types in the same assembly (hidden ones included, overrides once), driven on a fresh receiver per input;</item>
-/// <item>every method of an interface in the same assembly that the type implements explicitly or through a default
-/// implementation, called through the interface on the receiver;</item>
+/// <item>every interface method (from any assembly) the type implements explicitly, and every default implementation
+/// of a subject interface, called through the interface on the receiver;</item>
 /// <item>for interfaces: every member, as surface (driven through implementing types), and static methods.</item>
 /// </list>
 /// Generic types and methods are closed over the first of <see cref="ClosingArguments"/> that meets every constraint.
@@ -171,7 +171,9 @@ internal static class OraclePlanner
         }
         if (!type.IsInterface && !type.IsAbstract)
         {
-            foreach (var iface in type.GetInterfaces().Where(i => i.Assembly == type.Assembly && !i.ContainsGenericParameters))
+            // Interfaces from any assembly: an explicit implementation of an external interface (IDisposable.Dispose) is
+            // subject behavior too. Default implementations come from subject interfaces only.
+            foreach (var iface in type.GetInterfaces().Where(i => !i.ContainsGenericParameters))
             {
                 InterfaceMapping map;
                 try
@@ -185,8 +187,9 @@ internal static class OraclePlanner
                 for (var i = 0; i < map.InterfaceMethods.Length; i++)
                 {
                     var (im, target) = (map.InterfaceMethods[i], map.TargetMethods[i]);
-                    // A public implementation on the type is already driven directly.
-                    if (im.IsStatic || im.Name.Contains('<') || (target.IsPublic && target.DeclaringType != iface))
+                    // A public implementation on the type is already driven directly; only subject code is driven.
+                    if (im.IsStatic || im.Name.Contains('<') || (target.IsPublic && target.DeclaringType != iface)
+                        || target.DeclaringType?.Assembly != type.Assembly)
                         continue;
                     var key = "via " + StateRenderer.TypeName(iface) + "." + MethodKey(iface, im);
                     result.Add((key, im.IsGenericMethodDefinition ? CloseMethod(im) : im, im));

@@ -281,7 +281,9 @@ public class MemberOracleTests
     };
 
     /// <summary>The gate fixtures' file a.cs is expected to be exercised.</summary>
-    private static readonly OracleExpected Expected = new() { Projects = { ["P"] = ["a.cs"] } };
+    private static readonly OracleExpected Expected = new() { Projects = { ["P"] = new() { ["a.cs"] = 1 } } };
+
+    private static readonly HashSet<string> Inventory = ["a.cs", "b.cs"];
 
     private static OracleBaselineEntry Entry(string member, string witness) =>
         new() { Project = "P", File = "a.cs", Member = member, Finding = "finding", Fingerprint = "fp-" + witness, Witness = witness };
@@ -290,7 +292,7 @@ public class MemberOracleTests
     public void Gate_UnlistedDifferenceOnALosslessFile_Fails()
     {
         var report = GateReport(lossRecorded: false);
-        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"], Inventory);
         Assert.False(report.Passed);
         Assert.Equal("failing", Assert.Single(report.Gate).Decision);
     }
@@ -299,7 +301,7 @@ public class MemberOracleTests
     public void Gate_DifferenceOnAFileWithARecordedLoss_IsTolerated()
     {
         var report = GateReport(lossRecorded: true);
-        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"], Inventory);
         Assert.True(report.Passed);
         Assert.Equal("loss-recorded", Assert.Single(report.Gate).Decision);
     }
@@ -308,11 +310,11 @@ public class MemberOracleTests
     public void Gate_BaselinedDifference_PassesOnlyWithTheSameFingerprint()
     {
         var same = GateReport(lossRecorded: false);
-        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, Expected, same, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, Expected, same, ["a.cs"], Inventory);
         Assert.True(same.Passed);
 
         var changed = GateReport(lossRecorded: false, witness: "w2");
-        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, Expected, changed, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::M()", "w1")] }, Expected, changed, ["a.cs"], Inventory);
         Assert.False(changed.Passed);
         Assert.Equal("baseline-changed", Assert.Single(changed.Gate).Decision);
     }
@@ -321,7 +323,7 @@ public class MemberOracleTests
     public void Gate_BaselineEntryForAnAgreeingMember_IsStale()
     {
         var report = GateReport(lossRecorded: true);
-        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::N()", "w")] }, Expected, report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [Entry("T::N()", "w")] }, Expected, report, ["a.cs"], Inventory);
         Assert.False(report.Passed);
         Assert.Contains(report.Gate, g => g.Decision == "baseline-stale" && g.Member == "T::N()");
     }
@@ -335,7 +337,7 @@ public class MemberOracleTests
             Project = "P",
             Files = { new OracleFileReport { File = "a.cs", Status = "oracle-crashed", Checkpoint = "plan", Detail = "exit 134" } },
         };
-        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"], Inventory);
         Assert.False(report.Passed);
         Assert.Contains(report.Gate, g => g is { File: "a.cs", Member: "<file>", Decision: "failing" });
     }
@@ -349,22 +351,55 @@ public class MemberOracleTests
             Project = "P",
             Files =
             {
-                new OracleFileReport { File = "a.cs", Status = "swap-build-failed" },
+                new OracleFileReport { File = "a.cs", Status = "conversion-failed" },
                 new OracleFileReport { File = "b.cs", Status = "exercised" },
             },
         };
-        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs", "b.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs", "b.cs"], Inventory);
         Assert.False(report.Passed);
         Assert.Contains(report.Gate, g => g is { File: "a.cs", Member: "<coverage>", Decision: "failing" });
         Assert.Contains(report.Gate, g => g is { File: "b.cs", Decision: "new-coverage" });
     }
 
     [Fact]
-    public void Gate_TooFewComparedMembers_Fails()
+    public void Gate_TooFewComparisonsInAnExpectedFile_Fails()
     {
-        var report = GateReport(lossRecorded: true) with { MinimumComparedMembers = 5 };
-        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
-        Assert.Contains(report.Gate, g => g.Member == "<coverage>" && g.Decision == "failing");
+        var report = GateReport(lossRecorded: true);
+        var expected = new OracleExpected { Projects = { ["P"] = new() { ["a.cs"] = 10 } } };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), expected, report, ["a.cs"], Inventory);
+        Assert.Contains(report.Gate, g => g is { File: "a.cs", Member: "<coverage>", Decision: "failing" });
+    }
+
+    /// <summary>A shard checks every expected file against the full inventory, so a deleted file is caught in any shard.</summary>
+    [Fact]
+    public void Gate_ExpectedFileMissingFromTheInventory_FailsInEveryShard()
+    {
+        var report = new OracleProjectReport { Project = "P", Shard = "2/2" };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, [], new HashSet<string> { "b.cs" });
+        Assert.Contains(report.Gate, g => g is { File: "a.cs", Member: "<coverage>", Decision: "failing" });
+    }
+
+    /// <summary>A conversion that succeeded but whose C# does not compile fails, listed or not, loss or not.</summary>
+    [Fact]
+    public void Gate_SwapBuildFailure_FailsEvenForANewFile()
+    {
+        var report = new OracleProjectReport
+        {
+            Project = "P",
+            Files = { new OracleFileReport { File = "b.cs", Status = "swap-build-failed", LossRecorded = true, Detail = "error CS0103" } },
+        };
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["b.cs"], Inventory);
+        Assert.Contains(report.Gate, g => g is { File: "b.cs", Member: "<file>", Decision: "failing" });
+    }
+
+    [Fact]
+    public void FailureFingerprint_DependsOnTheDiagnostics()
+    {
+        var a = new OracleFileReport { File = "a.cs", Status = "candidate-build-failed", Detail = "/tmp/x/a.cs(3,1): error CS0103" };
+        var b = a with { Detail = "/tmp/y/a.cs(3,1): error CS0103" };
+        var c = a with { Detail = "/tmp/x/a.cs(3,1): error CS1002" };
+        Assert.Equal(OracleRunner.FailureFingerprint(a), OracleRunner.FailureFingerprint(b));
+        Assert.NotEqual(OracleRunner.FailureFingerprint(a), OracleRunner.FailureFingerprint(c));
     }
 
     [Fact]
@@ -372,7 +407,7 @@ public class MemberOracleTests
     {
         var report = GateReport(lossRecorded: true);
         report.Files[0].Members.Add(new MemberVerdict { Type = "T", Member = "P()", Kind = "static", Status = MemberStatus.Inconclusive, Reason = "replay never reached the input" });
-        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"]);
+        OracleRunner.ApplyGate("P", new OracleBaseline(), Expected, report, ["a.cs"], Inventory);
         Assert.Contains(report.Gate, g => g.Member == "T::P()" && g.Decision == "failing");
     }
 
@@ -530,6 +565,72 @@ public class MemberOracleTests
         var f = Single(verdicts, "static F(System.Boolean)->System.Int32");
         Assert.Equal(MemberStatus.Different, f.Status);
         Assert.Equal("HANG", f.Reason);
+    }
+
+    /// <summary>An infrastructure failure is never absorbed by a prefix that already differs.</summary>
+    [Fact]
+    public void TimeoutClassification_InfrastructureFailureStaysInconclusive()
+    {
+        var prefix = new MemberVerdict { Type = "T", Member = "F()", Kind = "static", Status = MemberStatus.Different, LimitedAt = 3, Fingerprint = "p", Witnesses = ["w"] };
+        var verdict = MemberDifferentialOracle.ClassifyTimeout(prefix, [new(ProbeOutcome.Finished, 0.1, "r"), new(ProbeOutcome.Finished, 0.1, "r")],
+            [new(ProbeOutcome.Infrastructure, 0, "lost"), new(ProbeOutcome.Hung, 4, null)], new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) });
+        Assert.Equal(MemberStatus.Inconclusive, verdict.Status);
+    }
+
+    /// <summary>A replay keeps the files the earlier inputs wrote (one sandbox for the prefix and the input).</summary>
+    [Fact]
+    public void FilesystemDependentHang_IsReplayedInOneSandbox()
+    {
+        const string write = "if (!b) System.IO.File.WriteAllText(\"marker\", \"x\");";
+        var verdicts = Compare(
+            "public static class S { public static int F(bool b) { " + write + " return 1; } }",
+            "public static class S { public static int F(bool b) { " + write + " if (b && System.IO.File.Exists(\"marker\")) System.Threading.Thread.Sleep(4000); return 1; } }",
+            ["S"], timeoutSeconds: 1);
+        var f = Single(verdicts, "static F(System.Boolean)->System.Int32");
+        Assert.Equal(MemberStatus.Different, f.Status);
+        Assert.Equal("HANG", f.Reason);
+    }
+
+    [Fact]
+    public void ExplicitImplementationOfAnExternalInterface_IsDriven()
+    {
+        var verdicts = Compare("public class C : System.IDisposable { public int X; void System.IDisposable.Dispose() { X = 1; } }",
+            "public class C : System.IDisposable { public int X; void System.IDisposable.Dispose() { X = 2; } }", ["C"]);
+        Assert.Contains(verdicts, v => v.Type == "C" && v.Member.StartsWith("via System.IDisposable.Dispose", StringComparison.Ordinal) && v.Status == MemberStatus.Different);
+    }
+
+    /// <summary>Project statics are observed after every input, so a later input cannot erase an earlier difference.</summary>
+    [Fact]
+    public void OtherTypesStatics_AreComparedAfterEveryInput()
+    {
+        const string other = "public static class Other { public static int X; } ";
+        var verdicts = Compare(
+            other + "public static class S { static int calls; public static int F(bool b) { Other.X = calls++ == 0 ? 1 : 0; return 0; } }",
+            other + "public static class S { static int calls; public static int F(bool b) { Other.X = calls++ == 0 ? 2 : 0; return 0; } }", ["Other", "S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F(System.Boolean)->System.Int32").Status);
+    }
+
+    [Fact]
+    public void DelegateSideEffects_AreCompared()
+    {
+        var verdicts = Compare("public static class S { public static System.Action<int[]> F() => a => { if (a != null && a.Length > 0) a[0] = 1; }; }",
+            "public static class S { public static System.Action<int[]> F() => a => { if (a != null && a.Length > 0) a[0] = 2; }; }", ["S"]);
+        Assert.Equal(MemberStatus.Different, Single(verdicts, "static F()->System.Action<System.Int32[]>").Status);
+    }
+
+    /// <summary>Incompleteness inside static state reaches the observation, so it is never counted as agreement.</summary>
+    [Fact]
+    public void IncompleteStaticState_IsNeverAgreement()
+    {
+        const string source = "public static class S { public static System.Func<System.IO.Stream, int> D = s => 1; }";
+        Assert.NotEqual(MemberStatus.Agree, Single(Compare(source, source, ["S"]), "<statics>").Status);
+    }
+
+    [Fact]
+    public void PathMap_MapsEveryWorkingCopyToOneRoot()
+    {
+        Assert.Equal(SubjectBuild.PathMap("/tmp/a/work").Replace("/tmp/a/work/", "R"), SubjectBuild.PathMap("/tmp/b/worker-1").Replace("/tmp/b/worker-1/", "R"));
+        Assert.Contains("/private/var/x/=/_oracle/", SubjectBuild.PathMap("/var/x"), StringComparison.Ordinal);
     }
 
     // ---- Codex round 2 false negatives --------------------------------------------------------

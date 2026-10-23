@@ -175,18 +175,20 @@ for debugging. For each type, it compares:
   `ToString()` is included, which shows text such as a `StringBuilder`'s
   content;
 - methods, property setters and indexers: declared ones, base-type ones from the
-  same assembly (hidden ones included), and interface methods implemented
-  explicitly or by default implementation, called through the interface. It
+  same assembly (hidden ones included), explicit implementations of any
+  interface, and default implementations of subject interfaces, called through
+  the interface. It
   compares the return value, the thrown exception type, argument state after
   the call (including `ref`/`out`), the receiver's state, the type's public
   static state, console output, and files created in a sandbox directory;
-- the public static state of every project type after each member, so a member
+- the public static state of every project type after each input, so a call
   that changes another type's statics is caught;
 - enum values, and the type's static state after initialization.
 
 Instance members run on a fresh receiver for each input, built from a
 constructor and input that actually construct. Tasks are awaited. A returned
-delegate is called on generated inputs, and its captured state is shown. Scalars
+delegate is called on generated inputs; its results, its arguments after the
+call and its captured state are shown. Scalars
 carry their runtime type (`1` versus `1L`). Every character of a rendering is
 hashed. A rendering that cannot be completed is never counted as agreement: one
 over 1,000,000 elements, over 256 MB, or containing a delegate the generator
@@ -215,8 +217,9 @@ to the inputs before the failing one. A per-project calibration run (the origina
 compared with itself) finds these limits once for all files.
 
 The failing input is then replayed from clean state, twice per build, in fresh
-processes. A replay runs the members before it and the member's earlier inputs
-first, so state-dependent failures reproduce:
+processes. A replay runs the members before it, then the member's earlier
+inputs and the failing input in one sandbox, so state-dependent failures
+(including files earlier inputs wrote) reproduce:
 
 - one build fails (hangs or crashes) while the other finishes quickly: `HANG`
   or `CRASH`, a difference;
@@ -230,15 +233,16 @@ first, so state-dependent failures reproduce:
   construct, or `eng/member-oracle-baseline.json` lists the member with the same
   fingerprint. The fingerprint is a hash of every differing input with both full
   observations, plus any replay outcome;
-- a file the oracle could not finish, an inconclusive member, or a swapped file
-  that compiles in-process but not with `dotnet build`;
+- a file the oracle could not finish, an inconclusive member, or a conversion
+  that succeeded but produced C# that does not compile (Calor to C#, the swap,
+  or `dotnet build`);
 - a baseline entry whose fingerprint changed, or whose member now agrees;
 - an inconclusive project;
 - a file listed in `eng/member-oracle-expected.json` that is no longer
-  exercised. Coverage is checked by file identity, so a new file cannot hide a
-  lost one. A newly exercised file is reported; add it with `--write-expected`;
-- fewer member comparisons than the project's floor
-  (`OracleMinimumComparedMembers` in `ProjectConfigs`, unsharded runs).
+  exercised, no longer exists, or makes fewer than 95% of the member
+  comparisons recorded for it. The list is per file, so a new file cannot hide a
+  lost one, and every shard checks it against the full file inventory. A newly
+  exercised file is reported; add it with `--write-expected`.
 
 Files matched by a harness exclude pattern are reported as `excluded`, not
 dropped. Each project writes `<Project>-member-oracle.json`, which lists every
@@ -253,14 +257,14 @@ When it landed (2026-10-22), it exercised 92 of 289 files:
 | Synthetic | 5 of 5 | 41 | 0 |
 | Synthetic2 | 1 of 1 | 10 | 0 |
 | MediatR | 8 of 32 | 78 | 63 |
-| Serilog | 14 of 112 (6 excluded) | 338 | 389 |
-| FluentValidation | 64 of 139 | 462 | 609 |
+| Serilog | 14 of 112 (6 excluded) | 339 | 391 |
+| FluentValidation | 64 of 139 | 466 | 610 |
 
 The other files do not convert with the default options. Most members are
 never compared because no generated input can build their receiver or
 arguments: interfaces, delegates and subject types without a usable
-constructor. Across all file swaps, the oracle made 35,139 member comparisons
-and found no difference. The whole corpus took about 4.5 minutes on a 4-job
+constructor. Across all file swaps, the oracle made 35,409 member comparisons
+and found no difference. The whole corpus took about 6 minutes on a 4-job
 laptop run. `AGREE` means no disagreement on a finite input set, not a proof
 of equivalence.
 

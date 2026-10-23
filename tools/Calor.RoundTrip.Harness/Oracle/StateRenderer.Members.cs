@@ -82,10 +82,10 @@ public static partial class StateRenderer
         return sink.Result();
     }
 
-    /// <summary>The public static state of every given type, in name order: what a member may have changed anywhere in the project.</summary>
-    public static string RenderProjectStatics(IEnumerable<KeyValuePair<string, Type>> types, int depth)
+    /// <summary>The public static state of every given type, in name order: what a call may have changed anywhere in
+    /// the project. Appended straight into the observation, so incompleteness is never lost.</summary>
+    internal static void AppendProjectStatics(Sink sink, IEnumerable<KeyValuePair<string, Type>> types, int depth)
     {
-        var sink = new Sink();
         foreach (var (name, type) in types.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             if (type.IsGenericTypeDefinition || PublicState(type, statics: true).Count == 0)
@@ -94,10 +94,9 @@ public static partial class StateRenderer
             AppendStatics(sink, type, depth);
             sink.Append(';');
         }
-        return sink.Result();
     }
 
-    private static void AppendStatics(Sink sink, Type type, int depth)
+    internal static void AppendStatics(Sink sink, Type type, int depth)
     {
         sink.Append('{');
         var first = true;
@@ -173,6 +172,15 @@ public static partial class StateRenderer
             catch (Exception ex)
             {
                 sb.Append("throw(" + Unwrap(ex).GetType().FullName + ")");
+            }
+            // What the call changed: its arguments (arrays, lists, ref/out) and its targets' state.
+            // The argument array is a container, not a hop: its elements render one level below the delegate.
+            sb.Append(" args=");
+            Append(sb, args, depth);
+            foreach (var d in del.GetInvocationList().Where(d => d.Target is not null))
+            {
+                sb.Append(" target=");
+                Append(sb, d.Target, depth - 1);
             }
             sb.Append("; ");
         }

@@ -63,12 +63,13 @@ public sealed class SubjectBuild
 
     /// <summary>Builds the project once with dotnet (restore, project references, generated files), then
     /// captures its compiler command line and dependency paths.</summary>
-    public static async Task<SubjectBuild> CreateAsync(string projectFile, RoundTripConfig config, CancellationToken cancellationToken)
+    public static async Task<SubjectBuild> CreateAsync(string projectFile, string sourceRoot, RoundTripConfig config, CancellationToken cancellationToken)
     {
         var projectDir = Path.GetDirectoryName(projectFile)!;
         var env = new Dictionary<string, string> { ["MSBUILDDISABLENODEREUSE"] = "1" };
         var tfm = await SelectTargetFrameworkAsync(projectFile, config, env, cancellationToken);
-        var common = $"-p:TargetFramework={tfm} -p:Configuration={config.Configuration} {config.ExtraBuildProperties}";
+        var buildProperties = $"-p:TargetFramework={tfm} -p:Configuration={config.Configuration} {config.ExtraBuildProperties}";
+        var common = buildProperties + " " + PathMap(sourceRoot);
 
         var (buildExit, buildOut, buildErr) = await ProcessRunner.RunAsync(config.DotnetPath,
             $"build \"{projectFile}\" {common} -nodeReuse:false --verbosity quiet", projectDir, config.BuildTimeout, env, cancellationToken);
@@ -91,7 +92,7 @@ public sealed class SubjectBuild
             throw new InvalidOperationException("MSBuild reported no compiler arguments.");
         var targetPath = json.RootElement.TryGetProperty("Properties", out var properties) && properties.TryGetProperty("TargetPath", out var tp)
             ? tp.GetString() : null;
-        return FromSpec(new Spec(projectFile, tfm, args, DependencyMap(items, projectDir), targetPath, common, config.DotnetPath), cancellationToken);
+        return FromSpec(new Spec(projectFile, tfm, args, DependencyMap(items, projectDir), targetPath, buildProperties, config.DotnetPath), cancellationToken);
     }
 
     /// <summary>Rebuilds the compilation from a captured compiler command line (no MSBuild).</summary>
@@ -171,7 +172,7 @@ public sealed class SubjectBuild
         private async Task<(int Exit, string Output)> BuildAsync(CancellationToken cancellationToken)
         {
             var (exit, stdout, stderr) = await ProcessRunner.RunAsync(_spec.DotnetPath,
-                $"build \"{_projectFile}\" {_spec.BuildProperties} -nodeReuse:false --verbosity quiet", Path.GetDirectoryName(_projectFile)!,
+                $"build \"{_projectFile}\" {_spec.BuildProperties} {PathMap(_root)} -nodeReuse:false --verbosity quiet", Path.GetDirectoryName(_projectFile)!,
                 _timeout, new Dictionary<string, string> { ["MSBUILDDISABLENODEREUSE"] = "1" }, cancellationToken);
             var output = (stdout + stderr).Trim();
             return (exit, output.Length > 800 ? output[^800..] : output);
@@ -227,6 +228,20 @@ public sealed class SubjectBuild
             public override bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? value) =>
                 values.TryGetValue(key, out value);
         }
+    }
+
+    /// <summary>
+    /// Maps a working copy's root to one fixed path in compiler output, so the original and every candidate (each built
+    /// in its own copy) embed identical source paths (<c>[CallerFilePath]</c>, PDB paths). On macOS the temp directory
+    /// is also reached as <c>/private/var</c>, so both spellings are mapped.
+    /// </summary>
+    public static string PathMap(string root)
+    {
+        root = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var pairs = new List<string> { $"{root}=/_oracle/" };
+        if (root.StartsWith("/var/", StringComparison.Ordinal))
+            pairs.Add($"/private{root}=/_oracle/");
+        return $"\"-p:PathMap={string.Join("%2C", pairs)}\"";
     }
 
     /// <summary>The configured target framework when the project declares it, else the newest .NET (Core) one, else the first.</summary>
