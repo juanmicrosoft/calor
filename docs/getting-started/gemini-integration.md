@@ -34,7 +34,7 @@ You can run this command again anytime to update the Calor documentation section
 
 ## Calor-First Enforcement
 
-Like current Codex CLI releases, **Gemini CLI supports hooks** (as of v0.26.0+). This means Calor-first development is enforced for covered write tools.
+Like current Codex CLI releases, **Gemini CLI supports hooks** (since its v0.26 release). This means Calor-first development is enforced for covered write tools.
 
 When Gemini tries to create a `.cs` file, the hook blocks the operation:
 

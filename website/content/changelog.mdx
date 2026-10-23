@@ -10,7 +10,57 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-23
+
+Calor 0.26 has three C# → Calor converter fixes, and one of them fixes a silent behavior
+change: a chained assignment such as `x = y = G()` called `G()` once per target. Releases no
+longer need an adjudication record (a committed review record that the release workflow used to
+require), and every check on the shipped packages still blocks a release. Two new CI checks
+compare converted code with the original: a round-trip harness leg that converts the way
+`calor convert` does by default, and a member-level differential oracle. The 0.24 and 0.25
+review records in `docs/plans/evidence/` moved to an archive branch.
+
+### Release health
+
+The 0.26 epic (#1591) asks every release from 0.26.0 on to record two numbers.
+
+- **Median time from a fix merging to it being on nuget.org: 1 day.** This release has 3
+  user-facing fixes, all in the converter, merged on 2026-10-22: #1628 (16:44 UTC), #1631
+  (19:43 UTC) and #1630 (21:56 UTC). The number is computed from the release date in this
+  section's header, 2026-10-23, not from the time nuget.org listed the packages. It is based on
+  only 3 fixes.
+- **Silent wrong-output bugs reported against 0.25.0: 1 (#1633).** A silent wrong-output bug is
+  one where Calor accepts the input, produces code that behaves differently, and reports
+  success. 0.25.0 was published on 2026-10-22. In `x += F().N();` the converter calls `F()`
+  before it reads `x`. When `F()` changes `x`, the converted code computes a different value
+  (12 instead of 3 in the issue's example), and the conversion still reports success. The
+  published 0.25.0 tool reproduces it. **It is not fixed in 0.26.0**; the fix is planned for
+  0.27.
+- **Known issue, not counted above (#1541, #1524).** The converter mishandles some collection
+  and object initializers: `new List<int> { 5 }` becomes `new List<int>(5)`, an empty list, and
+  an initializer such as `Capacity = 64` is dropped. Both were reported before 0.25.0, so they
+  do not count against it. Both still reproduce in 0.26.0, and the new member-level oracle
+  (#1587, below) flags them in its test fixture.
+
 ### Fixed
+
+- **The C# → Calor converter no longer fixes `~/.calor/manifests` for the whole process
+  (#1564).** User-level effect manifests are JSON files that tell Calor which effects a
+  library method has, such as console output or file access. The converter uses them to write
+  each function's `§E` row (its declared effects). Before this fix, the in-process converter
+  (the `CSharpToCalorConverter` library, the MCP tools, and test harnesses) read
+  `~/.calor/manifests` on its first conversion and kept using it until the process exited.
+  Changing `HOME` had no effect, so library output and test results depended on the
+  developer's machine.
+  - Each conversion now picks the directory when it starts: `$CALOR_HOME/manifests` if the
+    new `CALOR_HOME` variable is set, otherwise `~/.calor/manifests`. `calor effects` and
+    the compiler's effect check read the same directory. `CALOR_HOME` moves only the
+    manifest directory; the verification cache stays under your home directory.
+  - The new `ConversionOptions.UserManifestRoot` option sets the directory directly. Point it
+    at an empty directory, or set it to `""`, to convert without any user-level manifest.
+  - If you set neither, nothing changes: the CLI still reads `~/.calor/manifests`.
+  - Calor's own tests now run with an empty manifest directory, so a manifest in your home
+    directory can no longer change their results.
 
 - **`calor convert --lossy` no longer reports output that does not compile as clean (#1514).**
   Lossy mode skipped the round-trip check, which compiles the generated Calor and then the C#
@@ -55,6 +105,137 @@ what a program does.
 - **No more CS8600 warning for a lowered `out string`.** A binding that starts at `default`
   now emits `default!` for types that may be non-nullable references (`string s = default!;`).
   Built-in value types keep `default`.
+
+### Testing
+
+- **The round-trip harness now also tests the converter the way `calor convert` runs it.**
+  Before, the harness only converted with Lossy options. Those options allow recorded
+  semantic losses (substitutions or drops the converter reports) and turn on passthrough.
+  A plain `calor convert` uses Lossless options, which refuse such losses. The harness
+  converts each library file, swaps it into the project, and reruns the project's own
+  tests. A new `--mode default` leg does this with exactly the options `calor convert`
+  builds with no flags. A test fails if the harness and the CLI options ever differ. (#1586)
+- **CI runs both legs in parallel, and each one blocks on its own floors.** A floor is
+  the minimum fraction of library files the leg must keep converted. The default leg's
+  floors equal what it measured when it landed: MediatR 8 of 32 files (25.0%), Serilog
+  14 of 112 (12.5%) and FluentValidation 64 of 139 (46.0%). On the same commit, the
+  Lossy leg kept 71.9%, 59.8% and 71.9%. Losing one file from the default leg now fails
+  CI. One PR comment shows both legs side by side.
+- **`bench/corpus/README.md` no longer says the harness uses lossless conversion.** It
+  now describes both legs and lists each leg's floors.
+- **A new differential oracle checks that converted code behaves like the original
+  (#1587).** Until now, Lossless validation only compiled the round-tripped C#. The
+  round-trip harness caught a behavior change only if the subject's own tests happened to
+  exercise it. For example, `new List<int> { 5 }` became `new List<int>(5)` (an empty
+  list), and `Capacity = 64` was dropped. Both conversions still reported zero losses.
+  - For each corpus file that converts with the `calor convert` defaults, the oracle
+    builds the project twice: the original, and with only that file swapped for its
+    round-tripped C#. Each build is loaded into its own assembly load context.
+  - It constructs every type and compares the state to depth 2, meaning the public fields
+    and properties, and their fields and properties. It also calls methods on generated
+    inputs and compares return values, exception types and the state after the call.
+  - A member whose two runs on the same build disagree is skipped as nondeterministic.
+    A converted build that hangs or crashes where the original does not is a difference.
+  - CI runs it as the `member-oracle` job. A difference fails the job unless the file's
+    conversion records a loss or `eng/member-oracle-baseline.json` lists it. The job also
+    fails if a file listed in `eng/member-oracle-expected.json` is no longer checked.
+  - Both builds come from `dotnet build`, so the oracle compares exactly what the project
+    would ship.
+  - When it landed, it exercised 92 of 289 corpus files and compared 931 distinct members
+    with no difference found. Another 1,067 members could not be driven yet, mostly
+    because no generated input can construct them. The issue's two-member example is a
+    test fixture, and the oracle flags it.
+
+### Release process
+
+- **Releases no longer need an adjudication record (#1582).** Until now, `publish-nuget.yml`
+  published only after a gate script matched the packages against a committed review record.
+  That gate is gone from the release, website, installed-tool, audit and benchmark workflows. A
+  release is now a manual dispatch from `main` that names the version. The version must equal
+  `Directory.Build.props`, and `CHANGELOG.md` must have a `## [X.Y.Z]` section for it.
+- **Every check on the shipped packages stays, and each still stops the release when it fails.**
+  Before anything is pushed: the 13-project test matrix, the SDK consumer test on 5 platforms,
+  the coverage, mutation, performance and flakiness ratchets, the round-trip harness, package
+  inspection, the Z3 pin check, the SBOM, the wording scan of the notes, packages and website,
+  and a comparison with any copy of this version already on nuget.org. After the push: a
+  comparison with the packages nuget.org serves, then an install of `calor` from nuget.org
+  (`calor verify` must report `Proven: 14`, `Skipped: 0`), then the GitHub release, and only then
+  the website. The install check used to be a manual step after the release.
+- **A dry run is now possible.** `dry_run: true` runs every check and builds both packages, then
+  stops before the publish job. It never requests a NuGet key.
+- **Publishing still uses nuget.org Trusted Publishing.** Only the publish job, in the `main`-only
+  `nuget-release` environment, can exchange its GitHub token for a short-lived NuGet key. No API
+  key is stored.
+- **The release audit checks something simpler.** A release created by hand now fails the audit
+  unless its tag commit is on `main` and nuget.org serves both `calor` and `Calor.Sdk` at its
+  version.
+- **The .NET SDK pin (10.0.401) now lives in one shared action** instead of 8 copies across the
+  release workflows.
+- **The old gate's code is deleted (#1583).** Nothing called it after #1582. Removed: the two gate
+  scripts (`verify_release_adjudication.py`, about 1,240 lines, and `verify_maintainer_override.py`,
+  about 380), the map of which record each release needed, 358 compiler tests that tested the gate
+  or the 0.25 candidate freeze it read, and a website heading-id test that kept the gate's copy of
+  the site's anchor rules in step. The tests of the release workflows, the credential path and
+  the SDK pin stay. No published package or website page changes.
+- **The `create-release` agent skill describes the new procedure.** It bumps the version, writes
+  the `## [X.Y.Z]` section, and merges the release PR. The maintainer then dispatches
+  `publish-nuget.yml`, first with `dry_run: true`. The skill no longer claims it creates the GitHub
+  release; the workflow does that.
+- **The website deploy builds exactly the released commit, and checks it with `main`'s scripts
+  (#1585).** `publish-nuget` still starts the deploy after the release. The deploy fails unless
+  the release tag names the commit that was released and that commit is on `main`. It builds that
+  commit in its own checkout. The font check and the wording scan come from `main`, so redeploying
+  an older tag meets today's checks. The deploy no longer clones the full repository.
+- **Publishing benchmark results needs no release (#1585).** The benchmark headline is computed
+  from the committed B1 results at a `main` commit. So the publication branch and pull request
+  are now named after that commit, not the version in `Directory.Build.props`. The #1422
+  publication gate keeps all of its refusal checks. This release publishes no new benchmark
+  results.
+- **The B1 registration and results files moved to `eng/benchmark-publication/b1-1276/` (#1585),**
+  byte for byte, so they survive when `docs/plans/evidence/` is archived. (#1584 then removed
+  their hash seals and the gate's use of the #1407 evidence contract; see below.)
+- **`docs/plans/evidence/` is archived, and a clone is about 140 MB smaller (#1584).** The
+  directory held 2,990 review records, TRX files, transcripts and freeze manifests from the 0.24
+  and 0.25 milestones. All of it is on the orphan branch `evidence/archive-2026-10` (a branch
+  with no shared history that is never merged), and a short README on `main` points there.
+  History is not rewritten, so `.git` keeps its size.
+- **Tests that check real converter, verifier or benchmark behavior kept their inputs as
+  ordinary fixtures (#1584).** The shared interop controls, the interop guide's CLI and MCP
+  transcripts, the by-reference cases, the R0 conversion fixtures, the soundness sweep's case
+  packet and the determinism protocol now live under `tests/TestData/`. They have no hash seal
+  or amendment step: a change is reviewed in its pull request like any other test input. The
+  `bench/Calor.Soundness.Sweep` harness reads its cases from the new location.
+- **Tests that only checked a historical record against itself are deleted (#1584).** Removed:
+  the 0.24 evidence-contract, candidate-invalidation and candidate-manifest validators, the R0
+  scope packet, the T1 register, the D1 contract seal and the S2 disposition record, plus the
+  governance-only checks of the soundness registration and the B1 packets. That is 683 compiler
+  tests; a new guard test fails if a file other than the README is added under
+  `docs/plans/evidence/`. No published package or website page changes behavior.
+- **The determinism and benchmark gates lost their freeze machinery, not their checks
+  (#1584).** The determinism protocol (the workflow that runs the verifier tests many times on
+  every platform and compares the results byte for byte) no longer charges a compute budget, binds
+  runs to a release candidate, or runs `main`'s copy of its validator. Its hash freeze (D015) is
+  gone, and a change no longer needs an amendment-log entry; the existing entries stay as history.
+  It still refuses a change that weakens it against `main`, such as a removed case or a gate
+  command that lost its failure status. The benchmark publication gate no longer reads seals or
+  the 0.24 contract's amendment log; a method change is now a reviewed change to the
+  registration. Both still run every content check, and a local re-run reproduced the B1 results
+  byte for byte.
+
+### Documentation
+
+- **A test now checks every converter support level the website states (#1585).** The
+  `calor feature-check` page and the C# interoperability guides say which C# features the
+  converter supports `Full`, `Partial` or `NotSupported`. A new test reads those claims and
+  compares each one with the converter's feature registry, `FeatureSupport`, which is what
+  `calor feature-check` prints. The test reads every page: tables, prose, the command's JSON
+  output in code blocks, and quoted converter warnings such as `Feature 'out-var' is partially
+  supported`. Today the pages make 18 such claims, and all 18 match. A wrong level or
+  an unknown feature name fails CI. So does a level word or a phrase such as "fully supported" in
+  a paragraph, list item or table row that names a feature, unless it is one of the forms the
+  test reads. Three passages that use these words in another sense are listed, each with a reason.
+  The page's list of known gaps between the registry and real converter behavior must match the
+  test's list, and each gap carries a reason.
 
 ## [0.25.0] - 2026-10-20
 
