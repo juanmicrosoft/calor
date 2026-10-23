@@ -24,8 +24,10 @@ All notable changes to this project will be documented in this file.
   consumer, the CLI tool consumer and the Z3 test-host matrix) and two release-only ones (the
   release SDK consumer and the post-publish install check). Both images are ARM64 with 3 CPUs
   and 7 GB of memory, so nothing else changed. The determinism protocol's osx-arm64 environment
-  (the runner its dispatch-only workflow uses) moved too, as protocol 1.9.0. A new test fails if any workflow names a macOS
-  image other than `macos-15`. The release-only jobs first run on the next release dry run.
+  (the runner its dispatch-only workflow uses) moved too, as protocol 1.9.0. A new test fails if
+  any workflow names a macOS image other than `macos-15`. The release SDK consumer first runs on
+  the next release dry run. The install check is skipped in a dry run, so it first runs on the
+  next real publish.
 
 ## [0.26.0] - 2026-10-23
 

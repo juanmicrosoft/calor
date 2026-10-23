@@ -374,7 +374,8 @@ public class ReleaseWorkflowTests
     {
         // GitHub retires macos-14 on 2026-11-02 (actions/runner-images#13518). The release
         // workflows do not run on pull requests, so this is the check that their macOS legs
-        // moved; their first real run is the next release dry run.
+        // moved. publish-nuget's sdk-consumer first runs on the next release dry run; the
+        // verify-release install check is skipped in a dry run and first runs on a real publish.
         foreach (var path in Directory.GetFiles(WorkflowDir(), "*.yml"))
         {
             var labels = Regex.Matches(File.ReadAllText(path), @"(?m)^\s*(?:-\s+)?(?:runs-on|runner):\s*(\S+)\s*$")
