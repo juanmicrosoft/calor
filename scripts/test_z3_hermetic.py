@@ -46,7 +46,7 @@ GUARD_FACTS = (
 RUNNER_RIDS = {
     "ubuntu-latest": "linux-x64",
     "ubuntu-24.04-arm": "linux-arm64",
-    "macos-14": "osx-arm64",
+    "macos-15": "osx-arm64",
     "windows-latest": "win-x64",
     "windows-11-arm": "win-arm64",
 }

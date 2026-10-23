@@ -193,6 +193,8 @@ public class ReleaseWorkflowTests
         var job = Job(Read(Publish), "sdk-consumer");
         var rids = Regex.Matches(job, @"(?m)^            rid: (\S+)$").Select(m => m.Groups[1].Value).ToList();
         Assert.Equal(new[] { "linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64" }, rids);
+        Assert.Equal(new[] { ("ubuntu-latest", "linux-x64"), ("ubuntu-24.04-arm", "linux-arm64"), ("macos-15", "osx-arm64"),
+            ("windows-latest", "win-x64"), ("windows-11-arm", "win-arm64") }, RunnerRids(job));
         var check = Step(job, "Run M-A1 consumer check");
         Assert.Contains("CALOR_SDK_REQUIRE_ALL_RIDS: \"1\"", check);
         Assert.Contains("run: bash .github/scripts/test-sdk-package.sh", check);
@@ -363,6 +365,23 @@ public class ReleaseWorkflowTests
         Assert.DoesNotContain("continue-on-error", verify);
         Assert.Equal(new[] { "linux-x64", "osx-arm64", "win-x64" },
             Regex.Matches(verify, @"(?m)^            rid: (\S+)$").Select(m => m.Groups[1].Value));
+        Assert.Equal(new[] { ("ubuntu-latest", "linux-x64"), ("macos-15", "osx-arm64"), ("windows-latest", "win-x64") },
+            RunnerRids(Job(verify, "install-and-verify")));
+    }
+
+    [Fact]
+    public void NoWorkflowRunsOnTheRetiredMacos14Image()
+    {
+        // GitHub retires macos-14 on 2026-11-02 (actions/runner-images#13518). The release
+        // workflows do not run on pull requests, so this is the check that their macOS legs
+        // moved. publish-nuget's sdk-consumer first runs on the next release dry run; the
+        // verify-release install check is skipped in a dry run and first runs on a real publish.
+        foreach (var path in Directory.GetFiles(WorkflowDir(), "*.yml"))
+        {
+            var labels = Regex.Matches(File.ReadAllText(path), @"(?m)^\s*(?:-\s+)?(?:runs-on|runner):\s*(\S+)\s*$")
+                .Select(m => m.Groups[1].Value);
+            Assert.DoesNotContain(labels, l => l.StartsWith("macos-", StringComparison.Ordinal) && l != "macos-15");
+        }
     }
 
     [Fact]
@@ -537,6 +556,11 @@ public class ReleaseWorkflowTests
 
     private static string Read(string workflow) =>
         File.ReadAllText(Path.Combine(WorkflowDir(), workflow)).Replace("\r\n", "\n");
+
+    /// <summary>The (runner, rid) pairs of a job's matrix include list, in order.</summary>
+    private static List<(string, string)> RunnerRids(string job) =>
+        Regex.Matches(job, @"(?m)^          - runner: (\S+)\n            rid: (\S+)$")
+            .Select(m => (m.Groups[1].Value, m.Groups[2].Value)).ToList();
 
     private static string Job(string text, string name) =>
         Jobs(text).Single(j => j.Name == name).Body;

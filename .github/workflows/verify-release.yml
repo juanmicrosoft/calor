@@ -45,7 +45,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             rid: linux-x64
-          - runner: macos-14
+          - runner: macos-15
             rid: osx-arm64
           - runner: windows-latest
             rid: win-x64
