@@ -21,18 +21,21 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public sealed class S2ObligationStateTests
 {
-    private static (List<Obligation> Obligations, string CSharp, bool HasErrors) Solve(string source)
+    private static (List<Obligation> Obligations, string CSharp, bool HasErrors) Solve(
+        string source, bool enableTypeChecking = true)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         var options = new CompilationOptions
         {
+            EnableTypeChecking = enableTypeChecking,
             VerifyContracts = true,
             VerifyRefinements = true,
             ContractMode = ContractMode.Debug,
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var result = Program.Compile(source, "case.calr", options);
-        return (options.ObligationResults!.Obligations.ToList(), result.GeneratedCode, result.HasErrors);
+        // A type error stops compilation before obligations are generated.
+        return (options.ObligationResults?.Obligations.ToList() ?? [], result.GeneratedCode, result.HasErrors);
     }
 
     private static Obligation Single(List<Obligation> obligations, ObligationKind kind)
@@ -623,7 +626,10 @@ public sealed class S2ObligationStateTests
                 §B{n:Dst} x
                 §R INT:0
             """;
-        var subtype = Single(Solve(source).Obligations, ObligationKind.Subtype);
+        // #1530: named refinements are nominal, so the type checker now rejects binding a Src to
+        // a Dst. The solver's Subtype check on that bind is still exercised with the checker off.
+        Assert.True(Solve(source).HasErrors);
+        var subtype = Single(Solve(source, enableTypeChecking: false).Obligations, ObligationKind.Subtype);
         Assert.Equal(ObligationStatus.Discharged, subtype.Status);
     }
 
@@ -642,7 +648,9 @@ public sealed class S2ObligationStateTests
                 §B{n:Big} x
                 §R INT:0
             """;
-        var subtype = Single(Solve(source).Obligations, ObligationKind.Subtype);
+        // #1530: rejected by the type checker; the solver still refutes it with the checker off.
+        Assert.True(Solve(source).HasErrors);
+        var subtype = Single(Solve(source, enableTypeChecking: false).Obligations, ObligationKind.Subtype);
         Assert.Equal(ObligationStatus.Failed, subtype.Status);
     }
 }

@@ -22,14 +22,80 @@ public sealed class TypeChecker
     private int _lambdaBodyDepth;
     private readonly Stack<List<Diagnostic>> _flowCacheDiagnostics = new();
 
+    private readonly Dictionary<AstNode, string> _inferredRefinements =
+        new(ReferenceEqualityComparer.Instance);
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<
+        ModuleNode, IReadOnlyDictionary<AstNode, string>> InferredRefinementCache = new();
+
+    /// <summary>Nesting depth of speculative inference (overload trials, contextual probes).</summary>
+    private int _speculationDepth;
+
+    private readonly record struct SpeculationCheckpoint(
+        (int Diagnostics, int Fixes) Diagnostics,
+        Dictionary<AstNode, string> Refinements);
+
+    /// <summary>
+    /// Starts a speculative inference whose diagnostics AND inferred refinements are rolled back
+    /// by <see cref="EndSpeculation"/>. A rejected overload's contextual lambda typing must not
+    /// leave its refinement on a lambda parameter for the code generator (#1529 review round 2).
+    /// </summary>
+    private SpeculationCheckpoint BeginSpeculation()
+    {
+        _speculationDepth++;
+        return new SpeculationCheckpoint(
+            _diagnostics.CreateCheckpoint(),
+            new Dictionary<AstNode, string>(_inferredRefinements, ReferenceEqualityComparer.Instance));
+    }
+
+    private void EndSpeculation(SpeculationCheckpoint checkpoint)
+    {
+        _diagnostics.RestoreCheckpoint(checkpoint.Diagnostics);
+        _inferredRefinements.Clear();
+        foreach (var (node, refinement) in checkpoint.Refinements)
+            _inferredRefinements[node] = refinement;
+        _speculationDepth--;
+    }
+
     public TypeChecker(DiagnosticBag diagnostics)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
     }
 
+    /// <summary>
+    /// Declarations without a type annotation whose inferred type is a named refinement, mapped
+    /// to that refinement's <c>§RTYPE</c> name: unannotated binds (<c>§B{~x} init</c>,
+    /// a <see cref="BindStatementNode"/>) and contextually typed lambda parameters (a
+    /// <see cref="LambdaParameterNode"/>). Filled by <see cref="Check"/>.
+    /// </summary>
+    public IReadOnlyDictionary<AstNode, string> InferredRefinements => _inferredRefinements;
+
+    /// <summary>
+    /// #1529: a local inferred from a refined value carries the refinement. The type checker is
+    /// the source of that inferred type, but the emitter and the obligation generator run whether
+    /// or not the checker's diagnostics are enabled (<c>--no-type-check</c>). So both ask here: the
+    /// module is checked once with a throwaway diagnostic bag and the result is cached per module
+    /// instance. A module without <c>§RTYPE</c> declarations has no named refinements, so it is
+    /// not checked at all.
+    /// </summary>
+    public static IReadOnlyDictionary<AstNode, string> InferUnannotatedRefinements(ModuleNode module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        if (module.RefinementTypes.Count == 0)
+            return new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
+        return InferredRefinementCache.GetValue(module, static m =>
+        {
+            var checker = new TypeChecker(new DiagnosticBag());
+            checker.Check(m);
+            return new Dictionary<AstNode, string>(
+                checker._inferredRefinements, ReferenceEqualityComparer.Instance);
+        });
+    }
+
     public void Check(ModuleNode module)
     {
+        _hasNamedRefinements = module.RefinementTypes.Count > 0;
         _patternBindingTypes.Clear();
         _moduleDeclaredValueTypes.Clear();
         foreach (var enumType in DeclaredEnumTypeNames(module.Classes, module.Enums))
@@ -211,9 +277,10 @@ public sealed class TypeChecker
             return;
         }
 
-        // Use a simple string representation for the predicate text
+        // Named refinements are nominal (#1530): the §RTYPE name is part of the type's identity,
+        // so two refinements of one base type never compare equal.
         var predicateText = $"#{rtype.BaseTypeName}";
-        var refinedType = new RefinedType(baseType, predicateText, rtype.Predicate);
+        var refinedType = new RefinedType(baseType, predicateText, rtype.Predicate, rtype.Name);
         _env.DefineType(rtype.Name, refinedType);
     }
 
@@ -337,10 +404,14 @@ public sealed class TypeChecker
         _suppressDiagnostics = previousSuppressDiagnostics;
 
         // Add parameters to scope
+        var previousInlineRefinedParameters = _inlineRefinedParameters;
+        _inlineRefinedParameters = new HashSet<string>(StringComparer.Ordinal);
         foreach (var param in func.Parameters)
         {
             var paramType = ResolveTypeName(param.TypeName, param.Span);
             _env.DefineVariable(param.Name, paramType);
+            if (param.InlineRefinement != null)
+                _inlineRefinedParameters.Add(param.Name);
         }
 
         // 0.25 F3 (#847): local functions shadow same-named functions in the whole
@@ -357,6 +428,7 @@ public sealed class TypeChecker
 
         _env.ExitLocalFunctions();
         _currentReturnType = previousReturnType;
+        _inlineRefinedParameters = previousInlineRefinedParameters;
         _env.ExitScope();
     }
 
@@ -436,6 +508,12 @@ public sealed class TypeChecker
             case DictionaryForeachNode dictForeach:
                 CheckDictionaryForeachStatement(dictForeach);
                 break;
+            case AssignmentStatementNode assignment:
+                CheckRefinedAssignment(assignment);
+                break;
+            case CompoundAssignmentStatementNode compound when _hasNamedRefinements:
+                _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+                break;
             default:
                 // Other statement types (print, assignment, throw, etc.) are handled elsewhere or need no type checking
                 break;
@@ -461,12 +539,117 @@ public sealed class TypeChecker
         }
     }
 
+    /// <summary>
+    /// #1530: named refinements are nominal. A value of one named refinement is never accepted
+    /// where a DIFFERENT named refinement is expected (<c>Nat</c> into <c>Pos</c>), even when both
+    /// refine the same base type. A plain base-type value (an arithmetic result, a literal) keeps
+    /// its existing treatment at §ASSIGN and returns: it is accepted and guarded at runtime.
+    /// </summary>
+    private static bool IsDistinctNamedRefinement(CalorType target, CalorType source)
+        => target is RefinedType { RefinementName: not null }
+            && source is RefinedType { RefinementName: not null }
+            && !IsAssignable(target, source);
+
+    private void ReportDistinctNamedRefinement(
+        Parsing.TextSpan span, CalorType target, CalorType source, string position)
+        => ReportRefinementSoundnessError(span,
+            $"Cannot use {source.SurfaceName} as {target.SurfaceName} in {position}: named refinement "
+            + "types are distinct even over the same base type. Convert explicitly, for example "
+            + $"with a function that takes the base type and returns {target.SurfaceName}; its "
+            + "return guard checks the value.");
+
+    /// <summary>
+    /// Reports an error that protects a refinement (#1529/#1530). Unlike ordinary checker
+    /// diagnostics, it survives the flow cache of structural statements (try, foreach, using...),
+    /// which otherwise drops the checker's diagnostics there, and it survives the filtered
+    /// inference of assignment right-hand sides. Inside a speculative inference it is rolled
+    /// back with everything else.
+    /// </summary>
+    private void ReportRefinementSoundnessError(Parsing.TextSpan span, string message)
+    {
+        var before = _diagnostics.Count;
+        _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch, message);
+        _nominalRefinementDiagnostics.Add(_diagnostics.Last());
+        if (_speculationDepth == 0)
+            PreserveFlowCacheDiagnosticsSince(before);
+    }
+
+    private readonly HashSet<Diagnostic> _nominalRefinementDiagnostics =
+        new(ReferenceEqualityComparer.Instance);
+    private bool _hasNamedRefinements;
+
+    /// <summary>A lambda's parameters shadow same-named enclosing parameters.</summary>
+    private static HashSet<string> WithoutShadowedNames(HashSet<string> names, LambdaExpressionNode lambda)
+    {
+        if (!lambda.Parameters.Any(parameter => names.Contains(parameter.Name)))
+            return names;
+        var result = new HashSet<string>(names, StringComparer.Ordinal);
+        foreach (var parameter in lambda.Parameters)
+            result.Remove(parameter.Name);
+        return result;
+    }
+    private HashSet<string> _inlineRefinedParameters = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Type-checks an expression the checker otherwise leaves alone (an assignment right-hand
+    /// side), keeping ONLY the nominal-refinement diagnostics it produces. A call nested there
+    /// that passes a Nat where a Pos is expected is still reported, without surfacing any other
+    /// diagnostic that this statement kind never produced before.
+    /// </summary>
+    private CalorType InferKeepingOnlyNominalRefinementDiagnostics(ExpressionNode expression, CalorType? expected)
+    {
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var type = InferExpressionType(expression, expected);
+        var kept = _diagnostics.Skip(checkpoint.Diagnostics)
+            .Where(_nominalRefinementDiagnostics.Contains)
+            .ToList();
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        foreach (var diagnostic in kept)
+            _diagnostics.Add(diagnostic);
+        return type;
+    }
+
+    /// <summary>
+    /// In a module with §RTYPE declarations, an §ASSIGN right-hand side is type-checked for
+    /// refinement soundness only: a value of a different named refinement written into a refined
+    /// local is rejected, and so is one nested in the value (a call passing a Nat where a Pos is
+    /// expected). Every other assignment diagnostic stays with the binder and Roslyn, as before.
+    /// </summary>
+    private void CheckRefinedAssignment(AssignmentStatementNode assignment)
+    {
+        if (!_hasNamedRefinements)
+            return;
+
+        var targetType = assignment.Target is ReferenceNode reference
+            ? _env.LookupVariable(reference.Name)
+            : null;
+        // The expected type is the ERASED target: a base value written into a refined local is
+        // still accepted and guarded at run time (a match arm of type i32 into a Nat must not be
+        // rejected), while a lambda assigned to a delegate variable still gets its contextual
+        // parameter types, refinements included.
+        var valueType = InferKeepingOnlyNominalRefinementDiagnostics(
+            assignment.Value,
+            targetType is null ? null : EraseRefinement(targetType));
+        if (targetType != null && IsDistinctNamedRefinement(targetType, valueType))
+        {
+            ReportDistinctNamedRefinement(assignment.Span, targetType, valueType,
+                $"assignment to '{((ReferenceNode)assignment.Target).Name}'");
+        }
+    }
+
     private void CheckReturnStatement(ReturnStatementNode ret)
     {
         if (ret.Expression != null)
         {
             var returnType = InferExpressionType(ret.Expression, _currentReturnType);
             _inferredLambdaReturnTypes?.Add(returnType);
+            if (_currentReturnType != null
+                && !_suppressContextualDiagnostics
+                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode)
+                && IsDistinctNamedRefinement(_currentReturnType, returnType))
+            {
+                ReportDistinctNamedRefinement(ret.Expression.Span, _currentReturnType, returnType, "a return");
+            }
             if ((_validateReturnAssignments || ret.Expression is CallExpressionNode)
                 && _currentReturnType != null
                 && !ContainsInferencePlaceholder(_currentReturnType)
@@ -478,9 +661,16 @@ public sealed class TypeChecker
                 _lambdaReturnInvalid = true;
                 if (!_suppressContextualDiagnostics)
                 {
-                    _diagnostics.ReportError(ret.Expression.Span, DiagnosticCode.TypeMismatch,
-                        $"Return type {returnType.SurfaceName} is not assignable to "
-                        + _currentReturnType.SurfaceName);
+                    if (IsDistinctNamedRefinement(_currentReturnType, returnType))
+                    {
+                        ReportDistinctNamedRefinement(ret.Expression.Span, _currentReturnType, returnType, "a return");
+                    }
+                    else
+                    {
+                        _diagnostics.ReportError(ret.Expression.Span, DiagnosticCode.TypeMismatch,
+                            $"Return type {returnType.SurfaceName} is not assignable to "
+                            + _currentReturnType.SurfaceName);
+                    }
                 }
             }
         }
@@ -775,6 +965,7 @@ public sealed class TypeChecker
     private void CheckBindStatement(BindStatementNode bind)
     {
         CalorType varType;
+        CalorType? initializerType = null;
 
         if (bind.Initializer != null)
         {
@@ -797,7 +988,12 @@ public sealed class TypeChecker
                 {
                     initType = InferExpressionType(bind.Initializer, varType);
                 }
-                if (!IsAssignable(varType, initType)
+                initializerType = initType;
+                if (IsDistinctNamedRefinement(varType, initType))
+                {
+                    ReportDistinctNamedRefinement(bind.Span, varType, initType, $"the binding of '{bind.Name}'");
+                }
+                else if (!IsAssignable(varType, initType)
                     && !IsBinderOwnedNullabilityMismatch(varType, initType))
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
@@ -807,7 +1003,16 @@ public sealed class TypeChecker
             else
             {
                 var initType = InferExpressionType(bind.Initializer);
+                initializerType = initType;
                 varType = initType;
+                // #1529: the inferred local keeps the named refinement; record it so the emitter
+                // and obligation generator guard every later write exactly as for §B{x:Nat}.
+                // Speculative passes are rolled back (BeginSpeculation), so the last committed
+                // inference of this bind decides.
+                if (initType is RefinedType { RefinementName: { } refinementName })
+                    _inferredRefinements[bind] = refinementName;
+                else
+                    _inferredRefinements.Remove(bind);
             }
         }
         else if (bind.TypeName != null)
@@ -824,6 +1029,49 @@ public sealed class TypeChecker
             varType = ErrorType.Instance;
         }
 
+        // A mutable §B of a name already in scope is a reassignment, not a new variable (the
+        // emitter emits `x = …`, and keeps the established refinement contract for later writes).
+        // Changing a named refinement that way would leave the checker and the runtime guards
+        // enforcing different predicates, so it is rejected.
+        //
+        // The emitter keeps an established refinement contract for every later write, even when
+        // the rebind is annotated with the base type (`§B{~x:i32} v` after `§B{~x} a`, a: Nat).
+        // So the checker keeps the established refinement as the variable's type too; otherwise
+        // a later `§B{~x} p` (p: Pos) would look like a first refinement (#1530 review round 2).
+        var existingType = bind.IsMutable ? _env.LookupVariable(bind.Name) : null;
+        if (existingType is RefinedType { RefinementName: not null } established)
+        {
+            // Check the annotation AND the initializer: `§B{~x:i32} p` (p: Pos) still writes a
+            // Pos into the established Nat variable.
+            var rebound = varType is RefinedType { RefinementName: not null } annotatedRefinement
+                    && !established.Equals(annotatedRefinement)
+                ? annotatedRefinement
+                : initializerType is RefinedType { RefinementName: not null } initializerRefinement
+                    && !established.Equals(initializerRefinement)
+                    ? initializerRefinement
+                    : null;
+            if (rebound != null)
+            {
+                ReportRefinementSoundnessError(bind.Span,
+                    $"Cannot rebind '{bind.Name}' of type {established.SurfaceName} as {rebound.SurfaceName}: "
+                    + "a mutable rebind reassigns the existing variable and cannot change its named refinement.");
+            }
+            varType = established;
+        }
+        else if (existingType != null
+            && varType is RefinedType { RefinementName: not null } added
+            && _inlineRefinedParameters.Contains(bind.Name))
+        {
+            // The emitter keeps a parameter's inline refinement as the established contract, so
+            // it would never enforce the named refinement the checker would now claim.
+            ReportRefinementSoundnessError(bind.Span,
+                $"Cannot rebind parameter '{bind.Name}', which has an inline refinement, as {added.SurfaceName}: "
+                + "a mutable rebind reassigns the parameter and keeps its inline refinement.");
+            varType = existingType;
+        }
+
+        if (!bind.IsMutable)
+            _inlineRefinedParameters.Remove(bind.Name);
         _env.DefineVariable(bind.Name, varType);
     }
 
@@ -1545,7 +1793,10 @@ public sealed class TypeChecker
             .Where(candidate => candidate != null)
             .Select(candidate => candidate!)
             .ToArray();
-        if (candidates.Length == 0 && functionCandidates.Count > 0
+        var reportedNominal = candidates.Length == 0 && functionCandidates.Count > 0
+            && argumentTypes.Any(type => type is RefinedType { RefinementName: not null })
+            && ReportDistinctNamedRefinementArguments(call, functionCandidates, argumentTypes);
+        if (!reportedNominal && candidates.Length == 0 && functionCandidates.Count > 0
             && (call.Arguments.Any(RequiresTargetType)
                 || call.Arguments.Any(argument => argument is ReferenceNode reference
                     && _env.LookupFunctionCandidates(reference.Name).Count > 0)
@@ -1604,9 +1855,9 @@ public sealed class TypeChecker
         if (expectedType != null || !hasContextualCandidates)
             return InferCallArgument(argument, expectedType);
 
-        var checkpoint = _diagnostics.CreateCheckpoint();
+        var checkpoint = BeginSpeculation();
         var result = InferCallArgument(argument, null);
-        _diagnostics.RestoreCheckpoint(checkpoint);
+        EndSpeculation(checkpoint);
         return result;
     }
 
@@ -1656,6 +1907,8 @@ public sealed class TypeChecker
     private CalorType InferLambdaType(LambdaExpressionNode lambda, CalorType? expectedType)
     {
         var flowCacheDiagnosticStart = _diagnostics.Count;
+        var previousInlineRefinedParameters = _inlineRefinedParameters;
+        _inlineRefinedParameters = WithoutShadowedNames(_inlineRefinedParameters, lambda);
         var expectedFunction = expectedType != null
             && TryGetDelegateFunctionType(expectedType, out var function)
                 ? function
@@ -1692,6 +1945,13 @@ public sealed class TypeChecker
                 }
                 signatureValid = false;
             }
+            // #1529 review: a parameter typed by the target delegate carries its refinement
+            // into the body, so writes to it must be guarded like a declared refined parameter.
+            // The last committed inference decides; speculative ones are rolled back.
+            if (declaredTypeName is null && declaredType is RefinedType { RefinementName: { } inferredName })
+                _inferredRefinements[parameter] = inferredName;
+            else
+                _inferredRefinements.Remove(parameter);
             _env.DefineVariable(parameter.Name, declaredType);
             return declaredType;
         }).ToArray();
@@ -1761,7 +2021,18 @@ public sealed class TypeChecker
         _lambdaReturnInvalid = previousLambdaReturnInvalid;
         _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
         _env.ExitScope();
-        PreserveFlowCacheDiagnosticsSince(flowCacheDiagnosticStart);
+        _inlineRefinedParameters = previousInlineRefinedParameters;
+        // A committed lambda check keeps its diagnostics: through the flow cache of structural
+        // statements, as before, and through the filtered inference of an §ASSIGN right-hand
+        // side, so a lambda assigned to a delegate variable is checked as fully as one bound
+        // with §B (#1530 review round 3). A speculative check (an overload trial) keeps
+        // nothing; EndSpeculation rolls its diagnostics back.
+        if (_speculationDepth == 0)
+        {
+            PreserveFlowCacheDiagnosticsSince(flowCacheDiagnosticStart);
+            foreach (var diagnostic in _diagnostics.Skip(flowCacheDiagnosticStart))
+                _nominalRefinementDiagnostics.Add(diagnostic);
+        }
         _ = parameterTypes;
         _ = returnType;
         return expectedFunction is not null && signatureValid ? expectedFunction : ErrorType.Instance;
@@ -2618,6 +2889,39 @@ public sealed class TypeChecker
                 || item.index == paramsIndex);
     }
 
+    /// <summary>
+    /// #1530: when no overload accepts the call, and one would if the named-refinement arguments
+    /// were unconstrained, those arguments are the cause: a refinement was passed where a
+    /// different named refinement is expected. Other overload failures stay with the binder.
+    /// </summary>
+    private bool ReportDistinctNamedRefinementArguments(
+        CallExpressionNode call,
+        IReadOnlyList<FunctionCandidate> functionCandidates,
+        IReadOnlyList<CalorType> argumentTypes)
+    {
+        var relaxed = argumentTypes
+            .Select(type => type is RefinedType { RefinementName: not null } ? ErrorType.Instance : type)
+            .ToArray();
+        foreach (var candidate in functionCandidates)
+        {
+            if (TryResolveCallCandidate(candidate, call, relaxed) is not { } resolved)
+                continue;
+            for (var i = 0; i < argumentTypes.Count && i < resolved.ConversionTargets.Count; i++)
+            {
+                if (IsDistinctNamedRefinement(resolved.ConversionTargets[i], argumentTypes[i]))
+                {
+                    ReportDistinctNamedRefinement(
+                        call.Arguments[i].Span,
+                        resolved.ConversionTargets[i],
+                        argumentTypes[i],
+                        $"argument {i + 1} of '{call.Target}'");
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private ResolvedCallCandidate? TryResolveCallCandidate(
         FunctionCandidate candidate,
         CallExpressionNode call,
@@ -2774,12 +3078,12 @@ public sealed class TypeChecker
                     argument.Type,
                     forceExpanded: true);
                 var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
-                var diagnosticCheckpoint = _diagnostics.CreateCheckpoint();
+                var diagnosticCheckpoint = BeginSpeculation();
                 _suppressContextualDiagnostics = true;
                 var inferredArgumentType =
                     InferExpressionType(argument.Expression, expectedArgumentType);
                 _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
-                _diagnostics.RestoreCheckpoint(diagnosticCheckpoint);
+                EndSpeculation(diagnosticCheckpoint);
                 if (inferredArgumentType is ErrorType)
                     return null;
                 mappedArguments[i] =
@@ -2798,12 +3102,12 @@ public sealed class TypeChecker
                 if (!RequiresTargetType(argument.Expression))
                     continue;
                 var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
-                var diagnosticCheckpoint = _diagnostics.CreateCheckpoint();
+                var diagnosticCheckpoint = BeginSpeculation();
                 _suppressContextualDiagnostics = true;
                 var inferredArgumentType =
                     InferExpressionType(argument.Expression, contextualParamsArray.ElementType);
                 _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
-                _diagnostics.RestoreCheckpoint(diagnosticCheckpoint);
+                EndSpeculation(diagnosticCheckpoint);
                 if (inferredArgumentType is ErrorType)
                     return null;
                 expandedParamsArguments[i] =
@@ -3060,6 +3364,10 @@ public sealed class TypeChecker
             {
                 substitutions[typeParameter.Name] = argument;
             }
+            else if (TryJoinErasedRefinements(existing, argument, out var erasedJoin))
+            {
+                substitutions[typeParameter.Name] = erasedJoin;
+            }
             else
             {
                 substitutions[typeParameter.Name] = ErrorType.Instance;
@@ -3160,7 +3468,7 @@ public sealed class TypeChecker
             }
         }
 
-        var checkpoint = _diagnostics.CreateCheckpoint();
+        var checkpoint = BeginSpeculation();
         var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
         var previousReturnType = _currentReturnType;
         var previousValidateReturnAssignments = _validateReturnAssignments;
@@ -3169,6 +3477,8 @@ public sealed class TypeChecker
         _currentReturnType = null;
         _validateReturnAssignments = false;
         _inferredLambdaReturnTypes = new List<CalorType>();
+        var previousInlineRefinedParameters = _inlineRefinedParameters;
+        _inlineRefinedParameters = WithoutShadowedNames(_inlineRefinedParameters, lambda);
         _env.EnterScope();
         var currentSubstitutions =
             new Dictionary<string, CalorType>(substitutions, StringComparer.Ordinal);
@@ -3199,13 +3509,14 @@ public sealed class TypeChecker
             _lambdaBodyDepth--;
         }
         _env.ExitScope();
+        _inlineRefinedParameters = previousInlineRefinedParameters;
         foreach (var returnType in _inferredLambdaReturnTypes)
             InferTypeArguments(targetTemplate.ReturnType, returnType, substitutions);
         _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
         _currentReturnType = previousReturnType;
         _validateReturnAssignments = previousValidateReturnAssignments;
         _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
-        _diagnostics.RestoreCheckpoint(checkpoint);
+        EndSpeculation(checkpoint);
     }
 
     private bool TryGetMethodGroupConversionCost(
@@ -3363,9 +3674,18 @@ public sealed class TypeChecker
                 : IsAssignable(function.ParameterTypes[parameterIndex], argumentTypes[argumentIndex]);
             if (!typeMatches)
             {
-                _diagnostics.ReportError(arguments[argumentIndex].Span, DiagnosticCode.TypeMismatch,
-                    $"Argument type {argumentTypes[argumentIndex].SurfaceName} is not assignable to "
-                    + function.ParameterTypes[parameterIndex].SurfaceName);
+                if (IsDistinctNamedRefinement(function.ParameterTypes[parameterIndex], argumentTypes[argumentIndex]))
+                {
+                    ReportDistinctNamedRefinement(arguments[argumentIndex].Span,
+                        function.ParameterTypes[parameterIndex], argumentTypes[argumentIndex],
+                        $"delegate argument {argumentIndex + 1}");
+                }
+                else
+                {
+                    _diagnostics.ReportError(arguments[argumentIndex].Span, DiagnosticCode.TypeMismatch,
+                        $"Argument type {argumentTypes[argumentIndex].SurfaceName} is not assignable to "
+                        + function.ParameterTypes[parameterIndex].SurfaceName);
+                }
                 valid = false;
             }
         }
@@ -3575,6 +3895,7 @@ public sealed class TypeChecker
 
         if (IsAssignable(trueType, falseType)) return trueType;
         if (IsAssignable(falseType, trueType)) return falseType;
+        if (TryJoinErasedRefinements(trueType, falseType, out var erasedJoin)) return erasedJoin;
 
         // C# permits unlike arms when their enclosing target is object.
         // Preserve a real common type; a narrower target still fails assignment.
@@ -3702,12 +4023,23 @@ public sealed class TypeChecker
     {
         var span = typeNameSpan == Parsing.TextSpan.Empty ? fallbackSpan : typeNameSpan;
         var type = ResolveTypeName(typeName, span);
-        return type switch
+        type = type switch
         {
             NullableReferenceType nullable => nullable.ReferentType,
             NullableValueType nullable => nullable.UnderlyingType,
             _ => type
         };
+        // A refinement erases at run time, so `(is a Pos p)` emits `a is int p`: it tests only
+        // the base type and would bind an unchecked value to a Pos-typed variable (#1530 review).
+        if (type is RefinedType refined)
+        {
+            ReportRefinementSoundnessError(span,
+                $"A type pattern cannot test the refinement type {refined.SurfaceName}: refinements "
+                + $"erase at run time, so only the base type {refined.BaseType.SurfaceName} would be "
+                + "tested. Test the base type and check the predicate explicitly.");
+            return EraseRefinement(refined);
+        }
+        return type;
     }
 
     private static bool CanPossiblyMatchPattern(CalorType inputType, CalorType patternType)
@@ -3729,6 +4061,9 @@ public sealed class TypeChecker
             _ => patternType
         };
 
+        // Refinements erase at runtime, so a type test sees only the base types (#1530).
+        input = EraseRefinement(input);
+        pattern = EraseRefinement(pattern);
         return input.Equals(pattern)
             || IsAssignable(input, pattern)
             || IsAssignable(pattern, input);
@@ -4307,6 +4642,7 @@ public sealed class TypeChecker
             return nullableValue;
         if (IsAssignable(left, right)) return left;
         if (IsAssignable(right, left)) return right;
+        if (TryJoinErasedRefinements(left, right, out var erasedJoin)) return erasedJoin;
 
         if (!_suppressContextualDiagnostics)
         {
@@ -4548,6 +4884,31 @@ public sealed class TypeChecker
         while (type is RefinedType refined)
             type = refined.BaseType;
         return type;
+    }
+
+    /// <summary>
+    /// Joins two types when at least one is a named refinement and neither is assignable to the
+    /// other, for example <c>Nat</c> and <c>Pos</c> over <c>i32</c>. Named refinements are
+    /// nominal (#1530), so the join holds neither predicate: it is the common erased base type.
+    /// </summary>
+    private static bool TryJoinErasedRefinements(CalorType left, CalorType right, out CalorType joined)
+    {
+        joined = ErrorType.Instance;
+        if (left is not RefinedType && right is not RefinedType)
+            return false;
+        var erasedLeft = EraseRefinement(left);
+        var erasedRight = EraseRefinement(right);
+        if (IsAssignable(erasedLeft, erasedRight))
+        {
+            joined = erasedLeft;
+            return true;
+        }
+        if (IsAssignable(erasedRight, erasedLeft))
+        {
+            joined = erasedRight;
+            return true;
+        }
+        return false;
     }
 
     private static bool IsDefinitelyNotBool(CalorType type)

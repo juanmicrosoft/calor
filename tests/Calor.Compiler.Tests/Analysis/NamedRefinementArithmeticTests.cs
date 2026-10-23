@@ -175,7 +175,7 @@ public class NamedRefinementArithmeticTests
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
-            d => d.Message.Contains("Cannot assign i32 to variable of type i32{#i32}"));
+            d => d.Message.Contains("Cannot assign i32 to variable of type Nat"));
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Message.Contains("Cannot assign f64 to variable of type i32"));
     }
@@ -264,7 +264,7 @@ public class NamedRefinementArithmeticTests
             """);
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
-            && d.Message.Contains("Option<i32{#i32}>"));
+            && d.Message.Contains("Option<Nat>"));
     }
 
     /// <summary>
@@ -304,7 +304,7 @@ public class NamedRefinementArithmeticTests
             """);
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
-            && d.Message.Contains("Cannot assign i32 to variable of type i32{#i32}"));
+            && d.Message.Contains("Cannot assign i32 to variable of type Nat"));
         Assert.DoesNotContain(result.Diagnostics.Errors,
             d => d.Message.Contains("Arithmetic operators require numeric operands"));
     }

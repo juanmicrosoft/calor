@@ -85,6 +85,15 @@ public sealed class Obligation
     public string? ParameterName { get; internal set; }
 
     /// <summary>
+    /// For Subtype obligations: which refinement the condition checks, as
+    /// <c>refinement type 'Name'</c> or <c>inline refinement</c>. The emitter elides a write
+    /// guard only when Discharged obligations cover exactly the refinements that guard
+    /// enforces, so an obligation generated for a different predicate (the generator tracks
+    /// variables by name, the emitter by scope) can never drop a needed guard (#1529 review).
+    /// </summary>
+    public string? CheckedRefinement { get; internal set; }
+
+    /// <summary>
     /// For ProofObligation: the source proof ID from §PROOF{id}.
     /// Used by CSharpEmitter to match obligations to AST nodes.
     /// </summary>

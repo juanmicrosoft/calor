@@ -471,30 +471,51 @@ public sealed class FunctionType : CalorType
 /// Represents a refinement type: a base type constrained by a predicate.
 /// E.g., NatInt is i32 where # >= 0.
 /// At runtime, refinement types erase to their base type.
+///
+/// <para>A named refinement (<c>§RTYPE</c>) is nominal: its identity includes
+/// <see cref="RefinementName"/>, so <c>Nat</c> and <c>Pos</c> over the same <c>i32</c> are
+/// different types and neither is assignable to the other. Before #1530 every named refinement's
+/// <see cref="PredicateText"/> was <c>#&lt;base&gt;</c>, so any two refinements of one base compared
+/// equal and one could be bound or passed where the other was expected.</para>
 /// </summary>
 public sealed class RefinedType : CalorType
 {
     public CalorType BaseType { get; }
     public string PredicateText { get; }
     public Ast.ExpressionNode Predicate { get; }
-    public override string Name => $"{BaseType.Name}{{{PredicateText}}}";
-    public override string SurfaceName => $"{BaseType.SurfaceName}{{{PredicateText}}}";
 
-    public RefinedType(CalorType baseType, string predicateText, Ast.ExpressionNode predicate)
+    /// <summary>The <c>§RTYPE</c> name, or null for an anonymous refinement.</summary>
+    public string? RefinementName { get; }
+
+    public override string Name => RefinementName is null
+        ? $"{BaseType.Name}{{{PredicateText}}}"
+        : $"{BaseType.Name}{{{RefinementName}}}";
+    public override string SurfaceName => RefinementName
+        ?? $"{BaseType.SurfaceName}{{{PredicateText}}}";
+
+    public RefinedType(
+        CalorType baseType,
+        string predicateText,
+        Ast.ExpressionNode predicate,
+        string? refinementName = null)
     {
         BaseType = baseType ?? throw new ArgumentNullException(nameof(baseType));
         PredicateText = predicateText ?? throw new ArgumentNullException(nameof(predicateText));
         Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        RefinementName = refinementName;
     }
 
     public override bool Equals(CalorType? other)
     {
         if (other is RefinedType rt)
-            return BaseType.Equals(rt.BaseType) && PredicateText == rt.PredicateText;
+            return BaseType.Equals(rt.BaseType)
+                && PredicateText == rt.PredicateText
+                && string.Equals(RefinementName, rt.RefinementName, StringComparison.Ordinal);
         return false;
     }
 
-    public override int GetHashCode() => HashCode.Combine("Refined", BaseType, PredicateText);
+    public override int GetHashCode()
+        => HashCode.Combine("Refined", BaseType, PredicateText, RefinementName);
 }
 
 /// <summary>

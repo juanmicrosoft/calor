@@ -3,7 +3,7 @@
   "issue": 1589,
   "note": "Expected (class, token) per sweep case at main, checked by scripts/soundness_sweep_gate.py. Update only in a reviewed PR, with the reason in the PR body.",
   "recordedFrom": {
-    "commit": "399649371c66ddc8e20709ea234c2f40109b2879",
+    "commit": "eb0864aba9e32d0bb6ed720770c18d44976b5274",
     "runner": "local macOS arm64 (Apple silicon), .NET 10 SDK"
   },
   "cases": {
@@ -2312,24 +2312,24 @@
       "token": "Unsupported"
     },
     "R1-OBL-SUBTYPE-001": {
-      "class": "no-claim",
-      "token": "Failed"
+      "class": "harness-invalid",
+      "token": null
     },
     "R1-OBL-SUBTYPE-002": {
-      "class": "validated-proof",
-      "token": "Discharged"
+      "class": "harness-invalid",
+      "token": null
     },
     "R1-OBL-SUBTYPE-003": {
-      "class": "no-claim",
-      "token": "Failed"
+      "class": "harness-invalid",
+      "token": null
     },
     "R1-OBL-SUBTYPE-004": {
-      "class": "no-claim",
-      "token": "Failed"
+      "class": "harness-invalid",
+      "token": null
     },
     "R1-OBL-SUBTYPE-005": {
-      "class": "no-claim",
-      "token": "Failed"
+      "class": "harness-invalid",
+      "token": null
     },
     "R1-OBL-INDEX-BOUNDS-001": {
       "class": "no-claim",
