@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-23
+
+Calor 0.26 has three C# → Calor converter fixes, and one of them fixes a silent behavior
+change: a chained assignment such as `x = y = G()` called `G()` once per target. Releases no
+longer need an adjudication record (a committed review record that the release workflow used to
+require), and every check on the shipped packages still blocks a release. Two new CI checks
+compare converted code with the original: a round-trip harness leg that converts the way
+`calor convert` does by default, and a member-level differential oracle. The 0.24 and 0.25
+review records in `docs/plans/evidence/` moved to an archive branch.
+
+### Release health
+
+The 0.26 epic (#1591) asks every release from 0.26.0 on to record two numbers.
+
+- **Median time from a fix merging to it being on nuget.org: 1 day.** This release has 3
+  user-facing fixes, all in the converter, merged on 2026-10-22: #1628 (16:44 UTC), #1631
+  (19:43 UTC) and #1630 (21:56 UTC). The number is computed from the release date in this
+  section's header, 2026-10-23, not from the time nuget.org listed the packages. It is based on
+  only 3 fixes.
+- **Silent wrong-output bugs reported against 0.25.0: 1 (#1633).** A silent wrong-output bug is
+  one where Calor accepts the input, produces code that behaves differently, and reports
+  success. 0.25.0 was published on 2026-10-22. In `x += F().N();` the converter calls `F()`
+  before it reads `x`. When `F()` changes `x`, the converted code computes a different value
+  (12 instead of 3 in the issue's example), and the conversion still reports success. The
+  published 0.25.0 tool reproduces it. **It is not fixed in 0.26.0**; the fix is planned for
+  0.27.
+- **Known issue, not counted above (#1541, #1524).** The converter mishandles some collection
+  and object initializers: `new List<int> { 5 }` becomes `new List<int>(5)`, an empty list, and
+  an initializer such as `Capacity = 64` is dropped. Both were reported before 0.25.0, so they
+  do not count against it. Both still reproduce in 0.26.0, and the new member-level oracle
+  (#1587, below) flags them in its test fixture.
+
 ### Fixed
 
 - **The C# → Calor converter no longer fixes `~/.calor/manifests` for the whole process
@@ -149,10 +181,10 @@ what a program does.
   commit in its own checkout. The font check and the wording scan come from `main`, so redeploying
   an older tag meets today's checks. The deploy no longer clones the full repository.
 - **Publishing benchmark results needs no release (#1585).** The benchmark headline is computed
-  from the committed B1 results (226 registered Calor/C# program pairs, 17 of them included) at a
-  `main` commit. So
-  the publication branch and pull request are now named after that commit, not the version in
-  `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks.
+  from the committed B1 results at a `main` commit. So the publication branch and pull request
+  are now named after that commit, not the version in `Directory.Build.props`. The #1422
+  publication gate keeps all of its refusal checks. This release publishes no new benchmark
+  results.
 - **The B1 registration and results files moved to `eng/benchmark-publication/b1-1276/` (#1585),**
   byte for byte, so they survive when `docs/plans/evidence/` is archived. (#1584 then removed
   their hash seals and the gate's use of the #1407 evidence contract; see below.)

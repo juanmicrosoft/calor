@@ -12,12 +12,12 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.25.0';
-const releaseDate = '2026-10-20';
+const currentRelease = '0.26.0';
+const releaseDate = '2026-10-23';
 // 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
 const advisoryRelease = '0.24.0';
-// The release that last published static benchmark numbers. 0.24.0 and 0.25.0 publish none: benchmark
-// publication is governed separately (#1276/#1422), through its own benchmark.yml dispatch.
+// The release that last published static benchmark numbers. 0.24.0 through 0.26.0 publish none:
+// benchmark publication is governed separately (#1276/#1422), through its own benchmark.yml dispatch.
 const benchmarkRelease = '0.22.0';
 const benchmarkReleaseDate = '2026-09-15';
 const pauseHandoff = 'https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487';
@@ -243,7 +243,8 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'Converting C# to Calor: ref/out, interpolated strings, local functions and arrays.', { exact: true },
+      'Releases no longer need a review record, and two new CI checks compare converted code with the original.',
+      { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
     await expect(page).toHaveURL(/\/docs\/changelog\/$/);
@@ -444,7 +445,8 @@ test('research milestones stay distinct from software releases', async () => {
   expect(rootChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
   expect(rootCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
   expect(normalizedRootCurrentSection).toContain('This release publishes no new benchmark results');
-  expect(normalizedRootCurrentSection).toContain('Nothing was released.');
+  expect(normalizedRootCurrentSection).toContain('### Release health');
+  expect(normalizedRootCurrentSection).toContain('It is not fixed in 0.26.0');
   const rootAdvisorySection = rootChangelog.match(
     new RegExp(`^## \\[${advisoryRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
   )?.[0] ?? '';

@@ -140,7 +140,7 @@ Creates the following files:
 
 #### Calor-First Enforcement
 
-Like Claude Code, **Gemini CLI supports hooks** (as of v0.26.0+). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
+Like Claude Code, **Gemini CLI supports hooks** (since its v0.26 release). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
 
 Gemini will receive a JSON response blocking the operation and suggesting an `.calr` file instead. This enforcement ensures all new code is written in Calor.
 

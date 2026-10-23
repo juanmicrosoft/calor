@@ -257,7 +257,7 @@ Creates the following files:
 
 #### Calor-First Enforcement
 
-Like Claude Code, **Gemini CLI supports hooks** (as of v0.26.0+). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
+Like Claude Code, **Gemini CLI supports hooks** (since its v0.26 release). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
 
 When Gemini tries to write a C# file, the hook returns a JSON response that blocks the operation and provides guidance:
 
