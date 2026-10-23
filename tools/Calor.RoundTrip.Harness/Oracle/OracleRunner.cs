@@ -320,9 +320,8 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
 
     /// <summary>
     /// A failure's identity for baselines: status, checkpoint, exit code (<c>exit N</c> or <c>dotnet build failed (N)</c>),
-    /// and the failure detail with volatile tokens normalized away (absolute paths, line/column positions, hex hashes,
-    /// GUIDs, durations), so the same failure keeps its fingerprint across machines while two different errors with the
-    /// same code (CS0103 for <c>Foo</c> and for <c>Bar</c>) do not alias.
+    /// and the failure detail with only clearly volatile tokens removed (see <see cref="NormalizeFailure"/>), so the same
+    /// failure keeps its fingerprint across machines while two different errors with the same code do not alias.
     /// </summary>
     internal static string FailureFingerprint(OracleFileReport file)
     {
@@ -331,13 +330,18 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         return MemberDifferentialOracle.Hash(string.Join("\u0001", file.Status, file.Checkpoint ?? "", exit, NormalizeFailure(detail)));
     }
 
+    /// <summary>
+    /// Removes only tokens that are clearly volatile: absolute paths (which carry temp-directory names), line and column
+    /// positions, canonical 8-4-4-4-12 GUIDs, <c>0x</c>-prefixed addresses, and the oracle's own temp-directory names.
+    /// Identifiers, including ones that look like hex (<c>deadbeefdead</c>), are kept.
+    /// </summary>
     internal static string NormalizeFailure(string detail)
     {
         var s = System.Text.RegularExpressions.Regex.Replace(detail, @"(?:[A-Za-z]:)?(?:[/\\][^\s:()'""\[\]]+)+", "<path>");
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\(\d+,\d+(?:,\d+,\d+)?\)", "");
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", "<guid>");
-        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b[0-9a-f]{12,}\b", "<hex>");
-        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b\d+(?:\.\d+)?\s*(?:ms|s)\b", "<time>");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b0x[0-9a-fA-F]+\b", "<address>");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\bcalor-(?:oracle-1587|roundtrip|t1)-[A-Za-z0-9_]+\b", "<temp>");
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ");
         return s.Trim();
     }

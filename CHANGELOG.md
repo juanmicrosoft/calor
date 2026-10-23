@@ -103,8 +103,8 @@ what a program does.
     fails if a file listed in `eng/member-oracle-expected.json` is no longer checked.
   - Both builds come from `dotnet build`, so the oracle compares exactly what the project
     would ship.
-  - When it landed, it exercised 92 of 289 corpus files and compared 934 distinct members
-    with no difference found. Another 1,064 members could not be driven yet, mostly
+  - When it landed, it exercised 92 of 289 corpus files and compared 931 distinct members
+    with no difference found. Another 1,067 members could not be driven yet, mostly
     because no generated input can construct them. The issue's two-member example is a
     test fixture, and the oracle flags it.
 

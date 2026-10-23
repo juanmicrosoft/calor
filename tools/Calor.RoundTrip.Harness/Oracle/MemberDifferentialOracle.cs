@@ -139,13 +139,15 @@ public static partial class MemberDifferentialOracle
     /// part is set aside alone, so nondeterminism in one part (a <c>Guid.NewGuid()</c> static, say) never hides a stable
     /// difference in another. An input counts as compared when its primary part (the member's result, or a type's
     /// statics) is reproducible and complete on both builds; a setup failure identical on both builds is not evidence.
+    /// A part rendered identically but incompletely is reported, because it can hide a difference.
     /// </summary>
-    internal static (List<(string Part, string A, string B)> Differing, List<string> Unstable, bool Compared) CompareParts(
+    internal static (List<(string Part, string A, string B)> Differing, List<string> Unstable, bool Compared, List<string> Incomplete) CompareParts(
         string a1, string a2, string b1, string b2)
     {
         var (pa1, pa2, pb1, pb2) = (Parts(a1), Parts(a2), Parts(b1), Parts(b2));
         var differing = new List<(string, string, string)>();
         var unstable = new List<string>();
+        var incomplete = new List<string>();
         var compared = false;
         // The member's own outcome: it must be reproducible and complete for the input to count as compared (other parts,
         // such as an empty stdout, are always stable and prove nothing on their own).
@@ -162,10 +164,12 @@ public static partial class MemberDifferentialOracle
             }
             if (x1 != y1)
                 differing.Add((name, x1, y1));
-            else if (name == primary && !StateRenderer.IsIncompleteObservation(x1))
+            else if (StateRenderer.IsIncompleteObservation(x1))
+                incomplete.Add(name);
+            else if (name == primary)
                 compared = true;
         }
-        return (differing, unstable, compared || differing.Count > 0);
+        return (differing, unstable, compared || differing.Count > 0, incomplete);
     }
 
     /// <summary>The verdict for one member from its four runs (original 1, converted 1, original 2, converted 2).</summary>
@@ -178,10 +182,12 @@ public static partial class MemberDifferentialOracle
         var unstableParts = new SortedDictionary<string, int>(StringComparer.Ordinal);
         (string Label, string Part, string X, string Y)? firstUnstable = null;
         var executed = 0;
+        var incompleteParts = new SortedSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < n; i++)
         {
             var label = MemberOracleInputs.Render(member.Inputs[i]);
-            var (diff, unstable, compared) = CompareParts(a1[i], a2[i], b1[i], b2[i]);
+            var (diff, unstable, compared, incomplete) = CompareParts(a1[i], a2[i], b1[i], b2[i]);
+            incompleteParts.UnionWith(incomplete);
             differing.AddRange(diff.Select(d => ($"{label} [{d.Part}]", d.A, d.B)));
             foreach (var part in unstable)
             {
@@ -205,6 +211,16 @@ public static partial class MemberDifferentialOracle
                 Status = MemberStatus.Different, Reason = "OBSERVATION" + (unstableNote is null ? "" : "; " + unstableNote), Inputs = executed,
                 Witnesses = differing.Take(options.MaxWitnesses).Select(d => Witness(member.Member, d.Label, d.A, d.B, "original", "converted")).ToList(),
                 Fingerprint = Hash(string.Join("\u0000", differing.Select(d => $"{d.Label}\u0001{d.A}\u0002{d.B}"))),
+            };
+        }
+        // A part that could not be rendered in full may hide a difference: the member is never AGREE and never counts as
+        // compared coverage (any stable difference elsewhere has already failed above).
+        if (incompleteParts.Count > 0)
+        {
+            return verdict with
+            {
+                Status = MemberStatus.Skipped, Inputs = 0,
+                Reason = "incomplete observation: the " + string.Join(", ", incompleteParts) + " part could not be rendered in full on either build",
             };
         }
         if (executed == 0 && firstUnstable is { } u)
@@ -255,6 +271,20 @@ public static partial class MemberDifferentialOracle
         var summary = $"original {Describe(original)}, converted {Describe(converted)}";
         if (original.Concat(converted).Any(p => p.Outcome == ProbeOutcome.Infrastructure))
             return ("infrastructure:" + summary, prefix with { Status = MemberStatus.Inconclusive, Reason = $"input {k}: a replay never reached the input ({summary})" });
+        // All four replays finished: compare part by part first. A nondeterministic part (a Guid return, say) is set aside
+        // alone; a stable difference in any other part (arguments, receiver, statics, console, files) fails.
+        if (original.Concat(converted).All(p => p.Finished)
+            && CompareParts(original[0].Observation!, original[1].Observation!, converted[0].Observation!, converted[1].Observation!) is
+                { Differing: { Count: > 0 } stableDifferences })
+        {
+            var evidence = string.Join("\u0000", stableDifferences.Select(d => $"{d.Part}\u0001{d.A}\u0002{d.B}"));
+            return ($"differs:{Hash(evidence)}", prefix with
+            {
+                Status = MemberStatus.Different, Reason = "OBSERVATION",
+                Witnesses = [.. stableDifferences.Take(options.MaxWitnesses).Select(d => Witness(prefix.Member, $"input #{k} [{d.Part}] (replayed from clean state)", d.A, d.B, "original", "converted"))],
+                Fingerprint = Hash($"{k}\u0001" + evidence),
+            });
+        }
         // A build's replays must reproduce their termination and their primary part (the member's result); other parts
         // may be noisy (a Guid static) and are compared part by part below, so they neither block HANG/CRASH attribution
         // nor hide a stable difference.
@@ -282,13 +312,6 @@ public static partial class MemberDifferentialOracle
                 Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
             });
         }
-        if (o.Finished && c.Finished && CompareParts(o.Observation!, original[1].Observation!, c.Observation!, converted[1].Observation!).Differing is { Count: > 0 } parts)
-            return ($"differs:{Hash(string.Join("\u0000", parts.Select(d => $"{d.Part}\u0001{d.A}\u0002{d.B}")))}", prefix with
-            {
-                Status = MemberStatus.Different, Reason = "OBSERVATION",
-                Witnesses = [.. parts.Take(options.MaxWitnesses).Select(d => Witness(prefix.Member, $"input #{k} [{d.Part}] (replayed from clean state)", d.A, d.B, "original", "converted"))],
-                Fingerprint = Hash($"{k}\u0001" + string.Join("\u0000", parts.Select(d => $"{d.Part}\u0001{d.A}\u0002{d.B}"))),
-            });
         return (o.Finished && c.Finished ? "agrees" : $"both-fail:{o.Outcome}/{c.Outcome}", prefix with
         {
             Reason = !o.Finished && !c.Finished

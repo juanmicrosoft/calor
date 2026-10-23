@@ -257,13 +257,13 @@ When it landed (2026-10-22), it exercised 92 of 289 files:
 | Synthetic | 5 of 5 | 41 | 0 |
 | Synthetic2 | 1 of 1 | 10 | 0 |
 | MediatR | 8 of 32 | 78 | 63 |
-| Serilog | 14 of 112 (6 excluded) | 339 | 391 |
+| Serilog | 14 of 112 (6 excluded) | 336 | 394 |
 | FluentValidation | 64 of 139 | 466 | 610 |
 
 The other files do not convert with the default options. Most members are
 never compared because no generated input can build their receiver or
 arguments: interfaces, delegates and subject types without a usable
-constructor. Across all file swaps, the oracle made 35,409 member comparisons
+constructor. Across all file swaps, the oracle made 35,367 member comparisons
 and found no difference. The whole corpus took about 6 minutes on a 4-job
 laptop run. `AGREE` means no disagreement on a finite input set, not a proof
 of equivalence.

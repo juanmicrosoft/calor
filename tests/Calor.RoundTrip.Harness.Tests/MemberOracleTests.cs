@@ -663,7 +663,7 @@ public class MemberOracleTests
     {
         static string Obs(string result, string project) =>
             "result" + MemberDifferentialOracle.NameSeparator + result + MemberDifferentialOracle.PartSeparator + "project" + MemberDifferentialOracle.NameSeparator + project;
-        var (differing, unstable, compared) = MemberDifferentialOracle.CompareParts(Obs("1", "g1"), Obs("1", "g2"), Obs("2", "g3"), Obs("2", "g4"));
+        var (differing, unstable, compared, _) = MemberDifferentialOracle.CompareParts(Obs("1", "g1"), Obs("1", "g2"), Obs("2", "g3"), Obs("2", "g4"));
         Assert.Equal(["result"], differing.Select(d => d.Part));
         Assert.Equal(["project"], unstable);
         Assert.True(compared);
@@ -683,6 +683,43 @@ public class MemberOracleTests
         Assert.NotEqual(OracleRunner.FailureFingerprint(foo), OracleRunner.FailureFingerprint(bar));
         Assert.NotEqual(OracleRunner.FailureFingerprint(foo), OracleRunner.FailureFingerprint(otherExit));
         Assert.DoesNotContain("/tmp", OracleRunner.NormalizeFailure(foo.Detail!), StringComparison.Ordinal);
+    }
+
+    /// <summary>A replayed input whose return is nondeterministic still fails on a stable argument difference.</summary>
+    [Fact]
+    public void ReplayedInput_StablePartDifferenceFailsDespiteANondeterministicReturn()
+    {
+        static ProbeResult Finished(string result, string args) => new(ProbeOutcome.Finished, 0.1,
+            "result" + MemberDifferentialOracle.NameSeparator + result + MemberDifferentialOracle.PartSeparator + "args" + MemberDifferentialOracle.NameSeparator + args);
+        var prefix = new MemberVerdict { Type = "T", Member = "F()", Kind = "static", Status = MemberStatus.Timeout, LimitedAt = 3, Inputs = 3 };
+        var verdict = MemberDifferentialOracle.ClassifyTimeout(prefix,
+            [Finished("return=guid-1", "[1]"), Finished("return=guid-2", "[1]")],
+            [Finished("return=guid-3", "[2]"), Finished("return=guid-4", "[2]")],
+            new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) });
+        Assert.Equal(MemberStatus.Different, verdict.Status);
+        Assert.Contains("[args]", verdict.Witnesses[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>An observation part that cannot be rendered in full makes the member skipped, never AGREE or coverage.</summary>
+    [Fact]
+    public void IncompleteSecondaryPart_IsNeverAgreement()
+    {
+        const string d = "public static class S { public static System.Func<System.IO.Stream, int> D; ";
+        var verdicts = Compare(d + "public static void F() { D = s => 1; } }", d + "public static void F() { D = s => 2; } }", ["S"]);
+        var f = Single(verdicts, "static F()->System.Void");
+        Assert.Equal(MemberStatus.Skipped, f.Status);
+        Assert.StartsWith("incomplete observation", f.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, f.Inputs);
+    }
+
+    [Fact]
+    public void FailureFingerprint_KeepsHexLookingIdentifiers()
+    {
+        OracleFileReport Failure(string name) => new() { File = "a.cs", Status = "candidate-build-failed",
+            Detail = $"dotnet build failed (1): /tmp/calor-oracle-1587-AbC123/work/A.cs(3,9): error CS0103: The name '{name}' does not exist in the current context" };
+        Assert.NotEqual(OracleRunner.FailureFingerprint(Failure("deadbeefdead")), OracleRunner.FailureFingerprint(Failure("cafebabecafe")));
+        Assert.Contains("deadbeefdead", OracleRunner.NormalizeFailure(Failure("deadbeefdead").Detail!), StringComparison.Ordinal);
+        Assert.Equal("at <address> id <guid>", OracleRunner.NormalizeFailure("at 0x7ffe12 id 0f8fad5b-d9cb-469f-a165-70867728950e"));
     }
 
     // ---- Codex round 2 false negatives --------------------------------------------------------
