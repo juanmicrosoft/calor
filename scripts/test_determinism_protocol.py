@@ -229,6 +229,22 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.assertIn("D016", codes(protocol=no_cells, baseline=(PROTOCOL, CASES)))
         no_gate = mutate(lambda p: p["gates"]["steps"].pop(0))
         self.assertIn("D016", codes(protocol=no_gate, baseline=(PROTOCOL, CASES)))
+        # Review round 1 (#1584): a gate command weakened in the workflow and in the protocol together.
+        command = PROTOCOL["gates"]["steps"][0]["commands"][0]
+
+        def masked(p):
+            gate = p["gates"]["steps"][0]
+            gate["commands"] = [c + " || true" if c == command else c for c in gate["commands"]]
+            gate["script"] = [c + " || true" if c == command else c for c in gate["script"]]
+        test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        self.assertIn(command, test_yml)
+        self.assertIn("D016", codes(protocol=mutate(masked), baseline=(PROTOCOL, CASES),
+                                    texts={".github/workflows/test.yml": test_yml.replace(command, command + " || true", 1)}))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["steps"][0].update(after=[])), baseline=(PROTOCOL, CASES)))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"].pop()), baseline=(PROTOCOL, CASES)))
+        # A reviewed shard-script change only moves its pin; D014 still checks the script's structure.
+        repinned = mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptSha256="0" * 64))
+        self.assertNotIn("D016", codes(protocol=repinned, baseline=(PROTOCOL, CASES)))
         # #1584: a reviewed change that weakens nothing needs no amendment entry.
         reworded = mutate(lambda p: p["limitations"].append("an added limitation"))
         self.assertEqual(set(), codes(protocol=reworded, baseline=(PROTOCOL, CASES)))

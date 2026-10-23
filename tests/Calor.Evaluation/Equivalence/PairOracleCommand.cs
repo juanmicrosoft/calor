@@ -59,7 +59,7 @@ public static class PairOracleCommand
         return 0;
     }
 
-    /// <summary>Null when the checkout is the clean registration commit and every seal and pin matches.</summary>
+    /// <summary>Null when the checkout is the clean registration commit and every seal and pin it carries matches.</summary>
     internal static string? Preflight(string registrationDir, string registrationCommit)
     {
         if (!Regex.IsMatch(registrationCommit, "^[0-9a-f]{40}$"))
@@ -69,10 +69,25 @@ public static class PairOracleCommand
             return "HEAD is not the registration commit";
         if (Git(root, "status", "--porcelain", "--untracked-files=all").Length > 0)
             return "the checkout is not clean: an edited or untracked file could change the compiler, oracle, or packet (write outputs outside the repository)";
-        var seals = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "sha256.json")))!["files"]!.AsObject();
+        return PinProblem(root, registrationDir);
+    }
+
+    /// <summary>
+    /// The first registered hash the checkout does not match, or null. The B1 registration merged at f0e0eb68 carries a seal
+    /// (<c>sha256.json</c>) and oracle hash pins, and both are checked when present. #1584 removed them from the current
+    /// registration; pair contents are still checked per pair (step 1, IDENTITY_MISMATCH) and the run is bound to a clean
+    /// checkout of the registration commit.
+    /// </summary>
+    internal static string? PinProblem(string root, string registrationDir)
+    {
+        var sealPath = Path.Combine(registrationDir, "sha256.json");
+        var seals = File.Exists(sealPath)
+            ? JsonNode.Parse(File.ReadAllText(sealPath))!["files"]!.AsObject().Select(f => (f.Key, f.Value!.GetValue<string>()))
+            : [];
         var registration = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "registration.json")))!;
-        var pins = seals.Select(f => (f.Key, f.Value!.GetValue<string>()))
-            .Concat(registration["oracle"]!["implementation"]!.AsArray().Select(f => (f!["path"]!.GetValue<string>(), f["sha256"]!.GetValue<string>())));
+        var pins = seals.Concat(registration["oracle"]!["implementation"]!.AsArray()
+            .Where(f => f!["sha256"] is not null)
+            .Select(f => (f!["path"]!.GetValue<string>(), f["sha256"]!.GetValue<string>())));
         foreach (var (path, sha) in pins)
         {
             var full = Path.Combine(root, path);

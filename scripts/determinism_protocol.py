@@ -427,6 +427,22 @@ def vkey(version: str) -> tuple:
     return tuple(int(x) for x in version.split("."))
 
 
+def gates_weakened(old_p, protocol) -> bool:
+    """D016: every gate on protected main is still registered under the same workflow, job and step, with
+    every earlier step it required, and (for a gate with a pinned script) every command and every script
+    line it had, unchanged. A gate may gain lines; a shard step's scriptSha256 may change (D014 still
+    checks its structure)."""
+    for kind in ("steps", "shardSteps"):
+        new = {(g["workflow"], g["job"], g["step"]): g for g in protocol.get("gates", {}).get(kind, [])}
+        for old in old_p.get("gates", {}).get(kind, []):
+            now = new.get((old["workflow"], old["job"], old["step"]))
+            if now is None or not set(old.get("after", [])) <= set(now.get("after", [])) \
+                    or not set(old.get("commands", [])) <= set(now.get("commands", [])) \
+                    or not set(old.get("script", [])) <= set(now.get("script", [])):
+                return True
+    return False
+
+
 def validate(root: Path, protocol=None, cases=None, texts=None, baseline=None) -> list[tuple[str, str]]:
     """texts maps a repository-relative path to replacement text (negative controls only).
     baseline is (protocol, cases) as registered on protected main, when one exists."""
@@ -573,9 +589,7 @@ def validate(root: Path, protocol=None, cases=None, texts=None, baseline=None) -
         old_rows = {r["id"]: r for r in old_p["determinismRows"]}
         weaker = [name for name, bad in (
             ("cases or contributions removed", any(new_m.get(k, 0) < n for k, n in old_m.items())),
-            ("a gate was removed", any((g["workflow"], g["job"], g["step"]) not in
-                                       {(n["workflow"], n["job"], n["step"]) for n in protocol.get("gates", {}).get(k, [])}
-                                       for k in ("steps", "shardSteps") for g in old_p.get("gates", {}).get(k, []))),
+            ("a gate was removed or lost a command, script line, or prerequisite", gates_weakened(old_p, protocol)),
             ("a registered cell or artifact was repurposed", new_cells[:len(old_c["cells"]["ids"])] != old_c["cells"]["ids"]
              or any(a not in new_arts for a in old_c["artifacts"])),
             ("determinism row mapping narrowed", any(not (set(r["cases"]) <= set(rows.get(i, {}).get("cases", []))

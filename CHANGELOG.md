@@ -132,10 +132,8 @@ what a program does.
   the publication branch and pull request are now named after that commit, not the version in
   `Directory.Build.props`. The #1422 publication gate keeps all of its refusal checks.
 - **The B1 registration and results files moved to `eng/benchmark-publication/b1-1276/` (#1585),**
-  byte for byte, so they survive when `docs/plans/evidence/` is archived. Their hash seals still
-  name the old paths, and the gate maps those names to the new location instead of rewriting
-  anything sealed. The gate's third input, the #1407 evidence contract, has not moved yet: a
-  hash-pinned determinism script reads it from `docs/plans/evidence/`.
+  byte for byte, so they survive when `docs/plans/evidence/` is archived. (#1584 then removed
+  their hash seals and the gate's use of the #1407 evidence contract; see below.)
 - **`docs/plans/evidence/` is archived, and a clone is about 140 MB smaller (#1584).** The
   directory held 2,990 review records, TRX files, transcripts and freeze manifests from the 0.24
   and 0.25 milestones. All of it is on the orphan branch `evidence/archive-2026-10` (a branch
@@ -156,10 +154,13 @@ what a program does.
 - **The determinism and benchmark gates lost their freeze machinery, not their checks
   (#1584).** The determinism protocol (the workflow that runs the verifier tests many times on
   every platform and compares the results byte for byte) no longer charges a compute budget, binds
-  runs to a release candidate, or runs `main`'s copy of its validator; its hash freeze (D015) and
-  amendment log are gone. The benchmark publication gate no longer reads seals or the 0.24
-  contract's amendment log; a method change is now a reviewed change to the registration. Both
-  still run every content check, and a local re-run reproduced the B1 results byte for byte.
+  runs to a release candidate, or runs `main`'s copy of its validator. Its hash freeze (D015) is
+  gone, and a change no longer needs an amendment-log entry; the existing entries stay as history.
+  It still refuses a change that weakens it against `main`, such as a removed case or a gate
+  command that lost its failure status. The benchmark publication gate no longer reads seals or
+  the 0.24 contract's amendment log; a method change is now a reviewed change to the
+  registration. Both still run every content check, and a local re-run reproduced the B1 results
+  byte for byte.
 
 ### Documentation
 
