@@ -173,13 +173,13 @@ new diagnostic. The C# converter emits code that passes all four checks.
   `main` opens or updates one issue labeled `soundness-sweep`. Each pull request checks that
   the sweep still builds and that the fixture covers every case. `main` passes today: 0
   findings, and 4 of 710 cases time out. (#1589)
-- **An audit of the member oracle found 25 ways a real behavior change could pass, and fixed
+- **An audit of the member oracle found 36 ways a real behavior change could pass, and fixed
   them.** The member oracle (new in 0.26) runs each converted file's members on the original
   build and on the converted build, and compares what they do. The audit lists every way a
   comparison can end without a difference (AGREE, SKIPPED, NONDETERMINISTIC, TIMEOUT,
   INCONCLUSIVE, and hang or crash replays) in the oracle's README. For each one, a new test
   injects a real change by hand and checks that the oracle reports it or excludes the member
-  with a reason. 25 of these 67 tests passed silently before the fixes. Among the fixes:
+  with a reason. 36 of these 85 tests passed silently before the fixes. Among the fixes:
   - A thrown exception is compared by its message, data and inner exception, not by its type
     alone.
   - When one input times out, the inputs after it still run. Before, they were dropped.
@@ -188,6 +188,8 @@ new diagnostic. The C# converter emits code that passes all four checks.
   - Generic code also runs with `int` as the type argument, not only `object`.
   - Standard output and standard error are compared separately.
   - `ValueTask` results are awaited, and async streams and iterators are read to the end.
+  - A difference seen in the first two runs per build is confirmed by 6 more runs, so a random
+    value that repeats by chance no longer fails CI.
 
   Only the oracle changed; the converter did not. On the corpus, the oracle now compares
   648 instead of 466 members per FluentValidation file, and still finds no difference. The
