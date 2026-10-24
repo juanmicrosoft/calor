@@ -316,7 +316,7 @@ public class InheritanceTests
         var source = @"
 §M{m1:Test}
   §CL{c1:AbstractBase:abs}
-      §MT{mt1:Method:abs}
+      §MT{mt1:Method:pub:abs}
           §O{void}
 ";
 
@@ -459,7 +459,7 @@ public class InheritanceTests
         var source = @"
 §M{m1:Test}
   §CL{c1:NonAbstract:pub}
-      §MT{mt1:AbstractMethod:abs}
+      §MT{mt1:AbstractMethod:pub:abs}
           §O{void}
 ";
 

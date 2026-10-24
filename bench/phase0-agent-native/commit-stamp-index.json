@@ -27,16 +27,16 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "ddc3ff2e09640c19c422452505c7de84a3d445aa",
+      "measuredCommit": "bb9393c2cf96fd8747b9fd8040c945fbe917dd41",
       "basis": "post-merge-write-back",
-      "note": "#1633/#1632/#1634 (0.27, PR #1673): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at ddc3ff2e (the fix's code head). Calor0411Sites MediatR 289 -> 290 (Internal/HandlersOrderer.cs: the else-if whose hoisted _idx temp was lost now nests under the else and binds, +1) and FluentValidation 7867 -> 7869 (Internal/CollectionPropertyRule.cs: the statement after the AfterValidate: label is no longer dropped, +2). The CliCrossCheck block moves MediatR StopCalor1002 12 -> 11 and CompileClean 10 -> 11; PR #1631 measured the same move on main's own compiler, so it is pre-existing drift, not this change. Modules enforced, excluded and Calor0425 counts are unchanged. F1's completed identity (measured 9b9ba79f, landed f83b4e59, PR #1558) remains in the repository history.",
+      "note": "#1550/#1607/#1608/#1635 (0.27, PR #1674): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at bb9393c2 (the language-fix head rebased onto #1673, clean src). Every count equals the #1673 measurement; only the measured commit moves. No module stops on the new Calor0213 (an earlier measurement of this PR found one, FluentValidation ITestValidationContinuation.cs, and the converter fix for accessor bodies removed it). This supersedes #1673's pending identity (measured ddc3ff2e, PR #1673) before its write-back; that record remains in the repository history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "ddc3ff2e09640c19c422452505c7de84a3d445aa",
-          "pr": 1673,
+          "headCommit": "bb9393c2cf96fd8747b9fd8040c945fbe917dd41",
+          "pr": 1674,
           "treeHashes": {
-            "src": "d040ccdf983806bd73927b61f7aa341a91680da9",
+            "src": "51ee81a28503b1240300c451cc6b4b53e74c1044",
             "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
             "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
             "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
@@ -46,38 +46,28 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "67bc32936d550ba1ee66cd3a85a40d07a520ae2577f3781ecc75c163303946e7"
+          "artifactSha256": "ee7fa6a76447b667a6dc2ad071ecf6fceb39ec4d2f483e2eebbd7ed07a4a8cb7"
         }
       }
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
+      "measuredCommit": "bb9393c2cf96fd8747b9fd8040c945fbe917dd41",
       "basis": "post-merge-write-back",
-      "note": "#847 (0.25 F3, converter PR): both legs regenerated on dee529b8 (the F3 converter PR head, clean src) after adding expected.calr and test.calr for the local-function D-S1.5 fixture. D-A files 948->950; its 45 early-stop identities and total demand 3123 are unchanged. D-B is unchanged. Pending until the PR lands; the previous identity (F2, #1522, measured 7b117564, completed by the #1557 write-back) remains in git history.",
+      "note": "#1550 (0.27, PR #1674): D-A regenerated at bb9393c2 (the language-fix head, clean src). 14 more files stop before the effect pass (45 -> 59), all on the new Calor0213 (a write to an immutable binding): 9 archived agent outputs under epochs/ and 5 registered benchmarks in tests/TestData/Benchmarks. Total demand 3123 is unchanged. D-B is unchanged. Pending until the PR lands; the previous identity (#1531, measured dee529b8) remains in git history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "5bbc15b6a020f88b55a41109b93a7d8322726dfc",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d",
-          "/": "276388565e96a881258c82396e2a4a03122a188e"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "dee529b80298db16de1ce47acdd2fa3da57136ea",
-          "pr": 1531,
-          "phase1TreeHashes": {
-            "src": "289cf287dceb0b6e0f1ad6afe1dbe3e488bfbe2d"
+        "status": "pending",
+        "phase1": {
+          "headCommit": "bb9393c2cf96fd8747b9fd8040c945fbe917dd41",
+          "pr": 1674,
+          "treeHashes": {
+            "src": "51ee81a28503b1240300c451cc6b4b53e74c1044"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "phase1ArtifactSha256": "78d3237937aef7295310af5189040419d556c9be8bb6ef5f35bdea50355e0ccd"
+          "artifactSha256": "e336b09a528c57c36899fd7878a3e13a1991c134b48459e69c75ad6cfcb0da6b"
         }
       }
     },

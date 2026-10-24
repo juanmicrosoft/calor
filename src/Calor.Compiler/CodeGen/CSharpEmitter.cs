@@ -8928,8 +8928,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             StringOp.StartsWith => $"{args[0]}.StartsWith({args[1]})",
             StringOp.EndsWith when compMode != null => $"{args[0]}.EndsWith({args[1]}, {compMode})",
             StringOp.EndsWith => $"{args[0]}.EndsWith({args[1]})",
-            StringOp.IndexOf when compMode != null => $"{args[0]}.IndexOf({args[1]}, {compMode})",
-            StringOp.IndexOf => $"{args[0]}.IndexOf({args[1]})",
+            // #1608: every operand after the receiver is emitted (start index, count).
+            StringOp.IndexOf when compMode != null => $"{args[0]}.IndexOf({string.Join(", ", args.Skip(1))}, {compMode})",
+            StringOp.IndexOf => $"{args[0]}.IndexOf({string.Join(", ", args.Skip(1))})",
             StringOp.Equals when compMode != null => $"{args[0]}.Equals({args[1]}, {compMode})",
             StringOp.Equals => $"{args[0]}.Equals({args[1]})",
 
@@ -9056,7 +9057,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             // Creation
             StringBuilderOp.New when args.Count == 0 => "new System.Text.StringBuilder()",
-            StringBuilderOp.New => $"new System.Text.StringBuilder({args[0]})",
+            // #1608: StringBuilder has (int), (string), (int, int), (string, int) and
+            // (string, int, int, int) constructors; emit every operand, not only the first.
+            StringBuilderOp.New => $"new System.Text.StringBuilder({string.Join(", ", args)})",
 
             // Modification
             StringBuilderOp.Append => $"{args[0]}.Append({args[1]})",

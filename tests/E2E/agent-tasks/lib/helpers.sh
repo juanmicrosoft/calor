@@ -647,7 +647,7 @@ Example:
 §F{f001:GetGrade:pub}
   §I{i32:score}
   §O{str}
-  §B{str:grade} "F"
+  §B{~grade:str} "F"
   §IF{if1} (>= score 90)
     §ASSIGN grade "A"
   §EI (>= score 80)
@@ -672,7 +672,7 @@ Example:
 §F{f001:Countdown:pub}
   §O{void}
   §E{cw}
-  §B{i32:count} 5
+  §B{~count:i32} 5
   §WH{wh1} (> count 0)
     §C{Console.WriteLine}
     §A count
@@ -693,7 +693,7 @@ CLOSING tag, which is why `§/DO` is one of the few closers you write by hand.
 §F{f001:DoWhileDemo:pub}
   §O{void}
   §E{cw}
-  §B{i32:x} 0
+  §B{~x:i32} 0
   §DO{do1}
     §C{Console.WriteLine}
       §A x
@@ -733,7 +733,7 @@ CLOSING tag, which is why `§/DO` is one of the few closers you write by hand.
   §PUSH{nums} 10
   §PUSH{nums} 20
   §PUSH{nums} 30
-  §B{i32:sum} 0
+  §B{~sum:i32} 0
   §EACH{e1:n} nums
     §ASSIGN sum (+ sum n)
   §R sum
@@ -996,7 +996,7 @@ Delegate syntax: `§DEL{id:Name}` with an indented signature.
 §F{f001:Accumulate:pub}
   §I{i32:n}
   §O{i32}
-  §B{i32:acc} 0           // Bind variable acc = 0
+  §B{~acc:i32} 0          // Bind mutable variable acc = 0
   §ASSIGN acc (+ acc n)   // Assign acc = acc + n
   §ASSIGN acc (+ acc n)   // Assign again
   §ASSIGN acc (+ acc n)   // And again
@@ -1242,7 +1242,7 @@ Use `[type]` for array types:
   §O{bool}
   §Q (== n (len arr))
   §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))
-  §B{bool:allPos} true
+  §B{~allPos:bool} true
   §L{for1:i:0:(- (len arr) 1):1}
     §IF{if1} (<= arr{i} 0) → §ASSIGN allPos false
   §R allPos

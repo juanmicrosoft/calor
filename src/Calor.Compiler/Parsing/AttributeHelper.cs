@@ -271,6 +271,88 @@ public static class AttributeHelper
     }
 
     /// <summary>
+    /// C# keyword types that <see cref="IsLikelyType"/> does not list. They are never read
+    /// as a variable name by <see cref="IsAmbiguousTypeFirstBindHeader"/>.
+    /// </summary>
+    private static readonly HashSet<string> KeywordTypeSpellings = new(StringComparer.Ordinal)
+    {
+        "byte", "sbyte", "short", "ushort", "uint", "long", "ulong", "double", "nint", "nuint",
+        "never", "dec", "unit"
+    };
+
+    private static bool IsTypeSpelling(string value) =>
+        IsLikelyType(value) || KeywordTypeSpellings.Contains(value)
+        || !string.Equals(ExpandType(value), value, StringComparison.Ordinal);
+
+    private static bool IsPlainIdentifier(string value) =>
+        value.Length > 0 && (char.IsLetter(value[0]) || value[0] == '_')
+        && value.All(c => char.IsLetterOrDigit(c) || c == '_');
+
+    /// <summary>
+    /// #1635: a spelling that reads as a type: an upper-case identifier (<c>W</c>, <c>URL</c>),
+    /// a keyword type (<c>long</c>, <c>nint</c>), or one of those wrapped as an array, pointer,
+    /// nullable or Calor array (<c>T[]</c>, <c>T?</c>, <c>[T]</c>, <c>long[,]</c>).
+    /// </summary>
+    private static bool IsTypeShaped(string value)
+    {
+        var core = value;
+        while (true)
+        {
+            if (core.Length > 2 && core[0] == '[' && core[^1] == ']') { core = core[1..^1]; continue; }
+            if (core.EndsWith('?') || core.EndsWith('*')) { core = core[..^1]; continue; }
+            if (core.StartsWith('?')) { core = core[1..]; continue; }
+            var bracket = core.LastIndexOf('[');
+            if (bracket > 0 && core[^1] == ']' && core[(bracket + 1)..^1].All(c => c == ',')) { core = core[..bracket]; continue; }
+            break;
+        }
+        return IsPlainIdentifier(core) && (char.IsUpper(core[0]) || IsTypeSpelling(core));
+    }
+
+    /// <summary>
+    /// #1635: true when a two-field immutable header <c>§B{pos0:pos1}</c> is spelled
+    /// type-first (<c>pos0</c> looks like a type name, <c>pos1</c> like a variable) but
+    /// <see cref="InterpretBindAttributes"/> reads it name-first, because <c>pos0</c> is not a
+    /// recognizable type spelling (a one-letter or all-caps type such as <c>W</c> or
+    /// <c>T</c>). The reading would silently swap the name and the type, so the parser
+    /// rejects the header with <c>Calor0123</c> instead.
+    /// </summary>
+    public static bool IsAmbiguousTypeFirstBindHeader(string pos0, string? pos1)
+    {
+        if (string.IsNullOrEmpty(pos0) || string.IsNullOrEmpty(pos1)
+            || pos0.StartsWith('~') || pos1 is "const" or "mut")
+            return false;
+        // Read type-first: no swap.
+        if (IsLikelyType(pos0) && !IsLikelyType(pos1))
+            return false;
+        // Read name-first: a swap when the first field is type-shaped and the second is a
+        // plain lower-case identifier that is not itself a type spelling.
+        var firstIsTypeShaped = IsTypeShaped(pos0);
+        var secondIsVariableShaped = IsPlainIdentifier(pos1)
+            && (char.IsLower(pos1[0]) || pos1[0] == '_')
+            && !IsTypeSpelling(pos1);
+        return firstIsTypeShaped && secondIsVariableShaped;
+    }
+
+    /// <summary>
+    /// #1635: formats the positional fields of an immutable <c>§B</c> header so that
+    /// <see cref="InterpretBindAttributes"/> reads them back as exactly (<paramref name="name"/>,
+    /// <paramref name="type"/>). Type-first (<c>i32:x</c>) when the parser recognizes the type;
+    /// otherwise name-first (<c>x:T</c>); and the explicit <c>type:name:const</c> form when
+    /// neither two-field spelling is read correctly (a PascalCase local of a one-letter type).
+    /// </summary>
+    public static string FormatImmutableBindHeader(string name, string type)
+    {
+        if (IsLikelyType(type) && !IsLikelyType(name)
+            && type != "const" && type != "mut" && name is not ("const" or "mut"))
+            return $"{type}:{name}";
+        if (!(IsLikelyType(name) && !IsLikelyType(type))
+            && !IsAmbiguousTypeFirstBindHeader(name, type)
+            && !name.StartsWith('~') && type is not ("const" or "mut"))
+            return $"{name}:{type}";
+        return $"{type}:{name}:const";
+    }
+
+    /// <summary>
     /// Interprets attributes for FOR/§L (loop):
     /// <c>{id:var:from:to:step}</c>.
     ///

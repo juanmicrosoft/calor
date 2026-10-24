@@ -602,7 +602,6 @@
         "tests/TestData/Benchmarks/ComplexAlgorithms/BubbleSort.calr",
         "tests/TestData/Benchmarks/ComplexAlgorithms/DepthFirstSearch.calr",
         "tests/TestData/Benchmarks/ComplexAlgorithms/Dijkstra.calr",
-        "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.calr",
         "tests/TestData/Benchmarks/ComplexAlgorithms/InsertionSort.calr",
         "tests/TestData/Benchmarks/ComplexAlgorithms/InterpolationSearch.calr",
         "tests/TestData/Benchmarks/ComplexAlgorithms/Knapsack.calr",
@@ -660,11 +659,9 @@
         "tests/TestData/Benchmarks/DomainProblems/Calendar.calr",
         "tests/TestData/Benchmarks/DomainProblems/CsvParser.calr",
         "tests/TestData/Benchmarks/DomainProblems/DateDiff.calr",
-        "tests/TestData/Benchmarks/DomainProblems/DistanceCalculator.calr",
         "tests/TestData/Benchmarks/DomainProblems/EmailValidator.calr",
         "tests/TestData/Benchmarks/DomainProblems/GradeCalculator.calr",
         "tests/TestData/Benchmarks/DomainProblems/Inventory.calr",
-        "tests/TestData/Benchmarks/DomainProblems/PasswordValidator.calr",
         "tests/TestData/Benchmarks/DomainProblems/PhoneBook.calr",
         "tests/TestData/Benchmarks/DomainProblems/ShoppingCart.calr",
         "tests/TestData/Benchmarks/DomainProblems/Timer.calr",
@@ -762,7 +759,6 @@
         "tests/TestData/Benchmarks/TokenEconomics/Sign.calr",
         "tests/TestData/Benchmarks/TokenEconomics/StringUtils.calr",
         "tests/TestData/Benchmarks/TokenEconomics/SumDigits.calr",
-        "tests/TestData/Benchmarks/TokenEconomics/SumRange.calr",
         "tests/TestData/Benchmarks/TokenEconomics/TernaryChain.calr",
         "tests/TestData/Benchmarks/TokenEconomics/ThreeWayMerge.calr",
         "tests/TestData/Benchmarks/TokenEconomics/TruncateString.calr",
@@ -770,19 +766,87 @@
       ]
     },
     {
-      "id": "benchmarks:HashMap",
-      "expect": "known-failure",
+      "id": "benchmarks:EditDistance:1550",
+      "expect": "reject",
+      "negativeKind": "incidental",
       "mode": "each",
       "options": [
         "--no-enforce-effects"
       ],
       "errors": [
-        "HashMap.calr|Calor1002:CS0266|f002|Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
+        "EditDistance.calr|Calor0213|f001|Cannot assign to 'minAB': it is an immutable binding. Declare it mutable with a leading '~' (§B{~minAB} or §B{~minAB:type})."
       ],
-      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
-      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug, and lists this file in KnownWriteToReadOnlyLocal: the benchmark assigns to an immutable binding, which compiled silently before #1550 and is now Calor0213. The file is a registered B1 benchmark corpus input (#1276), so it is kept byte for byte.",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:HashMap:1550",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "HashMap.calr|Calor0213|f001|Cannot assign to 'absHash': it is an immutable binding. Declare it mutable with a leading '~' (§B{~absHash} or §B{~absHash:type})."
+      ],
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug, and lists this file in KnownWriteToReadOnlyLocal: the benchmark assigns to an immutable binding, which compiled silently before #1550 and is now Calor0213. The file is a registered B1 benchmark corpus input (#1276), so it is kept byte for byte.",
       "files": [
         "tests/TestData/Benchmarks/DataStructures/HashMap.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:DistanceCalculator:1550",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "DistanceCalculator.calr|Calor0213|f002|Cannot assign to 'absDx': it is an immutable binding. Declare it mutable with a leading '~' (§B{~absDx} or §B{~absDx:type}).",
+        "DistanceCalculator.calr|Calor0213|f002|Cannot assign to 'absDy': it is an immutable binding. Declare it mutable with a leading '~' (§B{~absDy} or §B{~absDy:type})."
+      ],
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug, and lists this file in KnownWriteToReadOnlyLocal: the benchmark assigns to an immutable binding, which compiled silently before #1550 and is now Calor0213. The file is a registered B1 benchmark corpus input (#1276), so it is kept byte for byte.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/DistanceCalculator.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:PasswordValidator:1550",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "PasswordValidator.calr|Calor0213|f004|Cannot assign to 'score': it is an immutable binding. Declare it mutable with a leading '~' (§B{~score} or §B{~score:type}).",
+        "PasswordValidator.calr|Calor0213|f004|Cannot assign to 'score': it is an immutable binding. Declare it mutable with a leading '~' (§B{~score} or §B{~score:type}).",
+        "PasswordValidator.calr|Calor0213|f004|Cannot assign to 'score': it is an immutable binding. Declare it mutable with a leading '~' (§B{~score} or §B{~score:type}).",
+        "PasswordValidator.calr|Calor0213|f004|Cannot assign to 'score': it is an immutable binding. Declare it mutable with a leading '~' (§B{~score} or §B{~score:type})."
+      ],
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug, and lists this file in KnownWriteToReadOnlyLocal: the benchmark assigns to an immutable binding, which compiled silently before #1550 and is now Calor0213. The file is a registered B1 benchmark corpus input (#1276), so it is kept byte for byte.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/PasswordValidator.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:SumRange:1550",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "SumRange.calr|Calor0213|f001|Cannot assign to 'sum': it is an immutable binding. Declare it mutable with a leading '~' (§B{~sum} or §B{~sum:type})."
+      ],
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug, and lists this file in KnownWriteToReadOnlyLocal: the benchmark assigns to an immutable binding, which compiled silently before #1550 and is now Calor0213. The file is a registered B1 benchmark corpus input (#1276), so it is kept byte for byte.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/SumRange.calr"
       ]
     },
     {

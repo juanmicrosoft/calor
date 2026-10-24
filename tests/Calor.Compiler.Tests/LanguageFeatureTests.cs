@@ -108,7 +108,7 @@ public class LanguageFeatureTests
             §M{m001:Test}
               §F{f001:Run:pub}
                   §O{string}
-                  §B{b001:result:string} §NEW{object}§/NEW.GetType
+                  §B{result:string} §NEW{object}§/NEW.GetType
                   §R result.Name
             """;
         var code = CompileToCode(source);
