@@ -44,6 +44,29 @@ public class Holder
     public int Last = Probe.Next();
 }
 
+public class Receiver
+{
+    public int V;
+    public static int Result;
+
+    public void Take(Receiver r)
+    {
+        Result = V * 10 + r.V;
+    }
+
+    public static implicit operator int(Receiver r)
+    {
+        Probe.N += 1;
+        return r.V;
+    }
+}
+
+public class EventFirst
+{
+    public event Action E = Probe.MakeHandler();
+    public int F = Probe.Next();
+}
+
 public class Named
 {
     public string Text;
@@ -106,6 +129,12 @@ public static class Probe
 
     public static int Take(List<int> xs) => xs[0];
 
+    public static int Bump()
+    {
+        N = 1;
+        return 7;
+    }
+
     public static Action MakeHandler()
     {
         N += 10;
@@ -147,11 +176,25 @@ public static class Probe
         var lambdaDefault = new Outer { F = null, Value = (Func<object>)(() => { return default(S); }) };
         int? none = null;
         var nullable = new Outer { Value = (int?)none };
+        var spelled = new Outer { Value = (Nullable<int>)none };
+        var r = new Receiver { V = 1 };
+        var other = new Receiver { V = 2 };
+        Func<int> change = () => { r = other; return 3; };
+        r.Take(new Receiver { V = change() });
+        var receiverResult = Receiver.Result;
+        var slots = new List<int>[2];
+        N = 0;
+        slots[N] = new List<int> { Bump() };
+        N = 0;
+        var max = Math.Max(new Receiver { V = 0 }, new Receiver { V = N });
+        N = 0;
+        var eventFirst = new EventFirst();
         return o.C.V + "|" + f + "|" + t.Item1 + "," + t.Item2[0] + "|" + a.A + "," + a.B[0]
             + "|" + (d.Value == null) + (d.Value is S) + "|" + cells[1].V + "|" + (h.Defaults[0] is S) + h.Field.C.V
             + "|" + ((Outer)h.First).Value + "," + h.Last + "|" + self + "|" + ((Named)named.Value).Text
             + "|" + anon.A + "," + anon.B + "," + argument + "|" + tuple.Item1 + "," + tuple.Item2 + "|" + xs[1] + "," + xs[2]
             + "|" + typed.A + "," + typed.B[0] + "|" + (((Func<object>)lambdaDefault.Value)() is S)
-            + "|" + (nullable.Value == null) + "|" + Log;
+            + "|" + (nullable.Value == null) + (spelled.Value == null) + "|" + receiverResult
+            + "|" + (slots[0] == null ? -1 : slots[0][0]) + "|" + max + "|" + eventFirst.F + "|" + Log;
     }
 }

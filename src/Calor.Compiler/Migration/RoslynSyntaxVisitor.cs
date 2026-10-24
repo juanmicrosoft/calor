@@ -13125,7 +13125,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var sawPropertyInitializer = false;
         foreach (var member in type.Members)
         {
-            if (member is PropertyDeclarationSyntax { Initializer: not null })
+            // An initialized event is kept as C# (ConvertEventFields) and must stay in place too.
+            if (member is PropertyDeclarationSyntax { Initializer: not null }
+                || member is EventFieldDeclarationSyntax eventField
+                    && eventField.Declaration.Variables.Any(variable => variable.Initializer != null))
                 sawPropertyInitializer = true;
             else if (sawPropertyInitializer && member is FieldDeclarationSyntax field
                 && field.Declaration.Variables.Any(variable => variable.Initializer != null))
@@ -13178,6 +13181,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return null;
         if (!IsInitializerSafePosition(creation))
             return "initializer-position";
+        // A cast to Nullable<T>, however spelled, loses its `?` in Calor (review r2, r3).
+        if (_semanticModel != null && creation.SyntaxTree == _semanticModel.SyntaxTree
+            && creation.DescendantNodes().OfType<CastExpressionSyntax>().Any(cast =>
+                _semanticModel.GetTypeInfo(cast.Type).Type is
+                {
+                    OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+                }))
+            return "nullable-cast";
         // A type or member name split across lines keeps its line break in Calor, which an inline
         // initializer or element line cannot hold (#1524 review).
         if (creation.DescendantNodes(node => node is not AnonymousFunctionExpressionSyntax)
@@ -13243,14 +13254,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             InitializerExpressionSyntax => true,
             AssignmentExpressionSyntax { Parent: InitializerExpressionSyntax } nested => nested.Right == child,
             // An argument of a statement-level call: HoistComplexArguments binds it ahead of the
-            // statement after the earlier arguments, and the receiver is a value the creation cannot
-            // change (a type, a local or a parameter), so nothing in the statement is overtaken.
-            ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } } argument =>
+            // statement after the earlier arguments. The call has no receiver to evaluate first (a
+            // method of this type, or a static method named through its type), and every argument
+            // reaches its parameter without a user-defined conversion, which a temporary would
+            // defer past the later arguments (review r3).
+            ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } list } argument =>
                 argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
-                && HasStableReceiver(invocation) && IsStatementLevelExpression(invocation),
-            ArgumentSyntax { Parent: ArgumentListSyntax { Parent: ObjectCreationExpressionSyntax { Initializer: null } outer } } argument =>
+                && HasStableReceiver(invocation) && HasPlainArgumentConversions(list)
+                && IsStatementLevelExpression(invocation),
+            ArgumentSyntax { Parent: ArgumentListSyntax { Parent: ObjectCreationExpressionSyntax { Initializer: null } outer } list } argument =>
                 argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
-                && IsStatementLevelExpression(outer),
+                && HasPlainArgumentConversions(list) && IsStatementLevelExpression(outer),
             _ => IsStatementLevelExpression(creation),
         };
     }
@@ -13274,7 +13288,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// <c>x = …;</c> / <c>a[i] = …;</c> statement. Whatever the converter hoists out of it then runs
     /// just before it, after everything earlier.
     /// </summary>
-    private static bool IsStatementLevelExpression(ExpressionSyntax expression)
+    private bool IsConstant(ExpressionSyntax expression) =>
+        _semanticModel != null && expression.SyntaxTree == _semanticModel.SyntaxTree
+        && _semanticModel.GetConstantValue(expression).HasValue;
+
+    /// <summary>A local or parameter that no lambda or local function in its member captures.</summary>
+    private bool IsUncapturedLocal(ExpressionSyntax expression)
+    {
+        if (expression is not IdentifierNameSyntax || _semanticModel == null
+            || expression.SyntaxTree != _semanticModel.SyntaxTree
+            || _semanticModel.GetSymbolInfo(expression).Symbol is not { } symbol
+            || symbol is not (ILocalSymbol or IParameterSymbol))
+            return false;
+        var body = expression.Ancestors().FirstOrDefault(node =>
+            node is BlockSyntax { Parent: BaseMethodDeclarationSyntax or AccessorDeclarationSyntax or LocalFunctionStatementSyntax });
+        if (body == null)
+            return false;
+        var flow = _semanticModel.AnalyzeDataFlow(body);
+        return flow is { Succeeded: true } && !flow.Captured.Contains(symbol, SymbolEqualityComparer.Default);
+    }
+
+    private bool IsStatementLevelExpression(ExpressionSyntax expression)
     {
         var (child, parent) = SkipParentheses(expression);
         return parent switch
@@ -13289,10 +13323,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
                 Parent: ExpressionStatementSyntax,
-            } assignment => assignment.Right == child && (IsNameChain(assignment.Left)
-                || assignment.Left is ElementAccessExpressionSyntax element && IsNameChain(element.Expression)
+            // Only a plain name: C# evaluates a receiver or an index before the right side, and
+            // the hoisted creation would run first (review r3: `a[i] = new List<int> { Bump() }`).
+            } assignment => assignment.Right == child && (assignment.Left is IdentifierNameSyntax
+                || assignment.Left is MemberAccessExpressionSyntax
+                {
+                    RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
+                } target && IsUncapturedLocal(target.Expression)
+                // `a[0] = new …;` with a constant index into a local no lambda captures: nothing
+                // the creation runs can change which element is stored to.
+                || assignment.Left is ElementAccessExpressionSyntax element
+                    && IsUncapturedLocal(element.Expression)
                     && element.ArgumentList.Arguments.All(index => index.RefKindKeyword.IsKind(SyntaxKind.None)
-                        && IsMarkerFreeValue(index.Expression))),
+                        && IsConstant(index.Expression))),
             _ => false,
         };
     }
@@ -13303,17 +13346,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private bool HasStableReceiver(InvocationExpressionSyntax invocation)
     {
+        if (_semanticModel == null || invocation.SyntaxTree != _semanticModel.SyntaxTree)
+            return false;
+        // A delegate local or field would be read after the hoisted creation ran (review r3: a
+        // captured local can be reassigned by an initializer value), so only methods qualify.
         if (invocation.Expression is IdentifierNameSyntax or GenericNameSyntax)
-            return true;
-        if (invocation.Expression is not MemberAccessExpressionSyntax
+            return _semanticModel.GetSymbolInfo(invocation.Expression).Symbol is IMethodSymbol;
+        return invocation.Expression is MemberAccessExpressionSyntax
             {
                 RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
-            } member || _semanticModel == null || invocation.SyntaxTree != _semanticModel.SyntaxTree)
-            return false;
-        return member.Expression is PredefinedTypeSyntax
-            || _semanticModel.GetSymbolInfo(member.Expression).Symbol
-                is ITypeSymbol or INamespaceSymbol or ILocalSymbol or IParameterSymbol;
+            } member
+            && _semanticModel.GetSymbolInfo(invocation).Symbol is IMethodSymbol { IsStatic: true }
+            && (member.Expression is PredefinedTypeSyntax
+                || _semanticModel.GetSymbolInfo(member.Expression).Symbol is ITypeSymbol);
     }
+
+    /// <summary>Every argument converts to its parameter by identity, reference or boxing.</summary>
+    private bool HasPlainArgumentConversions(ArgumentListSyntax list) =>
+        _semanticModel != null && list.SyntaxTree == _semanticModel.SyntaxTree
+        && list.Arguments.All(argument =>
+        {
+            var conversion = _semanticModel.GetConversion(argument.Expression);
+            return conversion.Exists && !conversion.IsUserDefined
+                && (conversion.IsIdentity || conversion.IsReference || conversion.IsBoxing);
+        });
 
     /// <summary>
     /// #1541 review r2: a tuple, anonymous object or collection expression holding an object or

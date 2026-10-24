@@ -106,7 +106,10 @@ public class InitializerConversionTests
     [InlineData("public int M() { var h = this; return h.Take2(new Outer { V = Next() }).V; }", "initializer-position")]
     [InlineData("public int M() { var t = (V0, new List<int> { Next() }); return t.Item1; }", "tuple")]
     [InlineData("public int M() { var a = new { A = V0, B = new List<int> { Next() } }; return a.A; }", "anonymous-object")]
-    [InlineData("public Outer O = new Outer { Value = (int?)V0 };", "object-initializer-value")]
+    [InlineData("public Outer O = new Outer { Value = (int?)V0 };", "nullable-cast")]
+    [InlineData("public Outer O = new Outer { Value = (System.Nullable<int>)V0 };", "nullable-cast")]
+    [InlineData("public int M() { var a = new List<int>[2]; var i = 0; a[i] = new List<int> { Next() }; return 0; }", "initializer-position")]
+    [InlineData("public int M() { var o = new Outer(); System.Func<int> f = () => { o = null; return 1; }; o.Items.Add(Take(1, new Outer { V = f() })); return 0; }", "initializer-position")]
     [InlineData("public int M() { var o = new Outer { Value = (System.Func<object>)(() => { return default(int); }) }; return 0; }", "object-initializer-value")]
     public void ShapeWithoutAFaithfulNativeForm_IsPreservedWithALoss(string member, string reason)
     {
