@@ -9549,10 +9549,28 @@ public sealed class Parser
                 nestedDelegates.Add(node);
                 classItems.Add(node);
             }
-            else if (Check(TokenKind.List) || Check(TokenKind.Dict) || Check(TokenKind.Set))
+            else if (Check(TokenKind.List) || Check(TokenKind.Dict) || Check(TokenKind.HashSet))
             {
-                // Skip orphaned collection literals at class level (converter artifact)
-                SkipCollectionLiteral();
+                // #1595: a collection block is a statement (it declares a local). It used to be
+                // skipped here by scanning for a §/LIST closer that indentation syntax never
+                // writes, which silently swallowed every later member and type. Parse exactly
+                // its own block, report a hard error, and keep parsing the class.
+                var tag = Current.Kind switch
+                {
+                    TokenKind.List => "§LIST",
+                    TokenKind.Dict => "§DICT",
+                    _ => "§HSET"
+                };
+                var collectionSpan = Current.Span;
+                _ = Current.Kind switch
+                {
+                    TokenKind.List => (ExpressionNode)ParseListCreation(),
+                    TokenKind.Dict => ParseDictionaryCreation(),
+                    _ => ParseSetCreation()
+                };
+                _diagnostics.ReportError(collectionSpan, DiagnosticCode.UnexpectedToken,
+                    $"{tag} is a statement and cannot appear in a class body; declare a field or property " +
+                    "with an inline initializer instead (for example §FLD{List<i32>:xs:pri} = §NEW{List<i32>} §/NEW)");
             }
             else
             {
@@ -14404,32 +14422,6 @@ public sealed class Parser
             }
         }
         return false;
-    }
-
-    /// <summary>
-    /// Skips a collection literal (§LIST, §DICT, §SET) by consuming tokens until the matching end tag.
-    /// Used to tolerate orphaned collection literals at class member level from converter output.
-    /// </summary>
-    private void SkipCollectionLiteral()
-    {
-        var endKind = Current.Kind switch
-        {
-            TokenKind.List => TokenKind.EndList,
-            TokenKind.Dict => TokenKind.EndDict,
-            TokenKind.Set => TokenKind.EndSet,
-            _ => TokenKind.EndList
-        };
-        Advance(); // consume §LIST/§DICT/§SET
-        ParseAttributes(); // consume attributes
-        while (!IsAtEnd && !Check(endKind))
-        {
-            Advance();
-        }
-        if (Check(endKind))
-        {
-            Advance();
-            ParseAttributes(); // consume end tag attributes
-        }
     }
 
     private static bool ShouldReportMismatchedId(string endId, string openId, Token endToken)

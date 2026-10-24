@@ -485,6 +485,8 @@ not compile.
 | Capturing, generic, async or iterator local functions | Member preserved | `method` with a `local-function` warning |
 | A collection-initializer array element, or a multi-line element in a rectangular array row | Statement preserved | `array-element-block` |
 | An assignment used as an array element, index or size | Statement or member preserved | `conditional-expression-hoisting` |
+| An initializer with no exact Calor form: `P = { ... }`, `["k"] = v`, a custom `Add` collection, a value that must run after the constructor, an initializer used as a method argument or inside a tuple | The creation keeps its C# text (`§CS{...}`) | `initializer-interop` |
+| An event field with an initializer: `event Action E = Make();` | Member preserved | `initializer-interop` |
 | `yield` in a property or indexer getter; partial properties | Member preserved | `iterator-accessor`, `partial-property` |
 
 The reason is the same each time: Calor has no form that keeps the C# meaning exactly, or

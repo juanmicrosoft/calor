@@ -57,6 +57,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// ConvertBlock and VisitGlobalStatement flush these before the containing statement.
     /// </summary>
     private readonly List<StatementNode> _pendingStatements = new();
+    // #1541: the source of each collection node, so an inline use can be preserved verbatim.
+    private readonly Dictionary<ExpressionNode, SyntaxNode> _collectionCreationSyntax =
+        new(ReferenceEqualityComparer.Instance);
 
     /// <summary>#943 (D1 RO-DECL-1): `out var x` / `out T x` lowered to a binding before their statement.</summary>
     private readonly HashSet<DeclarationExpressionSyntax> _loweredOutDeclarations = new();
@@ -3179,7 +3182,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: preprocessorBlocks.Count > 0 || HasDictionaryMemberInitializer(node)
+            items: preprocessorBlocks.Count > 0 || HasOrderSensitiveMemberInitializers(node)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -3401,7 +3404,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection(),
             Array.Empty<CalorAttributeNode>(),
             visibility: visibility,
-            indexers: indexers.Count > 0 ? indexers : null);
+            indexers: indexers.Count > 0 ? indexers : null,
+            // #1524: initializers run in source order (see HasOrderSensitiveMemberInitializers).
+            items: HasOrderSensitiveMemberInitializers(node)
+                ? BuildSourceOrderedClassItems(fields, properties, indexers, constructors, methods,
+                    Array.Empty<EventDefinitionNode>(), operatorOverloads, Array.Empty<CSharpInteropBlockNode>(),
+                    Array.Empty<MemberPreprocessorBlockNode>(), Array.Empty<ClassDefinitionNode>(),
+                    Array.Empty<InterfaceDefinitionNode>(), Array.Empty<EnumDefinitionNode>(),
+                    Array.Empty<DelegateDefinitionNode>())
+                : null);
         return PreserveTypeCompilerDirectives(node, convertedRecord);
     }
 
@@ -3727,7 +3738,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: preprocessorBlocks.Count > 0 || HasDictionaryMemberInitializer(node)
+            items: preprocessorBlocks.Count > 0 || HasOrderSensitiveMemberInitializers(node)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -4172,8 +4183,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ? ConvertExpression(variable.Initializer.Value)
                 : null;
 
-            // Block-level collections (§LIST, §DICT, §ARR, §SET) can't appear inline in
-            // §FLD{...} = ... format. Convert to §NEW{Type} constructor call instead.
+            // Block-level collections can't be §FLD defaults. A List/HashSet becomes an inline
+            // §LIST/§HSET; any other non-empty one stays C# (#1541, #1595).
             if (defaultValue != null && IsBlockLevelCollection(defaultValue))
             {
                 defaultValue = ConvertBlockLevelCollectionToNew(defaultValue, typeName);
@@ -4199,6 +4210,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private IReadOnlyList<EventDefinitionNode> ConvertEventFields(EventFieldDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("event-definition");
+        // #1524 review: §EVT has no initializer, so `event Action E = Make();` lost the handler and
+        // never ran Make(). Keep the member as C#.
+        if (node.Declaration.Variables.FirstOrDefault(variable => variable.Initializer != null) is { } initialized)
+            throw EscalateExpression(initialized, "initializer-interop", preserveMember: true);
 
         var events = new List<EventDefinitionNode>();
         var visibility = GetVisibility(node.Modifiers);
@@ -4348,45 +4363,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? ConvertExpression(node.Initializer.Value)
             : null;
 
-        // When an auto-property's default value has object initializers
-        // (e.g., = new("args") { Prop = val }), convert to a full-body getter.
-        // The emitter can't inline hoisted statements in auto-property syntax.
-        if (isAutoProperty && defaultValue is NewExpressionNode newExpr && newExpr.Initializers.Count > 0
-            && getter != null && getter.IsAutoImplemented)
-        {
-            var span = GetTextSpan(node);
-            var statements = new List<StatementNode>();
+        // #1524: an auto-property default with an object initializer stays a default
+        // (`= §NEW{T} A = x §/NEW`). It used to become a getter body that built a new object on
+        // every read, so identity and later writes through the setter were lost.
 
-            // §B{~_objInit:Type} §NEW{Type} §A args §/NEW
-            var tempVar = "_objInit";
-            var cleanNew = new NewExpressionNode(span, newExpr.TypeName, newExpr.TypeArguments,
-                newExpr.Arguments, new List<ObjectInitializerAssignment>());
-            statements.Add(new BindStatementNode(span, tempVar, typeName, true, cleanNew, new AttributeCollection()));
-
-            // Emit as setter calls: §C{_objInit.set_PropName} §A value §/C
-            // (§ASSIGN target value fails when value contains complex expressions
-            // with special characters that confuse the Calor parser)
-            foreach (var init in newExpr.Initializers)
-            {
-                var setterTarget = $"{tempVar}.set_{init.PropertyName}";
-                statements.Add(new CallStatementNode(span, setterTarget, false,
-                    new List<ExpressionNode> { init.Value }, new AttributeCollection()));
-            }
-
-            // §R _objInit
-            statements.Add(new ReturnStatementNode(span, new ReferenceNode(span, tempVar)));
-
-            getter = new PropertyAccessorNode(
-                getter.Span, getter.Kind, getter.Visibility,
-                preconditions: Array.Empty<RequiresNode>(),
-                body: statements,
-                new AttributeCollection());
-            isAutoProperty = false;
-            defaultValue = null;
-        }
-
-        // Block-level collections (§LIST, §DICT, §ARR, §SET) can't appear inline in
-        // §PROP{...} = ... format. Convert to §NEW{Type} constructor call instead.
+        // Block-level collections can't be §PROP defaults. A List/HashSet becomes an inline
+        // §LIST/§HSET; any other non-empty one stays C# (#1541, #1595).
         if (defaultValue != null && IsBlockLevelCollection(defaultValue))
         {
             defaultValue = ConvertBlockLevelCollectionToNew(defaultValue, typeName);
@@ -9768,22 +9750,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var code = expression is ThrowExpressionSyntax or DeclarationExpressionSyntax
             ? expression.ToString()
             : $"({expression})";
+        return TypedRawCSharp(expression, code);
+    }
+
+    /// <summary>
+    /// Raw C# in expression position, cast to its own type when Roslyn knows a nameable one so the
+    /// Calor binder can type it (an identity cast; it runs no conversion).
+    /// </summary>
+    private ExpressionNode TypedRawCSharp(ExpressionSyntax expression, string code, bool minimalTypeName = false)
+    {
         var span = GetTextSpan(expression);
         var raw = new RawCSharpExpressionNode(span, code);
         if (expression is not DeclarationExpressionSyntax &&
             _semanticModel != null && expression.SyntaxTree == _semanticModel.SyntaxTree)
         {
-            var type = _semanticModel.GetTypeInfo(expression).Type;
+            var info = _semanticModel.GetTypeInfo(expression);
+            // A tuple literal or collection expression takes its type from the target: cast to the
+            // converted type so each element converts in place, as in the original (#1541 review r2).
+            var type = expression is TupleExpressionSyntax or CollectionExpressionSyntax
+                ? info.ConvertedType ?? info.Type
+                : info.Type;
             if (type is { IsAnonymousType: false, IsRefLikeType: false } &&
                 (type.CanBeReferencedByName || type is IArrayTypeSymbol) &&
                 type.TypeKind is not (TypeKind.Error or TypeKind.Dynamic) &&
                 type.SpecialType != SpecialType.System_Void)
             {
+                // The minimal name is the one the preserved C# itself spells, so it resolves
+                // wherever that code does (the converter may move types into a namespace).
                 return new TypeOperationNode(span, TypeOp.Cast, raw,
-                    TypeMapper.CSharpToCalor(type.ToDisplayString(
-                        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
-                            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
-                            SymbolDisplayMiscellaneousOptions.ExpandNullable))));
+                    TypeMapper.CSharpToCalor(minimalTypeName
+                        ? type.ToMinimalDisplayString(_semanticModel, expression.SpanStart)
+                        : type.ToDisplayString(
+                            SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+                                SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+                                SymbolDisplayMiscellaneousOptions.ExpandNullable))));
             }
         }
         return raw;
@@ -9872,7 +9872,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var left = ConvertExpression(binary.Left);
             // Convert block-level collections to inline for as/is operands
             if (IsBlockLevelCollection(left))
-                left = ConvertBlockLevelCollectionToNew(left, ExtractTypeHint(binary.Left));
+                left = ConvertBlockLevelCollectionToNew(left, ExtractTypeHint(binary.Left), allowInline: false);
             var typeName = TypeMapper.CSharpToCalor(binary.Right.ToString());
             return new TypeOperationNode(GetTextSpan(binary), TypeOp.As, left, typeName);
         }
@@ -10547,6 +10547,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)
     {
+        if (ContainsInitializerCreation(collection))
+            return PreserveInitializerContainer(collection, "collection-expression");
         // Convert C# 12 collection expressions: [] or [1, 2, 3]
         // Empty collection: use Array.Empty<T>() for inline compatibility
         // (block-level §LIST with 0 elements causes issues in expression contexts like switch arms)
@@ -10723,10 +10725,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
     }
 
-    private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
+    private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew) =>
+        WithoutHoistedInitializerValues(implicitNew, () => ConvertImplicitObjectCreationCore(implicitNew));
+
+    private ExpressionNode ConvertImplicitObjectCreationCore(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
         if (HasDictionaryInitializerOperations(implicitNew.Initializer))
             return PreserveDictionaryInitializer(implicitNew);
+        if (InitializerPreservationReason(implicitNew) is { } preservationReason)
+            return PreserveInitializer(implicitNew, preservationReason);
 
         // Try to infer the target type from the surrounding syntax context
         var inferredType = InferTargetType(implicitNew);
@@ -10756,9 +10763,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
             }
+            // #1524: `default` would drop the initializer (and the object) entirely.
+            if (implicitNew.Initializer is { Expressions.Count: > 0 })
+                return PreserveInitializer(implicitNew, "target-typed-initializer");
             return DefaultValue(implicitNew, GetTextSpan(implicitNew));
         }
 
+        if (inferredType == null && implicitNew.Initializer is { Expressions.Count: > 0 })
+            return PreserveInitializer(implicitNew, "target-typed-initializer");
         _context.RecordFeatureUsage("target-typed-new");
         _context.IncrementConverted();
         var typeName = inferredType ?? "object";
@@ -11156,6 +11168,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertTupleExpression(TupleExpressionSyntax tuple)
     {
+        if (ContainsInitializerCreation(tuple))
+            return PreserveInitializerContainer(tuple, "tuple");
         _context.RecordFeatureUsage("tuple-literal");
         _context.IncrementConverted();
         var elements = tuple.Arguments
@@ -11854,36 +11868,67 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// Converts a block-level collection (§LIST, §DICT, §ARR, §SET) to a §NEW{Type} constructor
-    /// call, so it can appear inline in property/field default values.
-    /// For non-empty collections, elements are passed as constructor arguments.
+    /// #1541/#1595: a non-empty §LIST/§HSET converted from <c>new List&lt;T&gt; { … }</c> /
+    /// <c>new HashSet&lt;T&gt; { … }</c> that passed <see cref="InitializerPreservationReason"/>.
+    /// Its elements stay on one line, so the emitter can write it inline as
+    /// <c>§LIST{id:T} e1 e2 §/LIST{id}</c>, which compiles to <c>new List&lt;T&gt;() { e1, e2 }</c>.
     /// </summary>
-    private static ExpressionNode ConvertBlockLevelCollectionToNew(ExpressionNode node, string typeName)
+    private bool IsInlineCollection(ExpressionNode node) =>
+        node is ListCreationNode { Elements.Count: > 0 } or SetCreationNode { Elements.Count: > 0 }
+        && _collectionCreationSyntax.TryGetValue(node, out var syntax)
+        && syntax is ObjectCreationExpressionSyntax creation
+        && IsNativeCollectionCreation(creation);
+
+    /// <summary>
+    /// Converts a block-level collection (§LIST, §DICT, §SET) to an inline expression, so it can
+    /// appear where a statement cannot: a field or property default, an argument, an initializer
+    /// value, a foreach source. An empty collection becomes <c>§NEW{Type}</c>.
+    /// #1541/#1595: a non-empty one used to become <c>§NEW{List&lt;T&gt;} §A e1 …</c>, passing the
+    /// elements as constructor arguments (<c>new List&lt;int&gt;(5)</c> is an empty list with
+    /// capacity 5) and dropping dictionary entries. Now a List/HashSet is written inline
+    /// (<see cref="IsInlineCollection"/>) where <paramref name="allowInline"/>; any other
+    /// non-empty collection is preserved verbatim as C# with the loss recorded.
+    /// </summary>
+    private ExpressionNode ConvertBlockLevelCollectionToNew(ExpressionNode node, string typeName, bool allowInline = true)
     {
-        // For empty collections, use the property/field type name directly
-        // since the collection's ElementType might be inferred as 'object'
-        switch (node)
+        if (allowInline && IsInlineCollection(node))
         {
-            case ListCreationNode list when list.Elements.Count > 0:
-                return new NewExpressionNode(
-                    node.Span, $"List<{list.ElementType}>", new List<string>(),
-                    list.Elements, new List<ObjectInitializerAssignment>());
-            case DictionaryCreationNode dict when dict.Entries.Count > 0:
-                // Dictionary entries can't safely be expressed as ObjectInitializerAssignment
-                // (keys like "+" become invalid property names). Use empty constructor.
-                return new NewExpressionNode(
-                    node.Span, $"Dictionary<{dict.KeyType},{dict.ValueType}>", new List<string>(),
-                    new List<ExpressionNode>(), new List<ObjectInitializerAssignment>());
-            case SetCreationNode set when set.Elements.Count > 0:
-                return new NewExpressionNode(
-                    node.Span, $"HashSet<{set.ElementType}>", new List<string>(),
-                    set.Elements, new List<ObjectInitializerAssignment>());
-            default:
-                // Empty collections or unknown types — use property/field type
-                return new NewExpressionNode(
-                    node.Span, typeName, new List<string>(),
-                    new List<ExpressionNode>(), new List<ObjectInitializerAssignment>());
+            ExpressionNode inline = node switch
+            {
+                ListCreationNode list => new ListCreationNode(list.Span, list.Id, list.Name, list.ElementType,
+                    list.Elements, list.Attributes, list.ElementTypeSpan) { RenderInline = true },
+                SetCreationNode set => new SetCreationNode(set.Span, set.Id, set.Name, set.ElementType,
+                    set.Elements, set.Attributes, set.ElementTypeSpan) { RenderInline = true },
+                _ => node
+            };
+            _collectionCreationSyntax[inline] = _collectionCreationSyntax[node];
+            return inline;
         }
+
+        var hasElements = node switch
+        {
+            ListCreationNode list => list.Elements.Count > 0,
+            DictionaryCreationNode dict => dict.Entries.Count > 0,
+            SetCreationNode set => set.Elements.Count > 0,
+            _ => false
+        };
+        if (hasElements)
+        {
+            if (_collectionCreationSyntax.TryGetValue(node, out var syntax))
+            {
+                if (syntax is BaseObjectCreationExpressionSyntax creation)
+                    return PreserveInitializer(creation, "collection-initializer-inline");
+                throw EscalateExpression(syntax, "initializer-interop");
+            }
+            throw new InvalidOperationException(
+                "A non-empty collection node reached an inline position without its source syntax (#1541).");
+        }
+
+        // Empty collections or unknown types — use property/field type, since the
+        // collection's ElementType might be inferred as 'object'
+        return new NewExpressionNode(
+            node.Span, typeName, new List<string>(),
+            new List<ExpressionNode>(), new List<ObjectInitializerAssignment>());
     }
 
     private IReadOnlyList<string?>? ExtractArgumentModifiers(InvocationExpressionSyntax invocation)
@@ -12441,7 +12486,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Convert block-level collections to inline for member access targets
         // (e.g., new List<int>{1,2,3}.Count → inline §NEW.Count)
         if (IsBlockLevelCollection(target))
-            target = ConvertBlockLevelCollectionToNew(target, ExtractTypeHint(memberAccess.Expression));
+            target = ConvertBlockLevelCollectionToNew(target, ExtractTypeHint(memberAccess.Expression), allowInline: false);
         // Use ValueText to strip @ prefix from verbatim identifiers (e.g., @decimal → decimal)
         var memberName = memberAccess.Name.Identifier.ValueText;
         var span = GetTextSpan(memberAccess);
@@ -12514,7 +12559,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new FieldAccessNode(span, target, memberName);
     }
 
-    private ExpressionNode ConvertObjectCreation(ObjectCreationExpressionSyntax objCreation)
+    private ExpressionNode ConvertObjectCreation(ObjectCreationExpressionSyntax objCreation) =>
+        WithoutHoistedInitializerValues(objCreation, () => ConvertObjectCreationCore(objCreation));
+
+    /// <summary>
+    /// #1524/#1541: an initializer converted natively must not leave statements to run before the
+    /// enclosing statement. They would run ahead of the constructor and of earlier values, or, in a
+    /// field default, nowhere near it. Such a creation is preserved verbatim instead.
+    /// </summary>
+    private ExpressionNode WithoutHoistedInitializerValues(BaseObjectCreationExpressionSyntax creation, Func<ExpressionNode> convert)
+    {
+        var pendingMark = _pendingStatements.Count;
+        var converted = convert();
+        if (creation.Initializer is { Expressions.Count: > 0 } && converted is not RawCSharpExpressionNode
+            && _pendingStatements.Count > pendingMark)
+        {
+            _pendingStatements.RemoveRange(pendingMark, _pendingStatements.Count - pendingMark);
+            return PreserveInitializer(creation, "hoisted-initializer-value");
+        }
+        return converted;
+    }
+
+    private ExpressionNode ConvertObjectCreationCore(ObjectCreationExpressionSyntax objCreation)
     {
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
@@ -12560,6 +12626,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && (IsDictionaryType(collectionName)
                 || HasDictionaryInitializerOperations(objCreation.Initializer)))
             return PreserveDictionaryInitializer(objCreation);
+        if (!simpleDictionary && InitializerPreservationReason(objCreation) is { } preservationReason)
+            return PreserveInitializer(objCreation, preservationReason);
 
         if (objCreation.Type is GenericNameSyntax genericName)
         {
@@ -12604,8 +12672,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Hoist §NEW arguments to temp bindings — parser cannot handle §NEW nested inside §NEW
         HoistComplexArguments(args, objCreation.ArgumentList?.Arguments);
 
-        // Convert StringBuilder to native operations
-        if (typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")
+        // Convert StringBuilder to native operations. #1524: §NEW keeps an object initializer
+        // (`new StringBuilder { Capacity = 64 }`); the native sb-new form has no place for it.
+        if ((typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")
+            && objCreation.Initializer is not { Expressions.Count: > 0 })
         {
             _context.RecordFeatureUsage("native-stringbuilder-op");
             return new StringBuilderOperationNode(GetTextSpan(objCreation), StringBuilderOp.New, args);
@@ -12635,11 +12705,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     else
                     {
                         value = ConvertExpression(assignment.Right);
-                        // Hoist block-level values (§LIST, §DICT, §SET) that can't appear inline
+                        // #1524: a collection value stays in place (inline §LIST/§HSET, or C#). A
+                        // hoisted one ran before the constructor and the earlier values.
                         if (IsBlockLevelCollection(value))
-                        {
-                            value = HoistIfComplex(value, GetTextSpan(assignment));
-                        }
+                            value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(assignment.Right));
                     }
                     initializers.Add(new ObjectInitializerAssignment(propName, value));
                 }
@@ -12656,9 +12725,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
     }
 
-    private AnonymousObjectCreationNode ConvertAnonymousObjectCreation(AnonymousObjectCreationExpressionSyntax anonObj)
+    private ExpressionNode ConvertAnonymousObjectCreation(AnonymousObjectCreationExpressionSyntax anonObj)
     {
         _context.RecordFeatureUsage("anonymous-type");
+        if (ContainsInitializerCreation(anonObj))
+            return PreserveInitializerContainer(anonObj, "anonymous-object");
         var initializers = new List<ObjectInitializerAssignment>();
 
         foreach (var init in anonObj.Initializers)
@@ -12670,14 +12741,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     : init.Expression is MemberAccessExpressionSyntax m ? m.Name.Identifier.ValueText
                     : $"_prop{_context.GenerateId("p")}");
             var value = ConvertExpression(init.Expression);
-            // Hoist block-level values (§LIST, §DICT, §SET) that can't appear inline
+            // #1541: a collection value stays in place (inline §LIST/§HSET, or C#). Hoisting it
+            // ahead of the statement ran it before the earlier members' values.
             if (IsBlockLevelCollection(value))
-            {
-                var tempName = _context.GenerateId("_anonProp");
-                _pendingStatements.Add(new BindStatementNode(
-                    GetTextSpan(init), tempName, null, false, value, new AttributeCollection()));
-                value = new ReferenceNode(GetTextSpan(init), tempName);
-            }
+                value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(init.Expression));
             initializers.Add(new ObjectInitializerAssignment(name, value));
         }
 
@@ -12983,13 +13050,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        return new ListCreationNode(
+        var listNode = new ListCreationNode(
             GetTextSpan(objCreation),
             id,
             id,
             elementType,
             elements,
             new AttributeCollection());
+        _collectionCreationSyntax[listNode] = objCreation;
+        return listNode;
     }
 
     private static bool IsDictionaryType(string typeName) =>
@@ -13042,6 +13111,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             expr is InitializerExpressionSyntax
             || expr is AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax }) == true;
 
+    /// <summary>
+    /// #1524: the type's members must be emitted in source order, because grouping fields before
+    /// properties would change the order in which their initializers run. C# runs field and
+    /// auto-property initializers in textual order, so a property initializer written before a
+    /// field initializer (`P { get; } = new T { X = Next() }; int F = Next();`) would otherwise
+    /// run after it.
+    /// </summary>
+    private static bool HasOrderSensitiveMemberInitializers(TypeDeclarationSyntax type)
+    {
+        if (HasDictionaryMemberInitializer(type))
+            return true;
+        var sawPropertyInitializer = false;
+        foreach (var member in type.Members)
+        {
+            if (member is PropertyDeclarationSyntax { Initializer: not null })
+                sawPropertyInitializer = true;
+            else if (sawPropertyInitializer && member is FieldDeclarationSyntax field
+                && field.Declaration.Variables.Any(variable => variable.Initializer != null))
+                return true;
+        }
+        return false;
+    }
+
     private static bool HasDictionaryMemberInitializer(TypeDeclarationSyntax type) =>
         type.Members.SelectMany(member => member switch
         {
@@ -13061,6 +13153,323 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "Dictionary construction and initializer operations preserved verbatim",
             creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
         return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
+    }
+
+    /// <summary>
+    /// #1524, #1541, #1595: the reason this creation's initializer has no faithful native form,
+    /// or null when it converts natively. Native forms are:
+    /// <list type="bullet">
+    /// <item>an object initializer of plain <c>Name = value</c> assignments, emitted inline as
+    /// <c>§NEW{T} Name = value §/NEW</c> (C# <c>new T(args) { Name = value }</c>), when the
+    /// arguments and values are simple enough to stay in place;</item>
+    /// <item>a <c>List&lt;T&gt;</c>/<c>HashSet&lt;T&gt;</c> collection initializer with no
+    /// constructor arguments, as a <c>§LIST</c>/<c>§HSET</c> statement. Everywhere it cannot be a
+    /// statement, <see cref="ConvertBlockLevelCollectionToNew"/> preserves it instead.</item>
+    /// </list>
+    /// Every other shape is preserved verbatim: a nested member initializer (<c>P = { … }</c>
+    /// adds to or sets members of the existing <c>P</c>, it does not assign a new object), an
+    /// indexer or <c>{ a, b }</c> element initializer, an Add-collection that is not List or
+    /// HashSet, and any value whose conversion would be hoisted ahead of the creation.
+    /// </summary>
+    private string? InitializerPreservationReason(BaseObjectCreationExpressionSyntax creation)
+    {
+        var initializer = creation.Initializer;
+        if (initializer == null || initializer.Expressions.Count == 0)
+            return null;
+        if (!IsInitializerSafePosition(creation))
+            return "initializer-position";
+        // A type or member name split across lines keeps its line break in Calor, which an inline
+        // initializer or element line cannot hold (#1524 review).
+        if (creation.DescendantNodes(node => node is not AnonymousFunctionExpressionSyntax)
+                .Any(node => node is TypeSyntax or MemberAccessExpressionSyntax && node.ToString().Contains('\n')))
+            return "multi-line-name";
+        // Calls stay on their initializer line, so they run after the constructor and in source
+        // order. If converting one hoists anything, WithoutHoistedInitializerValues preserves the
+        // creation instead; if the emitter must move the creation, it moves it whole.
+        // A nested creation whose own initializer converts natively is written inline too
+        // (`§NEW{T} A = §NEW{U} B = 1 §/NEW §/NEW`, `§LIST{…} §NEW{U} B = 1 §/NEW §/LIST{…}`).
+        bool Allowed(ExpressionSyntax value) =>
+            IsInPlaceInitializerValue(value) || IsCallOnlyValue(value)
+            || value is ObjectCreationExpressionSyntax { Initializer.Expressions.Count: > 0 } nested
+                && (nested.Initializer.IsKind(SyntaxKind.ObjectInitializerExpression) || IsNativeCollectionCreation(nested))
+                && InitializerPreservationReason(nested) == null;
+
+        if (initializer.IsKind(SyntaxKind.ObjectInitializerExpression))
+        {
+            // A constructor argument with a marker is hoisted ahead of the enclosing statement.
+            if (!AreMarkerFreeArguments(creation))
+                return "object-initializer-arguments";
+            foreach (var expression in initializer.Expressions)
+            {
+                if (expression is not AssignmentExpressionSyntax
+                    {
+                        RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                        Left: IdentifierNameSyntax,
+                    } assignment)
+                    return "object-initializer-member";
+                if (assignment.Right is InitializerExpressionSyntax)
+                    return "nested-member-initializer";
+                if (!Allowed(assignment.Right))
+                    return "object-initializer-value";
+            }
+            return null;
+        }
+
+        if (initializer.IsKind(SyntaxKind.CollectionInitializerExpression)
+            && IsNativeCollectionCreation(creation)
+            && initializer.Expressions.All(element => element is not InitializerExpressionSyntax
+                && Allowed(element)
+                // A block lambda is multi-line in Calor and cannot sit on an element line.
+                && !element.DescendantNodesAndSelf().OfType<AnonymousFunctionExpressionSyntax>().Any()))
+            return null;
+
+        return "collection-initializer";
+    }
+
+    /// <summary>
+    /// #1524/#1541 review r2: a natively converted creation must sit where nothing the converter
+    /// hoists out of the enclosing expression can run ahead of a sibling: a local, field or
+    /// property initializer, a <c>return</c>, an expression body, a lambda body, a plain
+    /// <c>x = new …;</c> statement, a <c>foreach</c> source, or a value or element of another
+    /// initializer (which that creation's own check covers). In an argument, a tuple, an anonymous
+    /// object, an operator operand and the like, a hoisted §LIST/§NEW ran before the earlier
+    /// siblings (`new { A = N, B = Take(new List&lt;int&gt; { Next() }) }`), so the creation stays C#.
+    /// </summary>
+    private bool IsInitializerSafePosition(ExpressionSyntax creation)
+    {
+        var (child, parent) = SkipParentheses(creation);
+        return parent switch
+        {
+            InitializerExpressionSyntax => true,
+            AssignmentExpressionSyntax { Parent: InitializerExpressionSyntax } nested => nested.Right == child,
+            // An argument of a statement-level call: HoistComplexArguments binds it ahead of the
+            // statement after the earlier arguments, and the receiver is a value the creation cannot
+            // change (a type, a local or a parameter), so nothing in the statement is overtaken.
+            ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } } argument =>
+                argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
+                && HasStableReceiver(invocation) && IsStatementLevelExpression(invocation),
+            ArgumentSyntax { Parent: ArgumentListSyntax { Parent: ObjectCreationExpressionSyntax { Initializer: null } outer } } argument =>
+                argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
+                && IsStatementLevelExpression(outer),
+            _ => IsStatementLevelExpression(creation),
+        };
+    }
+
+    private static (SyntaxNode Child, SyntaxNode? Parent) SkipParentheses(ExpressionSyntax expression)
+    {
+        SyntaxNode child = expression;
+        var parent = expression.Parent;
+        while (parent is ParenthesizedExpressionSyntax)
+        {
+            child = parent;
+            parent = parent.Parent;
+        }
+        return (child, parent);
+    }
+
+    /// <summary>
+    /// The expression is the whole value of its statement or member: a local, field or property
+    /// initializer, a <c>return</c>, an expression body, a lambda expression body, a <c>foreach</c>
+    /// source, a switch-expression arm, an expression statement, or the right side of a plain
+    /// <c>x = …;</c> / <c>a[i] = …;</c> statement. Whatever the converter hoists out of it then runs
+    /// just before it, after everything earlier.
+    /// </summary>
+    private static bool IsStatementLevelExpression(ExpressionSyntax expression)
+    {
+        var (child, parent) = SkipParentheses(expression);
+        return parent switch
+        {
+            EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax or PropertyDeclarationSyntax } => true,
+            ReturnStatementSyntax or ArrowExpressionClauseSyntax or ExpressionStatementSyntax => true,
+            LambdaExpressionSyntax lambda => lambda.ExpressionBody == child,
+            ForEachStatementSyntax forEach => forEach.Expression == child,
+            // An arm's hoists stay in that arm's own branch (ConvertSwitchExpression).
+            SwitchExpressionArmSyntax arm => arm.Expression == child,
+            AssignmentExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                Parent: ExpressionStatementSyntax,
+            } assignment => assignment.Right == child && (IsNameChain(assignment.Left)
+                || assignment.Left is ElementAccessExpressionSyntax element && IsNameChain(element.Expression)
+                    && element.ArgumentList.Arguments.All(index => index.RefKindKeyword.IsKind(SyntaxKind.None)
+                        && IsMarkerFreeValue(index.Expression))),
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// The call's receiver cannot be changed by code that runs before it: no receiver (a method of
+    /// this type), a type or namespace name (a static call), or a local or parameter.
+    /// </summary>
+    private bool HasStableReceiver(InvocationExpressionSyntax invocation)
+    {
+        if (invocation.Expression is IdentifierNameSyntax or GenericNameSyntax)
+            return true;
+        if (invocation.Expression is not MemberAccessExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
+            } member || _semanticModel == null || invocation.SyntaxTree != _semanticModel.SyntaxTree)
+            return false;
+        return member.Expression is PredefinedTypeSyntax
+            || _semanticModel.GetSymbolInfo(member.Expression).Symbol
+                is ITypeSymbol or INamespaceSymbol or ILocalSymbol or IParameterSymbol;
+    }
+
+    /// <summary>
+    /// #1541 review r2: a tuple, anonymous object or collection expression holding an object or
+    /// collection initializer is kept as C# whole, so the initializer runs in its place among the
+    /// other members (the creation itself is not in a safe position, see
+    /// <see cref="IsInitializerSafePosition"/>; this keeps the siblings with it).
+    /// </summary>
+    private bool ContainsInitializerCreation(ExpressionSyntax expression) =>
+        expression.DescendantNodes(node => node is not AnonymousFunctionExpressionSyntax)
+            .OfType<BaseObjectCreationExpressionSyntax>()
+            .Any(creation => creation.Initializer is { Expressions.Count: > 0 });
+
+    private ExpressionNode PreserveInitializerContainer(ExpressionSyntax container, string reason)
+    {
+        _context.RecordFeatureUsage("initializer-interop");
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "initializer-interop",
+            $"Expression holding an initializer preserved verbatim ({reason})",
+            container.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return TypedRawCSharp(container, "(" + container + ")", minimalTypeName: true);
+    }
+
+    /// <summary>
+    /// <c>new List&lt;T&gt; { … }</c> or <c>new HashSet&lt;T&gt; { … }</c> of the BCL types, written
+    /// with the unqualified generic name and no constructor arguments: the shapes §LIST/§HSET mean.
+    /// </summary>
+    private bool IsNativeCollectionCreation(BaseObjectCreationExpressionSyntax creation) =>
+        creation is ObjectCreationExpressionSyntax
+        {
+            Type: GenericNameSyntax { Identifier.ValueText: "List" or "HashSet", TypeArgumentList.Arguments.Count: 1 },
+            ArgumentList: null or { Arguments.Count: 0 },
+            Initializer.RawKind: (int)SyntaxKind.CollectionInitializerExpression,
+        }
+        && (_semanticModel == null || creation.SyntaxTree != _semanticModel.SyntaxTree
+            // An unresolved name (a snippet without its usings) is read as the BCL type, as before.
+            || _semanticModel.GetTypeInfo(creation).Type is null or { TypeKind: TypeKind.Error }
+            || _semanticModel.GetTypeInfo(creation).Type is INamedTypeSymbol
+            {
+                OriginalDefinition.MetadataName: "List`1" or "HashSet`1"
+            } collectionType
+            && collectionType.OriginalDefinition.ContainingNamespace.ToDisplayString() == "System.Collections.Generic");
+
+    /// <summary>
+    /// A method call whose receiver and arguments are marker-free (<see cref="IsMarkerFreeValue"/>)
+    /// or are themselves such calls. Calor keeps nested calls on their initializer line, in order.
+    /// A creation, array or lambda argument is not one: the emitter can hoist it ahead of the
+    /// enclosing statement.
+    /// </summary>
+    private static bool IsCallOnlyValue(ExpressionSyntax expression) =>
+        expression is InvocationExpressionSyntax invocation
+        && (invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: not "nameof" } or GenericNameSyntax
+            || invocation.Expression is MemberAccessExpressionSyntax
+            {
+                RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
+                Name: IdentifierNameSyntax or GenericNameSyntax,
+            } member && (IsNameChain(member.Expression) || IsCallOnlyValue(member.Expression)))
+        && invocation.ArgumentList.Arguments.All(argument =>
+            argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
+            && (IsMarkerFreeValue(argument.Expression) || IsCallOnlyValue(argument.Expression)));
+
+    /// <summary>
+    /// An expression Calor writes without a section marker (§C, §NEW, §ARR, …): literals, names,
+    /// simple member reads, and unary, binary and cast operators over those. The emitter never
+    /// hoists such an expression, so it is safe as a constructor argument (which is hoisted when it
+    /// carries a marker, ahead of the enclosing statement) and anywhere in an initializer.
+    /// <c>default(T)</c> is excluded: it converts to an untyped <c>default</c> (#1524 review).
+    /// </summary>
+    private static bool IsMarkerFreeValue(ExpressionSyntax expression) => expression switch
+    {
+        // A literal whose text holds a section sign reads as a marker to the emitter (review r2).
+        LiteralExpressionSyntax literal => !literal.Token.Text.Contains('§'),
+        IdentifierNameSyntax identifier => identifier.Identifier.ValueText != "nameof",
+        ParenthesizedExpressionSyntax parenthesized => IsMarkerFreeValue(parenthesized.Expression),
+        // `this` is written §THIS, and a member read on anything but a name chain is hoisted.
+        MemberAccessExpressionSyntax member => IsNameChain(member),
+        PrefixUnaryExpressionSyntax unary => unary.Kind() is SyntaxKind.UnaryMinusExpression
+                or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression
+                or SyntaxKind.BitwiseNotExpression
+            && IsMarkerFreeValue(unary.Operand),
+        BinaryExpressionSyntax binary => binary.Kind() is not (SyntaxKind.AsExpression or SyntaxKind.IsExpression)
+            && IsMarkerFreeValue(binary.Left) && IsMarkerFreeValue(binary.Right),
+        // A cast to a nullable value type loses its `?` in Calor (review r2): `(int?)n` became `(int)n`.
+        CastExpressionSyntax cast => cast.Type is not NullableTypeSyntax && IsMarkerFreeValue(cast.Expression),
+        _ => false,
+    };
+
+    /// <summary><c>a</c>, <c>a.b.c</c>, <c>int.MaxValue</c>: names Calor writes as they are.</summary>
+    private static bool IsNameChain(ExpressionSyntax expression) => expression switch
+    {
+        IdentifierNameSyntax identifier => identifier.Identifier.ValueText != "nameof",
+        PredefinedTypeSyntax => true,
+        MemberAccessExpressionSyntax
+        {
+            RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
+            Name: IdentifierNameSyntax,
+        } member => IsNameChain(member.Expression),
+        _ => false,
+    };
+
+
+    /// <summary>
+    /// True for an initializer value or element that converts to an inline Calor expression the
+    /// emitters keep in place: a marker-free value (<see cref="IsMarkerFreeValue"/>), <c>typeof</c>,
+    /// a block-bodied lambda or an expression lambda whose body is marker-free or a call (its body
+    /// runs when it is called; hoists from a block body stay inside it), and array or plain object
+    /// creations whose sizes, elements and arguments are marker-free. Assignments, conditionals,
+    /// switch expressions, await, queries and the like can be hoisted into a temporary ahead of the
+    /// creation (changing evaluation order), or, at member level, out of the field initializer
+    /// altogether, so they are not. Calls are handled by <see cref="IsCallOnlyValue"/>.
+    /// </summary>
+    private static bool IsInPlaceInitializerValue(ExpressionSyntax expression) => expression switch
+    {
+        _ when IsMarkerFreeValue(expression) => true,
+        TypeOfExpressionSyntax => true,
+        // `default(T)` anywhere in the body converts to an untyped `default` (review r2).
+        AnonymousFunctionExpressionSyntax function when function.DescendantNodes().OfType<DefaultExpressionSyntax>().Any() => false,
+        AnonymousMethodExpressionSyntax => true,
+        LambdaExpressionSyntax { ExpressionBody: null } => true,
+        LambdaExpressionSyntax { ExpressionBody: { } body } => IsMarkerFreeValue(body) || IsCallOnlyValue(body),
+        // `new T[n]` / `new T[] { a, b }`: §ARR stays inline when its sizes and elements do.
+        ArrayCreationExpressionSyntax array =>
+            array.Type.RankSpecifiers.SelectMany(rank => rank.Sizes)
+                .All(size => size is OmittedArraySizeExpressionSyntax || IsMarkerFreeValue(size))
+            && (array.Initializer?.Expressions.All(IsMarkerFreeValue) ?? true),
+        // `new T()` / `new T(1, x)`: §NEW stays inline when its arguments carry no marker.
+        ObjectCreationExpressionSyntax { Initializer: null } creation => AreMarkerFreeArguments(creation),
+        _ => false,
+    };
+
+    private static bool AreMarkerFreeArguments(BaseObjectCreationExpressionSyntax creation) =>
+        creation.ArgumentList?.Arguments.All(argument => argument.RefKindKeyword.IsKind(SyntaxKind.None)
+            && argument.NameColon == null && IsMarkerFreeValue(argument.Expression)) ?? true;
+
+    /// <summary>
+    /// #1524, #1541, #1595: keeps a creation whose initializer has no faithful native form as an
+    /// inline C# expression, and records the loss. A target-typed <c>new(…) { … }</c> is spelled
+    /// with its type, so a later hoist into a <c>var</c> temporary cannot lose the target type.
+    /// </summary>
+    private ExpressionNode PreserveInitializer(BaseObjectCreationExpressionSyntax creation, string reason)
+    {
+        _context.RecordFeatureUsage("initializer-interop");
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "initializer-interop",
+            $"Object creation with an initializer preserved verbatim ({reason})",
+            creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        var code = creation.ToString();
+        if (creation is ImplicitObjectCreationExpressionSyntax implicitCreation
+            && _semanticModel != null && creation.SyntaxTree == _semanticModel.SyntaxTree
+            && _semanticModel.GetTypeInfo(creation).Type is { TypeKind: not TypeKind.Error } createdType
+            && !createdType.IsAnonymousType)
+        {
+            // The minimal name resolves wherever the surrounding preserved C# does, including after
+            // the converter moves the declarations into a module namespace (#1524 review).
+            code = "new " + createdType.ToMinimalDisplayString(_semanticModel, creation.SpanStart)
+                + implicitCreation.ArgumentList.ToString()
+                + (implicitCreation.Initializer == null ? "" : " " + implicitCreation.Initializer);
+        }
+        return TypedRawCSharp(creation, "(" + code + ")", minimalTypeName: true);
     }
 
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
@@ -13087,7 +13496,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        return new DictionaryCreationNode(
+        var dictionaryNode = new DictionaryCreationNode(
             GetTextSpan(objCreation),
             id,
             id,
@@ -13095,6 +13504,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             valueType,
             entries,
             new AttributeCollection());
+        _collectionCreationSyntax[dictionaryNode] = objCreation;
+        return dictionaryNode;
     }
 
     private SetCreationNode ConvertHashSetCreation(ObjectCreationExpressionSyntax objCreation, string elementType)
@@ -13111,13 +13522,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        return new SetCreationNode(
+        var setNode = new SetCreationNode(
             GetTextSpan(objCreation),
             id,
             id,
             elementType,
             elements,
             new AttributeCollection());
+        _collectionCreationSyntax[setNode] = objCreation;
+        return setNode;
     }
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)
@@ -13445,7 +13858,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     .Select(ConvertExpression)
                     .ToList();
                 var elementType = InferElementType(items);
-                return new ListCreationNode(GetTextSpan(initExpr), id, id, elementType, items, new AttributeCollection());
+                var listNode = new ListCreationNode(GetTextSpan(initExpr), id, id, elementType, items, new AttributeCollection());
+                _collectionCreationSyntax[listNode] = initExpr;
+                return listNode;
             }
 
             case SyntaxKind.ObjectInitializerExpression:

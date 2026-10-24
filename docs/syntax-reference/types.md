@@ -327,6 +327,22 @@ Calor provides built-in syntax for creating and manipulating collections with ty
   "review"
 ```
 
+### Inline Collections
+
+`§LIST`, `§DICT` and `§HSET` blocks are statements: they declare a local, so they belong in a
+method body. A block directly in a class body is error `Calor0100`. Where a value is needed
+instead, such as a field or property default or an element of another collection, write the
+collection on one line and close it with its id:
+
+```
+§FLD{List<i32>:xs:pub} = §LIST{xs:i32} 1 2 3 §/LIST{xs}
+§FLD{List<List<i32>>:grid:pub} = §LIST{grid:List<i32>} §LIST{row:i32} 1 §/LIST{row} §/LIST{grid}
+§PROP{p1:Tags:HashSet<str>:pub:get} = §HSET{tags:str} "a" "b" §/HSET{tags}
+```
+
+This compiles to `new List<int>() { 1, 2, 3 }`: the elements are added in order, as a C#
+collection initializer does.
+
 ### Collection Operations
 
 | Operation | Syntax | Description |
