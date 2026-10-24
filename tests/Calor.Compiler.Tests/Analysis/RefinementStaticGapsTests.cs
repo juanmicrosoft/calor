@@ -10,9 +10,9 @@ using Xunit;
 namespace Calor.Compiler.Tests.Analysis;
 
 /// <summary>
-/// #1676: four places where the refinement checks of #1529/#1530 did not reach. In each one the
-/// runtime refinement guards already fired, so no wrong value passed silently; only the static
-/// <c>Calor0202</c> was missing.
+/// #1676: four places where the refinement checks of #1529/#1530 did not reach. Mostly a runtime
+/// refinement guard already fired and only the static <c>Calor0202</c> was missing; a lambda
+/// passed inside <c>§P</c> also had no runtime guard on its parameter.
 ///
 /// <list type="number">
 /// <item><c>§P</c> statements were never type-checked, so a wrong-refinement call inside one was
@@ -463,7 +463,9 @@ public class RefinementStaticGapsTests
                   §SET{pub}
                     §ASSIGN _p value
             """);
-        AssertDistinct(setter, "Nat", "Pos", "assignment to '_p'");
+        // The emitter does not guard a setter's 'value', so the checker types it as its base
+        // type (i32) and claims no refinement for it: writing it into a Pos field is a base write.
+        AssertNoRefinementError(setter);
 
         var op = Compile("""
               §CL{c1:Holder:pub}
@@ -602,6 +604,111 @@ public class RefinementStaticGapsTests
 
         Assert.Equal(2, Invoke(assembly, "Holder", "Run", 2));
         Assert.IsType<ArgumentOutOfRangeException>(Throws(assembly, "Holder", "Run", -1));
+    }
+
+    // ───────────────────────── Review round 1 ─────────────────────────
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Print_MemberAccessTheCheckerCannotType_StillCompiles(bool withRefinements)
+    {
+        // §P keeps only refinement errors: the checker cannot type `s.Length`, Roslyn can.
+        var header = withRefinements ? Header : "§M{m:Rt}";
+        var result = Program.Compile(header + "\n" + """
+              §F{f1:Show:pub} (str:s) -> void
+                §E{cw}
+                §P s.Length
+            """, "print-member.calr", new CompilationOptions { EnableTypeChecking = true });
+        Assert.False(result.HasErrors, Errors(result));
+    }
+
+    [Fact]
+    public void Try_OrdinaryArmMismatchBeforeARefinementArm_StillReportsTheRefinement()
+    {
+        var result = Compile("""
+              §F{f1:Run:pub} (Pos:p, i32:k) -> i32
+                §TR{t1}
+                  §B{x:Nat} §W{w1} k
+                    §K INT:0 → k
+                    §K _ → p
+                  §R x
+                §CA{Exception:e}
+                  §R INT:0
+                §R INT:0
+            """);
+        AssertDistinct(result, "Pos", "Nat", "a match arm");
+    }
+
+    [Fact]
+    public void ClassMember_ThisQualifiedFieldWriteAndRead_AreChecked()
+    {
+        var write = Compile("""
+              §CL{c1:Holder:pub}
+                §FLD{Pos:_p:priv}
+                §MT{mt1:Set:pub} (Nat:n) -> void
+                  §ASSIGN this._p n
+            """);
+        AssertDistinct(write, "Nat", "Pos", "assignment to 'this._p'");
+
+        var read = Compile("""
+              §CL{c1:Holder:pub}
+                §FLD{Pos:_p:priv}
+                §MT{mt1:Get:pub} (Nat:_p) -> Nat
+                  §R this._p
+            """);
+        AssertDistinct(read, "Pos", "Nat", "a return");
+    }
+
+    [Fact]
+    public void ClassMember_CaseDistinctMembers_AreDistinctVariables()
+    {
+        const string Members = """
+              §CL{c1:Holder:pub}
+                §FLD{Nat:n:priv}
+                §PROP{p1:N:Pos:pub:get,set}
+            """;
+        AssertNoRefinementError(Compile(Members + """
+
+                §MT{mt1:Small:pub} () -> Nat
+                  §R n
+            """));
+        AssertDistinct(Compile(Members + """
+
+                §MT{mt1:Big:pub} () -> Nat
+                  §R N
+            """), "Pos", "Nat", "a return");
+    }
+
+    [Fact]
+    public void ClassMember_NestedClassCallsTheEnclosingStaticMethod()
+    {
+        // C# resolves `Take` to the enclosing class's static method, not the module function.
+        AssertNoRefinementError(Compile("""
+              §F{f0:Take:pub} (Pos:p) -> i32
+                §R p
+              §CL{c1:Outer:pub}
+                §MT{mt1:Take:pub:stat} (Nat:n) -> i32
+                  §R n
+                §CL{c2:Inner:pub}
+                  §MT{mt2:Use:pub} (Nat:n) -> i32
+                    §R §C{Take} §A n §/C
+            """));
+    }
+
+    [Fact]
+    public void ClassMember_AmbiguousOrGenericBaseClass_ImportsNoMembers()
+    {
+        AssertNoRefinementError(Compile("""
+              §CL{c0:Base:pub}
+                §FLD{Nat:v:prot}
+              §CL{c1:Base<T>:pub}
+                §FLD{Pos:v:prot}
+              §CL{c2:Derived:pub}
+                §EXT{Base<i32>}
+                §MT{mt1:Get:pub} () -> Pos
+                  §R v
+            """));
     }
 
     [Fact]

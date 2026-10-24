@@ -78,8 +78,9 @@ All notable changes to this project will be documented in this file.
   - Type-checker messages now name a refinement by its `§RTYPE` name (`Nat`) instead of
     `i32{#i32}`.
 - **Refinement errors are now reported in four places the type checker skipped (#1676).** In
-  each one the runtime guards already fired, so no wrong value passed silently; only the
-  compile-time `Calor0202` was missing.
+  most of these cases a runtime guard already fired, and only the compile-time `Calor0202` was
+  missing. The exception is a lambda passed inside `§P`, whose parameter also had no runtime
+  guard.
   - **`§P` statements are type-checked.** `§P §C{TakePos} §A n §/C` with `n: Nat` is now
     `Calor0202`. A lambda passed to a call inside `§P` now takes its parameter types from the
     delegate. If a parameter's type is `Nat`, writes to it are guarded, as they are everywhere
@@ -101,6 +102,12 @@ All notable changes to this project will be documented in this file.
     members the type checker reports only refinement errors. Its other checks are still left to
     name binding and the C# compiler, because it does not model inherited members. Members in a
     `§PP` block are not type-checked. Modules without `§RTYPE` are not affected.
+  - Variable names are now case-sensitive in the type checker, as they are in C#: a field `n`
+    and a property `N` are two different members.
+  - Known limit, unchanged by this release: a write to a refined field or property has no
+    runtime guard, so a base value such as `§ASSIGN _p INT:0` into a `Pos` field is not
+    checked. For the same reason a setter's `value` and an indexer's parameters are typed as
+    their base types.
   - **Breaking:** programs with these mismatches no longer compile. That includes a mutable
     rebind in a class method that changes a named refinement, such as `§B{~x} a` with `a: Nat`
     after a parameter `x: Pos`. No sample, docs example or website example changed. To convert
