@@ -1,0 +1,41 @@
+// 0.27 (#1541, #1595) shared control: collection initializers in field and property defaults.
+// `new List<int> { 5 }` must hold the element 5 (not become `new List<int>(5)`, an empty list
+// with capacity 5). A nested collection default must not end the class: the members after it
+// and the class after it must still exist. Capacity is traced because List(IEnumerable) and
+// Add-based initialization leave different capacities.
+using System.Collections.Generic;
+
+public class Holder
+{
+    public int Before = 1;
+    public List<int> Xs = new List<int> { 5 };
+    public List<List<int>> Nested = new List<List<int>> { new List<int> { 1, 2 }, new List<int>() };
+    public List<object> Objects = new List<object> { new List<string> { "a" } };
+    public static HashSet<string> Tags = new HashSet<string> { "x", "x", "y" };
+    public List<int> Prop { get; } = new List<int> { 7, 8, 9 };
+    public HashSet<int> SetProp { get; set; } = new HashSet<int> { 3 };
+    public int After = 2;
+
+    public int Later() => After + 40;
+}
+
+public class Other
+{
+    public int Y = 3;
+}
+
+public static class Probe
+{
+    static string Show(List<int> l) => l.Count + "/" + l.Capacity + "[" + string.Join(",", l) + "]";
+
+    public static string Run()
+    {
+        var h = new Holder();
+        var inner = (List<string>)h.Objects[0];
+        List<int> first = h.Nested[0];
+        List<int> second = h.Nested[1];
+        return Show(h.Xs) + "|" + h.Nested.Count + ":" + Show(first) + ":" + Show(second)
+            + "|" + inner.Count + inner[0] + "|" + Holder.Tags.Count + "|" + Show(h.Prop)
+            + "|" + h.SetProp.Count + "|" + h.Before + h.After + h.Later() + "|" + new Other().Y;
+    }
+}

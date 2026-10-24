@@ -6,6 +6,33 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Collection and object initializers convert correctly (#1541, #1524, #1595).** These were
+  silent wrong-output bugs: the converter changed what the code does and still reported a
+  lossless conversion.
+  - `new List<int> { 5 }` in a field or property default became `new List<int>(5)`, an empty
+    list with capacity 5. Field and property defaults of `List<T>` and `HashSet<T>` now convert
+    to an inline `§LIST`/`§HSET` that keeps every element, including nested lists.
+  - Object initializers such as `new StringBuilder { Capacity = 64 }` lost their assignments.
+    They now convert to `§NEW{StringBuilder} Capacity = 64 §/NEW` on fields, properties and
+    locals. An auto-property default is no longer rewritten into a getter that built a new
+    object on every read.
+  - A shape with no exact Calor form stays as C# (`§CS{…}`) and is reported as an
+    `initializer-interop` loss. Examples: a nested member initializer such as
+    `Items = { 1, 2 }`, which adds to the existing list, an index initializer such as
+    `["a"] = 1`, a custom collection with its own `Add`, and an initializer used as a method
+    argument or inside a tuple, where converting it natively could change the order in which
+    the surrounding expressions run.
+  - A class whose property initializer comes before a field initializer keeps its members in
+    source order, so the initializers still run in the order C# runs them.
+  - An event field with an initializer, such as `event Action E = Make();`, lost the
+    initializer. The member now stays as C#.
+- **A `§LIST`, `§DICT` or `§HSET` block directly in a class body is now error `Calor0100`
+  (#1595).** These blocks declare local variables, so they belong in a method. Before, the
+  parser skipped to the end of the file looking for a closing tag. Every later member and every
+  later class vanished from the output, and compilation still succeeded. The converter
+  produced this shape from a field such as
+  `List<List<int>> X = new List<List<int>> { new List<int> { 1 } };`.
+
 - **A local inferred from a refined value now keeps the refinement, so writes to it are
   checked (#1529).** A refinement type (`§RTYPE{r1:Nat:i32} (>= # INT:0)`) is a base type plus
   a predicate. The type checker already typed `§B{~x} a`, with `a: Nat`, as `Nat`. But the code

@@ -1,0 +1,11 @@
+§M{m001:InitializerInteropTest}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Bag:pub}
+    §PROP{p001:Items:List<i32>:pub:get} = §LIST{items:i32} 1 §/LIST{items}
+
+  §CL{c002:InitializerInteropTest:pub:stat}
+    §MT{m001:Verify:pub:stat} () -> i32
+      §S (== result 33)
+      §B{bag} (cast Bag §CS{(new Bag { Items = { 2, 3 } })})
+      §R (+ (* bag.Items.Count 10) §IDX bag.Items 2)

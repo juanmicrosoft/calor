@@ -1,0 +1,265 @@
+// 0.27 (#1524, #1541) shared control: evaluation order around initializers, from the PR's
+// review round 1. The outer constructor runs before a nested constructor argument, a lambda
+// value runs its body only when called, a tuple or anonymous-object member is read before a
+// later member's collection runs code, `default(S)` stays a boxed struct, and Add-collection
+// elements run their constructors in element order.
+using System;
+using System.Collections.Generic;
+
+public struct S
+{
+    public int V;
+}
+
+public class Cell
+{
+    public int V;
+
+    public Cell(int v)
+    {
+        V = v;
+        Probe.Log += "cell" + v + ";";
+    }
+}
+
+public class Outer
+{
+    public Cell C;
+    public Func<Cell> F;
+    public object Value;
+
+    public Outer()
+    {
+        Probe.N = 10;
+        Probe.Log += "outer;";
+    }
+}
+
+public class Holder
+{
+    public List<object> Defaults = new List<object> { default(S), 1 };
+    public Outer Field = new Outer { C = new Cell(Probe.N + 1) };
+    public Outer First { get; } = new Outer { Value = Probe.Next() };
+    public event Action E = Probe.MakeHandler();
+    public int Last = Probe.Next();
+}
+
+public class Receiver
+{
+    public int V;
+    public static int Result;
+
+    public void Take(Receiver r)
+    {
+        Result = V * 10 + r.V;
+    }
+
+    public static implicit operator int(Receiver r)
+    {
+        Probe.N += 1;
+        return r.V;
+    }
+}
+
+public class EventFirst
+{
+    public event Action E = Probe.MakeHandler();
+    public int F = Probe.Next();
+}
+
+public class Slot
+{
+    public List<int> Items;
+    public static Slot Current;
+    public static Slot Other;
+
+    public static int Swap()
+    {
+        Current = Other;
+        return 7;
+    }
+
+    public static void Set(ref Slot s)
+    {
+        s.Items = new List<int> { Swap() };
+    }
+}
+
+public class Key
+{
+    public static implicit operator Key(int x)
+    {
+        Probe.N += 1;
+        return new Key();
+    }
+}
+
+public struct Counter
+{
+    public int N;
+
+    public static int Take(Counter c, Cell x) => c.N * 100 + x.V;
+
+    public int Change()
+    {
+        N = 10;
+        return 7;
+    }
+
+    public int Go()
+    {
+        return Take(this, new Cell(0) { V = Change() });
+    }
+}
+
+public class EventThenProperty
+{
+    public event Action E = Probe.MakeHandler();
+    public Outer P { get; } = new Outer { Value = Probe.Next() };
+}
+
+public class Named
+{
+    public string Text;
+
+    public Named(string text, int n)
+    {
+        Text = text + n;
+    }
+}
+
+public class View
+{
+    public int Value;
+}
+
+public class Converts
+{
+    public static implicit operator int(Converts c)
+    {
+        Probe.N += 100;
+        return Probe.N;
+    }
+}
+
+public class Self
+{
+    public static implicit operator View(Self s)
+    {
+        Probe.N++;
+        return new View { Value = Probe.N };
+    }
+
+    public string Go()
+    {
+        Probe.N = 0;
+        var a = new Outer { C = new Cell(Probe.Pick(this, Probe.N)) };
+        Probe.N = 0;
+        var b = new Outer { F = () => new Cell(((View)this).Value) };
+        return a.C.V + "," + (b.F().V + b.F().V);
+    }
+}
+
+public static class Probe
+{
+    public static int N;
+    public static string Log = "";
+
+    public static int Next()
+    {
+        N += 1;
+        Log += "next" + N + ";";
+        return N;
+    }
+
+    public static int Pick(Self s, int n) => n;
+
+    public static void Empty()
+    {
+    }
+
+    public static int Take(List<int> xs) => xs[0];
+
+    public static int Bump()
+    {
+        N = 1;
+        return 7;
+    }
+
+    public static Action MakeHandler()
+    {
+        N += 10;
+        Log += "handler;";
+        return Empty;
+    }
+
+    public static string Run()
+    {
+        N = 0;
+        Log = "";
+        var o = new Outer { C = new Cell(Next()) };
+        N = 0;
+        var b = new Outer { F = () => new Cell(Next()) };
+        var f = b.F().V + b.F().V;
+        N = 0;
+        var t = (N, new List<int> { Next() });
+        N = 0;
+        var a = new { A = N, B = new List<int> { Next() } };
+        var d = new Outer { Value = default(S) };
+        N = 0;
+        var cells = new List<Cell> { new Cell(0), new Cell(Next()) };
+        N = 0;
+        var h = new Holder();
+        var self = new Self().Go();
+        N = 0;
+        var named = new Outer { Value = new Named("§", N) };
+        N = 0;
+        var anon = new { A = N, B = Take(new List<int> { Next() }) };
+        N = 0;
+        var argument = N * 10 + Take(new List<int> { Next() });
+        N = 0;
+        var tuple = (N, Take(new List<int> { Next() }));
+        N = 0;
+        int[] xs = [0, Next(), Take(new List<int> { Next() })];
+        N = 0;
+        var c = new Converts();
+        (int A, List<int> B) typed = (c, new List<int> { Next() });
+        var lambdaDefault = new Outer { F = null, Value = (Func<object>)(() => { return default(S); }) };
+        int? none = null;
+        var nullable = new Outer { Value = (int?)none };
+        var spelled = new Outer { Value = (Nullable<int>)none };
+        var r = new Receiver { V = 1 };
+        var other = new Receiver { V = 2 };
+        Func<int> change = () => { r = other; return 3; };
+        r.Take(new Receiver { V = change() });
+        var receiverResult = Receiver.Result;
+        var slots = new List<int>[2];
+        N = 0;
+        slots[N] = new List<int> { Bump() };
+        N = 0;
+        var max = Math.Max(new Receiver { V = 0 }, new Receiver { V = N });
+        N = 0;
+        var eventFirst = new EventFirst();
+        Slot.Current = new Slot();
+        Slot.Other = new Slot();
+        var oldSlot = Slot.Current;
+        Slot.Set(ref Slot.Current);
+        var slotTrace = (oldSlot.Items == null) + ":" + (Slot.Other.Items == null);
+        N = 0;
+        var keyed = new Dictionary<Key, List<int>>();
+        var readAt = -1;
+        keyed[0] = new List<int> { N };
+        foreach (var pair in keyed) readAt = pair.Value[0];
+        var counter = new Counter().Go();
+        N = 0;
+        var eventThenProperty = (int)new EventThenProperty().P.Value;
+        return o.C.V + "|" + f + "|" + t.Item1 + "," + t.Item2[0] + "|" + a.A + "," + a.B[0]
+            + "|" + (d.Value == null) + (d.Value is S) + "|" + cells[1].V + "|" + (h.Defaults[0] is S) + h.Field.C.V
+            + "|" + ((Outer)h.First).Value + "," + h.Last + "|" + self + "|" + ((Named)named.Value).Text
+            + "|" + anon.A + "," + anon.B + "," + argument + "|" + tuple.Item1 + "," + tuple.Item2 + "|" + xs[1] + "," + xs[2]
+            + "|" + typed.A + "," + typed.B[0] + "|" + (((Func<object>)lambdaDefault.Value)() is S)
+            + "|" + (nullable.Value == null) + (spelled.Value == null) + "|" + receiverResult
+            + "|" + (slots[0] == null ? -1 : slots[0][0]) + "|" + max + "|" + eventFirst.F
+            + "|" + slotTrace + "|" + readAt + "|" + counter + "|" + eventThenProperty + "|" + Log;
+    }
+}

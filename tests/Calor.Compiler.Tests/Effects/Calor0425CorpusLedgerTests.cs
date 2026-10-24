@@ -1568,7 +1568,10 @@ public class Calor0425CorpusLedgerTests
         // R2's historical recovery result or reopening its closed MISS.
         var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
         // #943 (0.25 F1): untyped out-var bindings (Calor0250) no longer stop binding: 265 -> 275.
-        const int EnforcedAfterStageBActivation = 275;
+        // #1541/#1524 (0.27): FluentValidation.Tests/CollectionValidatorWithParentTests.cs no longer
+        // stops at Calor0208 (an overload mismatch from the old `_item0 = …` initializer
+        // conversion; its custom Add-collection initializer now stays C#): 275 -> 276.
+        const int EnforcedAfterStageBActivation = 276;
         Assert.Equal(EnforcedAfterStageBActivation, enforcedNow);
     }
 
