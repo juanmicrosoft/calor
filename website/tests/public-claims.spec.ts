@@ -7,6 +7,7 @@ import data from '../public/data/benchmark-results.json';
 import agents from '../public/data/agent-benchmark-results.json';
 import refactoring from '../public/data/agent-refactoring-results.json';
 import provenance from '../public/data/benchmark-provenance.json';
+import featureSupport from '../public/data/feature-support.json';
 
 const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-detection',
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
@@ -98,6 +99,32 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
   }
   await page.goto(`${base}/docs/cli/feature-check/`);
   await expect(page.locator('article')).toContainText('Known gaps between the registry and 0.25 behavior');
+});
+
+// #1664: pages state converter support levels only through <SupportLevel>, which renders the level
+// from public/data/feature-support.json (the output of `calor feature-check --list`).
+test('support levels render from the FeatureSupport registry export', async ({ page }) => {
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  const names: Record<string, string> = { full: 'Full', partial: 'Partial', notsupported: 'NotSupported', manualrequired: 'ManualRequired' };
+  const registry = new Map<string, string>();
+  for (const [level, features] of Object.entries(featureSupport.data.features))
+    for (const feature of features as { name: string }[]) registry.set(feature.name, level);
+  await page.route('https://**/*', route => route.abort());
+  for (const [path, count] of [['cli/feature-check', 15], ['cli/convert', 1], ['guides/csharp-interoperability', 1],
+    ['syntax-reference/string-operations', 1]] as const) {
+    await page.goto(`${base}/docs/${path}/`);
+    const rendered = await page.locator('article [data-support-level]').evaluateAll(elements => elements.map(element =>
+      ({ feature: element.getAttribute('data-feature')!, level: element.getAttribute('data-support-level')!,
+        tag: element.tagName, text: element.textContent ?? '' })));
+    expect(rendered.length, path).toBe(count);
+    for (const { feature, level, tag, text } of rendered) {
+      expect(level, `${path}: ${feature}`).toBe(registry.get(feature));
+      if (tag === 'CODE') expect(text).toMatch(new RegExp(`^\\[${feature}\\] Feature '${feature}' `));
+      else expect(text, `${path}: ${feature}`).toBe(names[level]);
+    }
+  }
+  await page.goto(`${base}/docs/guides/csharp-interoperability/`);
+  await expect(page.locator('article')).toContainText(`reports ${names[registry.get('string-interpolation')!]}`);
 });
 
 test('nullability correction distinguishes binder diagnostics from CLI rejection and preserves history', async ({ page }) => {

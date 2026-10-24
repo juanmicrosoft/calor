@@ -168,6 +168,18 @@ new diagnostic. The C# converter emits code that passes all four checks.
   the sweep still builds and that the fixture covers every case. `main` passes today: 0
   findings, and 4 of 710 cases time out. (#1589)
 
+- **Website support levels now come from the converter's registry (#1664).** A support level
+  (Full, Partial, NotSupported or ManualRequired) says how the C#-to-Calor converter handles a
+  C# feature. The 18 levels on 4 pages used to be typed by hand, and a test found them in the
+  prose with regular expressions. A review found phrasings that slipped past it four times. A
+  page now states a level only with the `<SupportLevel feature="…" />` component. It renders
+  the level from `website/public/data/feature-support.json`, which is the output of
+  `calor feature-check --list`, and a test fails when that file differs from the registry. A
+  second test parses every page with Markdig, a Markdown parser, so emphasis, code spans,
+  parentheses and wrapped lines no longer change what it reads. It fails when a level word
+  such as "full" or "not supported" appears next to a feature name outside the component.
+  14 passages that use these words in another sense are allowlisted, each with a reason.
+
 ### Release process
 
 - **macOS CI jobs moved from `macos-14` to `macos-15`.** GitHub retires the `macos-14` runner

@@ -151,7 +151,7 @@ public static string Kind(object o) => "object:" + o;
 public static string Run(int x) => Kind($"k={x}");   // "fs:k={0}"
 ```
 
-`calor feature-check string-interpolation` reports **Partial** because of the handler row.
+`calor feature-check string-interpolation` reports **<SupportLevel feature="string-interpolation" />** because of the handler row.
 Interpolation is converted using the C# semantic model of the single file being converted. If a
 target type cannot be resolved there, for example a method from an assembly the converter was not
 given, the literal converts as a string-target literal and C# applies target typing again when
