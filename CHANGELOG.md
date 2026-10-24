@@ -173,7 +173,7 @@ new diagnostic. The C# converter emits code that passes all four checks.
   comparison can end without a difference (AGREE, SKIPPED, NONDETERMINISTIC, TIMEOUT,
   INCONCLUSIVE, and hang or crash replays) in the oracle's README. For each one, a new test
   injects a real change by hand and checks that the oracle reports it or excludes the member
-  with a reason. 36 of these 85 tests passed silently before the fixes. Among the fixes:
+  with a reason. 36 of these 86 tests passed silently before the fixes. Among the fixes:
   - A thrown exception is compared by its message, data and inner exception, not by its type
     alone.
   - When one input times out, the inputs after it still run. Before, they were dropped.
