@@ -153,28 +153,11 @@ jobs:
               sys.exit(f"::error::{project} is not release-critical in eng/test-manifest.json")
           PY
 
+      # #1666: the same checked-in script as test.yml's shard step, called with no inline shell
+      # (D014 checks the call and pins the script). It splits the compiler suite into two fresh
+      # test hosts (#1150) and writes the TRX files the next step checks part by part.
       - name: Run project tests
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/test
-          if [ "${{ matrix.name }}" = "compiler" ]; then
-            bash scripts/compiler-shard-filter.sh --self-test
-            : > test-output.log
-            # Match main CI's fresh-host mitigation for the unresolved #1150 leak.
-            for part in 1 2; do
-              filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
-              dotnet test "${{ matrix.project }}" -c Release --no-build --no-restore \
-                --filter "$filter" \
-                --logger "trx;LogFileName=${{ matrix.name }}-$part.trx" \
-                --results-directory artifacts/test \
-                --verbosity normal 2>&1 | tee -a test-output.log
-            done
-          else
-            dotnet test "${{ matrix.project }}" -c Release \
-              --logger "trx;LogFileName=${{ matrix.name }}.trx" \
-              --results-directory artifacts/test \
-              --verbosity normal 2>&1 | tee test-output.log
-          fi
+        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"
 
       # --submodules because THIS workflow checks out `submodules: recursive` for
       # every shard (above), unlike test.yml:375 which gives all but `compiler`

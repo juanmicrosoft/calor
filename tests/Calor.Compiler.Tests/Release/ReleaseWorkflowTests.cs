@@ -179,6 +179,13 @@ public class ReleaseWorkflowTests
         Assert.Contains("uses: ./.github/actions/bootstrap-z3", job);
         Assert.Contains("run: dotnet restore --locked-mode", job);
         Assert.Contains("is not release-critical in eng/test-manifest.json", Step(job, "Assert this project is release-critical in the manifest"));
+        // #1666: the shard body is the checked-in script test.yml also calls, with no inline shell.
+        const string shardCall = "run: bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"";
+        Assert.Equal("        " + shardCall, Step(job, "Run project tests").Split('\n')[1]);
+        Assert.Contains(shardCall, Job(Read("test.yml"), "remaining-tests"));
+        var shard = File.ReadAllText(Path.Combine(RepoRoot(), "scripts", "run-shard-tests.sh"));
+        Assert.Contains("bash scripts/compiler-shard-filter.sh --part \"$part\"", shard);
+        Assert.Contains("--logger \"trx;LogFileName=$name-$part.trx\"", shard);
         var inventory = Step(job, "Enforce test inventory");
         Assert.Equal(2, Regex.Matches(inventory, @"python3 scripts/check_trx\.py").Count);
         Assert.Equal(2, Regex.Matches(inventory, @"--submodules").Count);

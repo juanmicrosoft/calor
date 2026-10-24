@@ -195,20 +195,35 @@ class NegativeRegistrationControls(unittest.TestCase):
             (".github/workflows/test.yml", test_yml.replace(main, main.rstrip("\n") + " || true\n")),
             (".github/workflows/test.yml", test_yml.replace(main_block, "").replace(  # reorder: before the checkout
                 "      - name: Checkout code\n", main_block + "      - name: Checkout code\n", 1)),
-            (".github/workflows/publish-nuget.yml", publish.replace(
-                "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          mkdir -p artifacts/test\n          set +e\n", 1)),
             (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        'if': ${{ 1 == 2 }}\n")),
             (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        \"continue-on-error\": true\n")),
-            (".github/workflows/publish-nuget.yml", publish.replace(
-                "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          exit 0\n          mkdir -p artifacts/test\n", 1)),
-            (".github/workflows/publish-nuget.yml", publish.replace(
-                "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          if false; then\n          mkdir -p artifacts/test\n", 1)
-             .replace("              --verbosity normal 2>&1 | tee test-output.log\n          fi\n",
-                      "              --verbosity normal 2>&1 | tee test-output.log\n          fi\n          fi\n", 1)),
         ):
             self.assertIn(path, (".github/workflows/test.yml", ".github/workflows/publish-nuget.yml"))
             self.assertNotEqual(mutated, (ROOT / path).read_text(encoding="utf-8"))
             self.only("D014", texts={path: mutated})
+
+    def test_d014_shard_step_is_exactly_the_script_call(self) -> None:
+        """#1666: each shard step is one call of the checked-in script, with no inline shell, no other step key,
+        and no env or defaults that could change how bash runs it (BASH_ENV, a shell override)."""
+        call = '        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"\n'
+        for path in (".github/workflows/test.yml", ".github/workflows/publish-nuget.yml"):
+            text = (ROOT / path).read_text(encoding="utf-8")
+            self.assertEqual(1, text.count(call))
+            job = "remaining-tests" if path.endswith("test.yml") else "test"
+            job_head = f"  {job}:\n"
+            for mutated in (
+                text.replace(call, "        run: |\n          set -euo pipefail\n          bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"\n"),
+                text.replace(call, call.rstrip("\n") + " || true\n"),
+                text.replace(call, call.replace("run-shard-tests.sh", "run-shard-tests.sh --dry-run")),
+                text.replace(call, call + "        env:\n          BASH_ENV: scripts/skip.sh\n"),
+                text.replace(call, call + "        shell: sh\n"),
+                text.replace(call, call + "        timeout-minutes: 1\n"),
+                text.replace(job_head, job_head + "    env:\n      BASH_ENV: scripts/skip.sh\n", 1),
+                text.replace(job_head, job_head + "    defaults:\n      run:\n        shell: sh\n", 1),
+                text.replace("\njobs:\n", "\nenv:\n  BASH_ENV: scripts/skip.sh\n\njobs:\n", 1),
+            ):
+                self.assertNotEqual(text, mutated)
+                self.only("D014", texts={path: mutated})
 
     def test_harness_never_touches_the_real_home(self) -> None:
         self.assertTrue(dp.home_safe((ROOT / dp.HARNESS).read_text(encoding="utf-8")))
@@ -255,35 +270,63 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.assertIn("D016", codes(protocol=dropped, baseline=(PROTOCOL, CASES)))
 
     def test_d014_shard_step_cannot_skip_its_tests_even_when_re_pinned(self) -> None:
-        """Review round 2 (#1584): editing a shard script and re-pinning scriptSha256 to match must still fail
-        when the edit ends the script early, negates or guards a test, or changes a test command."""
-        test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
-        gate = next(g for g in PROTOCOL["gates"]["shardSteps"] if g["workflow"] == ".github/workflows/test.yml")
-        head = "      - name: Run project tests\n        run: |\n          set -euo pipefail\n"
-        self.assertIn(head, test_yml)
-        test_line = '          dotnet test "${{ matrix.project }}" -c Release \\\n'
-        self.assertIn(test_line, test_yml)
-        for mutated in (test_yml.replace(head, head + "          exit 0\n", 1),
-                        test_yml.replace(head, head + "          exit\n", 1),
-                        test_yml.replace(test_line, "          ! " + test_line[10:], 1),
-                        test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
-                                         'if false; then\n            eval', 1),
-                        test_yml.replace('--filter "$SHARD2_FILTER"', '--filter "$SHARD1_FILTER"', 1),
-                        # Review round 3: loop wrappers that never run, a literal condition, and an ERR trap.
-                        test_yml.replace(head, head + "          while ! true; do\n", 1).replace(
-                            "          if grep -q \"Z3 not available\"", "          done\n          if grep -q \"Z3 not available\"", 1),
-                        test_yml.replace(head, head + "          until ! false; do\n", 1).replace(
-                            "          if grep -q \"Z3 not available\"", "          done\n          if grep -q \"Z3 not available\"", 1),
-                        test_yml.replace('if [ "${{ matrix.name }}" = "compiler" ]; then\n            eval',
-                                         'if [ 1 = 0 ]; then\n            eval', 1),
-                        test_yml.replace(head, head + "          trap 'exit 0' ERR\n", 1)):
-            self.assertNotEqual(test_yml, mutated)
-            step = next(s for s in dp.parse_workflow(mutated)[gate["job"]]["steps"] if s.get("name") == gate["step"])
-            pin = dp.sha256_bytes("\n".join(ln for ln in step["run"].splitlines() if ln.strip()).encode("utf-8"))
-            repinned = mutate(lambda p: next(g for g in p["gates"]["shardSteps"] if g["workflow"] == gate["workflow"]).update(scriptSha256=pin))
-            self.assertIn("D014", codes(protocol=repinned, texts={".github/workflows/test.yml": mutated}))
-        # The committed scripts pass, including the step's trailing `exit 1` after the last test.
+        """Review round 2 (#1584), #1666: editing the shard script and re-pinning scriptSha256 to match must still
+        fail when the edit ends the script early, negates or guards a test, loops, traps, or changes a test
+        command. #1666's two (if (( 0 )) and trap 'exit 0' EXIT) are the last two."""
+        rel = "scripts/run-shard-tests.sh"
+        script = (ROOT / rel).read_text(encoding="utf-8")
+        head = "set -euo pipefail\n"
+        test_line = 'else\n  dotnet test "$project" -c Release \\\n'
+        branch = 'if [ "$name" = "compiler" ]; then\n'
+        z3 = 'if grep -q "Z3 not available" test-output.log; then\n'
+        for anchor in (head, test_line, branch, z3):
+            self.assertIn(anchor, script)
+        for mutated in (script.replace(head, head + "exit 0\n", 1),
+                        script.replace(head, head + "exit\n", 1),
+                        script.replace(test_line, 'else\n  ! dotnet test "$project" -c Release \\\n', 1),
+                        script.replace(branch, "if false; then\n", 1),
+                        script.replace('--filter "$filter"', '--filter "FullyQualifiedName~Calor.Compiler.Tests.B"', 1),
+                        script.replace(head, head + "while ! true; do\n", 1).replace(z3, "done\n" + z3, 1),
+                        script.replace(head, head + "until ! false; do\n", 1).replace(z3, "done\n" + z3, 1),
+                        script.replace(branch, "if [ 1 = 0 ]; then\n", 1),
+                        script.replace(head, head + "trap 'exit 0' ERR\n", 1),
+                        script.replace(head, head + "set +e\n", 1),
+                        script.replace("  dotnet build \"$project\" -c Release\n", "  dotnet build \"$project\" -c Release || true\n", 1),
+                        # #1666: an arithmetic condition that is never true, and an EXIT trap that ends with success.
+                        script.replace(head, head + "if (( 0 )); then\n", 1).replace(z3, "fi\n" + z3, 1),
+                        script.replace(head, head + "trap 'exit 0' EXIT\n", 1)):
+            self.assertNotEqual(script, mutated)
+            pin = dp.sha256_bytes("\n".join(ln for ln in mutated.splitlines() if ln.strip()).encode("utf-8"))
+            repinned = mutate(lambda p: [g.update(scriptSha256=pin) for g in p["gates"]["shardSteps"]])
+            self.assertIn("D014", codes(protocol=repinned, texts={rel: mutated}))
+            # The same edit without the re-pin fails on the pin itself.
+            self.assertIn("D014", codes(texts={rel: mutated}))
+        # The committed script passes, including its trailing `exit 1` after the last test.
         self.assertEqual(set(), codes())
+
+    def test_d016_the_move_to_a_script_is_one_reviewed_re_pin(self) -> None:
+        """#1666: main's inline shard steps may become the script call once, when each gate records repinnedFrom
+        equal to main's pin. After that the step stays the same call, cannot gain a trap, and keeps its tests."""
+        inline = mutate(lambda p: [g.update(scriptSha256="1" * 64, testCommands=['dotnet test "${{ matrix.project }}" -c Release'])
+                                   or [g.pop(k) for k in ("run", "scriptPath", "traps", "repinnedFrom")]
+                                   for g in p["gates"]["shardSteps"]])
+        moved = mutate(lambda p: [g.update(repinnedFrom="1" * 64) for g in p["gates"]["shardSteps"]])
+        self.assertNotIn("D016", codes(protocol=moved, baseline=(inline, CASES)))
+        unacknowledged = mutate(lambda p: [g.pop("repinnedFrom") for g in p["gates"]["shardSteps"]])
+        self.assertIn("D016", codes(protocol=unacknowledged, baseline=(inline, CASES)))
+        # Once main has the script form, its call, path and traps are fixed.
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"][0].update(run="bash scripts/other.sh")),
+                                    baseline=(PROTOCOL, CASES)))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"][0].update(scriptPath="scripts/other.sh")),
+                                    baseline=(PROTOCOL, CASES)))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"][0]["traps"].append("trap 'exit 0' EXIT")),
+                                    baseline=(PROTOCOL, CASES)))
+        self.assertIn("D016", codes(protocol=mutate(lambda p: p["gates"]["shardSteps"][0]["testCommands"].pop()),
+                                    baseline=(PROTOCOL, CASES)))
+        # main's real protocol (before #1666) accepts this branch's move.
+        baseline = dp.load_baseline(ROOT, "origin/main") if dr.git("rev-parse", "--verify", "--quiet", "origin/main").returncode == 0 else None
+        if baseline is not None and "scriptPath" not in baseline[0]["gates"]["shardSteps"][0]:
+            self.assertEqual(set(), codes(baseline=baseline))
 
     def test_d016_compares_with_the_packet_at_its_pre_1584_location(self) -> None:
         """Review round 2 (#1584): a baseline from before the move is read from its old location, not skipped."""
