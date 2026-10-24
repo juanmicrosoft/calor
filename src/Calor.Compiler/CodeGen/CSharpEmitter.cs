@@ -9185,8 +9185,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 EmitStatement(stmt, _emissionContext, skipEmptyLine: true);
             }
             declared.UnionWith(declaredByBody);
-            MergeBranchScopeFrames(_refinementDeclScopes, refinementsByBody, node);
-            MergeBranchScopeFrames(_indexedBoundScopes, indexedByBody, node);
+            MergeBranchScopeFrames(_refinementDeclScopes, refinementsByBody, node, SameRefinement);
+            MergeBranchScopeFrames(_indexedBoundScopes, indexedByBody, node,
+                (left, right) => string.Equals(left, right, StringComparison.Ordinal));
         }
         AppendLine("#endif");
         return "";
@@ -9211,8 +9212,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// never let a bad value through). Two different guards for one variable cannot both be kept,
     /// so that is an error.
     /// </summary>
+    /// <summary>Two refinement constraints guard the same values (an inherited refinement's predicate
+    /// is rebuilt per lookup, so the records are not reference-equal).</summary>
+    private static bool SameRefinement(RefinementConstraint? left, RefinementConstraint? right) =>
+        ReferenceEquals(left, right)
+        || (left is not null && right is not null
+            && string.Equals(left.TypeName, right.TypeName, StringComparison.Ordinal)
+            && string.Equals(left.RefinementName, right.RefinementName, StringComparison.Ordinal)
+            && left.HasInlineRefinement == right.HasInlineRefinement
+            && string.Equals(left.Description, right.Description, StringComparison.Ordinal));
+
     private void MergeBranchScopeFrames<T>(
-        List<Dictionary<string, T>> frames, List<Dictionary<string, T>> other, PreprocessorDirectiveNode node)
+        List<Dictionary<string, T>> frames, List<Dictionary<string, T>> other, PreprocessorDirectiveNode node,
+        Func<T, T, bool> same)
     {
         for (var index = 0; index < frames.Count && index < other.Count; index++)
         {
@@ -9222,7 +9234,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     frames[index][name] = value;
                 }
-                else if (value is not null && !EqualityComparer<T>.Default.Equals(current, value))
+                else if (value is not null && !same(current, value))
                 {
                     EmissionDiagnostics.ReportError(node.Span, Diagnostics.DiagnosticCode.DuplicateDefinition,
                         $"Variable '{name}' has a different refinement in each branch of the §PP{{{node.Condition}}} block; " +

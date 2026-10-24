@@ -67,7 +67,7 @@ public class PreprocessorBindingTests
 
     [Theory]
     [InlineData("§ASSIGN x 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§ASSIGN x 2\n§R x")]
+    [InlineData("§PP{DEBUG}\n  §B{~x:i32} 1\n§PPE\n  §B{~x:i32} 3\n§ASSIGN x 2\n§R x")]
     [InlineData("§PP{DEBUG}\n  §ASSIGN x 1\n§ASSIGN x 2\n§R x")]
     public void Binder_WriteToWritableFieldOrMutablePreprocessorLocal_IsAccepted(string body)
     {
@@ -351,6 +351,69 @@ public class PreprocessorBindingTests
         var result = Compile(Fn("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{~x:i32} 1\n  §PPE\n    §B{~x:i32} 2\n  §ASSIGN x 3\n§R 0"));
 
         Assert.DoesNotContain(result.Diagnostics.Errors, e => e.Code == DiagnosticCode.WriteToReadOnlyLocal);
+    }
+
+    // Review round 3: a branch binding that hides an outer name must be declared on every path,
+    // or after the block the name means the outer variable on the other path.
+    [Theory]
+    [InlineData("§PP{A}\n  §B{x:str} \"safe\"\n§R §C{Take} §A x §/C")]
+    [InlineData("§PP{A}\n  §B{~x:str} \"safe\"\n§R 0")]
+    [InlineData("§PP{A}\n  §B{k:i32} 0\n§PPE\n  §B{x:str} \"safe\"\n§R 0")]
+    public void Binder_BranchBindingHidingAMemberOnSomePaths_IsCalor0201(string body)
+    {
+        var source = "§M{m:T}\n  §CL{c1:K:pub}\n    §FLD{?str:x:pub}\n    §MT{take:Take:pub} (str:value) -> i32\n      §R (len value)\n" +
+            "    §MT{probe:Run:pub} () -> i32\n" + Indent(body, "      ") + "\n";
+        var diagnostics = Bind(source);
+
+        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition && e.Message.Contains("not every branch"));
+    }
+
+    [Fact]
+    public void Binder_BranchBindingRedeclaringAParameter_IsCalor0201()
+    {
+        var diagnostics = Bind(Fn("§PP{A}\n  §B{n:i32} 1\n§R n", "(i32:n) -> i32"));
+
+        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition);
+    }
+
+    [Fact]
+    public void Binder_BranchBindingsHidingAMemberOnEveryPath_AreAccepted()
+    {
+        var source = "§M{m:T}\n  §CL{c1:K:pub}\n    §FLD{?str:x:pub}\n    §MT{take:Take:pub} (str:value) -> i32\n      §R (len value)\n" +
+            "    §MT{probe:Run:pub} () -> i32\n      §PP{A}\n        §B{x:str} \"a\"\n      §PPE\n        §B{x:str} \"b\"\n      §R §C{Take} §A x §/C\n";
+        var diagnostics = Bind(source);
+
+        Assert.DoesNotContain(diagnostics.Errors, e => e.Code == DiagnosticCode.DuplicateDefinition);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    // Review round 3: a callable captured in a branch that was not picked still mutates the
+    // hoisted variable.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Binder_CallableCapturedInEitherBranch_InvalidatesTheHoistedNarrowing(bool captureInElse)
+    {
+        var capture = "§ASSIGN later §LAM{mut}\n  §ASSIGN x null\n§/LAM{mut}";
+        var ifBranch = "§B{~x:?str} input\n§IF{g1} (isempty x)\n  §R 0" + (captureInElse ? "" : "\n" + capture);
+        var elseBranch = "§B{~x:?str} input\n§IF{g2} (isempty x)\n  §R 0" + (captureInElse ? "\n" + capture : "");
+        var source = "§M{m:T}\n  §F{take:Take:pub} (str:value) -> i32\n    §E{}\n    §R (len value)\n" +
+            "  §F{probe:Probe:pub} (?str:input) -> i32\n    §B{~later:Action} §LAM{nop}\n      §B{k:i32} 0\n    §/LAM{nop}\n" +
+            "    §PP{A}\n" + Indent(ifBranch, "      ") + "\n    §PPE\n" + Indent(elseBranch, "      ") + "\n" +
+            "    §C{later} §/C\n    §R §C{Take} §A x §/C\n";
+        var diagnostics = Bind(source);
+
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    // Review round 3: identical inherited refinements in both branches are the same guard.
+    [Fact]
+    public void Emitter_SameInheritedRefinementInBothBranches_Compiles()
+    {
+        var result = Compile("§M{m:T}\n  §RTYPE{r1:Nat:i32} (>= # 0)\n  §RTYPE{r2:Pos:Nat} (> # 0)\n" +
+            "  §F{f:Run:pub} (Pos:n) -> i32\n    §PP{A}\n      §B{x:Pos} n\n    §PPE\n      §B{x:Pos} n\n    §R x\n");
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
     }
 
     // ===================================================================

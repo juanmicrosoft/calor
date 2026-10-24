@@ -303,7 +303,12 @@ if any branch declares the name immutable, it stays immutable afterwards.
 A branch binding that reuses a name already declared in the enclosing block
 is `Calor0258`, because C# rejects it (CS0128) whenever that branch is active.
 Branches that declare the same name must give it the same type; otherwise it
-is `Calor0201`, because the code after the block sees one variable.
+is `Calor0201`, because the code after the block sees one variable. A branch
+binding that hides a field, parameter or outer local must be declared in every
+branch (a `§PP` without `§PPE` has an empty second branch); otherwise it is
+`Calor0201`, because after the block the name would mean the outer variable
+whenever the other branch is active. A branch kept as verbatim C# (`§RAW`)
+counts as declaring it.
 Before 0.27 the bodies were only scanned, so a write to a `§PP` binding that
 shared a field's name, a write after a nested `§PP`, and a `§B{~x}` after a
 `§PP` that declared an immutable `x` all compiled.

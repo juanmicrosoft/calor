@@ -7262,12 +7262,19 @@ public sealed class Binder
         var declared = new List<BranchDeclaration>();
         var bodies = new List<IReadOnlyList<BoundStatement>>();
 
-        bodies.Add(BindPreprocessorBranch(baseline, branches, preprocessor.Body, declared));
+        bodies.Add(BindPreprocessorBranch(baseline, branches, preprocessor.Body, declared, branch: 0));
         if (preprocessor.ElseBody is { } elseBody)
-            bodies.Add(BindPreprocessorBranch(baseline, branches, elseBody, declared));
+            bodies.Add(BindPreprocessorBranch(baseline, branches, elseBody, declared, branch: 1));
         else
             branches.Add(baseline);
         JoinFlowBranchStates(baseline, branches);
+        // A branch holding verbatim C# (the converter keeps an inactive #if branch as §RAW) may
+        // declare anything, so it counts as declaring every name.
+        var opaqueBranches = new[] { preprocessor.Body, preprocessor.ElseBody }
+            .Select((body, index) => (body, index))
+            .Where(branch => branch.body is not null && ContainsVerbatimCSharp(branch.body))
+            .Select(branch => branch.index)
+            .ToArray();
 
         foreach (var group in declared.GroupBy(declaration => declaration.Storage.Name, StringComparer.Ordinal))
         {
@@ -7282,9 +7289,23 @@ public sealed class Binder
             // a local may shadow the member, as in C#.
             var shadowsNarrowedMember = existing is { StorageIdentity: { IsField: true } or { IsProperty: true } };
             string? conflict = null;
+            var hoistDespiteConflict = false;
             if (existing != null && !shadowsNarrowedMember)
             {
                 conflict = $"Variable '{visible.Name}' is already defined";
+            }
+            else if ((shadowsNarrowedMember || _scope.Lookup(visible.Name) is VariableSymbol)
+                     && declarations.Select(declaration => declaration.Branch)
+                         .Concat(opaqueBranches).Distinct().Count() < 2)
+            {
+                // A path through the block that declares nothing leaves the name meaning the outer
+                // field, parameter or local, so after the block it would mean different variables
+                // depending on the active branch. The binding still hoists, so writes to it are
+                // checked too.
+                conflict = $"Variable '{visible.Name}' declared in a §PP branch hides a variable or member of the " +
+                    "same name, but not every branch declares it, so after the block the name would refer to " +
+                    "different variables depending on the active branch. Declare it in every branch, or rename it";
+                hoistDespiteConflict = true;
             }
             else if (alternatives.Select(variable => TypeIdentity.Canonicalize(variable.TypeName))
                      .Distinct(StringComparer.Ordinal).Skip(1).Any())
@@ -7299,12 +7320,19 @@ public sealed class Binder
             {
                 foreach (var variable in alternatives)
                     _diagnostics.ReportError(variable.DeclarationSpan, DiagnosticCode.DuplicateDefinition, conflict);
-                continue;
+                if (!hoistDespiteConflict)
+                    continue;
             }
 
-            // Calls through the visible binding may run any branch's value.
+            // Calls through the visible binding may run any branch's value, and a callable captured
+            // in another branch mutates the same variable after the block: the other declarations
+            // share the visible one's storage from here on.
             foreach (var other in alternatives.Where(variable => !ReferenceEquals(variable, visible)))
+            {
                 StoreCallableState(visible, UnionCallableEffects(GetCallableState(visible), GetCallableState(other)));
+                _callableState.Remove(other);
+                other.StorageIdentity = visible;
+            }
             // A flow fact (such as "not null") a branch established for its binding survives the
             // block only when every declaring branch established the same one.
             var current = declarations.First(declaration => ReferenceEquals(declaration.Storage, visible)).Current;
@@ -7324,6 +7352,15 @@ public sealed class Binder
         return new BoundPreprocessorBlock(preprocessor.Span, bodies);
     }
 
+    private static bool ContainsVerbatimCSharp(IReadOnlyList<StatementNode> body) =>
+        body.Any(statement => statement switch
+        {
+            RawCSharpNode => true,
+            PreprocessorDirectiveNode nested => ContainsVerbatimCSharp(nested.Body)
+                || (nested.ElseBody is { } nestedElse && ContainsVerbatimCSharp(nestedElse)),
+            _ => false
+        });
+
     /// <summary>
     /// #1678: binds one <c>§PP</c> branch in a child scope, from the flow state before the block.
     /// Unlike <see cref="BindIsolatedFlowBranch"/>, the branch scope is not seeded with the visible
@@ -7334,14 +7371,15 @@ public sealed class Binder
         FlowNarrowingState baseline,
         List<FlowNarrowingState> branches,
         IReadOnlyList<StatementNode> body,
-        List<BranchDeclaration> declared)
+        List<BranchDeclaration> declared,
+        int branch)
     {
         RestoreFlowNarrowingState(baseline);
         try
         {
             using var _ = PushScope(_scope.CreateChild());
             var bound = BindStatements(body);
-            declared.AddRange(CollectBranchDeclarations());
+            declared.AddRange(CollectBranchDeclarations().Select(declaration => declaration with { Branch = branch }));
             return bound;
         }
         finally
@@ -7377,7 +7415,7 @@ public sealed class Binder
     /// for it at the end of the branch (<see cref="Current"/>, a flow-narrowed copy when the branch
     /// established, for example, that it is not null).
     /// </summary>
-    private sealed record BranchDeclaration(VariableSymbol Storage, VariableSymbol Current);
+    private sealed record BranchDeclaration(VariableSymbol Storage, VariableSymbol Current, int Branch = 0);
 
     /// <summary>
     /// #1550 review: a statement the binder does not bind (an event subscription, an opaque
