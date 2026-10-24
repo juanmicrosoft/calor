@@ -494,7 +494,7 @@ file is refused, rather than converted to Calor that would behave differently.
 **Reading the counts.** `nativeConversionCount` (CLI JSON) and `nativeConversions` (MCP)
 count constructs the converter wrote as Calor, not members. They still include the
 constructs of a type that a rescue later replaced with its original C#. For example, the
-`W1-F6-rescue` fixture reports 3 native conversions and 1 rescue, yet its output is all
+`W1-F6-rescue` fixture reports 8 native conversions and 1 rescue, yet its output is all
 C#. To know whether a file is fully native, read `conversionPaths.outcome` (`native`,
 `preserved`, `lossy`, `unverified` or `refused`) and the per-path counts next to it.
 `unverified` appears only with `--lossy`: the file was written, but its C# does not
@@ -524,7 +524,7 @@ reports in `conversionPaths`:
 | `CSharpToCalorConverter` (library) | No | `PassthroughOnError` |
 
 A member whose Calor does not parse is rescued on every surface in the default lossless
-mode. The trailing-label example `W1-F6-rescue` shows the difference: `calor convert`
+mode. The private-property example `W1-F6-rescue` shows the difference: `calor convert`
 rescues it and exits 0, MCP `calor_convert` refuses it unless you pass `passthroughOnError`,
 and `calor migrate` refuses the whole one-file project with exit code 1. The
 [`calor convert`](/docs/cli/convert/#which-path-preserved-each-member) and

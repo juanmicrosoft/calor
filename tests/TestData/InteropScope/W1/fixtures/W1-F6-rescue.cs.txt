@@ -1,8 +1,7 @@
 public class Counter
 {
-    public int Next(int x)
-    {
-        done:
-        return x + 1;
-    }
+    private static int count;
+    private static int Count { get { return count; } set { count = value; } }
+
+    public int Next() { Count = Count + 1; return Count; }
 }

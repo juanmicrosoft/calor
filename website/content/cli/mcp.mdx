@@ -89,7 +89,7 @@ trip. `calor_convert` refuses it by default; `passthroughOnError` preserves it:
 
 ```json
 { "name": "calor_convert",
-  "arguments": { "source": "public class G { public int M(int x) { here: return x; } }",
+  "arguments": { "source": "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }",
                  "passthroughOnError": true } }
 ```
 

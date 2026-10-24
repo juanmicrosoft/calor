@@ -27,40 +27,26 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
+      "measuredCommit": "ddc3ff2e09640c19c422452505c7de84a3d445aa",
       "basis": "post-merge-write-back",
-      "note": "#943 (0.25 F1, PR #1558): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 9b9ba79f (the F1 code head). Members whose C# out var cannot be lowered (RO-DECL-1) are now preserved instead of becoming untyped bindings that failed with Calor0250, so more modules bind: ModulesEnforced 265 -> 275 (MediatR 33 unchanged, serilog 100 -> 106, FluentValidation 132 -> 136), Calor0425 135 sites / 48 modules -> 143 / 52 over the larger enforced set, and Calor0411Sites rises with it. No previously enforced module stops. F5's completed identity (measured 3dbd108e, landed f7510f32, PR #1554) remains in the repository history.",
+      "note": "#1633/#1632/#1634 (0.27, PR #1673): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at ddc3ff2e (the fix's code head). Calor0411Sites MediatR 289 -> 290 (Internal/HandlersOrderer.cs: the else-if whose hoisted _idx temp was lost now nests under the else and binds, +1) and FluentValidation 7867 -> 7869 (Internal/CollectionPropertyRule.cs: the statement after the AfterValidate: label is no longer dropped, +2). The CliCrossCheck block moves MediatR StopCalor1002 12 -> 11 and CompileClean 10 -> 11; PR #1631 measured the same move on main's own compiler, so it is pre-existing drift, not this change. Modules enforced, excluded and Calor0425 counts are unchanged. F1's completed identity (measured 9b9ba79f, landed f83b4e59, PR #1558) remains in the repository history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "f83b4e5937a55bb1ad04e57ab2e410bf667c6232",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "3b5ecf97e2adf00c3de704ce8de126a66dfcbdf2",
-          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
-          "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30",
-          "/": "a023ed5cf0f205c589ac78345c96b624b75f8114"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "9b9ba79ff563d4856ca6d754d21932b515f28d11",
-          "pr": 1558,
-          "phase1TreeHashes": {
-            "src": "3b5ecf97e2adf00c3de704ce8de126a66dfcbdf2",
-            "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
-            "Directory.Build.props": "b1c4bd3c7dc6cc1e17ce21952c24d0fdc2c6a312",
+        "status": "pending",
+        "phase1": {
+          "headCommit": "ddc3ff2e09640c19c422452505c7de84a3d445aa",
+          "pr": 1673,
+          "treeHashes": {
+            "src": "d040ccdf983806bd73927b61f7aa341a91680da9",
+            "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
+            "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
             "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
             "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "phase1ArtifactSha256": "4e15966057a0adb3649c705d90f9378e7d230b79744708003bb459b3bdb5d265"
+          "artifactSha256": "67bc32936d550ba1ee66cd3a85a40d07a520ae2577f3781ecc75c163303946e7"
         }
       }
     },
