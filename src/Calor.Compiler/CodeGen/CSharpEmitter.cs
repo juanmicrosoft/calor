@@ -9156,11 +9156,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(PreprocessorDirectiveNode node)
     {
         // #1678: `#if` opens no C# scope, so both branches declare into the enclosing block and
-        // their locals stay visible after `#endif`. The branches are alternatives, though: a local
-        // the `#if` branch declares does not exist in the `#else` branch, so a `§B{~x}` there is a
-        // declaration, not a reassignment.
+        // their locals stay visible after `#endif`. The branches are alternatives, though: what the
+        // `#if` branch declares, or the refinement it installs on a variable, does not exist in the
+        // `#else` branch, so the `#else` branch is emitted from the state before the block (a
+        // `§B{~x}` there is a declaration, not a reassignment, and is not guarded by the other
+        // branch's refinement). After `#endif` the two states are merged conservatively.
         var declared = _declScopes[^1];
         var beforeBranches = new HashSet<string>(declared, StringComparer.Ordinal);
+        var refinementsBefore = SnapshotScopeFrames(_refinementDeclScopes);
+        var indexedBefore = SnapshotScopeFrames(_indexedBoundScopes);
         AppendLine($"#if {node.Condition}");
         foreach (var stmt in node.Body)
         {
@@ -9169,17 +9173,63 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.ElseBody != null && node.ElseBody.Count > 0)
         {
             var declaredByBody = new HashSet<string>(declared, StringComparer.Ordinal);
+            var refinementsByBody = SnapshotScopeFrames(_refinementDeclScopes);
+            var indexedByBody = SnapshotScopeFrames(_indexedBoundScopes);
             declared.Clear();
             declared.UnionWith(beforeBranches);
+            RestoreScopeFrames(_refinementDeclScopes, refinementsBefore);
+            RestoreScopeFrames(_indexedBoundScopes, indexedBefore);
             AppendLine("#else");
             foreach (var stmt in node.ElseBody)
             {
                 EmitStatement(stmt, _emissionContext, skipEmptyLine: true);
             }
             declared.UnionWith(declaredByBody);
+            MergeBranchScopeFrames(_refinementDeclScopes, refinementsByBody, node);
+            MergeBranchScopeFrames(_indexedBoundScopes, indexedByBody, node);
         }
         AppendLine("#endif");
         return "";
+    }
+
+    private static List<Dictionary<string, T>> SnapshotScopeFrames<T>(List<Dictionary<string, T>> frames) =>
+        frames.Select(frame => new Dictionary<string, T>(frame, StringComparer.Ordinal)).ToList();
+
+    private static void RestoreScopeFrames<T>(List<Dictionary<string, T>> frames, List<Dictionary<string, T>> snapshot)
+    {
+        for (var index = 0; index < frames.Count && index < snapshot.Count; index++)
+        {
+            frames[index].Clear();
+            foreach (var (name, value) in snapshot[index])
+                frames[index][name] = value;
+        }
+    }
+
+    /// <summary>
+    /// #1678: after <c>#endif</c> one variable stands for both branches. A write guard either
+    /// branch installed is kept (a guard the active branch did not need can only make a write fail,
+    /// never let a bad value through). Two different guards for one variable cannot both be kept,
+    /// so that is an error.
+    /// </summary>
+    private void MergeBranchScopeFrames<T>(
+        List<Dictionary<string, T>> frames, List<Dictionary<string, T>> other, PreprocessorDirectiveNode node)
+    {
+        for (var index = 0; index < frames.Count && index < other.Count; index++)
+        {
+            foreach (var (name, value) in other[index])
+            {
+                if (!frames[index].TryGetValue(name, out var current) || current is null)
+                {
+                    frames[index][name] = value;
+                }
+                else if (value is not null && !EqualityComparer<T>.Default.Equals(current, value))
+                {
+                    EmissionDiagnostics.ReportError(node.Span, Diagnostics.DiagnosticCode.DuplicateDefinition,
+                        $"Variable '{name}' has a different refinement in each branch of the §PP{{{node.Condition}}} block; " +
+                        "give it the same type in every branch");
+                }
+            }
+        }
     }
 
     public string Visit(MemberPreprocessorBlockNode node)

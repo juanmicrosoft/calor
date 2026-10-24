@@ -264,6 +264,95 @@ public class PreprocessorBindingTests
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
+    // Review round 2: a fact every declaring branch established for its binding survives the block.
+    [Fact]
+    public void Binder_BranchNarrowingOfAHoistedBinding_SurvivesWhenEveryBranchEstablishesIt()
+    {
+        var diagnostics = Bind(NarrowingProbe(
+            "§PP{A}\n  §B{x:?str} input\n  §IF{g1} (isempty x)\n    §R\n§PPE\n  §B{x:?str} input\n  §IF{g2} (isempty x)\n    §R"));
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Theory]
+    [InlineData("§PP{A}\n  §B{x:?str} input\n  §IF{g1} (isempty x)\n    §R\n§PPE\n  §B{x:?str} input")]
+    [InlineData("§PP{A}\n  §B{x:?str} input\n§PPE\n  §B{x:?str} input\n  §IF{g2} (isempty x)\n    §R")]
+    [InlineData("§PP{A}\n  §B{~x:?str} input\n  §IF{g1} (isempty x)\n    §R\n§PPE\n  §B{~x:?str} input\n  §IF{g2} (isempty x)\n    §R\n§ASSIGN x null")]
+    public void Binder_BranchNarrowingNotEstablishedEverywhereOrInvalidated_IsCalor0274(string body)
+    {
+        var diagnostics = Bind(NarrowingProbe(body));
+
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    private static string NarrowingProbe(string body) =>
+        "§M{m:P}\n  §F{take:Take:pub} (str:value) -> void\n    §E{}\n  §F{probe:Probe:pub} (?str:input) -> void\n" +
+        Indent(body + "\n§C{Take} §A x §/C", "    ") + "\n";
+
+    // Review round 2: a write inside a §PP inside a deferred callable is part of its summary.
+    [Theory]
+    [InlineData("§PP{A}\n  §ASSIGN value null\n§PPE\n  §ASSIGN value null")]
+    [InlineData("§PP{A}\n  §ASSIGN value null")]
+    [InlineData("§PP{A}\n  §B{k:i32} 0\n§PPE\n  §PP{B}\n    §ASSIGN value null")]
+    public void Binder_WriteInsidePreprocessorInsideLambda_ReachesTheCallSite(string lambdaBody)
+    {
+        var source = "§M{m:P}\n  §F{take:Take:pub} (str:value) -> i32\n    §R (len value)\n" +
+            "  §F{probe:Probe:pub} (?str:input) -> void\n    §B{~value:?str} input\n" +
+            "    §IF{guard} (!= value null)\n      §B{later:Action} §LAM{mut}\n" +
+            Indent(lambdaBody, "        ") + "\n      §/LAM{mut}\n      §C{later} §/C\n      §C{Take} §A value §/C\n";
+        var module = Parse(source, out var diagnostics);
+        new Binder(diagnostics).Bind(module);
+
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    // Review round 2: the #else branch is emitted without the #if branch's refinement metadata.
+    [Fact]
+    public void Emitter_ElseBranchRebind_IsNotGuardedByTheIfBranchRefinement()
+    {
+        var result = Compile("§M{m:T}\n  §RTYPE{r:Nat:i32} (>= # 0)\n  §F{f:Run:pub} (Nat:n) -> i32\n" +
+            "    §B{~x:i32} 0\n    §PP{A}\n      §B{~x:Nat} n\n    §PPE\n      §B{~x:i32} -1\n    §R x\n");
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+        var code = result.GeneratedCode;
+        var elseBranch = code[code.IndexOf("#else", StringComparison.Ordinal)..code.IndexOf("#endif", StringComparison.Ordinal)];
+        Assert.Contains("x = -1;", elseBranch);
+        Assert.DoesNotContain("Nat", elseBranch);
+        Assert.Empty(ExemplarCompileChecker.RoslynErrors(code));
+    }
+
+    [Fact]
+    public void Emitter_RefinementInstalledByOneBranch_StillGuardsWritesAfterTheBlock()
+    {
+        var result = Compile("§M{m:T}\n  §RTYPE{r:Nat:i32} (>= # 0)\n  §F{f:Run:pub} (Nat:n) -> i32\n" +
+            "    §B{~x:i32} 0\n    §PP{A}\n      §B{~x:i32} 1\n    §PPE\n      §B{~x:Nat} n\n    §ASSIGN x -2\n    §R x\n");
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+        var code = result.GeneratedCode;
+        var afterBlock = code[code.IndexOf("#endif", StringComparison.Ordinal)..];
+        Assert.Contains("Nat", afterBlock);
+    }
+
+    // Review round 2: §PP blocks beneath an opaque parent statement still hoist their bindings.
+    [Theory]
+    [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{x:i32} 1\n  §PPE\n    §B{x:i32} 2\n  §ASSIGN x 3\n§R 0")]
+    [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §PP{B}\n      §B{x:i32} 1\n  §ASSIGN x 3\n§R 0")]
+    [InlineData("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{~x:i32} 1\n  §PPE\n    §B{x:i32} 2\n  §ASSIGN x 3\n§R 0")]
+    public void Compile_WriteAfterPreprocessorBeneathOpaqueParent_IsCalor0213(string body)
+    {
+        var result = Compile(Fn(body));
+
+        Assert.Contains(result.Diagnostics.Errors, e => e.Code == DiagnosticCode.WriteToReadOnlyLocal);
+    }
+
+    [Fact]
+    public void Compile_WriteAfterPreprocessorBeneathOpaqueParentToMutableBinding_IsAccepted()
+    {
+        var result = Compile(Fn("§E{unsafe}\n§UNSAFE\n  §PP{A}\n    §B{~x:i32} 1\n  §PPE\n    §B{~x:i32} 2\n  §ASSIGN x 3\n§R 0"));
+
+        Assert.DoesNotContain(result.Diagnostics.Errors, e => e.Code == DiagnosticCode.WriteToReadOnlyLocal);
+    }
+
     // ===================================================================
     // Positive controls: valid §PP code compiles and the C# is right
     // ===================================================================
