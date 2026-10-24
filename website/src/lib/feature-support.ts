@@ -49,18 +49,30 @@ export function supportWarning(feature: string): string {
 const COMPONENT = /<SupportLevel\s+feature="([a-z0-9-]+)"(\s+form="warning")?\s*\/>/g;
 
 function expandTags(text: string): string {
-  return text.replace(COMPONENT, (_tag, feature: string, warning?: string) =>
-    warning ? supportWarning(feature) : supportLevelName(feature));
+  // The search index never fails the build: a tag the page itself would reject (an unknown
+  // feature) is left as written, and next build reports it when it renders the page.
+  return text.replace(COMPONENT, (tag, feature: string, warning?: string) => {
+    if (!levels.has(feature)) return tag;
+    const level = levels.get(feature)!;
+    return warning ? (WARNING_PHRASES[level] ? supportWarning(feature) : tag) : LEVEL_NAMES[level];
+  });
 }
+
+// Fenced code (``` or ~~~, any indentation) and code spans of any backtick run show a tag literally.
+const FENCE = /(^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\2[`~]*[ \t]*$)/m;
+const CODE_SPAN = /((`+)[\s\S]*?[^`]\2(?!`))/;
 
 /**
  * Replaces each <SupportLevel> tag in raw page text with what it renders (for the search index).
- * A tag inside a fenced block or an inline code span is shown literally on the page, so it is
- * left as written.
+ * A tag inside fenced code or a code span is shown literally on the page, so it is left as written.
  */
 export function expandSupportLevels(text: string): string {
   return text
-    .split(/(^```[^\n]*\n[\s\S]*?^```[^\n]*$)/m)
-    .map((part, i) => (i % 2 === 1 ? part : part.split(/(`[^`\n]*`)/).map((piece, k) => (k % 2 === 1 ? piece : expandTags(piece))).join('')))
+    .split(new RegExp(FENCE.source, 'm'))
+    .map((part, i) => {
+      // split() with two capture groups yields [text, fence, fenceMarker, text, ...].
+      if (i % 3 !== 0) return i % 3 === 1 ? part : '';
+      return part.split(CODE_SPAN).map((piece, k) => (k % 3 === 0 ? expandTags(piece) : k % 3 === 1 ? piece : '')).join('');
+    })
     .join('');
 }

@@ -8,6 +8,7 @@ import agents from '../public/data/agent-benchmark-results.json';
 import refactoring from '../public/data/agent-refactoring-results.json';
 import provenance from '../public/data/benchmark-provenance.json';
 import featureSupport from '../public/data/feature-support.json';
+import { expandSupportLevels } from '../src/lib/feature-support';
 
 const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-detection',
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
@@ -99,6 +100,23 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
   }
   await page.goto(`${base}/docs/cli/feature-check/`);
   await expect(page.locator('article')).toContainText('Known gaps between the registry and 0.25 behavior');
+});
+
+// #1664: the search index shows what a page renders: a tag in prose becomes its level, and a tag in
+// fenced code or a code span (any fence or backtick run) stays as written.
+test('search index expansion renders tags in prose and leaves code as written', () => {
+  const tag = '<SupportLevel feature="record" />';
+  const cases: [string, string][] = [
+    [`a ${tag} b`, 'a NotSupported b'],
+    ['```\n' + tag + '\n```\nx ' + tag, '```\n' + tag + '\n```\nx NotSupported'],
+    ['~~~\n' + tag + '\n~~~', '~~~\n' + tag + '\n~~~'],
+    ['  ```\n  ' + tag + '\n  ```', '  ```\n  ' + tag + '\n  ```'],
+    ['`` ' + tag + ' `` and ' + tag, '`` ' + tag + ' `` and NotSupported'],
+    ['`' + tag + '`', '`' + tag + '`'],
+    ['<SupportLevel feature="not-a-feature" />', '<SupportLevel feature="not-a-feature" />'],
+    ['<SupportLevel feature="out-var" form="warning" />', "[out-var] Feature 'out-var' is partially supported…"],
+  ];
+  for (const [input, expected] of cases) expect(expandSupportLevels(input), input).toBe(expected);
 });
 
 // #1664: pages state converter support levels only through <SupportLevel>, which renders the level

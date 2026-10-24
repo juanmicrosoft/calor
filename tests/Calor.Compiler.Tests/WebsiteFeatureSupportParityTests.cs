@@ -26,17 +26,19 @@ namespace Calor.Compiler.Tests;
 /// its literal, code-span and entity inlines; emphasis, links, code-span backticks and line breaks
 /// are structure, so <c>(*full*)</c>, <c>(**`full`**)</c> and a claim wrapped across two lines read
 /// the same as <c>full</c>. Inline HTML is read twice, once removed and once as a word break.</para>
-/// <para>Rule: a statement is next to a feature when it, the statement before it, or its section
-/// heading names a registry feature (in a code span, as a hyphenated name, as the plain words of a
-/// multi-word name such as "string interpolation", or as a single-word name that is not also a
-/// common word, such as "records") or mentions <c>feature-check</c>/<c>supportLevel</c>. Such a
+/// <para>Rule: a statement is next to a feature when it, the statement before it in its section, or
+/// any heading that encloses it names a registry feature (in a code span, as a hyphenated name, as
+/// the plain words of a multi-word name such as "string interpolation" or "partial properties", or
+/// as a single-word name such as "records") or mentions <c>feature-check</c>/<c>supportLevel</c>.
+/// A single-word name that is also a common word ("interfaces", "methods"; "if"/"for" only with a
+/// noun such as "statement" or "loop") counts in its own statement only. Such a
 /// statement may not contain a support-level word in any case (full, fully, partial, partially,
 /// partly, notsupported, unsupported, manualrequired, "not supported", "no support", "manual
 /// intervention", "manual required"), except inside an allowlisted passage (<see cref="NotClaims"/>),
 /// which must occur exactly once on its page. Text is NFKC-normalized and invisible format
 /// characters are removed first; footnotes, link titles, reference definitions and JSX attributes
-/// (entities decoded) are read. A prose component must name the feature named just before it; a
-/// table component, the feature in its row's first cell. Component counts per page are pinned.
+/// (entities decoded) are read. The text between a prose component and the one before it must name
+/// that component's feature and no other; a table component must name its row's first cell. Component counts per page are pinned.
 /// The level vocabulary is fixed: a synonym ("complete support") is not detected.</para>
 /// </summary>
 public sealed class WebsiteFeatureSupportParityTests
@@ -83,6 +85,17 @@ public sealed class WebsiteFeatureSupportParityTests
         ("guides/csharp-interoperability.mdx", "The full list of supported\nshapes", "the complete list, not a level"),
         ("syntax-reference/structure-tags.mdx", "inline parameter declarations are NOT supported inside\n`§LAM` headers",
             "Calor's own lambda syntax, not a converter level"),
+        // Proof statuses and Calor's own modifiers next to a common word such as "fields" or "class".
+        ("guides/adding-calor-to-existing-projects.mdx", "Read any `PARTIAL` residual", "an incomplete query answer, not a level"),
+        ("guides/dependent-types-tutorial.mdx", "is reported `Unsupported`", "a proof status, not a converter level"),
+        ("guides/verification-guarantees.mdx", "are `unsupported`, not\n  guessed", "a proof status, not a converter level"),
+        ("philosophy/static-verification.mdx", "forms outside the positive whitelist report\n`unsupported`", "a proof status, not a converter level"),
+        ("syntax-reference/refinement-types.mdx", "so a proof about one is\nreported `Unsupported`", "a proof status, not a converter level"),
+        ("syntax-reference/inheritance.mdx", "`partial` | Partial class - split across files", "Calor's `partial` modifier, not a level"),
+        ("syntax-reference/inheritance.mdx", "static class modifier not fully implemented", "a Calor modifier, not a converter level"),
+        ("syntax-reference/inheritance.mdx", "Static and partial class modifiers are not fully implemented",
+            "Calor's modifiers, not a converter level"),
+        ("syntax-reference/structure-tags.mdx", "accept the full set", "the whole set of accessibility levels, not a level"),
     ];
 
     /// <summary>SupportLevel components per page. A changed count means one was added or removed.</summary>
@@ -271,6 +284,11 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/convert.mdx", Heading, "Declarations are kept: `partial-property` is Fu&shy;ll.\n\n" + Heading)]
     [InlineData("cli/convert.mdx", Heading, "Declarations are kept: `partial-property` is \uFF26\uFF55\uFF4C\uFF4C.\n\n" + Heading)]
     [InlineData("cli/convert.mdx", "title: \"convert\"\n", "title: \"convert\"\ndescription: \"Records are fully supported\"\n")]
+    // Codex round 2 (#1664): common-word and plural names, keyword nouns, and a nested heading.
+    [InlineData("cli/convert.mdx", Heading, "Interfaces are fully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Partial properties are fully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "For loops are partially supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "## `record`\n\n### Conversion status\n\nFully supported.\n\n" + Heading)]
     // Codex round 1: an allowlisted passage copied next to a new claim is not excused.
     [InlineData("guides/csharp-interoperability.mdx", "## Next steps\n", "`in-parameter` (unsupported construct).\n\n## Next steps\n")]
     [InlineData("guides/csharp-interoperability.mdx", "## Next steps\n",
@@ -306,7 +324,10 @@ public sealed class WebsiteFeatureSupportParityTests
         "The command reports **<SupportLevel feature=\"string-interpolation\" />**", "names `string-interpolation`")]
     [InlineData("cli/feature-check.mdx", "- `yield-return` is <SupportLevel feature=\"yield-return\" />",
         "- `record` is <SupportLevel feature=\"in-parameter\" /> (compare `in-parameter`). `yield-return` is <SupportLevel feature=\"yield-return\" />",
-        "names `in-parameter`, which is not the feature named just before it")]
+        "names `in-parameter`, which is not the one feature named just before it")]
+    [InlineData("cli/feature-check.mdx", "- `yield-return` is <SupportLevel feature=\"yield-return\" /> for iterator *methods* only.",
+        "- `yield-return` is <SupportLevel feature=\"yield-return\" /> for iterator *methods* only. Records are <SupportLevel feature=\"yield-return\" />.",
+        "names `yield-return`, which is not the one feature named just before it")]
     public void AMisusedComponentFailsTheCheck(string page, string from, string to, string message)
     {
         var text = Read(page);
@@ -394,7 +415,7 @@ public sealed class WebsiteFeatureSupportParityTests
             else if (component.Warning && info.Support == SupportLevel.Full)
                 result.Findings.Add(new(page, component.Line, $"{component.Tag}: a Full feature has no converter warning"));
             else if (!component.Anchored)
-                result.Findings.Add(new(page, component.Line, $"{component.Tag} names `{component.Feature}`, which is not the feature named " +
+                result.Findings.Add(new(page, component.Line, $"{component.Tag} names `{component.Feature}`, which is not the one feature named " +
                                                               "just before it (in a table row: the row's first cell)"));
         }
         return result;
@@ -402,7 +423,7 @@ public sealed class WebsiteFeatureSupportParityTests
 
     /// <summary>One statement: a paragraph, heading, table row, code block, front matter, link
     /// reference definition, or a paragraph inside a JSX block or footnote. Section counts headings.</summary>
-    internal sealed record Statement(int Line, Text Text, bool Raw, bool Heading, int Section, HashSet<string>? RowAnchor);
+    internal sealed record Statement(int Line, Text Text, bool Raw, bool Heading, int Section, HashSet<string>? RowAnchor, int Level = 0);
 
     /// <summary>Collects every statement in document order. lineOffset maps a re-parsed HTML block back to page lines.</summary>
     private static void Walk(ContainerBlock container, int lineOffset, List<Statement> statements, int[] section)
@@ -437,7 +458,7 @@ public sealed class WebsiteFeatureSupportParityTests
                     break;
                 case HeadingBlock heading:
                     section[0]++;
-                    statements.Add(new(line, Render([heading]), false, true, section[0], null));
+                    statements.Add(new(line, Render([heading]), false, true, section[0], null, heading.Level));
                     break;
                 case LeafBlock leaf when leaf.Inline is not null: // paragraphs
                     statements.Add(new(line, Render([leaf]), false, false, section[0], null));
@@ -451,14 +472,27 @@ public sealed class WebsiteFeatureSupportParityTests
 
     private static void CheckStatements(string page, List<Statement> statements, ScanResult result)
     {
-        var mentions = statements.Select(s => Mentions(s.Text)).ToList();
-        var triggered = statements.Select((s, i) => mentions[i].Count > 0 || NamesTheCommand(s.Text)).ToList();
+        // A common word that is also a registry name ("interfaces", "for loops") names that feature in
+        // its own statement; only the other forms carry over to the statements around it.
+        var own = statements.Select(s => Mentions(s.Text, commonWords: true).Count > 0 || NamesTheCommand(s.Text)).ToList();
+        var context = statements.Select(s => Mentions(s.Text, commonWords: false).Count > 0 || NamesTheCommand(s.Text)).ToList();
+        // The headings that enclose each statement: its section heading and every heading above it
+        // with a smaller level, so "## `record`" then "### Status" still encloses "Fully supported."
+        var enclosing = new List<List<int>>();
+        var stack = new List<int>();
+        for (var i = 0; i < statements.Count; i++)
+        {
+            if (statements[i].Heading)
+            {
+                stack.RemoveAll(j => statements[j].Level >= statements[i].Level);
+                stack.Add(i);
+            }
+            enclosing.Add([.. stack]);
+        }
         // A level is "next to" a feature when the feature is named in the same statement, in the
-        // statement just before it, or in the heading of its section, so a feature heading or the
-        // paragraph that names a feature cannot be separated from a level stated below it.
-        bool Near(int i) => triggered[i] || (i > 0 && triggered[i - 1] && statements[i - 1].Section == statements[i].Section)
-                            || Enumerable.Range(0, i).Reverse().Where(j => statements[j].Heading && statements[j].Section == statements[i].Section)
-                                .Take(1).Any(j => triggered[j]);
+        // statement just before it in its section, or in any heading that encloses it.
+        bool Near(int i) => own[i] || (i > 0 && context[i - 1] && statements[i - 1].Section == statements[i].Section)
+                            || enclosing[i].Any(j => context[j]);
         var excused = ExcusesFor(page, statements, result);
         for (var i = 0; i < statements.Count; i++)
         {
@@ -541,9 +575,9 @@ public sealed class WebsiteFeatureSupportParityTests
         return text;
     }
 
-    /// <summary>The statement's components. A prose component is anchored when the last feature named
-    /// before it (in a code span or as a hyphenated name) is its own feature; a table component when
-    /// its row's first cell names it. The warning form names its feature in its own text.</summary>
+    /// <summary>The statement's components. A prose component is anchored when the text since the
+    /// previous component names its feature and no other (common words such as "methods" aside); a table component when its row's first
+    /// cell names it. The warning form names its feature in its own text.</summary>
     private static IEnumerable<Component> Components(string page, Statement statement)
     {
         var placeholders = new List<int>();
@@ -564,10 +598,14 @@ public sealed class WebsiteFeatureSupportParityTests
                 anchored = statement.RowAnchor.Contains(feature);
             else
             {
-                var before = k < placeholders.Count ? statement.Text.Joined[..placeholders[k]] : statement.Text.Joined;
-                var named = Tokens(before).LastOrDefault(t => FeatureSupport.GetFeatureInfo(t) is not null
-                                                            && (t.Contains('-') || statement.Text.CodeSpans.Contains(t)));
-                anchored = named == feature;
+                // The text since the previous component (or the statement's start) must name this
+                // feature and no other, with the same recognition the level scan uses.
+                var from = k == 0 || k - 1 >= placeholders.Count ? 0 : placeholders[k - 1] + 1;
+                var to = k < placeholders.Count ? placeholders[k] : statement.Text.Joined.Length;
+                var segment = statement.Text.Joined[from..to];
+                var codes = statement.Text.CodeSpans.Where(c => segment.Contains(c, StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
+                var named = Mentions(new Text(segment, segment, [], codes, false), commonWords: false);
+                anchored = named.Count == 1 && named.Contains(feature);
             }
             yield return new Component(page, statement.Line, tag, feature, warning, anchored);
         }
@@ -693,7 +731,7 @@ public sealed class WebsiteFeatureSupportParityTests
 
     /// <summary>The registry features a statement names: a code span equal to a registry name, a
     /// hyphenated registry name in the text, or the words of a multi-word registry name.</summary>
-    private static HashSet<string> Mentions(Text text)
+    private static HashSet<string> Mentions(Text text, bool commonWords = true)
     {
         var found = new HashSet<string>(StringComparer.Ordinal);
         foreach (var code in text.CodeSpans)
@@ -706,30 +744,57 @@ public sealed class WebsiteFeatureSupportParityTests
                 if (token.Contains('-') && FeatureSupport.GetFeatureInfo(token) is not null)
                     found.Add(token);
             var words = Words(rendered, splitFeatures: true);
-            foreach (var word in words)
-                foreach (var singular in new[] { word, word.TrimEnd('s'), word.EndsWith("es") ? word[..^2] : word,
-                             word.EndsWith("ies") ? word[..^3] + "y" : word })
+            for (var i = 0; i < words.Count; i++)
+                foreach (var singular in Singulars(words[i]))
+                {
                     if (SingleWordNames.Value.Contains(singular))
                         found.Add(singular);
+                    else if (commonWords && CommonWords.Contains(singular))
+                        found.Add(singular);
+                    // "if statements", "for loops": a keyword names its feature only with its noun.
+                    else if (commonWords && KeywordNouns.TryGetValue(singular, out var nouns) && i + 1 < words.Count
+                             && Singulars(words[i + 1]).Any(nouns.Contains))
+                        found.Add(singular);
+                }
             foreach (var name in MultiWordNames.Value)
                 for (var i = 0; i + name.Parts.Length <= words.Count; i++)
-                    if (name.Parts.Select((p, k) => words[i + k] == p || (k == name.Parts.Length - 1 && words[i + k] == p + "s")).All(b => b))
+                    if (name.Parts.Select((p, k) => words[i + k] == p || (k == name.Parts.Length - 1 && Singulars(words[i + k]).Contains(p))).All(b => b))
                         found.Add(name.Name);
         }
         return found;
     }
 
     // Single-word registry names that are also ordinary English or general programming words. As plain
-    // text they name no feature ("the full method", "for each field"); in a code span they still do.
+    // text they name their feature in their own statement ("Interfaces are fully supported") but do not
+    // put the statements around them in scope ("the full method"); in a code span they always do.
     private static readonly HashSet<string> CommonWords = new(StringComparer.Ordinal)
     {
-        "class", "method", "property", "field", "constructor", "if", "for", "foreach", "while", "switch", "attributes",
-        "dynamic", "unsafe", "fixed", "volatile", "namespace", "parallel", "span", "memory", "interface", "generics",
+        "class", "method", "property", "field", "constructor", "attributes", "dynamic", "unsafe", "fixed",
+        "volatile", "namespace", "parallel", "span", "memory", "interface", "generics",
+    };
+
+    // Keywords that are registry names but are also function words: plain text names the feature
+    // only when the keyword is followed by one of its nouns.
+    private static readonly Dictionary<string, string[]> KeywordNouns = new(StringComparer.Ordinal)
+    {
+        ["if"] = ["statement", "condition", "block"],
+        ["for"] = ["loop", "statement"],
+        ["foreach"] = ["loop", "statement"],
+        ["while"] = ["loop", "statement"],
+        ["switch"] = ["statement", "expression"],
     };
 
     private static readonly Lazy<HashSet<string>> SingleWordNames = new(() =>
-        FeatureSupport.GetAllFeatures().Select(f => f.Name).Where(n => n.All(char.IsLetterOrDigit) && !CommonWords.Contains(n))
+        FeatureSupport.GetAllFeatures().Select(f => f.Name)
+            .Where(n => n.All(char.IsLetterOrDigit) && !CommonWords.Contains(n) && !KeywordNouns.ContainsKey(n))
             .ToHashSet(StringComparer.Ordinal));
+
+    /// <summary>A word and its possible singular forms: records, classes, properties.</summary>
+    private static string[] Singulars(string word) =>
+    [
+        word, word.EndsWith('s') ? word[..^1] : word, word.EndsWith("es") ? word[..^2] : word,
+        word.EndsWith("ies") ? word[..^3] + "y" : word,
+    ];
 
     private static readonly Lazy<List<(string Name, string[] Parts)>> MultiWordNames = new(() =>
         FeatureSupport.GetAllFeatures().Select(f => f.Name).Where(n => n.Contains('-'))

@@ -179,9 +179,11 @@ new diagnostic. The C# converter emits code that passes all four checks.
   parentheses, wrapped lines, footnotes, link titles and JSX attributes no longer change what
   it reads. It fails when a level word such as "full" or "not supported" appears outside the
   component in a statement that names a feature, or right after one, or under a heading that
-  names one. 19 passages that use these words in another sense are allowlisted, each with a
-  reason, and each may appear only once on its page. The check reads a fixed list of level
-  words, so a synonym such as "complete support" is still not caught.
+  names one. A feature counts when it is named in a code span, by its registry name, or in
+  plain words such as "string interpolation" or "records". 28 passages that use these words
+  in another sense, such as the proof status `unsupported`, are allowlisted, each with a reason,
+  and each may appear only once on its page. The check reads a fixed list of level words, so a
+  synonym such as "complete support" is still not caught.
 
 ### Release process
 
