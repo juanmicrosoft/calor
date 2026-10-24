@@ -62,9 +62,9 @@
         "Subject": "FluentValidation",
         "Files": 216,
         "ParseFailed": 0,
-        "BindStopped": 80,
-        "ReachEffectPass": 136,
-        "StopCalor0410": 110,
+        "BindStopped": 79,
+        "ReachEffectPass": 137,
+        "StopCalor0410": 111,
         "StopCalor0422Or0423": 4,
         "StopCalor1002": 17,
         "CompileClean": 5,
@@ -74,11 +74,11 @@
       }
     ]
   },
-  "MeasuredCommit": "bb9393c2cf96fd8747b9fd8040c945fbe917dd41",
+  "MeasuredCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
   "AggregateDiagnostics": 143,
   "AggregateModulesWithDiagnostics": 52,
-  "AggregateModulesEnforced": 275,
-  "AggregateModulesExcluded": 89,
+  "AggregateModulesEnforced": 276,
+  "AggregateModulesExcluded": 88,
   "PerSubject": [
     {
       "Subject": "MediatR",
@@ -159,8 +159,8 @@
       "Subject": "FluentValidation",
       "Diagnostics": 85,
       "ModulesWithDiagnostics": 30,
-      "ModulesEnforced": 136,
-      "ModulesNotMeasured": 80,
+      "ModulesEnforced": 137,
+      "ModulesNotMeasured": 79,
       "RowlessDestination": 18,
       "UnknownSource": 0,
       "Assumed": 0,
@@ -173,18 +173,17 @@
       "InvocationWitness": 22,
       "ExcludedConversionFailed": 0,
       "ExcludedParseFailed": 0,
-      "ExcludedBindFailed": 80,
+      "ExcludedBindFailed": 79,
       "ExcludedEffectPassFaulted": 0,
       "ModulesEnforcedRawBagRule": 40,
       "RawBagBindFailed": 176,
       "BindFailureCauses": {
         "Calor0201": 10,
-        "Calor0208": 7,
+        "Calor0208": 6,
         "Calor0272": 1,
         "Calor0273": 62
       },
       "BindFailureModules": [
-        "Calor0208 FluentValidation.Tests/CollectionValidatorWithParentTests.cs",
         "Calor0273 FluentValidation.Tests/ComplexValidationTester.cs",
         "Calor0273 FluentValidation.Tests/NotEqualValidatorTests.cs",
         "Calor0208 FluentValidation.Tests/RulesetTests.cs",
@@ -266,8 +265,8 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 7869,
-      "Calor0411Modules": 113
+      "Calor0411Sites": 6176,
+      "Calor0411Modules": 114
     }
   ]
 }

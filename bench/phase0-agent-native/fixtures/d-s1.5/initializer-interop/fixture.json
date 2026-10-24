@@ -1,0 +1,13 @@
+{
+  "featureKey": "initializer-interop",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Verify",
+  "runtimeExpectedInt": 33,
+  "convertedRuntimeEntryPoint": "Verify",
+  "convertedExpectedUndefinedInt": 33,
+  "convertedExpectedDefinedInt": 33,
+  "definedSymbols": []
+}

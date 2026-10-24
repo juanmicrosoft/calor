@@ -1,0 +1,13 @@
+§M{m001:Fixture:overflow=unchecked}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Bag:pub}
+    §PROP{p003:Items:List<i32>:pub:get} = §LIST{list002:i32} 1 §/LIST{list002}
+
+
+  §CL{c004:InitializerInterop:pub:stat}
+    §MT{m005:Verify:pub:stat} () -> i32
+      §B{bag} (cast Bag §CS{(new Bag { Items = { 2, 3 } })})
+      §R (+ (* bag.Items.Count 10) §IDX bag.Items 2)
+
+

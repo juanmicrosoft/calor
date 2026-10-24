@@ -2091,6 +2091,446 @@
           "surfaceError": false
         }
       }
+    },
+    "T1-INIT-COLLECTION-DEFAULTS": {
+      "originalTrace": "1/4[5]|2:2/4[1,2]:0/0[]|1a|2|3/4[7,8,9]|1|1242|3",
+      "surfaces": {
+        "library": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": true,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert-passthroughOnError": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": true
+          },
+          "surfaceError": false
+        },
+        "mcp-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-batch": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        }
+      }
+    },
+    "T1-INIT-OBJECT": {
+      "originalTrace": "64|65|99|1,2|True|11s|70|3,4local|8,-3|12|3,4|56,100|78|5|ctor;Y=2;X=1;ctor;seed1;X=1;seed2;Y=2;seed3;seed4;ctor;next3;X=3;next4;Y=4;ctor;Y=-3;X=8;ctor;next6;X=6;next5;take;next9;ctor;next10;X=10;take;ctor;next7;X=7;ctor;next8;Y=8;ctor;X=11;",
+      "surfaces": {
+        "library": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": true,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert-passthroughOnError": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": true
+          },
+          "surfaceError": false
+        },
+        "mcp-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-batch": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "native",
+          "paths": {
+            "outcome": "native",
+            "interop": 0,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        }
+      }
+    },
+    "T1-INIT-NESTED": {
+      "originalTrace": "0,1,2|17|5|21|2|30|4,5|3|30,4|70|1|throw|9|ctor;ctor;v;i;x;|add1;add2;add7;",
+      "surfaces": {
+        "library": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": true,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert-passthroughOnError": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": true
+          },
+          "surfaceError": false
+        },
+        "mcp-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-batch": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 8,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        }
+      }
+    },
+    "T1-INIT-ORDER": {
+      "originalTrace": "11|23|0,1|0,1|FalseTrue|1|True11|11,22|10,23|§10|0,1,1|0,1|1,2|100,101|True|TrueTrue|13|7|1|11|False:True|1|7|11|outer;next11;cell11;outer;next11;cell11;next12;cell12;next1;next1;outer;cell0;next1;cell1;outer;cell11;outer;next11;handler;next22;outer;cell10;outer;cell11;cell12;outer;next1;next1;next1;next1;next2;next101;outer;outer;outer;handler;next11;cell0;handler;outer;next11;",
+      "surfaces": {
+        "library": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": true,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "cli-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-convert-passthroughOnError": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": true
+          },
+          "surfaceError": false
+        },
+        "mcp-migrate": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        },
+        "mcp-batch": {
+          "compile": "permissive-effects:Calor0410",
+          "outcome": "preserved",
+          "paths": {
+            "outcome": "preserved",
+            "interop": 29,
+            "rescue": 0,
+            "passthrough": 0,
+            "lossy": 0,
+            "dropped": 0,
+            "rescueUnusableMembers": false,
+            "passthroughOnError": false
+          },
+          "surfaceError": false
+        }
+      }
     }
   }
 }

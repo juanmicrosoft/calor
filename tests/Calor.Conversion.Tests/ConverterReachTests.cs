@@ -260,7 +260,11 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1Initializer");
 
         AssertParsesClean(rt);
-        Assert.Contains("§NEW{TestValidator}", rt.Calor);
+        // #1541: a custom Add-collection has no Calor form. It used to become
+        // `§NEW{TestValidator}` with `_item0 = …` assignments, which is not what the C# does;
+        // now the creation stays C#, so the lambdas are still passed to TestValidator.Add.
+        Assert.Contains("§CS{(new TestValidator", rt.Calor);
+        Assert.DoesNotContain("_item0", rt.Calor);
     }
 
     /// <summary>
@@ -874,10 +878,12 @@ public class ConverterReachTests
         Assert.False(diagnostics.HasErrors,
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
 
-        // ...and it is RESCUED, not native: this pins the boundary, so a later
-        // change that closed the object-initializer hoist would fail here and be
-        // recorded rather than sliding by.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        // ...and it is not native. This pinned the member-level §CSHARP rescue until #1524:
+        // the object-initializer hoist that left the lambdas' scope is closed now, because a
+        // creation whose initializer value is a lambda over `new Node { … }.Run` has no exact
+        // Calor form and stays C# in place (§CS, reported as initializer-interop).
+        Assert.Contains("§CS{(new Node", result.CalorSource);
+        Assert.Contains(result.Losses, loss => loss.Feature == "initializer-interop");
     }
 
     // ----- review N1: hoists must land before the §ARR2D opener --------------

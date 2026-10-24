@@ -1,5 +1,5 @@
 {
-  "trackedFileCount": 950,
+  "trackedFileCount": 952,
   "successfulTransformationCount": 697,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
@@ -60,6 +60,8 @@
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-access-shape/expected.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-access-shape/test.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-declaration/expected.calr",
+      "bench/phase0-agent-native/fixtures/d-s1.5/initializer-interop/expected.calr",
+      "bench/phase0-agent-native/fixtures/d-s1.5/initializer-interop/test.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l1m01.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l1m02.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l1m03.calr",

@@ -21,6 +21,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _conditionalExpressionDepth;
     private int _memberBodyDepth;
     private int _inlineObjectInitializers;
+    private int _inlineCollections;
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
     // ANOTHER lambda's body must never be hoisted to the enclosing statement:
@@ -70,6 +71,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _inInterpolation = false;
         _inInlineSiblingContext = 0;
         _inlineObjectInitializers = 0;
+        _inlineCollections = 0;
         Visit(module);
         return _builder.ToString();
     }
@@ -1077,13 +1079,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
-        // For collection creation defaults (Dict/List/Set), emit "= default" instead of
-        // the full §DICT/§LIST/§SET block, since the type is already on the §FLD tag.
+        // #1595: a collection default (§LIST/§HSET/§DICT) is written inline with its closer. It
+        // used to become "= default" (null), silently dropping the collection and its elements.
         string defaultVal;
-        if (node.DefaultValue is DictionaryCreationNode or ListCreationNode or SetCreationNode)
-            defaultVal = " = default";
-        else if (node.DefaultValue != null)
-            defaultVal = $" = {node.DefaultValue.Accept(this)}";
+        if (node.DefaultValue != null)
+            defaultVal = $" = {AcceptMemberDefault(node.DefaultValue)}";
         else
             defaultVal = "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -1099,6 +1099,83 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine($"§FLD{{{typeName}:{EscapeCalorIdentifier(node.Name)}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
 
         return "";
+    }
+
+    /// <summary>
+    /// #1524: a field or property default renders object initializers on its own line
+    /// (<c>§NEW{T} A = x §/NEW</c>). The multi-line form is a statement-level layout; after a
+    /// member header it was not read back as the default.
+    /// </summary>
+    private string AcceptMemberDefault(ExpressionNode value)
+    {
+        _inlineObjectInitializers++;
+        _inlineCollections++;
+        try
+        {
+            return value.Accept(this);
+        }
+        finally
+        {
+            _inlineObjectInitializers--;
+            _inlineCollections--;
+        }
+    }
+
+    /// <summary>
+    /// #1541/#1595: a collection in expression position (a member default, or an element of another
+    /// collection) is written on one line with its closer: <c>§LIST{id:T} e1 e2 §/LIST{id}</c>. The
+    /// statement form appends its own lines and returns nothing, which in expression position left
+    /// the value empty and put a §LIST statement in the class body.
+    /// </summary>
+    private string RenderInlineCollection(string open, string close, IEnumerable<string> items) =>
+        $"{open}{string.Concat(items.Select(item => " " + item))} {close}";
+
+    /// <summary>
+    /// An element (or §KV key/value) of a collection block. A nested collection is written inline on
+    /// its element line (#1595); anything else as an inline sibling.
+    /// </summary>
+    private string AcceptCollectionElement(ExpressionNode element)
+    {
+        if (element is ListCreationNode or SetCreationNode or DictionaryCreationNode)
+            return AcceptInlineCollection(element);
+        // #1541: an object-initializer element stays on its line (`§NEW{T} A = 1 §/NEW`), so it is
+        // created in element order instead of being hoisted ahead of the earlier elements.
+        _inlineObjectInitializers++;
+        try
+        {
+            return AcceptInInlineSibling(element);
+        }
+        finally
+        {
+            _inlineObjectInitializers--;
+        }
+    }
+
+    private string AcceptInlineCollection(ExpressionNode collection)
+    {
+        _inlineCollections++;
+        try
+        {
+            return collection.Accept(this);
+        }
+        finally
+        {
+            _inlineCollections--;
+        }
+    }
+
+    private List<string> RenderInlineCollectionItems(IEnumerable<ExpressionNode> elements)
+    {
+        var values = new List<string>();
+        foreach (var element in elements)
+        {
+            var value = AcceptCollectionElement(element);
+            if (value.Contains('\n') || string.IsNullOrWhiteSpace(value))
+                throw new InvalidOperationException(
+                    "An inline collection element must render on one line (#1541); the converter keeps such collections as C#.");
+            values.Add(value);
+        }
+        return values;
     }
 
     public string Visit(PropertyNode node)
@@ -1117,40 +1194,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsStatic) modifiers.Add("stat");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
-        // Compact auto-property shorthand
-        // If default value is multi-line (e.g., §NEW with initializers), fall through to full syntax
+        // Compact auto-property shorthand. #1524: a default with an object initializer stays on
+        // the header line too (see AcceptMemberDefault).
         if (node.IsAutoProperty && (node.Getter != null || node.Setter != null || node.Initer != null))
         {
-            // Pre-check: if default value would be multi-line, use full syntax instead
-            if (node.DefaultValue is NewExpressionNode newExpr && newExpr.Initializers.Count > 0)
-            {
-                // Fall through to full property syntax below
-            }
-            else
-            {
-                var accessors = new List<string>();
-                if (node.Getter != null)
-                    accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
-                                  node.Getter.Visibility == Visibility.Private ? "priget" :
-                                  node.Getter.Visibility == Visibility.Internal ? "intget" :
-                                  node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
-                if (node.Setter != null)
-                    accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
-                                  node.Setter.Visibility == Visibility.Private ? "priset" :
-                                  node.Setter.Visibility == Visibility.Internal ? "intset" :
-                                  node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
-                if (node.Initer != null)
-                    accessors.Add("init");
-                var accessorStr = string.Join(",", accessors);
-                var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
-                // v0.17 S1, round-4 finding — the row goes here, before the
-                // default value, because that is where the parser reads it
-                // (Parser.cs TryParseSameLineRow(EffectRowPosition.Property)).
-                // Omitting it let a Calor -> Calor re-emit silently strip a
-                // hand-written `§PROP{...} §E{cw}` and reopen the escape S1 closed.
-                AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
-                return "";
-            }
+            var accessors = new List<string>();
+            if (node.Getter != null)
+                accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
+                              node.Getter.Visibility == Visibility.Private ? "priget" :
+                              node.Getter.Visibility == Visibility.Internal ? "intget" :
+                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
+            if (node.Setter != null)
+                accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
+                              node.Setter.Visibility == Visibility.Private ? "priset" :
+                              node.Setter.Visibility == Visibility.Internal ? "intset" :
+                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
+            if (node.Initer != null)
+                accessors.Add("init");
+            var accessorStr = string.Join(",", accessors);
+            var defaultVal = node.DefaultValue != null ? $" = {AcceptMemberDefault(node.DefaultValue)}" : "";
+            // v0.17 S1, round-4 finding — the row goes here, before the
+            // default value, because that is where the parser reads it
+            // (Parser.cs TryParseSameLineRow(EffectRowPosition.Property)).
+            // Omitting it let a Calor -> Calor re-emit silently strip a
+            // hand-written `§PROP{...} §E{cw}` and reopen the escape S1 closed.
+            AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+            return "";
         }
 
         // Full property syntax with body and closing tag
@@ -1163,7 +1232,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.DefaultValue != null)
         {
-            AppendLine($"= {node.DefaultValue.Accept(this)}");
+            AppendLine($"= {AcceptMemberDefault(node.DefaultValue)}");
         }
 
         Dedent();
@@ -2033,7 +2102,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = AcceptInInlineSibling(element);
+            var val = AcceptCollectionElement(element);
             // #903: a multi-line element (an object initializer) cannot sit on an
             // element line; hoist it so the block lands at the enclosing indent.
             if (val.Contains('\n'))
@@ -2076,8 +2145,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C —
             // otherwise the parser would absorb the value (or next §KV) as the call's arg.
-            var key = AcceptInInlineSibling(entry.Key);
-            var value = AcceptInInlineSibling(entry.Value);
+            var key = AcceptCollectionElement(entry.Key);
+            var value = AcceptCollectionElement(entry.Value);
             // Review M3: the KEY needs the same guard as the value - a dictionary
             // whose key is an object initializer is multi-line too.
             if (key.Contains('\n'))
@@ -2123,7 +2192,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = AcceptInInlineSibling(element);
+            var val = AcceptCollectionElement(element);
             // #903: a multi-line element (an object initializer) cannot sit on an
             // element line; hoist it so the block lands at the enclosing indent.
             if (val.Contains('\n'))
@@ -2273,7 +2342,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// runs ahead of an earlier sibling; the bindings stay queued for the caller.
     /// </summary>
     private List<string> RenderArrayElements(
-        IEnumerable<ExpressionNode> elements, bool hoistSectionMarkers, bool inlineSibling = true)
+        IEnumerable<ExpressionNode> elements, bool hoistSectionMarkers, bool inlineSibling = true,
+        Func<string, bool>? mustLeaveLine = null)
     {
         var queued = _pendingHoistedLines.ToList();
         _pendingHoistedLines.Clear();
@@ -2295,7 +2365,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         var hoistAll = rendered.Any(r => r.Hoisted.Count > 0 || r.Value.Contains('\n')
-            || hoistSectionMarkers && ContainsSectionMarker(r.Value));
+            || hoistSectionMarkers && ContainsSectionMarker(r.Value)
+            || mustLeaveLine?.Invoke(r.Value) == true);
         var values = new List<string>(rendered.Count);
         foreach (var (node, value, hoisted) in rendered)
         {
@@ -2616,6 +2687,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ListCreationNode node)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        if (_inlineCollections > 0 || node.RenderInline)
+            return RenderInlineCollection($"§LIST{{{node.Id}:{elementType}}}", $"§/LIST{{{node.Id}}}",
+                RenderInlineCollectionItems(node.Elements));
 
         // Evaluate all elements first, collecting any hoisted bindings before the list.
         // AcceptInInlineSibling: each element line is parsed as a sibling expression
@@ -2624,7 +2698,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = AcceptInInlineSibling(element);
+            // #1595: a nested collection element is written inline, on its element line.
+            var val = AcceptCollectionElement(element);
             // #903: a multi-line element (an object initializer) cannot sit on an
             // element line; hoist it so the block lands at the enclosing indent.
             if (val.Contains('\n'))
@@ -2661,6 +2736,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var keyType = TypeMapper.CSharpToCalor(node.KeyType);
         var valueType = TypeMapper.CSharpToCalor(node.ValueType);
+        if (_inlineCollections > 0)
+        {
+            var entries = new List<string>();
+            foreach (var entry in node.Entries)
+            {
+                var pair = RenderInlineCollectionItems([entry.Key, entry.Value]);
+                entries.Add($"§KV {pair[0]} {pair[1]}");
+            }
+            return RenderInlineCollection($"§DICT{{{node.Id}:{keyType}:{valueType}}}", $"§/DICT{{{node.Id}}}", entries);
+        }
 
         // Pre-evaluate entries to flush hoisted bindings before the §DICT block
         var evaluatedEntries = new List<(string key, string value)>();
@@ -2668,8 +2753,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var entry in node.Entries)
         {
             // See sibling DictionaryNode visitor: AcceptInInlineSibling protects nested zero-arg calls.
-            var key = AcceptInInlineSibling(entry.Key);
-            var value = AcceptInInlineSibling(entry.Value);
+            var key = AcceptCollectionElement(entry.Key);
+            var value = AcceptCollectionElement(entry.Value);
             // Review M3: the KEY needs the same guard as the value - a dictionary
             // whose key is an object initializer is multi-line too.
             if (key.Contains('\n'))
@@ -2716,6 +2801,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(SetCreationNode node)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        if (_inlineCollections > 0 || node.RenderInline)
+            return RenderInlineCollection($"§HSET{{{node.Id}:{elementType}}}", $"§/HSET{{{node.Id}}}",
+                RenderInlineCollectionItems(node.Elements));
 
         // Pre-evaluate elements to flush hoisted bindings before the §HSET block.
         // AcceptInInlineSibling: each element line is parsed as a sibling expression
@@ -2724,7 +2812,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = AcceptInInlineSibling(element);
+            // #1595: a nested collection element is written inline, on its element line.
+            var val = AcceptCollectionElement(element);
             // #903: a multi-line element (an object initializer) cannot sit on an
             // element line; hoist it so the block lands at the enclosing indent.
             if (val.Contains('\n'))
@@ -3319,11 +3408,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             // Pre-evaluate initializer values to collect hoisted bindings
             var evalInits = new List<(string PropName, string Value)>();
-            foreach (var init in node.Initializers)
+            // #1524: a nested object initializer value stays on its line (`A = §NEW{U} B = 1 §/NEW`).
+            _inlineObjectInitializers++;
+            try
             {
-                var valueStr = init.Value.Accept(this);
-                if (!string.IsNullOrWhiteSpace(valueStr))
+                foreach (var init in node.Initializers)
+                {
+                    var valueStr = init.Value is ListCreationNode or SetCreationNode or DictionaryCreationNode
+                        ? AcceptInlineCollection(init.Value)
+                        // A one-argument §C must keep its §/C, or it reads the next `Name =` as its argument.
+                        : AcceptInInlineSibling(init.Value);
+                    // An empty rendering used to drop the assignment silently (#1524).
+                    if (string.IsNullOrWhiteSpace(valueStr))
+                        throw new InvalidOperationException(
+                            $"Object initializer value for '{init.PropertyName}' rendered empty (#1524).");
                     evalInits.Add((init.PropertyName, valueStr));
+                }
+            }
+            finally
+            {
+                _inlineObjectInitializers--;
             }
 
             // #1132: an array element stays on its line (`§NEW{T} A = x §/NEW`), not hoisted early.
@@ -3354,12 +3458,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var indent = new string(' ', _indentLevel * 2);
         var sb = new System.Text.StringBuilder();
         sb.Append("§ANON");
-        foreach (var init in node.Initializers)
+        // Values containing section markers are hoisted. #1541 review: when one is, every
+        // non-literal value is, in order, so none runs ahead of an earlier member's value.
+        var values = RenderArrayElements(node.Initializers.Select(init => init.Value), hoistSectionMarkers: true);
+        foreach (var (init, value) in node.Initializers.Zip(values))
         {
-            var value = init.Value.Accept(this);
-            // Hoist values containing section markers
-            if (ContainsSectionMarker(value))
-                value = HoistToTempVar(value);
             // Strip @ prefix from verbatim C# identifiers (e.g., @class, @checked, @Version)
             var propName = init.PropertyName.StartsWith("@") ? init.PropertyName[1..] : init.PropertyName;
             sb.Append($"\n{indent}  {propName} = {value}");
@@ -3595,15 +3698,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TupleLiteralNode node)
     {
-        var evalElements = new List<string>();
-        foreach (var e in node.Elements)
+        // Hoist elements that start with '(' to avoid tuple/lisp ambiguity
+        // e.g., ((> a b), (== c d)) would be misparse as nested lisp, and elements with section
+        // markers. #1541 review: when one is hoisted, every non-literal element is, in order, so
+        // `(n, new List<int> { Next() })` still reads n before Next() runs.
+        var evalElements = RenderArrayElements(node.Elements, hoistSectionMarkers: true,
+            mustLeaveLine: value => value.StartsWith("(", StringComparison.Ordinal));
+        for (var i = 0; i < evalElements.Count; i++)
         {
-            var val = e.Accept(this);
-            // Hoist elements that start with '(' to avoid tuple/lisp ambiguity
-            // e.g., ((> a b), (== c d)) would be misparse as nested lisp
-            if (val.StartsWith("(") || ContainsSectionMarker(val))
-                val = HoistToTempVar(val);
-            evalElements.Add(val);
+            if (evalElements[i].StartsWith("(", StringComparison.Ordinal))
+                evalElements[i] = HoistToTempVar(evalElements[i]);
         }
         return $"({string.Join(", ", evalElements)})";
     }

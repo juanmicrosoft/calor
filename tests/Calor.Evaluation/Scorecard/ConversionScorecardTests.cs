@@ -22,7 +22,12 @@ public class ConversionScorecardTests
     // #1132 (0.25 F5): 93 -> 94 fully converted and 97 -> 98 round-trip, both improvements
     // (array expressions convert and round-trip natively).
     // 0.25 F3 (#847): 94 -> 95 fully converted, 074_LocalFunctions converts natively in place.
-    private const int BASELINE_FULLY_CONVERTED = 95;
+    // 0.27 (#1524/#1541, maintainer decision): 95 -> 94. 092_Events.cs now keeps
+    // `new CustomEventArgs { … }` passed with `this` to the MessageSent delegate as C# with an
+    // initializer-interop loss: C# reads the delegate before the argument, and a natively
+    // converted initializer would be hoisted ahead of that read. A safe escalation, not wrong
+    // output; a follow-up issue tracks winning it back. Round-trip stays 98.
+    private const int BASELINE_FULLY_CONVERTED = 94;
     private const int BASELINE_ROUNDTRIP = 98;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>

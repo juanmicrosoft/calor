@@ -35,6 +35,13 @@ public sealed class ListCreationNode : ExpressionNode
 
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// #1541: the converter placed this collection where a value is needed (a member default, an
+    /// argument, a foreach source). The Calor emitter writes it on one line with its closer
+    /// (<c>§LIST{id:T} e1 e2 §/LIST{id}</c>) instead of as a statement.
+    /// </summary>
+    public bool RenderInline { get; init; }
+
     public ListCreationNode(
         TextSpan span,
         string id,
@@ -176,6 +183,13 @@ public sealed class SetCreationNode : ExpressionNode
     public IReadOnlyList<ExpressionNode> Elements { get; }
 
     public AttributeCollection Attributes { get; }
+
+    /// <summary>
+    /// #1541: the converter placed this collection where a value is needed (a member default, an
+    /// argument, a foreach source). The Calor emitter writes it on one line with its closer
+    /// (<c>§LIST{id:T} e1 e2 §/LIST{id}</c>) instead of as a statement.
+    /// </summary>
+    public bool RenderInline { get; init; }
 
     public SetCreationNode(
         TextSpan span,
