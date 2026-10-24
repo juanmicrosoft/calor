@@ -7241,38 +7241,80 @@ public sealed class Binder
         var branches = new List<FlowNarrowingState>();
         var declared = new List<VariableSymbol>();
 
-        void BindBranch(IReadOnlyList<StatementNode> body) =>
-            BindIsolatedFlowBranch(baseline, branches, setup: null, () =>
-            {
-                var bound = BindStatements(body);
-                declared.AddRange(CollectBranchDeclarations());
-                return bound;
-            });
-
-        BindBranch(preprocessor.Body);
+        BindPreprocessorBranch(baseline, branches, preprocessor.Body, declared);
         if (preprocessor.ElseBody is { } elseBody)
-            BindBranch(elseBody);
+            BindPreprocessorBranch(baseline, branches, elseBody, declared);
         else
             branches.Add(baseline);
         JoinFlowBranchStates(baseline, branches);
 
         foreach (var group in declared.GroupBy(variable => variable.Name, StringComparer.Ordinal))
         {
-            var visible = group.FirstOrDefault(variable => variable.IsImmutableBinding || !variable.IsMutable)
-                ?? group.First();
-            if (_scope.LookupLocal(visible.Name) is VariableSymbol existing
-                && !ReferenceEquals(existing.StorageIdentity, visible))
+            var alternatives = group.ToArray();
+            // Strictest first: an immutable §B, then any other non-mutable declaration.
+            var visible = alternatives.FirstOrDefault(variable => variable.IsImmutableBinding)
+                ?? alternatives.FirstOrDefault(variable => !variable.IsMutable)
+                ?? alternatives[0];
+            var existing = _scope.LookupLocal(visible.Name) as VariableSymbol;
+            // A flow-narrowed copy of a field or property is not a declaration of this block;
+            // a local may shadow the member, as in C#.
+            var shadowsNarrowedMember = existing is { StorageIdentity: { IsField: true } or { IsProperty: true } };
+            string? conflict = null;
+            if (existing != null && !shadowsNarrowedMember)
             {
-                foreach (var variable in group)
-                {
-                    _diagnostics.ReportError(variable.DeclarationSpan, DiagnosticCode.DuplicateDefinition,
-                        $"Variable '{variable.Name}' is already defined");
-                }
+                conflict = $"Variable '{visible.Name}' is already defined";
+            }
+            else if (alternatives.Select(variable => TypeIdentity.Canonicalize(variable.TypeName))
+                     .Distinct(StringComparer.Ordinal).Skip(1).Any())
+            {
+                // The code after the block has one variable, so its type (and any refinement
+                // the emitter guards writes with) must not depend on which branch is active.
+                conflict = $"Variable '{visible.Name}' is declared with different types in the branches " +
+                    $"of a §PP block ({string.Join(", ", alternatives.Select(variable => $"'{variable.TypeName}'").Distinct())}); " +
+                    "declare it with the same type in every branch";
+            }
+            if (conflict != null)
+            {
+                foreach (var variable in alternatives)
+                    _diagnostics.ReportError(variable.DeclarationSpan, DiagnosticCode.DuplicateDefinition, conflict);
                 continue;
             }
-            _scope.TryDeclare(visible);
+
+            // Calls through the visible binding may run any branch's value.
+            foreach (var other in alternatives.Where(variable => !ReferenceEquals(variable, visible)))
+                StoreCallableState(visible, UnionCallableEffects(GetCallableState(visible), GetCallableState(other)));
+            if (existing != null)
+                _scope.TryReplaceLocal(existing, visible);
+            else
+                _scope.TryDeclare(visible);
         }
         return null;
+    }
+
+    /// <summary>
+    /// #1678: binds one <c>§PP</c> branch in a child scope, from the flow state before the block.
+    /// Unlike <see cref="BindIsolatedFlowBranch"/>, the branch scope is not seeded with the visible
+    /// flow-narrowed copies: <c>#if</c> opens no C# scope, so a branch binding may shadow a narrowed
+    /// member exactly where it could outside the block.
+    /// </summary>
+    private void BindPreprocessorBranch(
+        FlowNarrowingState baseline,
+        List<FlowNarrowingState> branches,
+        IReadOnlyList<StatementNode> body,
+        List<VariableSymbol> declared)
+    {
+        RestoreFlowNarrowingState(baseline);
+        try
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            BindStatements(body);
+            declared.AddRange(CollectBranchDeclarations());
+        }
+        finally
+        {
+            branches.Add(CaptureFlowNarrowingState());
+            RestoreFlowNarrowingState(baseline);
+        }
     }
 
     /// <summary>

@@ -177,6 +177,93 @@ public class PreprocessorBindingTests
         Assert.Contains(result.Diagnostics.Errors, e => e.Code == DiagnosticCode.BindDuplicateInScope);
     }
 
+    // Review round 1: an immutable §B wins over a collection statement declaring the same name.
+    [Theory]
+    [InlineData("§E{alloc}\n§PP{A}\n  §LIST{x:i32}\n    1\n§PPE\n  §B{x:List<i32>} §NEW{List<i32>}\n§ASSIGN x x\n§R 0")]
+    [InlineData("§E{alloc}\n§PP{A}\n  §B{x:List<i32>} §NEW{List<i32>}\n§PPE\n  §LIST{x:i32}\n    1\n§ASSIGN x x\n§R 0")]
+    public void Compile_WriteAfterBranchesMixingCollectionAndImmutableBinding_IsRejected(string body)
+    {
+        var result = Compile(Fn(body));
+
+        Assert.True(result.HasErrors, "expected a §PP-related error");
+        Assert.Contains(result.Diagnostics.Errors, e =>
+            e.Code is DiagnosticCode.WriteToReadOnlyLocal or DiagnosticCode.DuplicateDefinition);
+    }
+
+    // Review round 1: the code after the block has one variable, so its type cannot depend on
+    // the active branch (a refinement guard would be emitted for only one of them).
+    [Theory]
+    [InlineData("§PP{A}\n  §B{~x:Nat} n\n§PPE\n  §B{~x:i32} 2\n§ASSIGN x -1\n§R x")]
+    [InlineData("§PP{A}\n  §B{~x:i32} 2\n§PPE\n  §B{~x:Nat} n\n§ASSIGN x -1\n§R x")]
+    [InlineData("§PP{A}\n  §B{x:str} \"a\"\n§PPE\n  §B{x:i32} 2\n§R 0")]
+    public void Binder_BranchesDeclaringOneNameWithDifferentTypes_AreCalor0201(string body)
+    {
+        var source = "§M{m1:T}\n  §RTYPE{r1:Nat:i32} (>= # 0)\n  §F{f1:Run:pub} (Nat:n) -> i32\n" +
+            Indent(body, "    ") + "\n";
+        var diagnostics = Bind(source);
+
+        Assert.Contains(diagnostics.Errors, e =>
+            e.Code == DiagnosticCode.DuplicateDefinition && e.Message.Contains("different types"));
+    }
+
+    // Review round 1: a branch local may shadow a flow-narrowed field, as it may outside §PP.
+    [Fact]
+    public void Converter_PreprocessorLocalShadowingANarrowedField_Compiles()
+    {
+        var conversion = new Migration.CSharpToCalorConverter().Convert("""
+            public class K
+            {
+                public string? x;
+                public int Run()
+                {
+                    if (x != null)
+                    {
+            #if A
+                        var x = "a";
+            #else
+                        var x = "b";
+            #endif
+                        return x.Length;
+                    }
+                    return 0;
+                }
+            }
+            """);
+
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        var result = Compile(conversion.CalorSource!);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+    }
+
+    // Review round 1: a call through a binding hoisted from §PP may run either branch's value.
+    [Theory]
+    [InlineData("§B{later:Action} Noop", "§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM{mut}")]
+    [InlineData("§B{later:Action} §LAM{mut} §C{Mutate} §A{ref} value §/C §/LAM{mut}", "§B{later:Action} Noop")]
+    public void Binder_CallThroughHoistedCallable_SeesEveryBranchMutation(string first, string second)
+    {
+        var source = $$"""
+            §M{m:PpCallable}
+              §F{noop:Noop:pub} () -> void
+                §E{}
+              §F{mutate:Mutate:pub} (?str:value:ref) -> void
+                §ASSIGN value null
+              §F{take:Take:pub} (str:value) -> void
+                §E{}
+              §F{probe:Probe:pub} (?str:value) -> void
+                §IF{guard} (!= value null)
+                  §PP{A}
+                    {{first}}
+                  §PPE
+                    {{second}}
+                  §C{later} §/C
+                  §C{Take} §A value §/C
+            """;
+        var module = Parse(source, out var diagnostics);
+        new Binder(diagnostics).Bind(module);
+
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
     // ===================================================================
     // Positive controls: valid §PP code compiles and the C# is right
     // ===================================================================
