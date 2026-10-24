@@ -70,32 +70,37 @@ public sealed class WebsiteFeatureSupportParityTests
         ("cli/feature-check.mdx", "Conversion can still preserve an unsupported construct as an interop\nblock.",
             "'unsupported construct' is any construct the converter keeps as C#, not a registry level"),
         ("cli/mcp.mdx", "whether the result is fully native", "an all-native conversion outcome, not a level"),
-        ("cli/review-packet.mdx", "`timeout`, `unsupported`, and `unavailable`", "proof statuses, not converter levels"),
+        ("cli/review-packet.mdx", "The seven proof statuses are `proven`, `refuted`, `assumed`, `unknown`,\n`timeout`, `unsupported`, and `unavailable`", "proof statuses, not converter levels"),
         ("guides/csharp-interoperability.mdx", "partial properties",
             "'partial properties' is the C# construct (partial-property), not a support level"),
         ("guides/csharp-interoperability.mdx", "output is not fully native Calor", "the converter's own outcome text (a pinned W1 transcript)"),
-        ("guides/csharp-interoperability.mdx", "(unsupported construct)", "the converter's own preservation-path text (a pinned W1 transcript)"),
-        ("guides/csharp-interoperability.mdx", "Unsupported interpolation holes",
+        ("guides/csharp-interoperability.mdx", "Preservation paths: 1 by converter interop (unsupported construct)", "the converter's own preservation-path text (a pinned W1 transcript)"),
+        ("guides/csharp-interoperability.mdx", "Unsupported interpolation holes | The hole keeps its C# text",
             "names the holes outside the native subset; the row's level is the registry's, on the feature-check page"),
-        ("syntax-reference/calls.mdx", "the converter's full list", "the complete list, not a level"),
+        ("syntax-reference/calls.mdx", "See the [C# interoperability guide](/docs/guides/csharp-interoperability/#call-tryparse-trygetvalue-and-other-ref-out-in-methods)\nfor the converter's full list", "the complete list, not a level"),
         ("syntax-reference/effects.mdx", "Effect rows do not yet fully verify callbacks", "effect verification, not a converter level"),
         ("cli/convert.mdx", "Partly converted beats nothing converted", "a partly converted file, not a level"),
         ("cli/mcp.mdx", "Partial results look like this:", "results a tool could not complete, not a level"),
         ("guides/adding-calor-to-existing-projects.mdx", "waives the full effect guarantee", "the whole effect guarantee, not a level"),
-        ("guides/csharp-interoperability.mdx", "The full list of supported\nshapes", "the complete list, not a level"),
+        ("guides/csharp-interoperability.mdx", "The full list of supported\nshapes is in [Array Expressions](/docs/cli/convert/#array-expressions)", "the complete list, not a level"),
         ("syntax-reference/structure-tags.mdx", "inline parameter declarations are NOT supported inside\n`§LAM` headers",
             "Calor's own lambda syntax, not a converter level"),
         // Proof statuses and Calor's own modifiers next to a common word such as "fields" or "class".
-        ("guides/adding-calor-to-existing-projects.mdx", "Read any `PARTIAL` residual", "an incomplete query answer, not a level"),
-        ("guides/dependent-types-tutorial.mdx", "is reported `Unsupported`", "a proof status, not a converter level"),
-        ("guides/verification-guarantees.mdx", "are `unsupported`, not\n  guessed", "a proof status, not a converter level"),
+        ("guides/adding-calor-to-existing-projects.mdx", "Read any `PARTIAL` residual before relying on a caller count", "an incomplete query answer, not a level"),
+        ("guides/dependent-types-tutorial.mdx", "so a proof about a `§B` name is reported `Unsupported`", "a proof status, not a converter level"),
+        ("guides/verification-guarantees.mdx", "Unregistered user fields and unmodeled contract calls are `unsupported`, not\n  guessed", "a proof status, not a converter level"),
         ("philosophy/static-verification.mdx", "forms outside the positive whitelist report\n`unsupported`", "a proof status, not a converter level"),
-        ("syntax-reference/refinement-types.mdx", "so a proof about one is\nreported `Unsupported`", "a proof status, not a converter level"),
+        ("syntax-reference/refinement-types.mdx", "the obligation solver does not yet track `§B` locals, so a proof about one is\nreported `Unsupported`", "a proof status, not a converter level"),
         ("syntax-reference/inheritance.mdx", "`partial` | Partial class - split across files", "Calor's `partial` modifier, not a level"),
         ("syntax-reference/inheritance.mdx", "static class modifier not fully implemented", "a Calor modifier, not a converter level"),
         ("syntax-reference/inheritance.mdx", "Static and partial class modifiers are not fully implemented",
             "Calor's modifiers, not a converter level"),
-        ("syntax-reference/structure-tags.mdx", "accept the full set", "the whole set of accessibility levels, not a level"),
+        ("benchmarking/metrics/contract-verification.mdx", "forms outside the positive\nwhitelist report `unsupported`",
+            "a proof status, not a converter level"),
+        ("guides/csharp-interoperability.mdx", "(fragments of the full output)", "the complete output, not a level"),
+        ("syntax-reference/contracts.mdx", "seven explicit outcomes: `proven`, `refuted`,\n`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`",
+            "proof statuses, not converter levels"),
+        ("syntax-reference/structure-tags.mdx", "accept the full set\nof C# accessibility levels", "the whole set of accessibility levels, not a level"),
     ];
 
     /// <summary>SupportLevel components per page. A changed count means one was added or removed.</summary>
@@ -113,7 +118,7 @@ public sealed class WebsiteFeatureSupportParityTests
         .UsePipeTables().UseYamlFrontMatter().UseEmphasisExtras().UseFootnotes().Build();
 
     // The component's exact grammar (a tag, not prose). Anything else starting <SupportLevel fails.
-    private static readonly Regex ComponentTag = new(@"^<SupportLevel feature=""(?<f>[a-z0-9-]+)""(?<w> form=""warning"")? />$");
+    private static readonly Regex ComponentTag = new(@"^<SupportLevel feature=""(?<f>[a-z0-9][a-z0-9 ()/-]*)""(?<w> form=""warning"")? />$");
 
     private static readonly HashSet<string> LevelWords = new(StringComparer.Ordinal)
     {
@@ -289,6 +294,14 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/convert.mdx", Heading, "Partial properties are fully supported.\n\n" + Heading)]
     [InlineData("cli/convert.mdx", Heading, "For loops are partially supported.\n\n" + Heading)]
     [InlineData("cli/convert.mdx", Heading, "## `record`\n\n### Conversion status\n\nFully supported.\n\n" + Heading)]
+    // Codex round 3 (#1664): a common-word heading or opening subject carries context; names with spaces.
+    [InlineData("cli/convert.mdx", Heading, "## Interfaces\n\n### Conversion status\n\nFully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Interfaces are converted.\n\nThey are fully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "A binary pattern (and/or) is fully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Unary patterns are fully supported.\n\n" + Heading)]
+    // An allowlisted passage reworded to state a converter level is no longer the passage.
+    [InlineData("guides/dependent-types-tutorial.mdx", "so a proof about a `§B` name is reported `Unsupported`",
+        "so a proof about a `§B` name is reported `Unsupported`. The converter support level for records is reported `Unsupported`")]
     // Codex round 1: an allowlisted passage copied next to a new claim is not excused.
     [InlineData("guides/csharp-interoperability.mdx", "## Next steps\n", "`in-parameter` (unsupported construct).\n\n## Next steps\n")]
     [InlineData("guides/csharp-interoperability.mdx", "## Next steps\n",
@@ -327,6 +340,9 @@ public sealed class WebsiteFeatureSupportParityTests
         "names `in-parameter`, which is not the one feature named just before it")]
     [InlineData("cli/feature-check.mdx", "- `yield-return` is <SupportLevel feature=\"yield-return\" /> for iterator *methods* only.",
         "- `yield-return` is <SupportLevel feature=\"yield-return\" /> for iterator *methods* only. Records are <SupportLevel feature=\"yield-return\" />.",
+        "names `yield-return`, which is not the one feature named just before it")]
+    [InlineData("cli/feature-check.mdx", "- `yield-return` is <SupportLevel feature=\"yield-return\" />",
+        "- `yield-return` and interfaces are <SupportLevel feature=\"yield-return\" />",
         "names `yield-return`, which is not the one feature named just before it")]
     public void AMisusedComponentFailsTheCheck(string page, string from, string to, string message)
     {
@@ -472,10 +488,12 @@ public sealed class WebsiteFeatureSupportParityTests
 
     private static void CheckStatements(string page, List<Statement> statements, ScanResult result)
     {
-        // A common word that is also a registry name ("interfaces", "for loops") names that feature in
-        // its own statement; only the other forms carry over to the statements around it.
-        var own = statements.Select(s => Mentions(s.Text, commonWords: true).Count > 0 || NamesTheCommand(s.Text)).ToList();
-        var context = statements.Select(s => Mentions(s.Text, commonWords: false).Count > 0 || NamesTheCommand(s.Text)).ToList();
+        var own = statements.Select(s => Mentions(s.Text).Count > 0 || NamesTheCommand(s.Text)).ToList();
+        // A common word that is also a registry name ("methods") carries over to the statement after it
+        // only when it is what that statement is about: a heading ("## Interfaces"), or the subject that
+        // opens a sentence ("Interfaces are converted."). Every other form always carries over.
+        var context = statements.Select(s => Mentions(s.Text, commonWords: false).Count > 0 || NamesTheCommand(s.Text)
+                                             || (s.Heading ? Mentions(s.Text).Count > 0 : SentenceSubjects(s.Text).Count > 0)).ToList();
         // The headings that enclose each statement: its section heading and every heading above it
         // with a smaller level, so "## `record`" then "### Status" still encloses "Fully supported."
         var enclosing = new List<List<int>>();
@@ -575,8 +593,33 @@ public sealed class WebsiteFeatureSupportParityTests
         return text;
     }
 
-    /// <summary>The statement's components. A prose component is anchored when the text since the
-    /// previous component names its feature and no other (common words such as "methods" aside); a table component when its row's first
+    /// <summary>Registry names (common words included) that open a sentence of the statement.</summary>
+    private static HashSet<string> SentenceSubjects(Text text)
+    {
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var sentence in Sentences(text.Joined))
+        {
+            var words = Tokens(sentence).Take(3).ToList();
+            if (words.Count > 0)
+                found.UnionWith(Mentions(new Text(string.Join(' ', words), string.Join(' ', words), [], [], false)));
+        }
+        return found;
+    }
+
+    private static IEnumerable<string> Sentences(string text)
+    {
+        var start = 0;
+        for (var i = 0; i < text.Length; i++)
+            if (".!?;:".Contains(text[i]) && (i + 1 == text.Length || char.IsWhiteSpace(text[i + 1])))
+            {
+                yield return text[start..i];
+                start = i + 1;
+            }
+        yield return text[start..];
+    }
+
+    /// <summary>The statement's components. A prose component is anchored when its sentence, up to the
+    /// component (and after any earlier component), names its feature and no other; a table component when its row's first
     /// cell names it. The warning form names its feature in its own text.</summary>
     private static IEnumerable<Component> Components(string page, Statement statement)
     {
@@ -602,9 +645,9 @@ public sealed class WebsiteFeatureSupportParityTests
                 // feature and no other, with the same recognition the level scan uses.
                 var from = k == 0 || k - 1 >= placeholders.Count ? 0 : placeholders[k - 1] + 1;
                 var to = k < placeholders.Count ? placeholders[k] : statement.Text.Joined.Length;
-                var segment = statement.Text.Joined[from..to];
+                var segment = Sentences(statement.Text.Joined[from..to]).Last();
                 var codes = statement.Text.CodeSpans.Where(c => segment.Contains(c, StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
-                var named = Mentions(new Text(segment, segment, [], codes, false), commonWords: false);
+                var named = Mentions(new Text(segment, segment, [], codes, false));
                 anchored = named.Count == 1 && named.Contains(feature);
             }
             yield return new Component(page, statement.Line, tag, feature, warning, anchored);
@@ -796,9 +839,11 @@ public sealed class WebsiteFeatureSupportParityTests
         word.EndsWith("ies") ? word[..^3] + "y" : word,
     ];
 
+    // Hyphenated names, and names written as words ("binary pattern (and/or)": its words before the
+    // parenthesis).
     private static readonly Lazy<List<(string Name, string[] Parts)>> MultiWordNames = new(() =>
-        FeatureSupport.GetAllFeatures().Select(f => f.Name).Where(n => n.Contains('-'))
-            .Select(n => (n, n.Split('-'))).ToList());
+        FeatureSupport.GetAllFeatures().Select(f => f.Name).Where(n => n.Contains('-') || n.Contains(' '))
+            .Select(n => (n, n.Contains(' ') ? n.Split('(')[0].Split(' ', StringSplitOptions.RemoveEmptyEntries) : n.Split('-'))).ToList());
 
     /// <summary>Maximal runs of letters, digits and hyphens.</summary>
     private static List<string> Tokens(string text)

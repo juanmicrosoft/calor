@@ -113,6 +113,7 @@ test('search index expansion renders tags in prose and leaves code as written', 
     ['  ```\n  ' + tag + '\n  ```', '  ```\n  ' + tag + '\n  ```'],
     ['`` ' + tag + ' `` and ' + tag, '`` ' + tag + ' `` and NotSupported'],
     ['`' + tag + '`', '`' + tag + '`'],
+    ['text\n\n    ' + tag + '\n', 'text\n\n    ' + tag + '\n'],
     ['<SupportLevel feature="not-a-feature" />', '<SupportLevel feature="not-a-feature" />'],
     ['<SupportLevel feature="out-var" form="warning" />', "[out-var] Feature 'out-var' is partially supported…"],
   ];
