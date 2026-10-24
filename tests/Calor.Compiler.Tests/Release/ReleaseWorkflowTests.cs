@@ -187,8 +187,8 @@ public class ReleaseWorkflowTests
         Assert.Contains("bash scripts/compiler-shard-filter.sh --part \"$part\"", shard);
         Assert.Contains("--logger \"trx;LogFileName=$name-$part.trx\"", shard);
         var inventory = Step(job, "Enforce test inventory");
-        Assert.Equal(2, Regex.Matches(inventory, @"python3 scripts/check_trx\.py").Count);
-        Assert.Equal(2, Regex.Matches(inventory, @"--submodules").Count);
+        Assert.Contains("python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules", inventory);
+        Assert.Single(Regex.Matches(inventory, @"python3 scripts/check_trx\.py"));
         var z3 = Step(job, "Assert no Z3-gated test silently skipped");
         Assert.Contains("if grep -q \"Z3 not available\" test-output.log; then", z3);
         Assert.Contains("exit 1", z3);

@@ -369,6 +369,11 @@ def main() -> int:
         help="TRX report. Repeatable: a project run as several invocations (see the "
              "split tests (compiler) shard, #1150) passes one --trx per part and the "
              "counts are summed against the single expectedTotal.")
+    parser.add_argument(
+        "--trx-dir", type=Path,
+        help="#1666: every *.trx file in this directory is one part of the shard (the compiler shard writes "
+             "two). The shard script empties the directory first, so it holds only this run's reports; a "
+             "missing part shows as a short total.")
     parser.add_argument("--project")
     parser.add_argument("--manifest", type=Path, default=Path("eng/test-manifest.json"))
     parser.add_argument("--self-test", action="store_true")
@@ -381,8 +386,15 @@ def main() -> int:
     if args.self_test:
         self_test()
         return 0
+    if args.trx_dir is not None:
+        if args.trx:
+            parser.error("give --trx or --trx-dir, not both")
+        args.trx = sorted(args.trx_dir.glob("*.trx"))
+        if not args.trx:
+            print(f"ERROR: no TRX report in {args.trx_dir}")
+            return 1
     if not args.trx or args.project is None:
-        parser.error("--trx and --project are required")
+        parser.error("--trx (or --trx-dir) and --project are required")
     errors = validate(args.trx, args.project, args.manifest, submodules=args.submodules)
     for error in errors:
         print(f"ERROR: {error}")

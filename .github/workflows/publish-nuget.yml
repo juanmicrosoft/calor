@@ -166,20 +166,11 @@ jobs:
       # this is what skipped the v0.16.0 publish: run 33568423848 reported
       # "executed 640, expected 639" on a shard where all 640 tests PASSED.
       - name: Enforce test inventory
+        # #1666: every TRX file the shard script wrote is one part, checked on its own and in sum.
+        # The determinism protocol freezes this step (D014).
         run: |
           set -euo pipefail
-          if [ "${{ matrix.name }}" = "compiler" ]; then
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/${{ matrix.name }}-1.trx" \
-              --trx "artifacts/test/${{ matrix.name }}-2.trx" \
-              --project "${{ matrix.project }}" \
-              --submodules
-          else
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/${{ matrix.name }}.trx" \
-              --project "${{ matrix.project }}" \
-              --submodules
-          fi
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "${{ matrix.project }}" --submodules
 
       # Assert the property that matters, not a filename: no Z3-gated test may skip on the
       # commit being released. This regression is invisible by construction otherwise —

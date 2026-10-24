@@ -606,6 +606,36 @@
           "python3 scripts/test_determinism_protocol.py",
           "python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main"
         ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "remaining-tests",
+        "step": "Enforce test inventory",
+        "after": [
+          "Run project tests"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\""
+        ],
+        "commands": [
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\""
+        ]
+      },
+      {
+        "workflow": ".github/workflows/publish-nuget.yml",
+        "job": "test",
+        "step": "Enforce test inventory",
+        "after": [
+          "Run project tests"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules"
+        ],
+        "commands": [
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules"
+        ]
       }
     ],
     "shardSteps": [

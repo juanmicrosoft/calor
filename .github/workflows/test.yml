@@ -581,19 +581,12 @@ jobs:
           echo "--- dotnet build servers ---"; ps -o pid,rss,comm -A 2>/dev/null | sort -k2 -rn | head -12
 
       - name: Enforce test inventory
-        # #1150: the compiler shard produces two TRX files (see the split above);
-        # check_trx.py sums them against the single expectedTotal.
+        # #1150/#1666: every TRX file the shard script wrote is one part (the compiler shard
+        # writes two). check_trx.py checks each part on its own and the sum against
+        # eng/test-manifest.json. The determinism protocol freezes this step (D014).
         run: |
-          if [ "${{ matrix.name }}" = "compiler" ]; then
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/${{ matrix.name }}-1.trx" \
-              --trx "artifacts/test/${{ matrix.name }}-2.trx" \
-              --project "${{ matrix.project }}"
-          else
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/${{ matrix.name }}.trx" \
-              --project "${{ matrix.project }}"
-          fi
+          set -euo pipefail
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "${{ matrix.project }}"
 
       - name: Upload test report
         if: always()

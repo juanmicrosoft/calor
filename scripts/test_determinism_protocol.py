@@ -269,6 +269,24 @@ class NegativeRegistrationControls(unittest.TestCase):
         dropped = mutate(lambda p: p["gates"]["shardSteps"][0]["testCommands"].pop())
         self.assertIn("D016", codes(protocol=dropped, baseline=(PROTOCOL, CASES)))
 
+    def test_d014_the_inventory_step_is_frozen(self) -> None:
+        """#1666: "Enforce test inventory" is what catches a shard that skipped or masked its tests, so it is a
+        frozen gate in both workflows: one top-level check_trx.py call after the shard step, unconditional."""
+        for path, flag in ((".github/workflows/test.yml", ""), (".github/workflows/publish-nuget.yml", " --submodules")):
+            text = (ROOT / path).read_text(encoding="utf-8")
+            line = f'          python3 scripts/check_trx.py --trx-dir artifacts/test --project "${{{{ matrix.project }}}}"{flag}\n'
+            step = "      - name: Enforce test inventory\n"
+            self.assertEqual(1, text.count(line))
+            for mutated in (text.replace(line, line.rstrip("\n") + " || true\n"),
+                            text.replace(line, "          exit 0\n" + line),
+                            text.replace(line, "          if false; then\n  " + line + "          fi\n"),
+                            text.replace(line, line.replace("--trx-dir artifacts/test", "--trx-dir artifacts/old")),
+                            text.replace(step, step + "        continue-on-error: true\n"),
+                            text.replace(step, step + "        if: ${{ false }}\n"),
+                            text.replace(step, "      - name: Enforce test inventory (skipped)\n")):
+                self.assertNotEqual(text, mutated)
+                self.only("D014", texts={path: mutated})
+
     def test_d014_shard_step_cannot_skip_its_tests_even_when_re_pinned(self) -> None:
         """Review round 2 (#1584), #1666: editing the shard script and re-pinning scriptSha256 to match must still
         fail when the edit ends the script early, negates or guards a test, loops, traps, or changes a test
