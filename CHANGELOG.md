@@ -17,7 +17,8 @@ All notable changes to this project will be documented in this file.
     reported). So is a write to a binding declared in a nested `§PP`. A `§B{~x}` after a `§PP`
     that declared an immutable `x` is `Calor0260`. A branch binding that reuses a name already
     declared in the same block is `Calor0258` (C# rejects it with CS0128 when that branch is
-    active). Code in a branch can also report new errors, such as an undefined name.
+    active). Two branches that declare one name with different types are `Calor0201`. Code in
+    a branch can also report new errors, such as an undefined name.
   - Reading a `§PP` binding after the block no longer reports `Calor0200` (undefined variable).
     A `§B{~x}` in the `§PPE` branch now declares `x` there instead of assigning to the `#if`
     branch's `x`, which did not exist in that branch (CS0103).
