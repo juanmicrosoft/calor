@@ -7363,7 +7363,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case ElementAccessExpressionSyntax element
                     when element.ArgumentList.Arguments.All(argument =>
                         argument.NameColon == null && argument.RefKindKeyword.IsKind(SyntaxKind.None)
-                        && !model.GetConversion(argument.Expression).IsUserDefined):
+                        && !HasEffectfulConversion(argument.Expression) && !IsDynamicTyped(argument.Expression)):
                 {
                     var receiverType = model.GetTypeInfo(element.Expression).Type;
                     if (receiverType is null || receiverType.TypeKind == TypeKind.Error)
@@ -7410,6 +7410,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Codex round 2: a user-defined ++/-- (or a C# 14 instance compound operator such as
         // `operator +=`) is not `x = x + 1`; the lowering would call a different operator.
         if (UsesUserDefinedUpdateOperator(site))
+            throw EscalateExpression(site, "compound-assignment-order");
+        // Codex round 3: a dynamic compound assignment binds its operator and its conversion back
+        // to the target at run time; `t = t op v` would bind a different conversion.
+        if (op != null && (IsDynamicTyped(left) || right != null && IsDynamicTyped(right)
+                || _semanticModel.GetOperation(site) is Microsoft.CodeAnalysis.Operations.IDynamicMemberReferenceOperation))
             throw EscalateExpression(site, "compound-assignment-order");
         var castType = op is { } castOperator && castOperator != CompoundAssignmentOperator.NullCoalesce
             ? NarrowingCastType(site, left) : null;
@@ -7459,6 +7464,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var mark = _pendingStatements.Count;
         var value = ConvertRight();
         var rightHoisted = HoistsHaveEffects(mark);
+        // Codex round 3: a target that is neither a fixed location nor decomposed into parts (a
+        // ref-returning property, an index with a user-defined conversion) is evaluated where it
+        // stands, after whatever the right-hand side hoisted.
+        if (parts == null && rightHoisted && !IsInertExpression(left))
+            throw EscalateExpression(site, "compound-assignment-order");
         // Codex round 2: C# converts the read (`x` in `x += F().N()`) to the operator's operand type
         // before the right-hand side; a temp holding the unconverted read would convert it after the
         // hoisted statements, so a user-defined input conversion stays C#.
@@ -7526,6 +7536,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return bound;
     }
 
+    private bool IsDynamicTyped(ExpressionSyntax expression)
+        => _semanticModel!.GetTypeInfo(expression).Type is { TypeKind: TypeKind.Dynamic }
+            || _semanticModel.GetConversion(expression).IsDynamic
+            || expression.DescendantNodesAndSelf().OfType<ExpressionSyntax>()
+                .Any(node => _semanticModel.GetTypeInfo(node).Type is { TypeKind: TypeKind.Dynamic });
+
     /// <summary>
     /// Codex round 2: whether a compound assignment or ++/-- binds to a user-defined operator that
     /// performs the update itself (<c>operator ++</c>, or a C# 14 instance <c>operator +=</c>).
@@ -7547,6 +7563,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private bool MayActOrThrow(ExpressionSyntax node)
     {
         var model = _semanticModel!;
+        // Codex round 3: the conversion applied to the node in its context (an implicit
+        // user-defined operator on an operand), and anything dynamic, run code too.
+        if (HasEffectfulConversion(node))
+            return true;
         switch (node)
         {
             case InvocationExpressionSyntax or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
@@ -7577,15 +7597,52 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         or SpecialType.System_Double) && operation.LeftOperand.Type?.TypeKind != TypeKind.Enum
                         && binary.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression);
             case CastExpressionSyntax cast:
-                return model.GetConversion(cast) is not { IsImplicit: true, IsUserDefined: false };
+                // The cast's own conversion (Codex round 3), not the one applied to its result.
+                return model.GetOperation(cast) is not Microsoft.CodeAnalysis.Operations.IConversionOperation
+                    {
+                        OperatorMethod: null, Conversion: { IsImplicit: true, IsUserDefined: false }
+                    };
             case MemberAccessExpressionSyntax member:
-                return model.GetSymbolInfo(member).Symbol is not (INamedTypeSymbol or INamespaceSymbol or IMethodSymbol
-                    or IFieldSymbol { IsStatic: true } or IFieldSymbol { IsConst: true });
+                return model.GetSymbolInfo(member).Symbol switch
+                {
+                    INamedTypeSymbol or INamespaceSymbol or IMethodSymbol or IFieldSymbol { IsConst: true } => false,
+                    // Reading another type's static field can run (and fail) its type initializer.
+                    IFieldSymbol { IsStatic: true } field => !IsEnclosingType(field.ContainingType, member),
+                    _ => true,
+                };
             case IdentifierNameSyntax identifier:
-                return model.GetSymbolInfo(identifier).Symbol is IPropertySymbol or IEventSymbol;
+                return model.GetSymbolInfo(identifier).Symbol switch
+                {
+                    IPropertySymbol or IEventSymbol => true,
+                    IFieldSymbol { IsStatic: true, IsConst: false } field => !IsEnclosingType(field.ContainingType, identifier),
+                    _ => false,
+                };
             default:
                 return false;
         }
+    }
+
+    // Codex round 3: a user-defined or dynamic conversion of the node, or a dynamic operation.
+    private bool HasEffectfulConversion(ExpressionSyntax node)
+    {
+        var model = _semanticModel!;
+        if (model.GetTypeInfo(node).Type is { TypeKind: TypeKind.Dynamic })
+            return node is not (IdentifierNameSyntax or LiteralExpressionSyntax)
+                || model.GetConversion(node) is { IsIdentity: false };
+        var conversion = model.GetConversion(node);
+        return conversion.IsUserDefined || conversion.IsDynamic;
+    }
+
+    // A static field of a type whose code is running here has been initialized.
+    private bool IsEnclosingType(INamedTypeSymbol? type, SyntaxNode at)
+    {
+        for (var current = _semanticModel!.GetEnclosingSymbol(at.SpanStart)?.ContainingType; current != null;
+             current = current.ContainingType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, type))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -7783,7 +7840,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     && IsInertExpression(element.Expression)
                     && element.ArgumentList.Arguments.All(argument =>
                         argument.NameColon == null && argument.RefKindKeyword.IsKind(SyntaxKind.None)
-                        && !model.GetConversion(argument.Expression).IsUserDefined
+                        && !HasEffectfulConversion(argument.Expression) && !IsDynamicTyped(argument.Expression)
                         && model.GetTypeInfo(argument.Expression).ConvertedType?.SpecialType is SpecialType.System_Int32
                             or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
                         && IsInertExpression(argument.Expression));
@@ -7939,6 +7996,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         // hoisted, unless nothing they run can change them.
                         var receiver = Unparen(elementAccess.Expression);
                         var key = elementAccess.ArgumentList.Arguments[0].Expression;
+                        // Codex round 3: a key converted by user code (or dynamically) converts
+                        // where it is used, after the hoisted statements.
+                        if (valueHoisted && (HasEffectfulConversion(key) || IsDynamicTyped(key)))
+                            throw EscalateExpression(assignment, "compound-assignment-order");
                         var captureKey = valueHoisted && !IsFixedValue(key, [assignment.Right]);
                         var captureReceiver = receiver is not ThisExpressionSyntax
                             && !IsFixedValue(receiver, [key, assignment.Right]);
@@ -9326,7 +9387,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         bool IsFixedOperand(ExpressionSyntax operand) => operand.DescendantNodesAndSelf()
             .OfType<ExpressionSyntax>()
-            .All(part => part switch
+            .All(part => !HasEffectfulConversion(part) && part switch
             {
                 BinaryExpressionSyntax or CastExpressionSyntax or PrefixUnaryExpressionSyntax => !MayActOrThrow(part),
                 ParenthesizedExpressionSyntax or PredefinedTypeSyntax => true,
@@ -11987,6 +12048,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // operators escalate to interop.
         var compOp = MapCompoundAssignmentOperator(assignment.Kind())
             ?? throw EscalateExpression(assignment, "unsupported-compound-assignment");
+        // Codex round 3: user-defined update operators and dynamic operations, as for statements.
+        if (UsesUserDefinedUpdateOperator(assignment) || IsDynamicTyped(assignment.Left) || IsDynamicTyped(assignment.Right))
+            throw EscalateExpression(assignment, "embedded-assignment");
         // #1574: `n ??= v` has the underlying type of a nullable value target, so re-reading
         // `n` would change the expression's type.
         if (compOp == CompoundAssignmentOperator.NullCoalesce)
@@ -12388,9 +12452,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (UsesUserDefinedUpdateOperator(postfix))
             throw EscalateExpression(postfix, "compound-assignment-order");
         var operand = Unparen(postfix.Operand);
+        if (IsDynamicTyped(operand))
+            throw EscalateExpression(postfix, "compound-assignment-order");
         var parts = DecomposeAssignmentTarget(operand);
-        if (parts == null ? !IsInertExpression(operand)
-            : parts.HasParts && !new[] { parts.Receiver! }.Concat(parts.Arguments ?? []).All(IsInertExpression))
+        var operandParts = parts is { HasParts: true } ? new[] { parts.Receiver! }.Concat(parts.Arguments ?? []).ToList() : [];
+        if (parts == null ? !IsInertExpression(operand) : !operandParts.All(IsInertExpression))
+            throw EscalateExpression(postfix, "compound-assignment-order");
+        // Codex round 3: `_pre = b.P; b.P = _pre + 1` runs the getter between two evaluations of b.
+        if (model.GetSymbolInfo(operand).Symbol is IPropertySymbol
+            && !operandParts.All(part => IsFixedValue(part, [])))
             throw EscalateExpression(postfix, "compound-assignment-order");
 
         // The code that runs before the operand in C#: everything in the same statement (or
