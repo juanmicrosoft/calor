@@ -60,8 +60,7 @@ public sealed record OracleProjectReport
     public int ExercisedFiles => Files.Count(f => f.Status == "exercised");
 
     /// <summary>Members whose inputs were compared: AGREE, DIFFERENT, and TIMEOUT / NONDETERMINISTIC members with a compared prefix.</summary>
-    public int ComparedMembers => Files.SelectMany(f => f.Members).Count(m => m.Status is MemberStatus.Agree or MemberStatus.Different
-        || (m.Status is MemberStatus.Timeout or MemberStatus.Nondeterministic && m.Inputs > 0));
+    public int ComparedMembers => Files.Sum(OracleRunner.Compared);
 
     public Dictionary<string, int> MemberTotals => Files.SelectMany(f => f.Members)
         .GroupBy(m => m.Status).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count());
@@ -353,16 +352,24 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         return s.Trim();
     }
 
-    /// <summary>Member comparisons a file made: AGREE, DIFFERENT, and TIMEOUT / NONDETERMINISTIC with a compared prefix.</summary>
-    public static int Compared(OracleFileReport file) => file.Members.Count(m => m.Status is MemberStatus.Agree or MemberStatus.Different
-        || (m.Status is MemberStatus.Timeout or MemberStatus.Nondeterministic && m.Inputs > 0));
+    /// <summary>
+    /// Member comparisons a file made: AGREE, DIFFERENT, and TIMEOUT / NONDETERMINISTIC with a compared prefix. #1667:
+    /// counted per member as the subject declares it. A member and its suffix segments are one member, counted once when
+    /// any of them compared an input, so segments can never make up for members that stopped being compared.
+    /// </summary>
+    public static int Compared(OracleFileReport file) =>
+        file.Members.GroupBy(m => m.OriginKey, StringComparer.Ordinal).Count(g => g.Any(m => SkipCategory.Of(m) is null));
 
     /// <summary>The skip-category distribution of a set of file reports (distinct members per category, exercised files only).</summary>
     public static Dictionary<string, int> SkipDistributionOf(IEnumerable<OracleFileReport> files)
     {
-        var counts = files.Where(f => f.Status == "exercised").SelectMany(f => f.Members)
-            .Select(m => (m.Key, Category: SkipCategory.Of(m))).Where(x => x.Category is not null).Distinct()
-            .GroupBy(x => x.Category!).ToDictionary(g => g.Key, g => g.Count());
+        // Per file, a member (with its segments) is skipped when none of its verdicts compared an input; its category is the
+        // member's own (the first verdict's), so a segment never counts as a member of its own.
+        var counts = files.Where(f => f.Status == "exercised")
+            .SelectMany(f => f.Members.GroupBy(m => m.OriginKey, StringComparer.Ordinal))
+            .Where(g => g.All(m => SkipCategory.Of(m) is not null))
+            .Select(g => (g.Key, Category: SkipCategory.Of(g.First())!)).Distinct()
+            .GroupBy(x => x.Category).ToDictionary(g => g.Key, g => g.Count());
         return SkipCategory.All.Where(counts.ContainsKey).ToDictionary(c => c, c => counts[c]);
     }
 

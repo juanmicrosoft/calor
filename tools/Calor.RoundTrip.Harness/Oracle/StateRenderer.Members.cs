@@ -112,19 +112,49 @@ public static partial class StateRenderer
         }
     }
 
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<FieldInfo>> PrivateStaticCache = new();
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<(string Label, FieldInfo Field)>> PrivateStaticCache = new();
 
-    [ThreadStatic] private static int _noDelegateCalls;
-
-    private sealed class DelegateCallScope : IDisposable
+    /// <summary>
+    /// A type's non-public static fields, in label order: constants left out, and compiler-generated fields too except
+    /// the storage of an auto-property that is not publicly readable (<c>&lt;N&gt;k__BackingField</c>, labelled
+    /// <c>N (auto-property)</c>), which is private state like any field. A publicly readable one is in the project part.
+    /// </summary>
+    private static IReadOnlyList<(string Label, FieldInfo Field)> PrivateStaticFields(Type t)
     {
-        public void Dispose() => _noDelegateCalls--;
+        if (t.IsGenericTypeDefinition)
+            return [];
+        var result = new List<(string, FieldInfo)>();
+        foreach (var f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly))
+        {
+            if (f.IsLiteral || f.FieldType.IsByRefLike || f.FieldType.IsPointer)
+                continue;
+            if (!f.Name.Contains('<'))
+            {
+                result.Add((f.Name, f));
+                continue;
+            }
+            if (f.Name.StartsWith('<') && f.Name.EndsWith(">k__BackingField", StringComparison.Ordinal))
+            {
+                var property = f.Name[1..f.Name.IndexOf('>')];
+                var getter = t.GetProperty(property, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)?.GetMethod;
+                if (getter is not { IsPublic: true })
+                    result.Add((property + " (auto-property)", f));
+            }
+        }
+        return result.OrderBy(x => x.Item1, StringComparer.Ordinal).ToList();
     }
 
-    private static DelegateCallScope NoDelegateCalls()
+    [ThreadStatic] private static int _uncallableStaysComplete;
+
+    private sealed class DelegateScope : IDisposable
     {
-        _noDelegateCalls++;
-        return new DelegateCallScope();
+        public void Dispose() => _uncallableStaysComplete--;
+    }
+
+    private static DelegateScope UncallableDelegatesStayComplete()
+    {
+        _uncallableStaysComplete++;
+        return new DelegateScope();
     }
 
     /// <summary>
@@ -136,25 +166,22 @@ public static partial class StateRenderer
     {
         foreach (var (name, type) in types.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
-            var fields = PrivateStaticCache.GetOrAdd(type, t => t.IsGenericTypeDefinition ? []
-                : t.GetFields(BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
-                    .Where(f => !f.IsLiteral && !f.Name.Contains('<') && !f.FieldType.IsByRefLike && !f.FieldType.IsPointer)
-                    .OrderBy(f => f.Name, StringComparer.Ordinal).ToList());
+            var fields = PrivateStaticCache.GetOrAdd(type, PrivateStaticFields);
             if (fields.Count == 0)
                 continue;
-            // Private state is observed for changes; a cached delegate's behavior is exercised by the members that use
-            // it, so here it is rendered by method and captured state only (calling it could never complete for every
-            // signature, and would make every input of the project incomplete).
-            using var _ = NoDelegateCalls();
+            // A cached delegate the generator can call is called, like any delegate; one it cannot call is rendered by
+            // method and captured state, and stays complete (marking it incomplete would make every input of the project
+            // incomplete). That residual is a documented limit (README, "Known limits").
+            using var _ = UncallableDelegatesStayComplete();
             sink.Append(name + "={");
             for (var i = 0; i < fields.Count; i++)
             {
                 if (i > 0)
                     sink.Append(", ");
-                sink.Append(fields[i].Name + "=");
+                sink.Append(fields[i].Label + "=");
                 try
                 {
-                    Append(sink, fields[i].GetValue(null), depth - 1);
+                    Append(sink, fields[i].Field.GetValue(null), depth - 1);
                 }
                 catch (Exception ex)
                 {
@@ -212,17 +239,13 @@ public static partial class StateRenderer
                 Append(sb, target, depth - 1);
             }
         }
-        if (_noDelegateCalls > 0)
-        {
-            sb.Append('>');
-            return;
-        }
         var invoke = del.GetType().GetMethod("Invoke")!;
         var parameters = invoke.GetParameters();
         if (MemberOracleInputs.Unsupported(parameters) is not null || invoke.ReturnType.IsByRef || invoke.ReturnType.IsByRefLike)
         {
             sb.Append(" calls=<not callable with generated inputs>>");
-            sb.MarkIncomplete();
+            if (_uncallableStaysComplete == 0)
+                sb.MarkIncomplete();
             return;
         }
         sb.Append(" calls=[");

@@ -101,9 +101,46 @@ public static partial class MemberDifferentialOracle
             }
         }
 
+        var judged = new List<(PlannedMember Member, MemberVerdict Verdict, bool Confirm)>();
         foreach (var member in expanded)
         {
-            var verdict = Judge(member, runs.Select(r => r[member.Key]).ToArray(), limits.TryGetValue(member.Key, out var k) ? k : null, options);
+            var verdict = Judge(member, runs.Select(r => r[member.Key]).ToArray(), limits.TryGetValue(member.Key, out var lim) ? lim : null, options, out var confirm);
+            judged.Add((member, verdict, confirm));
+        }
+        if (judged.Any(j => j.Confirm))
+        {
+            // #1667: a part stable on one build and unstable on the other is a difference only when more runs bear it out
+            // (two runs per build cannot tell a stable value from a low-entropy one that repeated by chance). The extra runs
+            // repeat the whole plan, original then converted, so every member sees the same state as in the main runs.
+            var extra = new List<Dictionary<string, MemberRun>>();
+            try
+            {
+                var o = options with { Limits = limits, OnTimeout = null };
+                for (var round = 1; round <= ConfirmationRounds; round++)
+                {
+                    extra.Add(Run(original, $"confirm{round}", expanded, o));
+                    extra.Add(Run(candidate, $"confirm{round}", expanded, o));
+                }
+            }
+            catch (TimeoutRestart)
+            {
+                extra.Clear();
+            }
+            for (var j = 0; j < judged.Count; j++)
+            {
+                var (member, verdict, confirm) = judged[j];
+                if (!confirm)
+                    continue;
+                verdict = extra.Count == 0
+                    ? verdict with { Reason = (verdict.Reason is null ? "" : verdict.Reason + "; ") + "one-sided instability not confirmed: a confirmation run timed out" }
+                    : Judge(member, runs.Concat(extra).Select(r => r[member.Key]).ToArray(), verdict.LimitedAt, options, out _);
+                judged[j] = (member, verdict, false);
+            }
+        }
+
+        foreach (var (member, judgedVerdict, _) in judged)
+        {
+            var verdict = judgedVerdict;
             if (verdict.LimitedAt is { } at && options.OnTimeout is null)
             {
                 // In-process: attribute the timeout now. (Child mode leaves it to the parent, which replays in fresh processes.)
@@ -134,7 +171,12 @@ public static partial class MemberDifferentialOracle
         foreach (var part in observation.Split(PartSeparator))
         {
             var cut = part.IndexOf(NameSeparator);
-            parts[cut < 0 ? "observation" : part[..cut]] = cut < 0 ? part : part[(cut + 1)..];
+            var name = cut < 0 ? "observation" : part[..cut];
+            // A repeated name is kept under its own key, never overwriting the first (rendered text is escaped, so a
+            // separator inside a part would itself be a defect, and must not be able to replace a part).
+            for (var n = 2; parts.ContainsKey(name); n++)
+                name = (cut < 0 ? "observation" : part[..cut]) + "#" + n;
+            parts[name] = cut < 0 ? part : part[(cut + 1)..];
         }
         return parts;
     }
@@ -185,19 +227,29 @@ public static partial class MemberDifferentialOracle
         return (differing, unstable, compared || differing.Count > 0, incomplete);
     }
 
-    /// <summary>The verdict for one member from its four runs (original 1, converted 1, original 2, converted 2).</summary>
-    private static MemberVerdict Judge(PlannedMember member, MemberRun[] r, int? limitedAt, OracleOptions options)
+    /// <summary>Extra (original, converted) run pairs that confirm one-sided nondeterminism (#1667).</summary>
+    internal const int ConfirmationRounds = 6;
+
+    /// <summary>
+    /// The verdict for one member from its runs: original 1, converted 1, original 2, converted 2, then any confirmation
+    /// runs in the same alternation. <paramref name="needsConfirmation"/> is set when only the four main runs were given
+    /// and a part looks stable on one build and unstable on the other: the caller then adds confirmation runs and judges
+    /// again.
+    /// </summary>
+    private static MemberVerdict Judge(PlannedMember member, MemberRun[] r, int? limitedAt, OracleOptions options, out bool needsConfirmation)
     {
-        var verdict = new MemberVerdict { Type = member.Type, Member = member.Member, Kind = member.Kind, Status = MemberStatus.Agree, LimitedAt = limitedAt };
+        needsConfirmation = false;
+        var verdict = new MemberVerdict { Type = member.Type, Member = member.Member, Kind = member.Kind, Status = MemberStatus.Agree, LimitedAt = limitedAt, Origin = member.Origin };
         var n = r.Min(x => x.Completed);
         var (a1, b1, a2, b2) = (r[0].Observations, r[1].Observations, r[2].Observations, r[3].Observations);
         var differing = new List<(string Label, string A, string B)>();
+        var unconfirmed = new SortedSet<string>(StringComparer.Ordinal);
         var unstableParts = new SortedDictionary<string, int>(StringComparer.Ordinal);
         (string Label, string Part, string X, string Y)? firstUnstable = null;
         var executed = 0;
         var incompleteParts = new SortedSet<string>(StringComparer.Ordinal);
-        // Per part: inputs on which each build failed to reproduce it, and the first such input (#1667, one-sided nondeterminism).
-        var unstableOn = new SortedDictionary<string, (int Original, int Converted, (string Label, string Stable, string X, string Y, bool ConvertedUnstable)? First)>(StringComparer.Ordinal);
+        // Per part: inputs on which each build failed to reproduce it (#1667, one-sided nondeterminism).
+        var unstableOn = new SortedDictionary<string, (int Original, int Converted)>(StringComparer.Ordinal);
         for (var i = 0; i < n; i++)
         {
             // The input's absolute index is part of its label, so two inputs that render alike (or a difference that moves to
@@ -210,16 +262,20 @@ public static partial class MemberDifferentialOracle
                 var entry = unstableOn.GetValueOrDefault(part);
                 entry.Original += originalStable ? 0 : 1;
                 entry.Converted += convertedStable ? 0 : 1;
-                if (entry.First is null && originalStable != convertedStable)
-                {
-                    string Part(string observation) => Parts(observation).GetValueOrDefault(part, "<absent>");
-                    entry.First = originalStable
-                        ? ($"{label} [{part}]", Part(a1[i]), Part(b1[i]), Part(b2[i]), true)
-                        : ($"{label} [{part}]", Part(b1[i]), Part(a1[i]), Part(a2[i]), false);
-                }
                 unstableOn[part] = entry;
             }
-            differing.AddRange(diff.Select(d => ($"{label} [{d.Part}]", d.A, d.B)));
+            foreach (var d in diff)
+            {
+                // With confirmation runs, a difference counts only when every run of each build reproduces the part: a
+                // low-entropy value can repeat by chance in two runs per build (#1667).
+                if (r.Length > 4 && !(Reproduced(r, i, d.Part, original: true) && Reproduced(r, i, d.Part, original: false)))
+                {
+                    unconfirmed.Add(d.Part);
+                    unstableParts[d.Part] = unstableParts.GetValueOrDefault(d.Part) + 1;
+                    continue;
+                }
+                differing.Add(($"{label} [{d.Part}]", d.A, d.B));
+            }
             foreach (var part in unstable)
             {
                 unstableParts[part] = unstableParts.GetValueOrDefault(part) + 1;
@@ -233,8 +289,15 @@ public static partial class MemberDifferentialOracle
             if (compared)
                 executed++;
         }
-        var unstableNote = unstableParts.Count == 0 ? null
+        string? unstableNote = unstableParts.Count == 0 ? null
             : "nondeterministic parts set aside: " + string.Join(", ", unstableParts.Select(kv => $"{kv.Key} on {kv.Value} input(s)"));
+        if (differing.Count > 0 && r.Length == 4)
+            needsConfirmation = true;
+        if (unconfirmed.Count > 0)
+        {
+            var note = $"a difference in {string.Join(", ", unconfirmed)} was not reproduced by {ConfirmationRounds} more runs per build";
+            unstableNote = unstableNote is null ? note : unstableNote + "; " + note;
+        }
         if (differing.Count > 0)
         {
             return verdict with
@@ -245,20 +308,23 @@ public static partial class MemberDifferentialOracle
             };
         }
         // #1667: a part one build reproduces on every input while the other build does not reproduce it on some input. The
-        // same code run twice in fresh contexts either is deterministic or is not; a conversion that turns a stable value
-        // into a changing one (or the reverse) is a behavior change, not noise to set aside.
-        if (unstableOn.FirstOrDefault(kv => (kv.Value.Original == 0) != (kv.Value.Converted == 0)) is { Key: { } oneSidedPart, Value.First: { } one })
+        // same code run in fresh contexts either is deterministic or is not; a conversion that turns a stable value into a
+        // changing one (or the reverse) is a behavior change, not noise to set aside. It is confirmed on more runs first.
+        var candidates = unstableOn.Where(kv => (kv.Value.Original == 0) != (kv.Value.Converted == 0))
+            .Select(kv => (Part: kv.Key, ConvertedUnstable: kv.Value.Original == 0)).ToList();
+        string? oneSidedNote = null;
+        if (candidates.Count > 0 && r.Length == 4)
         {
-            var (stableArm, unstableArm) = one.ConvertedUnstable ? ("original", "converted") : ("converted", "original");
-            return verdict with
-            {
-                Status = MemberStatus.Different, Inputs = executed,
-                Reason = $"ONE-SIDED-NONDETERMINISM: the {oneSidedPart} part is reproducible on every input of the {stableArm} build but not on the {unstableArm} build",
-                Witnesses = [$"{member.Member} {one.Label}: {stableArm} (both runs) {Excerpt(one.Stable)} | {Witness(member.Member, one.Label, one.X, one.Y, unstableArm + " run1", "run2")}"],
-                // The changing values never enter the fingerprint, so it is stable across runs.
-                Fingerprint = Hash($"ONE-SIDED\u0001{oneSidedPart}\u0001{unstableArm}\u0001{one.Label}\u0001{one.Stable}"),
-            };
+            needsConfirmation = true;
         }
+        else if (candidates.Count > 0)
+        {
+            if (ConfirmOneSided(member, r, n, candidates) is { } confirmed)
+                return verdict with { Status = MemberStatus.Different, Inputs = executed, Reason = confirmed.Reason, Witnesses = confirmed.Witnesses, Fingerprint = confirmed.Fingerprint };
+            oneSidedNote = $"one-sided instability in {string.Join(", ", candidates.Select(c => c.Part))} not confirmed by {ConfirmationRounds} more runs per build";
+        }
+        if (oneSidedNote is not null)
+            unstableNote = unstableNote is null ? oneSidedNote : unstableNote + "; " + oneSidedNote;
         // A part that could not be rendered in full may hide a difference: the member is never AGREE and never counts as
         // compared coverage (any stable difference elsewhere has already failed above).
         if (incompleteParts.Count > 0)
@@ -319,7 +385,8 @@ public static partial class MemberDifferentialOracle
     private static (string Outcome, MemberVerdict Verdict) Classify(MemberVerdict prefix, int k, ProbeResult[] original, ProbeResult[] converted, OracleOptions options)
     {
         var budget = options.MemberTimeout.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture);
-        string Describe(ProbeResult[] p) => string.Join("/", p.Select(x => x.Outcome + (x.Finished ? $"({StateRenderer.Invariant(x.Seconds)}s)" : "")));
+        string Describe(ProbeResult[] p) => string.Join("/", p.Select(x => x.Outcome
+            + (x.Finished ? $"({StateRenderer.Invariant(x.Seconds)}s)" : x.ExitCode is { } code ? $"(exit {code})" : "")));
         var summary = $"original {Describe(original)}, converted {Describe(converted)}";
         if (original.Concat(converted).Any(p => p.Outcome == ProbeOutcome.Infrastructure))
             return ("infrastructure:" + summary, prefix with { Status = MemberStatus.Inconclusive, Reason = $"input {k}: a replay never reached the input ({summary})" });
@@ -347,7 +414,8 @@ public static partial class MemberDifferentialOracle
             var parts = Parts(observation);
             return parts.TryGetValue("result", out var r) ? r : parts.TryGetValue("statics", out var st) ? st : observation;
         }
-        bool Consistent(ProbeResult[] p) => p.All(x => x.Outcome == p[0].Outcome && (!x.Finished || Primary(x.Observation) == Primary(p[0].Observation)));
+        bool Consistent(ProbeResult[] p) => p.All(x => x.Outcome == p[0].Outcome && x.ExitCode == p[0].ExitCode
+            && (!x.Finished || Primary(x.Observation) == Primary(p[0].Observation)));
         if (!Consistent(original) || !Consistent(converted))
             return ("nondeterministic:" + summary, prefix with { Status = MemberStatus.Nondeterministic, Reason = $"input {k} timed out or crashed, and its replays disagree ({summary})" });
         var quick = options.MemberTimeout.TotalSeconds / 4;
@@ -366,12 +434,12 @@ public static partial class MemberDifferentialOracle
         }
         // #1667: both builds fail, but differently (one hangs where the other crashes, reproduced twice each): the failure
         // itself changed, so it is a difference, not a shared timeout.
-        if (!o.Finished && !c.Finished && o.Outcome != c.Outcome)
+        if (!o.Finished && !c.Finished && (o.Outcome != c.Outcome || o.ExitCode != c.ExitCode))
         {
-            return ($"FAILURE-MODE:{o.Outcome}/{c.Outcome}", prefix with
+            return ($"FAILURE-MODE:{o.Outcome}{o.ExitCode}/{c.Outcome}{c.ExitCode}", prefix with
             {
                 Status = MemberStatus.Different, Reason = "FAILURE-MODE",
-                Fingerprint = Hash($"FAILURE-MODE\u0001{prefix.Key}\u0001{k}\u0001{o.Outcome}\u0001{c.Outcome}"),
+                Fingerprint = Hash($"FAILURE-MODE\u0001{prefix.Key}\u0001{k}\u0001{o.Outcome}{o.ExitCode}\u0001{c.Outcome}{c.ExitCode}"),
                 Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
             });
         }
@@ -381,6 +449,57 @@ public static partial class MemberDifferentialOracle
                 ? $"input {k} {o.Outcome} on both builds (replayed from clean state); the {prefix.Inputs} inputs before it agree"
                 : $"input {k} failed in the run but not when replayed ({summary}); the {prefix.Inputs} inputs before it agree",
         });
+    }
+
+    /// <summary>
+    /// #1667: confirms one-sided nondeterminism over every run (main and confirmation). A candidate part is confirmed when
+    /// the stable build rendered it identically on every one of its runs, for every input, and on some input the other
+    /// build produced at least two different values, none of them the stable build's. A low-entropy value that merely
+    /// repeated (a coin flip) fails the first test on more runs, or produces the stable value on the other build. The
+    /// fingerprint covers every affected input of every confirmed part (index, label, direction, stable value), never the
+    /// changing values, so it is reproducible and a newly affected input changes it.
+    /// </summary>
+    /// <summary>Whether every run of one build (the even runs are the original's) rendered part <paramref name="part"/> of input <paramref name="i"/> alike.</summary>
+    private static bool Reproduced(MemberRun[] r, int i, string part, bool original) =>
+        r.Where((_, j) => (j % 2 == 0) == original).Select(x => Parts(x.Observations[i]).GetValueOrDefault(part, "<absent>")).Distinct(StringComparer.Ordinal).Count() == 1;
+
+    private static (string Reason, List<string> Witnesses, string Fingerprint)? ConfirmOneSided(PlannedMember member, MemberRun[] r, int n,
+        List<(string Part, bool ConvertedUnstable)> candidates)
+    {
+        var confirmed = new List<(string Part, bool ConvertedUnstable, List<(string Label, string Stable, List<string> Values)> Affected)>();
+        foreach (var (part, convertedUnstable) in candidates)
+        {
+            var stableRuns = r.Where((_, j) => (j % 2 == 1) != convertedUnstable).ToArray();
+            var unstableRuns = r.Where((_, j) => (j % 2 == 1) == convertedUnstable).ToArray();
+            var affected = new List<(string, string, List<string>)>();
+            var holds = true;
+            for (var i = 0; i < n && holds; i++)
+            {
+                var stable = stableRuns.Select(x => Parts(x.Observations[i]).GetValueOrDefault(part, "<absent>")).Distinct(StringComparer.Ordinal).ToList();
+                if (stable.Count != 1)
+                {
+                    holds = false;
+                    continue;
+                }
+                var values = unstableRuns.Select(x => Parts(x.Observations[i]).GetValueOrDefault(part, "<absent>")).Distinct(StringComparer.Ordinal).ToList();
+                if (values.Count >= 2 && !values.Contains(stable[0], StringComparer.Ordinal))
+                    affected.Add(($"#{member.Offset + i} " + MemberOracleInputs.Render(member.Inputs[i]), stable[0], values));
+            }
+            if (holds && affected.Count > 0)
+                confirmed.Add((part, convertedUnstable, affected));
+        }
+        if (confirmed.Count == 0)
+            return null;
+        string Arm(bool convertedUnstable, bool stable) => convertedUnstable == stable ? "original" : "converted";
+        var first = confirmed[0];
+        var reason = "ONE-SIDED-NONDETERMINISM: " + string.Join("; ", confirmed.Select(c =>
+            $"the {c.Part} part is reproducible on every run of the {Arm(c.ConvertedUnstable, true)} build but changes on {c.Affected.Count} input(s) of the {Arm(c.ConvertedUnstable, false)} build"));
+        var witnesses = confirmed.Select(c =>
+            $"{member.Member} {c.Affected[0].Label} [{c.Part}]: {Arm(c.ConvertedUnstable, true)} (every run) {Excerpt(c.Affected[0].Stable)} | "
+            + $"{Arm(c.ConvertedUnstable, false)} {string.Join(" / ", c.Affected[0].Values.Take(2).Select(Excerpt))}").ToList();
+        var fingerprint = Hash("ONE-SIDED\u0001" + string.Join("\u0000", confirmed.SelectMany(c =>
+            c.Affected.Select(a => $"{c.Part}\u0001{Arm(c.ConvertedUnstable, false)}\u0001{a.Label}\u0001{a.Stable}"))));
+        return (reason, witnesses, fingerprint);
     }
 
     private static string Excerpt(string s) => s.Length <= 200 ? s : s[..200] + "…";

@@ -777,4 +777,205 @@ public class MemberOracleAuditTests
         Assert.Null(Of(MemberStatus.Timeout, "prefix", inputs: 5));
         Assert.Null(Of(MemberStatus.Different, "OBSERVATION"));
     }
+
+    // ---- Codex round 1 (#1667) --------------------------------------------------------------------------------
+
+    /// <summary>The console routers outlive load contexts: a NewLine the original set must not carry into the converted run.</summary>
+    [Fact]
+    public void Console_WriterStateDoesNotLeakBetweenBuilds()
+    {
+        var verdicts = Compare("public static class S { public static void F() { System.Console.Out.NewLine = \"!\"; System.Console.WriteLine(\"x\"); } }",
+            "public static class S { public static void F() { System.Console.WriteLine(\"x\"); } }", ["S"]);
+        AssertDifferent(Single(verdicts, "static F()->System.Void"), "[stdout]");
+    }
+
+    /// <summary>Identical low-entropy randomness (a coin flip repeats by chance) is never a one-sided difference.</summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void LowEntropyRandomness_OnIdenticalBuilds_IsNeverDifferent(int outcomes)
+    {
+        var source = "public static class S { public static int F() => System.Random.Shared.Next(" + outcomes + "); }";
+        for (var attempt = 0; attempt < 4; attempt++)
+            Assert.NotEqual(MemberStatus.Different, Single(Compare(source, source, ["S"]), "static F()->System.Int32").Status);
+    }
+
+    /// <summary>A one-sided fingerprint covers every affected input, so a baseline stops matching when another input is affected.</summary>
+    [Fact]
+    public void OneSidedNondeterminism_FingerprintCoversEveryAffectedInput()
+    {
+        const string original = "public static class S { public static string F(bool b) => \"fixed\"; }";
+        var onlyFalse = Single(Compare(original, "public static class S { public static string F(bool b) => b ? \"fixed\" : System.Guid.NewGuid().ToString(); }", ["S"]),
+            "static F(System.Boolean)->System.String");
+        var both = Single(Compare(original, "public static class S { public static string F(bool b) => System.Guid.NewGuid().ToString(); }", ["S"]),
+            "static F(System.Boolean)->System.String");
+        AssertDifferent(onlyFalse);
+        AssertDifferent(both);
+        Assert.NotEqual(onlyFalse.Fingerprint, both.Fingerprint);
+    }
+
+    /// <summary>The storage of a private static auto-property is private state too.</summary>
+    [Fact]
+    public void PrivateStaticAutoProperty_WrittenAfterItsOnlyReader_IsDifferent()
+    {
+        var verdicts = Compare("public static class S { static int N { get; set; } public static int Get() => N; public static void Set(int x) { N = x * 2; } }",
+            "public static class S { static int N { get; set; } public static int Get() => N; public static void Set(int x) { N = x * 3; } }", ["S"]);
+        AssertDifferent(Single(verdicts, "static Set(System.Int32)->System.Void"), "N (auto-property)");
+    }
+
+    /// <summary>A private delegate the generator can call is called, so a replaced callback whose only reader ran earlier is seen.</summary>
+    [Fact]
+    public void PrivateStaticCallableDelegate_ReplacedAfterItsOnlyReader_IsDifferent()
+    {
+        const string head = "public static class S { static System.Func<int> cache = () => 0; public static int Get() => cache(); public static void Set(int x) { cache = () => ";
+        var verdicts = Compare(head + "x; } }", head + "x + 1; } }", ["S"]);
+        AssertDifferent(Single(verdicts, "static Set(System.Int32)->System.Void"), "[private-statics]");
+    }
+
+    /// <summary>A suffix segment shares its member's sandbox, so it sees the files the earlier inputs wrote.</summary>
+    [Fact]
+    public void SuffixSegment_SeesTheFilesTheMembersEarlierInputsWrote()
+    {
+        const string body = "if (n == 0) System.IO.File.WriteAllText(\"marker\", \"x\"); if (n == int.MaxValue) System.Threading.Thread.Sleep(4000); "
+            + "return n == int.MinValue && System.IO.File.Exists(\"marker\") ? ";
+        var verdicts = Compare("public static class S { public static int F(int n) { " + body + "1 : 0; } }",
+            "public static class S { public static int F(int n) { " + body + "2 : 0; } }", ["S"], timeoutSeconds: 1);
+        AssertDifferent(Single(verdicts, "static F(System.Int32)->System.Int32 [inputs 14..]"), "#14");
+    }
+
+    /// <summary>A segment that itself times out is replayed like any member (the probe derives the same segments).</summary>
+    [Fact]
+    public void SuffixSegment_ThatTimesOut_IsReplayedAndTheNextSegmentCompared()
+    {
+        const string slow = "if (n == int.MaxValue || n == int.MinValue) System.Threading.Thread.Sleep(4000);";
+        var verdicts = Compare("public static class S { public static int F(int n) { " + slow + " return n; } }",
+            "public static class S { public static int F(int n) { " + slow + " return n < -100 && n > -1000 ? n + 1 : n; } }", ["S"], timeoutSeconds: 1);
+        var segment = Single(verdicts, "static F(System.Int32)->System.Int32 [inputs 14..]");
+        Assert.Equal(MemberStatus.Timeout, segment.Status);
+        Assert.Contains("on both builds (replayed from clean state)", segment.Reason, StringComparison.Ordinal);
+        AssertDifferent(Single(verdicts, "static F(System.Int32)->System.Int32 [inputs 15..]"));
+    }
+
+    /// <summary>A member and its segments are one member for coverage and skips: segments never inflate either count.</summary>
+    [Fact]
+    public void Segments_CountOnceForCoverageAndSkips()
+    {
+        MemberVerdict V(string member, string status, int inputs, string? origin = null, string? reason = null) =>
+            new() { Type = "T", Member = member, Kind = "static", Status = status, Inputs = inputs, Origin = origin, Reason = reason };
+        var file = new OracleFileReport
+        {
+            File = "a.cs", Status = "exercised",
+            Members =
+            [
+                V("F()", MemberStatus.Timeout, 0),
+                V("F() [inputs 1..]", MemberStatus.Agree, 5, origin: "F()"),
+                V("F() [inputs 7..]", MemberStatus.Agree, 5, origin: "F()"),
+                V("G()", MemberStatus.Timeout, 0),
+                V("G() [inputs 1..]", MemberStatus.Timeout, 0, origin: "G()"),
+            ],
+        };
+        Assert.Equal(1, OracleRunner.Compared(file));
+        Assert.Equal(new Dictionary<string, int> { ["timeout"] = 1 }, OracleRunner.SkipDistributionOf([file]));
+    }
+
+    /// <summary>A subject that throws a wrapper exception keeps the wrapper: only the oracle's own reflection wrapper is removed.</summary>
+    [Fact]
+    public void SubjectThrownWrapperExceptions_AreKept()
+    {
+        const string original = "public static class S { public static void F() => throw new System.InvalidOperationException(\"m\"); }";
+        AssertDifferent(Single(Compare(original,
+            "public static class S { public static void F() => throw new System.AggregateException(\"changed\", new System.InvalidOperationException(\"m\")); }", ["S"]),
+            "static F()->System.Void"), "AggregateException");
+        AssertDifferent(Single(Compare(original,
+            "public static class S { public static void F() => throw new System.Reflection.TargetInvocationException(new System.InvalidOperationException(\"m\")); }", ["S"]),
+            "static F()->System.Void"), "TargetInvocationException");
+    }
+
+    /// <summary>A faulted task keeps a subject AggregateException inside the task's own wrapper.</summary>
+    [Fact]
+    public void FaultedTask_SubjectAggregateException_IsKept()
+    {
+        const string head = "public static class S { public static async System.Threading.Tasks.Task F() { await System.Threading.Tasks.Task.Yield(); throw ";
+        var verdicts = Compare(head + "new System.InvalidOperationException(\"m\"); } }",
+            head + "new System.AggregateException(\"changed\", new System.InvalidOperationException(\"m\")); } }", ["S"]);
+        AssertDifferent(Single(verdicts, "static F()->System.Threading.Tasks.Task"), "AggregateException");
+    }
+
+    /// <summary>Two crashes with different exit codes are a difference; a build whose crashes disagree is nondeterministic.</summary>
+    [Fact]
+    public void Replay_CrashesWithDifferentExitCodes()
+    {
+        var prefix = new MemberVerdict { Type = "T", Member = "F()", Kind = "static", Status = MemberStatus.Timeout, LimitedAt = 3, Inputs = 3 };
+        var options = new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) };
+        ProbeResult Crash(int code) => new(ProbeOutcome.Crashed, 0, $"probe process exit {code}", ExitCode: code);
+        var different = MemberDifferentialOracle.ClassifyTimeout(prefix, [Crash(11), Crash(11)], [Crash(12), Crash(12)], options);
+        Assert.Equal(MemberStatus.Different, different.Status);
+        Assert.Equal("FAILURE-MODE", different.Reason);
+        Assert.Equal(MemberStatus.Timeout, MemberDifferentialOracle.ClassifyTimeout(prefix, [Crash(11), Crash(11)], [Crash(11), Crash(11)], options).Status);
+        Assert.Equal(MemberStatus.Nondeterministic, MemberDifferentialOracle.ClassifyTimeout(prefix, [Crash(11), Crash(12)], [Crash(12), Crash(12)], options).Status);
+    }
+
+    /// <summary>A file name with the observation's separators is escaped, so it cannot replace another part.</summary>
+    [Fact]
+    public void DirectoryNameWithSeparators_CannotReplaceAPart()
+    {
+        const string dir = "System.IO.Directory.CreateDirectory(\"\\u001eresult\\u001freturn=0\");";
+        var verdicts = Compare("public static class S { public static int F() { " + dir + " return 1; } }", "public static class S { public static int F() { " + dir + " return 2; } }", ["S"]);
+        AssertDifferent(Single(verdicts, "static F()->System.Int32"), "[result]");
+    }
+
+    [Fact]
+    public void Parts_RepeatedNameNeverOverwritesTheFirst()
+    {
+        var parts = MemberDifferentialOracle.Parts(Obs(("result", "return=1"), ("files", "x"), ("result", "return=0")));
+        Assert.Equal("return=1", parts["result"]);
+        Assert.Equal("return=0", parts["result#2"]);
+    }
+
+    /// <summary>The sandbox root renders as a token no literal string can produce.</summary>
+    [Fact]
+    public void SandboxRoot_DoesNotAliasALiteral()
+    {
+        const string original = "public static class S { public static string F() => System.IO.Directory.GetCurrentDirectory(); }";
+        AssertDifferent(Single(Compare(original, "public static class S { public static string F() => \"<sandbox>\"; }", ["S"]), "static F()->System.String"));
+        AssertDifferent(Single(Compare(original, "public static class S { public static string F() => \"§sandbox§\"; }", ["S"]), "static F()->System.String"));
+        Assert.Equal(MemberStatus.Agree, Single(Compare(original, original, ["S"]), "static F()->System.String").Status);
+    }
+
+    /// <summary>An abstract declaration is surface: changing its signature, or making it concrete, is a difference.</summary>
+    [Fact]
+    public void AbstractDeclaration_SignatureChange_IsASurfaceDifference()
+    {
+        var changed = Compare("public abstract class A { public abstract int F(); }", "public abstract class A { public abstract string F(); }", ["A"]);
+        Assert.Contains(changed, v => v.Type == "A" && v.Member.StartsWith("abstract F()", StringComparison.Ordinal) && v.Reason == "SURFACE");
+        var concrete = Compare("public abstract class A { public abstract int F(); }", "public abstract class A { public virtual int F() => 0; }", ["A"]);
+        Assert.Contains(concrete, v => v.Type == "A" && v.Reason == "SURFACE");
+        var same = Compare("public abstract class A { public abstract int F(); }", "public abstract class A { public abstract int F(); }", ["A"]);
+        AssertExcluded(Single(same, "A", "abstract F()->System.Int32"), "surface-only");
+    }
+
+    /// <summary>A delegate type is surface: a changed signature is a difference, not a dropped type.</summary>
+    [Fact]
+    public void DelegateType_SignatureChange_IsASurfaceDifference()
+    {
+        var verdicts = Compare("public delegate int Handler(int x);", "public delegate long Handler(int x);", ["Handler"]);
+        Assert.Contains(verdicts, v => v.Type == "Handler" && v.Reason == "SURFACE");
+    }
+
+    /// <summary>A reviewed baseline entry tolerates a file failure only with the same fingerprint; any change fails.</summary>
+    [Fact]
+    public void Gate_BaselinedFileFailure_PassesOnlyWithTheSameFingerprint()
+    {
+        OracleProjectReport Report(string detail) => new()
+        {
+            Project = "P", Files = { new OracleFileReport { File = "a.cs", Status = "candidate-build-failed", Detail = detail } },
+        };
+        var same = Report("dotnet build failed (1): error CS0103: The name 'Foo' does not exist");
+        var entry = new OracleBaselineEntry { Project = "P", File = "a.cs", Member = "<file>", Finding = "f", Fingerprint = OracleRunner.FailureFingerprint(same.Files[0]), Witness = "w" };
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [entry] }, new OracleExpected(), same, ["a.cs"], new HashSet<string> { "a.cs" });
+        Assert.True(same.Passed);
+        var changed = Report("dotnet build failed (1): error CS0103: The name 'Bar' does not exist");
+        OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [entry] }, new OracleExpected(), changed, ["a.cs"], new HashSet<string> { "a.cs" });
+        Assert.Contains(changed.Gate, g => g.Decision == "baseline-changed");
+    }
 }

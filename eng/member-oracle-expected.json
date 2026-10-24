@@ -94,14 +94,14 @@
       "src/Serilog/Rendering/Casing.cs": 424
     },
     "Synthetic": {
-      "SyntheticLib/Calculator.cs": 47,
-      "SyntheticLib/DateHelper.cs": 47,
-      "SyntheticLib/FizzBuzz.cs": 47,
-      "SyntheticLib/StringUtils.cs": 47,
-      "SyntheticLib/Temperature.cs": 47
+      "SyntheticLib/Calculator.cs": 41,
+      "SyntheticLib/DateHelper.cs": 41,
+      "SyntheticLib/FizzBuzz.cs": 41,
+      "SyntheticLib/StringUtils.cs": 41,
+      "SyntheticLib/Temperature.cs": 41
     },
     "Synthetic2": {
-      "GeoLib/Grid.cs": 11
+      "GeoLib/Grid.cs": 10
     }
   },
   "skips": {
@@ -110,6 +110,7 @@
       "no-receiver": 289,
       "abstract-receiver": 83,
       "interface-member": 166,
+      "surface-only": 13,
       "open-generic": 12,
       "incomplete-observation": 7
     },
@@ -117,6 +118,7 @@
       "unsupported-parameter": 26,
       "no-receiver": 22,
       "interface-member": 16,
+      "surface-only": 10,
       "open-generic": 13
     },
     "Serilog": {
@@ -124,6 +126,7 @@
       "no-receiver": 246,
       "abstract-receiver": 2,
       "interface-member": 93,
+      "surface-only": 3,
       "open-generic": 7,
       "byref-return": 1,
       "incomplete-observation": 5

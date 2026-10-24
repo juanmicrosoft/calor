@@ -104,8 +104,20 @@ internal static class OraclePlanner
         foreach (var candidate in types.Where(t => t is not null).Distinct().OrderBy(t => t!.FullName, StringComparer.Ordinal))
         {
             var type = candidate!;
-            if (IsCompilerGenerated(type) || typeof(Delegate).IsAssignableFrom(type))
+            if (IsCompilerGenerated(type))
                 continue;
+            if (typeof(Delegate).IsAssignableFrom(type))
+            {
+                // #1667: a delegate type has no behavior of its own, but its signature is surface: a changed Invoke
+                // signature is a difference, not a silently dropped type.
+                if (planned.Add(StateRenderer.TypeName(type)))
+                {
+                    plan.Add(new PlannedMember(StateRenderer.TypeName(type), "<hierarchy>", "hierarchy", [], null) { Hierarchy = Hierarchy(type) });
+                    if (type.GetMethod("Invoke") is { } invoke)
+                        plan.Add(new PlannedMember(StateRenderer.TypeName(type), MethodKey(type, invoke), "delegate-signature", [], "delegate type (surface only)"));
+                }
+                continue;
+            }
             if (type.IsGenericTypeDefinition)
             {
                 var closings = CloseTypes(type);
@@ -136,6 +148,15 @@ internal static class OraclePlanner
             foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                          .OrderBy(m => MethodKey(type, m), StringComparer.Ordinal))
                 plan.Add(new PlannedMember(typeName, MethodKey(type, m), "interface-member", [], "interface member (surface; driven through implementing types)"));
+        }
+
+        if (type is { IsInterface: false, IsAbstract: true, IsSealed: false })
+        {
+            // #1667: abstract declarations have no body to drive, but their signatures are surface: changing one is a
+            // difference, and the implementations are driven through the concrete types.
+            foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Where(m => m.IsAbstract)
+                         .OrderBy(m => MethodKey(type, m), StringComparer.Ordinal))
+                plan.Add(new PlannedMember(typeName, "abstract " + MethodKey(type, m), "abstract-member", [], "abstract member (surface; driven through implementing types)"));
         }
 
         if (!type.IsInterface && (!type.IsAbstract || type.IsValueType))

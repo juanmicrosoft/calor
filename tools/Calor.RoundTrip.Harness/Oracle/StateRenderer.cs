@@ -214,23 +214,41 @@ public static partial class StateRenderer
     /// </summary>
     internal static volatile string? SandboxRoot;
 
-    internal static string NormalizeSandbox(string s)
+    /// <summary>
+    /// Stands for the sandbox root in a rendered string. It is written after escaping, and escaping turns every
+    /// non-ASCII character into <c>\uXXXX</c>, so a literal <c>§</c> (or the text <c>&lt;sandbox&gt;</c>) in a
+    /// subject string can never render as this token: the real directory and a lookalike literal never alias.
+    /// </summary>
+    internal const string SandboxToken = "§sandbox§";
+
+    private static void Escape(StringBuilder into, char c) =>
+        into.Append(c is '"' or '\\' ? "\\" + c : c < 0x20 || c > 0x7e ? $"\\u{(int)c:x4}" : c.ToString());
+
+    private static string Escaped(string s)
     {
-        if (SandboxRoot is not { Length: > 0 } root || !s.Contains(Path.GetFileName(root), StringComparison.Ordinal))
-            return s;
-        // macOS resolves /var to /private/var, so a path can come back in either spelling.
-        var resolved = root.StartsWith("/var/", StringComparison.Ordinal) ? "/private" + root : root;
-        return s.Replace(resolved, "<sandbox>", StringComparison.Ordinal).Replace(root, "<sandbox>", StringComparison.Ordinal);
+        var sb = new StringBuilder(s.Length + 16);
+        foreach (var c in s)
+            Escape(sb, c);
+        return sb.ToString();
     }
 
     private static void AppendString(Sink sb, string s)
     {
-        s = NormalizeSandbox(s);
         sb.Append('"');
+        if (SandboxRoot is { Length: > 0 } root && s.Contains(Path.GetFileName(root), StringComparison.Ordinal))
+        {
+            // macOS resolves /var to /private/var, so a path can come back in either spelling.
+            var escaped = Escaped(s);
+            if (root.StartsWith("/var/", StringComparison.Ordinal))
+                escaped = escaped.Replace(Escaped("/private" + root), SandboxToken, StringComparison.Ordinal);
+            sb.Append(escaped.Replace(Escaped(root), SandboxToken, StringComparison.Ordinal));
+            sb.Append('"');
+            return;
+        }
         var chunk = new StringBuilder(Math.Min(s.Length, 8192) + 16);
         foreach (var c in s)
         {
-            chunk.Append(c is '"' or '\\' ? "\\" + c : c < 0x20 || c > 0x7e ? $"\\u{(int)c:x4}" : c.ToString());
+            Escape(chunk, c);
             if (chunk.Length >= 8192)
             {
                 sb.Append(chunk.ToString());
@@ -239,6 +257,14 @@ public static partial class StateRenderer
         }
         sb.Append(chunk.ToString());
         sb.Append('"');
+    }
+
+    /// <summary>A string as the renderer writes it (quoted and escaped), for text the oracle itself puts in a part.</summary>
+    internal static string Quoted(string s)
+    {
+        var sink = new Sink();
+        AppendString(sink, s);
+        return sink.Result();
     }
 
     private static bool OverridesToString(Type type)
@@ -265,8 +291,16 @@ public static partial class StateRenderer
         sb.Append("Task(" + task.Status);
         if (task.IsFaulted)
         {
+            // The task's AggregateException is the task's own wrapper; every exception it holds is the subject's, and is
+            // rendered whole (a subject AggregateException inside it keeps its message and data).
             sb.Append(", !");
-            Append(sb, Unwrap(task.Exception!), depth);
+            var inner = task.Exception!.InnerExceptions;
+            for (var i = 0; i < inner.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(", ");
+                Append(sb, inner[i], depth);
+            }
         }
         else if (task.Status == TaskStatus.RanToCompletion && task.GetType().IsGenericType
             && task.GetType().GetProperty("Result") is { } result && result.PropertyType.FullName != "System.Threading.Tasks.VoidTaskResult")
@@ -285,7 +319,7 @@ public static partial class StateRenderer
         }
         catch (Exception ex)
         {
-            return Task.FromException(Unwrap(ex));
+            return Task.FromException(StripInvocation(ex));
         }
     }
 
@@ -350,13 +384,21 @@ public static partial class StateRenderer
         sb.Append(')');
     }
 
-    /// <summary>A thrown exception, as <c>throw(...)</c>: the full exception rendering, so its message and data count.</summary>
+    /// <summary>
+    /// A thrown exception, as <c>throw(...)</c>: the full exception rendering, so its message and data count. Only the
+    /// one <see cref="TargetInvocationException"/> that the oracle's own reflection call adds is removed; whatever the
+    /// subject threw, a <see cref="TargetInvocationException"/> or a single-inner <see cref="AggregateException"/>
+    /// included, is rendered whole.
+    /// </summary>
     internal static void AppendThrown(Sink sb, Exception thrown, int depth, string prefix = "throw")
     {
         sb.Append(prefix + "(");
-        AppendException(sb, Unwrap(thrown), depth);
+        AppendException(sb, StripInvocation(thrown), depth);
         sb.Append(')');
     }
+
+    /// <summary>Removes the single reflection wrapper (<c>MethodBase.Invoke</c>, <c>DynamicInvoke</c>, <c>PropertyInfo.GetValue</c>).</summary>
+    internal static Exception StripInvocation(Exception ex) => ex is TargetInvocationException { InnerException: { } inner } ? inner : ex;
 
     /// <summary>The element type of an <c>IAsyncEnumerable&lt;T&gt;</c> the value implements.</summary>
     private static Type? AsyncItemType(Type type) =>

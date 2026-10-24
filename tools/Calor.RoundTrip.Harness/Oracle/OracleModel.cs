@@ -45,8 +45,15 @@ public sealed record MemberVerdict
     /// <summary>The member was limited to its first <c>LimitedAt</c> inputs because input <c>LimitedAt</c> timed out.</summary>
     public int? LimitedAt { get; init; }
 
+    /// <summary>#1667: for a suffix segment, the member it continues (null for the member itself).</summary>
+    public string? Origin { get; init; }
+
     [JsonIgnore]
     public string Key => Type + "::" + Member;
+
+    /// <summary>The member as the subject declares it: coverage and skips are counted per origin, never per segment.</summary>
+    [JsonIgnore]
+    public string OriginKey => Type + "::" + (Origin ?? Member);
 }
 
 public sealed record OracleOptions
@@ -107,7 +114,7 @@ public static class SkipCategory
     /// <summary>Every category, in report order.</summary>
     public static readonly string[] All =
     [
-        "unsupported-parameter", "no-receiver", "abstract-receiver", "interface-member", "open-generic", "byref-return",
+        "unsupported-parameter", "no-receiver", "abstract-receiver", "interface-member", "surface-only", "open-generic", "byref-return",
         "incomplete-observation", "no-input-compared", "nondeterministic", "timeout", "inconclusive", "other",
     ];
 
@@ -133,6 +140,7 @@ public static class SkipCategory
             : Starts("no public constructor") || Starts("no generated input constructs a receiver") || Starts("receiver construction timed out") ? "no-receiver"
             : Starts("instance member of an abstract type") ? "abstract-receiver"
             : Starts("instance member of an interface") || Starts("interface member") ? "interface-member"
+            : Starts("abstract member") || Starts("delegate type") ? "surface-only"
             : Starts("open generic type") || Starts("generic method (no closing") ? "open-generic"
             : Starts("by-ref or ref-struct return") ? "byref-return"
             : Starts("incomplete observation") ? "incomplete-observation"
@@ -157,8 +165,9 @@ public static class ProbeOutcome
     public const string Infrastructure = "infrastructure";
 }
 
-/// <summary>One replay of a member up to a single input, from clean state, to attribute a timeout or crash.</summary>
-public sealed record ProbeResult(string Outcome, double Seconds, string? Observation)
+/// <summary>One replay of a member up to a single input, from clean state, to attribute a timeout or crash. A crashed
+/// replay carries its process exit code (#1667), so two different crashes are told apart.</summary>
+public sealed record ProbeResult(string Outcome, double Seconds, string? Observation, int? ExitCode = null)
 {
     public bool Finished => Outcome == ProbeOutcome.Finished;
 }

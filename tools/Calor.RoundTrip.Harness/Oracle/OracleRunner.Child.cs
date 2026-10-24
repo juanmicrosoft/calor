@@ -225,7 +225,9 @@ public sealed partial class OracleRunner
             return JsonSerializer.Deserialize<ProbeResult>(await File.ReadAllTextAsync(probe + ".json", cancellationToken), Json)!;
         var reached = File.Exists(probe + ".started");
         var why = $"probe process exit {exit}: {(stderr.Length > 200 ? stderr[^200..] : stderr).Trim()}";
-        return new ProbeResult(!reached ? ProbeOutcome.Infrastructure : exit == -1 ? ProbeOutcome.Hung : ProbeOutcome.Crashed, 0, why);
+        return !reached ? new ProbeResult(ProbeOutcome.Infrastructure, 0, why)
+            : exit == -1 ? new ProbeResult(ProbeOutcome.Hung, 0, why)
+            : new ProbeResult(ProbeOutcome.Crashed, 0, why, ExitCode: exit);
     }
 
     // ---- Child side ------------------------------------------------------------------------------
