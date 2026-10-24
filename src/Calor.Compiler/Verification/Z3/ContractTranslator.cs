@@ -1966,9 +1966,10 @@ public sealed class ContractTranslator
             return null;
         if (node.Arguments.Count >= 3)
         {
-            // #1413 review: the emitter drops the start index (it emits s.IndexOf(t, mode)), so
-            // the solver's indexof-from-start would describe a different call.
-            return Refuse("IndexOf with a start index is not modeled: the emitted call ignores the start");
+            // #1413 review / #1608: the emitter now passes the start index (and count) through,
+            // but .NET throws for an out-of-range start while Z3's indexof returns -1, so the
+            // forms with a start index stay unmodeled.
+            return Refuse("IndexOf with a start index is not modeled: .NET throws for an out-of-range start, the solver does not");
         }
 
         var str = Translate(node.Arguments[0]);

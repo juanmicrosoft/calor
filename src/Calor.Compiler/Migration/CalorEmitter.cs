@@ -1929,12 +1929,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             && (node.TypeName is null or "var" || node.TypeName.StartsWith("ARRAY[", StringComparison.Ordinal)
                 || OneDimensional(node.TypeName) == OneDimensional(arrNode.ElementType + "[]")))
         {
-            EmitArrayCreationWithName(arrNode, node.Name);
+            EmitArrayCreationWithName(arrNode, node.Name, node.IsMutable);
             return "";
         }
         if (node.Initializer is MultiDimArrayCreationNode mdArrNode)
         {
-            EmitMultiDimArrayCreationWithName(mdArrNode, node.Name, node.TypeName);
+            EmitMultiDimArrayCreationWithName(mdArrNode, node.Name, node.TypeName, node.IsMutable);
             return "";
         }
 
@@ -1958,8 +1958,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            var typePrefix = mappedType != null ? $"{mappedType}:" : "";
-            bindHeader = $"§B{{{typePrefix}{EscapeCalorIdentifier(node.Name)}}}";
+            // #1635: a one-letter or all-caps type (`T item`) spelled type-first read back as a
+            // variable `T` of type `item`; pick the header spelling the parser reads correctly.
+            var escapedName = EscapeCalorIdentifier(node.Name);
+            bindHeader = mappedType != null
+                ? $"§B{{{AttributeHelper.FormatImmutableBindHeader(escapedName, mappedType)}}}"
+                : $"§B{{{escapedName}}}";
         }
 
         // Position 7 (§3.3): the row sits between the header group and the initializer.
@@ -2147,7 +2151,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         EmitBlockEnd($"§/HSET{{{variableName}}}");
     }
 
-    private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName)
+    /// <summary>
+    /// #1550/#1635: the fields of a typed <c>§B</c> header. A mutable binding is name-first
+    /// with <c>~</c>; an immutable one uses the spelling the parser reads back unchanged.
+    /// </summary>
+    private static string BindHeaderFields(string name, string type, bool isMutable) =>
+        isMutable ? $"~{name}:{type}" : AttributeHelper.FormatImmutableBindHeader(name, type);
+
+    private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName, bool isMutable = false)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
         // #1132: `[T]` cannot spell an array of arrays (`[i32[]]` does not parse).
@@ -2182,19 +2193,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // #1132: a complex size is quoted in place, not hoisted (a hoisted size ran
             // before the statement's earlier reads).
             var size = EmitSizeAttribute(node.Size);
-            AppendLine($"§B{{{arrayType}:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
+            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §ARR{{{elementType}:{variableName}:{size}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else
         {
-            AppendLine($"§B{{{arrayType}:{variableName}}} §C{{Array.Empty<{elementType}>}} §/C");
+            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §C{{Array.Empty<{elementType}>}} §/C");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
     }
 
-    private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName)
+    private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName, bool isMutable = false)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
         var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : ArrayOf(elementType, $"[{new string(',', Math.Max(node.Rank - 1, 0))}]");
@@ -2214,7 +2225,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
                 : "";
             var rows = RenderMultiDimRows(node);
-            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}{dims}}}");
+            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{node.Id}:{variableName}:{elementType}{dims}}}");
             Indent();
             foreach (var row in rows)
                 AppendLine($"§ROW {row}");
@@ -2228,14 +2239,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // #1132: complex sizes are quoted in place, in order; hoisting only some of
             // them ran a call before an earlier size was read (`new int[n, Next()]`).
             var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
-            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
+            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else
         {
             var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
+            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
         }
     }
 

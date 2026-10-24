@@ -1788,7 +1788,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "name");
             funcName = "";
         }
-        var visibility = ParseVisibility(visibilityStr);
+        var visibility = ParseVisibility(visibilityStr, startToken.Span);
 
         // NEW: Parse optional type parameters §F{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -1996,7 +1996,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AF", "name");
             funcName = "";
         }
-        var visibility = ParseVisibility(visibilityStr);
+        var visibility = ParseVisibility(visibilityStr, startToken.Span);
 
         // Parse optional type parameters §AF{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -3735,6 +3735,16 @@ public sealed class Parser
         if (args.Count >= 2)
         {
             var binaryOp = BinaryOperatorExtensions.FromString(opText);
+            if (binaryOp.HasValue && args.Count > 2 && !IsChainableBinaryOperator(binaryOp.Value))
+            {
+                // #1608: `(< a b c)` would chain to `(a < b) < c` and `(** a b c)` to
+                // `(a ** b) ** c`, neither of which is what the variadic form suggests.
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
+                    $"Operator '{opText}' takes exactly 2 operands, got {args.Count}. " +
+                    "Only + - * / % && || & | ^ << >> chain left over more operands; " +
+                    "combine comparisons explicitly, e.g. (&& (< a b) (< b c)).");
+                return new BinaryOperationNode(span, binaryOp.Value, args[0], args[1]);
+            }
             if (binaryOp.HasValue)
             {
                 // For more than 2 arguments, chain them: (+ a b c) => ((a + b) + c)
@@ -4202,6 +4212,17 @@ public sealed class Parser
                 return (token.Kind, text, span);
         }
     }
+
+    /// <summary>
+    /// #1608: binary operators whose variadic form <c>(op a b c)</c> means the left fold
+    /// <c>((a op b) op c)</c>. Comparisons and power are excluded: their fold is not what
+    /// the form suggests, so more than two operands is an arity error.
+    /// </summary>
+    private static bool IsChainableBinaryOperator(BinaryOperator op) => op is not (
+        BinaryOperator.Equal or BinaryOperator.NotEqual
+        or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
+        or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual
+        or BinaryOperator.Power);
 
     private bool IsUnaryOperator(TokenKind kind)
     {
@@ -6302,6 +6323,27 @@ public sealed class Parser
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BIND", "name");
         }
+        else if (attrs["_pos2"] is { } third && (third is not ("const" or "mut") || attrs["_pos3"] != null)
+                 && (attrs["_pos1"] ?? "").Count(c => c == '<') <= (attrs["_pos1"] ?? "").Count(c => c == '>'))
+        {
+            // #1635 review: a surplus field used to be ignored, so `§B{W:t:bogus}` (or the legacy
+            // `{id:name:type}` spelling) silently declared `W` of type `t`.
+            _diagnostics.ReportError(attrs.GetSpan("_pos2") ?? startToken.Span, DiagnosticCode.TypeFirstBindingHeader,
+                $"Binding header field '{third}' is not understood. A binding header is §B{{name}}, §B{{name:type}}, " +
+                "§B{~name:type}, or the explicit type-first forms §B{type:name:const} and §B{type:name:mut}.");
+        }
+        else if (attrs["_pos2"] == null
+                 && AttributeHelper.IsAmbiguousTypeFirstBindHeader(attrs["_pos0"] ?? "", attrs["_pos1"]))
+        {
+            // #1635: `§B{W:t}` used to declare a variable `W` of type `t`.
+            var pos0 = attrs["_pos0"];
+            var pos1 = attrs["_pos1"];
+            _diagnostics.ReportError(attrs.GetSpan("_pos0") ?? startToken.Span, DiagnosticCode.TypeFirstBindingHeader,
+                $"Binding header '§B{{{pos0}:{pos1}}}' is ambiguous. A two-field header is read name-first " +
+                $"unless the first field is a built-in or PascalCase type, so this would declare a variable '{pos0}' " +
+                $"of type '{pos1}'. If '{pos0}' is the type, write the name first: §B{{{pos1}:{pos0}}} " +
+                $"(or §B{{~{pos1}:{pos0}}} for a mutable binding).");
+        }
 
         // Position 7 (§3.3): §B{f:Func<i32,i32>} §E{cw} <init>. The row sits between the
         // header group and the initializer. TokenKind.Effects is not an expression start
@@ -7675,18 +7717,51 @@ public sealed class Parser
         return value;
     }
 
-    private static Visibility ParseVisibility(string? value)
+    /// <summary>
+    /// The visibility words the parser accepts, in the order the
+    /// <see cref="DiagnosticCode.UnknownVisibility"/> message lists them.
+    /// </summary>
+    internal const string ValidVisibilityWords =
+        "pub/public, int/internal, prot/pro/protected, priv/pri/private, " +
+        "prot-int/protected-internal, priv-prot/private-protected";
+
+    /// <summary>
+    /// Maps a visibility word to its <see cref="Visibility"/>. Returns false for a
+    /// word that is not a visibility (#1607: such a word used to compile silently
+    /// as <c>private</c>). <c>pri</c> and <c>pro</c> are the short forms the class
+    /// modifier and accessor tables already accept.
+    /// </summary>
+    private static bool TryParseVisibilityWord(string? value, out Visibility visibility)
     {
-        return value?.ToLowerInvariant() switch
+        Visibility? parsed = value?.ToLowerInvariant() switch
         {
             "public" or "pub" => Visibility.Public,
             "protected-internal" or "prot-int" => Visibility.ProtectedInternal,
             "private-protected" or "priv-prot" => Visibility.PrivateProtected,
             "internal" or "int" => Visibility.Internal,
-            "protected" or "prot" => Visibility.Protected,
-            "private" or "priv" => Visibility.Private,
-            _ => Visibility.Private
+            "protected" or "prot" or "pro" => Visibility.Protected,
+            "private" or "priv" or "pri" => Visibility.Private,
+            _ => null
         };
+        visibility = parsed ?? Visibility.Private;
+        return parsed.HasValue;
+    }
+
+    /// <summary>
+    /// Parses a visibility word. An absent or empty word means the declaration's
+    /// default (<c>private</c>); any other unknown word is a hard error (#1607).
+    /// </summary>
+    private Visibility ParseVisibility(string? value, TextSpan span)
+    {
+        if (TryParseVisibilityWord(value, out var visibility) || string.IsNullOrEmpty(value))
+            return visibility;
+        // A modifier in the visibility slot (`§MT{m1:Area:abs}`) used to drop the modifier.
+        var hint = ParseMethodModifiers(value) != MethodModifiers.None
+            ? $" '{value}' is a modifier: modifiers go in the field after the visibility, e.g. ':pub:{value}'."
+            : "";
+        _diagnostics.ReportError(span, DiagnosticCode.UnknownVisibility,
+            $"Unknown visibility '{value}'. Valid visibility words: {ValidVisibilityWords}.{hint}");
+        return visibility;
     }
 
     // Phase 6: Arrays and Collections
@@ -8018,7 +8093,8 @@ public sealed class Parser
             $"List<{listNode.ElementType}>",
             isMutable: false,
             listNode,
-            new AttributeCollection());
+            new AttributeCollection())
+        { IsCollectionStatementForm = true };
     }
 
     /// <summary>
@@ -8035,7 +8111,8 @@ public sealed class Parser
             System.Text.RegularExpressions.Regex.Replace(arrNode.ElementType, @"^(.+?)((?:\[,*\])*)$", "$1[]$2"),
             isMutable: false,
             arrNode,
-            new AttributeCollection());
+            new AttributeCollection())
+        { IsCollectionStatementForm = true };
     }
 
     /// <summary>
@@ -8102,7 +8179,8 @@ public sealed class Parser
             $"Dictionary<{dictNode.KeyType},{dictNode.ValueType}>",
             isMutable: false,
             dictNode,
-            new AttributeCollection());
+            new AttributeCollection())
+        { IsCollectionStatementForm = true };
     }
 
     /// <summary>
@@ -8187,7 +8265,8 @@ public sealed class Parser
             $"HashSet<{setNode.ElementType}>",
             isMutable: false,
             setNode,
-            new AttributeCollection());
+            new AttributeCollection())
+        { IsCollectionStatementForm = true };
     }
 
     /// <summary>
@@ -9159,10 +9238,28 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        var visStr = attrs["_pos2"];
         if (posCount < 2 && !IsIdPattern(id))
         {
             name = id;
             id = GenerateParserAutoId("m");
+        }
+        else if (posCount == 2 && !IsIdPattern(id))
+        {
+            // #1607 review round 2: `§MT{Run:pub}` in an interface is {name:vis}, not {id:name}.
+            visStr = name;
+            name = id;
+            id = GenerateParserAutoId("m");
+        }
+
+        // An interface member is public. The field used to be dropped, so `§MT{m1:Run:bogus}`
+        // compiled silently; an unknown word is Calor0122 and any other level is refused too.
+        if (!string.IsNullOrEmpty(visStr)
+            && ParseVisibility(visStr, startToken.Span) is not Visibility.Public
+            && TryParseVisibilityWord(visStr, out _))
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnknownVisibility,
+                $"Interface method '{name}' cannot be '{visStr}': interface methods are public. Remove the field or write ':pub'.");
         }
 
         if (string.IsNullOrEmpty(id))
@@ -9313,7 +9410,7 @@ public sealed class Parser
             if (IsVisibilityKeyword(pos2))
             {
                 // pos2 is a visibility like "pub", "int", etc.
-                visibility = ParseVisibility(pos2);
+                visibility = ParseVisibility(pos2, startToken.Span);
                 modifiers = pos3;
             }
             else
@@ -9645,7 +9742,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FLD", "name");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
         var fieldModifiers = ParseMethodModifiers(modStr);
 
         // Position 8 (§3.3): §FLD{Action<i32>:onChange:pri} §E{cw}. Read BEFORE the
@@ -9706,7 +9803,13 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount <= 3 && !IsIdPattern(id) && IsVisibilityKeyword(attrs["_pos1"] ?? ""))
+        // #1607 review: a two-field header without an ID pattern is the compact {name:vis}
+        // form whatever its second word is (as for §F), so `{Run:prv}` reaches the visibility
+        // check instead of declaring a method named `prv`.
+        if (!IsIdPattern(id) && !string.IsNullOrEmpty(attrs["_pos1"])
+            // A three-field header is {id:name:vis} only when its third field is a visibility;
+            // otherwise it is the compact {name:vis:modifiers} (#1607 review round 2).
+            && (posCount == 2 || posCount == 3 && !IsVisibilityKeyword(attrs["_pos2"] ?? "")))
         {
             // Shift: §MT{name:vis:mod}
             modStr = visStr;
@@ -9721,7 +9824,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr);
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
@@ -9861,7 +9964,13 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount <= 3 && !IsIdPattern(id) && IsVisibilityKeyword(attrs["_pos1"] ?? ""))
+        // #1607 review: a two-field header without an ID pattern is the compact {name:vis}
+        // form whatever its second word is (as for §F), so `{Run:prv}` reaches the visibility
+        // check instead of declaring a method named `prv`.
+        if (!IsIdPattern(id) && !string.IsNullOrEmpty(attrs["_pos1"])
+            // A three-field header is {id:name:vis} only when its third field is a visibility;
+            // otherwise it is the compact {name:vis:modifiers} (#1607 review round 2).
+            && (posCount == 2 || posCount == 3 && !IsVisibilityKeyword(attrs["_pos2"] ?? "")))
         {
             modStr = visStr;
             visStr = name;
@@ -9875,7 +9984,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AMT", "id");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr);
 
         // Parse optional type parameters §AMT{...}<T, U>
@@ -10923,7 +11032,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PROP", "id");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr);
 
         // --- Compact accessor shorthand ---
@@ -11083,7 +11192,7 @@ public sealed class Parser
             modStr = "";
         }
 
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr);
 
         // --- Compact accessor shorthand with inline params ---
@@ -11250,7 +11359,7 @@ public sealed class Parser
 
         var attrs = ParseAttributes();
         var visStr = attrs["_pos0"];
-        var visibility = visStr != null ? ParseVisibility(visStr) : (Visibility?)null;
+        var visibility = visStr != null ? ParseVisibility(visStr, startToken.Span) : (Visibility?)null;
 
         var preconditions = new List<RequiresNode>();
         var body = new List<StatementNode>();
@@ -11320,7 +11429,9 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id) && (IsVisibilityKeyword(id) || id.Equals("stat", StringComparison.OrdinalIgnoreCase)))
+        // #1607 review: a one-field header that is not an ID is the visibility (`§CTOR{pub}`);
+        // an unknown word there is reported below rather than read as an ID.
+        if (posCount < 2 && !string.IsNullOrEmpty(id) && !IsIdPattern(id))
         {
             visStr = id;
             id = GenerateParserAutoId("ctor");
@@ -11332,7 +11443,7 @@ public sealed class Parser
         }
 
         var isStatic = visStr.Equals("stat", StringComparison.OrdinalIgnoreCase);
-        var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr);
+        var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr, startToken.Span);
 
         // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
         var _inlineParams = new List<ParameterNode>();
@@ -11429,7 +11540,7 @@ public sealed class Parser
         Expect(TokenKind.CloseBrace);
 
         var csharpAttrs = ParseCSharpAttributes();
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -12726,6 +12837,18 @@ public sealed class Parser
         var visStr = attrs["_pos2"] ?? "private";
         var delegateType = attrs["_pos3"] ?? "";
 
+        // --- Compact syntax: optional ID (§EVT{Click:pub:EventHandler}, as documented) ---
+        var delegateTypeKey = "_pos3";
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount == 3 && !IsIdPattern(id) && IsVisibilityKeyword(name))
+        {
+            delegateType = visStr;
+            visStr = name;
+            name = id;
+            id = GenerateParserAutoId("e");
+            delegateTypeKey = "_pos2";
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "id");
@@ -12739,7 +12862,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "delegateType");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var visibility = ParseVisibility(visStr, startToken.Span);
 
         // Check for accessor bodies (§EADD / §EREM ... §/EVT)
         if (!Check(TokenKind.EventAdd) && !Check(TokenKind.EventRemove))
@@ -12751,7 +12874,7 @@ public sealed class Parser
                 visibility,
                 delegateType,
                 attrs,
-                attrs.GetSpan("_pos3"));
+                attrs.GetSpan(delegateTypeKey));
         }
 
         List<StatementNode>? addBody = null;
@@ -12798,7 +12921,7 @@ public sealed class Parser
             attrs,
             addBody,
             removeBody,
-            attrs.GetSpan("_pos3"));
+            attrs.GetSpan(delegateTypeKey));
     }
 
     private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
@@ -13953,13 +14076,13 @@ public sealed class Parser
         if (pos3 != null)
         {
             // 4 positionals: §EN{id:Name:vis:underlyingType}
-            visibility = ParseVisibility(pos2);
+            visibility = ParseVisibility(pos2, startToken.Span);
             underlyingType = pos3;
         }
         else if (pos2 != null && IsVisibilityKeyword(pos2))
         {
             // 3 positionals with visibility: §EN{id:Name:vis}
-            visibility = ParseVisibility(pos2);
+            visibility = ParseVisibility(pos2, startToken.Span);
             underlyingType = null;
         }
         else
@@ -14281,24 +14404,14 @@ public sealed class Parser
 
     private static bool IsVisibilityKeyword(string value)
     {
-        return value.Equals("pub", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("pri", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("pro", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("prot", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("priv", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("int", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("public", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("private", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("protected", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("private-protected", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("priv-prot", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("internal", StringComparison.OrdinalIgnoreCase);
+        // #1607: one table (TryParseVisibilityWord) decides what a visibility word is.
+        return TryParseVisibilityWord(value, out _);
     }
 
     private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
-        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot",
-        "public", "private", "private-protected", "protected", "internal"
+        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot", "prot-int",
+        "public", "private", "private-protected", "protected", "internal", "protected-internal"
     };
 
     /// <summary>
@@ -14320,7 +14433,7 @@ public sealed class Parser
             var trimmed = part.Trim();
             if (!found && VisibilityKeywords.Contains(trimmed))
             {
-                vis = ParseVisibility(trimmed);
+                TryParseVisibilityWord(trimmed, out vis);
                 found = true;
             }
             else
@@ -14337,8 +14450,8 @@ public sealed class Parser
     {
         "abs", "abstract", "seal", "sealed", "st", "stat", "static",
         "partial", "struct", "readonly",
-        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot",
-        "public", "private", "private-protected", "protected", "internal"
+        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot", "prot-int",
+        "public", "private", "private-protected", "protected", "internal", "protected-internal"
     };
 
     private static bool IsClassModifierOrVisibility(string value)

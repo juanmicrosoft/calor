@@ -101,7 +101,7 @@ public enum StringOp
     Contains,           // (contains s t)    → s.Contains(t)
     StartsWith,         // (starts s t)      → s.StartsWith(t)
     EndsWith,           // (ends s t)        → s.EndsWith(t)
-    IndexOf,            // (indexof s t)     → s.IndexOf(t)
+    IndexOf,            // (indexof s t [start [count]]) → s.IndexOf(t[, start[, count]])
     IsNullOrEmpty,      // (isempty s)       → string.IsNullOrEmpty(s)
     IsNullOrWhiteSpace, // (isblank s)       → string.IsNullOrWhiteSpace(s)
     Equals,             // (equals s t)      → s.Equals(t)
@@ -328,15 +328,20 @@ public static class StringOpExtensions
             StringOp.IsNullOrEmpty or
             StringOp.IsNullOrWhiteSpace => 1,
 
-            // ToString allows extra args for complex sub-expressions (e.g., indexer+range)
-            StringOp.ToString => 4,
+            // #1608: these used to accept up to 4 operands and the emitter dropped
+            // every operand past the ones it prints, so `(indexof s "@" 3)` compiled
+            // to `s.IndexOf("@")`. The counts now match what the emitter emits.
+            StringOp.ToString => 1,
 
-            // Two argument operations (some allow extra args for complex sub-expressions)
             StringOp.Contains or
             StringOp.StartsWith or
             StringOp.EndsWith or
-            StringOp.IndexOf or
-            StringOp.Equals => 4,
+            StringOp.Equals => 2,
+
+            // (indexof s t start) → s.IndexOf(t, start); (indexof s t start count) →
+            // s.IndexOf(t, start, count). Both are String.IndexOf overloads, with or
+            // without a trailing StringComparison.
+            StringOp.IndexOf => 4,
 
             StringOp.SubstringFrom or
             StringOp.Split or

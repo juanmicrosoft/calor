@@ -214,6 +214,48 @@ adding the annotation always silences the diagnostic.
 §B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
 ```
 
+### Calor0213 — `WriteToReadOnlyLocal`
+
+A hard error for any write to a local that Calor declares read-only: an
+immutable `§B` binding (no `~`) or a `§L` loop variable. Every write form is
+refused: `§ASSIGN`, compound assignment, `(inc x)`/`(dec x)`, a `§A{ref}` or
+`§A{out}` argument, and a mutable rebind (`§B{~i}`) of a loop variable. Before
+0.27 these compiled silently, because the generated C# local is not `readonly`.
+
+```calor
+§B{x:i32} 1
+§ASSIGN x 2          // Calor0213: 'x' is an immutable binding
+
+§L{l1:i:0:9:1}
+  §ASSIGN i 5        // Calor0213: 'i' is a §L loop variable
+```
+
+Declare the binding mutable with `~` (`§B{~x:i32} 1`). For a loop whose
+counter the body changes, use a `§WH` loop over a mutable binding. Statement
+forms that declare a collection (`§LIST`, `§ARR`, `§DICT`, `§HSET`) have no
+mutability marker and stay assignable.
+
+### Calor0123 — `TypeFirstBindingHeader`
+
+A two-field header `§B{a:b}` is read **name-first** unless `a` is a
+recognizable type spelling (a built-in such as `i32`, or a PascalCase name
+such as `Widget`) and `b` is not. A one-letter or all-caps type does not
+qualify, so `§B{W:t}` used to declare a variable `W` of type `t`, silently
+swapping the two. When the first field looks like a type (an upper-case
+name, a keyword type such as `long`, or an array, pointer or nullable form
+such as `T[]` or `i32?`) and the second like a variable (a lower-case
+identifier that is not a type), the parser now reports `Calor0123`. A
+third field other than `const` or `mut` (for example the legacy
+`§B{id:name:type}` spelling) is `Calor0123` too, because it used to be
+ignored:
+
+```calor
+§B{W:t} §NEW{W}      // Calor0123: write §B{t:W}
+§B{t:W} §NEW{W}      // OK: name first
+```
+
+The C# converter writes the spelling the parser reads back unchanged.
+
 ---
 
 ## Round-trip

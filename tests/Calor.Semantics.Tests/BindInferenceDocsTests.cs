@@ -60,7 +60,7 @@ public class BindInferenceDocsTests
     {
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:str}
+  §F{f001:Foo:pub}
       §O{str}
       §B{s} STR:"hello"
       §R s

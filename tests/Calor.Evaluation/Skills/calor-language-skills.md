@@ -174,8 +174,8 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
 §F{f001:Max:pub} ([i32]:arr) -> i32
   §Q (!= arr null)              // First: array must not be null
   §Q (> (len arr) 0)            // Then: array must have elements
-  §B{max} §IDX arr 0
-  §B{i} 1
+  §B{~max} §IDX arr 0
+  §B{~i} 1
   §WH{wh1} (< i (len arr))
     §B{current} §IDX arr i
     §IF{if1} (> current max)
@@ -310,7 +310,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 (starts s t)      // Starts with: (starts "hello" "he") → true
 (ends s t)        // Ends with: (ends "hello" "lo") → true
 (indexof s t)     // Index of FIRST occurrence: (indexof "hello" "l") → 2
-                  // NOTE: Only takes 2 args. No startIndex parameter!
+                  // Also (indexof s t start) and (indexof s t start count)
 (isempty s)       // Is null or empty: (isempty "" ) → true
 (equals s t)      // String equality: (equals "hi" "hi") → true
 
@@ -449,8 +449,8 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 **Complete Array Example:**
 ```calor
 §F{f001:SumArray:pub} ([i32]:nums) -> i32
-  §B{sum} 0
-  §B{i} 0
+  §B{~sum} 0
+  §B{~i} 0
   §WH{wh1} (< i (len nums))
     // IMPORTANT: Get element into a binding first, THEN use in expression
     §B{val} §IDX nums i
@@ -581,7 +581,7 @@ When you have a loop with conditional logic inside, use block-style for inner if
 
 **CRITICAL: §B declares a NEW variable. Use §ASSIGN to update existing variables.**
 ```calor
-§B{k} (% rng n)              // First use: declare k
+§B{~k} (% rng n)             // First use: declare k (mutable)
 §ASSIGN k (+ k offset)       // Update: use §ASSIGN, not §B
 
 // WRONG - variable redeclaration error:
@@ -649,7 +649,7 @@ When you have a loop with conditional logic inside, use block-style for inner if
 ```calor
 §F{f001:Power:pub} (i32:base, i32:exp) -> i32
   §Q (>= exp 0)
-  §B{result} 1
+  §B{~result} 1
   §L{for1:i:1:exp:1}
     §ASSIGN result (* result base)
 
@@ -665,7 +665,7 @@ When a loop contains an if statement, always use block-style for the inner if:
   §EI (== n 2) → §R true
   §EI (== (% n 2) 0) → §R false
 
-  §B{i} 3
+  §B{~i} 3
   §WH{wh1} (<= (* i i) n)
     §IF{if2} (== (% n i) 0)
       §R false
@@ -1160,18 +1160,12 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 §B{length} (len s)
 ```
 
-**WRONG - indexof with startIndex:**
+**indexof with a start index:**
 ```calor
-// WRONG: indexof only takes 2 arguments
-§B{next} (indexof s "@" (+ first 1))  // ❌ ERROR - 3 args not supported
-```
-
-**CORRECT - Use substr + indexof:**
-```calor
-// CORRECT: Search from offset using substr
+// (indexof s t start) → s.IndexOf(t, start); (indexof s t start count) → s.IndexOf(t, start, count)
 §B{first} (indexof s "@")
-§B{rest} (substr s (+ first 1))
-§B{next} (indexof rest "@")           // ✓ Search in substring
+§B{next} (indexof s "@" (+ first 1))   // ✓ Search after the first match
+// More operands than that is an error (Calor0110), never silently dropped.
 ```
 
 ### Variable Redeclaration Mistakes
@@ -1191,11 +1185,11 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **CORRECT - Use §ASSIGN to update existing variables:**
 ```calor
 // CORRECT: §B to declare, §ASSIGN to update
-§B{k} (% rng n)                 // Declare k
+§B{~k} (% rng n)                // Declare k (mutable)
 §ASSIGN k (+ k 1)               // ✓ Update k
 
 // CORRECT: Update in conditional
-§B{result} 0
+§B{~result} 0
 §IF{if1} (< n 0)
   §ASSIGN result (- 0 n)        // ✓ Update existing result
 ```
