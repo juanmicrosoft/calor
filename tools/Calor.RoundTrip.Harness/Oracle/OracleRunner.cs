@@ -70,6 +70,13 @@ public sealed record OracleProjectReport
         .GroupBy(m => m.Status == MemberStatus.Skipped ? m.Reason ?? "?" : m.Status)
         .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count());
 
+    /// <summary>
+    /// #1667: distinct members not compared, per <see cref="SkipCategory"/>, over the exercised files. Each file compares
+    /// the whole assembly, so a member counts once per category however many files skipped it; this is the number the
+    /// gate holds against the recorded distribution.
+    /// </summary>
+    public Dictionary<string, int> SkipDistribution => OracleRunner.SkipDistributionOf(Files);
+
     public Dictionary<string, int> FileTotals => Files.GroupBy(f => f.Status)
         .OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count());
 }
@@ -350,9 +357,22 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
     public static int Compared(OracleFileReport file) => file.Members.Count(m => m.Status is MemberStatus.Agree or MemberStatus.Different
         || (m.Status is MemberStatus.Timeout or MemberStatus.Nondeterministic && m.Inputs > 0));
 
+    /// <summary>The skip-category distribution of a set of file reports (distinct members per category, exercised files only).</summary>
+    public static Dictionary<string, int> SkipDistributionOf(IEnumerable<OracleFileReport> files)
+    {
+        var counts = files.Where(f => f.Status == "exercised").SelectMany(f => f.Members)
+            .Select(m => (m.Key, Category: SkipCategory.Of(m))).Where(x => x.Category is not null).Distinct()
+            .GroupBy(x => x.Category!).ToDictionary(g => g.Key, g => g.Count());
+        return SkipCategory.All.Where(counts.ContainsKey).ToDictionary(c => c, c => counts[c]);
+    }
+
+    /// <summary>How far a skip category may rise above its recorded count before the gate fails: 2 members or 5%, whichever is more.</summary>
+    public static int SkipTolerance(int recorded) => Math.Max(2, (int)Math.Ceiling(recorded * 0.05));
+
     /// <summary>
     /// Decides every difference and file failure, checks this shard's baseline entries for staleness, checks that every
-    /// file <c>eng/member-oracle-expected.json</c> lists for this shard was exercised, and (unsharded) the member floor.
+    /// file <c>eng/member-oracle-expected.json</c> lists for this shard was exercised, and (unsharded) the member floor
+    /// and the skip-category distribution (#1667).
     /// </summary>
     internal static void ApplyGate(string project, OracleBaseline baseline, OracleExpected expected, OracleProjectReport report,
         HashSet<string> filesInShard, IReadOnlySet<string> inventory)
@@ -421,6 +441,22 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         }
         foreach (var missing in expectedFiles.Keys.Where(f => !inventory.Contains(f)))
             report.Gate.Add(new OracleGateItem(missing, "<coverage>", "failing", "listed in eng/member-oracle-expected.json but no longer a library file"));
+
+        // #1667: the per-file floor allows 5% fewer comparisons per file, and a member that moves from one skip reason to
+        // another, or a new member that cannot be driven, does not lower it at all. The skip distribution is checked per
+        // category against the recorded one (unsharded: a shard sees only part of the project's files).
+        if (report.Shard is null && expected.SkipsFor(project) is { } recorded)
+        {
+            var observed = report.SkipDistribution;
+            foreach (var category in SkipCategory.All.Where(c => observed.ContainsKey(c) || recorded.ContainsKey(c)))
+            {
+                var (now, then) = (observed.GetValueOrDefault(category), recorded.GetValueOrDefault(category));
+                if (now > then + SkipTolerance(then))
+                    report.Gate.Add(new OracleGateItem("<project>", "<skips:" + category + ">", "failing",
+                        $"{now} distinct members skipped as {category}, recorded {then} in eng/member-oracle-expected.json (tolerance {SkipTolerance(then)}); "
+                        + "find what stopped being compared, or rerun with --write-expected if the rise is reviewed"));
+            }
+        }
     }
 
     public static readonly JsonSerializerOptions Json = new()
@@ -431,7 +467,7 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static string Markdown(IReadOnlyList<OracleProjectReport> reports)
+    public static string Markdown(IReadOnlyList<OracleProjectReport> reports, OracleExpected? expectedSkips = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("## Member differential oracle (#1587)").AppendLine();
@@ -458,6 +494,17 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
                     sb.AppendLine($"- **{g.Decision}** `{g.File}` `{g.Member}`: {Truncate(g.Detail, 400)}");
             }
             sb.AppendLine().AppendLine($"<details><summary>{r.Project}: files and skip reasons</summary>").AppendLine();
+            // #1667: the skip distribution by category, against what eng/member-oracle-expected.json recorded.
+            var distribution = r.SkipDistribution;
+            var recorded = expectedSkips?.SkipsFor(r.Project);
+            sb.AppendLine("| Skip category | Distinct members | Recorded | Change |").AppendLine("|---|---|---|---|");
+            foreach (var category in SkipCategory.All.Where(c => distribution.ContainsKey(c) || recorded?.ContainsKey(c) == true))
+            {
+                var now = distribution.GetValueOrDefault(category);
+                var then = recorded?.GetValueOrDefault(category);
+                sb.AppendLine($"| {category} | {now} | {(then is null ? "–" : then.Value)} | {(then is null ? "–" : (now - then.Value).ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture))} |");
+            }
+            sb.AppendLine();
             sb.AppendLine("Files: " + string.Join(", ", r.FileTotals.Select(kv => $"{kv.Key} {kv.Value}"))).AppendLine();
             foreach (var (reason, count) in r.SkipReasons)
                 sb.AppendLine($"- {count} × {reason}");
@@ -473,14 +520,20 @@ public sealed partial class OracleRunner(RoundTripConfig config, OracleOptions o
 /// with the member comparisons it made when listed.</summary>
 public sealed record OracleExpected
 {
-    public const string Schema = "calor.member-oracle-expected/2";
+    public const string Schema = "calor.member-oracle-expected/3";
 
     [JsonPropertyName("schema")] public string SchemaId { get; init; } = Schema;
 
     [JsonPropertyName("projects")] public Dictionary<string, Dictionary<string, int>> Projects { get; init; } = [];
 
+    /// <summary>#1667: per project, the distinct members skipped per <see cref="SkipCategory"/> when recorded.</summary>
+    [JsonPropertyName("skips")] public Dictionary<string, Dictionary<string, int>> Skips { get; init; } = [];
+
     public IReadOnlyDictionary<string, int> For(string project) =>
         Projects.TryGetValue(project, out var files) ? files : new Dictionary<string, int>();
+
+    /// <summary>The recorded skip distribution, or null when none was recorded for the project (the check is then off).</summary>
+    public IReadOnlyDictionary<string, int>? SkipsFor(string project) => Skips.TryGetValue(project, out var skips) ? skips : null;
 
     public static string DefaultPath(string repoRoot) => Path.Combine(repoRoot, "eng", "member-oracle-expected.json");
 

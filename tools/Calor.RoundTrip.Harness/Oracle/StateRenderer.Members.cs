@@ -28,7 +28,7 @@ public static partial class StateRenderer
             }
             catch (Exception ex)
             {
-                sb.Append("!" + Unwrap(ex).GetType().FullName);
+                AppendThrown(sb, ex, depth - 1, "!");
                 continue;
             }
             Append(sb, memberValue, depth - 1);
@@ -74,6 +74,22 @@ public static partial class StateRenderer
         return result.OrderBy(x => x.Item1, StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>
+    /// A call's arguments after the call. The argument list is a container, not a hop: each argument renders at the full
+    /// depth, like a return value, so a change two hops inside an argument object is visible.
+    /// </summary>
+    internal static void AppendArguments(Sink sink, object?[] arguments, int depth)
+    {
+        sink.Append('[');
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            if (i > 0)
+                sink.Append(", ");
+            Append(sink, arguments[i], depth);
+        }
+        sink.Append(']');
+    }
+
     /// <summary>Static state of a type: its own public static fields and properties.</summary>
     public static string RenderStatics(Type type, int depth)
     {
@@ -96,6 +112,59 @@ public static partial class StateRenderer
         }
     }
 
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<FieldInfo>> PrivateStaticCache = new();
+
+    [ThreadStatic] private static int _noDelegateCalls;
+
+    private sealed class DelegateCallScope : IDisposable
+    {
+        public void Dispose() => _noDelegateCalls--;
+    }
+
+    private static DelegateCallScope NoDelegateCalls()
+    {
+        _noDelegateCalls++;
+        return new DelegateCallScope();
+    }
+
+    /// <summary>
+    /// #1667: the non-public static fields every given type declares (constants and compiler-generated fields left out),
+    /// in name order. A member that changes private static state is otherwise visible only to members that run after it,
+    /// and plan order can put every reader first, so this state is observed after every input too.
+    /// </summary>
+    internal static void AppendPrivateStatics(Sink sink, IEnumerable<KeyValuePair<string, Type>> types, int depth)
+    {
+        foreach (var (name, type) in types.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+        {
+            var fields = PrivateStaticCache.GetOrAdd(type, t => t.IsGenericTypeDefinition ? []
+                : t.GetFields(BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                    .Where(f => !f.IsLiteral && !f.Name.Contains('<') && !f.FieldType.IsByRefLike && !f.FieldType.IsPointer)
+                    .OrderBy(f => f.Name, StringComparer.Ordinal).ToList());
+            if (fields.Count == 0)
+                continue;
+            // Private state is observed for changes; a cached delegate's behavior is exercised by the members that use
+            // it, so here it is rendered by method and captured state only (calling it could never complete for every
+            // signature, and would make every input of the project incomplete).
+            using var _ = NoDelegateCalls();
+            sink.Append(name + "={");
+            for (var i = 0; i < fields.Count; i++)
+            {
+                if (i > 0)
+                    sink.Append(", ");
+                sink.Append(fields[i].Name + "=");
+                try
+                {
+                    Append(sink, fields[i].GetValue(null), depth - 1);
+                }
+                catch (Exception ex)
+                {
+                    AppendThrown(sink, ex, 0, "!");
+                }
+            }
+            sink.Append("};");
+        }
+    }
+
     internal static void AppendStatics(Sink sink, Type type, int depth)
     {
         sink.Append('{');
@@ -113,7 +182,7 @@ public static partial class StateRenderer
             }
             catch (Exception ex)
             {
-                sink.Append("!" + Unwrap(ex).GetType().FullName);
+                AppendThrown(sink, ex, depth - 1, "!");
             }
         }
         sink.Append('}');
@@ -143,6 +212,11 @@ public static partial class StateRenderer
                 Append(sb, target, depth - 1);
             }
         }
+        if (_noDelegateCalls > 0)
+        {
+            sb.Append('>');
+            return;
+        }
         var invoke = del.GetType().GetMethod("Invoke")!;
         var parameters = invoke.GetParameters();
         if (MemberOracleInputs.Unsupported(parameters) is not null || invoke.ReturnType.IsByRef || invoke.ReturnType.IsByRefLike)
@@ -171,7 +245,7 @@ public static partial class StateRenderer
             }
             catch (Exception ex)
             {
-                sb.Append("throw(" + Unwrap(ex).GetType().FullName + ")");
+                AppendThrown(sb, ex, depth - 1);
             }
             // What the call changed: its arguments (arrays, lists, ref/out) and its targets' state.
             // The argument array is a container, not a hop: its elements render one level below the delegate.
@@ -200,14 +274,33 @@ public static partial class StateRenderer
         if (t.Name.Contains('<'))
             return "<compiler-generated>";
         var simple = t.Name.Split('`')[0];
-        var name = t.IsNested ? TypeName(t.DeclaringType!) + "+" + simple : (t.Namespace is { Length: > 0 } ns ? ns + "." : "") + simple;
-        if (!t.IsGenericType)
-            return name;
         var args = t.GetGenericArguments();
         // Nested types repeat their parents' generic arguments; show only the ones this type adds.
         var inherited = t.IsNested ? t.DeclaringType!.GetGenericArguments().Length : 0;
+        var name = t.IsNested ? TypeName(ClosedDeclaringType(t, args, inherited)) + "+" + simple : (t.Namespace is { Length: > 0 } ns ? ns + "." : "") + simple;
+        if (!t.IsGenericType)
+            return name;
         var own = args.Skip(inherited).ToArray();
         return own.Length == 0 ? name : name + "<" + string.Join(",", own.Select(TypeName)) + ">";
+    }
+
+    /// <summary>
+    /// #1667: a nested type of a closed generic type names its parent closed (<c>Cache&lt;System.Int32&gt;+Key</c>), not
+    /// open (<c>Cache&lt;T&gt;+Key</c>): reflection reports the open parent, so two closings would otherwise share a name.
+    /// </summary>
+    private static Type ClosedDeclaringType(Type t, Type[] args, int inherited)
+    {
+        var declaring = t.DeclaringType!;
+        if (inherited == 0 || !declaring.IsGenericTypeDefinition || t.IsGenericTypeDefinition || args.Take(inherited).Any(a => a.IsGenericParameter))
+            return declaring;
+        try
+        {
+            return declaring.MakeGenericType(args.Take(inherited).ToArray());
+        }
+        catch (ArgumentException)
+        {
+            return declaring;
+        }
     }
 
     internal static string Invariant(double seconds) => seconds.ToString("0.00", CultureInfo.InvariantCulture);

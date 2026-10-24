@@ -105,6 +105,8 @@ async Task<int> OracleCommand(string[] args)
         return 2;
     }
     var writeExpected = args.Contains("--write-expected");
+    // #1667: the summary compares each project's skip distribution with the one recorded before this run.
+    var recordedSkips = new Calor.RoundTrip.Harness.Oracle.OracleExpected { Skips = new(expected.Skips) };
 
     var withValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet", "--depth", "--scope", "--shard", "--baseline", "--jobs", "--member-timeout", "--expected" };
     var names = new List<string>();
@@ -144,6 +146,8 @@ async Task<int> OracleCommand(string[] args)
         if (writeExpected && shardCount == 1 && report.Inconclusive is null)
             expected.Projects[config.ProjectName] = report.Files.Where(f => f.Status == "exercised").OrderBy(f => f.File, StringComparer.Ordinal)
                 .ToDictionary(f => f.File, Calor.RoundTrip.Harness.Oracle.OracleRunner.Compared);
+        if (writeExpected && shardCount == 1 && report.Inconclusive is null)
+            expected.Skips[config.ProjectName] = report.SkipDistribution;
         var suffix = shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "";
         await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}{suffix}-member-oracle.json"),
             System.Text.Json.JsonSerializer.Serialize(report, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");
@@ -155,12 +159,13 @@ async Task<int> OracleCommand(string[] args)
         var ordered = new Calor.RoundTrip.Harness.Oracle.OracleExpected
         {
             Projects = expected.Projects.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToDictionary(kv => kv.Key, kv => kv.Value),
+            Skips = expected.Skips.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToDictionary(kv => kv.Key, kv => kv.Value),
         };
         await File.WriteAllTextAsync(expectedPath, System.Text.Json.JsonSerializer.Serialize(ordered, Calor.RoundTrip.Harness.Oracle.OracleRunner.Json) + "\n");
         Console.WriteLine($"Wrote {expectedPath}");
     }
 
-    var markdown = Calor.RoundTrip.Harness.Oracle.OracleRunner.Markdown(reports);
+    var markdown = Calor.RoundTrip.Harness.Oracle.OracleRunner.Markdown(reports, recordedSkips);
     var summarySuffix = (names.Count == 1 ? "-" + names[0] : "") + (shardCount > 1 ? $"-shard{shardIndex + 1}of{shardCount}" : "");
     await File.WriteAllTextAsync(Path.Combine(outputDir, $"member-oracle-summary{summarySuffix}.md"), markdown);
     if (Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY") is { Length: > 0 } summary)
@@ -1128,7 +1133,7 @@ static void PrintUsage()
           --baseline <path>        Reviewed findings (default eng/member-oracle-baseline.json)
           --output <path>          Report directory (default conversion-reports)
           --expected <path>        Files each project must exercise (default eng/member-oracle-expected.json)
-          --write-expected         Rewrite that list from this run (unsharded runs only)
+          --write-expected         Rewrite that list and the skip distribution from this run (unsharded only)
 
         Options (run):
           --projects-dir <path>    Directory containing target project clones

@@ -85,8 +85,13 @@ public static partial class MemberDifferentialOracle
         var timedOut = false;
         try
         {
+            // The console goes to process-wide routers whose target is the current input's buffer, so a writer the subject
+            // captured earlier (a static TextWriter initialized from Console.Out, say) still reaches the input that writes.
+            Console.SetOut(ConsoleRouter.Out);
+            Console.SetError(ConsoleRouter.Error);
             Console.SetIn(new StringReader(""));
             Environment.CurrentDirectory = sandbox.FullName;
+            StateRenderer.SandboxRoot = sandbox.FullName;
             thread.Start();
             if (!thread.Join(options.MemberTimeout))
             {
@@ -100,6 +105,8 @@ public static partial class MemberDifferentialOracle
             Console.SetError(originalErr);
             Console.SetIn(originalIn);
             Environment.CurrentDirectory = originalDir;
+            StateRenderer.SandboxRoot = null;
+            (ConsoleRouter.Out.Target, ConsoleRouter.Error.Target) = (TextWriter.Null, TextWriter.Null);
             try { sandbox.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
         return new Execution(observations, Volatile.Read(ref done.Value), timedOut, targetClock.Elapsed.TotalSeconds);
@@ -117,7 +124,7 @@ public static partial class MemberDifferentialOracle
         bool onCandidate, OracleOptions options)
     {
         var (_, plan) = SharedPlan(original, candidate, typeScope, options);
-        var runnable = plan.Where(m => m.Kind != "hierarchy" && m.SkipReason is null).ToList();
+        var runnable = OraclePlanner.Expand(plan.Where(m => m.Kind != "hierarchy" && m.SkipReason is null), options.Limits);
         var targetMember = runnable.FirstOrDefault(m => m.Key == memberKey);
         if (targetMember is null || input >= targetMember.Inputs.Count)
             return new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<{memberKey} input {input} is not in the plan>");
@@ -168,13 +175,17 @@ public static partial class MemberDifferentialOracle
         IReadOnlyDictionary<string, Type> types)
     {
         var stdout = new StringWriter(CultureInfo.InvariantCulture);
-        Console.SetOut(stdout);
-        Console.SetError(stdout);
+        var stderr = new StringWriter(CultureInfo.InvariantCulture);
+        ConsoleRouter.Out.Target = stdout;
+        ConsoleRouter.Error.Target = stderr;
         var parts = new ObservationParts();
         try
         {
             if (ObserveInto(parts, type, member, info, tuple, depth))
+            {
                 StateRenderer.AppendProjectStatics(parts["project"], types, depth);
+                StateRenderer.AppendPrivateStatics(parts["private-statics"], types, depth);
+            }
         }
         catch (Exception ex)
         {
@@ -183,9 +194,14 @@ public static partial class MemberDifferentialOracle
             parts = new ObservationParts();
             parts["setup"].Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {inner.Message})");
         }
+        // Standard output and standard error are separate parts: a message moved from one stream to the other is a difference.
         StateRenderer.Append(parts["stdout"], stdout.ToString(), 0);
-        var files = Directory.EnumerateFiles(sandbox, "*", SearchOption.AllDirectories)
-            .Select(f => Path.GetRelativePath(sandbox, f) + "=" + Hash(Convert.ToBase64String(File.ReadAllBytes(f))))
+        if (stderr.ToString() is { Length: > 0 } errors)
+            StateRenderer.Append(parts["stderr"], errors, 0);
+        // Files by content hash, and directories by name (an empty directory the member created is state too).
+        var files = Directory.EnumerateFileSystemEntries(sandbox, "*", SearchOption.AllDirectories)
+            .Select(f => Directory.Exists(f) ? Path.GetRelativePath(sandbox, f) + "/"
+                : Path.GetRelativePath(sandbox, f) + "=" + Hash(Convert.ToBase64String(File.ReadAllBytes(f))))
             .Order(StringComparer.Ordinal).ToList();
         if (files.Count > 0)
             parts["files"].Append(string.Join(";", files));
@@ -224,10 +240,10 @@ public static partial class MemberDifferentialOracle
                 }
                 catch (Exception ex)
                 {
-                    parts["result"].Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
+                    StateRenderer.AppendThrown(parts["result"], ex, depth);
                 }
                 // Arguments and static state are observed whether the constructor returned or threw.
-                StateRenderer.Append(parts["args"], args, depth);
+                StateRenderer.AppendArguments(parts["args"], args, depth);
                 StateRenderer.AppendStatics(parts["statics"], type, depth);
                 return true;
             }
@@ -279,12 +295,44 @@ public static partial class MemberDifferentialOracle
         }
         catch (Exception ex)
         {
-            parts["result"].Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
+            StateRenderer.AppendThrown(parts["result"], ex, depth);
         }
-        StateRenderer.Append(parts["args"], arguments, depth);
+        StateRenderer.AppendArguments(parts["args"], arguments, depth);
         if (receiver is not null)
             StateRenderer.Append(parts["this"], receiver, depth);
         StateRenderer.AppendStatics(parts["statics"], type, depth);
         return true;
     }
+}
+
+/// <summary>
+/// #1667: a process-wide console writer whose target is the current input's buffer. The oracle installs one for
+/// standard output and one for standard error once per execution and retargets them per input, so a writer the
+/// subject captured from <see cref="Console.Out"/> earlier (in a type initializer, say) still reaches the input
+/// that writes through it, instead of a buffer nobody reads.
+/// </summary>
+internal sealed class ConsoleRouter : TextWriter
+{
+    public static readonly ConsoleRouter Out = new();
+    public static readonly ConsoleRouter Error = new();
+
+    private volatile TextWriter _target = Null;
+
+    public TextWriter Target
+    {
+        get => _target;
+        set => _target = value;
+    }
+
+    public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+    public override IFormatProvider FormatProvider => CultureInfo.InvariantCulture;
+
+    public override void Write(char value) => _target.Write(value);
+
+    public override void Write(string? value) => _target.Write(value);
+
+    public override void Write(char[] buffer, int index, int count) => _target.Write(buffer, index, count);
+
+    public override void Flush() => _target.Flush();
 }

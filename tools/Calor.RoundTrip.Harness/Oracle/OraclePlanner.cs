@@ -14,7 +14,19 @@ internal sealed record PlannedMember(string Type, string Member, string Kind, IR
     /// <summary>For the <c>&lt;hierarchy&gt;</c> member: the type's kind, visibility, base chain and interfaces.</summary>
     public string? Hierarchy { get; init; }
 
+    /// <summary>#1667: for a suffix segment, the member it continues (what <see cref="OraclePlanner.Rebind"/> looks up).</summary>
+    public string? Origin { get; init; }
+
+    /// <summary>#1667: the index of <see cref="Inputs"/>[0] in the origin member's input list (0 except for a suffix segment).</summary>
+    public int Offset { get; init; }
+
+    /// <summary>#1667: 0 for the member itself, n for its n-th suffix segment.</summary>
+    public int Segment { get; init; }
+
     public string Key => Type + "::" + Member;
+
+    /// <summary>The member as the subject declares it (a suffix segment's origin).</summary>
+    public string Callable => Origin ?? Member;
 }
 
 /// <summary>
@@ -45,8 +57,9 @@ internal static class OraclePlanner
     {
         var types = new Dictionary<string, Type>(StringComparer.Ordinal);
         foreach (var t in LoadTypes(assembly))
-            if (!IsCompilerGenerated(t) && (t.IsGenericTypeDefinition ? CloseType(t) : t) is { } usable)
-                types.TryAdd(StateRenderer.TypeName(usable), usable);
+            if (!IsCompilerGenerated(t))
+                foreach (var usable in t.IsGenericTypeDefinition ? CloseTypes(t) : [t])
+                    types.TryAdd(StateRenderer.TypeName(usable), usable);
         return types;
     }
 
@@ -77,6 +90,17 @@ internal static class OraclePlanner
         var types = typeScope.Contains(AllTypes)
             ? LoadTypes(assembly).Concat(typeScope.Where(n => n != AllTypes).Select(n => assembly.GetType(n, throwOnError: false)))
             : typeScope.Select(n => assembly.GetType(n, throwOnError: false));
+        // A type is planned once per rendered name: two plan entries under one name would run the same type twice and
+        // leave the other unexercised, so a collision is reported instead of silently merged.
+        var planned = new HashSet<string>(StringComparer.Ordinal);
+        void PlanOnce(Type t)
+        {
+            var name = StateRenderer.TypeName(t);
+            if (planned.Add(name))
+                PlanType(plan, t, options, chooseReceivers);
+            else
+                plan.Add(new PlannedMember(name, "<type> " + t.FullName, "type", [], "type name shared with another type (not driven twice)"));
+        }
         foreach (var candidate in types.Where(t => t is not null).Distinct().OrderBy(t => t!.FullName, StringComparer.Ordinal))
         {
             var type = candidate!;
@@ -84,14 +108,14 @@ internal static class OraclePlanner
                 continue;
             if (type.IsGenericTypeDefinition)
             {
-                if (CloseType(type) is not { } closed)
-                {
+                var closings = CloseTypes(type);
+                if (closings.Count == 0)
                     plan.Add(new PlannedMember(StateRenderer.TypeName(type), "<type>", "type", [], "open generic type (no closing argument meets its constraints)"));
-                    continue;
-                }
-                type = closed;
+                foreach (var closed in closings)
+                    PlanOnce(closed);
+                continue;
             }
-            PlanType(plan, type, options, chooseReceivers);
+            PlanOnce(type);
         }
         return plan;
     }
@@ -166,7 +190,7 @@ internal static class OraclePlanner
                 // An override of a method already taken from a more derived type is the same behavior.
                 if (!m.IsStatic && !seen.Add(m.GetBaseDefinition()))
                     continue;
-                result.Add((MethodKey(type, m), m.IsGenericMethodDefinition ? CloseMethod(m) : m, m));
+                AddClosings(result, MethodKey(type, m), m);
             }
         }
         if (!type.IsInterface && !type.IsAbstract)
@@ -191,12 +215,27 @@ internal static class OraclePlanner
                     if (im.IsStatic || im.Name.Contains('<') || (target.IsPublic && target.DeclaringType != iface)
                         || target.DeclaringType?.Assembly != type.Assembly)
                         continue;
-                    var key = "via " + StateRenderer.TypeName(iface) + "." + MethodKey(iface, im);
-                    result.Add((key, im.IsGenericMethodDefinition ? CloseMethod(im) : im, im));
+                    AddClosings(result, "via " + StateRenderer.TypeName(iface) + "." + MethodKey(iface, im), im);
                 }
             }
         }
         return result.OrderBy(x => x.Item1, StringComparer.Ordinal);
+    }
+
+    /// <summary>A method under its key; a generic method once per closing (the value-type closing keyed <c>key over System.Int32</c>),
+    /// or once with a null method when no closing fits.</summary>
+    private static void AddClosings(List<(string, MethodInfo?, MethodInfo)> result, string key, MethodInfo m)
+    {
+        if (!m.IsGenericMethodDefinition)
+        {
+            result.Add((key, m, m));
+            return;
+        }
+        var closings = CloseMethods(m);
+        if (closings.Count == 0)
+            result.Add((key, null, m));
+        for (var i = 0; i < closings.Count; i++)
+            result.Add((i == 0 ? key : key + " over " + StateRenderer.TypeName(closings[i].GetGenericArguments()[0]), closings[i], m));
     }
 
     /// <summary>Parameterless getters are observed as state; event accessors take delegates.</summary>
@@ -259,37 +298,51 @@ internal static class OraclePlanner
         return $"{type.Attributes & shape} valueType={type.IsValueType} base=[{string.Join(" < ", chain)}] interfaces=[{string.Join(", ", interfaces)}]";
     }
 
-    public static Type? CloseType(Type open)
+    public static Type? CloseType(Type open) => CloseTypes(open).FirstOrDefault();
+
+    public static MethodInfo? CloseMethod(MethodInfo open) => CloseMethods(open).FirstOrDefault();
+
+    /// <summary>The value type a generic is also closed over (#1667), when its constraints allow it.</summary>
+    public static readonly Type ValueClosing = typeof(int);
+
+    /// <summary>
+    /// #1667: the closings the oracle drives. The first of <see cref="ClosingArguments"/> that meets every constraint, as
+    /// before, and also <see cref="ValueClosing"/> when that first one is a reference type and <c>int</c> fits too. Code that
+    /// depends on <c>T</c> (<c>default(T)</c>, a null check, boxing, <c>typeof(T)</c>) can behave the same for
+    /// <c>object</c> and differently for a value type, so one reference closing alone could hide the change.
+    /// </summary>
+    private static List<T> Closings<T>(int arity, Func<Type[], T> make) where T : class
     {
+        var closings = new List<T>();
         foreach (var argument in ClosingArguments)
+        {
+            if (TryMake(argument) is { } first)
+            {
+                closings.Add(first);
+                if (!argument.IsValueType && TryMake(ValueClosing) is { } value)
+                    closings.Add(value);
+                break;
+            }
+        }
+        return closings;
+
+        T? TryMake(Type argument)
         {
             try
             {
-                return open.MakeGenericType(Enumerable.Repeat(argument, open.GetGenericArguments().Length).ToArray());
+                return make(Enumerable.Repeat(argument, arity).ToArray());
             }
             catch (ArgumentException)
             {
-                // A constraint rejects this argument; try the next.
+                // A constraint rejects this argument.
+                return null;
             }
         }
-        return null;
     }
 
-    public static MethodInfo? CloseMethod(MethodInfo open)
-    {
-        foreach (var argument in ClosingArguments)
-        {
-            try
-            {
-                return open.MakeGenericMethod(Enumerable.Repeat(argument, open.GetGenericArguments().Length).ToArray());
-            }
-            catch (ArgumentException)
-            {
-                // A constraint rejects this argument; try the next.
-            }
-        }
-        return null;
-    }
+    public static List<Type> CloseTypes(Type open) => Closings(open.GetGenericArguments().Length, open.MakeGenericType);
+
+    public static List<MethodInfo> CloseMethods(MethodInfo open) => Closings(open.GetGenericArguments().Length, open.MakeGenericMethod);
 
     /// <summary>A method's plan key. A method declared on another type is prefixed with its declaring type.</summary>
     public static string MethodKey(Type owner, MethodInfo m) =>
@@ -305,9 +358,43 @@ internal static class OraclePlanner
     public static MemberInfo? Rebind(Type type, PlannedMember member) => member.Kind switch
     {
         "statics" or "enum-values" => type,
-        "construct" => type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(c => "ctor" + Signature(c) == member.Member),
-        _ => Callables(type).FirstOrDefault(c => c.Key == member.Member).Method,
+        "construct" => type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(c => "ctor" + Signature(c) == member.Callable),
+        _ => Callables(type).FirstOrDefault(c => c.Key == member.Callable).Method,
     };
+
+    /// <summary>Suffix segments a member may get (#1667): after this many failing inputs, the rest of its inputs are dropped.</summary>
+    public const int MaxSegments = 3;
+
+    /// <summary>
+    /// #1667: the plan with a suffix segment after every limited member. A member limited at input k (it timed out or
+    /// crashed there) used to stop at k, so inputs after k were never compared. Each limit now adds a segment that
+    /// drives inputs k+1 onward, right after the member, keyed <c>Member [inputs k+1..]</c>. A segment can be limited in
+    /// turn, up to <see cref="MaxSegments"/> segments per member. The expansion is a pure function of the plan and the
+    /// limits, so the main runs, the restarts and every replay derive the same plan.
+    /// </summary>
+    public static List<PlannedMember> Expand(IEnumerable<PlannedMember> plan, IReadOnlyDictionary<string, int> limits)
+    {
+        var expanded = new List<PlannedMember>();
+        foreach (var member in plan)
+        {
+            expanded.Add(member);
+            var current = member;
+            while (current.Segment + 1 < MaxSegments && limits.TryGetValue(current.Key, out var k) && k + 1 < current.Inputs.Count)
+            {
+                var from = current.Offset + k + 1;
+                current = current with
+                {
+                    Member = member.Member + $" [inputs {from}..]",
+                    Origin = member.Member,
+                    Inputs = member.Inputs.Skip(from).ToList(),
+                    Offset = from,
+                    Segment = current.Segment + 1,
+                };
+                expanded.Add(current);
+            }
+        }
+        return expanded;
+    }
 }
 
 /// <summary>

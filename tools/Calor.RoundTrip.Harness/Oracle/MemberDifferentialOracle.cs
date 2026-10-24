@@ -8,26 +8,29 @@ namespace Calor.RoundTrip.Harness.Oracle;
 /// #1587: the member-level differential oracle. Given two builds of the same subject (the original, and one
 /// with a single file swapped for its round-tripped C#), it drives the members <see cref="OraclePlanner"/>
 /// plans on both and compares what it observes: construction state to <see cref="OracleOptions.Depth"/>;
-/// return value, thrown exception type, argument state after the call (including <c>ref</c>/<c>out</c>),
-/// the receiver's state, the type's public static state, console output and created files; the public
-/// static state of every project type after each input; static state after type initialization; enum
+/// return value, thrown exception (type, message, data and state), argument state after the call (including
+/// <c>ref</c>/<c>out</c>), the receiver's state, the type's public static state, standard output and error, and
+/// created files and directories; the public and private static state of every project type after each input;
+/// static state after type initialization; enum
 /// values; and the surface (members, kind, visibility, base chain and interfaces). A member present in only
 /// one build is a difference.
 ///
 /// <para>Each build runs twice, every run in a fresh collectible load context, in the order original,
 /// converted, original, converted, so each run starts from clean static state. Each observation has named
-/// parts (result, args, this, statics, project, stdout, files), compared one by one: a part counts only when
-/// both builds reproduce it on re-run, and a nondeterministic part is set aside alone, so it never hides a
-/// stable difference in another part. The member is NONDETERMINISTIC only when no part of any input was
-/// reproducible. A setup (receiver, arguments) or observation failure identical on both builds, or a part
+/// parts (result, args, this, statics, project, private-statics, stdout, stderr, files; see README.md),
+/// compared one by one: a part counts only when both builds reproduce it on re-run, and a part neither build
+/// reproduces is set aside alone, so it never hides a stable difference in another part. A part one build
+/// reproduces on every input and the other does not is a difference (#1667). The member is NONDETERMINISTIC
+/// only when no part of any input was reproducible. A setup (receiver, arguments) or observation failure identical on both builds, or a part
 /// rendered incompletely on both, is not counted as compared.</para>
 ///
 /// <para>A member input that times out or crashes is handled by restarting with the member limited to the
 /// inputs before it, so every run executes the same inputs in the same order; the failing input is then
 /// replayed from clean state (preceding members and inputs included), twice per build. A build that fails
 /// where the other finishes quickly is a difference (HANG or CRASH); a failure both builds reproduce is
-/// TIMEOUT (the prefix is still compared); disagreeing replays are NONDETERMINISTIC; a replay that never
-/// reached the input is INCONCLUSIVE. AGREE means no disagreement on this finite input set; it is not a proof.</para>
+/// TIMEOUT (the prefix is still compared, and the inputs after the failing one run as a suffix segment);
+/// a hang on one build and a crash on the other is a difference; disagreeing replays are NONDETERMINISTIC; a
+/// replay that never reached the input is INCONCLUSIVE. AGREE means no disagreement on this finite input set; it is not a proof.</para>
 /// </summary>
 public static partial class MemberDifferentialOracle
 {
@@ -81,12 +84,15 @@ public static partial class MemberDifferentialOracle
         // In-process mode restarts here on a timeout; child mode exits and the parent restarts the process.
         var limits = new Dictionary<string, int>(options.Limits, StringComparer.Ordinal);
         Dictionary<string, MemberRun>[] runs;
+        List<PlannedMember> expanded;
         while (true)
         {
+            // A limited member gets a suffix segment for the inputs after its failing one (#1667).
+            expanded = OraclePlanner.Expand(runnable, limits);
             try
             {
                 var o = options with { Limits = limits };
-                runs = [Run(original, "run1", runnable, o), Run(candidate, "run1", runnable, o), Run(original, "run2", runnable, o), Run(candidate, "run2", runnable, o)];
+                runs = [Run(original, "run1", expanded, o), Run(candidate, "run1", expanded, o), Run(original, "run2", expanded, o), Run(candidate, "run2", expanded, o)];
                 break;
             }
             catch (TimeoutRestart restart)
@@ -95,7 +101,7 @@ public static partial class MemberDifferentialOracle
             }
         }
 
-        foreach (var member in runnable)
+        foreach (var member in expanded)
         {
             var verdict = Judge(member, runs.Select(r => r[member.Key]).ToArray(), limits.TryGetValue(member.Key, out var k) ? k : null, options);
             if (verdict.LimitedAt is { } at && options.OnTimeout is null)
@@ -121,7 +127,7 @@ public static partial class MemberDifferentialOracle
     /// <summary>Separates an observation's parts; a part name never contains the separators.</summary>
     internal const char PartSeparator = '\u001e', NameSeparator = '\u001f';
 
-    /// <summary>The named parts of one observation: result, args, this, statics, project, stdout, files (or setup).</summary>
+    /// <summary>The named parts of one observation: result, args, this, statics, project, private-statics, stdout, stderr, files (or setup).</summary>
     internal static Dictionary<string, string> Parts(string observation)
     {
         var parts = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -142,12 +148,18 @@ public static partial class MemberDifferentialOracle
     /// A part rendered identically but incompletely is reported, because it can hide a difference.
     /// </summary>
     internal static (List<(string Part, string A, string B)> Differing, List<string> Unstable, bool Compared, List<string> Incomplete) CompareParts(
-        string a1, string a2, string b1, string b2)
+        string a1, string a2, string b1, string b2) =>
+        CompareParts(a1, a2, b1, b2, out _);
+
+    /// <summary>As above; <paramref name="sides"/> says, for each unstable part, which build failed to reproduce it.</summary>
+    internal static (List<(string Part, string A, string B)> Differing, List<string> Unstable, bool Compared, List<string> Incomplete) CompareParts(
+        string a1, string a2, string b1, string b2, out List<(string Part, bool OriginalStable, bool ConvertedStable)> sides)
     {
         var (pa1, pa2, pb1, pb2) = (Parts(a1), Parts(a2), Parts(b1), Parts(b2));
         var differing = new List<(string, string, string)>();
         var unstable = new List<string>();
         var incomplete = new List<string>();
+        sides = [];
         var compared = false;
         // The member's own outcome: it must be reproducible and complete for the input to count as compared (other parts,
         // such as an empty stdout, are always stable and prove nothing on their own).
@@ -160,6 +172,7 @@ public static partial class MemberDifferentialOracle
             if (x1 != x2 || y1 != y2)
             {
                 unstable.Add(name);
+                sides.Add((name, x1 == x2, y1 == y2));
                 continue;
             }
             if (x1 != y1)
@@ -183,11 +196,29 @@ public static partial class MemberDifferentialOracle
         (string Label, string Part, string X, string Y)? firstUnstable = null;
         var executed = 0;
         var incompleteParts = new SortedSet<string>(StringComparer.Ordinal);
+        // Per part: inputs on which each build failed to reproduce it, and the first such input (#1667, one-sided nondeterminism).
+        var unstableOn = new SortedDictionary<string, (int Original, int Converted, (string Label, string Stable, string X, string Y, bool ConvertedUnstable)? First)>(StringComparer.Ordinal);
         for (var i = 0; i < n; i++)
         {
-            var label = MemberOracleInputs.Render(member.Inputs[i]);
-            var (diff, unstable, compared, incomplete) = CompareParts(a1[i], a2[i], b1[i], b2[i]);
+            // The input's absolute index is part of its label, so two inputs that render alike (or a difference that moves to
+            // another input) never share a witness or a fingerprint.
+            var label = $"#{member.Offset + i} " + MemberOracleInputs.Render(member.Inputs[i]);
+            var (diff, unstable, compared, incomplete) = CompareParts(a1[i], a2[i], b1[i], b2[i], out var sides);
             incompleteParts.UnionWith(incomplete);
+            foreach (var (part, originalStable, convertedStable) in sides)
+            {
+                var entry = unstableOn.GetValueOrDefault(part);
+                entry.Original += originalStable ? 0 : 1;
+                entry.Converted += convertedStable ? 0 : 1;
+                if (entry.First is null && originalStable != convertedStable)
+                {
+                    string Part(string observation) => Parts(observation).GetValueOrDefault(part, "<absent>");
+                    entry.First = originalStable
+                        ? ($"{label} [{part}]", Part(a1[i]), Part(b1[i]), Part(b2[i]), true)
+                        : ($"{label} [{part}]", Part(b1[i]), Part(a1[i]), Part(a2[i]), false);
+                }
+                unstableOn[part] = entry;
+            }
             differing.AddRange(diff.Select(d => ($"{label} [{d.Part}]", d.A, d.B)));
             foreach (var part in unstable)
             {
@@ -213,6 +244,21 @@ public static partial class MemberDifferentialOracle
                 Fingerprint = Hash(string.Join("\u0000", differing.Select(d => $"{d.Label}\u0001{d.A}\u0002{d.B}"))),
             };
         }
+        // #1667: a part one build reproduces on every input while the other build does not reproduce it on some input. The
+        // same code run twice in fresh contexts either is deterministic or is not; a conversion that turns a stable value
+        // into a changing one (or the reverse) is a behavior change, not noise to set aside.
+        if (unstableOn.FirstOrDefault(kv => (kv.Value.Original == 0) != (kv.Value.Converted == 0)) is { Key: { } oneSidedPart, Value.First: { } one })
+        {
+            var (stableArm, unstableArm) = one.ConvertedUnstable ? ("original", "converted") : ("converted", "original");
+            return verdict with
+            {
+                Status = MemberStatus.Different, Inputs = executed,
+                Reason = $"ONE-SIDED-NONDETERMINISM: the {oneSidedPart} part is reproducible on every input of the {stableArm} build but not on the {unstableArm} build",
+                Witnesses = [$"{member.Member} {one.Label}: {stableArm} (both runs) {Excerpt(one.Stable)} | {Witness(member.Member, one.Label, one.X, one.Y, unstableArm + " run1", "run2")}"],
+                // The changing values never enter the fingerprint, so it is stable across runs.
+                Fingerprint = Hash($"ONE-SIDED\u0001{oneSidedPart}\u0001{unstableArm}\u0001{one.Label}\u0001{one.Stable}"),
+            };
+        }
         // A part that could not be rendered in full may hide a difference: the member is never AGREE and never counts as
         // compared coverage (any stable difference elsewhere has already failed above).
         if (incompleteParts.Count > 0)
@@ -233,7 +279,13 @@ public static partial class MemberDifferentialOracle
             };
         }
         if (limitedAt is not null)
-            return verdict with { Status = MemberStatus.Timeout, Inputs = executed, Reason = $"input {limitedAt} timed out or crashed; the {executed} inputs before it agree" + (unstableNote is null ? "" : $" ({unstableNote})") };
+            return verdict with
+            {
+                Status = MemberStatus.Timeout, Inputs = executed,
+                Reason = $"input {limitedAt} of this segment (#{member.Offset + limitedAt}) timed out or crashed; the {executed} inputs before it agree"
+                    + (member.Segment + 1 < OraclePlanner.MaxSegments && limitedAt + 1 < member.Inputs.Count ? "; the inputs after it run as the next segment" : "; no further segment")
+                    + (unstableNote is null ? "" : $" ({unstableNote})"),
+            };
         if (executed == 0)
             return verdict with { Status = MemberStatus.Skipped, Reason = "no input could be compared: setup or observation failed, or the observation was incomplete, on both builds" };
         var notRun = n - executed;
@@ -312,6 +364,17 @@ public static partial class MemberDifferentialOracle
                 Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
             });
         }
+        // #1667: both builds fail, but differently (one hangs where the other crashes, reproduced twice each): the failure
+        // itself changed, so it is a difference, not a shared timeout.
+        if (!o.Finished && !c.Finished && o.Outcome != c.Outcome)
+        {
+            return ($"FAILURE-MODE:{o.Outcome}/{c.Outcome}", prefix with
+            {
+                Status = MemberStatus.Different, Reason = "FAILURE-MODE",
+                Fingerprint = Hash($"FAILURE-MODE\u0001{prefix.Key}\u0001{k}\u0001{o.Outcome}\u0001{c.Outcome}"),
+                Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
+            });
+        }
         return (o.Finished && c.Finished ? "agrees" : $"both-fail:{o.Outcome}/{c.Outcome}", prefix with
         {
             Reason = !o.Finished && !c.Finished
@@ -319,6 +382,8 @@ public static partial class MemberDifferentialOracle
                 : $"input {k} failed in the run but not when replayed ({summary}); the {prefix.Inputs} inputs before it agree",
         });
     }
+
+    private static string Excerpt(string s) => s.Length <= 200 ? s : s[..200] + "…";
 
     internal static string Hash(string? s) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(s ?? "")))[..32];
 
