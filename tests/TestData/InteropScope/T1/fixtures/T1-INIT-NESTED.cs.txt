@@ -1,0 +1,97 @@
+// 0.27 (#1524, #1541) shared control: initializer shapes Calor has no native form for. A nested
+// member initializer (`Items = { 1, 2 }`, `Inner = { A = 1 }`) adds to or sets members of the
+// object the constructor already made; it does not assign a new one. Index initializers
+// (`["a"] = 1`) overwrite, Add-form entries (`{ "a", 1 }`) throw on duplicates, a custom
+// Add-collection calls its own Add, and a target-typed `new() { ... }` and initializer values
+// that call methods keep their order relative to the constructor.
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+public class Inner
+{
+    public int A { get; set; }
+    public int B { get; set; } = 7;
+}
+
+public class Bag : IEnumerable<int>
+{
+    public static string Log = "";
+    private readonly List<int> _items = new List<int>();
+
+    public void Add(int item)
+    {
+        Log += "add" + item + ";";
+        _items.Add(item * 10);
+    }
+
+    public int Sum()
+    {
+        var sum = 0;
+        foreach (var i in _items) sum += i;
+        return sum;
+    }
+
+    public IEnumerator<int> GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public class Outer
+{
+    public static string Log = "";
+
+    public Outer()
+    {
+        Log += "ctor;";
+        Items.Add(0);
+    }
+
+    public List<int> Items { get; } = new List<int>();
+    public Inner Inner { get; } = new Inner();
+    public Dictionary<string, int> Map { get; } = new Dictionary<string, int>();
+    public int V { get; set; }
+}
+
+public class Holder
+{
+    public Outer O = new Outer { Items = { 1, 2 }, Inner = { A = 1 }, Map = { ["k"] = 5 } };
+    public Dictionary<string, int> Index = new Dictionary<string, int> { ["a"] = 1, ["a"] = 2 };
+    public Dictionary<string, int> Adds = new Dictionary<string, int> { { "a", 1 }, { "b", 2 } };
+    public Bag Bag = new Bag { 1, 2 };
+    public List<int> Target = new() { 4, 5 };
+    public Inner TargetObject = new() { A = 3 };
+    public int After = 9;
+}
+
+public static class Probe
+{
+    static int Tag(string t, int v)
+    {
+        Outer.Log += t + ";";
+        return v;
+    }
+
+    public static string Run()
+    {
+        Outer.Log = "";
+        Bag.Log = "";
+        var h = new Holder();
+        var local = new Outer { V = Tag("v", 3), Items = { Tag("i", 4) } };
+        var localBag = new Bag { 7 };
+        var localMap = new Dictionary<string, int> { ["x"] = Tag("x", 1) };
+        string dup;
+        try
+        {
+            var d = new Dictionary<string, int> { { "a", 1 }, { "a", 2 } };
+            dup = "no-throw" + d.Count;
+        }
+        catch (ArgumentException)
+        {
+            dup = "throw";
+        }
+        return string.Join(",", h.O.Items) + "|" + h.O.Inner.A + h.O.Inner.B + "|" + h.O.Map["k"]
+            + "|" + h.Index["a"] + h.Index.Count + "|" + h.Adds["b"] + "|" + h.Bag.Sum() + "|" + string.Join(",", h.Target)
+            + "|" + h.TargetObject.A + "|" + local.V + string.Join(",", local.Items) + "|" + localBag.Sum()
+            + "|" + localMap["x"] + "|" + dup + "|" + h.After + "|" + Outer.Log + "|" + Bag.Log;
+    }
+}

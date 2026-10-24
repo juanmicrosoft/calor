@@ -235,6 +235,47 @@
       ],
       "fixture": "tests/TestData/InteropScope/F1/fixtures/X-INT-08.cs.txt",
       "expected": "native-or-preserved"
+    },
+    {
+      "id": "T1-INIT-COLLECTION-DEFAULTS",
+      "covers": [
+        "collection-initializer-member-defaults",
+        "nested-collection-member-defaults"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INIT-COLLECTION-DEFAULTS.cs.txt",
+      "expected": "native"
+    },
+    {
+      "id": "T1-INIT-OBJECT",
+      "covers": [
+        "object-initializer-member-defaults",
+        "object-initializer-locals",
+        "object-initializer-order"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INIT-OBJECT.cs.txt",
+      "expected": "native"
+    },
+    {
+      "id": "T1-INIT-NESTED",
+      "covers": [
+        "nested-member-initializers",
+        "dictionary-index-initializers",
+        "custom-add-collection-initializers",
+        "target-typed-initializers"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INIT-NESTED.cs.txt",
+      "expected": "preserved"
+    },
+    {
+      "id": "T1-INIT-ORDER",
+      "covers": [
+        "initializer-nested-constructor-order",
+        "initializer-lambda-values",
+        "initializer-tuple-anonymous-siblings",
+        "initializer-default-of-struct"
+      ],
+      "fixture": "tests/TestData/InteropScope/T1/fixtures/T1-INIT-ORDER.cs.txt",
+      "expected": "native-or-preserved"
     }
   ]
 }

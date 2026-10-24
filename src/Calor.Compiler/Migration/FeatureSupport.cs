@@ -271,7 +271,13 @@ public static class FeatureSupport
         {
             Name = "object-initializer",
             Support = SupportLevel.Full,
-            Description = "Object initializers are converted to Calor §NEW with property assignments"
+            Description = "Object initializers of plain Name = value assignments are converted to Calor §NEW with property assignments; other shapes are preserved (initializer-interop)"
+        },
+        ["initializer-interop"] = new FeatureInfo
+        {
+            Name = "initializer-interop",
+            Support = SupportLevel.Partial,
+            Description = "Object and collection initializers with no faithful native form are preserved verbatim as inline C# interop and reported as a loss: nested member initializers (P = { ... }), indexer and multi-value element initializers, Add-collections other than List<T>/HashSet<T>, values or constructor arguments the emitter could hoist ahead of the constructor, and initializers outside a local, field or property initializer, return, expression or lambda body, foreach source, switch arm or plain assignment statement (a tuple, anonymous object or collection expression holding one is preserved whole). Event field initializers keep their member as C#."
         },
         ["dictionary-initializer"] = new FeatureInfo
         {

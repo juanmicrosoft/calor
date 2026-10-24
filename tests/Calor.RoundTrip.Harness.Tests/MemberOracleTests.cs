@@ -32,7 +32,10 @@ public class MemberOracleTests
         }
         """;
 
-    /// <summary>What <c>calor convert</c> then <c>calor --input</c> produced for the repro at HEAD 512491093 and 54ae66ee9.</summary>
+    /// <summary>
+    /// What <c>calor convert</c> then <c>calor --input</c> produced for the repro at HEAD 512491093 and 54ae66ee9,
+    /// before #1541 and #1524 were fixed. Kept verbatim as the injected miscompilation the oracle must flag.
+    /// </summary>
     public const string HolderMiscompiled = """
         using System.Collections.Generic;
         using System.Text;
@@ -87,19 +90,21 @@ public class MemberOracleTests
     }
 
     /// <summary>
-    /// The real converter, with the CLI's default (Lossless) options. While the converter still miscompiles
-    /// the repro (#1541, #1524), the oracle must flag it; once it is fixed, the round-trip must agree.
+    /// The real converter, with the CLI's default (Lossless) options. Since #1541 and #1524 were fixed the
+    /// repro converts natively and without a loss, and the round-trip agrees at construction depth 2.
+    /// <see cref="Repro_InjectedMiscompilation_FailsAtConstructionDepth2"/> keeps the pre-fix output as the
+    /// injected miscompilation the oracle must still flag.
     /// </summary>
     [Fact]
-    public void Repro_RealConverter_IsFlaggedWhileTheConverterStillMiscompilesIt()
+    public void Repro_RealConverter_RoundTripAgrees()
     {
         var result = OracleRunner.RoundTrip(HolderSource, "Holder.cs", global::Calor.Tests.Shared.HermeticCalorHome.EmptyManifestRoot);
         Assert.Equal("converted", result.Status);
-        Assert.False(result.LossRecorded, "the repro is reported lossless; the oracle is what catches it");
+        Assert.False(result.LossRecorded, "the repro converts natively; nothing is preserved as C#");
+        Assert.DoesNotContain("new List<int>(5)", result.CSharp!, StringComparison.Ordinal);
+        Assert.Contains("Capacity = 64", result.CSharp!, StringComparison.Ordinal);
         var ctor = Single(Compare(HolderSource, result.CSharp!, ["Holder"]), "ctor()");
-        var stillBroken = result.CSharp!.Contains("new List<int>(5)", StringComparison.Ordinal)
-            || !result.CSharp.Contains("Capacity", StringComparison.Ordinal);
-        Assert.Equal(stillBroken ? MemberStatus.Different : MemberStatus.Agree, ctor.Status);
+        Assert.Equal(MemberStatus.Agree, ctor.Status);
     }
 
     // ---- Methods ------------------------------------------------------------------------------

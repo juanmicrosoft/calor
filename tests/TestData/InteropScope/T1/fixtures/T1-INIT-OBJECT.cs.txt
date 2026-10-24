@@ -1,0 +1,86 @@
+// 0.27 (#1524) shared control: object initializers on fields, properties and locals. Every
+// assignment must survive (`new StringBuilder { Capacity = 64 }` keeps Capacity 64), run after
+// the constructor and in source order, and an auto-property default must be created once (the
+// same object on every read, and a later write through the setter must stick).
+using System.Collections.Generic;
+using System.Text;
+
+public class Point
+{
+    public static string Log = "";
+    private int _x;
+    private int _y;
+
+    public Point()
+    {
+        Log += "ctor;";
+    }
+
+    public int X
+    {
+        get => _x;
+        set { Log += "X=" + value + ";"; _x = value; }
+    }
+
+    public int Y
+    {
+        get => _y;
+        set { Log += "Y=" + value + ";"; _y = value; }
+    }
+
+    public string Name { get; set; } = "";
+}
+
+public class Holder
+{
+    public const int Base = 10;
+    public StringBuilder Field = new StringBuilder { Capacity = 64 };
+    public StringBuilder Sb { get; set; } = new StringBuilder { Capacity = 65 };
+    public Point P { get; } = new Point { Y = 2, X = 1 };
+    public static Point Shared = new Point { X = Base + 1, Name = "s" };
+    public Point Called = new Point { X = Seed(1), Y = Seed(2) };
+    public List<int> Seeds = new List<int> { Seed(3), Seed(4) };
+    public int After = 5;
+
+    public static int Seed(int v)
+    {
+        Point.Log += "seed" + v + ";";
+        return v;
+    }
+}
+
+public static class Probe
+{
+    static int Next(int v)
+    {
+        Point.Log += "next" + v + ";";
+        return v;
+    }
+
+    static int Take(int a, Point p)
+    {
+        Point.Log += "take;";
+        return a * 10 + p.X;
+    }
+
+    public static string Run()
+    {
+        Point.Log = "";
+        var h = new Holder();
+        var same = ReferenceEquals(h.P, h.P);
+        var first = h.Sb;
+        h.Sb = new StringBuilder { Capacity = 99 };
+        var local = new StringBuilder { Capacity = 70 };
+        var p = new Point { X = Next(3), Y = Next(4), Name = "local" };
+        var q = new Point { Y = -p.X, X = p.Y * 2 };
+        Point assigned;
+        assigned = new Point { X = Next(6) };
+        var taken = Take(Next(5), assigned);
+        var argument = Take(Next(9), new Point { X = Next(10) });
+        var arr = new Point[] { new Point { X = Next(7) }, new Point { Y = Next(8) } };
+        return h.Field.Capacity + "|" + first.Capacity + "|" + h.Sb.Capacity + "|" + h.P.X + "," + h.P.Y
+            + "|" + same + "|" + Holder.Shared.X + Holder.Shared.Name + "|" + local.Capacity
+            + "|" + p.X + "," + p.Y + p.Name + "|" + q.X + "," + q.Y + "|" + h.Called.X + h.Called.Y + "|" + string.Join(",", h.Seeds)
+            + "|" + taken + "," + argument + "|" + arr[0].X + arr[1].Y + "|" + h.After + "|" + Point.Log;
+    }
+}
