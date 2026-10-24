@@ -215,7 +215,10 @@ public class Calor0270CorpusVolumeTests
     // #943 (0.25 F1): serilog 34/11 -> 16/7. Members whose C# `out var` has no type the per-file
     // semantic model can resolve, or whose statement keeps part of itself as C#, are now preserved
     // as C# (RO-DECL-1), so their unresolved receivers are no longer bound: 313/37 -> 295/33.
-    private const int AggregateDiagnostics = 295;
+    // #1632 (0.27): FluentValidation Internal/CollectionPropertyRule.cs no longer drops the statement
+    // after its `AfterValidate:` label; the restored `foreach (var dependentRule in DependentRules)`
+    // body reads members of an inferred local, one more unresolved receiver: 295/33 -> 296/33.
+    private const int AggregateDiagnostics = 296;
     private const int AggregateModulesWithDiagnostics = 33;
     private const int PreK1AggregateModulesBound = 364;
 

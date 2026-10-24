@@ -17,8 +17,11 @@ namespace Calor.Compiler.Tests.ConversionReporting;
 /// </summary>
 public class LossyRoundTripReportingTests : IDisposable
 {
-    /// <summary>A label before the last statement: the lossy output drops the return and does not compile.</summary>
-    private const string TrailingLabel = "public class G { public int M(int x) { here: return x; } }";
+    /// <summary>
+    /// A private static property with accessor bodies: the lossy output does not compile (CS0273/CS0274).
+    /// #1632 fixed the previous input, a label before the last statement, whose statement was dropped.
+    /// </summary>
+    private const string TrailingLabel = "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }";
 
     /// <summary>A second, unrelated input: yield inside try/finally emits C# that does not compile.</summary>
     private const string YieldInTryFinally =

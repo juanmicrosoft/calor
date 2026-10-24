@@ -109,17 +109,17 @@ reported as `passthrough`; C# the converter keeps in every mode stays `interop`.
 So on the command line `--passthrough` rarely changes the report unless you also
 pass `--lossy`.
 
-Try it on a method whose last statement carries a label:
+Try it on a class with a private static property that has accessor bodies (its
+converted C# does not compile yet, so the round trip fails):
 
 ```csharp
 // Counter.cs
 public class Counter
 {
-    public int Next(int x)
-    {
-        done:
-        return x + 1;
-    }
+    private static int count;
+    private static int Count { get { return count; } set { count = value; } }
+
+    public int Next() { Count = Count + 1; return Count; }
 }
 ```
 
