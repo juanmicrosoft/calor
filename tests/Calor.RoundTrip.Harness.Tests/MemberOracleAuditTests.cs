@@ -978,4 +978,20 @@ public class MemberOracleAuditTests
         OracleRunner.ApplyGate("P", new OracleBaseline { Entries = [entry] }, new OracleExpected(), changed, ["a.cs"], new HashSet<string> { "a.cs" });
         Assert.Contains(changed.Gate, g => g.Decision == "baseline-changed");
     }
+
+    /// <summary>
+    /// A converted value that happens to repeat in both main runs, then changes, is not set aside as an unconfirmed
+    /// difference: the original keeps one value on every run, so it is one-sided. Process-wide AppContext data (it
+    /// survives load contexts) makes the converted build return "A" on its first two runs and a new value after.
+    /// </summary>
+    [Fact]
+    public void DifferenceThatOnlyOneBuildStopsReproducing_IsOneSided()
+    {
+        var key = "orc27-" + Guid.NewGuid().ToString("N");
+        var converted = "public static class S { public static string F() { var n = (int)(System.AppContext.GetData(\"" + key + "\") ?? 0); "
+            + "System.AppContext.SetData(\"" + key + "\", n + 1); return n < 2 ? \"A\" : \"B\" + n; } }";
+        var f = Single(Compare("public static class S { public static string F() => \"fixed\"; }", converted, ["S"]), "static F()->System.String");
+        AssertDifferent(f, "fixed");
+        Assert.StartsWith("ONE-SIDED-NONDETERMINISM", f.Reason, StringComparison.Ordinal);
+    }
 }

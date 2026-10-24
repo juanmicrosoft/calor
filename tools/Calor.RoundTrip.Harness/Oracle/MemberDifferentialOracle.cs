@@ -244,6 +244,8 @@ public static partial class MemberDifferentialOracle
         var (a1, b1, a2, b2) = (r[0].Observations, r[1].Observations, r[2].Observations, r[3].Observations);
         var differing = new List<(string Label, string A, string B)>();
         var unconfirmed = new SortedSet<string>(StringComparer.Ordinal);
+        // Unconfirmed differences that only one build failed to reproduce: one-sided candidates found by the extra runs.
+        var oneSidedFromConfirmation = new HashSet<(string Part, bool ConvertedUnstable)>();
         var unstableParts = new SortedDictionary<string, int>(StringComparer.Ordinal);
         (string Label, string Part, string X, string Y)? firstUnstable = null;
         var executed = 0;
@@ -268,9 +270,13 @@ public static partial class MemberDifferentialOracle
             {
                 // With confirmation runs, a difference counts only when every run of each build reproduces the part: a
                 // low-entropy value can repeat by chance in two runs per build (#1667).
-                if (r.Length > 4 && !(Reproduced(r, i, d.Part, original: true) && Reproduced(r, i, d.Part, original: false)))
+                if (r.Length > 4 && (Reproduced(r, i, d.Part, original: true), Reproduced(r, i, d.Part, original: false)) is var (originalHolds, convertedHolds)
+                    && !(originalHolds && convertedHolds))
                 {
                     unconfirmed.Add(d.Part);
+                    // A value one build kept and the other changed is still a candidate behavior change (one-sided).
+                    if (originalHolds != convertedHolds)
+                        oneSidedFromConfirmation.Add((d.Part, ConvertedUnstable: originalHolds));
                     unstableParts[d.Part] = unstableParts.GetValueOrDefault(d.Part) + 1;
                     continue;
                 }
@@ -311,7 +317,8 @@ public static partial class MemberDifferentialOracle
         // same code run in fresh contexts either is deterministic or is not; a conversion that turns a stable value into a
         // changing one (or the reverse) is a behavior change, not noise to set aside. It is confirmed on more runs first.
         var candidates = unstableOn.Where(kv => (kv.Value.Original == 0) != (kv.Value.Converted == 0))
-            .Select(kv => (Part: kv.Key, ConvertedUnstable: kv.Value.Original == 0)).ToList();
+            .Select(kv => (Part: kv.Key, ConvertedUnstable: kv.Value.Original == 0))
+            .Union(oneSidedFromConfirmation).ToList();
         string? oneSidedNote = null;
         if (candidates.Count > 0 && r.Length == 4)
         {
