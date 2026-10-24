@@ -215,8 +215,12 @@ public class Calor0270CorpusVolumeTests
     // #943 (0.25 F1): serilog 34/11 -> 16/7. Members whose C# `out var` has no type the per-file
     // semantic model can resolve, or whose statement keeps part of itself as C#, are now preserved
     // as C# (RO-DECL-1), so their unresolved receivers are no longer bound: 313/37 -> 295/33.
-    private const int AggregateDiagnostics = 295;
-    private const int AggregateModulesWithDiagnostics = 33;
+    // #1541/#1524 (0.27): object and collection initializers with no exact Calor form are kept as
+    // a typed §CS creation, so calls through the receivers they initialize (FluentValidation.Tests
+    // `var validator = new TestValidator { … }; validator.Validate(…)`) report SignatureUnresolved:
+    // FluentValidation 250/22 -> 329/35, serilog 16/7 -> 18/8 (KeyValuePairSettings.cs): 295/33 -> 376/47.
+    private const int AggregateDiagnostics = 376;
+    private const int AggregateModulesWithDiagnostics = 47;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>

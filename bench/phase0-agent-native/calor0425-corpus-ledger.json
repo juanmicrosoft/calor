@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "7631dc52eb4442808e2c1c671056bf3c7072ea89",
+  "MeasuredCommit": "53479ac5336e2c09183b94ef42387099249c7a83",
   "AggregateDiagnostics": 143,
   "AggregateModulesWithDiagnostics": 52,
   "AggregateModulesEnforced": 276,
@@ -265,7 +265,7 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 6755,
+      "Calor0411Sites": 6174,
       "Calor0411Modules": 114
     }
   ]
