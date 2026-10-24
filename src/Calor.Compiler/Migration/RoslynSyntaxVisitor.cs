@@ -7478,6 +7478,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // argument with a call, the call under a member access); those run after every hoist
         // here, so they count as hoisted too.
         var rightHoisted = HoistsHaveEffects(mark) || EmitterMayHoist(value);
+        // Codex round 1: a range or index-from-end bound with a call is hoisted by the emitter
+        // only in some positions, and parses as extra call arguments in others; it stays C#.
+        if (rightHoisted && HasMarkerRangeBound(value))
+            throw EscalateExpression(site, "compound-assignment-order");
         // Codex round 3: a target that is neither a fixed location nor decomposed into parts (a
         // ref-returning property, an index with a user-defined conversion) is evaluated where it
         // stands, after whatever the right-hand side hoisted.
@@ -7495,6 +7499,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // after the hoisted statements; a compound read is bound ahead of them and throws first.
         if (op == null && rightHoisted && parts is { HasParts: true }
             && (parts.Arguments == null ? parts.Path.Count > 1 : parts.Path.Count > 0))
+            throw EscalateExpression(site, "compound-assignment-order");
+        // Codex round 1: the same for a struct field of another type's static field (`H.s.X = …`):
+        // locating it runs H's static constructor before the right-hand side.
+        if (op == null && rightHoisted && IsStaticStructFieldPath(left))
             throw EscalateExpression(site, "compound-assignment-order");
         var rightSyntax = right != null ? new List<ExpressionSyntax> { right } : new List<ExpressionSyntax>();
 
@@ -7555,6 +7563,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             bound++;
         }
         return bound;
+    }
+
+    // #1677 (Codex round 1): `H.s.X` — a member of a struct reached through a static field of a
+    // type whose initializer this code has not necessarily run.
+    private bool IsStaticStructFieldPath(ExpressionSyntax left)
+    {
+        var model = _semanticModel!;
+        var current = Unparen(left);
+        var peeled = false;
+        while (current is MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression } member
+               && model.GetTypeInfo(member.Expression).Type is { IsValueType: true }
+               && model.GetSymbolInfo(member.Expression).Symbol is not INamedTypeSymbol)
+        {
+            current = Unparen(member.Expression);
+            peeled = true;
+        }
+        return peeled && model.GetSymbolInfo(current).Symbol is IFieldSymbol { IsStatic: true, IsConst: false } field
+            && !IsEnclosingType(field.ContainingType, current);
     }
 
     private bool IsDynamicTyped(ExpressionSyntax expression)
@@ -7676,28 +7702,53 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         });
 
     /// <summary>
-    /// #1677: whether CalorEmitter will hoist part of this value to a <c>§B{~_hoistN}</c> line
-    /// ahead of its statement: a §NEW argument, a member-access target or a unary operand that
-    /// renders a section marker (a call, a creation, an element access). Conservative: any node
-    /// outside the marker-free forms counts as a marker. Lambda bodies keep their own hoists.
+    /// #1677: whether CalorEmitter may hoist part of this value to a <c>§B{~_hoistN}</c> line
+    /// ahead of its statement. The emitter hoists a child that renders a section marker (a call,
+    /// a creation, an element access) out of a §NEW argument, a member-access target, a unary
+    /// operand, a tuple element, a range or index-from-end bound, a string operation and a
+    /// collection element. Conservative (Codex round 1): only the containers known to keep their
+    /// children in place (calls, binary operators, casts, element accesses, await) are searched
+    /// through; any other node with a marker child counts as hoisting. Lambda bodies keep their
+    /// own hoists, and the operands of <c>?:</c> and <c>??</c> are never hoisted.
     /// </summary>
     private static bool EmitterMayHoist(ExpressionNode? node)
     {
-        static bool RendersMarker(AstNode n) => n is not (ReferenceNode or IntLiteralNode or StringLiteralNode
-                or BoolLiteralNode or FloatLiteralNode or DecimalLiteralNode or ThisExpressionNode or BaseExpressionNode
-                or BinaryOperationNode or UnaryOperationNode or FieldAccessNode or TypeOperationNode)
-            || Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n).Any(RendersMarker);
+        static IEnumerable<AstNode> Children(AstNode n) => Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n);
+        // A hoisted lambda only creates a delegate; it cannot reorder anything observable.
+        // A type reference renders no marker; a non-expression node (an object-initializer
+        // entry) renders what its children render.
+        static bool RendersMarker(AstNode n) => n is not (LambdaExpressionNode or TypeReferenceNode)
+            && (n is not ExpressionNode ? Children(n).Any(RendersMarker) : n is not (ReferenceNode or IntLiteralNode or StringLiteralNode
+                    or BoolLiteralNode or FloatLiteralNode or DecimalLiteralNode or ThisExpressionNode or BaseExpressionNode
+                    or BinaryOperationNode or UnaryOperationNode or FieldAccessNode or TypeOperationNode)
+                || Children(n).Any(RendersMarker));
+        static bool IsElementPath(ExpressionNode target) => target is ArrayAccessNode or MultiDimArrayAccessNode
+            || target is FieldAccessNode inner && IsElementPath(inner.Target);
         static bool Walk(AstNode n) => n switch
         {
             LambdaExpressionNode => false,
-            NewExpressionNode creation when creation.Arguments.Any(RendersMarker) => true,
-            FieldAccessNode { Target: not (ArrayAccessNode or MultiDimArrayAccessNode or ArrayCreationNode
-                or MultiDimArrayCreationNode) } field when RendersMarker(field.Target) && !IsElementPath(field.Target) => true,
-            UnaryOperationNode unary when RendersMarker(unary.Operand) => true,
-            _ => Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n).Any(Walk),
+            ReferenceNode or IntLiteralNode or StringLiteralNode or BoolLiteralNode or FloatLiteralNode
+                or DecimalLiteralNode or ThisExpressionNode or BaseExpressionNode => false,
+            // A field path rooted in an element, or on an inline array creation, stays in place.
+            FieldAccessNode { Target: var target } when IsElementPath(target)
+                || target is ArrayCreationNode or MultiDimArrayCreationNode => Children(n).Any(Walk),
+            // Operands of ?: and ?? are rendered in a conditional region, where nothing is hoisted.
+            ConditionalExpressionNode or NullCoalesceNode => false,
+            CallExpressionNode or BinaryOperationNode or TypeOperationNode or ArrayAccessNode
+                or MultiDimArrayAccessNode or AwaitExpressionNode => Children(n).Any(Walk),
+            _ => Children(n).Any(RendersMarker) || Children(n).Any(Walk),
         };
-        static bool IsElementPath(ExpressionNode target) => target is FieldAccessNode inner
-            && (inner.Target is ArrayAccessNode or MultiDimArrayAccessNode || IsElementPath(inner.Target));
+        return node != null && Walk(node);
+    }
+
+    // #1677 (Codex round 1): a §RANGE or index-from-end bound that is a call or another marker.
+    private static bool HasMarkerRangeBound(ExpressionNode? node)
+    {
+        static bool Walk(AstNode n) => n is not LambdaExpressionNode
+            && (n is RangeExpressionNode or IndexFromEndNode
+                    && Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n)
+                        .Any(child => child is not (ReferenceNode or IntLiteralNode))
+                || Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n).Any(Walk));
         return node != null && Walk(node);
     }
 
@@ -7904,11 +7955,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 or DefaultExpressionSyntax or TypeOfExpressionSyntax or SizeOfExpressionSyntax:
                 return true;
             case IdentifierNameSyntax:
-                return model.GetSymbolInfo(expression).Symbol is ILocalSymbol { RefKind: RefKind.None }
-                    or IParameterSymbol { RefKind: RefKind.None } or IFieldSymbol
-                    or INamedTypeSymbol or INamespaceSymbol;
+                return model.GetSymbolInfo(expression).Symbol switch
+                {
+                    IFieldSymbol field => IsInitializedField(field, expression),
+                    ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }
+                        or INamedTypeSymbol or INamespaceSymbol => true,
+                    _ => false,
+                };
             case MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression } member:
                 return model.GetSymbolInfo(member).Symbol is IFieldSymbol or INamedTypeSymbol or INamespaceSymbol
+                    && (model.GetSymbolInfo(member).Symbol is not IFieldSymbol memberField
+                        || IsInitializedField(memberField, member))
                     && (model.GetSymbolInfo(member.Expression).Symbol is INamedTypeSymbol or INamespaceSymbol
                         || IsInertExpression(member.Expression));
             case ElementAccessExpressionSyntax element:
@@ -7921,7 +7978,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
                         && IsInertExpression(argument.Expression));
             case BinaryExpressionSyntax binary:
-                return model.GetOperation(binary) is Microsoft.CodeAnalysis.Operations.IBinaryOperation { OperatorMethod: null }
+                return model.GetOperation(binary) is Microsoft.CodeAnalysis.Operations.IBinaryOperation { OperatorMethod: null } operation
+                    // Codex round 1: string concatenation calls ToString on an operand that is
+                    // not a string, a built-in numeric, bool or char, or an enum.
+                    && (operation.Type?.SpecialType != SpecialType.System_String
+                        || new[] { operation.LeftOperand, operation.RightOperand }.All(operand =>
+                            operand.Type?.SpecialType is SpecialType.System_String or SpecialType.System_Boolean
+                                or SpecialType.System_Char or SpecialType.System_SByte or SpecialType.System_Byte
+                                or SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32
+                                or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
+                                or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal
+                            || operand.Type?.TypeKind == TypeKind.Enum))
                     && IsInertExpression(binary.Left) && IsInertExpression(binary.Right);
             case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression
                 or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
@@ -7934,6 +8001,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return false;
         }
     }
+
+    // #1677 (Codex round 1): reading a static field of another source type can run its static
+    // constructor; a metadata type's initializer runs no user code.
+    private bool IsInitializedField(IFieldSymbol field, SyntaxNode at)
+        => !field.IsStatic || field.IsConst || IsEnclosingType(field.ContainingType, at)
+            || field.ContainingType.DeclaringSyntaxReferences.Length == 0;
 
     /// <summary>
     /// #1633: whether a part's value cannot change while the rest of the statement runs: a
@@ -8078,6 +8151,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var valueHoisted = (putValMark is { } putAt
                         ? HoistsHaveEffects(valueMark, putAt) || !IsConstantCollection(assignment.Right)
                         : HoistsHaveEffects(valueMark)) || EmitterMayHoist(value);
+                    if (valueHoisted && HasMarkerRangeBound(value))
+                        throw EscalateExpression(assignment, "compound-assignment-order");
                     if ((keyHoisted || valueHoisted) && _semanticModel != null
                         && assignment.SyntaxTree == _semanticModel.SyntaxTree)
                     {
@@ -8216,38 +8291,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // #1677: where the statement's own conversion starts; the fallback below converts the
             // invocation again and must not keep the first conversion's hoists.
             var invocationMark = _pendingStatements.Count;
-            var args = invocation.ArgumentList.Arguments
-                .Select(a => ConvertExpression(a.Expression))
-                .ToList();
-
-            // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
-            HoistComplexArguments(args, invocation.ArgumentList.Arguments);
-
-            var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
-            var stmtArgNames = hasNamedArgs
-                ? invocation.ArgumentList.Arguments
-                    .Select(a => a.NameColon?.Name.Identifier.ValueText)
-                    .ToList()
-                : null;
-
-            var stmtArgModifiers = ExtractArgumentModifiers(invocation);
-
-            // Check for Console.WriteLine as special case
-            if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
-            {
-                if (args.Count == 1)
-                {
-                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: true);
-                }
-            }
-            else if (target == "Console.Write" || target == "System.Console.Write")
-            {
-                if (args.Count == 1)
-                {
-                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: false);
-                }
-            }
-
+            // #1677 (Codex round 1): the receiver's hoists come first; C# evaluates the receiver
+            // before the arguments.
             // Handle complex targets that need hoisting (element access, chained calls, new-then-call)
             if (invocation.Expression is MemberAccessExpressionSyntax stmtMemberAccess)
             {
@@ -8305,6 +8350,38 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _pendingStatements.Add(new BindStatementNode(
                         stmtSpan, tempName, null, false, complexConverted, new AttributeCollection()));
                     target = $"{tempName}.{stmtMethodName}";
+                }
+            }
+
+            var args = invocation.ArgumentList.Arguments
+                .Select(a => ConvertExpression(a.Expression))
+                .ToList();
+
+            // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
+            HoistComplexArguments(args, invocation.ArgumentList.Arguments);
+
+            var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
+            var stmtArgNames = hasNamedArgs
+                ? invocation.ArgumentList.Arguments
+                    .Select(a => a.NameColon?.Name.Identifier.ValueText)
+                    .ToList()
+                : null;
+
+            var stmtArgModifiers = ExtractArgumentModifiers(invocation);
+
+            // Check for Console.WriteLine as special case
+            if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
+            {
+                if (args.Count == 1)
+                {
+                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: true);
+                }
+            }
+            else if (target == "Console.Write" || target == "System.Console.Write")
+            {
+                if (args.Count == 1)
+                {
+                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: false);
                 }
             }
 
@@ -9037,10 +9114,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     ///   [("a", "Where", args1), (null, "Select", args2), (null, "First", args3)]
     /// where null target means "use previous step's result".
     /// </summary>
-    private List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)> CollectChainSteps(
+    private List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span, List<StatementNode> hoists)> CollectChainSteps(
         InvocationExpressionSyntax invocation)
     {
-        var steps = new List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)>();
+        var steps = new List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span, List<StatementNode> hoists)>();
         var current = invocation;
         // #943 (D1 RO-SYN-3, RO-COPY-4): chain steps keep no argument modifiers; preserve.
         if (invocation.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
@@ -9050,10 +9127,37 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         while (current.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
+            var span = GetTextSpan(current);
+            // #1677 (Codex round 1): each step's hoists are kept with the step and emitted right
+            // before its call, in C#'s order: the base receiver, then the step's arguments. They
+            // used to be emitted together ahead of the first call, outermost step first, so a
+            // later step's argument (`c.Next().Use(F().Val())`) ran before an earlier call.
+            var stepMark = _pendingStatements.Count;
+            var isBase = memberAccess.Expression is not InvocationExpressionSyntax;
+            string? baseTarget = null;
+            if (isBase)
+            {
+                // Base of the chain — has a concrete target
+                // If the base is an object creation (new Foo()), hoist to a temp bind
+                // so the chain decomposition produces §NEW + bind instead of raw text
+                if (memberAccess.Expression is ObjectCreationExpressionSyntax
+                    || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
+                {
+                    var newConverted = ConvertExpression(memberAccess.Expression);
+                    var newTypeHint = ExtractTypeHint(memberAccess.Expression);
+                    baseTarget = _context.GenerateId("_new", newTypeHint);
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, baseTarget, null, false, newConverted, new AttributeCollection()));
+                }
+                else
+                {
+                    baseTarget = memberAccess.Expression.ToString();
+                }
+            }
+
             var args = current.ArgumentList.Arguments
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
-            var span = GetTextSpan(current);
 
             // Hoist complex arguments — prevents §LAM/§NEW nesting inside §C
             for (int i = 0; i < args.Count; i++)
@@ -9082,34 +9186,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
-            if (memberAccess.Expression is InvocationExpressionSyntax inner)
-            {
-                // Intermediate step — target comes from previous chain step
-                steps.Add((null, methodName, args, span));
-                current = inner;
-            }
-            else
-            {
-                // Base of the chain — has a concrete target
-                // If the base is an object creation (new Foo()), hoist to a temp bind
-                // so the chain decomposition produces §NEW + bind instead of raw text
-                if (memberAccess.Expression is ObjectCreationExpressionSyntax
-                    || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
-                {
-                    var newConverted = ConvertExpression(memberAccess.Expression);
-                    var newTypeHint = ExtractTypeHint(memberAccess.Expression);
-                    var tempName = _context.GenerateId("_new", newTypeHint);
-                    _pendingStatements.Add(new BindStatementNode(
-                        span, tempName, null, false, newConverted, new AttributeCollection()));
-                    steps.Add((tempName, methodName, args, span));
-                }
-                else
-                {
-                    var baseTarget = memberAccess.Expression.ToString();
-                    steps.Add((baseTarget, methodName, args, span));
-                }
+            var hoists = _pendingStatements.GetRange(stepMark, _pendingStatements.Count - stepMark);
+            _pendingStatements.RemoveRange(stepMark, hoists.Count);
+            steps.Add((baseTarget, methodName, args, span, hoists));
+            if (isBase)
                 break;
-            }
+            current = (InvocationExpressionSyntax)memberAccess.Expression;
         }
 
         // Reverse so innermost (base) is first
@@ -9176,6 +9258,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var tempName = _context.GenerateId("_chain", step.methodName);
 
+            results.AddRange(step.hoists);
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
             results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
             prevTempName = tempName;
@@ -9184,6 +9267,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Last step becomes a call statement (no assignment, expression statement)
         var lastStep = steps[^1];
         var lastTarget = prevTempName!;
+        results.AddRange(lastStep.hoists);
         results.Add(new CallStatementNode(
             span,
             $"{lastTarget}.{lastStep.methodName}",
@@ -9226,6 +9310,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var tempName = _context.GenerateId("_chain", step.methodName);
 
+            results.AddRange(step.hoists);
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
             results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
             prevTempName = tempName;
@@ -9234,6 +9319,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Last step becomes the return value
         var lastStep = steps[^1];
         var lastTarget = prevTempName!;
+        results.AddRange(lastStep.hoists);
         var lastCallExpr = new CallExpressionNode(lastStep.span, $"{lastTarget}.{lastStep.methodName}", lastStep.args);
         results.Add(new ReturnStatementNode(span, lastCallExpr));
 
@@ -9244,7 +9330,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Emits bind statements for chain steps, with the final step using the provided name and type.
     /// </summary>
     private IReadOnlyList<StatementNode> EmitChainSteps(
-        List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)> steps,
+        List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span, List<StatementNode> hoists)> steps,
         string finalName,
         string? finalTypeName,
         bool finalIsMutable,
@@ -9255,7 +9341,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Not actually chained — fall back to single bind
             var step = steps[0];
             var callExpr = new CallExpressionNode(step.span, $"{step.baseTarget}.{step.methodName}", step.args);
-            return new[]
+            return new List<StatementNode>(step.hoists)
             {
                 new BindStatementNode(statementSpan, finalName, finalTypeName, finalIsMutable, callExpr, new AttributeCollection())
             };
@@ -9271,6 +9357,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var isLast = i == steps.Count - 1;
 
+            results.AddRange(step.hoists);
             // Hoist complex arguments (§NEW, ternaries with §NEW) from chain step args
             HoistComplexArguments(step.args);
             if (_pendingStatements.Count > 0)
@@ -9306,13 +9393,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.IncrementConverted();
 
         var id = _context.GenerateId("if");
+        var conditionMark = _pendingStatements.Count;
         var condition = ConvertExpression(node.Condition);
 
         var introducesLocals = node.Condition.DescendantNodesAndSelf()
             .Any(syntax => syntax is DeclarationExpressionSyntax or IsPatternExpressionSyntax);
         // #1633 audit: staging a call ahead of the condition moves it before the operands C#
         // evaluates first; that is allowed only when none of them can observe the call.
-        condition = HoistCallsFromCondition(condition, !introducesLocals && CallStagingKeepsOrder(node.Condition));
+        var stagingKeepsOrder = CallStagingKeepsOrder(node.Condition);
+        // #1677 (Codex round 1): converting the condition can itself hoist a call ahead of the
+        // `if` (`_chainF = F()` for `F().N()`), which moves it the same way staging would.
+        if (!stagingKeepsOrder && !introducesLocals && HoistsHaveEffects(conditionMark))
+            throw EscalateExpression(node.Condition, "compound-assignment-order");
+        condition = HoistCallsFromCondition(condition, !introducesLocals && stagingKeepsOrder);
 
         var (chainBindings, patternBindings) = SplitConditionHoists(_pendingStatements);
         _pendingStatements.Clear();
@@ -12984,6 +13077,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
         var target = invocation.Expression.ToString().Replace("!", "");
+        // #1677 (Codex round 1): C# evaluates the receiver before the arguments, so it is
+        // converted first and its hoists (`_chainNext = c.Next()`) come before the arguments'.
+        // The safety net below reuses it instead of converting it again (a second conversion
+        // repeated its hoists, such as a block lambda's bind).
+        var convertedReceiver = invocation.Expression is MemberAccessExpressionSyntax receiverAccess
+            ? ConvertExpression(receiverAccess.Expression)
+            : null;
         var args = invocation.ArgumentList.Arguments
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
@@ -13020,15 +13120,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             target = directGenericName.Identifier.Text;
         }
 
-        // #1677: the receiver converted once; the safety net below reuses it instead of converting
-        // it again (a second conversion repeated its hoists, such as a block lambda's bind).
-        ExpressionNode? convertedReceiver = null;
         // Try to convert common string methods to native StringOperationNode
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
-            var targetExpr = ConvertExpression(memberAccess.Expression);
-            convertedReceiver = targetExpr;
+            var targetExpr = convertedReceiver!;
             var targetStr = memberAccess.Expression.ToString();
             var span = GetTextSpan(invocation);
 
@@ -13101,9 +13197,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             // Handle indexer-then-call pattern: words[0].Method(...)
             // Hoist the element access to a temp bind so the method call has a clean target.
-            if (memberAccess.Expression is ElementAccessExpressionSyntax elementAccess)
+            if (memberAccess.Expression is ElementAccessExpressionSyntax)
             {
-                var elementConverted = ConvertExpression(elementAccess);
+                // #1677 (Codex round 1): the receiver, already converted; converting it again ran
+                // its hoists twice.
+                var elementConverted = targetExpr;
                 var tempName = _context.GenerateId("_elem");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, elementConverted, new AttributeCollection()));
