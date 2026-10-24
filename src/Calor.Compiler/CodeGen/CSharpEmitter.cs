@@ -221,10 +221,38 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // Starts with a base scope so isolated statement/expression emission (tests, or any
     // path not entered through a function/method ResetDeclScopes) always has a live scope.
     private List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
+    /// <param name="RefinementName">
+    /// The §RTYPE name when the variable's type is a named refinement (null for an inline-only
+    /// refinement). An unannotated bind from such a variable inherits it (#1529).
+    /// </param>
+    /// <param name="HasInlineRefinement">
+    /// True when the predicate includes a parameter's inline refinement.
+    /// </param>
     private sealed record RefinementConstraint(
         ExpressionNode Predicate,
         string Description,
-        string TypeName);
+        string TypeName,
+        string? RefinementName = null,
+        bool HasInlineRefinement = false)
+    {
+        /// <summary>
+        /// The <see cref="Verification.Obligations.Obligation.CheckedRefinement"/> values whose
+        /// Discharged obligations together prove this whole predicate.
+        /// </summary>
+        public IReadOnlyList<string> ObligationKeys =>
+            (RefinementName, HasInlineRefinement) switch
+            {
+                (null, _) => ["inline refinement"],
+                ({ } name, false) => [$"refinement type '{name}'"],
+                ({ } name, true) => [$"refinement type '{name}'", "inline refinement"],
+            };
+    }
+
+    /// <summary>
+    /// Unannotated binds whose type the type checker inferred as a named refinement (#1529).
+    /// </summary>
+    private IReadOnlyDictionary<AstNode, string> _inferredRefinements =
+        new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
     private sealed record CallableReturnShape(
         string DeclarationType,
         string? ValueType)
@@ -292,21 +320,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                             GetEffectiveRefinementPredicate(refinementType!),
                             inlinePredicate),
                         $"refinement type '{refinementType!.Name}' and inline refinement for parameter '{p.Name}'",
-                        ResolveRefinementBaseType(refinementType));
+                        ResolveRefinementBaseType(refinementType),
+                        refinementType.Name,
+                        HasInlineRefinement: true);
                 }
                 else if (p.InlineRefinement?.Predicate is { } inlineOnlyPredicate)
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
                         inlineOnlyPredicate,
                         $"inline refinement for parameter '{p.Name}'",
-                        p.TypeName);
+                        p.TypeName,
+                        HasInlineRefinement: true);
                 }
                 else if (hasNamedRefinement)
                 {
-                    _refinementDeclScopes[0][name] = new RefinementConstraint(
-                        GetEffectiveRefinementPredicate(refinementType!),
-                        $"refinement type '{refinementType!.Name}'",
-                        ResolveRefinementBaseType(refinementType));
+                    _refinementDeclScopes[0][name] = NamedRefinementConstraint(refinementType!);
                 }
 
                 var indexedTypeName = p.TypeName;
@@ -438,6 +466,53 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Collect(scope);
         foreach (var name in names)
             InvalidateDeclaredType(name);
+    }
+
+    private RefinementConstraint NamedRefinementConstraint(RefinementTypeNode refinementType)
+        => new(
+            GetEffectiveRefinementPredicate(refinementType),
+            $"refinement type '{refinementType.Name}'",
+            ResolveRefinementBaseType(refinementType),
+            refinementType.Name);
+
+    /// <summary>
+    /// The named refinement a bind's variable has: its annotation, or, for an unannotated bind
+    /// (#1529), the refinement of its initializer. An inferred local carries the refinement, so
+    /// it is declared exactly as <c>§B{x:Nat}</c> would be and every later write is guarded.
+    /// The type checker's inference is authoritative; a direct read or inc/dec of a variable
+    /// with a named refinement is also recognized where the checker does not run (class
+    /// members). Inline-only refinements are not inherited: the checker types such a parameter
+    /// as its base type.
+    /// </summary>
+    private RefinementTypeNode? GetBindRefinementType(BindStatementNode node)
+    {
+        if (node.TypeName != null)
+            return _refinementTypes.TryGetValue(node.TypeName, out var annotated) ? annotated : null;
+        if (node.Initializer is null)
+            return null;
+        if (_inferredRefinements.TryGetValue(node, out var inferredName)
+            && _refinementTypes.TryGetValue(inferredName, out var inferred))
+        {
+            return inferred;
+        }
+
+        var source = node.Initializer switch
+        {
+            ReferenceNode reference => reference,
+            UnaryOperationNode
+            {
+                Operator: UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+                    or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement,
+                Operand: ReferenceNode operand
+            } => operand,
+            _ => null
+        };
+        return source != null
+            && TryGetRefinementConstraint(source.Name, out var constraint)
+            && constraint.RefinementName is { } sourceName
+            && _refinementTypes.TryGetValue(sourceName, out var sourceRefinement)
+                ? sourceRefinement
+                : null;
     }
 
     private void DeclareRefinementInScope(string name, RefinementConstraint? constraint)
@@ -590,7 +665,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private bool ShouldEmitObligationGuard(
         Verification.Obligations.ObligationKind kind,
         Parsing.TextSpan? span = null,
-        string? parameterName = null)
+        string? parameterName = null,
+        IEnumerable<RefinementConstraint>? enforcedConstraints = null)
     {
         if (_contractMode == EmitContractMode.Off)
             return true;
@@ -607,6 +683,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         StringComparison.Ordinal))
                 && (span is null || obligation.Span.Start == span.Value.Start))
             .ToArray();
+        if (enforcedConstraints != null)
+        {
+            // A write guard may be elided only by obligations for exactly the refinements it
+            // enforces, and only if every one of them is covered. The generator tracks
+            // variables by name and the emitter by scope, so they can disagree on which
+            // refinement a write must preserve; a mismatch keeps the guard (#1529 review).
+            var keys = enforcedConstraints
+                .SelectMany(constraint => constraint.ObligationKeys)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            matching = matching
+                .Where(obligation => obligation.CheckedRefinement != null
+                    && keys.Contains(obligation.CheckedRefinement, StringComparer.Ordinal))
+                .ToArray();
+            if (keys.Any(key => !matching.Any(obligation =>
+                    string.Equals(obligation.CheckedRefinement, key, StringComparison.Ordinal))))
+            {
+                return true;
+            }
+        }
         if (matching.Length == 0)
             return true;
 
@@ -724,6 +820,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _indexedTypes = new Dictionary<string, IndexedTypeNode>(StringComparer.Ordinal);
         _refinementTypes =
             new Dictionary<string, RefinementTypeNode>(StringComparer.Ordinal);
+        _inferredRefinements =
+            new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
         _lineDirectiveFile = string.IsNullOrEmpty(LineDirectiveFilePath)
             ? null
             : EscapeString(LineDirectiveFilePath);
@@ -1385,6 +1483,37 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
     }
 
+    /// <summary>
+    /// A <c>ref</c>/<c>out</c> argument lets the callee write the variable through an alias that
+    /// no refinement guard sees, so <c>int.TryParse(s, out x)</c> could leave a Nat-typed
+    /// <c>x</c> negative. Passing a refined variable that way is rejected (Calor1104); the
+    /// program can pass a base-typed temporary and assign it back with a guarded §ASSIGN.
+    /// </summary>
+    private void ReportRefinedVariableByReference(ExpressionNode argument, string modifier)
+    {
+        var trimmed = modifier.Trim();
+        if (!(trimmed.StartsWith("ref", StringComparison.Ordinal)
+                || trimmed.StartsWith("out", StringComparison.Ordinal))
+            || trimmed.StartsWith("ref readonly", StringComparison.Ordinal)
+            || argument is not ReferenceNode reference
+            || !TryGetRefinementConstraint(reference.Name, out var constraint))
+        {
+            return;
+        }
+
+        var message =
+            $"'{reference.Name}' has {constraint.Description} and is passed as a '{trimmed}' argument. "
+            + "The callee's write cannot be checked against the refinement. Pass a base-typed "
+            + "temporary and assign it back; that assignment is guarded.";
+        if (_diagnostics is null)
+            throw new InvalidOperationException(message);
+        _diagnostics.Add(new Diagnostics.Diagnostic(
+            Diagnostics.DiagnosticCode.RefinedVariableByReference,
+            message,
+            argument.Span,
+            Diagnostics.DiagnosticSeverity.Error));
+    }
+
     private void ReportConstructorRefinementInitializerNotLowered(ConstructorNode node)
     {
         const string message =
@@ -1427,7 +1556,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     if (ShouldEmitObligationGuard(
                         Verification.Obligations.ObligationKind.Subtype,
                         bind.Span,
-                        bind.Name))
+                        bind.Name,
+                        [bindConstraint]))
                     {
                         EmitRefinementValueGuard(
                             bindConstraint,
@@ -1525,6 +1655,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             _refinementTypes[refinementType.Name] = refinementType;
         }
+        _inferredRefinements =
+            TypeChecking.TypeChecker.InferUnannotatedRefinements(node);
 
         var userUsings = node.Usings.ToList();
         foreach (var usingDirective in userUsings)
@@ -3253,6 +3385,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var argStr = node.Arguments[i].Accept(this);
             if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
             {
+                ReportRefinedVariableByReference(node.Arguments[i], node.ArgumentModifiers[i]!);
                 argStr = $"{node.ArgumentModifiers[i]} {argStr}";
             }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
@@ -3924,6 +4057,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var varName = SanitizeIdentifier(node.Name);
         var typeName = node.TypeName != null ? MapTypeName(node.TypeName) : "var";
+        // Resolved before this bind changes any scope: the initializer is read in the old scope.
+        var bindRefinement = GetBindRefinementType(node);
 
         // Only emit assignment (not declaration) if:
         // 1. The variable is marked as mutable (§B{~name:type})
@@ -3934,15 +4069,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             TryGetRefinementConstraint(node.Name, out var existingConstraint);
             var hasExistingIndexedBound = TryGetIndexedBound(node.Name, out _);
-            RefinementConstraint? reboundConstraint = null;
-            if (node.TypeName != null
-                && _refinementTypes.TryGetValue(node.TypeName, out var reboundRefinement))
-            {
-                reboundConstraint = new RefinementConstraint(
-                    GetEffectiveRefinementPredicate(reboundRefinement),
-                    $"refinement type '{reboundRefinement.Name}'",
-                    ResolveRefinementBaseType(reboundRefinement));
-            }
+            RefinementConstraint? reboundConstraint = bindRefinement is null
+                ? null
+                : NamedRefinementConstraint(bindRefinement);
             var reboundIndexedBound = GetIndexedBoundForBinding(node);
             // Emit the initializer against the old variable contract. It may
             // itself mutate the target, so installing the rebound metadata
@@ -3975,7 +4104,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         || ShouldEmitObligationGuard(
                             Verification.Obligations.ObligationKind.Subtype,
                             node.Span,
-                            node.Name)))
+                            node.Name,
+                            constraints)))
                 {
                     return EmitCheckedRefinedAssignment(
                         varName,
@@ -3994,15 +4124,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         DeclareVarInScope(varName);
-        if (node.TypeName != null
-            && _refinementTypes.TryGetValue(node.TypeName, out var refinementType))
+        if (bindRefinement != null)
         {
-            DeclareRefinementInScope(
-                varName,
-                new RefinementConstraint(
-                    GetEffectiveRefinementPredicate(refinementType),
-                    $"refinement type '{refinementType.Name}'",
-                    ResolveRefinementBaseType(refinementType)));
+            DeclareRefinementInScope(varName, NamedRefinementConstraint(bindRefinement));
         }
         else
         {
@@ -4137,7 +4261,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (!ShouldEmitObligationGuard(
                 Verification.Obligations.ObligationKind.Subtype,
                 node.Span,
-                refinedTarget.Name))
+                refinedTarget.Name,
+                [refinementConstraint]))
             {
                 return operation;
             }
@@ -6492,6 +6617,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var argStr = node.Arguments[i].Accept(this);
             if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
             {
+                ReportRefinedVariableByReference(node.Arguments[i], node.ArgumentModifiers[i]!);
                 argStr = $"{node.ArgumentModifiers[i]} {argStr}";
             }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
@@ -6951,7 +7077,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             && ShouldEmitObligationGuard(
                 Verification.Obligations.ObligationKind.Subtype,
                 node.Span,
-                reference.Name))
+                reference.Name,
+                [refinementConstraint]))
         {
             return EmitCheckedRefinedAssignment(
                 target,
@@ -7006,7 +7133,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             && ShouldEmitObligationGuard(
                 Verification.Obligations.ObligationKind.Subtype,
                 node.Span,
-                reference.Name))
+                reference.Name,
+                [refinementConstraint]))
         {
             return EmitCheckedRefinedAssignment(
                 target,
@@ -7442,17 +7570,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var parameter in parameters)
         {
             if (parameter.TypeName is null)
+            {
+                // #1529 review: a lambda parameter typed by its target delegate carries the
+                // delegate parameter's named refinement, so writes to it are guarded.
+                if (_inferredRefinements.TryGetValue(parameter, out var inferredName)
+                    && _refinementTypes.TryGetValue(inferredName, out var inferredRefinement))
+                {
+                    DeclareRefinementInScope(
+                        SanitizeIdentifier(parameter.Name),
+                        NamedRefinementConstraint(inferredRefinement));
+                }
                 continue;
+            }
 
             var name = SanitizeIdentifier(parameter.Name);
             if (_refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
             {
-                DeclareRefinementInScope(
-                    name,
-                    new RefinementConstraint(
-                        GetEffectiveRefinementPredicate(refinementType),
-                        $"refinement type '{refinementType.Name}'",
-                        ResolveRefinementBaseType(refinementType)));
+                DeclareRefinementInScope(name, NamedRefinementConstraint(refinementType));
             }
 
             var indexedTypeName = parameter.TypeName;

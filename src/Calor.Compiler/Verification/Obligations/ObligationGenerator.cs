@@ -22,6 +22,12 @@ public sealed class ObligationGenerator
     /// </summary>
     private readonly Dictionary<string, IndexedTypeNode> _indexedTypes = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Unannotated binds the type checker inferred as a named refinement (#1529).
+    /// </summary>
+    private IReadOnlyDictionary<AstNode, string> _inferredRefinements =
+        new Dictionary<AstNode, string>(ReferenceEqualityComparer.Instance);
+
     public ObligationGenerator(ObligationTracker tracker)
     {
         _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
@@ -37,6 +43,7 @@ public sealed class ObligationGenerator
         {
             _refinementTypes[rtype.Name] = rtype;
         }
+        _inferredRefinements = TypeChecker.InferUnannotatedRefinements(module);
 
         // Register indexed type definitions
         foreach (var itype in module.IndexedTypes)
@@ -211,13 +218,13 @@ public sealed class ObligationGenerator
         var inlineRefinementByVariable = new Dictionary<string, ExpressionNode>(
             StringComparer.Ordinal);
         var ambiguousVariables = new HashSet<string>(StringComparer.Ordinal);
+        var bindRefinements = ResolveBindRefinements(nodes, parameters);
         foreach (var group in nodes
                      .OfType<BindStatementNode>()
-                     .Where(bind => bind.TypeName != null
-                         && _refinementTypes.ContainsKey(bind.TypeName))
+                     .Where(bindRefinements.ContainsKey)
                      .GroupBy(bind => bind.Name, StringComparer.Ordinal))
         {
-            if (group.Select(bind => bind.TypeName)
+            if (group.Select(bind => bindRefinements[bind].Name)
                 .Distinct(StringComparer.Ordinal)
                 .Skip(1)
                 .Any())
@@ -234,10 +241,20 @@ public sealed class ObligationGenerator
                 inlineRefinementByVariable[parameter.Name] = inlinePredicate;
         }
 
+        // A lambda parameter shadows any outer variable of the same name, and this walk is flat
+        // (by name, not scope). Writes to such a name get no obligation, so the emitter keeps
+        // every runtime guard for them (#1529 review round 2).
+        foreach (var lambdaParameterName in nodes
+                     .OfType<LambdaExpressionNode>()
+                     .SelectMany(lambda => lambda.Parameters)
+                     .Select(parameter => parameter.Name))
+        {
+            ambiguousVariables.Add(lambdaParameterName);
+        }
+
         foreach (var bind in nodes.OfType<BindStatementNode>())
         {
-            if (bind.TypeName is null
-                || !_refinementTypes.TryGetValue(bind.TypeName, out var refinementType))
+            if (!bindRefinements.TryGetValue(bind, out var refinementType))
             {
                 if (!bind.IsMutable && refinementByVariable.ContainsKey(bind.Name))
                     ambiguousVariables.Add(bind.Name);
@@ -263,6 +280,7 @@ public sealed class ObligationGenerator
                 condition,
                 bind.Span);
             obligation.ParameterName = bind.Name;
+            obligation.CheckedRefinement = $"refinement type '{refinementType.Name}'";
         }
 
         foreach (var assignment in nodes.OfType<AssignmentStatementNode>())
@@ -371,6 +389,79 @@ public sealed class ObligationGenerator
         }
     }
 
+    /// <summary>
+    /// The named refinement each bind's variable has: its annotation, or, for an unannotated bind
+    /// (#1529), its initializer's refinement. This mirrors the emitter: the type checker's
+    /// inference first, then a direct read or inc/dec of a variable with a named refinement
+    /// (for class members, which the checker does not visit). Inline-only refinements are not
+    /// inherited, since the checker types such a parameter as its base type.
+    /// </summary>
+    private Dictionary<BindStatementNode, RefinementTypeNode> ResolveBindRefinements(
+        IEnumerable<AstNode> nodes,
+        IReadOnlyList<ParameterNode> parameters)
+    {
+        var result = new Dictionary<BindStatementNode, RefinementTypeNode>(
+            ReferenceEqualityComparer.Instance);
+        var namedByVariable = new Dictionary<string, RefinementTypeNode>(StringComparer.Ordinal);
+        foreach (var parameter in parameters)
+        {
+            if (_refinementTypes.TryGetValue(parameter.TypeName, out var parameterRefinement))
+                namedByVariable[parameter.Name] = parameterRefinement;
+        }
+
+        foreach (var bind in nodes.OfType<BindStatementNode>())
+        {
+            RefinementTypeNode? refinement = null;
+            if (bind.TypeName != null)
+            {
+                _refinementTypes.TryGetValue(bind.TypeName, out refinement);
+            }
+            else if (bind.Initializer != null)
+            {
+                if (_inferredRefinements.TryGetValue(bind, out var inferredName))
+                {
+                    _refinementTypes.TryGetValue(inferredName, out refinement);
+                }
+                else
+                {
+                    var source = bind.Initializer switch
+                    {
+                        ReferenceNode reference => reference,
+                        UnaryOperationNode
+                        {
+                            Operator: UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+                                or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement,
+                            Operand: ReferenceNode operand
+                        } => operand,
+                        _ => null
+                    };
+                    if (source != null)
+                        namedByVariable.TryGetValue(source.Name, out refinement);
+                }
+            }
+
+            if (bind.IsMutable && namedByVariable.TryGetValue(bind.Name, out var established))
+            {
+                // A mutable rebind reassigns the variable; like the emitter, keep the
+                // established refinement for every later read and write.
+                if (refinement != null)
+                    result[bind] = refinement;
+                namedByVariable[bind.Name] = established;
+            }
+            else if (refinement != null)
+            {
+                result[bind] = refinement;
+                namedByVariable[bind.Name] = refinement;
+            }
+            else if (bind.TypeName != null || !bind.IsMutable)
+            {
+                namedByVariable.Remove(bind.Name);
+            }
+        }
+
+        return result;
+    }
+
     private void AddAssignmentSubtypeObligation(
         string functionId,
         string variableName,
@@ -403,6 +494,7 @@ public sealed class ObligationGenerator
             condition,
             span);
         obligation.ParameterName = variableName;
+        obligation.CheckedRefinement = refinementDescription;
     }
 
     private static ExpressionNode BuildCompoundAssignmentValue(
@@ -455,6 +547,8 @@ public sealed class ObligationGenerator
                     : param.InlineRefinement.Predicate,
                 param.Span);
             obl.ParameterName = param.Name;
+            if (isOut)
+                obl.CheckedRefinement = "inline refinement";
 
             // Public functions get boundary status — can't statically verify caller behavior
             if (visibility == Visibility.Public)
@@ -481,6 +575,8 @@ public sealed class ObligationGenerator
                     : GetEffectiveRefinementPredicate(rtype),
                 param.Span);
             obl.ParameterName = param.Name;
+            if (isOut)
+                obl.CheckedRefinement = $"refinement type '{rtype.Name}'";
 
             if (visibility == Visibility.Public)
             {

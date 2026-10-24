@@ -514,7 +514,9 @@ public sealed class WebsiteExampleCheckerTests
     // #1429 (0.25 W1): pages 96 -> 97, complete 58 -> 62 and illustrative 33 -> 34, the new
     // guides/csharp-interoperability.mdx: four converted outputs (each also pinned to its CLI
     // transcript by W1GuideTranscriptTests) and one unchecked report excerpt.
-    private const string Pinned = "pages=97 complete=62 negative=6 grouped=3 checkedOutputs=2 illustrative=34";
+    // #1529/#1530 (0.27): complete 62 -> 64 and negative 6 -> 7, the nominal-refinement example
+    // and its Calor0202 refusal in syntax-reference/refinement-types.mdx.
+    private const string Pinned = "pages=97 complete=64 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

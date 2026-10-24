@@ -1100,6 +1100,12 @@ public static class DiagnosticCode
     /// </summary>
     public const string RefinementDuplicateName = "Calor1103";
 
+    /// <summary>
+    /// Error: a variable with a refinement is passed as a <c>ref</c> or <c>out</c> argument.
+    /// The callee writes it through an alias that no refinement guard can check (#1529 review).
+    /// </summary>
+    public const string RefinedVariableByReference = "Calor1104";
+
     // Obligation verification diagnostics (Calor1120-1141)
 
     /// <summary>

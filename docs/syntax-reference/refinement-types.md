@@ -67,6 +67,69 @@ Once defined, use the name as a parameter type:
 
 The obligation engine creates a verification obligation for `count` — proving the refinement predicate holds given the function's preconditions.
 
+### Each Named Refinement Is Its Own Type
+
+Named refinements are nominal. Two `§RTYPE`s over the same base type are different types, even
+when one predicate implies the other. Binding, passing, returning or assigning a `Pos` where a
+`Nat` is expected is a type error (`Calor0202`):
+
+```calor
+§M{m001:Ids}
+  §RTYPE{r1:Nat:i32} (>= # INT:0)
+  §RTYPE{r2:Pos:i32} (> # INT:0)
+  §F{f001:ToNat:pub} (i32:v) -> Nat
+    §R v
+  §F{f002:Use:pub} (Pos:p) -> Nat
+    §B{n:Nat} §C{ToNat} §A p §/C
+    §R n
+```
+
+Binding the `Pos` directly is rejected with `Calor0202`:
+
+```calor expect=Calor0202
+§M{m001:Ids}
+  §RTYPE{r1:Nat:i32} (>= # INT:0)
+  §RTYPE{r2:Pos:i32} (> # INT:0)
+  §F{f001:Use:pub} (Pos:p) -> Nat
+    §B{n:Nat} p
+    §R n
+```
+
+To convert on purpose, go through the base type: `ToNat` takes
+an `i32` and returns `Nat`, and its return guard checks the value at run time. Operators still
+see a refinement as its base type, so `(+ a p)` is an `i32`. A conditional `(? c a p)` whose arms
+are two different refinements also has the base type.
+
+### Locals Inferred From a Refined Value
+
+A `§B` without a type takes the type of its initializer, refinement included. After
+`§B{~x} count` with `count: NatInt`, `x` is a `NatInt`, exactly as if you had written
+`§B{~x:NatInt} count`. Every later write to `x` (`§ASSIGN`, `inc`/`dec`) has a runtime guard
+for `NatInt`. When refinement verification runs, the obligation engine can prove a write safe
+and drop its guard. It drops a guard only with a proof for that same refinement, and it skips
+writes it cannot match to one, such as a name a lambda parameter also uses; those keep their
+guard. Annotate the base type, `§B{~x:i32} count`, when the local should be free to leave the
+refinement. A parameter with only an inline refinement
+(`§I{i32:a} | (pred)`) has its base type, so a local inferred from it is a plain `i32`.
+
+Four related rules keep a refined variable checked:
+
+- A lambda parameter without a type takes its type from the target delegate, also when the
+  lambda is assigned to a delegate variable. If that type is `NatInt`, writes to the parameter
+  are guarded too.
+- A variable with a refinement cannot be passed as a `ref` or `out` argument (`Calor1104`),
+  because the callee's write could not be checked. Pass a base-typed temporary, then assign it
+  back with `§ASSIGN`, which is guarded.
+- A mutable rebind of an existing variable (`§B{~x} p` after `§B{~x} count`) reassigns it, so it
+  keeps the variable's named refinement and cannot change it (`Calor0202`). A parameter with an
+  inline refinement cannot be rebound as a named refinement either.
+- A type pattern cannot name a refinement type: `(is a Pos p)` is `Calor0202`. Refinements erase
+  at run time, so the test could only check the base type.
+
+The type checker does not visit class members (`§CL` methods), so the `Calor0202` errors on
+this page are not reported there. Runtime guards still apply inside methods, including on
+locals inferred from a refined parameter.
+
 ---
 
 ## Inline Refinements (`|`)
