@@ -218,8 +218,12 @@ public class Calor0270CorpusVolumeTests
     // #1632 (0.27): FluentValidation Internal/CollectionPropertyRule.cs no longer drops the statement
     // after its `AfterValidate:` label; the restored `foreach (var dependentRule in DependentRules)`
     // body reads members of an inferred local, one more unresolved receiver: 295/33 -> 296/33.
-    private const int AggregateDiagnostics = 296;
-    private const int AggregateModulesWithDiagnostics = 33;
+    // #1541/#1524 (0.27): object and collection initializers with no exact Calor form are kept as
+    // a typed §CS creation, so calls through the receivers they initialize (FluentValidation.Tests
+    // `var validator = new TestValidator { … }; validator.Validate(…)`) report SignatureUnresolved:
+    // FluentValidation 251/22 -> 330/35, serilog 16/7 -> 18/8 (KeyValuePairSettings.cs): 296/33 -> 377/47.
+    private const int AggregateDiagnostics = 377;
+    private const int AggregateModulesWithDiagnostics = 47;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
