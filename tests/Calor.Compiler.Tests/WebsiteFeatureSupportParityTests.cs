@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -24,13 +26,18 @@ namespace Calor.Compiler.Tests;
 /// its literal, code-span and entity inlines; emphasis, links, code-span backticks and line breaks
 /// are structure, so <c>(*full*)</c>, <c>(**`full`**)</c> and a claim wrapped across two lines read
 /// the same as <c>full</c>. Inline HTML is read twice, once removed and once as a word break.</para>
-/// <para>Rule: in a statement that names a registry feature (in a code span, as a hyphenated
-/// name, as the plain words of a multi-word name such as "string interpolation") or mentions
-/// <c>feature-check</c>/<c>supportLevel</c>, no support-level word may appear in any case (full,
-/// fully, partial, partially, partly, notsupported, unsupported, manualrequired, "not supported",
-/// "no support", "manual intervention", "manual required"), except inside an allowlisted passage
-/// (<see cref="NotClaims"/>). Each component must name a registry feature that its statement (or,
-/// in a table row, the row's first cell) names. Component counts per page are pinned.</para>
+/// <para>Rule: a statement is next to a feature when it, the statement before it, or its section
+/// heading names a registry feature (in a code span, as a hyphenated name, as the plain words of a
+/// multi-word name such as "string interpolation", or as a single-word name that is not also a
+/// common word, such as "records") or mentions <c>feature-check</c>/<c>supportLevel</c>. Such a
+/// statement may not contain a support-level word in any case (full, fully, partial, partially,
+/// partly, notsupported, unsupported, manualrequired, "not supported", "no support", "manual
+/// intervention", "manual required"), except inside an allowlisted passage (<see cref="NotClaims"/>),
+/// which must occur exactly once on its page. Text is NFKC-normalized and invisible format
+/// characters are removed first; footnotes, link titles, reference definitions and JSX attributes
+/// (entities decoded) are read. A prose component must name the feature named just before it; a
+/// table component, the feature in its row's first cell. Component counts per page are pinned.
+/// The level vocabulary is fixed: a synonym ("complete support") is not detected.</para>
 /// </summary>
 public sealed class WebsiteFeatureSupportParityTests
 {
@@ -70,6 +77,12 @@ public sealed class WebsiteFeatureSupportParityTests
             "names the holes outside the native subset; the row's level is the registry's, on the feature-check page"),
         ("syntax-reference/calls.mdx", "the converter's full list", "the complete list, not a level"),
         ("syntax-reference/effects.mdx", "Effect rows do not yet fully verify callbacks", "effect verification, not a converter level"),
+        ("cli/convert.mdx", "Partly converted beats nothing converted", "a partly converted file, not a level"),
+        ("cli/mcp.mdx", "Partial results look like this:", "results a tool could not complete, not a level"),
+        ("guides/adding-calor-to-existing-projects.mdx", "waives the full effect guarantee", "the whole effect guarantee, not a level"),
+        ("guides/csharp-interoperability.mdx", "The full list of supported\nshapes", "the complete list, not a level"),
+        ("syntax-reference/structure-tags.mdx", "inline parameter declarations are NOT supported inside\n`§LAM` headers",
+            "Calor's own lambda syntax, not a converter level"),
     ];
 
     /// <summary>SupportLevel components per page. A changed count means one was added or removed.</summary>
@@ -84,7 +97,7 @@ public sealed class WebsiteFeatureSupportParityTests
     internal const string ExportPath = "website/public/data/feature-support.json";
 
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UsePipeTables().UseYamlFrontMatter().UseEmphasisExtras().Build();
+        .UsePipeTables().UseYamlFrontMatter().UseEmphasisExtras().UseFootnotes().Build();
 
     // The component's exact grammar (a tag, not prose). Anything else starting <SupportLevel fails.
     private static readonly Regex ComponentTag = new(@"^<SupportLevel feature=""(?<f>[a-z0-9-]+)""(?<w> form=""warning"")? />$");
@@ -243,6 +256,25 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/convert.mdx", Heading, "<Callout type=\"note\" title=\"`partial-property` is Full\">\nText.\n</Callout>\n\n" + Heading)]
     [InlineData("cli/convert.mdx", Heading, "| Construct | Status |\n|:--|:--|\n| `partial-property` | Full |\n\n" + Heading)]
     [InlineData("cli/convert.mdx", "title: \"convert\"\n", "title: \"convert\"\ndescription: \"`out-var` is Full\"\n")]
+    // Codex round 1 (#1664): a plain single-word feature name, context from the heading or the paragraph
+    // before, footnotes, link titles, reference definitions, encoded JSX attributes, invisible and
+    // fullwidth characters.
+    [InlineData("cli/convert.mdx", Heading, "Records are fully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Feature 'record' is fully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "### `partial-property`\n\nFully supported.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "The converter keeps `partial-property` declarations.\n\nThis feature has full support.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Details[^status].\n\n[^status]: partial-property (Full)\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "See [details](/docs/ \"partial-property is Full\").\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "See [details][status].\n\n[status]: /docs/ \"partial-property is Full\"\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "<Callout title=\"partial-property is &#70;ull\">\nText.\n</Callout>\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Declarations are kept: `partial-property` is Fu\u200Bll.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Declarations are kept: `partial-property` is Fu&shy;ll.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", Heading, "Declarations are kept: `partial-property` is \uFF26\uFF55\uFF4C\uFF4C.\n\n" + Heading)]
+    [InlineData("cli/convert.mdx", "title: \"convert\"\n", "title: \"convert\"\ndescription: \"Records are fully supported\"\n")]
+    // Codex round 1: an allowlisted passage copied next to a new claim is not excused.
+    [InlineData("guides/csharp-interoperability.mdx", "## Next steps\n", "`in-parameter` (unsupported construct).\n\n## Next steps\n")]
+    [InlineData("guides/csharp-interoperability.mdx", "## Next steps\n",
+        "Unsupported interpolation holes include all `string-interpolation-to-string` expressions.\n\n## Next steps\n")]
     // An MDX expression next to a feature name cannot be read, so it fails.
     [InlineData("cli/convert.mdx", Heading, "Declarations are kept: `partial-property` is {'Fu' + 'll'}.\n\n" + Heading)]
     // Fenced output of the command, and a text line inside a fence that names the command.
@@ -272,12 +304,25 @@ public sealed class WebsiteFeatureSupportParityTests
     [InlineData("cli/convert.mdx", "<SupportLevel feature=\"out-var\" form=\"warning\" />", "<SupportLevel feature=\"in-parameter\" form=\"warning\" />", "a Full feature has no converter warning")]
     [InlineData("syntax-reference/string-operations.mdx", "`calor feature-check string-interpolation` reports **<SupportLevel feature=\"string-interpolation\" />**",
         "The command reports **<SupportLevel feature=\"string-interpolation\" />**", "names `string-interpolation`")]
+    [InlineData("cli/feature-check.mdx", "- `yield-return` is <SupportLevel feature=\"yield-return\" />",
+        "- `record` is <SupportLevel feature=\"in-parameter\" /> (compare `in-parameter`). `yield-return` is <SupportLevel feature=\"yield-return\" />",
+        "names `in-parameter`, which is not the feature named just before it")]
     public void AMisusedComponentFailsTheCheck(string page, string from, string to, string message)
     {
         var text = Read(page);
         Assert.Contains(from, text);
         Assert.Empty(Scan(page, text).Findings);
         Assert.Contains(Scan(page, text.Replace(from, to)).Findings, f => f.Message.Contains(message, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnMdxCommentRendersNothingAndStatesNothing()
+    {
+        var text = Read("cli/convert.mdx");
+        Assert.Contains(Heading, text);
+        Assert.Empty(Scan("cli/convert.mdx", text.Replace(Heading, "{/* `partial-property` is Full */}\n\n" + Heading)).Findings);
+        // In code the same characters are shown, not hidden, and are read.
+        Assert.NotEmpty(Scan("cli/convert.mdx", text.Replace(Heading, "`{/* partial-property is Full */}`\n\n" + Heading)).Findings);
     }
 
     [Theory]
@@ -335,8 +380,10 @@ public sealed class WebsiteFeatureSupportParityTests
     internal static ScanResult Scan(string page, string text)
     {
         var result = new ScanResult([], [], []);
-        var document = Markdown.Parse(text.Replace("\r\n", "\n"), Pipeline);
-        Walk(page, document, 0, result);
+        var source = WithoutMdxComments(text.Replace("\r\n", "\n"));
+        var statements = new List<Statement>();
+        Walk(Markdown.Parse(source, Pipeline), 0, statements, new int[1]);
+        CheckStatements(page, statements, result);
         foreach (var component in result.Components)
         {
             if (component.Feature is null)
@@ -347,14 +394,18 @@ public sealed class WebsiteFeatureSupportParityTests
             else if (component.Warning && info.Support == SupportLevel.Full)
                 result.Findings.Add(new(page, component.Line, $"{component.Tag}: a Full feature has no converter warning"));
             else if (!component.Anchored)
-                result.Findings.Add(new(page, component.Line, $"{component.Tag} names `{component.Feature}`, which its statement " +
-                                                              "(or its table row's first cell) does not name"));
+                result.Findings.Add(new(page, component.Line, $"{component.Tag} names `{component.Feature}`, which is not the feature named " +
+                                                              "just before it (in a table row: the row's first cell)"));
         }
         return result;
     }
 
-    /// <summary>Visits every block; lineOffset maps a re-parsed HTML block back to page lines.</summary>
-    private static void Walk(string page, ContainerBlock container, int lineOffset, ScanResult result)
+    /// <summary>One statement: a paragraph, heading, table row, code block, front matter, link
+    /// reference definition, or a paragraph inside a JSX block or footnote. Section counts headings.</summary>
+    internal sealed record Statement(int Line, Text Text, bool Raw, bool Heading, int Section, HashSet<string>? RowAnchor);
+
+    /// <summary>Collects every statement in document order. lineOffset maps a re-parsed HTML block back to page lines.</summary>
+    private static void Walk(ContainerBlock container, int lineOffset, List<Statement> statements, int[] section)
     {
         foreach (var block in container)
         {
@@ -365,32 +416,160 @@ public sealed class WebsiteFeatureSupportParityTests
                     foreach (var row in table.OfType<TableRow>())
                     {
                         var cells = row.OfType<TableCell>().Select(c => Render(c.Descendants<LeafBlock>())).ToList();
-                        var merged = Text.Join(cells, " | ");
-                        var anchor = cells.Count > 0 ? Mentions(cells[0]) : [];
-                        Check(page, row.Line + 1 + lineOffset, merged, anchor, result);
+                        statements.Add(new(row.Line + 1 + lineOffset, Text.Join(cells, " | "), false, false, section[0],
+                            cells.Count > 0 ? Mentions(cells[0]) : []));
                     }
                     break;
                 case YamlFrontMatterBlock front:
-                    CheckRaw(page, line, front.Lines.ToString(), result);
+                    statements.Add(new(line, Text.Raw(front.Lines.ToString()), true, false, section[0], null));
                     break;
                 case HtmlBlock html:
                     // MDX JSX blocks (<Callout>…</Callout>) hold Markdown that Markdig keeps raw. A leading
                     // zero-width space makes the same text parse as a paragraph with inline HTML and
                     // Markdown, so a level inside a JSX block or attribute is read like any other.
-                    var inner = Markdown.Parse("​" + html.Lines.ToString(), Pipeline);
-                    Walk(page, inner, line - 1, result);
+                    Walk(Markdown.Parse("​" + html.Lines.ToString(), Pipeline), line - 1, statements, section);
                     break;
                 case CodeBlock code: // fenced and indented
-                    CheckRaw(page, line, code.Lines.ToString(), result);
+                    statements.Add(new(line, Text.Raw(code.Lines.ToString()), true, false, section[0], null));
                     break;
-                case LeafBlock leaf when leaf.Inline is not null: // paragraphs and headings
-                    var rendered = Render([leaf]);
-                    Check(page, line, rendered, Mentions(rendered), result);
+                case LinkReferenceDefinition definition: // "[label]: url "title"" renders nothing but a link's title
+                    statements.Add(new(line, Text.Raw(definition.Label + " " + definition.Title), true, false, section[0], null));
                     break;
-                case ContainerBlock nested: // lists, list items, quotes
-                    Walk(page, nested, lineOffset, result);
+                case HeadingBlock heading:
+                    section[0]++;
+                    statements.Add(new(line, Render([heading]), false, true, section[0], null));
+                    break;
+                case LeafBlock leaf when leaf.Inline is not null: // paragraphs
+                    statements.Add(new(line, Render([leaf]), false, false, section[0], null));
+                    break;
+                case ContainerBlock nested: // lists, list items, quotes, footnotes, reference groups
+                    Walk(nested, lineOffset, statements, section);
                     break;
             }
+        }
+    }
+
+    private static void CheckStatements(string page, List<Statement> statements, ScanResult result)
+    {
+        var mentions = statements.Select(s => Mentions(s.Text)).ToList();
+        var triggered = statements.Select((s, i) => mentions[i].Count > 0 || NamesTheCommand(s.Text)).ToList();
+        // A level is "next to" a feature when the feature is named in the same statement, in the
+        // statement just before it, or in the heading of its section, so a feature heading or the
+        // paragraph that names a feature cannot be separated from a level stated below it.
+        bool Near(int i) => triggered[i] || (i > 0 && triggered[i - 1] && statements[i - 1].Section == statements[i].Section)
+                            || Enumerable.Range(0, i).Reverse().Where(j => statements[j].Heading && statements[j].Section == statements[i].Section)
+                                .Take(1).Any(j => triggered[j]);
+        var excused = ExcusesFor(page, statements, result);
+        for (var i = 0; i < statements.Count; i++)
+        {
+            var statement = statements[i];
+            foreach (var component in Components(page, statement))
+                result.Components.Add(component);
+            if (!Near(i) && !(statement.Raw && QuotesSingleWordFeature(statement.Text.Joined)))
+                continue;
+            if (statement.Text.Expression)
+                result.Findings.Add(new(page, statement.Line,
+                    $"an MDX expression next to a feature name, which the parity check cannot read: {statement.Text.Joined.Trim()}"));
+            var terms = new[] { statement.Text.Joined, statement.Text.Spaced }
+                .SelectMany(t => LevelTerms(Remove(Normalize(t), excused.GetValueOrDefault(i, [])))).Distinct().ToList();
+            if (terms.Count > 0)
+                result.Findings.Add(new(page, statement.Line,
+                    $"states a support level ({string.Join(", ", terms)}) outside <SupportLevel>: {statement.Text.Joined.Trim()}"));
+        }
+    }
+
+    /// <summary>Each allowlisted passage must occur exactly once on its page (in one statement); it is
+    /// removed from that statement only. A second copy anywhere on the page fails, so a passage
+    /// cannot be reused to excuse a new claim.</summary>
+    private static Dictionary<int, List<string>> ExcusesFor(string page, List<Statement> statements, ScanResult result)
+    {
+        var excused = new Dictionary<int, List<string>>();
+        for (var e = 0; e < NotClaims.Length; e++)
+        {
+            var (excusedPage, passage, _) = NotClaims[e];
+            if (excusedPage != page)
+                continue;
+            var hits = new List<(int Statement, string Form)>();
+            for (var i = 0; i < statements.Count; i++)
+            {
+                var forms = statements[i].Raw ? [Normalize(passage)] : PassageForms(passage);
+                foreach (var form in forms.Distinct())
+                {
+                    var count = Occurrences(Normalize(statements[i].Raw ? statements[i].Text.Joined : statements[i].Text.Joined), form)
+                                + (statements[i].Raw ? 0 : Occurrences(Normalize(statements[i].Text.Spaced), form));
+                    if (count > 0)
+                        hits.Add((i, form));
+                }
+            }
+            var where = hits.Select(h => h.Statement).Distinct().ToList();
+            var once = where.Count == 1 && OccursOnce(statements[where[0]], hits.Where(h => h.Statement == where[0]).Select(h => h.Form));
+            if (where.Count == 0)
+                continue; // reported as unused
+            result.UsedExcuses.Add(e);
+            if (!once)
+            {
+                result.Findings.Add(new(page, statements[where[0]].Line, $"the allowlisted passage \"{passage}\" appears more than once on the page"));
+                continue;
+            }
+            excused.TryAdd(where[0], []);
+            excused[where[0]].AddRange(hits.Select(h => h.Form));
+        }
+        return excused;
+    }
+
+    private static bool OccursOnce(Statement statement, IEnumerable<string> forms) =>
+        forms.Distinct().All(f => Occurrences(Normalize(statement.Text.Joined), f) <= 1 && Occurrences(Normalize(statement.Text.Spaced), f) <= 1);
+
+    private static string[] PassageForms(string passage)
+    {
+        var text = Render(Markdown.Parse(passage, Pipeline).Descendants<LeafBlock>());
+        return [Normalize(text.Joined), Normalize(text.Spaced)];
+    }
+
+    private static int Occurrences(string text, string form)
+    {
+        var count = 0;
+        for (var at = text.IndexOf(form, StringComparison.Ordinal); form.Length > 0 && at >= 0; at = text.IndexOf(form, at + form.Length, StringComparison.Ordinal))
+            count++;
+        return count;
+    }
+
+    private static string Remove(string text, List<string> forms)
+    {
+        foreach (var form in forms.Distinct())
+            text = text.Replace(form, " \u0003 ", StringComparison.Ordinal);
+        return text;
+    }
+
+    /// <summary>The statement's components. A prose component is anchored when the last feature named
+    /// before it (in a code span or as a hyphenated name) is its own feature; a table component when
+    /// its row's first cell names it. The warning form names its feature in its own text.</summary>
+    private static IEnumerable<Component> Components(string page, Statement statement)
+    {
+        var placeholders = new List<int>();
+        for (var at = statement.Text.Joined.IndexOf('\u0001'); at >= 0; at = statement.Text.Joined.IndexOf('\u0001', at + 1))
+            placeholders.Add(at);
+        for (var k = 0; k < statement.Text.Tags.Count; k++)
+        {
+            var tag = statement.Text.Tags[k].Tag;
+            var match = ComponentTag.Match(tag);
+            var feature = match.Success ? match.Groups["f"].Value : null;
+            var warning = match.Success && match.Groups["w"].Success;
+            bool anchored;
+            if (feature is null)
+                anchored = false;
+            else if (warning)
+                anchored = true;
+            else if (statement.RowAnchor is not null)
+                anchored = statement.RowAnchor.Contains(feature);
+            else
+            {
+                var before = k < placeholders.Count ? statement.Text.Joined[..placeholders[k]] : statement.Text.Joined;
+                var named = Tokens(before).LastOrDefault(t => FeatureSupport.GetFeatureInfo(t) is not null
+                                                            && (t.Contains('-') || statement.Text.CodeSpans.Contains(t)));
+                anchored = named == feature;
+            }
+            yield return new Component(page, statement.Line, tag, feature, warning, anchored);
         }
     }
 
@@ -404,6 +583,9 @@ public sealed class WebsiteFeatureSupportParityTests
             string.Join(separator, parts.Select(p => p.Joined)), string.Join(separator, parts.Select(p => p.Spaced)),
             parts.SelectMany(p => p.Tags).ToList(), parts.SelectMany(p => p.CodeSpans).ToHashSet(StringComparer.Ordinal),
             parts.Any(p => p.Expression));
+
+        /// <summary>Code, front matter and reference definitions: their characters as written.</summary>
+        public static Text Raw(string body) => new(Clean(body), Clean(body), [], [], false);
     }
 
     private static Text Render(IEnumerable<LeafBlock> leaves)
@@ -413,7 +595,8 @@ public sealed class WebsiteFeatureSupportParityTests
         var tags = new List<(int, string)>();
         var codes = new HashSet<string>(StringComparer.Ordinal);
         var literals = new StringBuilder();
-        void Piece(string s) { joined.Append(s); spaced.Append(' ').Append(s); }
+        var expression = false;
+        void Piece(string s) { s = Clean(s); joined.Append(s); spaced.Append(' ').Append(s); }
         void Visit(Inline inline)
         {
             switch (inline)
@@ -444,12 +627,23 @@ public sealed class WebsiteFeatureSupportParityTests
                         spaced.Append(" \u0001 ");
                     }
                     else
-                        spaced.Append(' ').Append(html.Tag).Append(' ');
+                    {
+                        // JSX attributes render as text (a Callout title): read them with entities decoded.
+                        var decoded = Clean(WebUtility.HtmlDecode(html.Tag));
+                        expression |= decoded.Contains('{') || decoded.Contains('}');
+                        spaced.Append(' ').Append(decoded).Append(' ');
+                    }
                     break;
                 case AutolinkInline autolink:
                     Piece(autolink.Url);
                     break;
-                case ContainerInline children: // emphasis, links, images
+                case LinkInline link: // link text or image alt, then the title shown as a tooltip
+                    foreach (var child in link)
+                        Visit(child);
+                    if (!string.IsNullOrEmpty(link.Title))
+                        Piece(" " + link.Title + " ");
+                    break;
+                case ContainerInline children: // emphasis
                     foreach (var child in children)
                         Visit(child);
                     break;
@@ -464,24 +658,37 @@ public sealed class WebsiteFeatureSupportParityTests
             joined.Append(' ');
             spaced.Append(' ');
         }
-        // An MDX comment ({/* ... */}) renders nothing; any other brace outside code is an MDX
-        // expression, which this check cannot read.
-        var bare = WithoutMdxComments(literals.ToString());
-        return new Text(WithoutMdxComments(joined.ToString()), WithoutMdxComments(spaced.ToString()), tags, codes,
-            bare.Contains('{') || bare.Contains('}'));
+        // Any brace outside code is an MDX expression (comments were removed from the source first),
+        // which this check cannot read.
+        var bare = literals.ToString();
+        return new Text(joined.ToString(), spaced.ToString(), tags, codes, expression || bare.Contains('{') || bare.Contains('}'));
     }
 
-    /// <summary>Removes MDX comments (<c>{/* … */}</c>), which render nothing.</summary>
-    private static string WithoutMdxComments(string text)
+    /// <summary>Compatibility normalization (fullwidth letters become ASCII) and removal of invisible
+    /// format characters (zero-width space, soft hyphen, word joiner), so neither hides a word.</summary>
+    private static string Clean(string text) =>
+        string.Concat(text.Normalize(NormalizationForm.FormKC).Where(c => char.GetUnicodeCategory(c) != UnicodeCategory.Format));
+
+    /// <summary>Blanks MDX comments (<c>{/* … */}</c>), which render nothing, outside code; line numbers are kept.</summary>
+    private static string WithoutMdxComments(string source)
     {
-        for (var start = text.IndexOf("{/*", StringComparison.Ordinal); start >= 0; start = text.IndexOf("{/*", start, StringComparison.Ordinal))
+        var document = Markdown.Parse(source, Pipeline);
+        var code = document.Descendants<CodeBlock>().Select(c => (c.Span.Start, c.Span.End))
+            .Concat(document.Descendants<CodeInline>().Select(c => (c.Span.Start, c.Span.End))).ToList();
+        var chars = source.ToCharArray();
+        for (var start = source.IndexOf("{/*", StringComparison.Ordinal); start >= 0; start = source.IndexOf("{/*", start + 1, StringComparison.Ordinal))
         {
-            var end = text.IndexOf("*/}", start + 3, StringComparison.Ordinal);
+            if (code.Any(c => start >= c.Start && start <= c.End))
+                continue;
+            var end = source.IndexOf("*/}", start + 3, StringComparison.Ordinal);
             if (end < 0)
                 break;
-            text = text[..start] + text[(end + 3)..];
+            for (var i = start; i < end + 3; i++)
+                if (chars[i] != '\n')
+                    chars[i] = ' ';
+            start = end;
         }
-        return text;
+        return new string(chars);
     }
 
     /// <summary>The registry features a statement names: a code span equal to a registry name, a
@@ -499,6 +706,11 @@ public sealed class WebsiteFeatureSupportParityTests
                 if (token.Contains('-') && FeatureSupport.GetFeatureInfo(token) is not null)
                     found.Add(token);
             var words = Words(rendered, splitFeatures: true);
+            foreach (var word in words)
+                foreach (var singular in new[] { word, word.TrimEnd('s'), word.EndsWith("es") ? word[..^2] : word,
+                             word.EndsWith("ies") ? word[..^3] + "y" : word })
+                    if (SingleWordNames.Value.Contains(singular))
+                        found.Add(singular);
             foreach (var name in MultiWordNames.Value)
                 for (var i = 0; i + name.Parts.Length <= words.Count; i++)
                     if (name.Parts.Select((p, k) => words[i + k] == p || (k == name.Parts.Length - 1 && words[i + k] == p + "s")).All(b => b))
@@ -506,6 +718,18 @@ public sealed class WebsiteFeatureSupportParityTests
         }
         return found;
     }
+
+    // Single-word registry names that are also ordinary English or general programming words. As plain
+    // text they name no feature ("the full method", "for each field"); in a code span they still do.
+    private static readonly HashSet<string> CommonWords = new(StringComparer.Ordinal)
+    {
+        "class", "method", "property", "field", "constructor", "if", "for", "foreach", "while", "switch", "attributes",
+        "dynamic", "unsafe", "fixed", "volatile", "namespace", "parallel", "span", "memory", "interface", "generics",
+    };
+
+    private static readonly Lazy<HashSet<string>> SingleWordNames = new(() =>
+        FeatureSupport.GetAllFeatures().Select(f => f.Name).Where(n => n.All(char.IsLetterOrDigit) && !CommonWords.Contains(n))
+            .ToHashSet(StringComparer.Ordinal));
 
     private static readonly Lazy<List<(string Name, string[] Parts)>> MultiWordNames = new(() =>
         FeatureSupport.GetAllFeatures().Select(f => f.Name).Where(n => n.Contains('-'))
@@ -556,41 +780,8 @@ public sealed class WebsiteFeatureSupportParityTests
         return terms;
     }
 
-    private static bool Triggered(Text text, HashSet<string> mentions) =>
-        mentions.Count > 0 || new[] { text.Joined, text.Spaced }.Any(t =>
-            Tokens(t).Any(token => token == "feature-check" || token.Equals("supportLevel", StringComparison.OrdinalIgnoreCase)));
-
-    private static void Check(string page, int line, Text text, HashSet<string> anchor, ScanResult result)
-    {
-        var mentions = Mentions(text);
-        foreach (var (tagLine, tag) in text.Tags)
-        {
-            var match = ComponentTag.Match(tag);
-            var feature = match.Success ? match.Groups["f"].Value : null;
-            var warning = match.Success && match.Groups["w"].Success;
-            result.Components.Add(new Component(page, line, tag, feature, warning, feature is not null && (warning || anchor.Contains(feature))));
-        }
-        if (!Triggered(text, mentions))
-            return;
-        if (text.Expression)
-            result.Findings.Add(new(page, line, $"an MDX expression next to a feature name, which the parity check cannot read: {text.Joined.Trim()}"));
-        var joined = Excuse(page, text.Joined, raw: false, rendered: p => p.Joined, result);
-        var spaced = Excuse(page, text.Spaced, raw: false, rendered: p => p.Spaced, result);
-        var terms = LevelTerms(joined).Concat(LevelTerms(spaced)).Distinct().ToList();
-        if (terms.Count > 0)
-            result.Findings.Add(new(page, line, $"states a support level ({string.Join(", ", terms)}) outside <SupportLevel>: {text.Joined.Trim()}"));
-    }
-
-    private static void CheckRaw(string page, int line, string body, ScanResult result)
-    {
-        var text = new Text(body, body, [], [], false);
-        if (!Triggered(text, Mentions(text)) && !QuotesSingleWordFeature(body))
-            return;
-        var excused = Excuse(page, body, raw: true, rendered: p => p.Joined, result);
-        var terms = LevelTerms(excused);
-        if (terms.Count > 0)
-            result.Findings.Add(new(page, line, $"a code block or front matter states a support level ({string.Join(", ", terms)}): {body.Trim()}"));
-    }
+    private static bool NamesTheCommand(Text text) => new[] { text.Joined, text.Spaced }.Any(t =>
+        Tokens(t).Any(token => token == "feature-check" || token.Equals("supportLevel", StringComparison.OrdinalIgnoreCase)));
 
     // A quoted single-word registry name in code ("record", 'record'), as in the command's JSON output.
     private static bool QuotesSingleWordFeature(string body)
@@ -602,26 +793,6 @@ public sealed class WebsiteFeatureSupportParityTests
                 return true;
         }
         return false;
-    }
-
-    /// <summary>Removes each allowlisted passage for this page from a statement's text. A raw
-    /// statement (code, front matter) matches the passage's source; prose matches the passage read
-    /// by the same parser.</summary>
-    private static string Excuse(string page, string text, bool raw, Func<Text, string> rendered, ScanResult result)
-    {
-        for (var i = 0; i < NotClaims.Length; i++)
-        {
-            var (excusedPage, passage, _) = NotClaims[i];
-            if (excusedPage != page)
-                continue;
-            var form = raw ? passage : Normalize(rendered(Render(Markdown.Parse(passage, Pipeline).Descendants<LeafBlock>())));
-            var normalized = Normalize(text);
-            if (form.Length == 0 || !normalized.Contains(form, StringComparison.Ordinal))
-                continue;
-            result.UsedExcuses.Add(i);
-            text = normalized.Replace(form, " \u0003 ", StringComparison.Ordinal);
-        }
-        return text;
     }
 
     private static string Normalize(string text) => string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

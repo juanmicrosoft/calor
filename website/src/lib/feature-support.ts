@@ -48,8 +48,19 @@ export function supportWarning(feature: string): string {
 
 const COMPONENT = /<SupportLevel\s+feature="([a-z0-9-]+)"(\s+form="warning")?\s*\/>/g;
 
-/** Replaces each <SupportLevel> tag in raw page text with what it renders (for the search index). */
-export function expandSupportLevels(text: string): string {
+function expandTags(text: string): string {
   return text.replace(COMPONENT, (_tag, feature: string, warning?: string) =>
     warning ? supportWarning(feature) : supportLevelName(feature));
+}
+
+/**
+ * Replaces each <SupportLevel> tag in raw page text with what it renders (for the search index).
+ * A tag inside a fenced block or an inline code span is shown literally on the page, so it is
+ * left as written.
+ */
+export function expandSupportLevels(text: string): string {
+  return text
+    .split(/(^```[^\n]*\n[\s\S]*?^```[^\n]*$)/m)
+    .map((part, i) => (i % 2 === 1 ? part : part.split(/(`[^`\n]*`)/).map((piece, k) => (k % 2 === 1 ? piece : expandTags(piece))).join('')))
+    .join('');
 }

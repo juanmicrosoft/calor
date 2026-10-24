@@ -106,6 +106,9 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
 test('support levels render from the FeatureSupport registry export', async ({ page }) => {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const names: Record<string, string> = { full: 'Full', partial: 'Partial', notsupported: 'NotSupported', manualrequired: 'ManualRequired' };
+  // ConversionContext's warning text per level; Full has none.
+  const warnings: Record<string, string> = { partial: 'is partially supported', notsupported: 'is not supported',
+    manualrequired: 'requires manual intervention' };
   const registry = new Map<string, string>();
   for (const [level, features] of Object.entries(featureSupport.data.features))
     for (const feature of features as { name: string }[]) registry.set(feature.name, level);
@@ -119,7 +122,7 @@ test('support levels render from the FeatureSupport registry export', async ({ p
     expect(rendered.length, path).toBe(count);
     for (const { feature, level, tag, text } of rendered) {
       expect(level, `${path}: ${feature}`).toBe(registry.get(feature));
-      if (tag === 'CODE') expect(text).toMatch(new RegExp(`^\\[${feature}\\] Feature '${feature}' `));
+      if (tag === 'CODE') expect(text, `${path}: ${feature}`).toBe(`[${feature}] Feature '${feature}' ${warnings[level]}…`);
       else expect(text, `${path}: ${feature}`).toBe(names[level]);
     }
   }
