@@ -135,8 +135,9 @@ Four related rules keep a refined variable checked:
 
 Inside class members the type checker reports only these refinement errors. Its other checks
 there are left to name binding and the C# compiler, as before, because it does not model
-inherited members. Members inside a `§PP` block are not type-checked; runtime guards still apply
-there. A write to a refined field or property has no runtime guard yet, so a setter's `value`
+inherited members, so in a class with a base class a bare call to a method the class does not
+declare is not checked. Members inside a `§PP` block are not type-checked; runtime guards still
+apply there. A write to a refined field or property has no runtime guard yet, so a setter's `value`
 and an indexer's parameters are typed as their base types.
 
 ---

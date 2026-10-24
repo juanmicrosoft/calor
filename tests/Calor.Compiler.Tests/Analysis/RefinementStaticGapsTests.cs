@@ -711,6 +711,85 @@ public class RefinementStaticGapsTests
             """));
     }
 
+    // ───────────────────────── Review round 2 ─────────────────────────
+
+    [Fact]
+    public void Runtime_DerivedMethodHidingABaseMethod_DecidesTheInferredRefinement()
+    {
+        // C# calls Derived.Take (returns Nat); the checker must not pick Base.Take (returns Pos)
+        // and give x a Pos guard that rejects a valid 0.
+        var assembly = CompileAndLoad("""
+              §CL{c0:Base:pub}
+                §MT{mt0:Take:pub} (Nat:n) -> Pos
+                  §R §C{ToPos} §A INT:1 §/C
+                §MT{mt9:ToPos:pub} (i32:v) -> Pos
+                  §R v
+              §CL{c1:Derived:pub}
+                §EXT{Base}
+                §MT{mt1:Take:pub} (i32:n) -> Nat
+                  §R §C{ToNat} §A INT:0 §/C
+                §MT{mt8:ToNat:pub} (i32:v) -> Nat
+                  §R v
+                §MT{mt2:Get:pub} (Nat:n) -> i32
+                  §B{~x} §C{Take} §A n §/C
+                  §R x
+            """);
+
+        Assert.Equal(0, Invoke(assembly, "Derived", "Get", 0));
+    }
+
+    [Fact]
+    public void ClassMember_NestedBaseClassOfTheSameName_ImportsNoMembers()
+    {
+        AssertNoRefinementError(Compile("""
+              §CL{c0:Base:pub}
+                §FLD{Nat:v:prot}
+              §CL{c1:Outer:pub}
+                §CL{c2:Base:pub}
+                  §FLD{Pos:v:prot}
+                §CL{c3:Derived:pub}
+                  §EXT{Base}
+                  §MT{mt1:Get:pub} () -> Pos
+                    §R v
+            """));
+    }
+
+    [Fact]
+    public void ClassMember_CallThatMayBeAnInheritedMethod_IsNotCheckedAgainstAModuleFunction()
+    {
+        AssertNoRefinementError(Compile("""
+              §F{f0:Add:pub} (Pos:p) -> i32
+                §R p
+              §CL{c1:Holder:pub}
+                §EXT{System.Collections.Generic.List<i32>}
+                §MT{mt1:Use:pub} (Nat:n) -> void
+                  §C{Add} §A n §/C
+            """));
+    }
+
+    [Fact]
+    public void ExpressionLambdaReturningADifferentRefinement_IsRejectedInPrintAndInAClassMethod()
+    {
+        const string Factory = """
+              §DEL{d1:Factory:pub}
+                §O{Pos}
+              §F{f0:Apply:pub} (Factory:fn) -> i32
+                §R §C{fn} §/C
+            """;
+        AssertDistinct(Compile(Factory + """
+
+              §F{f1:Run:pub} (Nat:n) -> void
+                §P §C{Apply} §A §LAM{l1} n §/LAM{l1} §/C
+            """), "Nat", "Pos", "a lambda return");
+        AssertDistinct(Compile(Factory + """
+
+              §CL{c1:Holder:pub}
+                §MT{mt1:Run:pub} (Nat:n) -> i32
+                  §B{f:Factory} §LAM{l1} n §/LAM{l1}
+                  §R §C{f} §/C
+            """), "Nat", "Pos", "a lambda return");
+    }
+
     [Fact]
     public void Runtime_LambdaInAClassMethod_IsGuarded()
     {

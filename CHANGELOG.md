@@ -100,8 +100,10 @@ All notable changes to this project will be documented in this file.
     indexer accessors, and operators of a `§CL` now get every refinement check of #1529 and
     #1530: binds, call arguments, returns, `§ASSIGN`, rebinds and type patterns. Inside class
     members the type checker reports only refinement errors. Its other checks are still left to
-    name binding and the C# compiler, because it does not model inherited members. Members in a
-    `§PP` block are not type-checked. Modules without `§RTYPE` are not affected.
+    name binding and the C# compiler, because it does not model inherited members. In a class
+    with a base class, a bare call to a method the class does not declare is not checked, since
+    it may name an inherited method. Members in a `§PP` block are not type-checked. Modules
+    without `§RTYPE` are not affected.
   - Variable names are now case-sensitive in the type checker, as they are in C#: a field `n`
     and a property `N` are two different members.
   - Known limit, unchanged by this release: a write to a refined field or property has no

@@ -148,10 +148,14 @@ public sealed class TypeChecker
         {
             // A base class is resolved only when its simple name names exactly one non-generic
             // module class; otherwise its members stay unknown to the checker (#1676 review).
-            var moduleClasses = module.Classes
+            // A nested class of the same simple name could be the one C# resolves, so the name
+            // must be unique among all classes, nested ones included.
+            var nameCounts = AllClasses(module.Classes)
                 .GroupBy(cls => cls.Name, StringComparer.Ordinal)
-                .Where(group => group.Count() == 1 && group.First().TypeParameters.Count == 0)
-                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+            var moduleClasses = module.Classes
+                .Where(cls => nameCounts[cls.Name] == 1 && cls.TypeParameters.Count == 0)
+                .ToDictionary(cls => cls.Name, StringComparer.Ordinal);
             foreach (var cls in module.Classes)
             {
                 CheckClassKeepingOnlyRefinementSoundness(cls, moduleClasses);
@@ -166,6 +170,9 @@ public sealed class TypeChecker
     /// diagnostics inside class members are mostly about its own model, not the program. The
     /// binder and Roslyn keep owning those, exactly as before this pass existed.
     /// </summary>
+    private static IEnumerable<ClassDefinitionNode> AllClasses(IEnumerable<ClassDefinitionNode> classes)
+        => classes.SelectMany(cls => AllClasses(cls.NestedClasses).Prepend(cls));
+
     private void CheckClassKeepingOnlyRefinementSoundness(
         ClassDefinitionNode cls, IReadOnlyDictionary<string, ClassDefinitionNode> moduleClasses)
     {
@@ -510,24 +517,28 @@ public sealed class TypeChecker
     /// </summary>
     private void CheckClass(ClassDefinitionNode cls, IReadOnlyDictionary<string, ClassDefinitionNode> moduleClasses)
     {
-        _env.EnterScope();
+        var ancestors = new List<ClassDefinitionNode>();
+        var visited = new HashSet<ClassDefinitionNode>(ReferenceEqualityComparer.Instance) { cls };
+        var baseName = cls.BaseClass;
+        while (baseName != null
+            && !baseName.Contains('<')
+            && moduleClasses.TryGetValue(baseName, out var baseClass)
+            && visited.Add(baseClass))
+        {
+            ancestors.Add(baseClass);
+            baseName = baseClass.BaseClass;
+        }
+        ancestors.Reverse();
+
+        // When the base chain ends in a class the checker cannot see (an external type, a
+        // generic or ambiguous name), an inherited member may be what a bare name means, so
+        // names from enclosing classes are not visible through this class (#1676 review).
+        _env.EnterScope(opaque: baseName != null);
         foreach (var tp in cls.TypeParameters)
             _env.DefineType(tp.Name, new TypeParameterType(tp.Name, tp.Constraints));
 
         var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
-        var ancestors = new List<ClassDefinitionNode>();
-        var visited = new HashSet<ClassDefinitionNode>(ReferenceEqualityComparer.Instance) { cls };
-        for (var baseName = cls.BaseClass;
-            baseName != null
-                && !baseName.Contains('<')
-                && moduleClasses.TryGetValue(baseName, out var baseClass)
-                && visited.Add(baseClass);
-            baseName = baseClass.BaseClass)
-        {
-            ancestors.Add(baseClass);
-        }
-        ancestors.Reverse();
         foreach (var ancestor in ancestors)
             DefineClassMemberVariables(ancestor);
         DefineClassMemberVariables(cls);
@@ -539,8 +550,12 @@ public sealed class TypeChecker
         var previousMemberScopeDepth = _memberScopeDepth;
         _memberScopeDepth = _env.ScopeDepth;
 
-        _env.EnterLocalFunctions();
-        foreach (var method in ancestors.Append(cls).SelectMany(owner => owner.Methods))
+        // A bare call names one of the class's own methods. With any base class, a name the
+        // class does not declare may be an inherited method (C# member hiding and overloads the
+        // checker does not model), so it resolves to nothing rather than to a module function
+        // or an enclosing class's method (#1676 review).
+        _env.EnterLocalFunctions(opaque: cls.BaseClass != null);
+        foreach (var method in cls.Methods)
         {
             _env.DefineLocalFunction(
                 GetCallableLookupName(method.Name),
@@ -2273,9 +2288,19 @@ public sealed class TypeChecker
                 {
                     if (!_suppressContextualDiagnostics)
                     {
-                        _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
-                            $"Lambda return type {returnType.SurfaceName} is not assignable to "
-                            + expectedFunction.ReturnType.SurfaceName);
+                        // A named-refinement mismatch is a refinement-soundness error, so the
+                        // filtered contexts (§P, class members, §TR bodies) keep it (#1676).
+                        if (IsDistinctNamedRefinement(expectedFunction.ReturnType, returnType))
+                        {
+                            ReportDistinctNamedRefinement(
+                                lambda.ExpressionBody.Span, expectedFunction.ReturnType, returnType, "a lambda return");
+                        }
+                        else
+                        {
+                            _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
+                                $"Lambda return type {returnType.SurfaceName} is not assignable to "
+                                + expectedFunction.ReturnType.SurfaceName);
+                        }
                     }
                     signatureValid = false;
                 }
@@ -5451,21 +5476,29 @@ public sealed class TypeEnvironment
         _typeScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
     }
 
-    public void EnterScope()
+    /// <summary>
+    /// Pushes a variable scope. An opaque scope ends variable lookup: a name not found in it, or
+    /// in the scopes opened after it, is not looked up in the scopes before it.
+    /// </summary>
+    public void EnterScope(bool opaque = false)
     {
-        // Variable names are case-sensitive, as in the binder and the emitted C#: a field `n`
-        // and a property `N` are two members (#1676 review). Type names stay case-insensitive.
         _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.Ordinal));
+        _opaqueVariableScopes.Push(opaque);
         _typeScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
     }
 
     public void ExitScope()
     {
         if (_variableScopes.Count > 1)
+        {
             _variableScopes.Pop();
+            _opaqueVariableScopes.Pop();
+        }
         if (_typeScopes.Count > 1)
             _typeScopes.Pop();
     }
+
+    private readonly Stack<bool> _opaqueVariableScopes = new(new[] { false });
 
     public void DefineVariable(string name, CalorType type)
     {
@@ -5474,10 +5507,12 @@ public sealed class TypeEnvironment
 
     public CalorType? LookupVariable(string name)
     {
-        foreach (var scope in _variableScopes)
+        foreach (var (scope, opaque) in _variableScopes.Zip(_opaqueVariableScopes))
         {
             if (scope.TryGetValue(name, out var type))
                 return type;
+            if (opaque)
+                return null;
         }
         return null;
     }
@@ -5492,10 +5527,12 @@ public sealed class TypeEnvironment
     public CalorType? LookupVariableAtOrBelow(string name, int depth)
     {
         var scopeDepth = _variableScopes.Count;
-        foreach (var scope in _variableScopes)
+        foreach (var (scope, opaque) in _variableScopes.Zip(_opaqueVariableScopes))
         {
             if (scopeDepth <= depth && scope.TryGetValue(name, out var type))
                 return type;
+            if (scopeDepth <= depth && opaque)
+                return null;
             scopeDepth--;
         }
         return null;
@@ -5566,10 +5603,12 @@ public sealed class TypeEnvironment
 
     public IReadOnlyList<FunctionCandidate> LookupFunctionCandidates(string name)
     {
-        foreach (var scope in _localFunctions)
+        foreach (var (scope, opaque) in _localFunctions.Zip(_opaqueLocalFunctions))
         {
             if (scope.TryGetValue(name, out var locals))
                 return locals;
+            if (opaque)
+                return Array.Empty<FunctionCandidate>();
         }
         return _functions.TryGetValue(name, out var overloads)
             ? overloads
@@ -5579,9 +5618,23 @@ public sealed class TypeEnvironment
     // 0.25 F3 (#847): local functions visible in the callable bodies being checked.
     private readonly Stack<Dictionary<string, List<FunctionCandidate>>> _localFunctions = new();
 
-    public void EnterLocalFunctions() => _localFunctions.Push(new(StringComparer.Ordinal));
+    /// <summary>
+    /// Pushes a callable scope. An opaque one ends lookup: a name it does not declare resolves to
+    /// no candidates instead of to an enclosing scope's or the module's functions.
+    /// </summary>
+    public void EnterLocalFunctions(bool opaque = false)
+    {
+        _localFunctions.Push(new(StringComparer.Ordinal));
+        _opaqueLocalFunctions.Push(opaque);
+    }
 
-    public void ExitLocalFunctions() => _localFunctions.Pop();
+    public void ExitLocalFunctions()
+    {
+        _localFunctions.Pop();
+        _opaqueLocalFunctions.Pop();
+    }
+
+    private readonly Stack<bool> _opaqueLocalFunctions = new();
 
     public void DefineLocalFunction(string name, FunctionCandidate candidate)
     {
