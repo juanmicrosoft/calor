@@ -7322,6 +7322,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var current = target;
         while (true)
         {
+            // Codex round 2: a ref-returning property or indexer is a location the lowering cannot
+            // hold; reading and writing it would run its getter twice.
+            if (model.GetSymbolInfo(current).Symbol is IPropertySymbol { ReturnsByRef: true }
+                or IPropertySymbol { ReturnsByRefReadonly: true })
+                return null;
             switch (current)
             {
                 case IdentifierNameSyntax:
@@ -7353,9 +7358,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         Path = path,
                     };
                 }
+                // Codex round 2: an argument converted by a user-defined operator would run that
+                // operator again for each evaluation of the rebuilt target.
                 case ElementAccessExpressionSyntax element
                     when element.ArgumentList.Arguments.All(argument =>
-                        argument.NameColon == null && argument.RefKindKeyword.IsKind(SyntaxKind.None)):
+                        argument.NameColon == null && argument.RefKindKeyword.IsKind(SyntaxKind.None)
+                        && !model.GetConversion(argument.Expression).IsUserDefined):
                 {
                     var receiverType = model.GetTypeInfo(element.Expression).Type;
                     if (receiverType is null || receiverType.TypeKind == TypeKind.Error)
@@ -7399,6 +7407,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 : new AssignmentStatementNode(span, plainTarget, plainValue);
         }
 
+        // Codex round 2: a user-defined ++/-- (or a C# 14 instance compound operator such as
+        // `operator +=`) is not `x = x + 1`; the lowering would call a different operator.
+        if (UsesUserDefinedUpdateOperator(site))
+            throw EscalateExpression(site, "compound-assignment-order");
         var castType = op is { } castOperator && castOperator != CompoundAssignmentOperator.NullCoalesce
             ? NarrowingCastType(site, left) : null;
         var parts = DecomposeAssignmentTarget(left);
@@ -7447,6 +7459,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var mark = _pendingStatements.Count;
         var value = ConvertRight();
         var rightHoisted = HoistsHaveEffects(mark);
+        // Codex round 2: C# converts the read (`x` in `x += F().N()`) to the operator's operand type
+        // before the right-hand side; a temp holding the unconverted read would convert it after the
+        // hoisted statements, so a user-defined input conversion stays C#.
+        if (rightHoisted && _semanticModel.GetOperation(site)
+                is Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation { InConversion.IsUserDefined: true })
+            throw EscalateExpression(site, "compound-assignment-order");
         var rightSyntax = right != null ? new List<ExpressionSyntax> { right } : new List<ExpressionSyntax>();
 
         var bound = 0;
@@ -7506,6 +7524,68 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             bound++;
         }
         return bound;
+    }
+
+    /// <summary>
+    /// Codex round 2: whether a compound assignment or ++/-- binds to a user-defined operator that
+    /// performs the update itself (<c>operator ++</c>, or a C# 14 instance <c>operator +=</c>).
+    /// </summary>
+    private bool UsesUserDefinedUpdateOperator(ExpressionSyntax site) => _semanticModel?.GetOperation(site) switch
+    {
+        Microsoft.CodeAnalysis.Operations.IIncrementOrDecrementOperation { OperatorMethod: not null } => true,
+        Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation { OperatorMethod: { } method } =>
+            method.Name.EndsWith("Assignment", StringComparison.Ordinal) || !method.IsStatic,
+        _ => false,
+    };
+
+    /// <summary>
+    /// Codex round 2: whether evaluating this node (not its operands) can call user code or throw,
+    /// so moving a hoisted statement ahead of it is observable: calls, creations, updates, element
+    /// and member accesses (null references, getters), user-defined or checked operators, integer
+    /// division, and conversions that are explicit or user-defined.
+    /// </summary>
+    private bool MayActOrThrow(ExpressionSyntax node)
+    {
+        var model = _semanticModel!;
+        switch (node)
+        {
+            case InvocationExpressionSyntax or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
+                or AssignmentExpressionSyntax or AwaitExpressionSyntax or ConditionalAccessExpressionSyntax
+                or ElementAccessExpressionSyntax or ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax
+                or SwitchExpressionSyntax or ThrowExpressionSyntax or QueryExpressionSyntax
+                or InterpolatedStringExpressionSyntax:
+                return true;
+            case PostfixUnaryExpressionSyntax:
+                return true;
+            case PrefixUnaryExpressionSyntax prefix:
+                return prefix.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression
+                    || model.GetOperation(prefix) is not Microsoft.CodeAnalysis.Operations.IUnaryOperation { OperatorMethod: null, IsChecked: false };
+            case BinaryExpressionSyntax binary:
+                if (binary.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression)
+                    return false;
+                return model.GetOperation(binary) is not Microsoft.CodeAnalysis.Operations.IBinaryOperation
+                    {
+                        OperatorMethod: null, IsChecked: false
+                    } operation
+                    || operation.OperatorKind is Microsoft.CodeAnalysis.Operations.BinaryOperatorKind.Divide
+                        or Microsoft.CodeAnalysis.Operations.BinaryOperatorKind.Remainder
+                    // String concatenation calls ToString on its operands.
+                    || operation.LeftOperand.Type?.SpecialType is not (SpecialType.System_Boolean or SpecialType.System_Char
+                        or SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16
+                        or SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32
+                        or SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Single
+                        or SpecialType.System_Double) && operation.LeftOperand.Type?.TypeKind != TypeKind.Enum
+                        && binary.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression);
+            case CastExpressionSyntax cast:
+                return model.GetConversion(cast) is not { IsImplicit: true, IsUserDefined: false };
+            case MemberAccessExpressionSyntax member:
+                return model.GetSymbolInfo(member).Symbol is not (INamedTypeSymbol or INamespaceSymbol or IMethodSymbol
+                    or IFieldSymbol { IsStatic: true } or IFieldSymbol { IsConst: true });
+            case IdentifierNameSyntax identifier:
+                return model.GetSymbolInfo(identifier).Symbol is IPropertySymbol or IEventSymbol;
+            default:
+                return false;
+        }
     }
 
     /// <summary>
@@ -7703,6 +7783,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     && IsInertExpression(element.Expression)
                     && element.ArgumentList.Arguments.All(argument =>
                         argument.NameColon == null && argument.RefKindKeyword.IsKind(SyntaxKind.None)
+                        && !model.GetConversion(argument.Expression).IsUserDefined
                         && model.GetTypeInfo(argument.Expression).ConvertedType?.SpecialType is SpecialType.System_Int32
                             or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
                         && IsInertExpression(argument.Expression));
@@ -7846,37 +7927,39 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var indexOrKey = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
                     var valueMark = _pendingStatements.Count;
                     var value = ConvertExpression(assignment.Right);
-                    if (HoistsHaveEffects(valueMark) && _semanticModel != null
+                    var keyHoisted = _pendingStatements.Skip(keyMark).Take(valueMark - keyMark)
+                        .Any(statement => statement is not BindStatementNode { Initializer: LambdaExpressionNode });
+                    var valueHoisted = HoistsHaveEffects(valueMark);
+                    if ((keyHoisted || valueHoisted) && _semanticModel != null
                         && assignment.SyntaxTree == _semanticModel.SyntaxTree)
                     {
-                        // #1633 audit: C# evaluates the collection and the key before the
-                        // right-hand side, so they are bound ahead of what it hoisted unless
-                        // nothing it runs can change them.
+                        // #1633 audit (Codex round 2): C# evaluates the collection, then the key, then
+                        // the right-hand side. The collection is bound ahead of what the key or the
+                        // right-hand side hoisted, and the key ahead of what the right-hand side
+                        // hoisted, unless nothing they run can change them.
                         var receiver = Unparen(elementAccess.Expression);
                         var key = elementAccess.ArgumentList.Arguments[0].Expression;
-                        var later = new List<ExpressionSyntax> { assignment.Right };
-                        var captureKey = !IsFixedValue(key, later);
+                        var captureKey = valueHoisted && !IsFixedValue(key, [assignment.Right]);
                         var captureReceiver = receiver is not ThisExpressionSyntax
                             && !IsFixedValue(receiver, [key, assignment.Right]);
-                        var captures = new List<StatementNode>();
                         if (captureReceiver)
                         {
                             if (_semanticModel.GetTypeInfo(receiver).Type is not { IsReferenceType: true }
-                                || valueMark != keyMark)
+                                || !IsInertExpression(receiver))
                                 throw EscalateExpression(assignment, "compound-assignment-order");
                             var receiverTemp = _context.GenerateId("_asg");
-                            captures.Add(new BindStatementNode(GetTextSpan(assignment), receiverTemp, null, false,
-                                ConvertExpression(receiver), new AttributeCollection()));
+                            _pendingStatements.Insert(keyMark, new BindStatementNode(GetTextSpan(assignment), receiverTemp,
+                                null, false, ConvertExpression(receiver), new AttributeCollection()));
                             collectionName = receiverTemp;
+                            valueMark++;
                         }
                         if (captureKey)
                         {
                             var keyTemp = _context.GenerateId("_asg");
-                            captures.Add(new BindStatementNode(GetTextSpan(assignment), keyTemp, null, false,
-                                indexOrKey, new AttributeCollection()));
+                            _pendingStatements.Insert(valueMark, new BindStatementNode(GetTextSpan(assignment), keyTemp,
+                                null, false, indexOrKey, new AttributeCollection()));
                             indexOrKey = new ReferenceNode(GetTextSpan(assignment), keyTemp);
                         }
-                        _pendingStatements.InsertRange(valueMark, captures);
                     }
                     // Hoist block-level values that can't appear inline in §PUT/§SETIDX
                     if (IsBlockLevelCollection(value))
@@ -9225,12 +9308,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 Walk(binary.Left);
                 Walk(binary.Right);
+                // Codex round 2: the operator itself runs inline, after its operands; a user-defined
+                // or throwing one must not be passed by a later staged call.
+                if (MayActOrThrow(binary))
+                    inlineFixed = false;
                 return;
             }
             if (node is PrefixUnaryExpressionSyntax unary && unary.Kind() is SyntaxKind.LogicalNotExpression
                     or SyntaxKind.UnaryMinusExpression or SyntaxKind.BitwiseNotExpression)
             {
                 Walk(unary.Operand);
+                if (MayActOrThrow(unary))
+                    inlineFixed = false;
                 return;
             }
             inlineFixed &= IsFixedOperand(node);
@@ -9239,10 +9328,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .OfType<ExpressionSyntax>()
             .All(part => part switch
             {
-                BinaryExpressionSyntax or ParenthesizedExpressionSyntax or CastExpressionSyntax
-                    or PredefinedTypeSyntax => true,
-                PrefixUnaryExpressionSyntax unary => unary.Kind() is not (SyntaxKind.PreIncrementExpression
-                    or SyntaxKind.PreDecrementExpression),
+                BinaryExpressionSyntax or CastExpressionSyntax or PrefixUnaryExpressionSyntax => !MayActOrThrow(part),
+                ParenthesizedExpressionSyntax or PredefinedTypeSyntax => true,
                 IdentifierNameSyntax or MemberAccessExpressionSyntax or GenericNameSyntax or QualifiedNameSyntax
                     when model.GetSymbolInfo(part).Symbol is INamedTypeSymbol or INamespaceSymbol => true,
                 IdentifierNameSyntax when part.Parent is MemberAccessExpressionSyntax { Name: var name } && name == part => true,
@@ -12297,6 +12384,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (_semanticModel == null || postfix.SyntaxTree != _semanticModel.SyntaxTree)
             return;
         var model = _semanticModel;
+        // Codex round 2: a user-defined ++/-- is not `_pre + 1`.
+        if (UsesUserDefinedUpdateOperator(postfix))
+            throw EscalateExpression(postfix, "compound-assignment-order");
         var operand = Unparen(postfix.Operand);
         var parts = DecomposeAssignmentTarget(operand);
         if (parts == null ? !IsInertExpression(operand)
@@ -12328,31 +12418,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return;
 
         var variable = model.GetSymbolInfo(operand).Symbol;
-        var fixedLocal = operand is IdentifierNameSyntax
-            && variable is ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }
-            && !IsCapturedVariable(variable);
         foreach (var node in earlier)
         {
             var symbol = node is IdentifierNameSyntax or MemberAccessExpressionSyntax
                 ? model.GetSymbolInfo(node).Symbol : null;
             if (variable != null && SymbolEqualityComparer.Default.Equals(symbol, variable))
                 throw EscalateExpression(postfix, "compound-assignment-order");
-            if (fixedLocal)
-                continue;
-            // The operand is shared state (a field, a property, an element): an earlier call,
-            // property or indexer access, or another update could observe or change it.
-            var effect = node switch
-            {
-                InvocationExpressionSyntax or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
-                    or AssignmentExpressionSyntax or AwaitExpressionSyntax or ConditionalAccessExpressionSyntax
-                    or ElementAccessExpressionSyntax => true,
-                PrefixUnaryExpressionSyntax or PostfixUnaryExpressionSyntax =>
-                    node.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression
-                        or SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression,
-                IdentifierNameSyntax or MemberAccessExpressionSyntax => symbol is IPropertySymbol or IEventSymbol,
-                _ => false,
-            };
-            if (effect)
+            // Codex round 2: even for a local operand, an earlier operation that can throw (or call
+            // user code) must not see, or be preceded by, the increment.
+            if (MayActOrThrow(node))
                 throw EscalateExpression(postfix, "compound-assignment-order");
         }
     }
