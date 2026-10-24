@@ -6,6 +6,41 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **The C# converter keeps evaluation order in the cases #1673 left open (#1677).** These were
+  silent wrong-output bugs: the converted program ran code in a different order, or ran it
+  twice, and the conversion reported no loss. Each case below now converts in C#'s order, or
+  stays C# with a `compound-assignment-order` loss (the converter's report that it kept a
+  statement as C# to protect its evaluation order).
+  - `if (A() < F())`, where `A()` returns a type with a user-defined conversion to `int`, ran
+    `F()` before the conversion. The condition now stays inline.
+  - Code in a nested class was treated as if its outer class's static constructor had already
+    run, so an `x++` could move ahead of that constructor. Such a statement now stays C#.
+  - `a[k + 0] += 5`, with a user-defined conversion on `k`, ran the conversion twice. The index
+    is now computed once. The same holds for an index that reads another class's static field
+    or concatenates an object with a custom `ToString`.
+  - `a[x + x++] += 5` read `x` after the increment. It now stays C#.
+  - `a[k] = new List<int>(F())` ran `F()` before `k`'s user-defined conversion. It now stays C#.
+  - `h.s.X = F().N()`, where `s` is a struct field, ran `F()` before the null check on `h` (or
+    before the static constructor, for a static `s`). It now stays C#.
+  - `b.F = new C(G())` and `x += new C(G()).V` evaluated `b` or `x` after `G()`. The receiver
+    and the read now come first.
+  - `c.Next().Use(F().Val())` ran `F()` before `c.Next()`. Receivers now run before arguments.
+- **Chained calls are converted once (#1677).** Some chains ran part of their receiver twice:
+  `() => c.Next().Next().Val()` called `Next()` three times, and in the test corpus statements
+  such as `validator.TestValidate(new Person())…` inside a lambda called `TestValidate` twice.
+- **Block lambdas and `using` resources keep the temps their statement hoisted (#1677).** A
+  hoisted temp is a binding the converter places before the statement, such as `_pre` for
+  `Use(y++, () => { … })`. It was dropped when the statement also contained a block lambda, or
+  when it came from the resource of a `using`, so the output failed to compile. Undeclared temps
+  in the converted test corpus fall from 42 (19 files) to 20 (11 files); the rest come from
+  other constructs, such as base-constructor arguments.
+- **Expression lambdas that assign or increment convert correctly (#1677).**
+  `Func<int, int> f = n => S += n` returns the new value, which the conversion dropped (a
+  compile error). It now stays C# with an `embedded-assignment` loss.
+  `Action a = () => Point.S++` produced a `return` in a `void` lambda; it now converts to an
+  increment statement. Compound assignments to static fields, instance fields, properties and
+  indexers in expression lambdas, such as `n => Point.Log += "x"`, were checked and convert
+  correctly.
 - **Collection and object initializers convert correctly (#1541, #1524, #1595).** These were
   silent wrong-output bugs: the converter changed what the code does and still reported a
   lossless conversion.

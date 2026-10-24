@@ -10066,7 +10066,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             resource = new ReferenceNode(GetTextSpan(node), "unknown");
         }
 
-        var body = ConvertEmbeddedStatement(node.Statement);
+        // #1677: what converting the resource hoisted (a lambda or chain temp) runs before the
+        // `using`, as the resource does. The body starts each of its statements with no pending
+        // hoists, which dropped these and left an undeclared temp.
+        var resourceHoists = new List<StatementNode>(_pendingStatements);
+        _pendingStatements.Clear();
+        List<StatementNode> body;
+        try
+        {
+            body = ConvertEmbeddedStatement(node.Statement);
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(resourceHoists);
+        }
 
         return new UsingStatementNode(
             GetTextSpan(node),

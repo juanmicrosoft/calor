@@ -83,6 +83,8 @@ public class ConverterEvaluationOrderResidualTests
         yield return ("R1-string-concat-in-index", "using System.Collections.Generic; public class Key { public override string ToString() { Probe.calls++; return \"k\"; } } public static class Probe { public static int calls; public static string Run() { var d = new Dictionary<string, int>(); d[\"k\"] = 1; var k = new Key(); d[\"\" + k] += 5; return calls + \":\" + d[\"k\"]; } }", "native-or-preserved");
         yield return ("R1-receiver-before-argument", "public class C { public C Next() { Probe.log += \"N\"; return this; } public int Val() { Probe.log += \"V\"; return 1; } public int Use(int n) { Probe.log += \"U\"; return n; } } public static class Probe { public static string log = \"\"; static C F() { log += \"F\"; return new C(); } public static string Run() { var c = new C(); int x = c.Next().Use(F().Val()); c.Next().Use(F().Val()); return log + x; } }", "native-or-preserved");
 
+        yield return ("L-using-resource-hoist", "using System; public class D : IDisposable { public void Dispose() { Probe.log += \"d\"; } } public static class Probe { public static string log = \"\"; static D Open(Action<int> a) { a(1); return new D(); } public static string Run() { using (Open(v => log += \"o\" + v)) { log += \"b\"; } using (Open(v => { log += \"p\" + v; })) log += \"c\"; return log; } }", "native");
+
         // ---- Expression lambdas: compound assignments to members, properties and indexers. ----
         yield return ("X-lambda-static-field", "using System; public class Point { public static string Log = \"\"; } public static class Probe { public static string Run() { Action<int> a = n => Point.Log += \"x\"; a(1); a(2); return Point.Log; } }", "native");
         yield return ("X-lambda-static-field-int", "using System; public class Point { public static int Count = 1; } public static class Probe { public static string Run() { Action<int> a = n => Point.Count += n; Action<int> m = n => Point.Count *= n; a(4); m(3); a(1); return Point.Count.ToString(); } }", "native");
@@ -152,6 +154,7 @@ public class ConverterEvaluationOrderResidualTests
     [InlineData("L-block-lambda-postfix", null)]
     [InlineData("L-block-lambda-chain-statement", null)]
     [InlineData("L-block-lambda-argument-after-chain", null)]
+    [InlineData("L-using-resource-hoist", null)]
     [InlineData("X-lambda-func-value", "embedded-assignment")]
     [InlineData("X-lambda-increment-members", null)]
     [InlineData("X-lambda-static-field", null)]
