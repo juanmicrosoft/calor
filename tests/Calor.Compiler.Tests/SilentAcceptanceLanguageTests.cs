@@ -318,7 +318,8 @@ public class SilentAcceptanceLanguageTests
     [Theory]
     [InlineData("§B{x:i32} 1\n§PP{DEBUG}\n  §ASSIGN x 2\n§R x")]
     [InlineData("§L{l1:i:0:3:1}\n  §PP{DEBUG}\n    §ASSIGN i 5\n§R 0")]
-    [InlineData("§B{x:i32} 1\n§PP{DEBUG}\n  §B{~x} 2\n§R x")]
+    // #1678: `§B{x} 1` then `§PP` `§B{~x} 2` is now bound, so it is Calor0260 like the same
+    // rebind outside §PP (PreprocessorBindingTests.Binder_MutableRebindOfPreprocessorImmutableBinding_IsCalor0260).
     [InlineData("§E{mut}\n§B{x:i32} 1\n§B{~xs:List<i32>} §NEW{List<i32>}\n§PUSH{xs} (inc x)\n§R x")]
     public void Binder_WriteInsideUnboundStatement_IsCalor0213(string body)
     {

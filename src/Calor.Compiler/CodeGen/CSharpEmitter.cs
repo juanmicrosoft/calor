@@ -9155,6 +9155,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(PreprocessorDirectiveNode node)
     {
+        // #1678: `#if` opens no C# scope, so both branches declare into the enclosing block and
+        // their locals stay visible after `#endif`. The branches are alternatives, though: a local
+        // the `#if` branch declares does not exist in the `#else` branch, so a `§B{~x}` there is a
+        // declaration, not a reassignment.
+        var declared = _declScopes[^1];
+        var beforeBranches = new HashSet<string>(declared, StringComparer.Ordinal);
         AppendLine($"#if {node.Condition}");
         foreach (var stmt in node.Body)
         {
@@ -9162,11 +9168,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         if (node.ElseBody != null && node.ElseBody.Count > 0)
         {
+            var declaredByBody = new HashSet<string>(declared, StringComparer.Ordinal);
+            declared.Clear();
+            declared.UnionWith(beforeBranches);
             AppendLine("#else");
             foreach (var stmt in node.ElseBody)
             {
                 EmitStatement(stmt, _emissionContext, skipEmptyLine: true);
             }
+            declared.UnionWith(declaredByBody);
         }
         AppendLine("#endif");
         return "";

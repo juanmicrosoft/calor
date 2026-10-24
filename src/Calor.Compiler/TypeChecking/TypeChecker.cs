@@ -514,6 +514,9 @@ public sealed class TypeChecker
             case CompoundAssignmentStatementNode compound when _hasNamedRefinements:
                 _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
                 break;
+            case PreprocessorDirectiveNode preprocessor:
+                CheckPreprocessorDirective(preprocessor);
+                break;
             default:
                 // Other statement types (print, assignment, throw, etc.) are handled elsewhere or need no type checking
                 break;
@@ -906,6 +909,30 @@ public sealed class TypeChecker
         foreach (var statement in fixedStatement.Body)
             CheckStatement(statement);
         _env.ExitScope();
+    }
+
+    /// <summary>
+    /// #1678: checks both branches of a statement-level <c>§PP</c> (<c>#if</c>) block, each in its
+    /// own scope (the branches are alternatives). <c>#if</c> opens no C# scope, so a binding a
+    /// branch declares is defined in the enclosing scope afterwards (the first branch's type
+    /// wins when both declare it).
+    /// </summary>
+    private void CheckPreprocessorDirective(PreprocessorDirectiveNode preprocessor)
+    {
+        var declared = new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase);
+        foreach (var branch in new[] { preprocessor.Body, preprocessor.ElseBody })
+        {
+            if (branch is null)
+                continue;
+            _env.EnterScope();
+            foreach (var statement in branch)
+                CheckStatement(statement);
+            foreach (var (name, type) in _env.CurrentScopeVariables)
+                declared.TryAdd(name, type);
+            _env.ExitScope();
+        }
+        foreach (var (name, type) in declared)
+            _env.DefineVariable(name, type);
     }
 
     private void CheckScopedStatements(IReadOnlyList<StatementNode> statements)
@@ -5129,6 +5156,9 @@ public sealed class TypeEnvironment
     {
         _variableScopes.Peek()[name] = type;
     }
+
+    /// <summary>#1678: the variables defined in the innermost scope.</summary>
+    public IReadOnlyDictionary<string, CalorType> CurrentScopeVariables => _variableScopes.Peek();
 
     public CalorType? LookupVariable(string name)
     {

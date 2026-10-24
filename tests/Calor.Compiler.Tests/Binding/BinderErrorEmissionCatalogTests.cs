@@ -46,7 +46,7 @@ public sealed class BinderErrorEmissionCatalogTests
 
         var binderRoutes = routes.Where(route =>
             route.SiteId.StartsWith("src/Calor.Compiler/Binding/Binder.cs::", StringComparison.Ordinal)).ToArray();
-        Assert.Equal(26, binderRoutes.Count(route => // #1550 adds one WriteToReadOnlyLocal site (ReportReadOnlyWrite)
+        Assert.Equal(27, binderRoutes.Count(route => // #1550 adds one WriteToReadOnlyLocal site (ReportReadOnlyWrite); #1678 one DuplicateDefinition site (BindPreprocessorDirective)
             route.Sink is "DiagnosticBag.ReportError" or "DiagnosticBag.ReportErrorWithFix"));
         Assert.Equal(4, binderRoutes.Count(route => route.Sink == "DiagnosticBag.Report"));
         Assert.Equal(3, binderRoutes
