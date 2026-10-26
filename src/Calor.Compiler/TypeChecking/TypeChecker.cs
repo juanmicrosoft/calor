@@ -140,6 +140,50 @@ public sealed class TypeChecker
         {
             CheckFunction(func);
         }
+
+        // Third pass (#1676): class members. Before this the checker never looked inside a
+        // §CL, so inside methods only the runtime refinement guards applied. Only a module with
+        // §RTYPE declarations has named refinements to protect.
+        if (_hasNamedRefinements)
+        {
+            // A base class is resolved only when its simple name names exactly one non-generic
+            // module class; otherwise its members stay unknown to the checker (#1676 review).
+            // A nested class of the same simple name could be the one C# resolves, so the name
+            // must be unique among all classes, nested ones included.
+            var nameCounts = AllClasses(module.Classes)
+                .GroupBy(cls => cls.Name, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+            var moduleClasses = module.Classes
+                .Where(cls => nameCounts[cls.Name] == 1 && cls.TypeParameters.Count == 0)
+                .ToDictionary(cls => cls.Name, StringComparer.Ordinal);
+            foreach (var cls in module.Classes)
+            {
+                CheckClassKeepingOnlyRefinementSoundness(cls, moduleClasses);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks a class's members and keeps ONLY the refinement-soundness errors that produces
+    /// (#1676). The checker has no member table: inherited fields, members of an external base
+    /// class, events, indexers and user-defined operators are all invisible to it, so its other
+    /// diagnostics inside class members are mostly about its own model, not the program. The
+    /// binder and Roslyn keep owning those, exactly as before this pass existed.
+    /// </summary>
+    private static IEnumerable<ClassDefinitionNode> AllClasses(IEnumerable<ClassDefinitionNode> classes)
+        => classes.SelectMany(cls => AllClasses(cls.NestedClasses).Prepend(cls));
+
+    private void CheckClassKeepingOnlyRefinementSoundness(
+        ClassDefinitionNode cls, IReadOnlyDictionary<string, ClassDefinitionNode> moduleClasses)
+    {
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        CheckClass(cls, moduleClasses);
+        var kept = _diagnostics.Skip(checkpoint.Diagnostics)
+            .Where(_refinementSoundnessDiagnostics.Contains)
+            .ToList();
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        foreach (var diagnostic in kept)
+            _diagnostics.Add(diagnostic);
     }
 
     /// <summary>
@@ -295,16 +339,19 @@ public sealed class TypeChecker
     /// correct, documented generic parameter might be a typo.</para>
     /// </summary>
     private void RegisterTypeParameters(FunctionNode func)
+        => RegisterTypeParameters(func.TypeParameters, func.Name);
+
+    private void RegisterTypeParameters(IReadOnlyList<TypeParameterNode> typeParameters, string callableName)
     {
-        foreach (var tp in func.TypeParameters)
+        foreach (var tp in typeParameters)
         {
             _env.DefineType(tp.Name, new TypeParameterType(tp.Name, tp.Constraints));
         }
 
-        var open = func.Name.IndexOf('<');
-        if (open > 0 && func.Name.EndsWith('>'))
+        var open = callableName.IndexOf('<');
+        if (open > 0 && callableName.EndsWith('>'))
         {
-            foreach (var raw in func.Name[(open + 1)..^1].Split(','))
+            foreach (var raw in callableName[(open + 1)..^1].Split(','))
             {
                 var name = raw.Trim();
                 if (name.Length > 0)
@@ -319,37 +366,45 @@ public sealed class TypeChecker
         => _env.DefineFunction(GetCallableLookupName(func.Name), CreateCandidate(func));
 
     private FunctionCandidate CreateCandidate(FunctionNode func)
+        => CreateCandidate(func.TypeParameters, func.Name, func.Parameters, func.Output);
+
+    private FunctionCandidate CreateCandidate(
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        string callableName,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output)
     {
         _env.EnterScope();
 
         // Signature PRE-PASS: resolve quietly. CheckFunction resolves the same annotations again
         // and owns the diagnostics — without this the unresolved-type warning was reported three
         // times for a single `T` (parameter here, return here, parameter again there).
+        var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
 
-        RegisterTypeParameters(func);
+        RegisterTypeParameters(typeParameters, callableName);
 
         var paramTypes = new List<CalorType>();
-        foreach (var param in func.Parameters)
+        foreach (var param in parameters)
         {
             var paramType = ResolveTypeName(param.TypeName, param.Span);
             paramTypes.Add(paramType);
         }
 
-        var returnType = func.Output != null
-            ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
+        var returnType = output != null
+            ? ResolveTypeName(output.TypeName, output.Span)
             : PrimitiveType.Void;
 
-        _suppressDiagnostics = false;
+        _suppressDiagnostics = previousSuppressDiagnostics;
         _env.ExitScope();
 
         var funcType = new FunctionType(paramTypes, returnType);
         return new FunctionCandidate(
             funcType,
-            func.Parameters.Select(parameter => parameter.Name).ToArray(),
-            func.Parameters.Select(parameter => parameter.Modifier).ToArray(),
-            func.Parameters.Select(parameter => parameter.DefaultValue != null).ToArray(),
-            GetTypeParameterNames(func));
+            parameters.Select(parameter => parameter.Name).ToArray(),
+            parameters.Select(parameter => parameter.Modifier).ToArray(),
+            parameters.Select(parameter => parameter.DefaultValue != null).ToArray(),
+            GetTypeParameterNames(typeParameters, callableName));
     }
 
     private void RegisterDelegate(DelegateDefinitionNode delegateDefinition)
@@ -376,13 +431,14 @@ public sealed class TypeChecker
         return open > 0 && name.EndsWith('>') ? name[..open] : name;
     }
 
-    private static IReadOnlyList<string> GetTypeParameterNames(FunctionNode function)
+    private static IReadOnlyList<string> GetTypeParameterNames(
+        IReadOnlyList<TypeParameterNode> typeParameters, string callableName)
     {
-        var names = function.TypeParameters.Select(parameter => parameter.Name).ToList();
-        var open = function.Name.IndexOf('<');
-        if (open > 0 && function.Name.EndsWith('>'))
+        var names = typeParameters.Select(parameter => parameter.Name).ToList();
+        var open = callableName.IndexOf('<');
+        if (open > 0 && callableName.EndsWith('>'))
         {
-            names.AddRange(function.Name[(open + 1)..^1]
+            names.AddRange(callableName[(open + 1)..^1]
                 .Split(',')
                 .Select(name => name.Trim())
                 .Where(name => name.Length > 0));
@@ -393,20 +449,37 @@ public sealed class TypeChecker
     private void CheckFunction(FunctionNode func)
     {
         _env.EnterScope();
-
         RegisterTypeParameters(func);
-        var previousReturnType = _currentReturnType;
         var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
-        _currentReturnType = func.Output != null
+        var returnType = func.Output != null
             ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
             : PrimitiveType.Void;
         _suppressDiagnostics = previousSuppressDiagnostics;
+        CheckCallableBody(func.Parameters, returnType, func.Body);
+        _env.ExitScope();
+    }
+
+    /// <summary>
+    /// Checks one callable body: a module function, a local function, or (#1676) a class member.
+    /// The caller has already entered a scope and registered the callable's type parameters;
+    /// <paramref name="returnType"/> is what a <c>§R</c> in the body must produce.
+    /// </summary>
+    private void CheckCallableBody(
+        IReadOnlyList<ParameterNode> parameters,
+        CalorType returnType,
+        IReadOnlyList<StatementNode> body,
+        Action? defineExtraVariables = null)
+    {
+        _env.EnterScope();
+        var previousReturnType = _currentReturnType;
+        _currentReturnType = returnType;
 
         // Add parameters to scope
         var previousInlineRefinedParameters = _inlineRefinedParameters;
         _inlineRefinedParameters = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var param in func.Parameters)
+        defineExtraVariables?.Invoke();
+        foreach (var param in parameters)
         {
             var paramType = ResolveTypeName(param.TypeName, param.Span);
             _env.DefineVariable(param.Name, paramType);
@@ -417,11 +490,11 @@ public sealed class TypeChecker
         // 0.25 F3 (#847): local functions shadow same-named functions in the whole
         // body (and in each other), as in C#.
         _env.EnterLocalFunctions();
-        foreach (var local in func.Body.OfType<LocalFunctionStatementNode>())
+        foreach (var local in body.OfType<LocalFunctionStatementNode>())
             _env.DefineLocalFunction(GetCallableLookupName(local.Function.Name), CreateCandidate(local.Function));
 
         // Check body statements
-        foreach (var stmt in func.Body)
+        foreach (var stmt in body)
         {
             CheckStatement(stmt);
         }
@@ -430,6 +503,171 @@ public sealed class TypeChecker
         _currentReturnType = previousReturnType;
         _inlineRefinedParameters = previousInlineRefinedParameters;
         _env.ExitScope();
+    }
+
+    /// <summary>
+    /// #1676: checks every member body of a class (methods, constructors, property and indexer
+    /// accessors, operators) as the checker checks a module function, so the static refinement
+    /// checks (#1529, #1530) apply inside methods too, and the inferred refinements of locals and
+    /// lambda parameters there come from the checker like everywhere else. The class's fields and
+    /// properties, and those of base classes declared in the module, are in scope as variables.
+    /// The class's own methods shadow same-named module functions, as they do in the emitted C#.
+    /// Members inside §PP blocks are not visited: the checker has no preprocessor state, and an
+    /// inactive arm need not compile.
+    /// </summary>
+    private void CheckClass(ClassDefinitionNode cls, IReadOnlyDictionary<string, ClassDefinitionNode> moduleClasses)
+    {
+        var ancestors = new List<ClassDefinitionNode>();
+        var visited = new HashSet<ClassDefinitionNode>(ReferenceEqualityComparer.Instance) { cls };
+        var baseName = cls.BaseClass;
+        while (baseName != null
+            && !baseName.Contains('<')
+            && moduleClasses.TryGetValue(baseName, out var baseClass)
+            && visited.Add(baseClass))
+        {
+            ancestors.Add(baseClass);
+            baseName = baseClass.BaseClass;
+        }
+        ancestors.Reverse();
+
+        // When the base chain ends in a class the checker cannot see (an external type, a
+        // generic or ambiguous name), an inherited member may be what a bare name means, so
+        // names from enclosing classes are not visible through this class (#1676 review).
+        _env.EnterScope(opaque: baseName != null);
+        foreach (var tp in cls.TypeParameters)
+            _env.DefineType(tp.Name, new TypeParameterType(tp.Name, tp.Constraints));
+
+        var previousSuppressDiagnostics = _suppressDiagnostics;
+        _suppressDiagnostics = true;
+        foreach (var ancestor in ancestors)
+            DefineClassMemberVariables(ancestor);
+        DefineClassMemberVariables(cls);
+        _suppressDiagnostics = previousSuppressDiagnostics;
+
+        // A §B{~name} in a member body that names a field declares a new local (the emitter only
+        // treats locals and parameters as rebind targets), so the rebind rules must not see the
+        // member scope.
+        var previousMemberScopeDepth = _memberScopeDepth;
+        _memberScopeDepth = _env.ScopeDepth;
+
+        // A bare call names one of the class's own methods. With any base class, a name the
+        // class does not declare may be an inherited method (C# member hiding and overloads the
+        // checker does not model), so it resolves to nothing rather than to a module function
+        // or an enclosing class's method (#1676 review).
+        _env.EnterLocalFunctions(opaque: cls.BaseClass != null);
+        foreach (var method in cls.Methods)
+        {
+            _env.DefineLocalFunction(
+                GetCallableLookupName(method.Name),
+                CreateCandidate(method.TypeParameters, method.Name, method.Parameters, method.Output));
+        }
+
+        foreach (var constructor in cls.Constructors)
+            CheckMemberBody(constructor.Parameters, null, constructor.Body);
+        foreach (var method in cls.Methods)
+        {
+            _env.EnterScope();
+            RegisterTypeParameters(method.TypeParameters, method.Name);
+            CheckMemberBody(method.Parameters, method.Output, method.Body);
+            _env.ExitScope();
+        }
+        foreach (var property in cls.Properties)
+        {
+            CheckAccessors(
+                Array.Empty<ParameterNode>(), property.TypeName, property.TypeNameSpan,
+                property.Getter, property.Setter, property.Initer);
+        }
+        foreach (var indexer in cls.Indexers)
+        {
+            CheckAccessors(
+                indexer.Parameters, indexer.TypeName, indexer.Span,
+                indexer.Getter, indexer.Setter, indexer.Initer);
+        }
+        foreach (var op in cls.OperatorOverloads)
+            CheckMemberBody(op.Parameters, op.Output, op.Body);
+        // Nested classes see the enclosing class's members and methods, as a C# nested type
+        // sees the enclosing type's statics; their own methods shadow them.
+        foreach (var nested in cls.NestedClasses)
+            CheckClass(nested, moduleClasses);
+        _env.ExitLocalFunctions();
+        _memberScopeDepth = previousMemberScopeDepth;
+        _env.ExitScope();
+    }
+
+    /// <summary>
+    /// Scope depth of the innermost class's fields and properties, or 0 outside class members.
+    /// Variables at or below it are members, never rebind targets.
+    /// </summary>
+    private int _memberScopeDepth;
+
+    /// <summary>A reference spelled <c>this.name</c> names the member <c>name</c>.</summary>
+    private static bool TryGetThisMemberName(string reference, out string memberName)
+    {
+        memberName = reference.StartsWith("this.", StringComparison.Ordinal) ? reference[5..] : "";
+        return memberName.Length > 0 && !memberName.Contains('.');
+    }
+
+    /// <summary>The declared type of a member of the innermost class, ignoring locals.</summary>
+    private CalorType? LookupThisMember(string name)
+        => _memberScopeDepth > 0 ? _env.LookupVariableAtOrBelow(name, _memberScopeDepth) : null;
+
+    private void DefineClassMemberVariables(ClassDefinitionNode cls)
+    {
+        foreach (var field in cls.Fields)
+            _env.DefineVariable(field.Name, ResolveTypeName(field.TypeName, field.TypeNameSpan));
+        foreach (var property in cls.Properties)
+            _env.DefineVariable(property.Name, ResolveTypeName(property.TypeName, property.TypeNameSpan));
+    }
+
+    private void CheckMemberBody(
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        IReadOnlyList<StatementNode> body)
+    {
+        var previousSuppressDiagnostics = _suppressDiagnostics;
+        _suppressDiagnostics = true;
+        var returnType = output != null
+            ? ResolveTypeName(output.TypeName, output.Span)
+            : PrimitiveType.Void;
+        _suppressDiagnostics = previousSuppressDiagnostics;
+        CheckCallableBody(parameters, returnType, body);
+    }
+
+    private void CheckAccessors(
+        IReadOnlyList<ParameterNode> parameters,
+        string typeName,
+        TextSpan typeNameSpan,
+        params PropertyAccessorNode?[] accessors)
+    {
+        var previousSuppressDiagnostics = _suppressDiagnostics;
+        _suppressDiagnostics = true;
+        var memberType = ResolveTypeName(typeName, typeNameSpan);
+        _suppressDiagnostics = previousSuppressDiagnostics;
+        foreach (var accessor in accessors)
+        {
+            if (accessor is null)
+                continue;
+            // The emitter guards neither an accessor's `value` nor an indexer's parameters, so
+            // they are typed as their base types: the checker claims no refinement the
+            // generated code does not enforce (#1676 review).
+            void DefineAccessorVariables(bool withValue)
+            {
+                foreach (var parameter in parameters)
+                    _env.DefineVariable(parameter.Name, EraseRefinement(ResolveTypeName(parameter.TypeName, parameter.Span)));
+                if (withValue)
+                    _env.DefineVariable("value", EraseRefinement(memberType));
+            }
+            if (accessor.Kind == PropertyAccessorNode.AccessorKind.Get)
+            {
+                CheckCallableBody(Array.Empty<ParameterNode>(), memberType, accessor.Body,
+                    () => DefineAccessorVariables(withValue: false));
+            }
+            else
+            {
+                CheckCallableBody(Array.Empty<ParameterNode>(), PrimitiveType.Void, accessor.Body,
+                    () => DefineAccessorVariables(withValue: true));
+            }
+        }
     }
 
     private void CheckStatement(StatementNode stmt)
@@ -514,6 +752,14 @@ public sealed class TypeChecker
             case CompoundAssignmentStatementNode compound when _hasNamedRefinements:
                 _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
                 break;
+            case PrintStatementNode print when _hasNamedRefinements:
+                // #1676: the printed expression is type-checked for refinement soundness: a call
+                // inside §P passing a Nat where a Pos is expected is Calor0202, and a lambda
+                // passed to such a call is typed by the delegate parameter, refinement included,
+                // so writes to its parameter are guarded. The checker's other diagnostics are not
+                // kept: it cannot type much of what §P prints (`s.Length`), and Roslyn does.
+                _ = InferKeepingOnlyRefinementSoundnessDiagnostics(print.Expression);
+                break;
             default:
                 // Other statement types (print, assignment, throw, etc.) are handled elsewhere or need no type checking
                 break;
@@ -570,11 +816,20 @@ public sealed class TypeChecker
         var before = _diagnostics.Count;
         _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch, message);
         _nominalRefinementDiagnostics.Add(_diagnostics.Last());
+        _refinementSoundnessDiagnostics.Add(_diagnostics.Last());
         if (_speculationDepth == 0)
             PreserveFlowCacheDiagnosticsSince(before);
     }
 
     private readonly HashSet<Diagnostic> _nominalRefinementDiagnostics =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// Only the errors <see cref="ReportRefinementSoundnessError"/> reports. Unlike
+    /// <see cref="_nominalRefinementDiagnostics"/>, it does not include the other diagnostics of
+    /// a committed lambda check, so it is the set class members keep (#1676).
+    /// </summary>
+    private readonly HashSet<Diagnostic> _refinementSoundnessDiagnostics =
         new(ReferenceEqualityComparer.Instance);
     private bool _hasNamedRefinements;
 
@@ -610,6 +865,23 @@ public sealed class TypeChecker
     }
 
     /// <summary>
+    /// Type-checks an expression and keeps only the refinement-soundness errors it produces
+    /// (#1676): no ordinary diagnostic, not even one from a committed lambda check.
+    /// </summary>
+    private CalorType InferKeepingOnlyRefinementSoundnessDiagnostics(ExpressionNode expression)
+    {
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var type = InferExpressionType(expression);
+        var kept = _diagnostics.Skip(checkpoint.Diagnostics)
+            .Where(_refinementSoundnessDiagnostics.Contains)
+            .ToList();
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        foreach (var diagnostic in kept)
+            _diagnostics.Add(diagnostic);
+        return type;
+    }
+
+    /// <summary>
     /// In a module with §RTYPE declarations, an §ASSIGN right-hand side is type-checked for
     /// refinement soundness only: a value of a different named refinement written into a refined
     /// local is rejected, and so is one nested in the value (a call passing a Nat where a Pos is
@@ -620,22 +892,57 @@ public sealed class TypeChecker
         if (!_hasNamedRefinements)
             return;
 
-        var targetType = assignment.Target is ReferenceNode reference
-            ? _env.LookupVariable(reference.Name)
-            : null;
+        var targetName = assignment.Target switch
+        {
+            ReferenceNode reference => reference.Name,
+            FieldAccessNode { Target: ThisExpressionNode or ReferenceNode { Name: "this" } } thisField => $"this.{thisField.FieldName}",
+            _ => null,
+        };
+        var targetType = assignment.Target switch
+        {
+            ReferenceNode reference when TryGetThisMemberName(reference.Name, out var memberName)
+                => LookupThisMember(memberName),
+            ReferenceNode reference => _env.LookupVariable(reference.Name),
+            FieldAccessNode { Target: ThisExpressionNode or ReferenceNode { Name: "this" } } thisField => LookupThisMember(thisField.FieldName),
+            _ => null,
+        };
         // The expected type is the ERASED target: a base value written into a refined local is
         // still accepted and guarded at run time (a match arm of type i32 into a Nat must not be
         // rejected), while a lambda assigned to a delegate variable still gets its contextual
         // parameter types, refinements included.
-        var valueType = InferKeepingOnlyNominalRefinementDiagnostics(
-            assignment.Value,
-            targetType is null ? null : EraseRefinement(targetType));
+        // #1676: a match written into a refined local is inferred against the erased target too,
+        // but each arm is also checked against the declared refinement: an arm of a different
+        // named refinement (a Pos arm into a Nat) is rejected, while a base-typed arm keeps the
+        // guarded path.
+        var previousArmRefinement = _matchArmRefinementTarget;
+        _matchArmRefinementTarget = assignment.Value is MatchExpressionNode
+            && targetType is RefinedType { RefinementName: not null }
+                ? (assignment.Value, targetType, $"assignment to '{targetName}'")
+                : null;
+        CalorType valueType;
+        try
+        {
+            valueType = InferKeepingOnlyNominalRefinementDiagnostics(
+                assignment.Value,
+                targetType is null ? null : EraseRefinement(targetType));
+        }
+        finally
+        {
+            _matchArmRefinementTarget = previousArmRefinement;
+        }
         if (targetType != null && IsDistinctNamedRefinement(targetType, valueType))
         {
             ReportDistinctNamedRefinement(assignment.Span, targetType, valueType,
-                $"assignment to '{((ReferenceNode)assignment.Target).Name}'");
+                $"assignment to '{targetName}'");
         }
     }
+
+    /// <summary>
+    /// The match expression whose arms must each be checked against a declared refinement (a
+    /// match assigned to a refined local, #1676), with that refinement and the position used in
+    /// the diagnostic. Inherited by matches nested in an arm's result.
+    /// </summary>
+    private (ExpressionNode Match, CalorType Refinement, string Position)? _matchArmRefinementTarget;
 
     private void CheckReturnStatement(ReturnStatementNode ret)
     {
@@ -1038,7 +1345,7 @@ public sealed class TypeChecker
         // the rebind is annotated with the base type (`§B{~x:i32} v` after `§B{~x} a`, a: Nat).
         // So the checker keeps the established refinement as the variable's type too; otherwise
         // a later `§B{~x} p` (p: Pos) would look like a first refinement (#1530 review round 2).
-        var existingType = bind.IsMutable ? _env.LookupVariable(bind.Name) : null;
+        var existingType = bind.IsMutable ? _env.LookupVariableAbove(bind.Name, _memberScopeDepth) : null;
         if (existingType is RefinedType { RefinementName: not null } established)
         {
             // Check the annotation AND the initializer: `§B{~x:i32} p` (p: Pos) still writes a
@@ -1981,9 +2288,19 @@ public sealed class TypeChecker
                 {
                     if (!_suppressContextualDiagnostics)
                     {
-                        _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
-                            $"Lambda return type {returnType.SurfaceName} is not assignable to "
-                            + expectedFunction.ReturnType.SurfaceName);
+                        // A named-refinement mismatch is a refinement-soundness error, so the
+                        // filtered contexts (§P, class members, §TR bodies) keep it (#1676).
+                        if (IsDistinctNamedRefinement(expectedFunction.ReturnType, returnType))
+                        {
+                            ReportDistinctNamedRefinement(
+                                lambda.ExpressionBody.Span, expectedFunction.ReturnType, returnType, "a lambda return");
+                        }
+                        else
+                        {
+                            _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
+                                $"Lambda return type {returnType.SurfaceName} is not assignable to "
+                                + expectedFunction.ReturnType.SurfaceName);
+                        }
                     }
                     signatureValid = false;
                 }
@@ -4317,6 +4634,9 @@ public sealed class TypeChecker
 
     private CalorType InferReferenceType(ReferenceNode refNode)
     {
+        // `this.x` inside a class member is the member's declared type (#1676).
+        if (TryGetThisMemberName(refNode.Name, out var thisMember) && LookupThisMember(thisMember) is { } memberType)
+            return memberType;
         var type = _env.LookupVariable(refNode.Name);
         if (type != null)
         {
@@ -4532,6 +4852,9 @@ public sealed class TypeChecker
 
     private CalorType InferFieldAccessType(FieldAccessNode field)
     {
+        // `this.x` inside a class member is the member's declared type (#1676).
+        if (field.Target is ThisExpressionNode or ReferenceNode { Name: "this" } && LookupThisMember(field.FieldName) is { } memberType)
+            return memberType;
         var targetType = InferExpressionType(field.Target);
 
         if (targetType is RecordType recordType)
@@ -4561,6 +4884,12 @@ public sealed class TypeChecker
 
     private CalorType InferMatchExpressionType(MatchExpressionNode match, CalorType? expectedType)
     {
+        // Consumed here: only this match, and matches nested in its arms' results, are checked
+        // against the declared refinement; the target and guards are ordinary expressions.
+        var armRefinement = _matchArmRefinementTarget is { } pending && ReferenceEquals(pending.Match, match)
+            ? pending
+            : ((ExpressionNode Match, CalorType Refinement, string Position)?)null;
+        _matchArmRefinementTarget = null;
         var targetType = InferExpressionType(match.Target);
 
         // Unify the types of all case bodies
@@ -4594,7 +4923,26 @@ public sealed class TypeChecker
                 CalorType caseType;
                 if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
                 {
-                    caseType = InferExpressionType(ret.Expression, expectedType);
+                    var previousArmRefinement = _matchArmRefinementTarget;
+                    _matchArmRefinementTarget = armRefinement is { } nested
+                        && ret.Expression is MatchExpressionNode
+                            ? nested with { Match = ret.Expression }
+                            : null;
+                    try
+                    {
+                        caseType = InferExpressionType(ret.Expression, expectedType);
+                    }
+                    finally
+                    {
+                        _matchArmRefinementTarget = previousArmRefinement;
+                    }
+                    if (armRefinement is { } target
+                        && !_suppressContextualDiagnostics
+                        && IsDistinctNamedRefinement(target.Refinement, caseType))
+                    {
+                        ReportDistinctNamedRefinement(
+                            ret.Expression.Span, target.Refinement, caseType, $"a match arm of the {target.Position}");
+                    }
                 }
                 else
                 {
@@ -4603,16 +4951,31 @@ public sealed class TypeChecker
 
                 if (expectedType != null)
                 {
+                    // #1676: a named-refinement mismatch is a refinement-soundness error, so it
+                    // survives the flow cache of a §TR body like every other one. It is checked
+                    // on every arm: an earlier ordinary mismatch (dropped there) must not hide it.
+                    var distinctRefinement = IsDistinctNamedRefinement(expectedType, caseType);
+                    if (distinctRefinement && !_suppressContextualDiagnostics)
+                    {
+                        var armSpan = lastStmt is ReturnStatementNode { Expression: { } armResult }
+                            ? armResult.Span
+                            : match.Span;
+                        ReportDistinctNamedRefinement(armSpan, expectedType, caseType, "a match arm");
+                    }
                     if (!reportedTargetMismatch && !IsAssignable(expectedType, caseType))
                     {
                         hasTargetMismatch = true;
-                        if (!_suppressContextualDiagnostics)
+                        if (!_suppressContextualDiagnostics && !distinctRefinement)
                         {
                             _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
                                 $"Match arm type {caseType.SurfaceName} is not assignable to "
                                 + expectedType.SurfaceName);
                         }
                         reportedTargetMismatch = true;
+                    }
+                    else if (distinctRefinement)
+                    {
+                        hasTargetMismatch = true;
                     }
                     unifiedType = expectedType;
                 }
@@ -5107,23 +5470,35 @@ public sealed class TypeEnvironment
 
     public TypeEnvironment()
     {
-        _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
+        // Variable names are case-sensitive, as in the binder and the emitted C#: a field `n`
+        // and a property `N` are two members (#1676 review). Type names stay case-insensitive.
+        _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.Ordinal));
         _typeScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
     }
 
-    public void EnterScope()
+    /// <summary>
+    /// Pushes a variable scope. An opaque scope ends variable lookup: a name not found in it, or
+    /// in the scopes opened after it, is not looked up in the scopes before it.
+    /// </summary>
+    public void EnterScope(bool opaque = false)
     {
-        _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
+        _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.Ordinal));
+        _opaqueVariableScopes.Push(opaque);
         _typeScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
     }
 
     public void ExitScope()
     {
         if (_variableScopes.Count > 1)
+        {
             _variableScopes.Pop();
+            _opaqueVariableScopes.Pop();
+        }
         if (_typeScopes.Count > 1)
             _typeScopes.Pop();
     }
+
+    private readonly Stack<bool> _opaqueVariableScopes = new(new[] { false });
 
     public void DefineVariable(string name, CalorType type)
     {
@@ -5132,10 +5507,47 @@ public sealed class TypeEnvironment
 
     public CalorType? LookupVariable(string name)
     {
-        foreach (var scope in _variableScopes)
+        foreach (var (scope, opaque) in _variableScopes.Zip(_opaqueVariableScopes))
         {
             if (scope.TryGetValue(name, out var type))
                 return type;
+            if (opaque)
+                return null;
+        }
+        return null;
+    }
+
+    /// <summary>The number of open variable scopes, including the global one.</summary>
+    public int ScopeDepth => _variableScopes.Count;
+
+    /// <summary>
+    /// Looks a variable up only in the scopes opened after the first <paramref name="depth"/>
+    /// scopes, so a name found only in an outer scope (a class member) is not found.
+    /// </summary>
+    public CalorType? LookupVariableAtOrBelow(string name, int depth)
+    {
+        var scopeDepth = _variableScopes.Count;
+        foreach (var (scope, opaque) in _variableScopes.Zip(_opaqueVariableScopes))
+        {
+            if (scopeDepth <= depth && scope.TryGetValue(name, out var type))
+                return type;
+            if (scopeDepth <= depth && opaque)
+                return null;
+            scopeDepth--;
+        }
+        return null;
+    }
+
+    public CalorType? LookupVariableAbove(string name, int depth)
+    {
+        var scopeDepth = _variableScopes.Count;
+        foreach (var scope in _variableScopes)
+        {
+            if (scopeDepth <= depth)
+                return null;
+            if (scope.TryGetValue(name, out var type))
+                return type;
+            scopeDepth--;
         }
         return null;
     }
@@ -5191,10 +5603,12 @@ public sealed class TypeEnvironment
 
     public IReadOnlyList<FunctionCandidate> LookupFunctionCandidates(string name)
     {
-        foreach (var scope in _localFunctions)
+        foreach (var (scope, opaque) in _localFunctions.Zip(_opaqueLocalFunctions))
         {
             if (scope.TryGetValue(name, out var locals))
                 return locals;
+            if (opaque)
+                return Array.Empty<FunctionCandidate>();
         }
         return _functions.TryGetValue(name, out var overloads)
             ? overloads
@@ -5204,9 +5618,23 @@ public sealed class TypeEnvironment
     // 0.25 F3 (#847): local functions visible in the callable bodies being checked.
     private readonly Stack<Dictionary<string, List<FunctionCandidate>>> _localFunctions = new();
 
-    public void EnterLocalFunctions() => _localFunctions.Push(new(StringComparer.Ordinal));
+    /// <summary>
+    /// Pushes a callable scope. An opaque one ends lookup: a name it does not declare resolves to
+    /// no candidates instead of to an enclosing scope's or the module's functions.
+    /// </summary>
+    public void EnterLocalFunctions(bool opaque = false)
+    {
+        _localFunctions.Push(new(StringComparer.Ordinal));
+        _opaqueLocalFunctions.Push(opaque);
+    }
 
-    public void ExitLocalFunctions() => _localFunctions.Pop();
+    public void ExitLocalFunctions()
+    {
+        _localFunctions.Pop();
+        _opaqueLocalFunctions.Pop();
+    }
+
+    private readonly Stack<bool> _opaqueLocalFunctions = new();
 
     public void DefineLocalFunction(string name, FunctionCandidate candidate)
     {
