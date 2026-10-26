@@ -258,6 +258,25 @@ new diagnostic. The C# converter emits code that passes all four checks.
   report also shows how many members each project skips, by reason, and CI fails if a reason
   grows by more than 2 members or 5% over the recorded count. (#1667)
 
+- **Website support levels now come from the converter's registry (#1664).** A support level
+  (Full, Partial, NotSupported or ManualRequired) says how the C#-to-Calor converter handles a
+  C# feature. The 18 levels on 4 pages used to be typed by hand, and a test found them in the
+  prose with regular expressions. A review found phrasings that slipped past it four times. A
+  page now states a level only with the `<SupportLevel feature="…" />` component. It renders
+  the level from `website/public/data/feature-support.json`, which is the output of
+  `calor feature-check --list`, and a test fails when that file differs from the registry. A
+  second test parses every page with Markdig, a Markdown parser, so emphasis, code spans,
+  parentheses, wrapped lines, footnotes, link titles and JSX attributes no longer change what
+  it reads. It fails when a level word such as "full" or "not supported" appears outside the
+  component in a statement that names a feature, or right after one, or under a heading that
+  names one. It also checks level headings and introducing paragraphs over lists of features.
+  A table component's first cell must name exactly its feature. A feature counts when it is
+  named in a code span, by its registry name, or in plain words such as "string interpolation"
+  or "records". 31 passages that use these words
+  in another sense, such as the proof status `unsupported`, are allowlisted, each with a reason,
+  and each may appear only once on its page. The check reads a fixed list of level words, so a
+  synonym such as "complete support" is still not caught.
+
 - **CI test shards run from a checked-in script, and each shard's results are checked from
   its TRX file (#1666).** A TRX file is the test report that `dotnet test` writes. The test
   shards (11 in `test.yml`, 13 in `publish-nuget.yml`) used to run their tests from inline
