@@ -132,7 +132,11 @@ public static partial class MemberDifferentialOracle
                 if (!confirm)
                     continue;
                 verdict = extra.Count == 0
-                    ? verdict with { Reason = (verdict.Reason is null ? "" : verdict.Reason + "; ") + "one-sided instability not confirmed: a confirmation run timed out" }
+                    ? verdict with
+                    {
+                        Status = MemberStatus.Inconclusive, Inputs = 0, Fingerprint = null, Witnesses = [],
+                        Reason = "a confirmation run timed out; the provisional difference or one-sided instability could not be confirmed",
+                    }
                     : Judge(member, runs.Concat(extra).Select(r => r[member.Key]).ToArray(), verdict.LimitedAt, options, out _);
                 judged[j] = (member, verdict, false);
             }
@@ -377,7 +381,7 @@ public static partial class MemberDifferentialOracle
     /// </summary>
     public static MemberVerdict ClassifyTimeout(MemberVerdict prefix, ProbeResult[] original, ProbeResult[] converted, OracleOptions options)
     {
-        if (prefix.LimitedAt is not { } k)
+        if (prefix.Status == MemberStatus.Inconclusive || prefix.LimitedAt is not { } k)
             return prefix;
         var (outcome, classified) = Classify(prefix, k, original, converted, options);
         // A replay that never reached the input is inconclusive even when the prefix already differs: the gate fails it
@@ -433,9 +437,10 @@ public static partial class MemberDifferentialOracle
             var failing = !c.Finished ? c : o;
             var reason = failing.Outcome == ProbeOutcome.Crashed ? "CRASH" : "HANG";
             var arm = !c.Finished ? "converted" : "original";
-            return ($"{reason}:{arm}", prefix with
+            var failure = $"{reason}:{arm}:exit={failing.ExitCode}";
+            return (failure, prefix with
             {
-                Status = MemberStatus.Different, Reason = reason, Fingerprint = Hash($"{reason}\u0001{prefix.Key}\u0001{k}\u0001{arm}"),
+                Status = MemberStatus.Different, Reason = reason, Fingerprint = Hash($"{failure}\u0001{prefix.Key}\u0001{k}"),
                 Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
             });
         }
@@ -450,7 +455,7 @@ public static partial class MemberDifferentialOracle
                 Witnesses = [$"{prefix.Member} input #{k} (replayed from clean state, twice per build): {summary}; budget {budget}s"],
             });
         }
-        return (o.Finished && c.Finished ? "agrees" : $"both-fail:{o.Outcome}/{c.Outcome}", prefix with
+        return (o.Finished && c.Finished ? "agrees" : $"both-fail:{o.Outcome}:exit={o.ExitCode}/{c.Outcome}:exit={c.ExitCode}", prefix with
         {
             Reason = !o.Finished && !c.Finished
                 ? $"input {k} {o.Outcome} on both builds (replayed from clean state); the {prefix.Inputs} inputs before it agree"

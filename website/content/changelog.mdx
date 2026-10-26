@@ -179,17 +179,22 @@ new diagnostic. The C# converter emits code that passes all four checks.
   comparison can end without a difference (AGREE, SKIPPED, NONDETERMINISTIC, TIMEOUT,
   INCONCLUSIVE, and hang or crash replays) in the oracle's README. For each one, a new test
   injects a real change by hand and checks that the oracle reports it or excludes the member
-  with a reason. 36 of these 86 tests passed silently before the fixes. Among the fixes:
+  with a reason. 36 of the initial 86 tests passed silently before the fixes. The suite now
+  has 94 cases. Among the fixes:
   - A thrown exception is compared by its message, data and inner exception, not by its type
-    alone.
+    alone. Subject-thrown reflection wrappers are preserved, including during enumeration
+    and `ToString()`.
   - When one input times out, the inputs after it still run. Before, they were dropped.
   - A result that is stable on one build and changes on every run of the other is now a
     difference, not skipped as nondeterministic.
   - Generic code also runs with `int` as the type argument, not only `object`.
   - Standard output and standard error are compared separately.
   - `ValueTask` results are awaited, and async streams and iterators are read to the end.
-  - A difference seen in the first two runs per build is confirmed by 6 more runs, so a random
-    value that repeats by chance no longer fails CI.
+  - A difference seen in the first two runs per build is confirmed by 6 more runs, reducing
+    false alarms from random values that repeat by chance. A confirmation timeout is
+    inconclusive, not a confirmed difference.
+  - Crash exit codes are included in replay fingerprints, so a changed crash cannot reuse
+    an earlier baseline entry.
 
   Only the oracle changed; the converter did not. On the corpus, the oracle now compares
   648 instead of 466 members per FluentValidation file, and still finds no difference. The

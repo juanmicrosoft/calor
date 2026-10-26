@@ -65,8 +65,8 @@ one compared input. Every other verdict carries a `SkipCategory`.
 
 The runs are original, converted, original, converted, each in a fresh load context. When a
 member would be DIFFERENT (J1) or one-sided (J2) on those four runs, 6 more (original,
-converted) run pairs of the whole plan confirm it (`ConfirmationRounds`), so a low-entropy value
-that repeated by chance never fails the gate. Per input
+converted) run pairs of the whole plan confirm it (`ConfirmationRounds`), reducing false alarms
+from low-entropy values that repeated by chance. Per input
 (`CompareParts`), a part is *stable* when each build reproduces it on its re-run. A stable part
 that differs between the builds is a difference. An unstable part is set aside alone. A part
 identical on both builds but rendered incompletely is incomplete. The input counts as compared
@@ -78,6 +78,7 @@ applies:
 |---|---|---|---|---|
 | J1 | DIFFERENT `OBSERVATION` | Some input has a part every run of each build reproduces, and the builds differ, whatever other parts or inputs do. A difference the confirmation runs do not reproduce is set aside with a note; when only one build stopped reproducing it, it is checked as J2 | no | `StableInputDifference_IsDifferentEvenWhenAnotherInputIsUnstable`, `GuidStatic_DoesNotHideAStableReturnDifference`, `NondeterministicReceiver_DoesNotHideAStableResultDifference`, `IncompleteSecondaryPart_DoesNotHideAStableResultDifference`, `IncompleteOnOneBuildOnly_IsDifferent`, `LowEntropyRandomness_OnIdenticalBuilds_IsNeverDifferent` |
 | J2 | DIFFERENT `ONE-SIDED-NONDETERMINISM` | Over all 16 runs, one build renders a part identically on every run of every input, and on some input the other build produces at least two values, none of them the stable one. The fingerprint covers every affected input | **was a false negative** (NONDETERMINISTIC, skipped) | `OneSidedNondeterminism_ConvertedUnstable_IsDifferent`, `OneSidedNondeterminism_OriginalUnstable_IsDifferent`, `OneSidedNondeterminism_FingerprintIsStable`, `OneSidedNondeterminism_FingerprintCoversEveryAffectedInput`, `DifferenceThatOnlyOneBuildStopsReproducing_IsOneSided` |
+| J2a | INCONCLUSIVE | A confirmation run timed out, so J1 or J2 cannot be confirmed. The provisional difference is not reported as confirmed or counted as coverage; later timeout replays cannot replace this verdict | no (fails the gate) | `ConfirmationTimeout_IsInconclusiveRatherThanAnUnconfirmedDifference` |
 | J3 | SKIPPED `incomplete-observation` (INCOMPLETE) | A part identical on both builds could not be rendered in full (more than 1,000,000 items, more than 256 MiB, a delegate the generator cannot call) | yes, excluded | `IncompleteResult_IsExcludedFromCoverage`, `IncompleteSecondaryPart_IsNeverAgreement`, `PrivateStaticDelegate_DoesNotMakeObservationsIncomplete` |
 | J4 | NONDETERMINISTIC | No input compared, and some part was unstable on both builds | yes, excluded | `NondeterministicOnBothBuilds_IsExcludedFromCoverage` |
 | J5 | TIMEOUT (prefix) | The member was limited at input k; the inputs before k are compared; then classified by replays (R1 to R8) | the failing input only; later inputs run as a segment (S1) | `SharedTimeout_StillComparesTheFinishedPrefix`, `TimeoutWithNoComparedInput_IsExcludedFromCoverage` |
@@ -89,7 +90,7 @@ each channel; the ones marked fixed were AGREE (or TIMEOUT, NONDETERMINISTIC) be
 
 | Channel | Fixtures |
 |---|---|
-| Exceptions of one type with different messages or data (**fixed**: only the type was compared) | `ThrownException_SameTypeDifferentMessage_IsDifferent`, `ThrownException_SameMessageDifferentData_IsDifferent`, `ThrownException_DifferentInnerException_IsDifferent`, `ThrownException_SubjectExceptionProperty_IsDifferent`, `ThrowingConstructor_DifferentMessage_IsDifferent`, `ThrowingGetter_DifferentMessage_IsDifferent`, `FaultedTask_DifferentMessage_IsDifferent`, `FaultedTask_SubjectAggregateException_IsKept`, `SubjectThrownWrapperExceptions_AreKept`, `ExceptionNamingTheSandbox_IsStable` |
+| Exceptions of one type with different messages or data (**fixed**: only the type was compared; subject-thrown reflection wrappers also survive direct enumeration, async waits and `ToString()`) | `ThrownException_SameTypeDifferentMessage_IsDifferent`, `ThrownException_SameMessageDifferentData_IsDifferent`, `ThrownException_DifferentInnerException_IsDifferent`, `ThrownException_SubjectExceptionProperty_IsDifferent`, `ThrowingConstructor_DifferentMessage_IsDifferent`, `ThrowingGetter_DifferentMessage_IsDifferent`, `FaultedTask_DifferentMessage_IsDifferent`, `FaultedTask_SubjectAggregateException_IsKept`, `SubjectThrownWrapperExceptions_AreKept`, `Rendering_SubjectThrownInvocationException_IsKept`, `ExceptionNamingTheSandbox_IsStable` |
 | Static state (**fixed**: private statics, private static auto-properties and cached callbacks, and `Cache<int>`-style closed generics) | `PrivateStatic_WrittenAfterItsOnlyReader_IsDifferent`, `PrivateStaticAutoProperty_WrittenAfterItsOnlyReader_IsDifferent`, `PrivateStaticCallableDelegate_ReplacedAfterItsOnlyReader_IsDifferent`, `StaticOfAGenericTypeClosedOverInt_IsObserved`, `PublicStaticOfAnotherType_IsDifferent`, `MutationOfAnotherTypesStatics_IsCompared` |
 | Console and files (**fixed**: stdout and stderr were one buffer; a writer captured from `Console.Out` lost later output; directories were not listed; a name could inject a part; the sandbox token aliased a literal) | `Console_StdoutVersusStderr_IsDifferent`, `Console_WriterCapturedInATypeInitializer_IsObservedOnLaterInputs`, `Console_WriterStateDoesNotLeakBetweenBuilds`, `FileContent_IsDifferent`, `CreatedDirectory_IsDifferent`, `DirectoryNameWithSeparators_CannotReplaceAPart`, `Parts_RepeatedNameNeverOverwritesTheFirst`, `SandboxRoot_DoesNotAliasALiteral` |
 | Async results (**fixed**: `ValueTask` was not awaited; async streams were opaque) | `ValueTask_StateAfterCompletion_IsDifferent`, `ValueTaskResult_IsDifferent`, `Task_ReceiverStateAfterCompletion_IsDifferent`, `AsyncStream_ItemsAreCompared`, `AsyncResult_IsAwaitedBeforeComparison` |
@@ -113,7 +114,7 @@ the preceding members, then the member's inputs up to k, in one sandbox.
 | R5 | DIFFERENT `FAILURE-MODE` | Both builds fail differently: one hangs and one crashes, or both crash with different exit codes | **was a false negative** (shared TIMEOUT) | `Replay_HangVersusCrash_IsDifferent`, `Replay_CrashesWithDifferentExitCodes` |
 | R6 | TIMEOUT, both fail | Both builds fail input k the same way | the failing input only | `TimeoutClassification_FollowsTheCleanStateReplays` |
 | R7 | TIMEOUT, did not reproduce | The replays finish and agree, or one build finishes slowly while the other fails | the failing input only | `TimeoutClassification_FollowsTheCleanStateReplays` |
-| R8 | DIFFERENT prefix, replay folded in | The prefix already differs; the replay outcome joins its fingerprint | no | `TimeoutClassification_ChangesTheFingerprintOfADifferingPrefix` |
+| R8 | DIFFERENT prefix, replay folded in | The prefix already differs; the replay outcome, including crash exit codes, joins its fingerprint | no | `TimeoutClassification_ChangesTheFingerprintOfADifferingPrefix`, `Replay_CrashExitCodeChangesTheFingerprint` |
 | C1 | NONDETERMINISTIC, unreproduced crash | The file's process crashed in the member once and the traced re-run finished: AGREE becomes NONDETERMINISTIC | no: a DIFFERENT verdict is kept | `UnreproducedCrash_NeverHidesADifference` |
 | C2 | File failure | The child crashed outside a member, kept failing, or the swap does not build; the gate fails the file | no (fails) | `Gate_FileFailure_Fails`, `Gate_SwapBuildFailure_FailsEvenForANewFile` |
 
@@ -169,6 +170,8 @@ silently on evidence they hold:
   the same state is not seen there.
 - **Nondeterministic parts.** A part neither build reproduces is set aside (J7), so a change inside
   it is not seen; the member's reason names every such part.
+- **Finite confirmation.** Eight runs per build reduce chance results; they cannot prove
+  determinism or rule out false alarms when random values happen to repeat on every run.
 - **Child-process protocol.** Restarts, calibration, `MaxRestarts` and the probe processes run only
   in the `member-oracle` CI job (the corpus has members that hang, so every run exercises them);
   the fixtures drive the same comparison, segment and replay logic in-process.

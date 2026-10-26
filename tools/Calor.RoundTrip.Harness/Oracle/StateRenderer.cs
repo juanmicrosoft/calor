@@ -176,7 +176,7 @@ public static partial class StateRenderer
             }
             catch (Exception ex)
             {
-                AppendThrown(sb, ex, 0, "!");
+                AppendThrown(sb, ex, 0, "!", stripInvocation: false);
             }
         }
     }
@@ -202,7 +202,7 @@ public static partial class StateRenderer
         }
         catch (Exception ex)
         {
-            AppendThrown(sb, ex, depth - 1, "!");
+            AppendThrown(sb, ex, depth - 1, "!", stripInvocation: false);
         }
         sb.Append(']');
     }
@@ -390,10 +390,10 @@ public static partial class StateRenderer
     /// subject threw, a <see cref="TargetInvocationException"/> or a single-inner <see cref="AggregateException"/>
     /// included, is rendered whole.
     /// </summary>
-    internal static void AppendThrown(Sink sb, Exception thrown, int depth, string prefix = "throw")
+    internal static void AppendThrown(Sink sb, Exception thrown, int depth, string prefix = "throw", bool stripInvocation = true)
     {
         sb.Append(prefix + "(");
-        AppendException(sb, StripInvocation(thrown), depth);
+        AppendException(sb, stripInvocation ? StripInvocation(thrown) : thrown, depth);
         sb.Append(')');
     }
 
@@ -412,12 +412,14 @@ public static partial class StateRenderer
         {
             var enumerable = typeof(IAsyncEnumerable<>).MakeGenericType(itemType);
             var enumeratorType = typeof(IAsyncEnumerator<>).MakeGenericType(itemType);
-            var enumerator = enumerable.GetMethod("GetAsyncEnumerator")!.Invoke(value, [CancellationToken.None])!;
+            // Do not wrap synchronous reflection failures: the same catch also receives exceptions from awaited tasks,
+            // which have no reflection wrapper. A subject-thrown TargetInvocationException must survive either path.
+            var enumerator = enumerable.GetMethod("GetAsyncEnumerator")!.Invoke(value, BindingFlags.DoNotWrapExceptions, null, [CancellationToken.None], null)!;
             var moveNext = enumeratorType.GetMethod("MoveNextAsync")!;
             var current = enumeratorType.GetProperty("Current")!;
             try
             {
-                for (var n = 0; ((ValueTask<bool>)moveNext.Invoke(enumerator, null)!).AsTask().GetAwaiter().GetResult(); n++)
+                for (var n = 0; ((ValueTask<bool>)moveNext.Invoke(enumerator, BindingFlags.DoNotWrapExceptions, null, null, null)!).AsTask().GetAwaiter().GetResult(); n++)
                 {
                     if (n > 0)
                         sb.Append(", ");
@@ -426,7 +428,7 @@ public static partial class StateRenderer
                         sb.MarkIncomplete();
                         break;
                     }
-                    Append(sb, current.GetValue(enumerator), depth - 1);
+                    Append(sb, current.GetValue(enumerator, BindingFlags.DoNotWrapExceptions, null, null, null), depth - 1);
                 }
             }
             finally
@@ -436,7 +438,7 @@ public static partial class StateRenderer
         }
         catch (Exception ex)
         {
-            AppendThrown(sb, ex, depth - 1, "!");
+            AppendThrown(sb, ex, depth - 1, "!", stripInvocation: false);
         }
         sb.Append(']');
     }
@@ -461,7 +463,7 @@ public static partial class StateRenderer
         }
         catch (Exception ex)
         {
-            AppendThrown(sb, ex, depth - 1, "!");
+            AppendThrown(sb, ex, depth - 1, "!", stripInvocation: false);
         }
         sb.Append(']');
     }

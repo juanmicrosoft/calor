@@ -43,6 +43,43 @@ public class MemberOracleAuditTests
     private static string Obs(params (string Part, string Value)[] parts) =>
         string.Join(MemberDifferentialOracle.PartSeparator, parts.Select(p => p.Part + MemberDifferentialOracle.NameSeparator + p.Value));
 
+    [Fact]
+    public void ConfirmationTimeout_IsInconclusiveRatherThanAnUnconfirmedDifference()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-oracle-confirmation-");
+        try
+        {
+            var marker = Path.Combine(directory.FullName, "confirming");
+            var literal = System.Text.Json.JsonSerializer.Serialize(marker);
+            var body = $"public static class S {{ public static int F() {{ if (System.IO.File.Exists({literal})) System.Threading.Thread.Sleep(1000); return ";
+            var verdicts = MemberDifferentialOracle.Compare(
+                MemberOracleTests.Compile("original", body + "1; } }"),
+                MemberOracleTests.Compile("converted", body + "2; } }"), ["S"],
+                new OracleOptions
+                {
+                    MemberTimeout = TimeSpan.FromMilliseconds(250),
+                    OnMemberStart = (label, member) =>
+                    {
+                        if (label == "confirm1" && member == "S::static F()->System.Int32")
+                            File.WriteAllText(marker, "");
+                    },
+                });
+            var verdict = Single(verdicts, "static F()->System.Int32");
+            Assert.Equal(MemberStatus.Inconclusive, verdict.Status);
+            Assert.Contains("confirmation run timed out", verdict.Reason, StringComparison.Ordinal);
+            Assert.Equal("inconclusive", SkipCategory.Of(verdict));
+            Assert.Equal(0, OracleRunner.Compared(new OracleFileReport { File = "f.cs", Status = "exercised", Members = [verdict] }));
+            Assert.Equal(MemberStatus.Inconclusive, MemberDifferentialOracle.ClassifyTimeout(verdict with { LimitedAt = 0 },
+                [new(ProbeOutcome.Finished, 0, Obs(("result", "1"))), new(ProbeOutcome.Finished, 0, Obs(("result", "1")))],
+                [new(ProbeOutcome.Finished, 0, Obs(("result", "2"))), new(ProbeOutcome.Finished, 0, Obs(("result", "2")))],
+                new OracleOptions()).Status);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     // ---- AGREE: a stable difference on any compared input fails ----------------------------------------------
 
     /// <summary>AGREE with some inputs not compared (setup failed identically): a difference on a compared input still fails.</summary>
@@ -891,6 +928,30 @@ public class MemberOracleAuditTests
             "static F()->System.Void"), "TargetInvocationException");
     }
 
+    [Theory]
+    [InlineData("enumerable")]
+    [InlineData("enumerator")]
+    [InlineData("async")]
+    [InlineData("tostring")]
+    public void Rendering_SubjectThrownInvocationException_IsKept(string channel)
+    {
+        var body = channel switch
+        {
+            "enumerable" => "public static System.Collections.IEnumerable F() { yield return 0; throw ERROR; }",
+            "enumerator" => "public static System.Collections.IEnumerator F() { yield return 0; throw ERROR; }",
+            "async" => "public static async System.Collections.Generic.IAsyncEnumerable<int> F() { await System.Threading.Tasks.Task.Yield(); yield return 0; throw ERROR; }",
+            _ => "public static object F() => new Value(); } public class Value { public override string ToString() => throw ERROR;",
+        };
+        var source = "public static class S { " + body + " }";
+        const string inner = "new System.InvalidOperationException(\"m\")";
+        var original = source.Replace("ERROR", inner, StringComparison.Ordinal);
+        var converted = source.Replace("ERROR", "new System.Reflection.TargetInvocationException(" + inner + ")", StringComparison.Ordinal);
+        var changed = Assert.Single(Compare(original, converted, ["S"]), v => v.Member.StartsWith("static F()", StringComparison.Ordinal));
+        AssertDifferent(changed, "TargetInvocationException");
+        var unchanged = Assert.Single(Compare(converted, converted, ["S"]), v => v.Member.StartsWith("static F()", StringComparison.Ordinal));
+        Assert.Equal(MemberStatus.Agree, unchanged.Status);
+    }
+
     /// <summary>A faulted task keeps a subject AggregateException inside the task's own wrapper.</summary>
     [Fact]
     public void FaultedTask_SubjectAggregateException_IsKept()
@@ -913,6 +974,28 @@ public class MemberOracleAuditTests
         Assert.Equal("FAILURE-MODE", different.Reason);
         Assert.Equal(MemberStatus.Timeout, MemberDifferentialOracle.ClassifyTimeout(prefix, [Crash(11), Crash(11)], [Crash(11), Crash(11)], options).Status);
         Assert.Equal(MemberStatus.Nondeterministic, MemberDifferentialOracle.ClassifyTimeout(prefix, [Crash(11), Crash(12)], [Crash(12), Crash(12)], options).Status);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Replay_CrashExitCodeChangesTheFingerprint(bool differingPrefix, bool sharedCrash)
+    {
+        var prefix = new MemberVerdict
+        {
+            Type = "T", Member = "F()", Kind = "static", LimitedAt = 3, Inputs = 3,
+            Status = differingPrefix ? MemberStatus.Different : MemberStatus.Timeout,
+            Fingerprint = differingPrefix ? "prefix" : null,
+        };
+        var options = new OracleOptions { MemberTimeout = TimeSpan.FromSeconds(4) };
+        ProbeResult Crash(int code) => new(ProbeOutcome.Crashed, 0, null, ExitCode: code);
+        ProbeResult Finished() => new(ProbeOutcome.Finished, 0.01, Obs(("result", "return=0")));
+        MemberVerdict Classify(int code) => MemberDifferentialOracle.ClassifyTimeout(prefix,
+            sharedCrash ? [Crash(code), Crash(code)] : [Finished(), Finished()], [Crash(code), Crash(code)], options);
+        AssertDifferent(Classify(11));
+        Assert.NotEqual(Classify(11).Fingerprint, Classify(12).Fingerprint);
+        Assert.Equal(Classify(11).Fingerprint, Classify(11).Fingerprint);
     }
 
     /// <summary>A file name with the observation's separators is escaped, so it cannot replace another part.</summary>
