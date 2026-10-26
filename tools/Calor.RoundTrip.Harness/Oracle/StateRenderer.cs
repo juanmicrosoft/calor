@@ -124,16 +124,11 @@ public static partial class StateRenderer
             case MemberInfo member:
                 sb.Append("<" + member.MemberType + " " + (member.DeclaringType is { } declaring ? TypeName(declaring) + "::" : "") + member + ">");
                 return;
-            case Exception ex:
-                // Exception.ToString carries stack traces and line numbers, which differ between equivalent builds.
-                sb.Append(TypeName(ex.GetType()) + "(");
-                AppendString(sb, ex.Message);
-                if (depth > 0 && ex.InnerException is { } inner)
-                {
-                    sb.Append(", inner=");
-                    Append(sb, inner, depth - 1);
-                }
-                sb.Append(')');
+            case Exception ex: AppendException(sb, ex, depth); return;
+            case ValueTask valueTask:
+                // Awaited like a Task, so the other parts observe the state after it completes.
+                sb.Append("ValueTask:");
+                AppendTask(sb, AsTask(() => valueTask.AsTask()), depth);
                 return;
             case IFormattable formattable when value.GetType().IsPrimitive || value.GetType().Namespace == "System":
                 sb.Append(TypeName(value.GetType()) + "(" + formattable.ToString(null, CultureInfo.InvariantCulture) + ")");
@@ -155,12 +150,22 @@ public static partial class StateRenderer
             sb.Append("<byref-like " + TypeName(type) + ">");
             return;
         }
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTask<>))
+        {
+            sb.Append("ValueTask:");
+            AppendTask(sb, AsTask(() => (Task)type.GetMethod(nameof(ValueTask<int>.AsTask))!.Invoke(value, null)!), depth);
+            return;
+        }
 
         sb.Append(TypeName(type));
         if (depth <= 0)
             return;
         if (value is IEnumerable items)
             AppendItems(sb, items, depth);
+        else if (AsyncItemType(type) is { } asyncItem)
+            AppendAsyncItems(sb, value, asyncItem, depth);
+        else if (value is IEnumerator enumerator && type.Name.Contains('<'))
+            AppendEnumerator(sb, enumerator, depth);
         AppendMembers(sb, value, type, depth);
         if (OverridesToString(type))
         {
@@ -171,7 +176,7 @@ public static partial class StateRenderer
             }
             catch (Exception ex)
             {
-                sb.Append("!" + Unwrap(ex).GetType().FullName);
+                AppendThrown(sb, ex, 0, "!", stripInvocation: false);
             }
         }
     }
@@ -197,18 +202,53 @@ public static partial class StateRenderer
         }
         catch (Exception ex)
         {
-            sb.Append("!" + Unwrap(ex).GetType().FullName);
+            AppendThrown(sb, ex, depth - 1, "!", stripInvocation: false);
         }
         sb.Append(']');
+    }
+
+    /// <summary>
+    /// The private working directory of the member being driven. Every run gets a fresh one with a random name, so a
+    /// string that embeds it (an exception message naming a file, say) is rendered with the root replaced: two builds
+    /// that name the same file in their own sandbox agree, and the rest of the string is still compared.
+    /// </summary>
+    internal static volatile string? SandboxRoot;
+
+    /// <summary>
+    /// Stands for the sandbox root in a rendered string. It is written after escaping, and escaping turns every
+    /// non-ASCII character into <c>\uXXXX</c>, so a literal <c>§</c> (or the text <c>&lt;sandbox&gt;</c>) in a
+    /// subject string can never render as this token: the real directory and a lookalike literal never alias.
+    /// </summary>
+    internal const string SandboxToken = "§sandbox§";
+
+    private static void Escape(StringBuilder into, char c) =>
+        into.Append(c is '"' or '\\' ? "\\" + c : c < 0x20 || c > 0x7e ? $"\\u{(int)c:x4}" : c.ToString());
+
+    private static string Escaped(string s)
+    {
+        var sb = new StringBuilder(s.Length + 16);
+        foreach (var c in s)
+            Escape(sb, c);
+        return sb.ToString();
     }
 
     private static void AppendString(Sink sb, string s)
     {
         sb.Append('"');
+        if (SandboxRoot is { Length: > 0 } root && s.Contains(Path.GetFileName(root), StringComparison.Ordinal))
+        {
+            // macOS resolves /var to /private/var, so a path can come back in either spelling.
+            var escaped = Escaped(s);
+            if (root.StartsWith("/var/", StringComparison.Ordinal))
+                escaped = escaped.Replace(Escaped("/private" + root), SandboxToken, StringComparison.Ordinal);
+            sb.Append(escaped.Replace(Escaped(root), SandboxToken, StringComparison.Ordinal));
+            sb.Append('"');
+            return;
+        }
         var chunk = new StringBuilder(Math.Min(s.Length, 8192) + 16);
         foreach (var c in s)
         {
-            chunk.Append(c is '"' or '\\' ? "\\" + c : c < 0x20 || c > 0x7e ? $"\\u{(int)c:x4}" : c.ToString());
+            Escape(chunk, c);
             if (chunk.Length >= 8192)
             {
                 sb.Append(chunk.ToString());
@@ -217,6 +257,14 @@ public static partial class StateRenderer
         }
         sb.Append(chunk.ToString());
         sb.Append('"');
+    }
+
+    /// <summary>A string as the renderer writes it (quoted and escaped), for text the oracle itself puts in a part.</summary>
+    internal static string Quoted(string s)
+    {
+        var sink = new Sink();
+        AppendString(sink, s);
+        return sink.Result();
     }
 
     private static bool OverridesToString(Type type)
@@ -243,8 +291,16 @@ public static partial class StateRenderer
         sb.Append("Task(" + task.Status);
         if (task.IsFaulted)
         {
+            // The task's AggregateException is the task's own wrapper; every exception it holds is the subject's, and is
+            // rendered whole (a subject AggregateException inside it keeps its message and data).
             sb.Append(", !");
-            Append(sb, Unwrap(task.Exception!), depth);
+            var inner = task.Exception!.InnerExceptions;
+            for (var i = 0; i < inner.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(", ");
+                Append(sb, inner[i], depth);
+            }
         }
         else if (task.Status == TaskStatus.RanToCompletion && task.GetType().IsGenericType
             && task.GetType().GetProperty("Result") is { } result && result.PropertyType.FullName != "System.Threading.Tasks.VoidTaskResult")
@@ -253,6 +309,163 @@ public static partial class StateRenderer
             Append(sb, result.GetValue(task), depth);
         }
         sb.Append(')');
+    }
+
+    private static Task AsTask(Func<Task> convert)
+    {
+        try
+        {
+            return convert();
+        }
+        catch (Exception ex)
+        {
+            return Task.FromException(StripInvocation(ex));
+        }
+    }
+
+    /// <summary>
+    /// An exception: its type, message, <see cref="Exception.Data"/> entries, the public state its own type declares
+    /// below <see cref="Exception"/> (<c>ParamName</c>, <c>ActualValue</c>, a subject exception's properties), and its
+    /// inner exception. Stack traces, sources, target sites and HResults are left out (they are not what the code
+    /// chose to report). Two exceptions of one type with different messages or data therefore render differently.
+    /// </summary>
+    internal static void AppendException(Sink sb, Exception ex, int depth)
+    {
+        var type = ex.GetType();
+        sb.Append(TypeName(type) + "(");
+        AppendString(sb, ex.Message);
+        if (depth <= 0)
+        {
+            sb.Append(')');
+            return;
+        }
+        try
+        {
+            if (ex.Data is { Count: > 0 } data)
+            {
+                sb.Append(", data={");
+                var first = true;
+                foreach (DictionaryEntry entry in data)
+                {
+                    if (!first)
+                        sb.Append(", ");
+                    first = false;
+                    Append(sb, entry.Key, depth - 1);
+                    sb.Append(": ");
+                    Append(sb, entry.Value, depth - 1);
+                }
+                sb.Append('}');
+            }
+        }
+        catch (Exception dataError)
+        {
+            sb.Append(", data=!" + Unwrap(dataError).GetType().FullName);
+        }
+        foreach (var (label, member) in PublicState(type))
+        {
+            if (member.DeclaringType is not { } declaring || declaring == typeof(Exception) || !typeof(Exception).IsAssignableFrom(declaring)
+                || label is nameof(Exception.Message) or nameof(Exception.InnerException) or nameof(Exception.StackTrace))
+                continue;
+            sb.Append(", " + label + "=");
+            try
+            {
+                Append(sb, member is FieldInfo f ? f.GetValue(ex) : ((PropertyInfo)member).GetValue(ex), depth - 1);
+            }
+            catch (Exception getterError)
+            {
+                AppendThrown(sb, getterError, 0, "!");
+            }
+        }
+        if (ex.InnerException is { } inner)
+        {
+            sb.Append(", inner=");
+            Append(sb, inner, depth - 1);
+        }
+        sb.Append(')');
+    }
+
+    /// <summary>
+    /// A thrown exception, as <c>throw(...)</c>: the full exception rendering, so its message and data count. Only the
+    /// one <see cref="TargetInvocationException"/> that the oracle's own reflection call adds is removed; whatever the
+    /// subject threw, a <see cref="TargetInvocationException"/> or a single-inner <see cref="AggregateException"/>
+    /// included, is rendered whole.
+    /// </summary>
+    internal static void AppendThrown(Sink sb, Exception thrown, int depth, string prefix = "throw", bool stripInvocation = true)
+    {
+        sb.Append(prefix + "(");
+        AppendException(sb, stripInvocation ? StripInvocation(thrown) : thrown, depth);
+        sb.Append(')');
+    }
+
+    /// <summary>Removes the single reflection wrapper (<c>MethodBase.Invoke</c>, <c>DynamicInvoke</c>, <c>PropertyInfo.GetValue</c>).</summary>
+    internal static Exception StripInvocation(Exception ex) => ex is TargetInvocationException { InnerException: { } inner } ? inner : ex;
+
+    /// <summary>The element type of an <c>IAsyncEnumerable&lt;T&gt;</c> the value implements.</summary>
+    private static Type? AsyncItemType(Type type) =>
+        type.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>))?.GetGenericArguments()[0];
+
+    /// <summary>An async stream is drained like a collection (each <c>MoveNextAsync</c> awaited), so what it yields is compared.</summary>
+    private static void AppendAsyncItems(Sink sb, object value, Type itemType, int depth)
+    {
+        sb.Append("async[");
+        try
+        {
+            var enumerable = typeof(IAsyncEnumerable<>).MakeGenericType(itemType);
+            var enumeratorType = typeof(IAsyncEnumerator<>).MakeGenericType(itemType);
+            // Do not wrap synchronous reflection failures: the same catch also receives exceptions from awaited tasks,
+            // which have no reflection wrapper. A subject-thrown TargetInvocationException must survive either path.
+            var enumerator = enumerable.GetMethod("GetAsyncEnumerator")!.Invoke(value, BindingFlags.DoNotWrapExceptions, null, [CancellationToken.None], null)!;
+            var moveNext = enumeratorType.GetMethod("MoveNextAsync")!;
+            var current = enumeratorType.GetProperty("Current")!;
+            try
+            {
+                for (var n = 0; ((ValueTask<bool>)moveNext.Invoke(enumerator, BindingFlags.DoNotWrapExceptions, null, null, null)!).AsTask().GetAwaiter().GetResult(); n++)
+                {
+                    if (n > 0)
+                        sb.Append(", ");
+                    if (n == MaxItems || sb.Full)
+                    {
+                        sb.MarkIncomplete();
+                        break;
+                    }
+                    Append(sb, current.GetValue(enumerator, BindingFlags.DoNotWrapExceptions, null, null, null), depth - 1);
+                }
+            }
+            finally
+            {
+                ((IAsyncDisposable)enumerator).DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendThrown(sb, ex, depth - 1, "!", stripInvocation: false);
+        }
+        sb.Append(']');
+    }
+
+    /// <summary>A compiler-generated iterator returned as an <see cref="IEnumerator"/> is drained, so what it yields is compared.</summary>
+    private static void AppendEnumerator(Sink sb, IEnumerator enumerator, int depth)
+    {
+        sb.Append("enumerator[");
+        try
+        {
+            for (var n = 0; enumerator.MoveNext(); n++)
+            {
+                if (n > 0)
+                    sb.Append(", ");
+                if (n == MaxItems || sb.Full)
+                {
+                    sb.MarkIncomplete();
+                    break;
+                }
+                Append(sb, enumerator.Current, depth - 1);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendThrown(sb, ex, depth - 1, "!", stripInvocation: false);
+        }
+        sb.Append(']');
     }
 
     public static Exception Unwrap(Exception ex)

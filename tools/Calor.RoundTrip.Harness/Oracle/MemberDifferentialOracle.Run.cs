@@ -17,6 +17,8 @@ public static partial class MemberDifferentialOracle
     {
         var results = new Dictionary<string, MemberRun>(StringComparer.Ordinal);
         using var loaded = arm.Load(label);
+        using var sandboxes = new SandboxChain();
+        ConsoleRouter.Reset();
         var types = OraclePlanner.UsableTypes(loaded.Assembly);
         foreach (var member in plan)
         {
@@ -28,7 +30,7 @@ public static partial class MemberDifferentialOracle
                 results[member.Key] = new MemberRun(Enumerable.Repeat("<type missing>", limit).ToArray(), limit);
                 continue;
             }
-            var run = Execute(type, member, OraclePlanner.Rebind(type, member), limit, options, label, types);
+            var run = Execute(type, member, OraclePlanner.Rebind(type, member), limit, options, label, types, sandboxes.For(member));
             if (run.TimedOut)
             {
                 options.OnTimeout?.Invoke(member.Key, run.Completed);
@@ -43,16 +45,47 @@ public static partial class MemberDifferentialOracle
         Math.Min(member.Inputs.Count, options.Limits.TryGetValue(member.Key, out var l) ? l : int.MaxValue);
 
     /// <summary>
-    /// Drives inputs [0, count) of one member on a worker thread with the member's budget, in one private working
+    /// #1667: the private working directory of each member, shared by a member and its suffix segments (which follow it
+    /// in plan order), so a segment sees the files the member's earlier inputs wrote, as the inputs would in one run.
+    /// </summary>
+    private sealed class SandboxChain : IDisposable
+    {
+        private string? _origin;
+        private DirectoryInfo? _current;
+
+        public string For(PlannedMember member)
+        {
+            var origin = member.Type + "::" + member.Callable;
+            if (origin != _origin || _current is null)
+            {
+                Dispose();
+                _origin = origin;
+                _current = Directory.CreateTempSubdirectory("calor-oracle-1587-");
+            }
+            return _current.FullName;
+        }
+
+        public void Dispose()
+        {
+            if (_current is not null)
+            {
+                try { _current.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
+            _current = null;
+        }
+    }
+
+    /// <summary>
+    /// Drives inputs [0, count) of one member on a worker thread with the member's budget, in its private working
     /// directory with captured console (shared by all its inputs, as each input sees the files earlier ones wrote).
     /// <paramref name="target"/> is an input index the caller times separately (a probe), calling
     /// <see cref="OracleOptions.OnProbeInput"/> right before it.
     /// </summary>
     private static Execution Execute(Type type, PlannedMember member, MemberInfo? info, int count, OracleOptions options,
-        string label, IReadOnlyDictionary<string, Type> types, int target = -1)
+        string label, IReadOnlyDictionary<string, Type> types, string sandboxPath, int target = -1)
     {
         var observations = new string[count];
-        var sandbox = Directory.CreateTempSubdirectory("calor-oracle-1587-");
+        var sandbox = new DirectoryInfo(sandboxPath);
         var (originalOut, originalErr, originalIn, originalDir) = (Console.Out, Console.Error, Console.In, Environment.CurrentDirectory);
         var abandoned = new StrongBox<bool>(false);
         var done = new StrongBox<int>(0);
@@ -85,8 +118,13 @@ public static partial class MemberDifferentialOracle
         var timedOut = false;
         try
         {
+            // The console goes to process-wide routers whose target is the current input's buffer, so a writer the subject
+            // captured earlier (a static TextWriter initialized from Console.Out, say) still reaches the input that writes.
+            Console.SetOut(ConsoleRouter.Out);
+            Console.SetError(ConsoleRouter.Error);
             Console.SetIn(new StringReader(""));
             Environment.CurrentDirectory = sandbox.FullName;
+            StateRenderer.SandboxRoot = sandbox.FullName;
             thread.Start();
             if (!thread.Join(options.MemberTimeout))
             {
@@ -100,7 +138,8 @@ public static partial class MemberDifferentialOracle
             Console.SetError(originalErr);
             Console.SetIn(originalIn);
             Environment.CurrentDirectory = originalDir;
-            try { sandbox.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            StateRenderer.SandboxRoot = null;
+            (ConsoleRouter.Out.Target, ConsoleRouter.Error.Target) = (TextWriter.Null, TextWriter.Null);
         }
         return new Execution(observations, Volatile.Read(ref done.Value), timedOut, targetClock.Elapsed.TotalSeconds);
     }
@@ -117,22 +156,24 @@ public static partial class MemberDifferentialOracle
         bool onCandidate, OracleOptions options)
     {
         var (_, plan) = SharedPlan(original, candidate, typeScope, options);
-        var runnable = plan.Where(m => m.Kind != "hierarchy" && m.SkipReason is null).ToList();
+        var runnable = OraclePlanner.Expand(plan.Where(m => m.Kind != "hierarchy" && m.SkipReason is null), options.Limits);
         var targetMember = runnable.FirstOrDefault(m => m.Key == memberKey);
         if (targetMember is null || input >= targetMember.Inputs.Count)
             return new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<{memberKey} input {input} is not in the plan>");
         using var loaded = (onCandidate ? candidate : original).Load("probe");
+        using var sandboxes = new SandboxChain();
+        ConsoleRouter.Reset();
         var types = OraclePlanner.UsableTypes(loaded.Assembly);
         foreach (var member in runnable.TakeWhile(m => m.Key != memberKey))
         {
             if (types.GetValueOrDefault(member.Type) is not { } t)
                 continue;
-            if (Execute(t, member, OraclePlanner.Rebind(t, member), Limit(member, options), options, "probe", types).TimedOut)
+            if (Execute(t, member, OraclePlanner.Rebind(t, member), Limit(member, options), options, "probe", types, sandboxes.For(member)).TimedOut)
                 return new ProbeResult(ProbeOutcome.Infrastructure, 0, $"<replay of {member.Key} timed out>");
         }
         if (types.GetValueOrDefault(targetMember.Type) is not { } type)
             return new ProbeResult(ProbeOutcome.Infrastructure, 0, "<type missing>");
-        var run = Execute(type, targetMember, OraclePlanner.Rebind(type, targetMember), input + 1, options, "probe", types, target: input);
+        var run = Execute(type, targetMember, OraclePlanner.Rebind(type, targetMember), input + 1, options, "probe", types, sandboxes.For(targetMember), target: input);
         if (run.Completed == input + 1)
             return new ProbeResult(ProbeOutcome.Finished, run.TargetSeconds, run.Observations[input]);
         return run.Completed == input
@@ -168,24 +209,34 @@ public static partial class MemberDifferentialOracle
         IReadOnlyDictionary<string, Type> types)
     {
         var stdout = new StringWriter(CultureInfo.InvariantCulture);
-        Console.SetOut(stdout);
-        Console.SetError(stdout);
+        var stderr = new StringWriter(CultureInfo.InvariantCulture);
+        ConsoleRouter.Out.Target = stdout;
+        ConsoleRouter.Error.Target = stderr;
         var parts = new ObservationParts();
         try
         {
             if (ObserveInto(parts, type, member, info, tuple, depth))
+            {
                 StateRenderer.AppendProjectStatics(parts["project"], types, depth);
+                StateRenderer.AppendPrivateStatics(parts["private-statics"], types, depth);
+            }
         }
         catch (Exception ex)
         {
             // The oracle failed to observe (not the member): a structured setup failure, never agreement on its own.
             var inner = StateRenderer.Unwrap(ex);
             parts = new ObservationParts();
-            parts["setup"].Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {inner.Message})");
+            parts["setup"].Append($"{SetupFailed}(observe: {inner.GetType().FullName}: {StateRenderer.Quoted(inner.Message)})");
         }
+        // Standard output and standard error are separate parts: a message moved from one stream to the other is a difference.
         StateRenderer.Append(parts["stdout"], stdout.ToString(), 0);
-        var files = Directory.EnumerateFiles(sandbox, "*", SearchOption.AllDirectories)
-            .Select(f => Path.GetRelativePath(sandbox, f) + "=" + Hash(Convert.ToBase64String(File.ReadAllBytes(f))))
+        if (stderr.ToString() is { Length: > 0 } errors)
+            StateRenderer.Append(parts["stderr"], errors, 0);
+        // Files by content hash, and directories by name (an empty directory the member created is state too). Names are
+        // quoted and escaped like any rendered string, so no name can contain the part separators.
+        var files = Directory.EnumerateFileSystemEntries(sandbox, "*", SearchOption.AllDirectories)
+            .Select(f => Directory.Exists(f) ? "dir " + StateRenderer.Quoted(Path.GetRelativePath(sandbox, f))
+                : "file " + StateRenderer.Quoted(Path.GetRelativePath(sandbox, f)) + "=" + Hash(Convert.ToBase64String(File.ReadAllBytes(f))))
             .Order(StringComparer.Ordinal).ToList();
         if (files.Count > 0)
             parts["files"].Append(string.Join(";", files));
@@ -213,7 +264,7 @@ public static partial class MemberDifferentialOracle
                 }
                 catch (Exception ex)
                 {
-                    parts["setup"].Append($"{SetupFailed}(args: {StateRenderer.Unwrap(ex).GetType().FullName})");
+                    StateRenderer.AppendThrown(parts["setup"], ex, 0, SetupFailed + "(args)");
                     return false;
                 }
                 try
@@ -224,10 +275,10 @@ public static partial class MemberDifferentialOracle
                 }
                 catch (Exception ex)
                 {
-                    parts["result"].Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
+                    StateRenderer.AppendThrown(parts["result"], ex, depth);
                 }
                 // Arguments and static state are observed whether the constructor returned or threw.
-                StateRenderer.Append(parts["args"], args, depth);
+                StateRenderer.AppendArguments(parts["args"], args, depth);
                 StateRenderer.AppendStatics(parts["statics"], type, depth);
                 return true;
             }
@@ -254,7 +305,7 @@ public static partial class MemberDifferentialOracle
             }
             catch (Exception ex)
             {
-                parts["setup"].Append($"{SetupFailed}(receiver: {StateRenderer.Unwrap(ex).GetType().FullName})");
+                StateRenderer.AppendThrown(parts["setup"], ex, 0, SetupFailed + "(receiver)");
                 return false;
             }
         }
@@ -265,7 +316,7 @@ public static partial class MemberDifferentialOracle
         }
         catch (Exception ex)
         {
-            parts["setup"].Append($"{SetupFailed}(args: {StateRenderer.Unwrap(ex).GetType().FullName})");
+            StateRenderer.AppendThrown(parts["setup"], ex, 0, SetupFailed + "(args)");
             return false;
         }
         try
@@ -279,12 +330,54 @@ public static partial class MemberDifferentialOracle
         }
         catch (Exception ex)
         {
-            parts["result"].Append("throw(" + StateRenderer.Unwrap(ex).GetType().FullName + ")");
+            StateRenderer.AppendThrown(parts["result"], ex, depth);
         }
-        StateRenderer.Append(parts["args"], arguments, depth);
+        StateRenderer.AppendArguments(parts["args"], arguments, depth);
         if (receiver is not null)
             StateRenderer.Append(parts["this"], receiver, depth);
         StateRenderer.AppendStatics(parts["statics"], type, depth);
         return true;
+    }
+}
+
+/// <summary>
+/// #1667: a process-wide console writer whose target is the current input's buffer. The oracle installs one for
+/// standard output and one for standard error once per execution and retargets them per input, so a writer the
+/// subject captured from <see cref="Console.Out"/> earlier (in a type initializer, say) still reaches the input
+/// that writes through it, instead of a buffer nobody reads.
+/// </summary>
+internal sealed class ConsoleRouter : TextWriter
+{
+    public static readonly ConsoleRouter Out = new();
+    public static readonly ConsoleRouter Error = new();
+
+    private volatile TextWriter _target = Null;
+
+    public TextWriter Target
+    {
+        get => _target;
+        set => _target = value;
+    }
+
+    public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+    public override IFormatProvider FormatProvider => CultureInfo.InvariantCulture;
+
+    public override void Write(char value) => _target.Write(value);
+
+    public override void Write(string? value) => _target.Write(value);
+
+    public override void Write(char[] buffer, int index, int count) => _target.Write(buffer, index, count);
+
+    public override void Flush() => _target.Flush();
+
+    /// <summary>
+    /// Starts a run with default writer state. The routers outlive load contexts, so a <c>NewLine</c> the subject set on
+    /// <see cref="Console.Out"/> in one build's run must not carry into the other build's.
+    /// </summary>
+    public static void Reset()
+    {
+        Out.NewLine = Environment.NewLine;
+        Error.NewLine = Environment.NewLine;
     }
 }

@@ -294,6 +294,8 @@ public static class MemberOracleInputs
         DefaultInstanceToken => "new()",
         FactoryToken f => f.Label,
         ListSpec l => "[" + string.Join(",", l.Items.Select(RenderToken)) + "]",
+        // #1667: every culture renders as its type name at depth 0, so the label names it (inputs never alias in witnesses).
+        CultureInfo c => "culture:" + (c.Name.Length == 0 ? "invariant" : c.Name),
         _ => StateRenderer.Render(v, 0),
     };
 

@@ -45,8 +45,15 @@ public sealed record MemberVerdict
     /// <summary>The member was limited to its first <c>LimitedAt</c> inputs because input <c>LimitedAt</c> timed out.</summary>
     public int? LimitedAt { get; init; }
 
+    /// <summary>#1667: for a suffix segment, the member it continues (null for the member itself).</summary>
+    public string? Origin { get; init; }
+
     [JsonIgnore]
     public string Key => Type + "::" + Member;
+
+    /// <summary>The member as the subject declares it: coverage and skips are counted per origin, never per segment.</summary>
+    [JsonIgnore]
+    public string OriginKey => Type + "::" + (Origin ?? Member);
 }
 
 public sealed record OracleOptions
@@ -97,6 +104,51 @@ public sealed record OracleOptions
     public Action? OnProbeInput { get; init; }
 }
 
+/// <summary>
+/// #1667: why a member was not compared, as a stable category (the raw reasons carry type names and input numbers).
+/// The per-project distribution of these categories is reported and gated against <c>eng/member-oracle-expected.json</c>,
+/// so a rise in members the oracle cannot drive is visible and fails instead of passing as a smaller AGREE count.
+/// </summary>
+public static class SkipCategory
+{
+    /// <summary>Every category, in report order.</summary>
+    public static readonly string[] All =
+    [
+        "unsupported-parameter", "no-receiver", "abstract-receiver", "interface-member", "surface-only", "open-generic", "byref-return",
+        "incomplete-observation", "no-input-compared", "nondeterministic", "timeout", "inconclusive", "other",
+    ];
+
+    /// <summary>The member's category, or null when its inputs were compared (AGREE, DIFFERENT, or a compared prefix).</summary>
+    public static string? Of(MemberVerdict member)
+    {
+        switch (member.Status)
+        {
+            case MemberStatus.Agree or MemberStatus.Different:
+                return null;
+            case MemberStatus.Timeout or MemberStatus.Nondeterministic when member.Inputs > 0:
+                return null;
+            case MemberStatus.Timeout:
+                return "timeout";
+            case MemberStatus.Nondeterministic:
+                return "nondeterministic";
+            case MemberStatus.Inconclusive:
+                return "inconclusive";
+        }
+        var reason = member.Reason ?? "";
+        bool Starts(string prefix) => reason.StartsWith(prefix, StringComparison.Ordinal);
+        return Starts("unsupported parameter type") ? "unsupported-parameter"
+            : Starts("no public constructor") || Starts("no generated input constructs a receiver") || Starts("receiver construction timed out") ? "no-receiver"
+            : Starts("instance member of an abstract type") ? "abstract-receiver"
+            : Starts("instance member of an interface") || Starts("interface member") ? "interface-member"
+            : Starts("abstract member") || Starts("delegate type") ? "surface-only"
+            : Starts("open generic type") || Starts("generic method (no closing") ? "open-generic"
+            : Starts("by-ref or ref-struct return") ? "byref-return"
+            : Starts("incomplete observation") ? "incomplete-observation"
+            : Starts("no input could be compared") ? "no-input-compared"
+            : "other";
+    }
+}
+
 /// <summary>How a probe ended.</summary>
 public static class ProbeOutcome
 {
@@ -113,8 +165,9 @@ public static class ProbeOutcome
     public const string Infrastructure = "infrastructure";
 }
 
-/// <summary>One replay of a member up to a single input, from clean state, to attribute a timeout or crash.</summary>
-public sealed record ProbeResult(string Outcome, double Seconds, string? Observation)
+/// <summary>One replay of a member up to a single input, from clean state, to attribute a timeout or crash. A crashed
+/// replay carries its process exit code (#1667), so two different crashes are told apart.</summary>
+public sealed record ProbeResult(string Outcome, double Seconds, string? Observation, int? ExitCode = null)
 {
     public bool Finished => Outcome == ProbeOutcome.Finished;
 }
