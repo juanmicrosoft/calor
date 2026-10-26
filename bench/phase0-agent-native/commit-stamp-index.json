@@ -27,16 +27,16 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "d94866d19bf5cf2f2496761b5dce792801621f8e",
+      "measuredCommit": "4e87980e16225ca0a32e032aa746358e6bcecaa7",
       "basis": "post-merge-write-back",
-      "note": "#1677 originally regenerated at 655bd907: removing duplicate receiver/argument conversions reduced Calor0411 sites to MediatR 289, serilog 722 and FluentValidation 5766. #1588/#1686 continuation remeasured at d94866d1, including restored metadata-string null patterns and the integrated website/oracle heads, with the automatic pinned-CLI cross-check: Calor0425 143 -> 142 sites, still 52 diagnostic modules of 276 enforced; Calor0411 sites serilog 722 -> 695 and FluentValidation 5766 -> 4486, MediatR unchanged. Explicit preservation of unsupported ordered operands, patterns, constructor labels and collection targets reduces native coverage; these falls are not binding or effect-resolution improvements. All 364 selected outputs still parse. The phase-1 identity is pending, not authoritative, until post-merge write-back. Earlier identities remain in repository history.",
+      "note": "#1677 originally regenerated at 655bd907: removing duplicate receiver/argument conversions reduced Calor0411 sites to MediatR 289, serilog 722 and FluentValidation 5766. #1588/#1686 continuation remeasured at 4e87980e, including restored metadata-string null patterns, exact query-continuation receiver typing, and the integrated website/oracle heads, with the automatic pinned-CLI cross-check: Calor0425 143 -> 142 sites, still 52 diagnostic modules of 276 enforced; Calor0411 sites serilog 722 -> 695 and FluentValidation 5766 -> 4486, MediatR unchanged. Explicit preservation of unsupported ordered operands, patterns, constructor labels and collection targets reduces native coverage; these falls are not binding or effect-resolution improvements. All 364 selected outputs still parse. The phase-1 identity is pending, not authoritative, until post-merge write-back. Earlier identities remain in repository history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "d94866d19bf5cf2f2496761b5dce792801621f8e",
+          "headCommit": "4e87980e16225ca0a32e032aa746358e6bcecaa7",
           "pr": 1686,
           "treeHashes": {
-            "src": "4b735877cf1405d080886e716665a67f9a5b255c",
+            "src": "c77e0083b78b8349eab1c6090acfc663d1e1314b",
             "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
             "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
             "Directory.Packages.props": "27c5b7901def159db761922bc6fa62655e00cf1c",
@@ -46,7 +46,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "artifactSha256": "270c6d4b9fcd23fddd509311fad3161fdbe7e2eab39920adcaf7ac8a5e67b0b7"
+          "artifactSha256": "78ea640269631c9b77cc93ffeb2fe3fa20aaea726fb4823954e27f299f6e2153"
         }
       }
     },
