@@ -123,7 +123,17 @@ public class BinderIncompleteRatchetTests
         + "Debugging/SelfLog.cs 3 -> 1 and FluentValidation ValidationException.cs 1 -> 0 (lifted call "
         + "holes); 22 source records change with the same per-file deltas as on F2's original base, "
         + "binding-error identities by location only, with binding-error counts and incomplete "
-        + "diagnostics unchanged";
+        + "diagnostics unchanged. #1588/#1686 (0.27): converter safety guards and exact native "
+        + "rewrites change 59 source-coverage records, with every corpus source hash unchanged "
+        + "and all 364 selected outputs still parsed and bound. Binder visits 29347 -> 25268 "
+        + "are not a precision improvement: exact native spans 28655 -> 25057, opaque source "
+        + "expressions 12208 -> 21885, and unmapped expressions 47295 -> 41216. Selected opaque "
+        + "boundaries 689 -> 838; separately, preserve-all boundaries 729 -> 918 and opaque "
+        + "expressions 14397 -> 17112. These are additional preservation costs, not historical "
+        + "budget waivers. All 72 source-carrier identities remain guarded (63 native, nine "
+        + "preserved expressions), including all 47 native generic identities. In-repo visits "
+        + "4828 -> 4826 come solely from the approved 06-03 declaration-pattern snapshot "
+        + "(seven -> five visits); incomplete diagnostics remain zero";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");

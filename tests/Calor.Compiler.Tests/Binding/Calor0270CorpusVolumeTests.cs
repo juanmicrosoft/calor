@@ -226,8 +226,10 @@ public class Calor0270CorpusVolumeTests
     // converted twice, and the first copy's hoisted binds stayed in the output (each a second call
     // such as `validator.TestValidate(…)`, each reporting its own SignatureUnresolved). Each is now
     // converted once: FluentValidation 330 -> 235, MediatR 29 -> 27, modules unchanged: 377/47 -> 280/47.
-    private const int AggregateDiagnostics = 280;
-    private const int AggregateModulesWithDiagnostics = 47;
+    // #1588/#1686: explicit preservation reduces serilog 18 -> 13 and FluentValidation
+    // 235 -> 210, not binding precision. All 364 converted modules still parse and bind.
+    private const int AggregateDiagnostics = 250;
+    private const int AggregateModulesWithDiagnostics = 45;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>

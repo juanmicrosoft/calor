@@ -50,8 +50,8 @@
         "ParseFailed": 0,
         "BindStopped": 6,
         "ReachEffectPass": 106,
-        "StopCalor0410": 63,
-        "StopCalor0422Or0423": 6,
+        "StopCalor0410": 61,
+        "StopCalor0422Or0423": 8,
         "StopCalor1002": 25,
         "CompileClean": 12,
         "StoppedInCliOnlyPass": 0,
@@ -70,12 +70,12 @@
         "CompileClean": 5,
         "StoppedInCliOnlyPass": 0,
         "Calor0425Modules": 30,
-        "Calor0425Sites": 85
+        "Calor0425Sites": 84
       }
     ]
   },
-  "MeasuredCommit": "655bd907fa7d12bee2d162c5687505af5cafad9f",
-  "AggregateDiagnostics": 143,
+  "MeasuredCommit": "6bb8dfd35d3de5367b749e2d4e5dd04285c32823",
+  "AggregateDiagnostics": 142,
   "AggregateModulesWithDiagnostics": 52,
   "AggregateModulesEnforced": 276,
   "AggregateModulesExcluded": 88,
@@ -135,8 +135,8 @@
       "ExcludedParseFailed": 0,
       "ExcludedBindFailed": 6,
       "ExcludedEffectPassFaulted": 0,
-      "ModulesEnforcedRawBagRule": 63,
-      "RawBagBindFailed": 49,
+      "ModulesEnforcedRawBagRule": 64,
+      "RawBagBindFailed": 48,
       "BindFailureCauses": {
         "Calor0201": 1,
         "Calor0208": 3,
@@ -152,12 +152,12 @@
         "Calor0261 Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 722,
+      "Calor0411Sites": 695,
       "Calor0411Modules": 69
     },
     {
       "Subject": "FluentValidation",
-      "Diagnostics": 85,
+      "Diagnostics": 84,
       "ModulesWithDiagnostics": 30,
       "ModulesEnforced": 137,
       "ModulesNotMeasured": 79,
@@ -166,7 +166,7 @@
       "Assumed": 0,
       "RowlessInvoked": 18,
       "RowlessNeverInvoked": 0,
-      "ExternalBase": 45,
+      "ExternalBase": 44,
       "InvocationRowless": 22,
       "InvocationUndetermined": 0,
       "InvocationAssumed": 0,
@@ -175,8 +175,8 @@
       "ExcludedParseFailed": 0,
       "ExcludedBindFailed": 79,
       "ExcludedEffectPassFaulted": 0,
-      "ModulesEnforcedRawBagRule": 40,
-      "RawBagBindFailed": 176,
+      "ModulesEnforcedRawBagRule": 41,
+      "RawBagBindFailed": 175,
       "BindFailureCauses": {
         "Calor0201": 10,
         "Calor0208": 6,
@@ -265,7 +265,7 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 5766,
+      "Calor0411Sites": 4486,
       "Calor0411Modules": 114
     }
   ]

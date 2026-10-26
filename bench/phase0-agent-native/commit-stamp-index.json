@@ -27,16 +27,16 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "655bd907fa7d12bee2d162c5687505af5cafad9f",
+      "measuredCommit": "6bb8dfd35d3de5367b749e2d4e5dd04285c32823",
       "basis": "post-merge-write-back",
-      "note": "#1677 (0.27, PR #1686): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 655bd907 (the converter-fix head, on top of #1680). Calor0411Sites fall MediatR 290 -> 289, serilog 724 -> 722, FluentValidation 6176 -> 5766: a chained or indexed receiver and a statement call's argument list were converted twice, and the first copy's hoisted binds (second calls such as validator.TestValidate(...)) stayed in the output; each is now converted once. Calor0425 sites, modules and ModulesEnforced are unchanged. #1675's identity (1cbcc2b2, completed at 13664e62) remains in the repository history.",
+      "note": "#1677 originally regenerated at 655bd907: removing duplicate receiver/argument conversions reduced Calor0411 sites to MediatR 289, serilog 722 and FluentValidation 5766. #1588/#1686 continuation remeasured at 6bb8dfd3, including restored metadata-string null patterns, with the automatic pinned-CLI cross-check: Calor0425 143 -> 142 sites, still 52 diagnostic modules of 276 enforced; Calor0411 sites serilog 722 -> 695 and FluentValidation 5766 -> 4486, MediatR unchanged. Explicit preservation of unsupported ordered operands, patterns, constructor labels and collection targets reduces native coverage; these falls are not binding or effect-resolution improvements. All 364 selected outputs still parse. The phase-1 identity is pending, not authoritative, until post-merge write-back. Earlier identities remain in repository history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "655bd907fa7d12bee2d162c5687505af5cafad9f",
+          "headCommit": "6bb8dfd35d3de5367b749e2d4e5dd04285c32823",
           "pr": 1686,
           "treeHashes": {
-            "src": "6ebd94da9ac0f97dac8b02f5effa1b03d9a8ff38",
+            "src": "4b735877cf1405d080886e716665a67f9a5b255c",
             "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
             "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
             "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
@@ -46,7 +46,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "d841594321208b3e9524f6cdaaecf2b1a5c2fdd2e923bf2b819311c83131a47a"
+          "artifactSha256": "327a7ec45119b95c47fbfccda72603b006cd4d099ecbdf0393c6de3391a588b2"
         }
       }
     },
