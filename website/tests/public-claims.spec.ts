@@ -132,7 +132,7 @@ test('support levels render from the FeatureSupport registry export', async ({ p
   for (const [level, features] of Object.entries(featureSupport.data.features))
     for (const feature of features as { name: string }[]) registry.set(feature.name, level);
   await page.route('https://**/*', route => route.abort());
-  for (const [path, count] of [['cli/feature-check', 15], ['cli/convert', 1], ['guides/csharp-interoperability', 1],
+  for (const [path, count] of [['cli/feature-check', 19], ['cli/convert', 1], ['guides/csharp-interoperability', 1],
     ['syntax-reference/string-operations', 1]] as const) {
     await page.goto(`${base}/docs/${path}/`);
     const rendered = await page.locator('article [data-support-level]').evaluateAll(elements => elements.map(element =>
