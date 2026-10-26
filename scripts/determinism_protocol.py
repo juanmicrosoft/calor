@@ -175,9 +175,30 @@ def check_gates(protocol, text) -> list[str]:
             if lines != gate["script"] or any(not top_level_ok(script, c) for c in gate.get("commands", [])):
                 problems.append(f"{where}: script differs from the frozen script or a gate command is not top-level")
         else:
+            if "scriptPath" in gate:
+                # #1666: the step is exactly one call of a checked-in script, with no inline shell, and
+                # nothing in the job or workflow (env, defaults) can change how bash runs it. The checks
+                # below then apply to the script file. The test host's TRX files are checked per part
+                # by check_trx.py in "Enforce test inventory", so a script that skips or masks its tests
+                # fails there even after a re-pin.
+                if set(step) != {"name", "run"} or script != gate.get("run") \
+                        or gate.get("run") != f'bash {gate["scriptPath"]} "${{{{ matrix.name }}}}" "${{{{ matrix.project }}}}"':
+                    problems.append(f"{where}: shard step is not exactly `{gate.get('run')}` with no other key")
+                if {"env", "defaults"} & set(job["keys"]) or re.search(r"(?m)^(env|defaults):", text(gate["workflow"])):
+                    problems.append(f"{where}: the job or workflow sets env or defaults, which can change how the shard script runs")
+                try:
+                    script = text(gate["scriptPath"])
+                except OSError:
+                    problems.append(f"{where}: shard script {gate['scriptPath']} does not exist")
+                    continue
             cmds = shell_commands(script)
             if gate.get("scriptSha256") != sha256_bytes("\n".join(ln for ln in script.splitlines() if ln.strip()).encode("utf-8")):
                 problems.append(f"{where}: shard script differs from its pinned hash")
+            # #1666: every trap is a registered one (the sampler cleanup), so `trap 'exit 0' EXIT` cannot turn a
+            # failing script into a passing step, and no condition is arithmetic, such as `if (( 0 ))`.
+            if any(c.startswith("trap ") and c not in gate.get("traps", []) for _, c in cmds) \
+                    or any(re.match(r"^(el)?if\s+(\(\(|let\b)", c) for _, c in cmds):
+                problems.append(f"{where}: shard script sets an unregistered trap or uses an arithmetic condition")
             # #1584 review round 2: the step must run exactly its registered dotnet test commands, and nothing may
             # end it before the last one, negate a command, or put a test behind a constant or negated condition.
             tests = [c for _, c in cmds if c.startswith("dotnet test ")]
@@ -461,11 +482,20 @@ def gates_weakened(old_p, protocol) -> bool:
             if (old["workflow"], old["job"], old["step"]) in RETIRED_GATES:
                 continue
             now = new.get((old["workflow"], old["job"], old["step"]))
-            if now is None or not set(old.get("after", [])) - retired <= set(now.get("after", [])) \
+            if now is None:
+                return True
+            repinned = old.get("scriptSha256") == now.get("scriptSha256") or now.get("repinnedFrom") == old.get("scriptSha256")
+            # #1666: a shard step moved once from inline shell to a checked-in script (scriptPath). Its
+            # dotnet test commands then name the script's variables, not matrix expressions, so that one
+            # re-pinned move may replace them; D014 checks the new ones. Afterwards the step stays that call.
+            moved = "scriptPath" in now and "scriptPath" not in old and repinned
+            if not set(old.get("after", [])) - retired <= set(now.get("after", [])) \
                     or not set(old.get("commands", [])) <= set(now.get("commands", [])) \
                     or not set(old.get("script", [])) <= set(now.get("script", [])) \
-                    or not set(old.get("testCommands", [])) <= set(now.get("testCommands", [])) \
-                    or (old.get("scriptSha256") != now.get("scriptSha256") and now.get("repinnedFrom") != old.get("scriptSha256")):
+                    or (not moved and not set(old.get("testCommands", [])) <= set(now.get("testCommands", []))) \
+                    or ("scriptPath" in old and (old["scriptPath"], old.get("run")) != (now.get("scriptPath"), now.get("run"))) \
+                    or not set(now.get("traps", [])) <= set(old.get("traps", now.get("traps", []))) \
+                    or not repinned:
                 return True
     return False
 
