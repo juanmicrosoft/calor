@@ -38,7 +38,9 @@ namespace Calor.Compiler.Tests;
 /// which must occur exactly once on its page. Text is NFKC-normalized and invisible format
 /// characters are removed first; footnotes, link titles, reference definitions and JSX attributes
 /// (entities decoded) are read. The text between a prose component and the one before it must name
-/// that component's feature and no other; a table component must name its row's first cell. Component counts per page are pinned.
+/// that component's feature and no other; a table's first cell must name exactly its component's
+/// feature. A level in an enclosing heading or a list's introducing paragraph also applies to
+/// features in that list. Component counts per page are pinned.
 /// The level vocabulary is fixed: a synonym ("complete support") is not detected.</para>
 /// </summary>
 public sealed class WebsiteFeatureSupportParityTests
@@ -352,6 +354,65 @@ public sealed class WebsiteFeatureSupportParityTests
         Assert.Contains(Scan(page, text.Replace(from, to)).Findings, f => f.Message.Contains(message, StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("## Fully supported\n\n- Records\n- Interfaces\n")]
+    [InlineData("Fully supported:\n\n- Records\n- Interfaces\n")]
+    [InlineData("## Fully supported\n\n### Declarations\n\n- Records\n")]
+    [InlineData("## Fully supported\n\n- Declarations\n  - Records\n")]
+    [InlineData("Fully supported:\n\n1. Declarations\n   - Records\n")]
+    [InlineData("> Fully supported:\n>\n> - Records\n")]
+    [InlineData("<Callout>\nFully supported:\n\n- Records\n</Callout>\n")]
+    [InlineData("## (**`full`**)\n\n- Records\n")]
+    [InlineData("Fu<span></span>lly supported:\n\n- Interfaces\n")]
+    [InlineData("## Not supported\n\n- Notes\n- Records\n")]
+    [InlineData("Fully supported:\n\n- Notes\n- Records\n")]
+    public void ALevelIntroducingAFeatureListFailsTheCheck(string addition)
+    {
+        var text = Read("cli/convert.mdx");
+        Assert.Empty(Scan("cli/convert.mdx", text).Findings);
+        var findings = Scan("cli/convert.mdx", text.Replace(Heading, addition + "\n" + Heading)).Findings;
+        Assert.Contains(findings, f => f.Message.Contains("states a support level", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("`ref-parameter` and `in-parameter`", "ref-parameter", "")]
+    [InlineData("Records and string interpolation", "record", "")]
+    [InlineData("`string-interpolation-hole` and `string-interpolation`", "string-interpolation-hole", "")]
+    [InlineData("`out-var` and interfaces", "out-var", " form=\"warning\"")]
+    [InlineData("Records", "out-var", " form=\"warning\"")]
+    public void ATableComponentRequiresExactlyOneMatchingFeature(string firstCell, string feature, string form)
+    {
+        var source = $"| Feature | Level |\n| --- | --- |\n| {firstCell} | <SupportLevel feature=\"{feature}\"{form} /> |\n";
+        Assert.Contains(Scan("guides/new-page.mdx", source).Findings,
+            f => f.Message.Contains($"names `{feature}`, which is not the one feature", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("## Fully native\n\n- Installation\n- Configuration\n")]
+    [InlineData("Fully native:\n\n- Installation\n\n## Declarations\n\n- Records\n")]
+    [InlineData("Fully native:\n\nAn unrelated paragraph.\n\n- Records\n")]
+    [InlineData("- Fully native\n- Records\n")]
+    [InlineData("## Fully native\n\n## Declarations\n\n- Records\n")]
+    [InlineData("## Declarations\n\n- Records are <SupportLevel feature=\"record\" />.\n")]
+    [InlineData("| Feature | Level |\n| --- | --- |\n| Records | <SupportLevel feature=\"record\" /> |\n")]
+    [InlineData("| Feature | Level |\n| --- | --- |\n| `out-var` | <SupportLevel feature=\"out-var\" form=\"warning\" /> |\n")]
+    [InlineData("| Feature | Level |\n| --- | --- |\n| `string-interpolation-hole` | <SupportLevel feature=\"string-interpolation-hole\" /> |\n")]
+    [InlineData("| Feature | Level |\n| --- | --- |\n| `partial-property` | <SupportLevel feature=\"partial-property\" /> |\n")]
+    public void ListContextAndTableAnchorsDoNotRejectUnrelatedOrGeneratedLevels(string source)
+    {
+        Assert.Empty(Scan("guides/new-page.mdx", source).Findings);
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData(" Full.", true)]
+    public void AListIntroductionExcusesOnlyItsAllowlistedWords(string extra, bool fails)
+    {
+        var result = Scan("cli/mcp.mdx", $"Partial results look like this:{extra}\n\n- Records\n");
+        Assert.Equal(fails, result.Findings.Count > 0);
+        Assert.Single(result.UsedExcuses);
+    }
+
     [Fact]
     public void AnMdxCommentRendersNothingAndStatesNothing()
     {
@@ -439,13 +500,15 @@ public sealed class WebsiteFeatureSupportParityTests
 
     /// <summary>One statement: a paragraph, heading, table row, code block, front matter, link
     /// reference definition, or a paragraph inside a JSX block or footnote. Section counts headings.</summary>
-    internal sealed record Statement(int Line, Text Text, bool Raw, bool Heading, int Section, HashSet<string>? RowAnchor, int Level = 0);
+    internal sealed record Statement(int Line, Text Text, bool Raw, bool Heading, int Section, HashSet<string>? RowAnchor,
+        int Level = 0, List<int>? ListIntroductions = null);
 
     /// <summary>Collects every statement in document order. lineOffset maps a re-parsed HTML block back to page lines.</summary>
     private static void Walk(ContainerBlock container, int lineOffset, List<Statement> statements, int[] section)
     {
-        foreach (var block in container)
+        for (var blockIndex = 0; blockIndex < container.Count; blockIndex++)
         {
+            var block = container[blockIndex];
             var line = block.Line + 1 + lineOffset;
             switch (block)
             {
@@ -478,6 +541,20 @@ public sealed class WebsiteFeatureSupportParityTests
                     break;
                 case LeafBlock leaf when leaf.Inline is not null: // paragraphs
                     statements.Add(new(line, Render([leaf]), false, false, section[0], null));
+                    break;
+                case ListBlock list:
+                    var start = statements.Count;
+                    // A JSX opening block can contain the paragraph before a list's blank line.
+                    var introduction = blockIndex > 0 && container[blockIndex - 1] is ParagraphBlock or HtmlBlock
+                        && start > 0 && statements[^1] is { Raw: false, Heading: false, RowAnchor: null } ? start - 1 : (int?)null;
+                    Walk(list, lineOffset, statements, section);
+                    for (var i = start; i < statements.Count; i++)
+                    {
+                        var introductions = new List<int>(statements[i].ListIntroductions ?? []);
+                        if (introduction is { } index)
+                            introductions.Add(index);
+                        statements[i] = statements[i] with { ListIntroductions = introductions };
+                    }
                     break;
                 case ContainerBlock nested: // lists, list items, quotes, footnotes, reference groups
                     Walk(nested, lineOffset, statements, section);
@@ -512,12 +589,22 @@ public sealed class WebsiteFeatureSupportParityTests
         bool Near(int i) => own[i] || (i > 0 && context[i - 1] && statements[i - 1].Section == statements[i].Section)
                             || enclosing[i].Any(j => context[j]);
         var excused = ExcusesFor(page, statements, result);
+        // A level can precede the names it classifies: "## Fully supported" / "- Records".
+        // Keep this reverse context structural: only a list's actual introducing paragraph and
+        // enclosing headings qualify, never an arbitrary earlier paragraph or sibling list item.
+        var listContext = new HashSet<int>();
+        for (var i = 0; i < statements.Count; i++)
+            if (own[i] && statements[i].ListIntroductions is { } introductions)
+            {
+                listContext.UnionWith(introductions);
+                listContext.UnionWith(enclosing[i]);
+            }
         for (var i = 0; i < statements.Count; i++)
         {
             var statement = statements[i];
             foreach (var component in Components(page, statement))
                 result.Components.Add(component);
-            if (!Near(i) && !(statement.Raw && QuotesSingleWordFeature(statement.Text.Joined)))
+            if (!Near(i) && !listContext.Contains(i) && !(statement.Raw && QuotesSingleWordFeature(statement.Text.Joined)))
                 continue;
             if (statement.Text.Expression)
                 result.Findings.Add(new(page, statement.Line,
@@ -620,7 +707,7 @@ public sealed class WebsiteFeatureSupportParityTests
 
     /// <summary>The statement's components. A prose component is anchored when its sentence, up to the
     /// component (and after any earlier component), names its feature and no other; a table component when its row's first
-    /// cell names it. The warning form names its feature in its own text.</summary>
+    /// cell names exactly that feature. Outside tables the warning form names its feature in its own text.</summary>
     private static IEnumerable<Component> Components(string page, Statement statement)
     {
         var placeholders = new List<int>();
@@ -635,10 +722,10 @@ public sealed class WebsiteFeatureSupportParityTests
             bool anchored;
             if (feature is null)
                 anchored = false;
+            else if (statement.RowAnchor is not null)
+                anchored = statement.RowAnchor.Count == 1 && statement.RowAnchor.Contains(feature);
             else if (warning)
                 anchored = true;
-            else if (statement.RowAnchor is not null)
-                anchored = statement.RowAnchor.Contains(feature);
             else
             {
                 // The text since the previous component (or the statement's start) must name this
@@ -786,7 +873,9 @@ public sealed class WebsiteFeatureSupportParityTests
             foreach (var token in Tokens(rendered))
                 if (token.Contains('-') && FeatureSupport.GetFeatureInfo(token) is not null)
                     found.Add(token);
-            var words = Words(rendered, splitFeatures: true);
+            // An exact hyphenated registry name is one feature, not its shorter subfeatures
+            // ("string-interpolation-hole" does not also name "string-interpolation").
+            var words = Words(rendered, splitFeatures: false);
             for (var i = 0; i < words.Count; i++)
                 foreach (var singular in Singulars(words[i]))
                 {
