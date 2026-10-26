@@ -10917,6 +10917,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var subjectType = _semanticModel?.GetTypeInfo(isPattern.Expression).Type;
         for (var type = subjectType as INamedTypeSymbol; type != null; type = type.BaseType)
         {
+            // Metadata string equality preserves constant-pattern value and null semantics.
+            if (type.SpecialType == SpecialType.System_String && type.Locations.Any(location => location.IsInMetadata))
+                continue;
             if (type.GetMembers("op_Equality").Length > 0 || type.GetMembers("op_Inequality").Length > 0)
                 throw EscalateExpression(isPattern, "complex-is-pattern");
         }
