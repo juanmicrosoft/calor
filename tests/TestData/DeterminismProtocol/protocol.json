@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.9.0",
+  "protocolVersion": "1.10.0",
   "status": "REGISTERED",
   "cases": {
     "registry": "tests/TestData/DeterminismProtocol/cases.json",
@@ -572,7 +572,7 @@
     "rule": "The recorder and the CaseResult schema are reviewed with the protocol (#1584 removed their D015 hash freeze); the three call sites (DifferentialGate.Run, CommittedReportsMatchGeneratedOracle, TranslatorOutputMatchesCommittedBaseline) must stay (D014), and the decider rejects any record made under other protocol or harness bytes within a run."
   },
   "gates": {
-    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e. A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing a gate step is a weakening that D016 reports against protected main. A shard step's script is pinned by the SHA-256 of its non-blank lines (scriptSha256). A reviewed change to it updates the pin and records the pin it replaces in repinnedFrom; D016 rejects a changed pin without that. Its dotnet test commands must equal testCommands exactly, and the script may not end before the last one (exit or return), negate a command, use a while or until loop, trap ERR, or put a test behind a constant, literal or negated condition. D016 requires every gate, prerequisite, command, script line and test command on protected main to remain (#1584 retired the two main's-validator steps). Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
+    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) is, since #1666, exactly one call of a checked-in script (run, scriptPath) with no other step key, in a job and workflow with no env or defaults; the checks below apply to that script. The script must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e; every trap must be one registered in traps, and no condition may be arithmetic ('(( ))' or let). A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing a gate step is a weakening that D016 reports against protected main. A shard step's script is pinned by the SHA-256 of its non-blank lines (scriptSha256). A reviewed change to it updates the pin and records the pin it replaces in repinnedFrom; D016 rejects a changed pin without that. Its dotnet test commands must equal testCommands exactly, and the script may not end before the last one (exit or return), negate a command, use a while or until loop, trap ERR, or put a test behind a constant, literal or negated condition. D016 requires every gate, prerequisite, command, script line and test command on protected main to remain (#1584 retired the two main's-validator steps). A shard step's one move from inline shell to a script (#1666) may replace its test commands when it records repinnedFrom; afterwards its run and scriptPath stay, and it may not gain a trap. Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
     "steps": [
       {
         "workflow": ".github/workflows/test.yml",
@@ -606,6 +606,36 @@
           "python3 scripts/test_determinism_protocol.py",
           "python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main"
         ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "remaining-tests",
+        "step": "Enforce test inventory",
+        "after": [
+          "Run project tests"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\""
+        ],
+        "commands": [
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\""
+        ]
+      },
+      {
+        "workflow": ".github/workflows/publish-nuget.yml",
+        "job": "test",
+        "step": "Enforce test inventory",
+        "after": [
+          "Run project tests"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules"
+        ],
+        "commands": [
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules"
+        ]
       }
     ],
     "shardSteps": [
@@ -616,11 +646,16 @@
         "after": [
           "Bootstrap verified Z3 assets"
         ],
-        "scriptSha256": "b2e788239d12b5dcd672635e4d08ed21ad657e56ffcf57be16ca8536fcd5d92c",
+        "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
+        "scriptPath": "scripts/run-shard-tests.sh",
+        "scriptSha256": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
+        "repinnedFrom": "b2e788239d12b5dcd672635e4d08ed21ad657e56ffcf57be16ca8536fcd5d92c",
         "testCommands": [
-          "dotnet test \"${{ matrix.project }}\" -c Release --no-build  --filter \"$SHARD1_FILTER\"  --logger \"trx;LogFileName=${{ matrix.name }}-1.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee test-output.log",
-          "dotnet test \"${{ matrix.project }}\" -c Release --no-build  --filter \"$SHARD2_FILTER\"  --logger \"trx;LogFileName=${{ matrix.name }}-2.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
-          "dotnet test \"${{ matrix.project }}\" -c Release  --logger \"trx;LogFileName=${{ matrix.name }}.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee test-output.log"
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
+          "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
+        ],
+        "traps": [
+          "trap 'kill \"$sampler_pid\" 2>/dev/null || true' EXIT"
         ]
       },
       {
@@ -630,16 +665,22 @@
         "after": [
           "Build"
         ],
-        "scriptSha256": "43af29422549f0b21c15e9ca0b7372795c2e7208bc868e4732249052a5be301e",
+        "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
+        "scriptPath": "scripts/run-shard-tests.sh",
+        "scriptSha256": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
+        "repinnedFrom": "43af29422549f0b21c15e9ca0b7372795c2e7208bc868e4732249052a5be301e",
         "testCommands": [
-          "dotnet test \"${{ matrix.project }}\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=${{ matrix.name }}-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
-          "dotnet test \"${{ matrix.project }}\" -c Release  --logger \"trx;LogFileName=${{ matrix.name }}.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee test-output.log"
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
+          "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
+        ],
+        "traps": [
+          "trap 'kill \"$sampler_pid\" 2>/dev/null || true' EXIT"
         ]
       }
     ],
     "alwaysAllowed": [
       "Runner resource probe (#1150)"
     ],
-    "residual": "The workflow file is part of the tree under review; a change to these steps and to the validator together is visible to review."
+    "residual": "The workflow file and the shard script are part of the tree under review; a change to these steps, the script and the validator together is visible to review. Since #1666 a re-pinned script that skips or masks its tests still fails: \"Enforce test inventory\" runs scripts/check_trx.py on the TRX files the test host wrote, part by part (tests executed, every executed test passed, results only from the project's assembly, no test in two parts, the TRX not tracked by git) and in sum against eng/test-manifest.json. What remains is a script that writes a forged TRX, and a masked Z3 log check, which the TRX cannot show; the structural checks above guard the latter."
   }
 }
