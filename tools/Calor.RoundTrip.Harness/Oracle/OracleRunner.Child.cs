@@ -81,12 +81,20 @@ public sealed partial class OracleRunner
                 var converted = await ProbeTwiceAsync(stem, specPath, originalPath, v.Key, k, onCandidate: true, state, workDir, cancellationToken);
                 v = MemberDifferentialOracle.ClassifyTimeout(v, original, converted, options);
             }
-            if (unreproduced.Contains(v.Key) && v.Status is MemberStatus.Agree)
-                v = v with { Status = MemberStatus.Nondeterministic, Reason = "the file's process crashed in this member once, and the crash did not reproduce" };
-            members.Add(v);
+            members.Add(UnreproducedCrash(v, unreproduced));
         }
         return report with { Members = members, Restarts = restarts, Seconds = Seconds(clock) };
     }
+
+    /// <summary>
+    /// A member whose process crashed once, where the traced re-run then finished: an AGREE verdict becomes
+    /// NONDETERMINISTIC (its compared inputs still count), because one run of it did not finish. Any other verdict,
+    /// a DIFFERENT one above all, is kept: an unreproduced crash never hides a difference.
+    /// </summary>
+    internal static MemberVerdict UnreproducedCrash(MemberVerdict verdict, IReadOnlySet<string> unreproduced) =>
+        unreproduced.Contains(verdict.Key) && verdict.Status is MemberStatus.Agree
+            ? verdict with { Status = MemberStatus.Nondeterministic, Reason = "the file's process crashed in this member once, and the crash did not reproduce" }
+            : verdict;
 
     /// <summary>Spawns the file's child until it finishes, folding timeouts, receiver bans and reproduced crashes into the state.</summary>
     private async Task<(Attempt Attempt, ChildState State, int Restarts, HashSet<string> Unreproduced)> RunProtocolAsync(string relative,
@@ -217,7 +225,9 @@ public sealed partial class OracleRunner
             return JsonSerializer.Deserialize<ProbeResult>(await File.ReadAllTextAsync(probe + ".json", cancellationToken), Json)!;
         var reached = File.Exists(probe + ".started");
         var why = $"probe process exit {exit}: {(stderr.Length > 200 ? stderr[^200..] : stderr).Trim()}";
-        return new ProbeResult(!reached ? ProbeOutcome.Infrastructure : exit == -1 ? ProbeOutcome.Hung : ProbeOutcome.Crashed, 0, why);
+        return !reached ? new ProbeResult(ProbeOutcome.Infrastructure, 0, why)
+            : exit == -1 ? new ProbeResult(ProbeOutcome.Hung, 0, why)
+            : new ProbeResult(ProbeOutcome.Crashed, 0, why, ExitCode: exit);
     }
 
     // ---- Child side ------------------------------------------------------------------------------
