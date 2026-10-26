@@ -7702,43 +7702,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         });
 
     /// <summary>
-    /// #1677: whether CalorEmitter may hoist part of this value to a <c>§B{~_hoistN}</c> line
-    /// ahead of its statement. The emitter hoists a child that renders a section marker (a call,
-    /// a creation, an element access) out of a §NEW argument, a member-access target, a unary
-    /// operand, a tuple element, a range or index-from-end bound, a string operation and a
-    /// collection element. Conservative (Codex round 1): only the containers known to keep their
-    /// children in place (calls, binary operators, casts, element accesses, await) are searched
-    /// through; any other node with a marker child counts as hoisting. Lambda bodies keep their
-    /// own hoists, and the operands of <c>?:</c> and <c>??</c> are never hoisted.
+    /// Whether ordinary expression emission moves work ahead of its statement.
+    /// Probe the emitter itself so its in-place rendering boundaries stay authoritative.
     /// </summary>
     private static bool EmitterMayHoist(ExpressionNode? node)
     {
-        static IEnumerable<AstNode> Children(AstNode n) => Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n);
-        // A hoisted lambda only creates a delegate; it cannot reorder anything observable.
-        // A type reference renders no marker; a non-expression node (an object-initializer
-        // entry) renders what its children render.
-        static bool RendersMarker(AstNode n) => n is not (LambdaExpressionNode or TypeReferenceNode)
-            && (n is not ExpressionNode ? Children(n).Any(RendersMarker) : n is not (ReferenceNode or IntLiteralNode or StringLiteralNode
-                    or BoolLiteralNode or FloatLiteralNode or DecimalLiteralNode or ThisExpressionNode or BaseExpressionNode
-                    or BinaryOperationNode or UnaryOperationNode or FieldAccessNode or TypeOperationNode)
-                || Children(n).Any(RendersMarker));
-        static bool IsElementPath(ExpressionNode target) => target is ArrayAccessNode or MultiDimArrayAccessNode
-            || target is FieldAccessNode inner && IsElementPath(inner.Target);
-        static bool Walk(AstNode n) => n switch
-        {
-            LambdaExpressionNode => false,
-            ReferenceNode or IntLiteralNode or StringLiteralNode or BoolLiteralNode or FloatLiteralNode
-                or DecimalLiteralNode or ThisExpressionNode or BaseExpressionNode => false,
-            // A field path rooted in an element, or on an inline array creation, stays in place.
-            FieldAccessNode { Target: var target } when IsElementPath(target)
-                || target is ArrayCreationNode or MultiDimArrayCreationNode => Children(n).Any(Walk),
-            // Operands of ?: and ?? are rendered in a conditional region, where nothing is hoisted.
-            ConditionalExpressionNode or NullCoalesceNode => false,
-            CallExpressionNode or BinaryOperationNode or TypeOperationNode or ArrayAccessNode or StackAllocNode
-                or MultiDimArrayAccessNode or AwaitExpressionNode => Children(n).Any(Walk),
-            _ => Children(n).Any(RendersMarker) || Children(n).Any(Walk),
-        };
-        return node != null && Walk(node);
+        return node != null && CalorEmitter.HoistsInExpression(node);
     }
 
     // #1677 (Codex round 1): a §RANGE or index-from-end bound that is a call or another marker.
@@ -8027,15 +7996,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return !IsCapturedVariable(symbol) && !later.Any(part => WritesVariable(part, symbol));
     }
 
-    private List<ExpressionNode> ConvertOrderedExpressions(IEnumerable<ExpressionSyntax> expressions)
+    private List<ExpressionNode> ConvertOrderedExpressions(
+        IEnumerable<ExpressionSyntax> expressions, bool stageComplexArguments = false, bool inPlace = false)
     {
         var syntax = expressions.ToArray();
         var converted = new List<ExpressionNode>(syntax.Length);
         for (var index = 0; index < syntax.Length; index++)
         {
             var mark = _pendingStatements.Count;
-            var value = ConvertExpression(syntax[index]);
-            if (HoistsHaveEffects(mark) || EmitterMayHoist(value))
+            var value = inPlace ? ConvertInPlace(syntax[index], always: true) : ConvertExpression(syntax[index]);
+            if (HoistsHaveEffects(mark) || !inPlace
+                && !(stageComplexArguments && IsComplexArgument(value)) && EmitterMayHoist(value))
             {
                 for (var earlier = 0; earlier < index; earlier++)
                     RequireFixedEarlierOperand(syntax[earlier], converted[earlier], syntax[index..]);
@@ -8386,7 +8357,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
-            var args = ConvertOrderedExpressions(invocation.ArgumentList.Arguments.Select(a => a.Expression));
+            var args = ConvertOrderedExpressions(invocation.ArgumentList.Arguments.Select(a => a.Expression),
+                stageComplexArguments: true);
 
             // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
             HoistComplexArguments(args, invocation.ArgumentList.Arguments);
@@ -9189,7 +9161,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
-            var args = ConvertOrderedExpressions(current.ArgumentList.Arguments.Select(a => a.Expression));
+            var args = ConvertOrderedExpressions(current.ArgumentList.Arguments.Select(a => a.Expression),
+                stageComplexArguments: true);
 
             // Hoist complex arguments — prevents §LAM/§NEW nesting inside §C
             for (int i = 0; i < args.Count; i++)
@@ -10063,7 +10036,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection());
     }
 
-    private UsingStatementNode ConvertUsingStatement(UsingStatementSyntax node)
+    private UsingStatementNode ConvertUsingStatement(UsingStatementSyntax node, int resourceIndex = 0)
     {
         _context.RecordFeatureUsage("using-statement");
         _context.IncrementConverted();
@@ -10081,7 +10054,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             if (node.Declaration.Variables.Count > 0)
             {
-                var variable = node.Declaration.Variables[0];
+                var variable = node.Declaration.Variables[resourceIndex];
                 variableName = variable.Identifier.ValueText;
                 resource = variable.Initializer != null
                     ? ConvertExpression(variable.Initializer.Value)
@@ -10110,7 +10083,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<StatementNode> body;
         try
         {
-            body = ConvertEmbeddedStatement(node.Statement);
+            if (node.Declaration != null && resourceIndex + 1 < node.Declaration.Variables.Count)
+            {
+                // Nested usings acquire left-to-right and dispose right-to-left, even on failure.
+                var nested = ConvertUsingStatement(node, resourceIndex + 1);
+                body = [.. _pendingStatements, nested];
+            }
+            else
+            {
+                body = ConvertEmbeddedStatement(node.Statement);
+            }
         }
         finally
         {
@@ -10913,7 +10895,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // escalate the containing member to §CSHARP interop instead.
         var binaryOp = BinaryOperatorExtensions.FromString(op)
             ?? throw EscalateExpression(binary, "unsupported-binary-operator");
-        var operands = ConvertOrderedExpressions([binary.Left, binary.Right]);
+        // Binary operands are rendered in conditional regions, so only converter hoists escape.
+        var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: true);
 
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, operands[0], operands[1]);
     }
@@ -12838,19 +12821,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax or BaseObjectCreationExpressionSyntax
             or ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None };
 
-        bool Complex(ExpressionNode arg) =>
-            !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
-            && (arg is NewExpressionNode or LambdaExpressionNode
-                    or ListCreationNode or DictionaryCreationNode or SetCreationNode
-                || arg is ConditionalExpressionNode cond
-                    && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
-
         // #1132: a hoisted argument runs before the call's earlier arguments, so every
         // earlier argument that is not InPlace is bound first, in order.
         last = -1;
         for (var i = 0; i < args.Count; i++)
         {
-            if (Complex(args[i]) && args[i] is not LambdaExpressionNode)
+            if (IsComplexArgument(args[i]) && args[i] is not LambdaExpressionNode)
                 last = i;
         }
         // #943 (D1 RO-CALL-1, RO-ORD-1): a hoisted argument would run before the receiver and the
@@ -12868,12 +12844,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     && plain.SyntaxTree == _semanticModel.SyntaxTree
                     && _semanticModel.GetSymbolInfo(plain).Symbol is ILocalSymbol or IParameterSymbol))
                 throw EscalateExpression(refs[i], "conditional-expression-hoisting");
-            var hoist = Complex(args[i]) || i < last && !InPlace(i);
+            var hoist = IsComplexArgument(args[i]) || i < last && !InPlace(i);
             if (!hoist)
                 continue;
             // #1132: an untyped temp drops the argument's target typing (a method group) or
             // moves a user-defined conversion after the later arguments: preserve instead.
-            if (!Complex(args[i]) && syntax is { } typed && i < typed.Count && !KeepsMeaningInTemp(typed[i].Expression))
+            if (!IsComplexArgument(args[i]) && syntax is { } typed && i < typed.Count && !KeepsMeaningInTemp(typed[i].Expression))
                 throw EscalateExpression(typed[i].Expression, "conditional-expression-hoisting");
             var tempName = args[i] switch
             {
@@ -12882,7 +12858,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ListCreationNode listNode => _context.GenerateId("_list", listNode.ElementType),
                 DictionaryCreationNode => _context.GenerateId("_dict"),
                 SetCreationNode setNode => _context.GenerateId("_set", setNode.ElementType),
-                ConditionalExpressionNode when Complex(args[i]) => _context.GenerateId("_tern"),
+                ConditionalExpressionNode when IsComplexArgument(args[i]) => _context.GenerateId("_tern"),
                 _ => _context.GenerateId("_arg")
             };
             _pendingStatements.Add(new BindStatementNode(
@@ -12890,6 +12866,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             args[i] = new ReferenceNode(args[i].Span, tempName);
         }
     }
+
+    private bool IsComplexArgument(ExpressionNode arg) =>
+        !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
+        && (arg is NewExpressionNode or LambdaExpressionNode
+                or ListCreationNode or DictionaryCreationNode or SetCreationNode
+            || arg is ConditionalExpressionNode cond
+                && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
 
     private static bool ContainsComplexNode(ExpressionNode node)
     {
@@ -13147,7 +13130,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? ConvertExpression(receiverAccess.Expression)
             : null;
         var argumentMark = _pendingStatements.Count;
-        var args = ConvertOrderedExpressions(invocation.ArgumentList.Arguments.Select(a => a.Expression));
+        var args = ConvertOrderedExpressions(invocation.ArgumentList.Arguments.Select(a => a.Expression),
+            stageComplexArguments: true);
 
         // Hoist §NEW, §LAM, §ARR arguments to temp bindings — the parser cannot handle them nested inside §C
         HoistComplexArguments(args, invocation.ArgumentList.Arguments);
@@ -13770,7 +13754,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        var args = ConvertOrderedExpressions(objCreation.ArgumentList?.Arguments.Select(a => a.Expression) ?? []);
+        var args = ConvertOrderedExpressions(objCreation.ArgumentList?.Arguments.Select(a => a.Expression) ?? [],
+            stageComplexArguments: true);
         for (var index = 0; index < args.Count; index++)
         {
             if (IsBlockLevelCollection(args[index]))
@@ -14017,9 +14002,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         joinCall.Arguments[0], joinCall.Arguments[1], joinCall.Arguments[2], newResultLambda
                     });
                 }
-                else if (projection is not ReferenceNode refNode || refNode.Name != rangeVar)
+                else if (body.Clauses.Count == 0
+                    || projection is not ReferenceNode refNode || refNode.Name != rangeVar)
                 {
-                    // Only add Select if projection is not just the range variable
+                    // A bare from/select must call Select even for an identity projection.
                     currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector });
                 }
             }

@@ -102,7 +102,7 @@ public class InitializerConversionTests
     [InlineData("public Outer O = new Outer { Value = default(int) };", "object-initializer-value")]
     [InlineData("public Outer O = new Outer { Value = (System.Func<int>)(() => new List<int>(Next()).Count) };", "object-initializer-value")]
     [InlineData("public List<object> X = new List<object> { new System.\n        Object() };", "multi-line-name")]
-    [InlineData("public int M() { return V0 + Take(Next(), new Outer { V = Next() }); }", "initializer-position")]
+    [InlineData("public int M() { return V0 + Take(Next(), new Outer { V = Next() }); }", "conditional-expression-hoisting")]
     [InlineData("public int M() { var h = this; return h.Take2(new Outer { V = Next() }).V; }", "initializer-position")]
     [InlineData("public int M() { var t = (V0, new List<int> { Next() }); return t.Item1; }", "tuple")]
     [InlineData("public int M() { var a = new { A = V0, B = new List<int> { Next() } }; return a.A; }", "anonymous-object")]

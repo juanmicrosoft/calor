@@ -137,6 +137,11 @@ public class ConverterEvaluationOrderResidualTests
         yield return ("X-lambda-increment-members", "using System; public class Point { public static int S; public int X; } public static class Probe { public static string Run() { var p = new Point(); Action a = () => Point.S++; Action b = () => p.X--; Action c = () => ++Point.S; a(); a(); b(); c(); return Point.S + \":\" + p.X; } }", "native");
         yield return ("X-lambda-func-value", "using System; public class Point { public static int S = 1; } public static class Probe { public static string Run() { Func<int, int> f = n => Point.S += n; int r = f(4); return r + \":\" + Point.S; } }", "native-or-preserved");
         yield return ("X-lambda-hoisted-rhs", "using System; public class C { public int N() => 3; } public class Point { public static int S = 1; } public static class Probe { static C F() { Point.S = 100; return new C(); } public static string Run() { Action<int> a = n => Point.S += F().N(); a(0); return Point.S.ToString(); } }", "native");
+        yield return ("AUDIT-query-identity-runtime-type", "using System.Linq; public static class Probe { public static string Run() { int[] xs = { 1, 2 }; var q = from x in xs select x; return (q is int[]) + \":\" + q.Sum(); } }", "native-or-preserved");
+        yield return ("AUDIT-query-identity-custom-select", "using System; public class Input { public int Value; public Input(int value) { Value = value; } public Input Select(Func<int, int> selector) { Probe.log += \"S\"; return new Input(selector(Value) + 1); } } public static class Probe { public static string log = \"\"; public static string Run() { var q = from x in new Input(2) select x; return log + q.Value; } }", "native-or-preserved");
+        yield return ("AUDIT-using-multiple-dispose", "using System; public class D : IDisposable { string name; public D(string n) { name = n; Probe.log += n; } public void Dispose() { Probe.log += name; } } public static class Probe { public static string log = \"\"; public static string Run() { using (D a = new D(\"a\"), b = new D(\"b\")) { log += \"B\"; } return log; } }", "native");
+        yield return ("AUDIT-using-multiple-constructor-throws", "using System; public class D : IDisposable { public void Dispose() { Probe.log += \"d\"; } } public static class Probe { public static string log = \"\"; static D Fail() { log += \"X\"; throw new InvalidOperationException(); } public static string Run() { try { using (D a = new D(), b = Fail()) { log += \"B\"; } } catch (InvalidOperationException) { log += \"C\"; } return log; } }", "native");
+        yield return ("AUDIT-using-multiple-hoisted-resource", "using System; public class D : IDisposable { string name; public D(string n) { name = n; Probe.log += n; } public D Next() { Probe.log += \"n\"; return this; } public void Dispose() { Probe.log += name; } } public static class Probe { public static string log = \"\"; static D Make() { log += \"m\"; return new D(\"b\"); } public static string Run() { using (D a = new D(\"a\"), b = Make().Next()) { log += \"B\"; } return log; } }", "native");
     }
 
     public static TheoryData<string, Surface> ConversionRows()
@@ -175,12 +180,12 @@ public class ConverterEvaluationOrderResidualTests
     [Theory]
     [InlineData("A-staged-call-user-conversion", null)]
     [InlineData("A-staged-call-control", null)]
-    [InlineData("B-nested-type-static-ctor", "compound-assignment-order")]
-    [InlineData("B-nested-type-local-postfix", "compound-assignment-order")]
+    [InlineData("B-nested-type-static-ctor", null)]
+    [InlineData("B-nested-type-local-postfix", null)]
     [InlineData("C-index-arithmetic-conversion", null)]
     [InlineData("C-index-arithmetic-cast", null)]
-    [InlineData("D-postfix-in-own-index", "compound-assignment-order")]
-    [InlineData("D-postfix-in-own-index-simple", "compound-assignment-order")]
+    [InlineData("D-postfix-in-own-index", null)]
+    [InlineData("D-postfix-in-own-index-simple", null)]
     [InlineData("D-postfix-in-own-index-control", null)]
     [InlineData("E-put-collection-initializer", "initializer-interop")]
     [InlineData("E-put-list-capacity", "compound-assignment-order")]

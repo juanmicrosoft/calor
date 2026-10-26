@@ -404,19 +404,19 @@ public class TypeOperationTests
     }
 
     [Fact]
-    public void Migration_CSharpIsDeclaration_ConvertsToTypeOperationNode()
+    public void Migration_CSharpIsDeclaration_PreservesThePatternBinding()
     {
-        // "x is string s" — declaration pattern, variable binding is not preserved but type check is
         var csharp = "public class Test { public bool M(object x) { if (x is string s) return true; return false; } }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
+        var converter = new CSharpToCalorConverter();
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
+        Assert.Empty(result.Losses);
 
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(is x str)", calor);
+        Assert.Contains("(is x str s)", calor);
     }
 
     #endregion

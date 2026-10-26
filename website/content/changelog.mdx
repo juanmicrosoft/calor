@@ -30,6 +30,11 @@ All notable changes to Calor, organized by release.
   Array targets without spreads and a single array-to-array spread can convert natively.
   Other targets and mixed spreads stay C# with a reported loss. Collection expressions,
   collection spreads and complex `is` patterns are now marked **Partial**, not **Full**.
+- **Identity queries still call `Select` (#1588).** A bare `from x in source select x`
+  no longer becomes `source`. This retains the iterator type and custom query operators.
+- **Every resource in a `using` statement is acquired and disposed (#1588).** Multiple
+  resources now become nested `using` statements. Acquisition stays left-to-right, disposal
+  stays right-to-left, and a failed later acquisition still disposes earlier resources.
 - **The C# converter keeps evaluation order in the cases #1673 left open (#1677).** These were
   silent wrong-output bugs: the converted program ran code in a different order, or ran it
   twice, and the conversion reported no loss. Each case below now converts in C#'s order, or
@@ -38,11 +43,11 @@ All notable changes to Calor, organized by release.
   - `if (A() < F())`, where `A()` returns a type with a user-defined conversion to `int`, ran
     `F()` before the conversion. The condition now stays inline.
   - Code in a nested class was treated as if its outer class's static constructor had already
-    run, so an `x++` could move ahead of that constructor. Such a statement now stays C#.
+    run, so an `x++` could move ahead of that constructor. The read and increment now stay inline.
   - `a[k + 0] += 5`, with a user-defined conversion on `k`, ran the conversion twice. The index
     is now computed once. The same holds for an index that reads another class's static field
     or concatenates an object with a custom `ToString`.
-  - `a[x + x++] += 5` read `x` after the increment. It now stays C#.
+  - `a[x + x++] += 5` read `x` after the increment. The index now evaluates in C#'s order.
   - `a[k] = new List<int>(F())` ran `F()` before `k`'s user-defined conversion. It now stays C#.
   - `h.s.X = F().N()`, where `s` is a struct field, ran `F()` before the null check on `h` (or
     before the static constructor, for a static `s`). It now stays C#.
@@ -55,9 +60,8 @@ All notable changes to Calor, organized by release.
 - **Block lambdas and `using` resources keep the temps their statement hoisted (#1677).** A
   hoisted temp is a binding the converter places before the statement, such as `_pre` for
   `Use(y++, () => { … })`. It was dropped when the statement also contained a block lambda, or
-  when it came from the resource of a `using`, so the output failed to compile. Undeclared temps
-  in the converted test corpus fall from 42 (19 files) to 20 (11 files); the rest come from
-  other constructs, such as base-constructor arguments.
+  when it came from the resource of a `using`, so the output failed to compile. These bindings
+  now stay with the statements that use them.
 - **Expression lambdas that assign or increment convert correctly (#1677).**
   `Func<int, int> f = n => S += n` returns the new value, which the conversion dropped (a
   compile error). It now stays C# with an `embedded-assignment` loss.
