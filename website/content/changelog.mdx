@@ -208,6 +208,19 @@ new diagnostic. The C# converter emits code that passes all four checks.
   the sweep still builds and that the fixture covers every case. `main` passes today: 0
   findings, and 4 of 710 cases time out. (#1589)
 
+- **CI test shards run from a checked-in script, and each shard's results are checked from
+  its TRX file (#1666).** A TRX file is the test report that `dotnet test` writes. The test
+  shards (11 in `test.yml`, 13 in `publish-nuget.yml`) used to run their tests from inline
+  shell in the workflow. A change that also updated the determinism protocol's pin for that shell
+  could skip the tests with `if (( 0 ))` or hide failures with `trap 'exit 0' EXIT`. The
+  protocol is the checked-in rule set that `scripts/determinism_protocol.py` enforces. Both
+  workflows now call `scripts/run-shard-tests.sh`, and the protocol requires the step to be
+  exactly that call. `scripts/check_trx.py` now checks each part of a shard on its own: it
+  must have run tests, every test it ran must have passed, every result must come from that
+  project's test assembly, no test may appear in two parts, and the file may not be tracked
+  by git. So a shard that skips or hides its tests fails even after a re-pin. A script that
+  writes a fake TRX file is still not caught.
+
 ### Release process
 
 - **macOS CI jobs moved from `macos-14` to `macos-15`.** GitHub retires the `macos-14` runner

@@ -548,61 +548,14 @@ jobs:
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
 
+      # #1666: the shard body is a checked-in script, called with no inline shell. The
+      # determinism protocol (D014) requires this step to be exactly this call and pins the
+      # script; "Enforce test inventory" checks every part's TRX from the test host, so a
+      # script that skips or masks its tests fails there even after a re-pin. The script
+      # also builds the compiler shard once, streams the #1150 resource sampler, splits the
+      # compiler suite in two fresh hosts, and fails if a Z3-gated test skipped.
       - name: Run project tests
-        run: |
-          set -euo pipefail
-          # #1150: the compiler shard's two invocations pass --no-build, so build once
-          # up front. Other shards keep building as part of their single `dotnet test`.
-          if [ "${{ matrix.name }}" = "compiler" ]; then
-            dotnet build "${{ matrix.project }}" -c Release
-          fi
-          # #1150: stream resource readings INTO THIS STEP'S LOG. The post-hoc
-          # probe below cannot observe a runner shutdown — verified on run
-          # 33687411104, a kill that happened AFTER that probe landed, whose log
-          # contains no probe output at all. A step cannot run once the runner
-          # service is stopping, so `if: always()` buys nothing here. Streamed
-          # samples survive, because the log is captured up to the instant of
-          # death. Its own stdout, deliberately not through `tee`, so
-          # test-output.log stays clean for the Z3 grep below.
-          bash scripts/runner-resource-sampler.sh 10 &
-          sampler_pid=$!
-          trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
-          # #1150: the compiler shard runs in TWO invocations, so each `dotnet test`
-          # gets a FRESH test host and no single host accumulates the whole suite.
-          # This CAPS THE SYMPTOM; it does not fix the leak — six candidate causes
-          # have been tested and refuted (see
-          # docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md), and a full
-          # single-host run on Linux still exhausts a 16 GB machine. Anyone reading a
-          # green pipeline here should read that document before concluding otherwise.
-          #
-          # The split is by test-class initial, balanced from real counts: 3,996 vs
-          # 3,982 of 7,978. Part 2's filter is the exact NEGATION of part 1's, so the
-          # two partition the suite — and check_trx.py sums both TRX files against the
-          # one expectedTotal, which makes that self-verifying: overlap, a gap, or a
-          # part that silently fails to run all break the sum.
-          if [ "${{ matrix.name }}" = "compiler" ]; then
-            eval "$(bash scripts/compiler-shard-filter.sh)"
-            dotnet test "${{ matrix.project }}" -c Release --no-build \
-              --filter "$SHARD1_FILTER" \
-              --logger "trx;LogFileName=${{ matrix.name }}-1.trx" \
-              --results-directory artifacts/test \
-              --verbosity normal 2>&1 | tee test-output.log
-            dotnet test "${{ matrix.project }}" -c Release --no-build \
-              --filter "$SHARD2_FILTER" \
-              --logger "trx;LogFileName=${{ matrix.name }}-2.trx" \
-              --results-directory artifacts/test \
-              --verbosity normal 2>&1 | tee -a test-output.log
-          else
-          dotnet test "${{ matrix.project }}" -c Release \
-            --logger "trx;LogFileName=${{ matrix.name }}.trx" \
-            --results-directory artifacts/test \
-            --verbosity normal 2>&1 | tee test-output.log
-          fi
-          if grep -q "Z3 not available" test-output.log; then
-            echo "::error::Z3-gated tests skipped — natives did not reach this test host."
-            grep -c "Z3 not available" test-output.log
-            exit 1
-          fi
+        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"
 
       # Issue #1150: this shard has been SIGTERM'd seven times in two days
       # ("The runner has received a shutdown signal", exit 143) with ZERO test
@@ -628,19 +581,12 @@ jobs:
           echo "--- dotnet build servers ---"; ps -o pid,rss,comm -A 2>/dev/null | sort -k2 -rn | head -12
 
       - name: Enforce test inventory
-        # #1150: the compiler shard produces two TRX files (see the split above);
-        # check_trx.py sums them against the single expectedTotal.
+        # #1150/#1666: every TRX file the shard script wrote is one part (the compiler shard
+        # writes two). check_trx.py checks each part on its own and the sum against
+        # eng/test-manifest.json. The determinism protocol freezes this step (D014).
         run: |
-          if [ "${{ matrix.name }}" = "compiler" ]; then
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/${{ matrix.name }}-1.trx" \
-              --trx "artifacts/test/${{ matrix.name }}-2.trx" \
-              --project "${{ matrix.project }}"
-          else
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/${{ matrix.name }}.trx" \
-              --project "${{ matrix.project }}"
-          fi
+          set -euo pipefail
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "${{ matrix.project }}"
 
       - name: Upload test report
         if: always()
