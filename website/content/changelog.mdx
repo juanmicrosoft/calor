@@ -12,6 +12,24 @@ All notable changes to Calor, organized by release.
 
 ### Fixed
 
+- **The converter audit found more silent behavior changes (#1588).** Argument lists,
+  binary expressions, constructors, tuples, anonymous objects, array indexing, stack allocation
+  and `with` expressions now keep C# evaluation order, or preserve the affected statement as
+  C# with a reported loss. Named constructor arguments and named arguments in decomposed call
+  chains stay C# when their labels cannot be retained.
+- **Native mappings no longer substitute unrelated members (#1588).** Source-defined
+  `Regex`, `Char`, `StringBuilder` and `String.Empty` keep their original meaning. A property
+  named `Ordinal` is no longer mistaken for a `StringComparison` constant.
+  Static `string.Equals` stays a static call, including when its first argument is null.
+  Typed integer defaults and `byte`/`short` limits retain their types during overload selection.
+- **Pattern conversion keeps matching and binding semantics (#1588).** Declaration patterns
+  bind only after a successful match, and `var` patterns retain their inferred types. Property
+  and positional patterns, overloaded equality and repeated effectful subjects stay C# when
+  boolean lowering would change their behavior.
+- **Collection expressions retain their collection type and enumeration order (#1588).**
+  Array targets without spreads and a single array-to-array spread can convert natively.
+  Other targets and mixed spreads stay C# with a reported loss. Collection expressions,
+  collection spreads and complex `is` patterns are now marked **Partial**, not **Full**.
 - **The C# converter keeps evaluation order in the cases #1673 left open (#1677).** These were
   silent wrong-output bugs: the converted program ran code in a different order, or ran it
   twice, and the conversion reported no loss. Each case below now converts in C#'s order, or

@@ -46,7 +46,13 @@
 
 
   §CL{c016:ConditionalHarness:pub:stat}
-    §MT{m017:Get:pub:stat} () -> i32
-      §E{alloc}
-      §B{ConditionalDelegate:d} §LAM{lam018:value:i32} (+ value 1) §/LAM{lam018}
-      §R (+ (+ (+ (+ §C{ConditionalClass.Value} §/C §NEW{ConditionalRecord} §A 3 §/NEW.Value) §C{d} §A 4 §/C) §C{ConditionalPartial.PartialValue} §/C) §C{ConditionalPartial.Shared} §/C)
+    §CSHARP{    public static int Get()
+    {
+        ConditionalDelegate d = value => value + 1;
+        return ConditionalClass.Value()
+            + new ConditionalRecord(3).Value
+            + d(4)
+            + ConditionalPartial.PartialValue()
+            + ConditionalPartial.Shared();
+    }
+    }§/CSHARP

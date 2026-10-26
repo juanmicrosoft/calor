@@ -1,8 +1,7 @@
 §M{m001:Test_06_03:overflow=unchecked}
   §CL{c001:PatternDemo:pub}
     §MT{m002:GetLength:pub} (any:value) -> i32
-      §IF{if003} (is value str)
-        §B{str:text} (cast str value)
+      §IF{if003} (is value str text)
         §R (len text)
       §R 0
 

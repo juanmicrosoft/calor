@@ -1,6 +1,6 @@
 {
   "trackedFileCount": 952,
-  "successfulTransformationCount": 697,
+  "successfulTransformationCount": 699,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -59,7 +59,6 @@
       "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-access-shape/expected.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/conditional-access-shape/test.calr",
-      "bench/phase0-agent-native/fixtures/d-s1.5/conditional-declaration/expected.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/initializer-interop/expected.calr",
       "bench/phase0-agent-native/fixtures/d-s1.5/initializer-interop/test.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l1m01.calr",
@@ -237,7 +236,6 @@
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m33.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m34.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m35.calr",
-      "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/09-03.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/11-03.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr",

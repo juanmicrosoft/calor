@@ -59,7 +59,7 @@ public sealed class WebsiteFeatureSupportParityTests
     private static readonly IReadOnlyDictionary<string, int> PinnedClaims = new Dictionary<string, int>
     {
         ["cli/convert.mdx"] = 1,
-        ["cli/feature-check.mdx"] = 15,
+        ["cli/feature-check.mdx"] = 19,
         ["guides/csharp-interoperability.mdx"] = 1,
         ["syntax-reference/string-operations.mdx"] = 1,
     };
@@ -108,7 +108,7 @@ public sealed class WebsiteFeatureSupportParityTests
         Assert.Equal(PinnedClaims.OrderBy(p => p.Key, StringComparer.Ordinal),
             counts.OrderBy(p => p.Key, StringComparer.Ordinal));
         // The feature-check table is the bulk of the claims; it must parse as a table.
-        Assert.Equal(13, claims.Count(c => c.Shape == "table"));
+        Assert.Equal(17, claims.Count(c => c.Shape == "table"));
     }
 
     [Fact]

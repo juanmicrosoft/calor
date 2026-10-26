@@ -930,7 +930,7 @@ public class StringOperationTests
     [InlineData("s.Contains(\"x\", StringComparison.InvariantCultureIgnoreCase)", StringOp.Contains, StringComparisonMode.InvariantIgnoreCase)]
     public void Migration_StringMethodWithComparison_ConvertsWithMode(string csharpExpr, StringOp expectedOp, StringComparisonMode expectedMode)
     {
-        var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
+        var csharp = $"using System; public class Test {{ public object M(string s) => {csharpExpr}; }}";
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
@@ -942,20 +942,19 @@ public class StringOperationTests
     }
 
     [Fact]
-    public void Migration_StringEqualsStatic_ConvertsToEqualsOp()
+    public void Migration_StringEqualsStatic_PreservesStaticCall()
     {
-        // The C# to Calor converter converts string.Equals(a, b, comparison) to equals with mode
-        var csharp = "public class Test { public bool M(string a, string b) { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); } }";
+        var csharp = "using System; public class Test { public bool M(string a, string b) { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); } }";
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
 
-        // Check via round-trip - the emitted Calor should contain equals with ignore-case
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("equals", calor);
-        Assert.Contains(":ignore-case", calor);
+        Assert.Contains("§C{string.Equals}", calor);
+        Assert.Contains("StringComparison.OrdinalIgnoreCase", calor);
+        Assert.DoesNotContain("(equals", calor);
     }
 
     [Theory]
@@ -966,7 +965,7 @@ public class StringOperationTests
     [InlineData("s.Contains(\"x\", StringComparison.InvariantCultureIgnoreCase)", ":invariant-ignore-case")]
     public void Migration_StringComparisonMode_RoundTripsToCalor(string csharpExpr, string expectedKeyword)
     {
-        var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
+        var csharp = $"using System; public class Test {{ public object M(string s) => {csharpExpr}; }}";
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 

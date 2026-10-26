@@ -53,3 +53,16 @@ convert natively and the rest stay C#; the description lists which.
 
 - `yield-return` is Full for iterator *methods* only. Iterator accessors are
   `iterator-accessor` (NotSupported).
+
+## Collection Expressions and Patterns in 0.27
+
+The unreleased 0.27 converter preserves more collection expressions and patterns as C#.
+This avoids changing runtime collection types, enumeration order, matching or binding.
+The registry entries describe these limits:
+
+| Feature | Level | Native | Stays C# |
+|:--------|:------|:-------|:---------|
+| `collection-expression` | Partial | array targets without spreads; the single-spread case below | other collection targets, to retain their runtime type |
+| `collection-spread` | Partial | a single array spread into an array target | other spreads, to retain enumeration order |
+| `collection-spread-mixed` | Partial | — | mixed spreads, to retain enumeration and element evaluation order |
+| `complex-is-pattern` | Partial | simple `is` checks and declaration patterns | property and positional patterns, and other complex checks whose lowering could change evaluation or binding |
