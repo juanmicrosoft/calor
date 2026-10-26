@@ -40,8 +40,7 @@ All notable changes to this project will be documented in this file.
   and runtime guards) only read the bind's annotation. So `§ASSIGN x INT:-5` compiled with no
   guard and no obligation, and `x` silently held `-5`. Now `§B{~x} a` behaves exactly like
   `§B{~x:Nat} a`: every `§ASSIGN` and `inc`/`dec` of `x` has a runtime guard for `Nat`, and the
-  obligation engine treats it like the annotated local. This also holds inside class methods,
-  which the type checker does not visit.
+  obligation engine treats it like the annotated local. This also holds inside class methods.
   A lambda parameter typed by a delegate whose parameter is `Nat` is guarded the same way, also
   when the lambda is assigned to a delegate variable. A local inferred from a parameter with
   only an inline refinement (`§I{i32:a} | (pred)`) is still a plain `i32`, because the checker
@@ -78,8 +77,43 @@ All notable changes to this project will be documented in this file.
     the right-hand side of an `§ASSIGN`.
   - Type-checker messages now name a refinement by its `§RTYPE` name (`Nat`) instead of
     `i32{#i32}`.
-  - The type checker does not visit class members (`§CL` methods), so these new errors do not
-    fire there yet. Runtime guards still apply there.
+- **Refinement errors are now reported in four places the type checker skipped (#1676).** In
+  most of these cases a runtime guard already fired, and only the compile-time `Calor0202` was
+  missing. The exception is a lambda passed inside `§P`, whose parameter also had no runtime
+  guard.
+  - **`§P` statements are type-checked.** `§P §C{TakePos} §A n §/C` with `n: Nat` is now
+    `Calor0202`. A lambda passed to a call inside `§P` now takes its parameter types from the
+    delegate. If a parameter's type is `Nat`, writes to it are guarded, as they are everywhere
+    else. Before, that parameter was a plain `i32`, and `§ASSIGN p INT:-5` inside the lambda
+    had no guard.
+  - **A `§W` match assigned to a refined local is checked arm by arm.** In `§ASSIGN x <match>`
+    with `x: Nat`, an arm that produces a `Pos` is now `Calor0202`. Before, the match was typed
+    against the base `i32`, so every arm passed. An arm that produces a plain `i32` is still
+    accepted and guarded at run time.
+  - **A match-arm mismatch between two refinements is reported inside `§TR` bodies.** Binding
+    or returning a match whose arm is `Pos` where `Nat` is expected used an ordinary type-checker
+    error. The type checker drops its ordinary errors inside `§TR`, `§EACH`, `§USE` and the
+    other block statements it only walks for control flow, and leaves them to later passes. That
+    error is now a refinement error, which is kept there like the other #1530 errors. Other
+    checks inside `§TR` bodies are unchanged.
+  - **Class members are type-checked for refinements.** Methods, constructors, property and
+    indexer accessors, and operators of a `§CL` now get every refinement check of #1529 and
+    #1530: binds, call arguments, returns, `§ASSIGN`, rebinds and type patterns. Inside class
+    members the type checker reports only refinement errors. Its other checks are still left to
+    name binding and the C# compiler, because it does not model inherited members. In a class
+    with a base class, a bare call to a method the class does not declare is not checked, since
+    it may name an inherited method. Members in a `§PP` block are not type-checked. Modules
+    without `§RTYPE` are not affected.
+  - Variable names are now case-sensitive in the type checker, as they are in C#: a field `n`
+    and a property `N` are two different members.
+  - Known limit, unchanged by this release: a write to a refined field or property has no
+    runtime guard, so a base value such as `§ASSIGN _p INT:0` into a `Pos` field is not
+    checked. For the same reason a setter's `value` and an indexer's parameters are typed as
+    their base types.
+  - **Breaking:** programs with these mismatches no longer compile. That includes a mutable
+    rebind in a class method that changes a named refinement, such as `§B{~x} a` with `a: Nat`
+    after a parameter `x: Pos`. No sample, docs example or website example changed. To convert
+    on purpose, call a function that takes the base type and returns the target refinement.
 
 - **Compound assignments read their target before the right-hand side (#1633).** This was a
   silent behavior change in 0.25.0 and 0.26.0. In `x += F().N();` the converter called `F()`
