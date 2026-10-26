@@ -13898,6 +13898,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var currentExpr = ConvertExpression(query.FromClause.Expression);
 
         var body = query.Body;
+        string? continuationReceiverType = null;
         while (body != null)
         {
             // Process body clauses (where, orderby, let, join, additional from)
@@ -14014,7 +14015,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     || selected.Identifier.ValueText != rangeVar.TrimStart('@'))
                 {
                     // A bare from/select must call Select even for an identity projection.
-                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector });
+                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector },
+                        continuationReceiverType);
                 }
             }
             else if (body.SelectOrGroup is GroupClauseSyntax groupClause)
@@ -14035,6 +14037,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Handle continuation (into g ...)
             if (body.Continuation != null)
             {
+                var resultType = (_semanticModel?.GetSymbolInfo(body.SelectOrGroup).Symbol as IMethodSymbol)?.ReturnType;
+                continuationReceiverType = resultType != null && CanNameQueryParameterType(resultType)
+                    ? TypeMapper.CSharpToCalor(resultType.ToDisplayString())
+                    : null;
                 rangeVar = body.Continuation.Identifier.Text;
                 body = body.Continuation.Body;
             }
@@ -14139,7 +14145,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Creates a chained method call node (e.g., collection.Where(...)).
     /// The receiver expression is emitted to Calor to form the target string.
     /// </summary>
-    private CallExpressionNode MakeChainedCall(TextSpan span, ExpressionNode receiver, string methodName, IReadOnlyList<ExpressionNode> arguments)
+    private CallExpressionNode MakeChainedCall(TextSpan span, ExpressionNode receiver, string methodName,
+        IReadOnlyList<ExpressionNode> arguments, string? receiverType = null)
     {
         // Hoist complex receivers to temp bindings instead of embedding raw Calor
         // in the target string — section markers (§C, §NEW, etc.) break the parser
@@ -14150,7 +14157,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         var tempName = _context.GenerateId("_chain", methodName);
         _pendingStatements.Add(new BindStatementNode(
-            span, tempName, null, false, receiver, new AttributeCollection()));
+            span, tempName, receiverType, false, receiver, new AttributeCollection()));
         return new CallExpressionNode(span, $"{tempName}.{methodName}", arguments);
     }
 
