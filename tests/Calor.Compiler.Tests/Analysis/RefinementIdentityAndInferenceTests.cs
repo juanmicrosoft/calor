@@ -414,11 +414,12 @@ public class RefinementIdentityAndInferenceTests
     [Fact]
     public void Runtime_RebindInAClassMethod_KeepsTheEstablishedRefinement()
     {
-        // The type checker does not visit class members, so nothing types `x` as Pos there. The
-        // emitter keeps the established typed-rebind semantics (ObligationTests
+        // #1676: the type checker now visits class members, so this rebind (Nat, then Pos) is the
+        // same Calor0202 as in a module function. With the checker off, the emitter keeps the
+        // established typed-rebind semantics (ObligationTests
         // CSharpEmit_TypedRebind_PreservesPriorContract...): the rebind checks both refinements,
         // and later writes keep the first one, Nat.
-        var assembly = CompileAndLoad("""
+        const string Body = """
               §CL{c1:Holder:pub}
                 §MT{mt1:Rebind:pub} (Nat:a, Pos:p, i32:v) -> i32
                   §E{}
@@ -426,7 +427,14 @@ public class RefinementIdentityAndInferenceTests
                   §B{~x} p
                   §ASSIGN x v
                   §R x
-            """, out _);
+            """;
+        Assert.Contains(Compile(Body).Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
+            && d.Message.Contains("Cannot rebind 'x' of type Nat as Pos"));
+        var assembly = CompileAndLoad(Body, out _, new CompilationOptions
+        {
+            ContractMode = ContractMode.Debug,
+            EnableTypeChecking = false,
+        });
 
         Assert.Equal(4, Invoke(assembly, "Holder", "Rebind", 1, 2, 4));
         Assert.Equal(0, Invoke(assembly, "Holder", "Rebind", 1, 2, 0));
@@ -523,12 +531,12 @@ public class RefinementIdentityAndInferenceTests
 
     // ───────────────────────── Review round 2 findings ─────────────────────────
 
-    private static Assembly CompileAndLoadVerified(string body)
+    private static Assembly CompileAndLoadVerified(string body, bool enableTypeChecking = true)
     {
         var options = new CompilationOptions
         {
             ContractMode = ContractMode.Debug,
-            EnableTypeChecking = true,
+            EnableTypeChecking = enableTypeChecking,
             VerifyRefinements = true,
             ObligationPolicy = ObligationPolicy.Permissive,
         };
@@ -591,7 +599,9 @@ public class RefinementIdentityAndInferenceTests
     {
         // The emitter keeps x: Pos across the rebind, so y (inferred from x) is Pos. The
         // obligation generator must not prove a Nat obligation and drop the Pos guard.
-        var assembly = CompileAndLoadVerified("""
+        // #1676: the checker now visits class members and rejects the rebind (Calor0202), so the
+        // guard is exercised with the checker off.
+        const string Body = """
               §CL{c1:Holder:pub}
                 §MT{mt1:Run:pub} (Pos:x, Nat:a, i32:v) -> i32
                   §E{}
@@ -599,7 +609,10 @@ public class RefinementIdentityAndInferenceTests
                   §B{~y} x
                   §ASSIGN y v
                   §R y
-            """);
+            """;
+        Assert.Contains(Compile(Body).Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
+            && d.Message.Contains("Cannot rebind 'x' of type Pos as Nat"));
+        var assembly = CompileAndLoadVerified(Body, enableTypeChecking: false);
 
         Assert.Equal(5, Invoke(assembly, "Holder", "Run", 1, 2, 5));
         Assert.IsType<ArgumentOutOfRangeException>(Throws(assembly, "Holder", "Run", 1, 2, 0));
