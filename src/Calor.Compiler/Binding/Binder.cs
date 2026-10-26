@@ -1694,7 +1694,7 @@ public sealed class Binder
             RawCSharpNode => null,
             // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
             LocalFunctionStatementNode => null,
-            PreprocessorDirectiveNode => ScanUnboundWrites(stmt),
+            PreprocessorDirectiveNode preprocessor => BindPreprocessorDirective(preprocessor),
             EventSubscribeNode => ScanUnboundWrites(stmt),
             EventUnsubscribeNode => ScanUnboundWrites(stmt),
             // Unknown — explicit unsupported node, NOT null
@@ -4750,6 +4750,15 @@ public sealed class Binder
     {
         if (node is BoundLambdaExpression)
             yield break;
+        if (node is BoundPreprocessorBlock preprocessor) // #1678: either branch may run
+        {
+            foreach (var statement in preprocessor.Branches.SelectMany(branch => branch))
+            {
+                foreach (var variable in GetExplicitlyMutatedVariables(statement))
+                    yield return variable;
+            }
+            yield break;
+        }
         if (node is BoundAssignmentStatement
             {
                 Target: BoundVariableExpression assigned
@@ -4984,6 +4993,15 @@ public sealed class Binder
     {
         if (node is BoundLambdaExpression)
             yield break;
+        if (node is BoundPreprocessorBlock preprocessor) // #1678: either branch may run
+        {
+            foreach (var statement in preprocessor.Branches.SelectMany(branch => branch))
+            {
+                foreach (var effects in GetObservedCallEffects(statement))
+                    yield return effects;
+            }
+            yield break;
+        }
         if (node is BoundCallExpression expression)
             yield return expression.ObservedCallableEffects;
         else if (node is BoundCallStatement statement)
@@ -6676,7 +6694,9 @@ public sealed class Binder
     }
 
     private static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode node) =>
-        node.ChildNodes.SelectMany(DescendantsAndSelf).Prepend(node);
+        (node is BoundPreprocessorBlock preprocessor // #1678: either branch may run
+            ? preprocessor.Branches.SelectMany(branch => branch)
+            : node.ChildNodes).SelectMany(DescendantsAndSelf).Prepend(node);
 
     private static IEnumerable<string> ByReferenceWrittenNames(IReadOnlyList<string?> modifiers, IReadOnlyList<BoundExpression> arguments) =>
         modifiers.Select((modifier, index) => modifier is "ref" or "out" && index < arguments.Count
@@ -7064,14 +7084,6 @@ public sealed class Binder
 
     private void ReportWriteToReadOnlyLocal(VariableSymbol variable, Parsing.TextSpan span, string form)
     {
-        // A name the binder could not resolve may be a binding declared inside a §PP block.
-        if (variable.Id.IsNone && !variable.Name.Contains('.')
-            && LookupPreprocessorLocal(variable.Name) is { } preprocessorLocal)
-        {
-            if (preprocessorLocal != UnboundLocal.Writable)
-                ReportReadOnlyWrite(variable.Name, isLoopVariable: false, span, form);
-            return;
-        }
         var storage = variable.StorageIdentity;
         if (storage.IsLoopVariable)
             ReportReadOnlyWrite(variable.Name, isLoopVariable: true, span, form);
@@ -7228,62 +7240,194 @@ public sealed class Binder
     }
 
     /// <summary>
-    /// #1550 review: a statement the binder does not bind (a preprocessor body, an event
-    /// subscription, an opaque statement such as <c>§PUSH</c> or <c>§EACHKV</c>) may still not
-    /// write a read-only local. Walks its subtree with its own lexical scopes: a name declared
-    /// inside the subtree is judged by that declaration (an immutable <c>§B</c> or a <c>§L</c>
-    /// variable stays read-only; anything else is writable), and any other name by the
-    /// enclosing scope.
+    /// #1678: binds both branches of a statement-level <c>§PP</c> (<c>#if</c>) block. Each
+    /// branch is an alternative: it is bound in its own child scope from the same flow state, so
+    /// a branch does not see the other branch's bindings, and the flow states are joined as for
+    /// an <c>§IF</c> (a block without <c>§PPE</c> may also be skipped). An <c>#elif</c> chain is a
+    /// <c>§PP</c> nested in <c>§PPE</c>, so it is bound by the same rule.
+    /// <para><c>#if</c> opens no C# scope and the emitter writes the branch statements inline, so
+    /// a binding declared at the top of either branch stays visible to the statements after the
+    /// block, in the enclosing scope. When several branches declare the same name, the strictest
+    /// declaration is the one that stays visible (an immutable binding over a mutable one), so a
+    /// later write or rebind is checked against every branch. A branch binding that redeclares a
+    /// name already declared in the enclosing block is <c>Calor0201</c>, as it is outside
+    /// <c>§PP</c> (C# rejects it with CS0128 whenever that branch is active).</para>
+    /// <para>The block contributes no bound statement: analysis passes still treat the body as
+    /// opaque, as before. Only binding (scopes, read-only checks, types) sees it.</para>
+    /// </summary>
+    private BoundStatement? BindPreprocessorDirective(PreprocessorDirectiveNode preprocessor)
+    {
+        var baseline = CaptureFlowNarrowingState();
+        var branches = new List<FlowNarrowingState>();
+        var declared = new List<BranchDeclaration>();
+        var bodies = new List<IReadOnlyList<BoundStatement>>();
+
+        bodies.Add(BindPreprocessorBranch(baseline, branches, preprocessor.Body, declared, branch: 0));
+        if (preprocessor.ElseBody is { } elseBody)
+            bodies.Add(BindPreprocessorBranch(baseline, branches, elseBody, declared, branch: 1));
+        else
+            branches.Add(baseline);
+        JoinFlowBranchStates(baseline, branches);
+        // A branch holding verbatim C# (the converter keeps an inactive #if branch as §RAW) may
+        // declare anything, so it counts as declaring every name.
+        var opaqueBranches = new[] { preprocessor.Body, preprocessor.ElseBody }
+            .Select((body, index) => (body, index))
+            .Where(branch => branch.body is not null && ContainsVerbatimCSharp(branch.body))
+            .Select(branch => branch.index)
+            .ToArray();
+
+        foreach (var group in declared.GroupBy(declaration => declaration.Storage.Name, StringComparer.Ordinal))
+        {
+            var declarations = group.ToArray();
+            var alternatives = declarations.Select(declaration => declaration.Storage).ToArray();
+            // Strictest first: an immutable §B, then any other non-mutable declaration.
+            var visible = alternatives.FirstOrDefault(variable => variable.IsImmutableBinding)
+                ?? alternatives.FirstOrDefault(variable => !variable.IsMutable)
+                ?? alternatives[0];
+            var existing = _scope.LookupLocal(visible.Name) as VariableSymbol;
+            // A flow-narrowed copy of a field or property is not a declaration of this block;
+            // a local may shadow the member, as in C#.
+            var shadowsNarrowedMember = existing is { StorageIdentity: { IsField: true } or { IsProperty: true } };
+            string? conflict = null;
+            var hoistDespiteConflict = false;
+            if (existing != null && !shadowsNarrowedMember)
+            {
+                conflict = $"Variable '{visible.Name}' is already defined";
+            }
+            else if ((shadowsNarrowedMember || _scope.Lookup(visible.Name) is VariableSymbol)
+                     && declarations.Select(declaration => declaration.Branch)
+                         .Concat(opaqueBranches).Distinct().Count() < 2)
+            {
+                // A path through the block that declares nothing leaves the name meaning the outer
+                // field, parameter or local, so after the block it would mean different variables
+                // depending on the active branch. The binding still hoists, so writes to it are
+                // checked too.
+                conflict = $"Variable '{visible.Name}' declared in a §PP branch hides a variable or member of the " +
+                    "same name, but not every branch declares it, so after the block the name would refer to " +
+                    "different variables depending on the active branch. Declare it in every branch, or rename it";
+                hoistDespiteConflict = true;
+            }
+            else if (alternatives.Select(variable => TypeIdentity.Canonicalize(variable.TypeName))
+                     .Distinct(StringComparer.Ordinal).Skip(1).Any())
+            {
+                // The code after the block has one variable, so its type (and any refinement
+                // the emitter guards writes with) must not depend on which branch is active.
+                conflict = $"Variable '{visible.Name}' is declared with different types in the branches " +
+                    $"of a §PP block ({string.Join(", ", alternatives.Select(variable => $"'{variable.TypeName}'").Distinct())}); " +
+                    "declare it with the same type in every branch";
+            }
+            if (conflict != null)
+            {
+                foreach (var variable in alternatives)
+                    _diagnostics.ReportError(variable.DeclarationSpan, DiagnosticCode.DuplicateDefinition, conflict);
+                if (!hoistDespiteConflict)
+                    continue;
+            }
+
+            // Calls through the visible binding may run any branch's value, and a callable captured
+            // in another branch mutates the same variable after the block: the other declarations
+            // share the visible one's storage from here on.
+            foreach (var other in alternatives.Where(variable => !ReferenceEquals(variable, visible)))
+            {
+                StoreCallableState(visible, UnionCallableEffects(GetCallableState(visible), GetCallableState(other)));
+                _callableState.Remove(other);
+                other.StorageIdentity = visible;
+            }
+            // A flow fact (such as "not null") a branch established for its binding survives the
+            // block only when every declaring branch established the same one.
+            var current = declarations.First(declaration => ReferenceEquals(declaration.Storage, visible)).Current;
+            var narrowed = !ReferenceEquals(current, visible)
+                && declarations.All(declaration => !ReferenceEquals(declaration.Current, declaration.Storage)
+                    && declaration.Current.NullableAnnotation == current.NullableAnnotation
+                    && string.Equals(declaration.Current.TypeName, current.TypeName, StringComparison.Ordinal));
+            var hoisted = narrowed ? current : visible;
+            if (narrowed)
+                _flowNarrowingSources[hoisted] = visible;
+            if (existing != null)
+                _scope.TryReplaceLocal(existing, hoisted);
+            else
+                _scope.TryDeclare(hoisted);
+        }
+        // Opaque to analysis passes; the binder's own deferred-effect walks read the branches.
+        return new BoundPreprocessorBlock(preprocessor.Span, bodies);
+    }
+
+    private static bool ContainsVerbatimCSharp(IReadOnlyList<StatementNode> body) =>
+        body.Any(statement => statement switch
+        {
+            RawCSharpNode => true,
+            PreprocessorDirectiveNode nested => ContainsVerbatimCSharp(nested.Body)
+                || (nested.ElseBody is { } nestedElse && ContainsVerbatimCSharp(nestedElse)),
+            _ => false
+        });
+
+    /// <summary>
+    /// #1678: binds one <c>§PP</c> branch in a child scope, from the flow state before the block.
+    /// Unlike <see cref="BindIsolatedFlowBranch"/>, the branch scope is not seeded with the visible
+    /// flow-narrowed copies: <c>#if</c> opens no C# scope, so a branch binding may shadow a narrowed
+    /// member exactly where it could outside the block.
+    /// </summary>
+    private IReadOnlyList<BoundStatement> BindPreprocessorBranch(
+        FlowNarrowingState baseline,
+        List<FlowNarrowingState> branches,
+        IReadOnlyList<StatementNode> body,
+        List<BranchDeclaration> declared,
+        int branch)
+    {
+        RestoreFlowNarrowingState(baseline);
+        try
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            var bound = BindStatements(body);
+            declared.AddRange(CollectBranchDeclarations().Select(declaration => declaration with { Branch = branch }));
+            return bound;
+        }
+        finally
+        {
+            branches.Add(CaptureFlowNarrowingState());
+            RestoreFlowNarrowingState(baseline);
+        }
+    }
+
+    /// <summary>
+    /// #1678: the bindings a <c>§PP</c> branch declared in its own scope (nested <c>§PP</c> blocks
+    /// have already hoisted theirs into it). A flow-narrowed copy of an outer variable is not a
+    /// declaration; a narrowed copy of a branch binding stands for the binding itself.
+    /// </summary>
+    private List<BranchDeclaration> CollectBranchDeclarations()
+    {
+        var outer = _scope.Parent;
+        var result = new List<BranchDeclaration>();
+        foreach (var symbol in _scope.GetDeclaredSymbols().OfType<VariableSymbol>())
+        {
+            var storage = symbol.StorageIdentity;
+            if (outer?.Lookup(symbol.Name) is VariableSymbol enclosing
+                && ReferenceEquals(enclosing.StorageIdentity, storage))
+                continue;
+            if (!result.Any(declaration => ReferenceEquals(declaration.Storage, storage)))
+                result.Add(new BranchDeclaration(storage, symbol));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// #1678: a binding a <c>§PP</c> branch declared (<see cref="Storage"/>) and the symbol visible
+    /// for it at the end of the branch (<see cref="Current"/>, a flow-narrowed copy when the branch
+    /// established, for example, that it is not null).
+    /// </summary>
+    private sealed record BranchDeclaration(VariableSymbol Storage, VariableSymbol Current, int Branch = 0);
+
+    /// <summary>
+    /// #1550 review: a statement the binder does not bind (an event subscription, an opaque
+    /// statement such as <c>§PUSH</c> or <c>§EACHKV</c>) may still not write a read-only local.
+    /// Walks its subtree with its own lexical scopes: a name declared inside the subtree is
+    /// judged by that declaration (an immutable <c>§B</c> or a <c>§L</c> variable stays
+    /// read-only; anything else is writable), and any other name by the enclosing scope.
+    /// <c>§PP</c> blocks are bound instead (#1678, <see cref="BindPreprocessorDirective"/>).
     /// </summary>
     private BoundStatement? ScanUnboundWrites(StatementNode root)
     {
         ScanUnboundWrites(root, new Dictionary<string, UnboundLocal>(StringComparer.Ordinal));
-        if (root is PreprocessorDirectiveNode preprocessor)
-            RecordPreprocessorDeclarations(preprocessor);
-        return null;
-    }
-
-    /// <summary>
-    /// #1550 review round 3: <c>#if</c> opens no C# scope, so a binding declared at the top of a
-    /// <c>§PP</c> branch is visible to the statements after the block. The binder does not bind
-    /// the block, so it records the declared names here, per scope; a later write to one of them
-    /// is checked against the strictest branch (read-only if any branch declares it read-only).
-    /// </summary>
-    private readonly Dictionary<Scope, Dictionary<string, UnboundLocal>> _preprocessorLocals = new();
-
-    private void RecordPreprocessorDeclarations(PreprocessorDirectiveNode preprocessor)
-    {
-        if (!_preprocessorLocals.TryGetValue(_scope, out var declared))
-            _preprocessorLocals[_scope] = declared = new Dictionary<string, UnboundLocal>(StringComparer.Ordinal);
-        void Record(IEnumerable<StatementNode>? branch)
-        {
-            foreach (var statement in branch ?? [])
-            {
-                if (statement is PreprocessorDirectiveNode nested)
-                {
-                    Record(nested.Body);
-                    Record(nested.ElseBody);
-                }
-                else if (statement is BindStatementNode bind
-                         && !(bind.IsMutable && _scope.Lookup(bind.Name) is VariableSymbol))
-                {
-                    var kind = bind.IsMutable || bind.IsCollectionStatementForm ? UnboundLocal.Writable : UnboundLocal.Immutable;
-                    if (!declared.TryGetValue(bind.Name, out var existing) || existing == UnboundLocal.Writable)
-                        declared[bind.Name] = kind;
-                }
-            }
-        }
-        Record(preprocessor.Body);
-        Record(preprocessor.ElseBody);
-    }
-
-    private UnboundLocal? LookupPreprocessorLocal(string name)
-    {
-        for (var scope = _scope; scope != null; scope = scope.Parent)
-        {
-            if (_preprocessorLocals.TryGetValue(scope, out var declared) && declared.TryGetValue(name, out var kind))
-                return kind;
-        }
         return null;
     }
 
@@ -7309,10 +7453,6 @@ public sealed class Binder
             else if (_scope.Lookup(reference.Name) is VariableSymbol variable)
             {
                 ReportWriteToReadOnlyLocal(variable, target.Span, form);
-            }
-            else if (LookupPreprocessorLocal(reference.Name) is UnboundLocal.Immutable)
-            {
-                ReportReadOnlyWrite(reference.Name, isLoopVariable: false, target.Span, form);
             }
         }
 
@@ -7379,9 +7519,34 @@ public sealed class Binder
                     childScope[bind.Name] = bind.IsMutable || bind.IsCollectionStatementForm
                         ? UnboundLocal.Writable : UnboundLocal.Immutable;
                     break;
+                case PreprocessorDirectiveNode preprocessor: // #1678: #if opens no scope
+                    AddPreprocessorDeclarations(preprocessor, childScope);
+                    break;
                 case IsPatternNode { VariableName: { } pattern }:
                     childScope[pattern] = UnboundLocal.Writable;
                     break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// #1678: inside an opaque statement, the bindings a <c>§PP</c> block's branches declare stay
+    /// visible after it (nested blocks included), judged by the strictest branch.
+    /// </summary>
+    private void AddPreprocessorDeclarations(PreprocessorDirectiveNode preprocessor, Dictionary<string, UnboundLocal> scope)
+    {
+        foreach (var statement in preprocessor.Body.Concat(preprocessor.ElseBody ?? []))
+        {
+            if (statement is PreprocessorDirectiveNode nested)
+            {
+                AddPreprocessorDeclarations(nested, scope);
+            }
+            else if (statement is BindStatementNode bind
+                     && !(bind.IsMutable && (scope.ContainsKey(bind.Name) || _scope.Lookup(bind.Name) is VariableSymbol)))
+            {
+                var kind = bind.IsMutable || bind.IsCollectionStatementForm ? UnboundLocal.Writable : UnboundLocal.Immutable;
+                if (!scope.TryGetValue(bind.Name, out var existing) || existing == UnboundLocal.Writable)
+                    scope[bind.Name] = kind;
             }
         }
     }

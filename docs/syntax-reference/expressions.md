@@ -150,6 +150,13 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 (>= score 70)     // score at least 70
 ```
 
+Each comparison takes exactly two operands. `(== x)` and `(!= x)` are
+`Calor0110`: they used to compare `x` with `null` silently. Write the null
+explicitly, `(== x null)`. The same rule holds for the other two short forms
+the parser used to accept: `(?? x)` is `Calor0110` (it was read as `x`, dropping
+the fallback), and so is `(? c a)` (it was read as `c ? a : null`). The
+conditional `(? c a b)` takes exactly three operands and `(?? a b)` exactly two.
+
 ---
 
 ## Logical Operators

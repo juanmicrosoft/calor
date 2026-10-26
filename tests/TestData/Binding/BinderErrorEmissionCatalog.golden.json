@@ -177,6 +177,19 @@
     "reason": "Duplicate declarations are already compilation errors."
   },
   {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindPreprocessorDirective::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindPreprocessorDirective",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindQuantifier::DiagnosticBag.ReportError#01",
     "member": "Calor.Compiler.Binding.Binder.BindQuantifier",
     "sink": "DiagnosticBag.ReportError",
