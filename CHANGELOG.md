@@ -24,8 +24,10 @@ All notable changes to this project will be documented in this file.
   Array targets without spreads and a single array-to-array spread can convert natively.
   Other targets and mixed spreads stay C# with a reported loss. Collection expressions,
   collection spreads and complex `is` patterns are now marked **Partial**, not **Full**.
-- **Identity queries still call `Select` (#1588).** A bare `from x in source select x`
-  no longer becomes `source`. This retains the iterator type and custom query operators.
+- **Query translation keeps the correct operators (#1588).** A bare `from x in source select x`
+  still calls `Select`. Grouping an unchanged range variable uses the one-selector `GroupBy`
+  overload. Parenthesized projections and escaped identifiers retain C#'s translation rules.
+  This preserves iterator types and custom query operators.
 - **Every resource in a `using` statement is acquired and disposed (#1588).** Multiple
   resources now become nested `using` statements. Acquisition stays left-to-right, disposal
   stays right-to-left, and a failed later acquisition still disposes earlier resources.

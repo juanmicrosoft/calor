@@ -14003,7 +14003,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     });
                 }
                 else if (body.Clauses.Count == 0
-                    || projection is not ReferenceNode refNode || refNode.Name != rangeVar)
+                    || selectClause.Expression is not IdentifierNameSyntax selected
+                    || selected.Identifier.ValueText != rangeVar.TrimStart('@'))
                 {
                     // A bare from/select must call Select even for an identity projection.
                     currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector });
@@ -14012,9 +14013,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             else if (body.SelectOrGroup is GroupClauseSyntax groupClause)
             {
                 var keySelector = ConvertLinqLambda(span, rangeVar, groupClause.ByExpression);
-                var elementSelector = ConvertLinqLambda(span, rangeVar, groupClause.GroupExpression);
-                currentExpr = MakeChainedCall(span, currentExpr, "GroupBy",
-                    new ExpressionNode[] { keySelector, elementSelector });
+                if (groupClause.GroupExpression is IdentifierNameSyntax grouped
+                    && grouped.Identifier.ValueText == rangeVar.TrimStart('@'))
+                {
+                    currentExpr = MakeChainedCall(span, currentExpr, "GroupBy", [keySelector]);
+                }
+                else
+                {
+                    var elementSelector = ConvertLinqLambda(span, rangeVar, groupClause.GroupExpression);
+                    currentExpr = MakeChainedCall(span, currentExpr, "GroupBy", [keySelector, elementSelector]);
+                }
             }
 
             // Handle continuation (into g ...)
