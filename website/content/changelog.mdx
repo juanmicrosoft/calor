@@ -26,6 +26,7 @@ All notable changes to Calor, organized by release.
   bind only after a successful match, and `var` patterns retain their inferred types. Property
   and positional patterns, overloaded equality and repeated effectful subjects stay C# when
   boolean lowering would change their behavior.
+  Built-in `string` null checks remain native without invoking user-defined equality.
 - **Collection expressions retain their collection type and enumeration order (#1588).**
   Array targets without spreads and a single array-to-array spread can convert natively.
   Other targets and mixed spreads stay C# with a reported loss. Collection expressions,
@@ -33,7 +34,10 @@ All notable changes to Calor, organized by release.
 - **Query translation keeps the correct operators (#1588).** A bare `from x in source select x`
   still calls `Select`. Grouping an unchanged range variable uses the one-selector `GroupBy`
   overload. Parenthesized projections and escaped identifiers retain C#'s translation rules.
-  This preserves iterator types and custom query operators.
+  This preserves iterator types and custom query operators. Query continuations retain the
+  preceding operator's return type for effect checking.
+- **Inline conditionals keep their enclosing indentation boundary.** A following preserved
+  C# member remains a class member instead of being parsed as a statement.
 - **Every resource in a `using` statement is acquired and disposed (#1588).** Multiple
   resources now become nested `using` statements. Acquisition stays left-to-right, disposal
   stays right-to-left, and a failed later acquisition still disposes earlier resources.
