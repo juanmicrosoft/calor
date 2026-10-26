@@ -278,6 +278,41 @@ counter the body changes, use a `§WH` loop over a mutable binding. Statement
 forms that declare a collection (`§LIST`, `§ARR`, `§DICT`, `§HSET`) have no
 mutability marker and stay assignable.
 
+### Bindings inside `§PP`
+
+A statement-level `§PP{COND}` block (C# `#if`) is bound like any other code:
+both branches are checked, including every branch of an `#elif` chain
+(a `§PP` nested in `§PPE`). Each branch is checked on its own, so one branch
+never sees another branch's bindings.
+
+`#if` opens no C# scope. The emitter writes a branch's statements straight
+into the enclosing block, so a binding declared at the top of a branch is
+still visible after the block, as it is in C#. When two branches declare
+the same name, a later write is checked against the strictest declaration:
+if any branch declares the name immutable, it stays immutable afterwards.
+
+```calor
+§PP{DEBUG}
+  §B{x:i32} 1
+§PPE
+  §B{~x:i32} 2
+§ASSIGN x 3          // Calor0213: 'x' is immutable in the DEBUG branch
+§B{~x} 4             // Calor0260: same reason
+```
+
+A branch binding that reuses a name already declared in the enclosing block
+is `Calor0258`, because C# rejects it (CS0128) whenever that branch is active.
+Branches that declare the same name must give it the same type; otherwise it
+is `Calor0201`, because the code after the block sees one variable. A branch
+binding that hides a field, parameter or outer local must be declared in every
+branch (a `§PP` without `§PPE` has an empty second branch); otherwise it is
+`Calor0201`, because after the block the name would mean the outer variable
+whenever the other branch is active. A branch kept as verbatim C# (`§RAW`)
+counts as declaring it.
+Before 0.27 the bodies were only scanned, so a write to a `§PP` binding that
+shared a field's name, a write after a nested `§PP`, and a `§B{~x}` after a
+`§PP` that declared an immutable `x` all compiled.
+
 ### Calor0123 — `TypeFirstBindingHeader`
 
 A two-field header `§B{a:b}` is read **name-first** unless `a` is a

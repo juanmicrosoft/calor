@@ -670,7 +670,54 @@ public sealed class BindValidationPass
                 ScanExpressionForCalls(fixedStmt.Initializer);
                 CheckBlock(fixedStmt.Body);
                 break;
+
+            case PreprocessorDirectiveNode preprocessor:
+                CheckPreprocessorBranches(preprocessor);
+                break;
         }
+    }
+
+    /// <summary>
+    /// #1678: a statement-level <c>§PP</c> (<c>#if</c>) opens no C# scope. The emitter writes each
+    /// branch's statements inline in the enclosing block, so each branch is checked in the
+    /// enclosing scope: a branch <c>§B</c> that reuses a name already declared in the block is
+    /// Calor0258 (CS0128), and a <c>§B{~x}</c> of an earlier local is a reassignment. The branches
+    /// are alternatives, so a branch does not see another branch's bindings. Every branch binding
+    /// stays declared after the block; a name is mutable afterwards only if every branch that
+    /// declares it declares it mutable.
+    /// </summary>
+    private void CheckPreprocessorBranches(PreprocessorDirectiveNode preprocessor)
+    {
+        var scope = _scopes[^1];
+        var mutable = _mutableScopes[^1];
+        var before = new Dictionary<string, string>(scope, StringComparer.Ordinal);
+        var beforeMutable = new HashSet<string>(mutable, StringComparer.Ordinal);
+        var declared = new Dictionary<string, (string Type, bool Mutable)>(StringComparer.Ordinal);
+
+        foreach (var branch in new[] { preprocessor.Body, preprocessor.ElseBody })
+        {
+            if (branch is null)
+                continue;
+            foreach (var stmt in branch)
+                CheckStatement(stmt);
+            foreach (var (name, type) in scope)
+            {
+                if (before.ContainsKey(name))
+                    continue;
+                var isMutable = mutable.Contains(name);
+                declared[name] = declared.TryGetValue(name, out var earlier)
+                    ? (earlier.Type, earlier.Mutable && isMutable)
+                    : (type, isMutable);
+            }
+            scope.Clear();
+            foreach (var (name, type) in before)
+                scope[name] = type;
+            mutable.Clear();
+            mutable.UnionWith(beforeMutable);
+        }
+
+        foreach (var (name, (type, isMutable)) in declared)
+            DeclareLocal(name, type, isMutable);
     }
 
     private void CheckBind(BindStatementNode bind)
