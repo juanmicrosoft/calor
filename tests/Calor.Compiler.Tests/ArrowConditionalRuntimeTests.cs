@@ -13,6 +13,22 @@ namespace Calor.Compiler.Tests;
 public class ArrowConditionalRuntimeTests
 {
     [Fact]
+    public void InlineConditionalReturn_DoesNotConsumeMethodDedentBeforeInteropSibling()
+    {
+        const string source = """
+            §M{m1:Arrow}
+              §CL{c1:C:pub}
+                §MT{m1:Native:pub:stat} (bool:b) -> i32
+                  §R §IF{tern1} b → 1 §EL → 2
+                §CSHARP{public static int Other() => 3;}§/CSHARP
+            """;
+        var module = Parse(source);
+        var type = Assert.Single(module.Classes);
+        Assert.Equal("Native", Assert.Single(type.Methods).Name);
+        Assert.Contains("Other()", Assert.Single(type.InteropBlocks).CSharpCode);
+    }
+
+    [Fact]
     public void ArrowReturn_DoesNotStealLoopDedent()
     {
         const string source = """

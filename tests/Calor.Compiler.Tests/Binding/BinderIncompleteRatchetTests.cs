@@ -616,6 +616,8 @@ public class BinderIncompleteRatchetTests
         if (diagnostics.HasErrors)
         {
             coverage.OutputParseFailures++;
+            Console.WriteLine($"Native conversion output parse failure for {file}: "
+                + string.Join("\n", diagnostics.Errors));
             return;
         }
         var bindDiagnostics = new DiagnosticBag();

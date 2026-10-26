@@ -6130,9 +6130,9 @@ public sealed class Parser
         // Parse else expression
         var elseExpr = ParseExpression();
 
-        // Expect closing §/I{id}
+        // An inline conditional owns no Dedent; that token belongs to its enclosing body.
         var endSpan = elseExpr.Span;
-        if (IsBlockEnd(TokenKind.EndIf))
+        if (Check(TokenKind.EndIf))
         {
             var endToken = ExpectBlockEnd(TokenKind.EndIf);
             var endAttrs = ParseAttributes();
