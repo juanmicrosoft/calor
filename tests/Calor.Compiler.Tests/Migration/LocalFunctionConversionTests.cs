@@ -203,7 +203,7 @@ public class LocalFunctionConversionTests
 
     [Theory]
     [MemberData(nameof(NativeRows))]
-    public async Task NativeRows_ConvertInPlace_CompileByDefault_AndRunTheSame(
+    public async Task LocalFunctions_ConvertNatively_CompileByDefault_AndRunTheSame(
         string row, string expected, Surface surface)
     {
         var source = row switch
@@ -216,7 +216,6 @@ public class LocalFunctionConversionTests
 
         var (calor, losses) = await ConvertAsync(source, surface);
 
-        // Native, in place: nested §F, no interop, no rescue, nothing hoisted.
         Assert.DoesNotContain("§CSHARP", calor);
         Assert.DoesNotContain("§CS{", calor);
         Assert.Empty(losses);

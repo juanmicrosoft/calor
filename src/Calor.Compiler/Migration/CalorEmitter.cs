@@ -2422,6 +2422,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             && (allowMultiline || !value.Contains('\n'));
     }
 
+    internal static bool HoistsInExpression(ExpressionNode expression)
+    {
+        var probe = new CalorEmitter { _memberBodyDepth = 1 };
+        probe.AcceptInInlineSibling(expression);
+        return probe._builder.Length != 0 || probe._pendingHoistedLines.Count != 0;
+    }
+
     public string Visit(AssignmentStatementNode node)
     {
         // AcceptInInlineSibling: §ASSIGN target value emits two space-separated

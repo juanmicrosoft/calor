@@ -135,11 +135,11 @@ public class ConverterDefect1574Tests
     }
 
     [Fact]
-    public void PreservedChain_IsReportedAsAnEmbeddedAssignmentLoss()
+    public void PreservedChain_IsReportedAsAnInPlaceAssignmentLoss()
     {
         var result = new CSharpToCalorConverter(new ConversionOptions()).Convert(Rows().Single(r => r.Id == "CH-if-condition").Source);
-        Assert.Contains(result.Losses, loss => loss.Feature == "embedded-assignment");
-        Assert.NotNull(FeatureSupport.GetFeatureInfo("embedded-assignment"));
+        Assert.Contains(result.Losses, loss => loss.Feature == "conditional-expression-hoisting");
+        Assert.NotNull(FeatureSupport.GetFeatureInfo("conditional-expression-hoisting"));
         Assert.Equal(SupportLevel.NotSupported, FeatureSupport.GetFeatureInfo("embedded-assignment")!.Support);
     }
 

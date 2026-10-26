@@ -2,6 +2,7 @@
   §U{System.Collections.Generic}
 
   §CL{c001:Container:pub}
-    §PROP{p002:Items:List<str>:pub:get,set} = §C{Array.Empty<str>}
+    §CSHARP{    public List<string> Items { get; set; } = [];
+    }§/CSHARP
 
 

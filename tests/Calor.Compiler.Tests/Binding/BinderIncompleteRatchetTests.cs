@@ -123,7 +123,17 @@ public class BinderIncompleteRatchetTests
         + "Debugging/SelfLog.cs 3 -> 1 and FluentValidation ValidationException.cs 1 -> 0 (lifted call "
         + "holes); 22 source records change with the same per-file deltas as on F2's original base, "
         + "binding-error identities by location only, with binding-error counts and incomplete "
-        + "diagnostics unchanged";
+        + "diagnostics unchanged. #1588/#1686 (0.27): converter safety guards and exact native "
+        + "rewrites change 59 source-coverage records, with every corpus source hash unchanged "
+        + "and all 364 selected outputs still parsed and bound. Binder visits 29347 -> 25268 "
+        + "are not a precision improvement: exact native spans 28655 -> 25057, opaque source "
+        + "expressions 12208 -> 21885, and unmapped expressions 47295 -> 41216. Selected opaque "
+        + "boundaries 689 -> 838; separately, preserve-all boundaries 729 -> 918 and opaque "
+        + "expressions 14397 -> 17112. These are additional preservation costs, not historical "
+        + "budget waivers. All 72 source-carrier identities remain guarded (63 native, nine "
+        + "preserved expressions), including all 47 native generic identities. In-repo visits "
+        + "4828 -> 4826 come solely from the approved 06-03 declaration-pattern snapshot "
+        + "(seven -> five visits); incomplete diagnostics remain zero";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
@@ -218,6 +228,22 @@ public class BinderIncompleteRatchetTests
         Assert.True(incomplete == baseline.IncompleteCount,
             $"Incomplete count IMPROVED from {baseline.IncompleteCount} to {incomplete} — " +
             "record it: regenerate the baseline in this PR so the ratchet tracks reality.");
+    }
+
+    [SkippableFact]
+    public void SourceCarrierIdentities_SurviveWithoutRegeneratingAggregateCoverage()
+    {
+        var files = SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
+            .Select(evidence => Path.Combine(RepoRoot(), "bench", "corpus", evidence.File))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        Skip.IfNot(files.All(File.Exists), "corpus submodules not initialized");
+        Assert.Multiple(files.Select(file => (Action)(() =>
+        {
+            var coverage = new NativeConversionCoverage();
+            MeasureNative(file, File.ReadAllText(file).Replace("\r\n", "\n"), coverage);
+            Assert.NotNull(coverage.LastSourceCoverage);
+        })).ToArray());
     }
 
     [SkippableFact]
@@ -409,12 +435,14 @@ public class BinderIncompleteRatchetTests
         var failedBinding = WithBindingCoverage(before, bindDiagnostics);
         Assert.True(failedBinding.BindingErrorCount > 0);
         Assert.NotEqual(WithBindingCoverage(before, new DiagnosticBag()), failedBinding);
-        // #943 (0.25 F1): 4 identities moved to PreservedCases (their member is now §CSHARP).
-        Assert.Equal(68, SourceCarrierCases.Value.Count);
-        Assert.Equal(4, PreservedCarrierCases.Value.Count);
+        // #943 moved four identities; #1588 preserves five more explicit member identities.
+        Assert.Equal(63, SourceCarrierCases.Value.Count);
+        Assert.Equal(9, PreservedCarrierCases.Value.Count);
         Assert.Equal(47, SourceCarrierCases.Value.Count(c => c.SourceKind == "GenericName"));
-        Assert.Equal(21, SourceCarrierCases.Value.Count(c => c.SourceKind == "ConditionalAccessExpression"));
-        Assert.Equal(68, SourceCarrierCases.Value
+        Assert.Equal(16, SourceCarrierCases.Value.Count(c => c.SourceKind == "ConditionalAccessExpression"));
+        Assert.Equal(63, SourceCarrierCases.Value
+            .Select(c => (c.File, c.SourceStart, c.SourceEnd)).Distinct().Count());
+        Assert.Equal(72, SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
             .Select(c => (c.File, c.SourceStart, c.SourceEnd)).Distinct().Count());
         var carrier = new SourceCarrierCase("identity.cs", first.Start, first.End,
             "NumericLiteralExpression", "1", nameof(IntLiteralNode), first.Start, first.End, "1");
@@ -598,6 +626,8 @@ public class BinderIncompleteRatchetTests
         if (diagnostics.HasErrors)
         {
             coverage.OutputParseFailures++;
+            Console.WriteLine($"Native conversion output parse failure for {file}: "
+                + string.Join("\n", diagnostics.Errors));
             return;
         }
         var bindDiagnostics = new DiagnosticBag();
@@ -899,8 +929,9 @@ public class BinderIncompleteRatchetTests
         var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
             .Replace('\\', '/');
         var nodes = Walk(module).OfType<ExpressionNode>().ToArray();
-        foreach (var evidence in SourceCarrierCases.Value.Where(c => c.File == relative))
-            AssertSourceCarrierPreserved(nodes, source, evidence);
+        Assert.Multiple(SourceCarrierCases.Value.Where(c => c.File == relative)
+            .Select(evidence => (Action)(() => AssertSourceCarrierPreserved(nodes, source, evidence)))
+            .ToArray());
         foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
         {
             Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
@@ -920,7 +951,12 @@ public class BinderIncompleteRatchetTests
             .SequenceEqual(OpaqueTokens(evidence.CarrierCode))),
             $"Source carrier disappeared or changed for {evidence.File}:"
             + $"{evidence.SourceStart}..{evidence.SourceEnd} ({evidence.SourceKind}). "
-            + "Resolve the source operation explicitly; regenerating aggregate coverage is not sufficient.");
+            + "Resolve the source operation explicitly; regenerating aggregate coverage is not sufficient. "
+            + "Current source-region carriers: " + string.Join("; ",
+                nodes.Where(node => node.Span.Start >= evidence.SourceStart
+                    && node.Span.Start < evidence.SourceEnd).Select(node =>
+                    $"{node.GetType().Name} {node.Span.Start}..{node.Span.End}: "
+                    + node.Accept(new Compiler.CodeGen.CSharpEmitter()))));
     }
 
     private static void AssertOpaqueSerializationPreserved(

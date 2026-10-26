@@ -644,8 +644,8 @@ public static class FeatureSupport
         ["collection-expression"] = new FeatureInfo
         {
             Name = "collection-expression",
-            Support = SupportLevel.Full,
-            Description = "C# 12 collection expressions [1, 2, 3] are converted via ConvertCollectionExpression"
+            Support = SupportLevel.Partial,
+            Description = "Array-targeted collection expressions convert natively; other targets preserve C# to retain their runtime collection type"
         },
         ["readonly-struct"] = new FeatureInfo
         {
@@ -1016,20 +1016,20 @@ public static class FeatureSupport
         ["complex-is-pattern"] = new FeatureInfo
         {
             Name = "complex-is-pattern",
-            Support = SupportLevel.Full,
-            Description = "Recursive patterns in is-expressions (is { Prop: val }, is { } name) are converted to boolean expressions"
+            Support = SupportLevel.Partial,
+            Description = "Simple is-pattern checks and declaration patterns convert natively; property and positional patterns preserve C# to retain evaluation and binding semantics"
         },
         ["collection-spread"] = new FeatureInfo
         {
             Name = "collection-spread",
-            Support = SupportLevel.Full,
-            Description = "Collection spread operator (..) including mixed spreads [..a, ..b] via Concat chains"
+            Support = SupportLevel.Partial,
+            Description = "A single array spread into an array converts natively; other spreads preserve C# and its enumeration order"
         },
         ["collection-spread-mixed"] = new FeatureInfo
         {
             Name = "collection-spread-mixed",
-            Support = SupportLevel.Full,
-            Description = "Mixed collection spreads [..a, x, ..b] converted to Concat chains"
+            Support = SupportLevel.Partial,
+            Description = "Mixed collection spreads preserve C# to retain enumeration and element evaluation order"
         },
         ["implicit-new-with-args"] = new FeatureInfo
         {

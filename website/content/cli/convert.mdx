@@ -86,6 +86,13 @@ default, without `--passthrough`, which widens it further. "Conversion
 successful" is printed only when there are no recorded losses and requested
 validation passed.
 
+In the unreleased 0.27 converter, collection expressions convert natively only for
+array targets without spreads or a single array-to-array spread. Other collection
+targets and mixed spreads stay C# to retain their runtime type and enumeration order.
+Declaration patterns remain native. Property and positional patterns, and other complex
+`is` checks whose lowering could change evaluation or binding, stay C# with a reported
+loss. See the [registry entries and limits](/docs/cli/feature-check/#collection-expressions-and-patterns-in-0-27).
+
 ### Which Path Preserved Each Member
 
 Each recorded loss names the **path** that produced it, and the **trigger** that

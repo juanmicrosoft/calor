@@ -8,18 +8,6 @@
   "OpaqueBudgetStatus": "Parent explicitly accepted 20 additional opaque boundaries / 180 source expressions for #1191 after inspecting per-file evidence (PR1252 comment5603520220). Independent review of these guards is separate; neither decision proves whole-corpus equivalence or unchanged native fidelity",
   "Cases": [
     {
-      "File": "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceCollectionExtensions.cs",
-      "SourceStart": 5545,
-      "SourceEnd": 5571,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "filter?.Invoke(scanResult)",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 5552,
-      "CarrierEnd": 5571,
-      "CarrierCode": "filter?.Invoke(scanResult)",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
       "File": "FluentValidation/src/FluentValidation.Tests.Benchmarks/AccessorCacheBenchmark.cs",
       "SourceStart": 1311,
       "SourceEnd": 1335,
@@ -149,30 +137,6 @@
       "CarrierStart": 8004,
       "CarrierEnd": 8014,
       "CarrierCode": "rule.Components.LastOrDefault()?.Validator",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
-      "File": "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs",
-      "SourceStart": 7171,
-      "SourceEnd": 7197,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "r.person?.NickNames?.Any()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 7191,
-      "CarrierEnd": 7197,
-      "CarrierCode": "r.person?.NickNames?.Any()",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
-      "File": "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs",
-      "SourceStart": 7589,
-      "SourceEnd": 7615,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "r.person?.NickNames?.Any()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 7609,
-      "CarrierEnd": 7615,
-      "CarrierCode": "r.person?.NickNames?.Any()",
       "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
     },
     {
@@ -705,18 +669,6 @@
     },
     {
       "File": "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs",
-      "SourceStart": 5939,
-      "SourceEnd": 5970,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "failure.CustomState?.ToString()",
-      "CarrierKind": "ExpressionCallNode",
-      "CarrierStart": 5959,
-      "CarrierEnd": 5970,
-      "CarrierCode": "failure.CustomState?.ToString()",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
-      "File": "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs",
       "SourceStart": 8271,
       "SourceEnd": 8329,
       "SourceKind": "ConditionalAccessExpression",
@@ -788,18 +740,6 @@
       "Resolution": "Conditional chain retained with a single-evaluation receiver capture: GetInterfaces() is var _chainGetInterfaces074 binds once; the var pattern always matches, the true arm retains FirstOrDefault(predicate), and the suffix retains ?.GetGenericArguments().FirstOrDefault(). The predicate is retained with its inferred System.Type parameter explicit. This is concrete operation/provenance evidence, not a whole-program equivalence proof"
     },
     {
-      "File": "serilog/src/Serilog/Capturing/PropertyValueConverter.cs",
-      "SourceStart": 17619,
-      "SourceEnd": 17652,
-      "SourceKind": "ConditionalAccessExpression",
-      "SourceExpression": "ex.InnerException?.GetType().Name",
-      "CarrierKind": "FieldAccessNode",
-      "CarrierStart": 17637,
-      "CarrierEnd": 17652,
-      "CarrierCode": "ex.InnerException?.GetType().Name",
-      "Resolution": "Whole conditional expression retained by a carrier with a narrower source span"
-    },
-    {
       "File": "serilog/src/Serilog/Events/ScalarValue.cs",
       "SourceStart": 2777,
       "SourceEnd": 2828,
@@ -825,6 +765,66 @@
     }
   ],
   "PreservedCases": [
+    {
+      "File": "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs",
+      "SourceStart": 5939,
+      "SourceEnd": 5970,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "failure.CustomState?.ToString()",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 5959,
+      "CarrierEnd": 5970,
+      "CarrierCode": "failure.CustomState?.ToString()",
+      "Resolution": "#1588/#1686: BuildErrorMessage is preserved as a whole C# member in selected-branch lossy conversion. In Replace at line 132, later argument hoists cannot overtake messageArgumentMatches[i].Value. The conditional invocation remains verbatim inside that member; lower native coverage receives no binding-improvement credit"
+    },
+    {
+      "File": "serilog/src/Serilog/Capturing/PropertyValueConverter.cs",
+      "SourceStart": 17619,
+      "SourceEnd": 17652,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "ex.InnerException?.GetType().Name",
+      "CarrierKind": "FieldAccessNode",
+      "CarrierStart": 17637,
+      "CarrierEnd": 17652,
+      "CarrierCode": "ex.InnerException?.GetType().Name",
+      "Resolution": "#1588/#1686: CreateStructureValue is preserved as a whole C# member in selected-branch lossy conversion because its _lastSeenNames ?? [] collection expression targets HashSet<string>, not a supported native array. The conditional invocation remains verbatim inside that member; lower native coverage receives no binding-improvement credit"
+    },
+    {
+      "File": "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs",
+      "SourceStart": 7171,
+      "SourceEnd": 7197,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "r.person?.NickNames?.Any()",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 7191,
+      "CarrierEnd": 7197,
+      "CarrierCode": "r.person?.NickNames?.Any()",
+      "Resolution": "#1588/#1686: Nested_conditions_Rule_For is preserved as a whole C# member in selected-branch lossy conversion. Its final validator.Validate(new Request()) stages construction ahead of a captured receiver whose stability cannot be proved. The conditional invocation remains verbatim inside that member; lower native coverage receives no binding-improvement credit"
+    },
+    {
+      "File": "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs",
+      "SourceStart": 7589,
+      "SourceEnd": 7615,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "r.person?.NickNames?.Any()",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 7609,
+      "CarrierEnd": 7615,
+      "CarrierCode": "r.person?.NickNames?.Any()",
+      "Resolution": "#1588/#1686: Nested_conditions_Rule_For_Each is preserved as a whole C# member in selected-branch lossy conversion. Its final validator.Validate(new Request()) stages construction ahead of a captured receiver whose stability cannot be proved. The conditional invocation remains verbatim inside that member; lower native coverage receives no binding-improvement credit"
+    },
+    {
+      "File": "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceCollectionExtensions.cs",
+      "SourceStart": 5545,
+      "SourceEnd": 5571,
+      "SourceKind": "ConditionalAccessExpression",
+      "SourceExpression": "filter?.Invoke(scanResult)",
+      "CarrierKind": "ExpressionCallNode",
+      "CarrierStart": 5552,
+      "CarrierEnd": 5571,
+      "CarrierCode": "filter?.Invoke(scanResult)",
+      "Resolution": "#1588/#1686: AddScanResult is preserved as a whole C# member in selected-branch lossy conversion because its ServiceDescriptor constructor arguments use labels that the native constructor mapping cannot retain. The conditional invocation remains verbatim inside that member; this is a native-coverage reduction, not a binding improvement"
+    },
     {
       "File": "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
       "SourceStart": 3342,
@@ -874,5 +874,6 @@
       "Resolution": "#943 (0.25 F1, D1 RO-DECL-1): MessageFormatter.BuildMessage is preserved as a §CSHARP member because its `out var value` is declared inside a block lambda, where the bounded lowering never applies; the source expression is kept verbatim inside that member"
     }
   ],
-  "F1PreservedCases": "#943 moved 4 ConditionalAccessExpression identities (two members: Serilog MessageTemplateTextFormatter.Format and FluentValidation MessageFormatter.BuildMessage) from Cases to PreservedCases; the remaining 68 keep native carriers. Four AbstractValidator lambda names shifted by one (_lam039/042/073/076 -> _lam038/041/072/075) because SetExecutedRuleSets (`out var obj`, type unresolved per file) is now preserved and generates no lambda name; spans and tokens are otherwise unchanged"
+  "F1PreservedCases": "#943 moved 4 ConditionalAccessExpression identities (two members: Serilog MessageTemplateTextFormatter.Format and FluentValidation MessageFormatter.BuildMessage) from Cases to PreservedCases. Four AbstractValidator lambda names shifted by one (_lam039/042/073/076 -> _lam038/041/072/075) because SetExecutedRuleSets (`out var obj`, type unresolved per file) is now preserved and generates no lambda name; spans and tokens are otherwise unchanged",
+  "Milestone027PreservedCases": "#1588/#1686 explicitly moves five conditional-invocation identities to PreservedCases after inspecting the exact selected-branch conversion and escalation diagnostics. All 72 source identities remain guarded: 63 native carriers and 9 whole-member-preserved expressions. All 47 generic identities remain native. Historical opaque-budget attribution is unchanged; the additional preservation is recorded separately"
 }

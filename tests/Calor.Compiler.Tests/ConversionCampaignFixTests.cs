@@ -890,10 +890,8 @@ class Test
     #region Issue 372: Empty collection [] emits default
 
     [Fact]
-    public void Convert_EmptyCollectionExpression_EmitsConstructor()
+    public void Convert_EmptyCollectionExpression_PreservesTargetShape()
     {
-        // Empty collection expressions are converted to Array.Empty<T>() inline calls
-        // for compatibility in expression contexts (property initializers, switch arms, etc.)
         var csharp = @"
 using System.Collections.Generic;
 class Container
@@ -904,11 +902,13 @@ class Container
         var calor = result.CalorSource;
 
         Assert.DoesNotContain("default", calor);
-        Assert.Contains("Array.Empty", calor);
+        Assert.Contains("[]", calor);
+        Assert.Contains(result.Losses, loss => loss.Feature == "property"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
-    public void Convert_EmptyCollectionExpressionInMethod_EmitsArrayEmpty()
+    public void Convert_EmptyCollectionExpressionInMethod_PreservesTargetShape()
     {
         var csharp = @"
 using System.Collections.Generic;
@@ -923,7 +923,9 @@ class Processor
         var calor = result.CalorSource;
 
         Assert.DoesNotContain("default", calor);
-        Assert.Contains("Array.Empty", calor);
+        Assert.Contains("[]", calor);
+        Assert.Contains(result.Losses, loss => loss.Feature == "method"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
@@ -1036,16 +1038,12 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        // Should bind the variable 's' via a cast
-        Assert.Contains("s", calor);
-        // Should contain a type check
-        Assert.Contains("(is value str)", calor);
-        // Should contain a bind for the pattern variable
-        Assert.Contains("§B", calor);
+        Assert.Contains("(is value str s)", calor);
+        Assert.DoesNotContain("(cast", calor);
     }
 
     [Fact]
-    public void Convert_DeclarationPattern_CastsVariable()
+    public void Convert_DeclarationPattern_BindsOnlyAfterMatching()
     {
         var csharp = @"
 class Test
@@ -1062,9 +1060,8 @@ class Test
         var result = _converter.Convert(csharp);
         var calor = result.CalorSource;
 
-        // Should have a cast for the pattern variable
-        Assert.Contains("cast", calor);
-        Assert.Contains("text", calor);
+        Assert.Contains("(is value str text)", calor);
+        Assert.DoesNotContain("(cast", calor);
     }
 
     #endregion
@@ -2132,7 +2129,7 @@ public class Demo
     #region Batch 13: Collection spread and fluent chain fixes
 
     [Fact]
-    public void Convert_CollectionSpreadOnly_ConvertsToToList()
+    public void Convert_CollectionSpreadOnly_PreservesTargetShape()
     {
         var csharp = @"
 using System.Collections.Generic;
@@ -2151,8 +2148,9 @@ public class Demo
 
         // Should NOT contain ERR
         Assert.DoesNotContain("ERR", calor);
-        // Should contain a ToList call
-        Assert.Contains("ToList", calor);
+        Assert.Contains("[..items]", calor);
+        Assert.Contains(result.Losses, loss => loss.Feature == "method"
+            && loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]

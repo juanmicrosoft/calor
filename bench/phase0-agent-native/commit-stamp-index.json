@@ -27,40 +27,26 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
+      "measuredCommit": "4e87980e16225ca0a32e032aa746358e6bcecaa7",
       "basis": "post-merge-write-back",
-      "note": "#1595/#1541/#1524 (0.27, PR #1675): regenerated with CALOR_REGENERATE_CALOR0425_LEDGER=1 at 1cbcc2b2 (the initializer-conversion code head, on top of #1674). FluentValidation.Tests/CollectionValidatorWithParentTests.cs no longer stops at Calor0208 (the old `_item0 = ...` conversion of a custom Add-collection initializer; the initializer now stays C#), so ModulesEnforced 275 -> 276 (FluentValidation 136 -> 137). Calor0411Sites 7869 -> 6176: effect sites inside initializers preserved as C# are no longer counted. Calor0425 sites and modules are unchanged. #1674's pending measurement (bb9393c2, PR #1674) remains in the repository history.",
+      "note": "#1677 originally regenerated at 655bd907: removing duplicate receiver/argument conversions reduced Calor0411 sites to MediatR 289, serilog 722 and FluentValidation 5766. #1588/#1686 continuation remeasured at 4e87980e, including restored metadata-string null patterns, exact query-continuation receiver typing, and the integrated website/oracle heads, with the automatic pinned-CLI cross-check: Calor0425 143 -> 142 sites, still 52 diagnostic modules of 276 enforced; Calor0411 sites serilog 722 -> 695 and FluentValidation 5766 -> 4486, MediatR unchanged. Explicit preservation of unsupported ordered operands, patterns, constructor labels and collection targets reduces native coverage; these falls are not binding or effect-resolution improvements. All 364 selected outputs still parse. The phase-1 identity is pending, not authoritative, until post-merge write-back. Earlier identities remain in repository history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "13664e62787942b0d1bbde7e61f71c292e3da3a7",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "ad726b96420f411f902ccff550faed9b349f6554",
-          "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
-          "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30",
-          "/": "7f38e2d467bf67ae90aed683dd8957546f8515b9"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
-          "pr": 1675,
-          "phase1TreeHashes": {
-            "src": "ad726b96420f411f902ccff550faed9b349f6554",
+        "status": "pending",
+        "phase1": {
+          "headCommit": "4e87980e16225ca0a32e032aa746358e6bcecaa7",
+          "pr": 1686,
+          "treeHashes": {
+            "src": "c77e0083b78b8349eab1c6090acfc663d1e1314b",
             "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
             "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
-            "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+            "Directory.Packages.props": "27c5b7901def159db761922bc6fa62655e00cf1c",
             "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-            "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+            "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "phase1ArtifactSha256": "bb2a039f6ca707e463dafd24e0e1d54f6744c6b68f15ce82111146af8cab373d"
+          "artifactSha256": "78ea640269631c9b77cc93ffeb2fe3fa20aaea726fb4823954e27f299f6e2153"
         }
       }
     },

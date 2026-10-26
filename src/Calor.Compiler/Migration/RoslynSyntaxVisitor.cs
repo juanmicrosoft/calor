@@ -7474,7 +7474,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var mark = _pendingStatements.Count;
         var value = ConvertRight();
-        var rightHoisted = HoistsHaveEffects(mark);
+        // #1677: the Calor emitter also hoists parts of the value ahead of the statement (a §NEW
+        // argument with a call, the call under a member access); those run after every hoist
+        // here, so they count as hoisted too.
+        var rightHoisted = HoistsHaveEffects(mark) || EmitterMayHoist(value);
+        // Codex round 1: a range or index-from-end bound with a call is hoisted by the emitter
+        // only in some positions, and parses as extra call arguments in others; it stays C#.
+        if (rightHoisted && HasMarkerRangeBound(value))
+            throw EscalateExpression(site, "compound-assignment-order");
         // Codex round 3: a target that is neither a fixed location nor decomposed into parts (a
         // ref-returning property, an index with a user-defined conversion) is evaluated where it
         // stands, after whatever the right-hand side hoisted.
@@ -7485,6 +7492,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // hoisted statements, so a user-defined input conversion stays C#.
         if (rightHoisted && _semanticModel.GetOperation(site)
                 is Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation { InConversion.IsUserDefined: true })
+            throw EscalateExpression(site, "compound-assignment-order");
+        // #1677 (F): a field of a struct reached through a reference or an array element
+        // (`h.s.X = …`, `a[i].X = …`) is located before the right-hand side runs, so a null
+        // receiver or a bad index throws before it. A simple store's location is only computed
+        // after the hoisted statements; a compound read is bound ahead of them and throws first.
+        if (op == null && rightHoisted && parts is { HasParts: true }
+            && (parts.Arguments == null ? parts.Path.Count > 1 : parts.Path.Count > 0))
+            throw EscalateExpression(site, "compound-assignment-order");
+        // Codex round 1: the same for a struct field of another type's static field (`H.s.X = …`):
+        // locating it runs H's static constructor before the right-hand side.
+        if (op == null && rightHoisted && IsStaticStructFieldPath(left))
             throw EscalateExpression(site, "compound-assignment-order");
         var rightSyntax = right != null ? new List<ExpressionSyntax> { right } : new List<ExpressionSyntax>();
 
@@ -7545,6 +7563,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             bound++;
         }
         return bound;
+    }
+
+    // #1677 (Codex round 1): `H.s.X` — a member of a struct reached through a static field of a
+    // type whose initializer this code has not necessarily run.
+    private bool IsStaticStructFieldPath(ExpressionSyntax left)
+    {
+        var model = _semanticModel!;
+        var current = Unparen(left);
+        var peeled = false;
+        while (current is MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression } member
+               && model.GetTypeInfo(member.Expression).Type is { IsValueType: true }
+               && model.GetSymbolInfo(member.Expression).Symbol is not INamedTypeSymbol)
+        {
+            current = Unparen(member.Expression);
+            peeled = true;
+        }
+        return peeled && model.GetSymbolInfo(current).Symbol is IFieldSymbol { IsStatic: true, IsConst: false } field
+            && !IsEnclosingType(field.ContainingType, current);
     }
 
     private bool IsDynamicTyped(ExpressionSyntax expression)
@@ -7644,29 +7680,71 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return conversion.IsUserDefined || conversion.IsDynamic;
     }
 
-    // A static field of a type whose code is running here has been initialized.
+    // A static field of the type whose code is running here has been initialized.
+    // #1677 (B): only the innermost type. Code in a nested type runs without initializing its
+    // enclosing types, so reading an outer type's static field can still run its static
+    // constructor.
     private bool IsEnclosingType(INamedTypeSymbol? type, SyntaxNode at)
-    {
-        for (var current = _semanticModel!.GetEnclosingSymbol(at.SpanStart)?.ContainingType; current != null;
-             current = current.ContainingType)
-        {
-            if (SymbolEqualityComparer.Default.Equals(current, type))
-                return true;
-        }
-        return false;
-    }
+        => type != null && SymbolEqualityComparer.Default.Equals(
+            _semanticModel!.GetEnclosingSymbol(at.SpanStart)?.ContainingType, type);
 
     /// <summary>
     /// #1633: whether the statements hoisted since <paramref name="mark"/> can do anything
     /// observable. Binding a lambda or a literal to a temp cannot, so it may run before the
     /// target's parts.
     /// </summary>
-    private bool HoistsHaveEffects(int mark) => _pendingStatements.Skip(mark).Any(statement =>
+    private bool HoistsHaveEffects(int mark, int? end = null) => _pendingStatements.Skip(mark)
+        .Take((end ?? _pendingStatements.Count) - mark).Any(statement =>
         statement is not BindStatementNode
         {
             Initializer: LambdaExpressionNode or IntLiteralNode or StringLiteralNode or BoolLiteralNode
                 or FloatLiteralNode or DecimalLiteralNode
         });
+
+    /// <summary>
+    /// Whether ordinary expression emission moves work ahead of its statement.
+    /// Probe the emitter itself so its in-place rendering boundaries stay authoritative.
+    /// </summary>
+    private static bool EmitterMayHoist(ExpressionNode? node)
+    {
+        return node != null && CalorEmitter.HoistsInExpression(node);
+    }
+
+    // #1677 (Codex round 1): a §RANGE or index-from-end bound that is a call or another marker.
+    private static bool HasMarkerRangeBound(ExpressionNode? node)
+    {
+        static bool Walk(AstNode n) => n is not LambdaExpressionNode
+            && (n is RangeExpressionNode or IndexFromEndNode
+                    && Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n)
+                        .Any(child => child is not (ReferenceNode or IntLiteralNode))
+                || Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(n).Any(Walk));
+        return node != null && Walk(node);
+    }
+
+    /// <summary>
+    /// #1677 (E): whether creating this collection runs no user code: a
+    /// <c>System.Collections.Generic</c> creation whose constructor arguments and initializer elements are all constants (so <c>Add</c> hashes or
+    /// compares only built-in values). Such a <c>_putVal</c> hoist cannot change the receiver or
+    /// key, or be passed by their conversions.
+    /// </summary>
+    private bool IsConstantCollection(ExpressionSyntax right)
+    {
+        var model = _semanticModel!;
+        bool Constant(ExpressionSyntax expression) => model.GetConstantValue(expression).HasValue
+            && !HasEffectfulConversion(expression);
+        bool Element(ExpressionSyntax element) => element switch
+        {
+            InitializerExpressionSyntax complex => complex.Expressions.All(Constant),
+            AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax access } indexed =>
+                access.ArgumentList.Arguments.All(argument => Constant(argument.Expression)) && Constant(indexed.Right),
+            _ => Constant(element),
+        };
+        return Unparen(right) is BaseObjectCreationExpressionSyntax creation
+            && model.GetTypeInfo(creation).Type?.ContainingNamespace?.ToDisplayString() == "System.Collections.Generic"
+            && !HasEffectfulConversion(right)
+            && (creation.ArgumentList?.Arguments.All(argument => Constant(argument.Expression)) ?? true)
+            && (creation.Initializer?.Expressions.All(Element) ?? true);
+    }
 
     /// <summary>
     /// #1633: which of a target's parts (receiver, then arguments) must be bound to a temp before
@@ -7830,7 +7908,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private bool IsInertExpression(ExpressionSyntax expression)
     {
         var model = _semanticModel!;
+        // #1677 (C): a user-defined or dynamic conversion applied to any operand runs code; in
+        // `a[k + 0]` it is `k`'s conversion to int, nested inside built-in arithmetic. Roslyn
+        // reports a parenthesized operand's conversion on the parentheses.
+        if (HasEffectfulConversion(expression))
+            return false;
         expression = Unparen(expression);
+        if (HasEffectfulConversion(expression))
+            return false;
         if (model.GetConstantValue(expression).HasValue)
             return true;
         switch (expression)
@@ -7839,11 +7924,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 or DefaultExpressionSyntax or TypeOfExpressionSyntax or SizeOfExpressionSyntax:
                 return true;
             case IdentifierNameSyntax:
-                return model.GetSymbolInfo(expression).Symbol is ILocalSymbol { RefKind: RefKind.None }
-                    or IParameterSymbol { RefKind: RefKind.None } or IFieldSymbol
-                    or INamedTypeSymbol or INamespaceSymbol;
+                return model.GetSymbolInfo(expression).Symbol switch
+                {
+                    IFieldSymbol field => IsInitializedField(field, expression),
+                    ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }
+                        or INamedTypeSymbol or INamespaceSymbol => true,
+                    _ => false,
+                };
             case MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression } member:
                 return model.GetSymbolInfo(member).Symbol is IFieldSymbol or INamedTypeSymbol or INamespaceSymbol
+                    && (model.GetSymbolInfo(member).Symbol is not IFieldSymbol memberField
+                        || IsInitializedField(memberField, member))
                     && (model.GetSymbolInfo(member.Expression).Symbol is INamedTypeSymbol or INamespaceSymbol
                         || IsInertExpression(member.Expression));
             case ElementAccessExpressionSyntax element:
@@ -7856,7 +7947,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
                         && IsInertExpression(argument.Expression));
             case BinaryExpressionSyntax binary:
-                return model.GetOperation(binary) is Microsoft.CodeAnalysis.Operations.IBinaryOperation { OperatorMethod: null }
+                return model.GetOperation(binary) is Microsoft.CodeAnalysis.Operations.IBinaryOperation { OperatorMethod: null } operation
+                    // Codex round 1: string concatenation calls ToString on an operand that is
+                    // not a string, a built-in numeric, bool or char, or an enum.
+                    && (operation.Type?.SpecialType != SpecialType.System_String
+                        || new[] { operation.LeftOperand, operation.RightOperand }.All(operand =>
+                            operand.Type?.SpecialType is SpecialType.System_String or SpecialType.System_Boolean
+                                or SpecialType.System_Char or SpecialType.System_SByte or SpecialType.System_Byte
+                                or SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Int32
+                                or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
+                                or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal
+                            || operand.Type?.TypeKind == TypeKind.Enum))
                     && IsInertExpression(binary.Left) && IsInertExpression(binary.Right);
             case PrefixUnaryExpressionSyntax unary when unary.Kind() is SyntaxKind.UnaryMinusExpression
                 or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression or SyntaxKind.BitwiseNotExpression:
@@ -7869,6 +7970,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return false;
         }
     }
+
+    // #1677 (Codex round 1): reading a static field of another source type can run its static
+    // constructor; a metadata type's initializer runs no user code.
+    private bool IsInitializedField(IFieldSymbol field, SyntaxNode at)
+        => !field.IsStatic || field.IsConst || IsEnclosingType(field.ContainingType, at)
+            || field.ContainingType.DeclaringSyntaxReferences.Length == 0;
 
     /// <summary>
     /// #1633: whether a part's value cannot change while the rest of the statement runs: a
@@ -7887,6 +7994,45 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || symbol is not (ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None }))
             return false;
         return !IsCapturedVariable(symbol) && !later.Any(part => WritesVariable(part, symbol));
+    }
+
+    private List<ExpressionNode> ConvertOrderedExpressions(
+        IEnumerable<ExpressionSyntax> expressions, bool stageComplexArguments = false, bool inPlace = false)
+    {
+        var syntax = expressions.ToArray();
+        var converted = new List<ExpressionNode>(syntax.Length);
+        for (var index = 0; index < syntax.Length; index++)
+        {
+            var mark = _pendingStatements.Count;
+            var value = inPlace ? ConvertInPlace(syntax[index], always: true) : ConvertExpression(syntax[index]);
+            if (HoistsHaveEffects(mark) || !inPlace
+                && !(stageComplexArguments && IsComplexArgument(value)) && EmitterMayHoist(value))
+            {
+                for (var earlier = 0; earlier < index; earlier++)
+                    RequireFixedEarlierOperand(syntax[earlier], converted[earlier], syntax[index..]);
+            }
+            converted.Add(value);
+        }
+        return converted;
+    }
+
+    private void RequireFixedEarlierOperand(
+        ExpressionSyntax expression, ExpressionNode converted, IReadOnlyList<ExpressionSyntax> later)
+    {
+        // An earlier operand already captured in a temp has been evaluated. A type/namespace
+        // receiver evaluates nothing. Otherwise a later hoist may not overtake its read or conversion.
+        if (converted is ReferenceNode reference
+            && _pendingStatements.OfType<BindStatementNode>().Any(bind => bind.Name == reference.Name))
+            return;
+        // A generic-name receiver can only name a type, even without its project's metadata.
+        if (expression is GenericNameSyntax && expression.Parent is MemberAccessExpressionSyntax member
+            && ReferenceEquals(member.Expression, expression))
+            return;
+        if (_semanticModel != null && expression.SyntaxTree == _semanticModel.SyntaxTree
+            && (_semanticModel.GetSymbolInfo(expression).Symbol is INamedTypeSymbol or INamespaceSymbol
+                || !HasEffectfulConversion(expression) && IsFixedValue(expression, later)))
+            return;
+        throw EscalateExpression(expression, "compound-assignment-order");
     }
 
     private bool IsCapturedVariable(ISymbol variable)
@@ -7995,9 +8141,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var indexOrKey = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
                     var valueMark = _pendingStatements.Count;
                     var value = ConvertExpression(assignment.Right);
+                    // Hoist block-level values that can't appear inline in §PUT/§SETIDX.
+                    // #1677 (E): before the order checks below, which treat this hoist like any
+                    // other the right-hand side made (`a[k] = new List<int> { F() }` runs F()
+                    // ahead of the receiver and the key).
+                    int? putValMark = null;
+                    if (IsBlockLevelCollection(value))
+                    {
+                        putValMark = _pendingStatements.Count;
+                        var tempName = _context.GenerateId("_putVal");
+                        _pendingStatements.Add(new BindStatementNode(
+                            GetTextSpan(assignment), tempName, null, false, value, new AttributeCollection()));
+                        value = new ReferenceNode(GetTextSpan(assignment), tempName);
+                    }
                     var keyHoisted = _pendingStatements.Skip(keyMark).Take(valueMark - keyMark)
                         .Any(statement => statement is not BindStatementNode { Initializer: LambdaExpressionNode });
-                    var valueHoisted = HoistsHaveEffects(valueMark);
+                    var valueHoisted = (putValMark is { } putAt
+                        ? HoistsHaveEffects(valueMark, putAt) || !IsConstantCollection(assignment.Right)
+                        : HoistsHaveEffects(valueMark)) || EmitterMayHoist(value);
+                    if (valueHoisted && HasMarkerRangeBound(value))
+                        throw EscalateExpression(assignment, "compound-assignment-order");
                     if ((keyHoisted || valueHoisted) && _semanticModel != null
                         && assignment.SyntaxTree == _semanticModel.SyntaxTree)
                     {
@@ -8033,15 +8196,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             indexOrKey = new ReferenceNode(GetTextSpan(assignment), keyTemp);
                         }
                     }
-                    // Hoist block-level values that can't appear inline in §PUT/§SETIDX
-                    if (IsBlockLevelCollection(value))
-                    {
-                        var tempName = _context.GenerateId("_putVal");
-                        _pendingStatements.Add(new BindStatementNode(
-                            GetTextSpan(assignment), tempName, null, false, value, new AttributeCollection()));
-                        value = new ReferenceNode(GetTextSpan(assignment), tempName);
-                    }
-
                     // Determine if this is a list (numeric index) or dictionary (key-based)
                     var firstArg = elementAccess.ArgumentList.Arguments[0].Expression;
                     if (firstArg is LiteralExpressionSyntax literal &&
@@ -8142,38 +8296,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (expr is InvocationExpressionSyntax invocation)
         {
             var target = invocation.Expression.ToString().Replace("!", "");
-            var args = invocation.ArgumentList.Arguments
-                .Select(a => ConvertExpression(a.Expression))
-                .ToList();
-
-            // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
-            HoistComplexArguments(args, invocation.ArgumentList.Arguments);
-
-            var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
-            var stmtArgNames = hasNamedArgs
-                ? invocation.ArgumentList.Arguments
-                    .Select(a => a.NameColon?.Name.Identifier.ValueText)
-                    .ToList()
-                : null;
-
-            var stmtArgModifiers = ExtractArgumentModifiers(invocation);
-
-            // Check for Console.WriteLine as special case
-            if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
-            {
-                if (args.Count == 1)
-                {
-                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: true);
-                }
-            }
-            else if (target == "Console.Write" || target == "System.Console.Write")
-            {
-                if (args.Count == 1)
-                {
-                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: false);
-                }
-            }
-
+            // #1677: where the statement's own conversion starts; the fallback below converts the
+            // invocation again and must not keep the first conversion's hoists.
+            var invocationMark = _pendingStatements.Count;
+            // #1677 (Codex round 1): the receiver's hoists come first; C# evaluates the receiver
+            // before the arguments.
             // Handle complex targets that need hoisting (element access, chained calls, new-then-call)
             if (invocation.Expression is MemberAccessExpressionSyntax stmtMemberAccess)
             {
@@ -8234,11 +8361,43 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
+            var args = ConvertOrderedExpressions(invocation.ArgumentList.Arguments.Select(a => a.Expression),
+                stageComplexArguments: true);
+
+            // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
+            HoistComplexArguments(args, invocation.ArgumentList.Arguments);
+
+            var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
+            var stmtArgNames = hasNamedArgs
+                ? invocation.ArgumentList.Arguments
+                    .Select(a => a.NameColon?.Name.Identifier.ValueText)
+                    .ToList()
+                : null;
+
+            var stmtArgModifiers = ExtractArgumentModifiers(invocation);
+
+            // Check for Console.WriteLine as special case
+            if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
+            {
+                if (args.Count == 1)
+                {
+                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: true);
+                }
+            }
+            else if (target == "Console.Write" || target == "System.Console.Write")
+            {
+                if (args.Count == 1)
+                {
+                    return new PrintStatementNode(GetTextSpan(node), args[0], isWriteLine: false);
+                }
+            }
+
             // Safety net: if the target still contains characters that ParseValue() can't handle
             // (indexers, method calls with args, string literals, generic type args), the parser will fail.
             // Fall back to ConvertInvocationExpression which does more aggressive hoisting.
             if (target.Contains('[') || target.Contains('(') || target.Contains('"') || target.Contains('<'))
             {
+                _pendingStatements.RemoveRange(invocationMark, _pendingStatements.Count - invocationMark);
                 var exprResult = ConvertInvocationExpression(invocation);
                 if (exprResult is CallExpressionNode callExpr)
                 {
@@ -8962,23 +9121,52 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     ///   [("a", "Where", args1), (null, "Select", args2), (null, "First", args3)]
     /// where null target means "use previous step's result".
     /// </summary>
-    private List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)> CollectChainSteps(
+    private List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span, List<StatementNode> hoists)> CollectChainSteps(
         InvocationExpressionSyntax invocation)
     {
-        var steps = new List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)>();
+        var steps = new List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span, List<StatementNode> hoists)>();
         var current = invocation;
         // #943 (D1 RO-SYN-3, RO-COPY-4): chain steps keep no argument modifiers; preserve.
         if (invocation.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
                 .OfType<ArgumentSyntax>().FirstOrDefault(a => !a.RefKindKeyword.IsKind(SyntaxKind.None)) is { } byReference)
             throw EscalateExpression(byReference, "ref-parameter");
+        if (invocation.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
+                .OfType<ArgumentSyntax>().FirstOrDefault(a => a.NameColon != null) is { } namedArgument)
+            throw EscalateExpression(namedArgument, "named-argument");
 
         while (current.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
-            var args = current.ArgumentList.Arguments
-                .Select(a => ConvertExpression(a.Expression))
-                .ToList();
             var span = GetTextSpan(current);
+            // #1677 (Codex round 1): each step's hoists are kept with the step and emitted right
+            // before its call, in C#'s order: the base receiver, then the step's arguments. They
+            // used to be emitted together ahead of the first call, outermost step first, so a
+            // later step's argument (`c.Next().Use(F().Val())`) ran before an earlier call.
+            var stepMark = _pendingStatements.Count;
+            var isBase = memberAccess.Expression is not InvocationExpressionSyntax;
+            string? baseTarget = null;
+            if (isBase)
+            {
+                // Base of the chain — has a concrete target
+                // If the base is an object creation (new Foo()), hoist to a temp bind
+                // so the chain decomposition produces §NEW + bind instead of raw text
+                if (memberAccess.Expression is ObjectCreationExpressionSyntax
+                    || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
+                {
+                    var newConverted = ConvertExpression(memberAccess.Expression);
+                    var newTypeHint = ExtractTypeHint(memberAccess.Expression);
+                    baseTarget = _context.GenerateId("_new", newTypeHint);
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, baseTarget, null, false, newConverted, new AttributeCollection()));
+                }
+                else
+                {
+                    baseTarget = memberAccess.Expression.ToString();
+                }
+            }
+
+            var args = ConvertOrderedExpressions(current.ArgumentList.Arguments.Select(a => a.Expression),
+                stageComplexArguments: true);
 
             // Hoist complex arguments — prevents §LAM/§NEW nesting inside §C
             for (int i = 0; i < args.Count; i++)
@@ -9007,34 +9195,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
-            if (memberAccess.Expression is InvocationExpressionSyntax inner)
-            {
-                // Intermediate step — target comes from previous chain step
-                steps.Add((null, methodName, args, span));
-                current = inner;
-            }
-            else
-            {
-                // Base of the chain — has a concrete target
-                // If the base is an object creation (new Foo()), hoist to a temp bind
-                // so the chain decomposition produces §NEW + bind instead of raw text
-                if (memberAccess.Expression is ObjectCreationExpressionSyntax
-                    || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
-                {
-                    var newConverted = ConvertExpression(memberAccess.Expression);
-                    var newTypeHint = ExtractTypeHint(memberAccess.Expression);
-                    var tempName = _context.GenerateId("_new", newTypeHint);
-                    _pendingStatements.Add(new BindStatementNode(
-                        span, tempName, null, false, newConverted, new AttributeCollection()));
-                    steps.Add((tempName, methodName, args, span));
-                }
-                else
-                {
-                    var baseTarget = memberAccess.Expression.ToString();
-                    steps.Add((baseTarget, methodName, args, span));
-                }
+            if (isBase && HoistsHaveEffects(stepMark))
+                RequireFixedEarlierOperand(memberAccess.Expression, new ReferenceNode(span, baseTarget!),
+                    current.ArgumentList.Arguments.Select(argument => argument.Expression).ToArray());
+
+            var hoists = _pendingStatements.GetRange(stepMark, _pendingStatements.Count - stepMark);
+            _pendingStatements.RemoveRange(stepMark, hoists.Count);
+            steps.Add((baseTarget, methodName, args, span, hoists));
+            if (isBase)
                 break;
-            }
+            current = (InvocationExpressionSyntax)memberAccess.Expression;
         }
 
         // Reverse so innermost (base) is first
@@ -9101,6 +9271,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var tempName = _context.GenerateId("_chain", step.methodName);
 
+            results.AddRange(step.hoists);
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
             results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
             prevTempName = tempName;
@@ -9109,6 +9280,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Last step becomes a call statement (no assignment, expression statement)
         var lastStep = steps[^1];
         var lastTarget = prevTempName!;
+        results.AddRange(lastStep.hoists);
         results.Add(new CallStatementNode(
             span,
             $"{lastTarget}.{lastStep.methodName}",
@@ -9151,6 +9323,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var tempName = _context.GenerateId("_chain", step.methodName);
 
+            results.AddRange(step.hoists);
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
             results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
             prevTempName = tempName;
@@ -9159,6 +9332,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Last step becomes the return value
         var lastStep = steps[^1];
         var lastTarget = prevTempName!;
+        results.AddRange(lastStep.hoists);
         var lastCallExpr = new CallExpressionNode(lastStep.span, $"{lastTarget}.{lastStep.methodName}", lastStep.args);
         results.Add(new ReturnStatementNode(span, lastCallExpr));
 
@@ -9169,7 +9343,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Emits bind statements for chain steps, with the final step using the provided name and type.
     /// </summary>
     private IReadOnlyList<StatementNode> EmitChainSteps(
-        List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)> steps,
+        List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span, List<StatementNode> hoists)> steps,
         string finalName,
         string? finalTypeName,
         bool finalIsMutable,
@@ -9180,7 +9354,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Not actually chained — fall back to single bind
             var step = steps[0];
             var callExpr = new CallExpressionNode(step.span, $"{step.baseTarget}.{step.methodName}", step.args);
-            return new[]
+            return new List<StatementNode>(step.hoists)
             {
                 new BindStatementNode(statementSpan, finalName, finalTypeName, finalIsMutable, callExpr, new AttributeCollection())
             };
@@ -9196,6 +9370,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var isLast = i == steps.Count - 1;
 
+            results.AddRange(step.hoists);
             // Hoist complex arguments (§NEW, ternaries with §NEW) from chain step args
             HoistComplexArguments(step.args);
             if (_pendingStatements.Count > 0)
@@ -9231,13 +9406,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.IncrementConverted();
 
         var id = _context.GenerateId("if");
+        var conditionMark = _pendingStatements.Count;
         var condition = ConvertExpression(node.Condition);
 
         var introducesLocals = node.Condition.DescendantNodesAndSelf()
             .Any(syntax => syntax is DeclarationExpressionSyntax or IsPatternExpressionSyntax);
         // #1633 audit: staging a call ahead of the condition moves it before the operands C#
         // evaluates first; that is allowed only when none of them can observe the call.
-        condition = HoistCallsFromCondition(condition, !introducesLocals && CallStagingKeepsOrder(node.Condition));
+        var stagingKeepsOrder = CallStagingKeepsOrder(node.Condition);
+        // #1677 (Codex round 1): converting the condition can itself hoist a call ahead of the
+        // `if` (`_chainF = F()` for `F().N()`), which moves it the same way staging would.
+        if (!stagingKeepsOrder && !introducesLocals && HoistsHaveEffects(conditionMark))
+            throw EscalateExpression(node.Condition, "compound-assignment-order");
+        condition = HoistCallsFromCondition(condition, !introducesLocals && stagingKeepsOrder);
 
         var (chainBindings, patternBindings) = SplitConditionHoists(_pendingStatements);
         _pendingStatements.Clear();
@@ -9370,7 +9551,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && logical.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression)
             {
                 if (HasCall(logical))
+                {
                     keepsOrder &= inlineFixed;
+                    StagedConversion(expression, logical);
+                }
                 else
                     inlineFixed &= IsFixedOperand(logical);
                 return;
@@ -9378,6 +9562,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (node is InvocationExpressionSyntax)
             {
                 keepsOrder &= inlineFixed;
+                StagedConversion(expression, node);
                 return;
             }
             if (node is BinaryExpressionSyntax binary && !binary.IsKind(SyntaxKind.CoalesceExpression))
@@ -9399,6 +9584,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return;
             }
             inlineFixed &= IsFixedOperand(node);
+        }
+        // #1677 (A): a staged part's temp holds its unconverted value; a user-defined conversion
+        // (`A()` to int in `A() < F()`) then runs inline, after a later staged call.
+        void StagedConversion(ExpressionSyntax outer, ExpressionSyntax staged)
+        {
+            if (HasEffectfulConversion(outer) || HasEffectfulConversion(staged))
+                inlineFixed = false;
         }
         bool IsFixedOperand(ExpressionSyntax operand) => operand.DescendantNodesAndSelf()
             .OfType<ExpressionSyntax>()
@@ -9848,7 +10040,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection());
     }
 
-    private UsingStatementNode ConvertUsingStatement(UsingStatementSyntax node)
+    private UsingStatementNode ConvertUsingStatement(UsingStatementSyntax node, int resourceIndex = 0)
     {
         _context.RecordFeatureUsage("using-statement");
         _context.IncrementConverted();
@@ -9866,7 +10058,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             if (node.Declaration.Variables.Count > 0)
             {
-                var variable = node.Declaration.Variables[0];
+                var variable = node.Declaration.Variables[resourceIndex];
                 variableName = variable.Identifier.ValueText;
                 resource = variable.Initializer != null
                     ? ConvertExpression(variable.Initializer.Value)
@@ -9887,7 +10079,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             resource = new ReferenceNode(GetTextSpan(node), "unknown");
         }
 
-        var body = ConvertEmbeddedStatement(node.Statement);
+        // #1677: what converting the resource hoisted (a lambda or chain temp) runs before the
+        // `using`, as the resource does. The body starts each of its statements with no pending
+        // hoists, which dropped these and left an undeclared temp.
+        var resourceHoists = new List<StatementNode>(_pendingStatements);
+        _pendingStatements.Clear();
+        List<StatementNode> body;
+        try
+        {
+            if (node.Declaration != null && resourceIndex + 1 < node.Declaration.Variables.Count)
+            {
+                // Nested usings acquire left-to-right and dispose right-to-left, even on failure.
+                var nested = ConvertUsingStatement(node, resourceIndex + 1);
+                body = [.. _pendingStatements, nested];
+            }
+            else
+            {
+                body = ConvertEmbeddedStatement(node.Statement);
+            }
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(resourceHoists);
+        }
 
         return new UsingStatementNode(
             GetTextSpan(node),
@@ -10684,14 +10899,35 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // escalate the containing member to §CSHARP interop instead.
         var binaryOp = BinaryOperatorExtensions.FromString(op)
             ?? throw EscalateExpression(binary, "unsupported-binary-operator");
-        var leftExpr = ConvertExpression(binary.Left);
-        var rightExpr = ConvertExpression(binary.Right);
+        // Binary operands are rendered in conditional regions, so only converter hoists escape.
+        var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: true);
 
-        return new BinaryOperationNode(GetTextSpan(binary), binaryOp, leftExpr, rightExpr);
+        return new BinaryOperationNode(GetTextSpan(binary), binaryOp, operands[0], operands[1]);
     }
 
     private ExpressionNode ConvertIsPatternExpression(IsPatternExpressionSyntax isPattern)
     {
+        if (isPattern.Pattern.DescendantNodesAndSelf().Any(pattern =>
+                pattern is VarPatternSyntax { Designation: ParenthesizedVariableDesignationSyntax }
+                or RecursivePatternSyntax { PositionalPatternClause: not null }
+                or RecursivePatternSyntax { PropertyPatternClause.Subpatterns.Count: > 0 }
+                or RecursivePatternSyntax { Designation: not null }))
+            throw EscalateExpression(isPattern, "complex-is-pattern");
+
+        var subjectType = _semanticModel?.GetTypeInfo(isPattern.Expression).Type;
+        for (var type = subjectType as INamedTypeSymbol; type != null; type = type.BaseType)
+        {
+            // Metadata string equality preserves constant-pattern value and null semantics.
+            if (type.SpecialType == SpecialType.System_String && type.Locations.Any(location => location.IsInMetadata))
+                continue;
+            if (type.GetMembers("op_Equality").Length > 0 || type.GetMembers("op_Inequality").Length > 0)
+                throw EscalateExpression(isPattern, "complex-is-pattern");
+        }
+        if (subjectType?.TypeKind == TypeKind.Dynamic
+            || isPattern.Pattern.DescendantNodesAndSelf().Any(pattern => pattern is BinaryPatternSyntax)
+                && (_semanticModel == null || !IsFixedValue(isPattern.Expression, [])))
+            throw EscalateExpression(isPattern, "complex-is-pattern");
+
         // Convert "x is null" to "(== x null)"
         // Convert "x is not null" to "(!= x null)"
         var left = ConvertExpression(isPattern.Expression);
@@ -11071,10 +11307,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     };
 
     /// <summary>
-    /// Converts "x is SomeType varName" to a type check expression and hoists a variable binding.
-    /// The type check (is) is returned as the expression value for use in conditions.
-    /// The variable binding (§B{varName} (cast SomeType x)) is hoisted via _pendingStatements
-    /// so it appears before the containing statement.
+    /// Keeps declaration-pattern binding inside the successful type test.
     /// </summary>
     private ExpressionNode ConvertDeclarationPattern(
         IsPatternExpressionSyntax isPattern,
@@ -11083,23 +11316,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var calorType = TypeMapper.CSharpToCalor(declPattern.Type.ToString());
 
-        if (_conditionalRegionDepth > 0 && declPattern.Designation is SingleVariableDesignationSyntax conditionalVariable)
+        if (declPattern.Designation is SingleVariableDesignationSyntax conditionalVariable)
             return new IsPatternNode(GetTextSpan(isPattern), left, calorType,
                 conditionalVariable.Identifier.ValueText);
-
-        // Hoist a variable binding: §B{varName} (cast Type expr)
-        if (declPattern.Designation is SingleVariableDesignationSyntax singleVar)
-        {
-            var varName = singleVar.Identifier.Text;
-            var castExpr = new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Cast, left, calorType);
-            _pendingStatements.Add(new BindStatementNode(
-                GetTextSpan(isPattern),
-                varName,
-                calorType,
-                isMutable: false,
-                castExpr,
-                new AttributeCollection()));
-        }
 
         // Return the type check as the expression
         return new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left, calorType);
@@ -11121,9 +11340,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             case SingleVariableDesignationSyntax singleVar:
             {
                 // "x is var name" → hoist binding, return true (always matches)
+                if (_semanticModel?.GetDeclaredSymbol(singleVar) is not ILocalSymbol variable)
+                    throw EscalateExpression(isPattern, "complex-is-pattern");
                 var varName = singleVar.Identifier.Text;
                 _pendingStatements.Add(new BindStatementNode(
-                    span, varName, "object", isMutable: false, left, new AttributeCollection()));
+                    span, varName, TypeMapper.CSharpToCalor(variable.Type.ToDisplayString()),
+                    isMutable: false, left, new AttributeCollection()));
                 return new BoolLiteralNode(span, true);
             }
 
@@ -11314,6 +11536,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (ContainsInitializerCreation(collection))
             return PreserveInitializerContainer(collection, "collection-expression");
+        if (_semanticModel?.GetTypeInfo(collection).ConvertedType is not IArrayTypeSymbol
+            || collection.Elements.OfType<SpreadElementSyntax>().Any(spread =>
+                collection.Elements.Count != 1
+                || _semanticModel.GetTypeInfo(spread.Expression).Type is not IArrayTypeSymbol))
+            throw EscalateExpression(collection, "collection-expression");
         // Convert C# 12 collection expressions: [] or [1, 2, 3]
         // Empty collection: use Array.Empty<T>() for inline compatibility
         // (block-level §LIST with 0 elements causes issues in expression contexts like switch arms)
@@ -11349,7 +11576,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             if (element is ExpressionElementSyntax exprElement)
             {
-                var converted = ConvertExpression(exprElement.Expression);
+                var converted = ConvertArrayElement(exprElement.Expression, rectangular: false);
                 initializer.Add(converted);
 
                 // Try to infer element type from first element
@@ -11364,10 +11591,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 if (collection.Elements.Count == 1)
                 {
                     _context.RecordFeatureUsage("collection-spread");
-                    var spreadTarget = spread.Expression.ToString();
-                    return new CallExpressionNode(GetTextSpan(collection),
-                        $"{spreadTarget}.{GetCollectionMaterializer(collection)}",
-                        Array.Empty<ExpressionNode>());
+                    return new CallExpressionNode(GetTextSpan(collection), "System.Linq.Enumerable.ToArray",
+                        [ConvertInPlace(spread.Expression, always: true)]);
                 }
                 // Mixed spread [..a, ..b] or [1, ..a] — convert to Concat chain
                 _context.RecordFeatureUsage("collection-spread");
@@ -11495,6 +11720,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertImplicitObjectCreationCore(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
+        if (implicitNew.ArgumentList?.Arguments.Any(argument => argument.NameColon != null) == true)
+            throw EscalateExpression(implicitNew, "named-argument");
         if (HasDictionaryInitializerOperations(implicitNew.Initializer))
             return PreserveDictionaryInitializer(implicitNew);
         if (InitializerPreservationReason(implicitNew) is { } preservationReason)
@@ -11539,15 +11766,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("target-typed-new");
         _context.IncrementConverted();
         var typeName = inferredType ?? "object";
-        var args = implicitNew.ArgumentList.Arguments
-            .Select(a =>
+        var args = ConvertOrderedExpressions(implicitNew.ArgumentList.Arguments.Select(a => a.Expression));
+        for (var index = 0; index < args.Count; index++)
+        {
+            if (IsBlockLevelCollection(args[index]))
             {
-                var expr = ConvertExpression(a.Expression);
-                // Convert block-level collections to inline for constructor args
-                if (IsBlockLevelCollection(expr))
-                    expr = ConvertBlockLevelCollectionToNew(expr, ExtractTypeHint(a.Expression));
-                return expr;
-            }).ToList();
+                args[index] = ConvertBlockLevelCollectionToNew(args[index],
+                    ExtractTypeHint(implicitNew.ArgumentList.Arguments[index].Expression));
+            }
+        }
         var initializers = new List<ObjectInitializerAssignment>();
         if (implicitNew.Initializer != null)
         {
@@ -11920,7 +12147,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
         return typeName switch
         {
-            "int" or "Int32" or "long" or "Int64" or "short" or "byte" => new IntLiteralNode(GetTextSpan(defaultExpr), 0),
+            "int" or "Int32" => new IntLiteralNode(GetTextSpan(defaultExpr), 0),
+            "long" or "Int64" => new IntLiteralNode(GetTextSpan(defaultExpr), 0) { IsLong = true },
+            "short" or "byte" => new TypeOperationNode(GetTextSpan(defaultExpr), TypeOp.Cast,
+                new IntLiteralNode(GetTextSpan(defaultExpr), 0), TypeMapper.CSharpToCalor(typeName)),
             // #1528: keep the literal's width; a plain 0.0 is a double.
             "double" or "Double" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0),
             "float" or "Single" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0) { IsSingle = true },
@@ -11937,19 +12167,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return PreserveInitializerContainer(tuple, "tuple");
         _context.RecordFeatureUsage("tuple-literal");
         _context.IncrementConverted();
-        var elements = tuple.Arguments
-            .Select(a =>
+        var elements = ConvertOrderedExpressions(tuple.Arguments.Select(a => a.Expression));
+        for (var index = 0; index < elements.Count; index++)
+        {
+            if (IsBlockLevelCollection(elements[index]))
             {
-                var expr = ConvertExpression(a.Expression);
-                // Convert block-level collections to inline §NEW for tuple elements
-                if (IsBlockLevelCollection(expr))
-                {
-                    var typeName = ExtractTypeHint(a.Expression);
-                    expr = ConvertBlockLevelCollectionToNew(expr, typeName);
-                }
-                return expr;
-            })
-            .ToList();
+                elements[index] = ConvertBlockLevelCollectionToNew(elements[index],
+                    ExtractTypeHint(tuple.Arguments[index].Expression));
+            }
+        }
         return new TupleLiteralNode(GetTextSpan(tuple), elements);
     }
 
@@ -12389,8 +12615,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("range-expression");
         _context.IncrementConverted();
-        var start = rangeExpr.LeftOperand != null ? ConvertExpression(rangeExpr.LeftOperand) : null;
-        var end = rangeExpr.RightOperand != null ? ConvertExpression(rangeExpr.RightOperand) : null;
+        var operands = ConvertOrderedExpressions(
+            new[] { rangeExpr.LeftOperand, rangeExpr.RightOperand }.OfType<ExpressionSyntax>());
+        var start = rangeExpr.LeftOperand != null ? operands[0] : null;
+        var end = rangeExpr.RightOperand != null ? operands[^1] : null;
         return new RangeExpressionNode(GetTextSpan(rangeExpr), start, end);
     }
 
@@ -12400,6 +12628,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.IncrementConverted();
         var target = ConvertExpression(withExpr.Expression);
         var assignments = new List<WithPropertyAssignmentNode>();
+        var mark = _pendingStatements.Count;
 
         foreach (var expr in withExpr.Initializer.Expressions)
         {
@@ -12422,6 +12651,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 assignments.Add(new WithPropertyAssignmentNode(GetTextSpan(expr), expr.ToString(), value));
             }
         }
+        if (HoistsHaveEffects(mark) || assignments.Any(assignment => EmitterMayHoist(assignment.Value)))
+            throw EscalateExpression(withExpr, "compound-assignment-order");
 
         return new WithExpressionNode(GetTextSpan(withExpr), target, assignments);
     }
@@ -12527,9 +12758,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && target.Left == node))
             // The target of a whole-statement assignment: ConvertAssignmentStatement binds its
             // read, receiver and arguments ahead of whatever the right-hand side hoists.
+            // #1677 (D): not when the postfix is inside that target (`a[x + x++] += 5`): its hoist
+            // runs before the target's own earlier operands.
             .Where(node => !node.AncestorsAndSelf().Any(ancestor =>
                 ancestor.Parent is AssignmentExpressionSyntax { Parent: ExpressionStatementSyntax } statementAssignment
-                && statementAssignment.Left == ancestor))
+                && statementAssignment.Left == ancestor
+                && !postfix.Ancestors().Contains(ancestor)))
             .ToList();
         if (earlier.Count == 0)
             return;
@@ -12594,19 +12828,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax or BaseObjectCreationExpressionSyntax
             or ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None };
 
-        bool Complex(ExpressionNode arg) =>
-            !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
-            && (arg is NewExpressionNode or LambdaExpressionNode
-                    or ListCreationNode or DictionaryCreationNode or SetCreationNode
-                || arg is ConditionalExpressionNode cond
-                    && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
-
         // #1132: a hoisted argument runs before the call's earlier arguments, so every
         // earlier argument that is not InPlace is bound first, in order.
         last = -1;
         for (var i = 0; i < args.Count; i++)
         {
-            if (Complex(args[i]) && args[i] is not LambdaExpressionNode)
+            if (IsComplexArgument(args[i]) && args[i] is not LambdaExpressionNode)
                 last = i;
         }
         // #943 (D1 RO-CALL-1, RO-ORD-1): a hoisted argument would run before the receiver and the
@@ -12624,12 +12851,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     && plain.SyntaxTree == _semanticModel.SyntaxTree
                     && _semanticModel.GetSymbolInfo(plain).Symbol is ILocalSymbol or IParameterSymbol))
                 throw EscalateExpression(refs[i], "conditional-expression-hoisting");
-            var hoist = Complex(args[i]) || i < last && !InPlace(i);
+            var hoist = IsComplexArgument(args[i]) || i < last && !InPlace(i);
             if (!hoist)
                 continue;
             // #1132: an untyped temp drops the argument's target typing (a method group) or
             // moves a user-defined conversion after the later arguments: preserve instead.
-            if (!Complex(args[i]) && syntax is { } typed && i < typed.Count && !KeepsMeaningInTemp(typed[i].Expression))
+            if (!IsComplexArgument(args[i]) && syntax is { } typed && i < typed.Count && !KeepsMeaningInTemp(typed[i].Expression))
                 throw EscalateExpression(typed[i].Expression, "conditional-expression-hoisting");
             var tempName = args[i] switch
             {
@@ -12638,7 +12865,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ListCreationNode listNode => _context.GenerateId("_list", listNode.ElementType),
                 DictionaryCreationNode => _context.GenerateId("_dict"),
                 SetCreationNode setNode => _context.GenerateId("_set", setNode.ElementType),
-                ConditionalExpressionNode when Complex(args[i]) => _context.GenerateId("_tern"),
+                ConditionalExpressionNode when IsComplexArgument(args[i]) => _context.GenerateId("_tern"),
                 _ => _context.GenerateId("_arg")
             };
             _pendingStatements.Add(new BindStatementNode(
@@ -12646,6 +12873,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             args[i] = new ReferenceNode(args[i].Span, tempName);
         }
     }
+
+    private bool IsComplexArgument(ExpressionNode arg) =>
+        !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
+        && (arg is NewExpressionNode or LambdaExpressionNode
+                or ListCreationNode or DictionaryCreationNode or SetCreationNode
+            || arg is ConditionalExpressionNode cond
+                && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
 
     private static bool ContainsComplexNode(ExpressionNode node)
     {
@@ -12895,12 +13129,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
         var target = invocation.Expression.ToString().Replace("!", "");
-        var args = invocation.ArgumentList.Arguments
-            .Select(a => ConvertExpression(a.Expression))
-            .ToList();
+        // #1677 (Codex round 1): C# evaluates the receiver before the arguments, so it is
+        // converted first and its hoists (`_chainNext = c.Next()`) come before the arguments'.
+        // The safety net below reuses it instead of converting it again (a second conversion
+        // repeated its hoists, such as a block lambda's bind).
+        var convertedReceiver = invocation.Expression is MemberAccessExpressionSyntax receiverAccess
+            ? ConvertExpression(receiverAccess.Expression)
+            : null;
+        var argumentMark = _pendingStatements.Count;
+        var args = ConvertOrderedExpressions(invocation.ArgumentList.Arguments.Select(a => a.Expression),
+            stageComplexArguments: true);
 
         // Hoist §NEW, §LAM, §ARR arguments to temp bindings — the parser cannot handle them nested inside §C
         HoistComplexArguments(args, invocation.ArgumentList.Arguments);
+        if (invocation.Expression is MemberAccessExpressionSyntax receiver
+            && (HoistsHaveEffects(argumentMark) || args.Any(EmitterMayHoist)))
+        {
+            RequireFixedEarlierOperand(receiver.Expression, convertedReceiver!,
+                invocation.ArgumentList.Arguments.Select(a => a.Expression).ToArray());
+        }
 
         var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
         var argNames = hasNamedArgs
@@ -12931,17 +13178,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             target = directGenericName.Identifier.Text;
         }
 
+        if (target is "string.Equals" or "String.Equals" or "System.String.Equals"
+            && _semanticModel?.GetSymbolInfo(invocation).Symbol is IMethodSymbol { ReturnType.SpecialType: SpecialType.System_Boolean })
+        {
+            return new TypeOperationNode(GetTextSpan(invocation), TypeOp.Cast,
+                new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments), "bool");
+        }
+
         // Try to convert common string methods to native StringOperationNode
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
-            var targetExpr = ConvertExpression(memberAccess.Expression);
+            var targetExpr = convertedReceiver!;
             var targetStr = memberAccess.Expression.ToString();
             var span = GetTextSpan(invocation);
 
             // Try StringBuilder instance methods first (heuristic: target looks like StringBuilder)
             // This prevents sb.ToString() from matching StringOp.ToString
-            if (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb") || targetStr.StartsWith("_sb"))
+            if (!hasNamedArgs && (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb") || targetStr.StartsWith("_sb")))
             {
                 var sbOp = TryGetStringBuilderOperation(methodName, targetExpr, args, span);
                 if (sbOp != null)
@@ -12951,7 +13205,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
-            var stringOp = TryGetStringOperation(methodName, targetExpr, args, span);
+            var stringOp = hasNamedArgs ? null : TryGetStringOperation(invocation, methodName, targetExpr, args, span);
             if (stringOp != null)
             {
                 _context.RecordFeatureUsage("native-string-op");
@@ -12959,7 +13213,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
 
             // Try StringBuilder instance methods (for other naming patterns)
-            var sbOp2 = TryGetStringBuilderOperation(methodName, targetExpr, args, span);
+            var sbOp2 = hasNamedArgs ? null : TryGetStringBuilderOperation(methodName, targetExpr, args, span);
             if (sbOp2 != null)
             {
                 _context.RecordFeatureUsage("native-stringbuilder-op");
@@ -12984,20 +13238,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Hoist inner call to a temp bind so the outer call has a clean target.
             // The temp bind is added to _pendingStatements which ConvertBlock flushes
             // before the containing statement.
-            // CAVEAT: When the containing statement is a loop (while/for), the hoisted bind
-            // is emitted once before the loop rather than re-evaluated per iteration. This is
-            // semantically correct for LINQ's lazy IEnumerable chains (Where/Select/etc.
-            // return deferred iterators), but would change behavior for eagerly-evaluated
-            // chains. In practice this is acceptable — the alternative was non-functional Calor.
+            // Loop conditions use ConvertLoopCondition to keep these binds inside each iteration.
             // NOTE: Native ops (string, StringBuilder, regex, char) above may already have
             // returned, so this only fires for non-native chains. Statement-level decomposition
             // in ConvertBlock uses WouldChainUseNativeOps to stay aligned — see its doc comment.
             if (memberAccess.Expression is InvocationExpressionSyntax innerInvocation)
             {
                 _context.RecordFeatureUsage("linq-method");
-                var innerConverted = _conditionalRegionDepth > 0
-                    ? targetExpr
-                    : ConvertInvocationExpression(innerInvocation);
+                // #1677: targetExpr is this inner call, already converted (ConvertExpression on an
+                // invocation is ConvertInvocationExpression). Converting it again ran its own
+                // hoisted receivers twice: `() => c.Next().Next().Val()` called Next three times.
+                var innerConverted = targetExpr;
                 var innerMethodHint = ExtractInnerMethodName(innerInvocation);
                 var tempName = _context.GenerateId("_chain", innerMethodHint);
                 _pendingStatements.Add(new BindStatementNode(
@@ -13007,9 +13258,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             // Handle indexer-then-call pattern: words[0].Method(...)
             // Hoist the element access to a temp bind so the method call has a clean target.
-            if (memberAccess.Expression is ElementAccessExpressionSyntax elementAccess)
+            if (memberAccess.Expression is ElementAccessExpressionSyntax)
             {
-                var elementConverted = ConvertExpression(elementAccess);
+                // #1677 (Codex round 1): the receiver, already converted; converting it again ran
+                // its hoists twice.
+                var elementConverted = targetExpr;
                 var tempName = _context.GenerateId("_elem");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, elementConverted, new AttributeCollection()));
@@ -13072,7 +13325,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Check for static string methods like string.IsNullOrEmpty
-        if (target.StartsWith("string."))
+        if (!hasNamedArgs && target.StartsWith("string."))
         {
             var methodName = target.Substring(7); // Remove "string." prefix
             var span = GetTextSpan(invocation);
@@ -13085,7 +13338,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Check for static Regex methods like Regex.IsMatch
-        if (target.StartsWith("Regex.") || target.StartsWith("System.Text.RegularExpressions.Regex."))
+        if (!hasNamedArgs && IsMetadataMember(invocation, "System.Text.RegularExpressions.Regex")
+            && (target.StartsWith("Regex.") || target.StartsWith("System.Text.RegularExpressions.Regex.")))
         {
             var methodName = target.Contains(".") ? target.Substring(target.LastIndexOf('.') + 1) : target;
             var span = GetTextSpan(invocation);
@@ -13098,7 +13352,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Check for static char methods like char.IsLetter
-        if (target.StartsWith("char.") || target.StartsWith("Char."))
+        if (!hasNamedArgs && IsMetadataMember(invocation, "System.Char")
+            && (target.StartsWith("char.") || target.StartsWith("Char.")))
         {
             var methodName = target.Substring(target.IndexOf('.') + 1);
             var span = GetTextSpan(invocation);
@@ -13142,7 +13397,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (invocation.Expression is MemberAccessExpressionSyntax finalMa)
             {
                 var finalMethodName = finalMa.Name.Identifier.Text;
-                var finalConverted = ConvertExpression(finalMa.Expression);
+                var finalConverted = convertedReceiver ?? ConvertExpression(finalMa.Expression);
                 var tempName = _context.GenerateId("_expr");
                 _pendingStatements.Add(new BindStatementNode(
                     GetTextSpan(invocation), tempName, null, false, finalConverted, new AttributeCollection()));
@@ -13152,6 +13407,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments);
     }
+
+    private bool IsMetadataMember(ExpressionSyntax expression, string metadataName)
+        => _semanticModel != null && expression.SyntaxTree == _semanticModel.SyntaxTree
+            && _semanticModel.GetSymbolInfo(expression).Symbol is { } member
+            && member is IMethodSymbol or IFieldSymbol
+            && member.ContainingType.DeclaringSyntaxReferences.Length == 0
+            && SymbolEqualityComparer.Default.Equals(member.ContainingType,
+                _semanticModel.Compilation.GetTypeByMetadataName(metadataName));
 
     private StringOperationNode? TryGetRegexOperation(
         string methodName,
@@ -13211,6 +13474,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     private StringOperationNode? TryGetStringOperation(
+        InvocationExpressionSyntax invocation,
         string methodName,
         ExpressionNode target,
         List<ExpressionNode> args,
@@ -13238,6 +13502,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             if (comparisonName != null)
             {
+                var comparisonSyntax = invocation.ArgumentList.Arguments[^1].Expression;
+                if (_semanticModel?.GetSymbolInfo(comparisonSyntax).Symbol is not IFieldSymbol field
+                    || field.DeclaringSyntaxReferences.Length != 0
+                    || !SymbolEqualityComparer.Default.Equals(field.ContainingType,
+                        _semanticModel.Compilation.GetTypeByMetadataName("System.StringComparison")))
+                    return null;
+
                 comparisonMode = ParseStringComparisonFromRef(comparisonName);
                 if (comparisonMode != null)
                 {
@@ -13298,32 +13569,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<ExpressionNode> args,
         TextSpan span)
     {
-        // Check for StringComparison overloads on static methods
-        StringComparisonMode? comparisonMode = null;
-        var regularArgs = args;
-        if (args.Count >= 1)
-        {
-            var lastArg = args[^1];
-            // Handle StringComparison as ReferenceNode or FieldAccessNode
-            string? comparisonName = lastArg switch
-            {
-                ReferenceNode refNode when refNode.Name.StartsWith("StringComparison.") => refNode.Name,
-                FieldAccessNode fieldAccess when fieldAccess.FieldName is "Ordinal" or "OrdinalIgnoreCase"
-                    or "InvariantCulture" or "InvariantCultureIgnoreCase" =>
-                    $"StringComparison.{fieldAccess.FieldName}",
-                _ => null
-            };
-
-            if (comparisonName != null)
-            {
-                comparisonMode = ParseStringComparisonFromRef(comparisonName);
-                if (comparisonMode != null)
-                {
-                    regularArgs = args.Take(args.Count - 1).ToList();
-                }
-            }
-        }
-
         return methodName switch
         {
             "IsNullOrEmpty" when args.Count == 1 => new StringOperationNode(span, StringOp.IsNullOrEmpty, args),
@@ -13331,7 +13576,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "Join" when args.Count == 2 => new StringOperationNode(span, StringOp.Join, args),
             "Concat" when args.Count >= 2 => new StringOperationNode(span, StringOp.Concat, args),
             "Format" when args.Count >= 2 => new StringOperationNode(span, StringOp.Format, args),
-            "Equals" when regularArgs.Count == 2 => new StringOperationNode(span, StringOp.Equals, regularArgs, comparisonMode),
             _ => null
         };
     }
@@ -13351,7 +13595,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (memberName == "Empty")
         {
             var targetStr = memberAccess.Expression.ToString();
-            if (targetStr is "string" or "String" or "System.String")
+            if (targetStr is "string" or "String" or "System.String"
+                && IsMetadataMember(memberAccess, "System.String"))
             {
                 return new StringLiteralNode(span, "");
             }
@@ -13377,13 +13622,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case "int" when memberName == "MinValue":
                     return new IntLiteralNode(span, int.MinValue);
                 case "byte" when memberName == "MaxValue":
-                    return new IntLiteralNode(span, byte.MaxValue);
+                    return new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, byte.MaxValue), "u8");
                 case "byte" when memberName == "MinValue":
-                    return new IntLiteralNode(span, byte.MinValue);
+                    return new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, byte.MinValue), "u8");
                 case "short" when memberName == "MaxValue":
-                    return new IntLiteralNode(span, short.MaxValue);
+                    return new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, short.MaxValue), "i16");
                 case "short" when memberName == "MinValue":
-                    return new IntLiteralNode(span, short.MinValue);
+                    return new TypeOperationNode(span, TypeOp.Cast, new IntLiteralNode(span, short.MinValue), "i16");
                 default:
                     // For long, float, double, etc. — pass through as reference
                     return new ReferenceNode(span, $"{keyword}.{memberName}");
@@ -13438,6 +13683,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertObjectCreationCore(ObjectCreationExpressionSyntax objCreation)
     {
+        if (objCreation.ArgumentList?.Arguments.Any(argument => argument.NameColon != null) == true)
+            throw EscalateExpression(objCreation, "named-argument");
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
 
@@ -13514,16 +13761,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        var args = objCreation.ArgumentList?.Arguments
-            .Select(a =>
+        var args = ConvertOrderedExpressions(objCreation.ArgumentList?.Arguments.Select(a => a.Expression) ?? [],
+            stageComplexArguments: true);
+        for (var index = 0; index < args.Count; index++)
+        {
+            if (IsBlockLevelCollection(args[index]))
             {
-                var expr = ConvertExpression(a.Expression);
-                // Convert block-level collections to inline for constructor args
-                if (IsBlockLevelCollection(expr))
-                    expr = ConvertBlockLevelCollectionToNew(expr, ExtractTypeHint(a.Expression));
-                return expr;
-            })
-            .ToList() ?? new List<ExpressionNode>();
+                args[index] = ConvertBlockLevelCollectionToNew(args[index],
+                    ExtractTypeHint(objCreation.ArgumentList!.Arguments[index].Expression));
+            }
+        }
 
         // Hoist §NEW arguments to temp bindings — parser cannot handle §NEW nested inside §NEW
         HoistComplexArguments(args, objCreation.ArgumentList?.Arguments);
@@ -13531,6 +13778,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Convert StringBuilder to native operations. #1524: §NEW keeps an object initializer
         // (`new StringBuilder { Capacity = 64 }`); the native sb-new form has no place for it.
         if ((typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")
+            && IsMetadataMember(objCreation, "System.Text.StringBuilder")
             && objCreation.Initializer is not { Expressions.Count: > 0 })
         {
             _context.RecordFeatureUsage("native-stringbuilder-op");
@@ -13588,15 +13836,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return PreserveInitializerContainer(anonObj, "anonymous-object");
         var initializers = new List<ObjectInitializerAssignment>();
 
-        foreach (var init in anonObj.Initializers)
+        var values = ConvertOrderedExpressions(anonObj.Initializers.Select(init => init.Expression));
+        for (var index = 0; index < anonObj.Initializers.Count; index++)
         {
+            var init = anonObj.Initializers[index];
             // Use explicit name if present; otherwise infer from the last simple identifier.
             // Complex expressions (indexers, invocations) get a generated safe name.
             var name = init.NameEquals?.Name.Identifier.ValueText
                 ?? (init.Expression is IdentifierNameSyntax id ? id.Identifier.ValueText
                     : init.Expression is MemberAccessExpressionSyntax m ? m.Name.Identifier.ValueText
                     : $"_prop{_context.GenerateId("p")}");
-            var value = ConvertExpression(init.Expression);
+            var value = values[index];
             // #1541: a collection value stays in place (inline §LIST/§HSET, or C#). Hoisting it
             // ahead of the statement ran it before the earlier members' values.
             if (IsBlockLevelCollection(value))
@@ -13648,6 +13898,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var currentExpr = ConvertExpression(query.FromClause.Expression);
 
         var body = query.Body;
+        string? continuationReceiverType = null;
         while (body != null)
         {
             // Process body clauses (where, orderby, let, join, additional from)
@@ -13703,7 +13954,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     case JoinClauseSyntax joinClause:
                     {
                         var joinVar = joinClause.Identifier.Text;
+                        var joinMark = _pendingStatements.Count;
                         var joinCollection = ConvertExpression(joinClause.InExpression);
+                        if (HoistsHaveEffects(joinMark) || EmitterMayHoist(joinCollection))
+                            throw EscalateExpression(query, "linq-query");
                         var leftKey = ConvertExpression(joinClause.LeftExpression);
                         var rightKey = ConvertExpression(joinClause.RightExpression);
                         // Default result selector: anonymous object with both range vars.
@@ -13756,23 +14010,37 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         joinCall.Arguments[0], joinCall.Arguments[1], joinCall.Arguments[2], newResultLambda
                     });
                 }
-                else if (projection is not ReferenceNode refNode || refNode.Name != rangeVar)
+                else if (body.Clauses.Count == 0
+                    || selectClause.Expression is not IdentifierNameSyntax selected
+                    || selected.Identifier.ValueText != rangeVar.TrimStart('@'))
                 {
-                    // Only add Select if projection is not just the range variable
-                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector });
+                    // A bare from/select must call Select even for an identity projection.
+                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector },
+                        continuationReceiverType);
                 }
             }
             else if (body.SelectOrGroup is GroupClauseSyntax groupClause)
             {
                 var keySelector = ConvertLinqLambda(span, rangeVar, groupClause.ByExpression);
-                var elementSelector = ConvertLinqLambda(span, rangeVar, groupClause.GroupExpression);
-                currentExpr = MakeChainedCall(span, currentExpr, "GroupBy",
-                    new ExpressionNode[] { keySelector, elementSelector });
+                if (groupClause.GroupExpression is IdentifierNameSyntax grouped
+                    && grouped.Identifier.ValueText == rangeVar.TrimStart('@'))
+                {
+                    currentExpr = MakeChainedCall(span, currentExpr, "GroupBy", [keySelector]);
+                }
+                else
+                {
+                    var elementSelector = ConvertLinqLambda(span, rangeVar, groupClause.GroupExpression);
+                    currentExpr = MakeChainedCall(span, currentExpr, "GroupBy", [keySelector, elementSelector]);
+                }
             }
 
             // Handle continuation (into g ...)
             if (body.Continuation != null)
             {
+                var resultType = (_semanticModel?.GetSymbolInfo(body.SelectOrGroup).Symbol as IMethodSymbol)?.ReturnType;
+                continuationReceiverType = resultType != null && CanNameQueryParameterType(resultType)
+                    ? TypeMapper.CSharpToCalor(resultType.ToDisplayString())
+                    : null;
                 rangeVar = body.Continuation.Identifier.Text;
                 body = body.Continuation.Body;
             }
@@ -13877,7 +14145,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Creates a chained method call node (e.g., collection.Where(...)).
     /// The receiver expression is emitted to Calor to form the target string.
     /// </summary>
-    private CallExpressionNode MakeChainedCall(TextSpan span, ExpressionNode receiver, string methodName, IReadOnlyList<ExpressionNode> arguments)
+    private CallExpressionNode MakeChainedCall(TextSpan span, ExpressionNode receiver, string methodName,
+        IReadOnlyList<ExpressionNode> arguments, string? receiverType = null)
     {
         // Hoist complex receivers to temp bindings instead of embedding raw Calor
         // in the target string — section markers (§C, §NEW, etc.) break the parser
@@ -13888,7 +14157,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         var tempName = _context.GenerateId("_chain", methodName);
         _pendingStatements.Add(new BindStatementNode(
-            span, tempName, null, false, receiver, new AttributeCollection()));
+            span, tempName, receiverType, false, receiver, new AttributeCollection()));
         return new CallExpressionNode(span, $"{tempName}.{methodName}", arguments);
     }
 
@@ -15107,7 +15376,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new MultiDimArrayAccessNode(span, array, indices);
         }
 
-        var index = ConvertInPlace(elementAccess.ArgumentList.Arguments[0].Expression);
+        var index = ConvertInPlace(elementAccess.ArgumentList.Arguments[0].Expression, always: true);
 
         // Only use char-at when the target is a string literal (e.g. "hello"[0])
         // Default to §IDX (ArrayAccess) — array/list indexing is far more common
@@ -15169,6 +15438,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 // without certifying that context, retain the complete C# lambda.
                 if (IsTupleAssignment(lambdaAssign))
                     throw EscalateExpression(lambdaAssign, "tuple-deconstruction");
+                // #1677: `Func<int, int> f = n => S += n` returns the assigned value; the statement
+                // lowering below has none, so the lambda stays C#.
+                if (LambdaReturnsValue(lambda) == true)
+                    throw EscalateExpression(lambdaAssign, "embedded-assignment");
                 // #1632 audit: what the assignment hoists runs inside the lambda, on each call,
                 // not once where the lambda is created.
                 var enclosing = new List<StatementNode>(_pendingStatements);
@@ -15184,6 +15457,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var assignment = ConvertAssignmentStatement(lambdaAssign, lambdaAssign.Left, compound,
                         lambdaAssign.Right, GetTextSpan(lambdaAssign));
                     stmtBody = new List<StatementNode>(_pendingStatements) { assignment };
+                }
+                finally
+                {
+                    _pendingStatements.Clear();
+                    _pendingStatements.AddRange(enclosing);
+                }
+            }
+            else if (lambda.ExpressionBody is PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax
+                && lambda.ExpressionBody.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression
+                    or SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression
+                && LambdaReturnsValue(lambda) == false)
+            {
+                // #1677: `() => Point.S++` for a void delegate is an increment statement. As a value
+                // it became `return _pre` (CS8030), and a prefix form a bare expression (CS0201).
+                var update = lambda.ExpressionBody;
+                var operand = update is PostfixUnaryExpressionSyntax post ? post.Operand : ((PrefixUnaryExpressionSyntax)update).Operand;
+                var increment = update.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PreIncrementExpression;
+                var enclosing = new List<StatementNode>(_pendingStatements);
+                _pendingStatements.Clear();
+                try
+                {
+                    var statement = ConvertAssignmentStatement(update, operand,
+                        increment ? CompoundAssignmentOperator.Add : CompoundAssignmentOperator.Subtract,
+                        null, GetTextSpan(update));
+                    stmtBody = new List<StatementNode>(_pendingStatements) { statement };
                 }
                 finally
                 {
@@ -15219,7 +15517,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (lambda.Body is BlockSyntax block)
         {
-            stmtBody = WithBodyReassignments(block, () => ConvertBlock(block)).ToList(); // #1550 review round 3
+            stmtBody = ConvertFunctionBlock(block);
         }
 
         return new LambdaExpressionNode(
@@ -15232,6 +15530,49 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             stmtBody,
             new AttributeCollection(),
             isStatic);
+    }
+
+    // #1677: whether the lambda's delegate returns a value; null when that is not known (no
+    // semantic model, or a target type that does not resolve).
+    private bool? LambdaReturnsValue(LambdaExpressionSyntax lambda)
+    {
+        if (_semanticModel == null || lambda.SyntaxTree != _semanticModel.SyntaxTree)
+            return null;
+        // The delegate the lambda converts to, not the lambda's own inferred signature: with an
+        // unresolved target type, Roslyn infers a return type from the body.
+        if (_semanticModel.GetTypeInfo(lambda).ConvertedType is not INamedTypeSymbol
+            {
+                TypeKind: TypeKind.Delegate, DelegateInvokeMethod: { } invoke
+            } || invoke.ReturnType.TypeKind == TypeKind.Error)
+            return null;
+        if (invoke.ReturnsVoid)
+            return false;
+        // An async lambda returning a non-generic Task or ValueTask has no value either.
+        return !(lambda.AsyncKeyword.IsKind(SyntaxKind.AsyncKeyword) && invoke.ReturnType is INamedTypeSymbol
+        {
+            IsGenericType: false, Name: "Task" or "ValueTask",
+            ContainingNamespace: { Name: "Tasks", ContainingNamespace.Name: "Threading" },
+        });
+    }
+
+    /// <summary>
+    /// The block body of a lambda or anonymous method. #1677: ConvertBlock starts each statement
+    /// with no pending hoists, so the hoists the enclosing statement made before reaching the
+    /// lambda are set aside and restored; they used to be dropped, leaving an undeclared temp.
+    /// </summary>
+    private List<StatementNode> ConvertFunctionBlock(BlockSyntax block)
+    {
+        var enclosing = new List<StatementNode>(_pendingStatements);
+        _pendingStatements.Clear();
+        try
+        {
+            return WithBodyReassignments(block, () => ConvertBlock(block)).ToList(); // #1550 review round 3
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(enclosing);
+        }
     }
 
     /// <summary>
@@ -15261,7 +15602,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<StatementNode>? stmtBody = null;
         if (anonMethod.Body is BlockSyntax block)
         {
-            stmtBody = WithBodyReassignments(block, () => ConvertBlock(block)).ToList(); // #1550 review round 3
+            stmtBody = ConvertFunctionBlock(block);
         }
 
         return new LambdaExpressionNode(
@@ -15781,7 +16122,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (stackAlloc.Initializer != null)
         {
             initializer = stackAlloc.Initializer.Expressions
-                .Select(ConvertExpression)
+                .Select(expression => ConvertInPlace(expression, always: true))
                 .ToList();
         }
 
@@ -15792,7 +16133,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("stackalloc");
         var initializer = implicitStackAlloc.Initializer.Expressions
-            .Select(ConvertExpression)
+            .Select(expression => ConvertInPlace(expression, always: true))
             .ToList();
         // Infer type from first element or use "i32" as default
         return new StackAllocNode(GetTextSpan(implicitStackAlloc), "i32", null, initializer);

@@ -1919,6 +1919,10 @@ public sealed class CSharpToCalorConverter
         if (!string.IsNullOrEmpty(linqLocation))
             refs.Add(MetadataReference.CreateFromFile(linqLocation));
 
+        var regexLocation = typeof(System.Text.RegularExpressions.Regex).Assembly.Location;
+        if (!string.IsNullOrEmpty(regexLocation))
+            refs.Add(MetadataReference.CreateFromFile(regexLocation));
+
         // Add System.Runtime for core types
         var runtimeDir = System.IO.Path.GetDirectoryName(objectLocation);
         if (runtimeDir != null)

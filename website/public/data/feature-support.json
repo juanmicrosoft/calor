@@ -257,10 +257,6 @@
           "description": "Lock statements are converted to \u00A7SYNC blocks with full semantics"
         },
         {
-          "name": "collection-expression",
-          "description": "C# 12 collection expressions [1, 2, 3] are converted via ConvertCollectionExpression"
-        },
-        {
           "name": "readonly-struct",
           "description": "Readonly structs are converted with struct and readonly modifiers"
         },
@@ -283,18 +279,6 @@
         {
           "name": "char-literal-surrogate",
           "description": "Lone-surrogate char literals round-trip as escaped UTF-16 code units in single-quoted Calor literals"
-        },
-        {
-          "name": "complex-is-pattern",
-          "description": "Recursive patterns in is-expressions (is { Prop: val }, is { } name) are converted to boolean expressions"
-        },
-        {
-          "name": "collection-spread",
-          "description": "Collection spread operator (..) including mixed spreads [..a, ..b] via Concat chains"
-        },
-        {
-          "name": "collection-spread-mixed",
-          "description": "Mixed collection spreads [..a, x, ..b] converted to Concat chains"
         },
         {
           "name": "binary pattern (and/or)",
@@ -497,6 +481,10 @@
           "workaround": "Declare the variable before the statement and pass it with out"
         },
         {
+          "name": "collection-expression",
+          "description": "Array-targeted collection expressions convert natively; other targets preserve C# to retain their runtime collection type"
+        },
+        {
           "name": "preprocessor-directive",
           "description": "Default conversion preserves all #if/#elif/#else branches as explicit \u00A7PP AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
           "workaround": "Interface and enum member-level directives may use verbatim interop; review those counted preservation boundaries"
@@ -520,6 +508,18 @@
           "name": "local-function",
           "description": "A non-capturing local function declared directly in a method body, without attributes, type parameters, async/unsafe/extern, yield, nested local functions, or ref/out/in/params/default parameters, converts in place to a nested \u00A7F (a C# static local function). A member with any other local function is preserved verbatim as a \u00A7CSHARP interop block",
           "workaround": "Make the local function static (pass captured values as parameters) and non-generic, or keep the member as a \u00A7CSHARP interop block"
+        },
+        {
+          "name": "complex-is-pattern",
+          "description": "Simple is-pattern checks and declaration patterns convert natively; property and positional patterns preserve C# to retain evaluation and binding semantics"
+        },
+        {
+          "name": "collection-spread",
+          "description": "A single array spread into an array converts natively; other spreads preserve C# and its enumeration order"
+        },
+        {
+          "name": "collection-spread-mixed",
+          "description": "Mixed collection spreads preserve C# to retain enumeration and element evaluation order"
         },
         {
           "name": "implicit-new-with-args",

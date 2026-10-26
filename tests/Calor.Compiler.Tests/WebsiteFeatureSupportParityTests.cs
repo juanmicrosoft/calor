@@ -109,7 +109,7 @@ public sealed class WebsiteFeatureSupportParityTests
     private static readonly IReadOnlyDictionary<string, int> PinnedComponents = new Dictionary<string, int>
     {
         ["cli/convert.mdx"] = 1,
-        ["cli/feature-check.mdx"] = 15,
+        ["cli/feature-check.mdx"] = 19,
         ["guides/csharp-interoperability.mdx"] = 1,
         ["syntax-reference/string-operations.mdx"] = 1,
     };
@@ -165,7 +165,7 @@ public sealed class WebsiteFeatureSupportParityTests
             counts.OrderBy(p => p.Key, StringComparer.Ordinal));
         // The feature-check table is the bulk of the levels; each row renders its own feature's level.
         var page = Read("cli/feature-check.mdx");
-        Assert.Equal(13, Regex.Matches(page, @"(?m)^\| `(?<f>[a-z0-9-]+)` \| <SupportLevel feature=""\k<f>"" /> \|").Count);
+        Assert.Equal(17, Regex.Matches(page, @"(?m)^\| `(?<f>[a-z0-9-]+)` \| <SupportLevel feature=""\k<f>"" /> \|").Count);
     }
 
     [Fact]

@@ -6,6 +6,70 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **The converter audit found more silent behavior changes (#1588).** Argument lists,
+  binary expressions, constructors, tuples, anonymous objects, array indexing, stack allocation
+  and `with` expressions now keep C# evaluation order, or preserve the affected statement as
+  C# with a reported loss. Named constructor arguments and named arguments in decomposed call
+  chains stay C# when their labels cannot be retained.
+- **Native mappings no longer substitute unrelated members (#1588).** Source-defined
+  `Regex`, `Char`, `StringBuilder` and `String.Empty` keep their original meaning. A property
+  named `Ordinal` is no longer mistaken for a `StringComparison` constant.
+  Static `string.Equals` stays a static call, including when its first argument is null.
+  Typed integer defaults and `byte`/`short` limits retain their types during overload selection.
+- **Pattern conversion keeps matching and binding semantics (#1588).** Declaration patterns
+  bind only after a successful match, and `var` patterns retain their inferred types. Property
+  and positional patterns, overloaded equality and repeated effectful subjects stay C# when
+  boolean lowering would change their behavior.
+  Built-in `string` null checks remain native without invoking user-defined equality.
+- **Collection expressions retain their collection type and enumeration order (#1588).**
+  Array targets without spreads and a single array-to-array spread can convert natively.
+  Other targets and mixed spreads stay C# with a reported loss. Collection expressions,
+  collection spreads and complex `is` patterns are now marked **Partial**, not **Full**.
+- **Query translation keeps the correct operators (#1588).** A bare `from x in source select x`
+  still calls `Select`. Grouping an unchanged range variable uses the one-selector `GroupBy`
+  overload. Parenthesized projections and escaped identifiers retain C#'s translation rules.
+  This preserves iterator types and custom query operators. Query continuations retain the
+  preceding operator's return type for effect checking.
+- **Inline conditionals keep their enclosing indentation boundary.** A following preserved
+  C# member remains a class member instead of being parsed as a statement.
+- **Every resource in a `using` statement is acquired and disposed (#1588).** Multiple
+  resources now become nested `using` statements. Acquisition stays left-to-right, disposal
+  stays right-to-left, and a failed later acquisition still disposes earlier resources.
+- **The C# converter keeps evaluation order in the cases #1673 left open (#1677).** These were
+  silent wrong-output bugs: the converted program ran code in a different order, or ran it
+  twice, and the conversion reported no loss. Each case below now converts in C#'s order, or
+  stays C# with a `compound-assignment-order` loss (the converter's report that it kept a
+  statement as C# to protect its evaluation order).
+  - `if (A() < F())`, where `A()` returns a type with a user-defined conversion to `int`, ran
+    `F()` before the conversion. The condition now stays inline.
+  - Code in a nested class was treated as if its outer class's static constructor had already
+    run, so an `x++` could move ahead of that constructor. The read and increment now stay inline.
+  - `a[k + 0] += 5`, with a user-defined conversion on `k`, ran the conversion twice. The index
+    is now computed once. The same holds for an index that reads another class's static field
+    or concatenates an object with a custom `ToString`.
+  - `a[x + x++] += 5` read `x` after the increment. The index now evaluates in C#'s order.
+  - `a[k] = new List<int>(F())` ran `F()` before `k`'s user-defined conversion. It now stays C#.
+  - `h.s.X = F().N()`, where `s` is a struct field, ran `F()` before the null check on `h` (or
+    before the static constructor, for a static `s`). It now stays C#.
+  - `b.F = new C(G())` and `x += new C(G()).V` evaluated `b` or `x` after `G()`. The receiver
+    and the read now come first.
+  - `c.Next().Use(F().Val())` ran `F()` before `c.Next()`. Receivers now run before arguments.
+- **Chained calls are converted once (#1677).** Some chains ran part of their receiver twice:
+  `() => c.Next().Next().Val()` called `Next()` three times, and in the test corpus statements
+  such as `validator.TestValidate(new Person())…` inside a lambda called `TestValidate` twice.
+- **Block lambdas and `using` resources keep the temps their statement hoisted (#1677).** A
+  hoisted temp is a binding the converter places before the statement, such as `_pre` for
+  `Use(y++, () => { … })`. It was dropped when the statement also contained a block lambda, or
+  when it came from the resource of a `using`, so the output failed to compile. These bindings
+  now stay with the statements that use them.
+- **Expression lambdas that assign or increment convert correctly (#1677).**
+  `Func<int, int> f = n => S += n` returns the new value, which the conversion dropped (a
+  compile error). It now stays C# with an `embedded-assignment` loss.
+  `Action a = () => Point.S++` produced a `return` in a `void` lambda; it now converts to an
+  increment statement. Compound assignments to static fields, instance fields, properties and
+  indexers in expression lambdas, such as `n => Point.Log += "x"`, were checked and convert
+  correctly.
+
 - **Code inside `§PP` blocks is now checked like other code (#1678).** `§PP{COND}` is Calor's
   form of C# `#if`. The binder used to scan its bodies instead of binding them, so three writes
   to an immutable binding compiled with exit code 0. Now both branches are bound, including
