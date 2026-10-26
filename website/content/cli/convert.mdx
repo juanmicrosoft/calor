@@ -184,7 +184,7 @@ when you had not passed the flag.
 With `--format json`, stdout holds exactly one [schema 2.0 envelope](/docs/cli/envelope-schema/)
 and the text report goes to stderr, including the `--verbose` progress lines. Each conversion issue is a `Calor1343`
 diagnostic whose message starts with the feature name, for example
-`[out-var] Feature 'out-var' is partially supported…`. The counts are under `data`:
+<SupportLevel feature="out-var" form="warning" />. The counts are under `data`:
 
 | Field | Meaning |
 |:------|:--------|

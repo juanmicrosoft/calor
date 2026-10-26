@@ -265,8 +265,7 @@ whose format clause contains a backslash keeps its whole statement as C#. It is 
 **Limits.** The converter decides the target type from the single file it is converting.
 If a called method comes from an assembly it was not given, the string converts as a
 plain string, and the C# compiler applies target typing again when the generated code
-is built. `calor feature-check string-interpolation` reports **Partial**: interpolation is
-not fully supported, because handler targets have no Calor form.
+is built. `calor feature-check string-interpolation` reports **<SupportLevel feature="string-interpolation" />** because handler targets have no Calor form.
 
 **Changed since 0.24:** a call whose only overload took a `FormattableString` made the
 converted Calor fail to compile, and the CLI then kept the whole class as C#. MCP

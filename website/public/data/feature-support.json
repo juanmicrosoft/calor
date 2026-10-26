@@ -1,0 +1,802 @@
+{
+  "version": "2.0",
+  "command": "feature-check",
+  "diagnostics": [],
+  "summary": {
+    "total": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0
+  },
+  "data": {
+    "totalFeatures": 177,
+    "features": {
+      "full": [
+        {
+          "name": "class",
+          "description": "Classes are converted to Calor class definitions"
+        },
+        {
+          "name": "struct",
+          "description": "Structs are converted to Calor struct definitions"
+        },
+        {
+          "name": "enum",
+          "description": "Enums are converted to Calor enum definitions"
+        },
+        {
+          "name": "method",
+          "description": "Methods are converted to Calor function definitions"
+        },
+        {
+          "name": "property",
+          "description": "Properties are converted to Calor property definitions"
+        },
+        {
+          "name": "indexer",
+          "description": "Indexers (this[]) are converted to Calor indexer definitions"
+        },
+        {
+          "name": "field",
+          "description": "Fields are converted to Calor field definitions"
+        },
+        {
+          "name": "constructor",
+          "description": "Constructors are converted to Calor constructors"
+        },
+        {
+          "name": "if",
+          "description": "If statements are converted to Calor IF blocks"
+        },
+        {
+          "name": "foreach",
+          "description": "Foreach loops are converted to Calor FOREACH blocks"
+        },
+        {
+          "name": "while",
+          "description": "While loops are converted to Calor WHILE blocks"
+        },
+        {
+          "name": "switch",
+          "description": "Switch statements are converted to Calor MATCH blocks"
+        },
+        {
+          "name": "try-catch",
+          "description": "Try/catch/finally blocks are converted to Calor TRY blocks"
+        },
+        {
+          "name": "async-await",
+          "description": "Async/await is converted to Calor async functions"
+        },
+        {
+          "name": "lambda",
+          "description": "Lambda expressions are converted to Calor lambda syntax"
+        },
+        {
+          "name": "generics",
+          "description": "Generic types and methods are supported"
+        },
+        {
+          "name": "pattern-matching-basic",
+          "description": "Basic pattern matching (type, constant, var) is supported"
+        },
+        {
+          "name": "string-interpolation-to-string",
+          "description": "An interpolated string whose target receives the formatted string (string, object) converts to a native Calor string with ${...} holes"
+        },
+        {
+          "name": "null-coalescing",
+          "description": "Null coalescing operators are converted"
+        },
+        {
+          "name": "null-conditional",
+          "description": "Null conditional operators are converted"
+        },
+        {
+          "name": "linq-method",
+          "description": "LINQ method syntax is fully supported with chained call decomposition"
+        },
+        {
+          "name": "array-initializer",
+          "description": "Bare array initializers are converted to Calor array nodes"
+        },
+        {
+          "name": "object-initializer",
+          "description": "Object initializers of plain Name = value assignments are converted to Calor \u00A7NEW with property assignments; other shapes are preserved (initializer-interop)"
+        },
+        {
+          "name": "list-initializer",
+          "description": "List initializers are converted to Calor \u00A7LIST nodes"
+        },
+        {
+          "name": "hashset-initializer",
+          "description": "HashSet initializers are converted to Calor \u00A7SET nodes"
+        },
+        {
+          "name": "anonymous-type",
+          "description": "Anonymous types are converted to Calor \u00A7ANON blocks"
+        },
+        {
+          "name": "foreach-index",
+          "description": "Indexed foreach via \u00A7EACH with optional index variable"
+        },
+        {
+          "name": "attributes",
+          "description": "Attributes are preserved via [@Name] syntax with proper AST"
+        },
+        {
+          "name": "relational-pattern",
+          "description": "Relational patterns (is \u003E x, is \u003C x) are converted to comparison expressions"
+        },
+        {
+          "name": "compound-pattern",
+          "description": "Compound patterns (and/or) are converted to boolean expressions"
+        },
+        {
+          "name": "generic-type-constraint",
+          "description": "Generic type constraints are supported via \u00A7WHERE syntax"
+        },
+        {
+          "name": "goto",
+          "description": "Goto statements are converted to \u00A7GOTO{label} nodes"
+        },
+        {
+          "name": "labeled-statement",
+          "description": "Labeled statements are converted to \u00A7LABEL{name} nodes"
+        },
+        {
+          "name": "unsafe",
+          "description": "Unsafe code blocks are converted to \u00A7UNSAFE blocks"
+        },
+        {
+          "name": "pointer",
+          "description": "Pointer types (int*) are supported with \u00A7ADDR and \u00A7DEREF"
+        },
+        {
+          "name": "stackalloc",
+          "description": "Stackalloc expressions are converted to \u00A7SALLOC nodes"
+        },
+        {
+          "name": "fixed",
+          "description": "Fixed statements are converted to \u00A7FIXED blocks"
+        },
+        {
+          "name": "volatile",
+          "description": "Volatile modifier is passed through to generated C# fields"
+        },
+        {
+          "name": "extension-method",
+          "description": "Extension methods are converted with \u0027this\u0027 parameter modifier preserved"
+        },
+        {
+          "name": "operator-overload",
+          "description": "Operator overloads are fully supported via \u00A7OP tags and converted to op_ CIL-convention methods"
+        },
+        {
+          "name": "implicit-conversion",
+          "description": "Implicit conversions are fully supported via \u00A7OP tags and converted to op_Implicit methods"
+        },
+        {
+          "name": "explicit-conversion",
+          "description": "Explicit conversions are fully supported via \u00A7OP tags and converted to op_Explicit methods"
+        },
+        {
+          "name": "yield-return",
+          "description": "Yield return/break statements are converted to Calor yield syntax"
+        },
+        {
+          "name": "is-type-pattern",
+          "description": "Type test patterns (is Type) are fully supported via TypeOperationNode"
+        },
+        {
+          "name": "equals-operator",
+          "description": "Custom == and != operators are fully supported via \u00A7OP tags and converted to op_Equality/op_Inequality methods"
+        },
+        {
+          "name": "primary-constructor",
+          "description": "Primary constructors (class Foo(int x)) are converted to readonly fields"
+        },
+        {
+          "name": "range-expression",
+          "description": "Range expressions (0..5, ..5, 5..) are converted to \u00A7RANGE nodes"
+        },
+        {
+          "name": "index-from-end",
+          "description": "Index from end expressions (^1) are converted to \u00A7^ nodes"
+        },
+        {
+          "name": "named-argument",
+          "description": "Named arguments (param: value) are supported in both statement and expression contexts"
+        },
+        {
+          "name": "declaration-pattern",
+          "description": "Declaration patterns (is Type name) are fully supported via TypeOperationNode with variable binding"
+        },
+        {
+          "name": "throw-expression",
+          "description": "Throw expressions are converted to \u00A7ERR nodes"
+        },
+        {
+          "name": "nameof",
+          "description": "nameof() expressions are preserved as (nameof x) in Calor and emit nameof(x) in C#"
+        },
+        {
+          "name": "nested-generic-type",
+          "description": "Nested generic types like Dictionary\u003Cstring, List\u003Cint\u003E\u003E are fully supported with inline angle bracket syntax"
+        },
+        {
+          "name": "nested-type",
+          "description": "Nested type declarations (classes, structs, interfaces, enums inside other types) are supported"
+        },
+        {
+          "name": "in-parameter",
+          "description": "in parameters and \u00A7A{in} arguments convert natively (a C# ref argument to an in parameter becomes \u00A7A{in}). A call statement that omits in, or whose by-reference operand contains a call, creation, assignment or \u002B\u002B/-- or indexes a non-array, stays C# (\u00A7RAW); in indexer parameters preserve the member"
+        },
+        {
+          "name": "checked-block",
+          "description": "checked/unchecked wrapper stripped, body statements fully preserved"
+        },
+        {
+          "name": "with-expression",
+          "description": "with expressions (record copying) are converted to \u00A7WITH blocks"
+        },
+        {
+          "name": "init-accessor",
+          "description": "init keyword is handled in property accessors"
+        },
+        {
+          "name": "required-member",
+          "description": "required modifier on properties and fields is detected and emitted"
+        },
+        {
+          "name": "list-pattern",
+          "description": "list/slice patterns ([a, b, ..rest])"
+        },
+        {
+          "name": "lock-statement",
+          "description": "Lock statements are converted to \u00A7SYNC blocks with full semantics"
+        },
+        {
+          "name": "readonly-struct",
+          "description": "Readonly structs are converted with struct and readonly modifiers"
+        },
+        {
+          "name": "namespace-single-scope",
+          "description": "One block-scoped or file-scoped namespace converts natively with qualified identities and namespace-local usings"
+        },
+        {
+          "name": "utf8-string-literal",
+          "description": "UTF-8 string literals (C# 11) are fully supported \u2014 u8 suffix is preserved through round-trip"
+        },
+        {
+          "name": "char-literal",
+          "description": "Char literals use native single-quoted Calor syntax and emit compile-time-constant C# char literals"
+        },
+        {
+          "name": "type-pattern",
+          "description": "Type-test and typed-declaration patterns (case Type: / case Type name:) are represented natively via TypePatternNode, preserving the runtime type test and binding"
+        },
+        {
+          "name": "char-literal-surrogate",
+          "description": "Lone-surrogate char literals round-trip as escaped UTF-16 code units in single-quoted Calor literals"
+        },
+        {
+          "name": "binary pattern (and/or)",
+          "description": "Pattern combinators (and/or) are converted to AndPatternNode/OrPatternNode"
+        },
+        {
+          "name": "unary pattern (not)",
+          "description": "Negated patterns (not) are converted to NegatedPatternNode"
+        },
+        {
+          "name": "complex-recursive-pattern",
+          "description": "Property patterns and positional patterns are fully supported including nested patterns"
+        },
+        {
+          "name": "postfix-operator",
+          "description": "Postfix i\u002B\u002B/i-- is supported via hoisting strategy \u2014 original value is preserved in a temp variable"
+        },
+        {
+          "name": "default-parameter",
+          "description": "Default parameter values are converted to \u00A7I{type:name} = value syntax"
+        },
+        {
+          "name": "parallel",
+          "description": "Parallel.For/ForEach/Invoke are converted as method calls"
+        },
+        {
+          "name": "plinq",
+          "description": "PLINQ .AsParallel() chains are converted as method calls"
+        },
+        {
+          "name": "com-interop",
+          "description": "COM attributes ([ComImport], [Guid]) are preserved"
+        },
+        {
+          "name": "extern-method",
+          "description": "Extern methods with [DllImport] are fully supported"
+        },
+        {
+          "name": "dllimport",
+          "description": "[DllImport] attribute for P/Invoke is fully supported"
+        },
+        {
+          "name": "tuple-type",
+          "description": "Tuple types in signatures like (int, string) are mapped"
+        },
+        {
+          "name": "tuple-literal",
+          "description": "Tuple literals (a, b) are fully supported"
+        },
+        {
+          "name": "span",
+          "description": "Span\u003CT\u003E and ReadOnlySpan\u003CT\u003E types are supported"
+        },
+        {
+          "name": "memory",
+          "description": "Memory\u003CT\u003E and ReadOnlyMemory\u003CT\u003E types are supported"
+        },
+        {
+          "name": "multidim-array",
+          "description": "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializers (\u00A7ROW), element access, and new[,] of a known type. new[,] of an unknown type, and an element that cannot be written in place (a collection initializer or a multi-line element, array-element-block), are preserved as C#"
+        },
+        {
+          "name": "refinement-type",
+          "description": "Refinement types (\u00A7RTYPE) define base types constrained by predicates; erased to base types in C#"
+        },
+        {
+          "name": "proof-obligation",
+          "description": "Proof obligations (\u00A7PROOF) declare conditions to be verified; emitted as comments or runtime checks"
+        },
+        {
+          "name": "indexed-type",
+          "description": "Indexed types (\u00A7ITYPE) define size-parameterized types for bounds checking; erased to base types in C#"
+        },
+        {
+          "name": "index-bounds",
+          "description": "Index bounds obligations verify array/list accesses are within bounds using Z3"
+        },
+        {
+          "name": "notnull-constraint",
+          "description": "notnull type constraint supported via TypeConstraintKind.NotNull"
+        },
+        {
+          "name": "explicit-interface",
+          "description": "Explicit interface implementations preserved as IInterface.MethodName"
+        },
+        {
+          "name": "verbatim-identifier",
+          "description": "C# @keyword identifiers mapped to backtick syntax in Calor"
+        },
+        {
+          "name": "conditional-using",
+          "description": "Using directives inside #if blocks supported via \u00A7PP wrapping \u00A7U"
+        },
+        {
+          "name": "anonymous-method",
+          "description": "C# delegate { } anonymous methods are converted to Calor lambda expressions"
+        },
+        {
+          "name": "ref-expression",
+          "description": "ref expressions never convert natively: members with ref locals, ref returns (block or expression bodied), conditional refs or ref assignments are preserved as C#, with a ref-parameter warning"
+        },
+        {
+          "name": "global-qualified-name",
+          "description": "global:: qualified names are converted to unqualified references"
+        },
+        {
+          "name": "implicit-element-access",
+          "description": "Implicit element access ([\u0027key\u0027] in initializers) is converted to index access"
+        },
+        {
+          "name": "var-pattern",
+          "description": "var patterns (is var name, is var (a, b)) converted with variable hoisting"
+        }
+      ],
+      "partial": [
+        {
+          "name": "interface",
+          "description": "Public abstract signature-only methods, properties, and indexers are native; interfaces with non-representable contract members are preserved whole as counted C# interop",
+          "workaround": "Keep default, static abstract/virtual, private, event, and nested-type interface contracts as exact C# interop"
+        },
+        {
+          "name": "for",
+          "description": "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations are preserved inline; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
+        },
+        {
+          "name": "string-interpolation",
+          "description": "Interpolated strings assigned, returned or passed as string or object convert natively, keeping format specifiers, alignment, culture and hole order. FormattableString and IFormattable targets with at least one hole convert natively with an explicit cast that keeps the selected overload. [InterpolatedStringHandler] targets (custom and .NET handler overloads such as StringBuilder.Append) and hole-free FormattableString targets keep their statement as C# interop; holes outside the native subset keep their C# text",
+          "workaround": "Keep handler-based calls (logging, assertion and builder APIs) as C# interop, or pass a formatted string to a string overload"
+        },
+        {
+          "name": "string-interpolation-formattable",
+          "description": "An interpolated string with at least one hole targeting FormattableString or IFormattable converts natively with an explicit cast to that type, so the same overload is selected. Hole-free targets are preserved (string-interpolation-formattable-constant), and holes outside the native subset keep their C# text (string-interpolation-hole)",
+          "workaround": "Review preserved hole-free FormattableString calls; they stay C# interop"
+        },
+        {
+          "name": "string-interpolation-hole",
+          "description": "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as \u00A7CS{...} inside the hole, with assumed effects",
+          "workaround": "Move the expression into a local before the interpolated string to convert it natively"
+        },
+        {
+          "name": "conditional-access-shape",
+          "description": "Conditional member and positional invocation chains convert natively. Conditional indexing, named/ref arguments, generic conditional calls and unsupported grouping preserve the original expression as counted C# interop",
+          "workaround": "Keep the counted interop, or express the null check and dependent operations as explicit statements"
+        },
+        {
+          "name": "conditional-expression-hoisting",
+          "description": "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
+          "workaround": "Keep the counted interop, or express conditional side effects as explicit statements before converting"
+        },
+        {
+          "name": "linq-query",
+          "description": "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. Complex or unresolved selectors remain inline and deferred."
+        },
+        {
+          "name": "initializer-interop",
+          "description": "Object and collection initializers with no faithful native form are preserved verbatim as inline C# interop and reported as a loss: nested member initializers (P = { ... }), indexer and multi-value element initializers, Add-collections other than List\u003CT\u003E/HashSet\u003CT\u003E, values or constructor arguments the emitter could hoist ahead of the constructor, and initializers outside a local, field or property initializer, return, expression or lambda body, foreach source, switch arm or plain assignment statement (a tuple, anonymous object or collection expression holding one is preserved whole). Event field initializers keep their member as C#."
+        },
+        {
+          "name": "dictionary-initializer",
+          "description": "Literal Add-style Dictionary initializers in direct local bindings and returns use \u00A7DICT. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as inline C# interop to retain their operations, type initialization order and evaluation timing."
+        },
+        {
+          "name": "ref-parameter",
+          "description": "ref parameters and ref arguments convert natively (\u00A7A{ref}) and pass the caller\u0027s storage, never a copy. Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, by-reference delegates, constructor and indexer arguments, and method-generic by-reference parameters are preserved as C#",
+          "workaround": "Keep the preserved member as C# interop; no tuple or wrapper form is equivalent"
+        },
+        {
+          "name": "out-parameter",
+          "description": "out parameters and out arguments convert natively (\u00A7A{out}, out _ discards). Flow attributes such as [NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
+          "workaround": "Keep the preserved member as C# interop; no tuple or Result\u003CT, E\u003E form is equivalent"
+        },
+        {
+          "name": "pattern-matching-advanced",
+          "description": "Advanced patterns (list, property, relational) may be simplified",
+          "workaround": "Review converted patterns for semantic correctness"
+        },
+        {
+          "name": "dynamic",
+          "description": "Dynamic type is converted to \u0027any\u0027 with warning",
+          "workaround": "Consider using generics or interfaces"
+        },
+        {
+          "name": "generic-method-expression",
+          "description": "Generic method calls like Option\u003CT\u003E.Some() in expressions may have issues",
+          "workaround": "Assign generic method results to intermediate variables before use"
+        },
+        {
+          "name": "target-typed-new",
+          "description": "Target-typed new with arguments is converted using \u0027object\u0027 placeholder type",
+          "workaround": "Review and replace \u0027object\u0027 with the correct type name"
+        },
+        {
+          "name": "null-conditional-method",
+          "description": "Null-conditional method calls (obj?.Method()) are converted with AST-based args",
+          "workaround": "Review converted null-conditional method calls for correctness"
+        },
+        {
+          "name": "out-var",
+          "description": "out var x / out T x in an expression statement, local declaration, return or if condition directly in a block lowers to a mutable binding before the statement when the type is expressible and the name collides with nothing in scope (it starts at default). Chained assignments, a visible symbol named default, loop, using and lock headers, lambdas, queries, interpolation holes, filters, initializers and expression-bodied members are preserved as C#",
+          "workaround": "Declare the variable before the statement and pass it with out"
+        },
+        {
+          "name": "collection-expression",
+          "description": "Array-targeted collection expressions convert natively; other targets preserve C# to retain their runtime collection type"
+        },
+        {
+          "name": "preprocessor-directive",
+          "description": "Default conversion preserves all #if/#elif/#else branches as explicit \u00A7PP AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
+          "workaround": "Interface and enum member-level directives may use verbatim interop; review those counted preservation boundaries"
+        },
+        {
+          "name": "conditional-declaration",
+          "description": "Conditional declarations preserve every branch in source order, using explicit interop whenever a declaration is not natively representable",
+          "workaround": "Review InteropPreserved losses; preservation is lossless but not fully native"
+        },
+        {
+          "name": "namespace",
+          "description": "Single namespace scopes convert natively; lossless conversion preserves multiple, nested, or mixed global/namespace topologies as whole-file C# interop",
+          "workaround": "Use lossy mode for native \u00A7NS topology, or keep the lossless whole-file interop boundary"
+        },
+        {
+          "name": "namespace-topology",
+          "description": "Multiple, nested, or mixed global/namespace scopes convert natively only in explicit lossy mode; default lossless mode uses whole-file interop",
+          "workaround": "Review the recorded namespace-topology interop loss or explicitly choose lossy native \u00A7NS conversion"
+        },
+        {
+          "name": "local-function",
+          "description": "A non-capturing local function declared directly in a method body, without attributes, type parameters, async/unsafe/extern, yield, nested local functions, or ref/out/in/params/default parameters, converts in place to a nested \u00A7F (a C# static local function). A member with any other local function is preserved verbatim as a \u00A7CSHARP interop block",
+          "workaround": "Make the local function static (pass captured values as parameters) and non-generic, or keep the member as a \u00A7CSHARP interop block"
+        },
+        {
+          "name": "complex-is-pattern",
+          "description": "Simple is-pattern checks and declaration patterns convert natively; property and positional patterns preserve C# to retain evaluation and binding semantics"
+        },
+        {
+          "name": "collection-spread",
+          "description": "A single array spread into an array converts natively; other spreads preserve C# and its enumeration order"
+        },
+        {
+          "name": "collection-spread-mixed",
+          "description": "Mixed collection spreads preserve C# to retain enumeration and element evaluation order"
+        },
+        {
+          "name": "implicit-new-with-args",
+          "description": "Target-typed new expressions are supported but type inference uses \u0027object\u0027 placeholder when target type cannot be determined"
+        },
+        {
+          "name": "tuple-deconstruction",
+          "description": "Flat identifier tuple assignments and certified scalar declarations stay atomic; other declarations, complex operands and expression-valued assignments use counted C# interop to preserve evaluation order and Deconstruct semantics"
+        },
+        {
+          "name": "pragma",
+          "description": "#pragma directives, including warning disable/restore and checksum, use an explicit source-ordered directive node",
+          "workaround": "Embedded placements that cannot be structurally owned preserve their enclosing C# boundary"
+        }
+      ],
+      "notsupported": [
+        {
+          "name": "record",
+          "description": "Records are not natively supported; record declarations are preserved verbatim as \u00A7CSHARP interop blocks (counted as a conversion loss)",
+          "workaround": "Rewrite the record as an explicit class before migration, or keep it as a \u00A7CSHARP interop block"
+        },
+        {
+          "name": "string-interpolation-handler",
+          "description": "An interpolated string (or a \u002B chain of them) passed to an [InterpolatedStringHandler] parameter cannot be represented in Calor; the enclosing statement or member is preserved as C# interop, or the conversion fails when preservation is off",
+          "workaround": "Keep the call as C# interop, or call a string overload with an already formatted string"
+        },
+        {
+          "name": "string-interpolation-formattable-constant",
+          "description": "An interpolated string with no holes targeting FormattableString or IFormattable (for example FormattableString.Invariant($\u0022text\u0022)) has no Calor form; the enclosing statement or member is preserved as C# interop",
+          "workaround": "Keep the call as C# interop, or pass a plain string"
+        },
+        {
+          "name": "array-element-block",
+          "description": "An array element that Calor writes as a block (a collection initializer, or a multi-line element such as an anonymous object in a rectangular array row) preserves its statement as counted C# interop",
+          "workaround": "Bind the element to a local first, then use the local in the array"
+        },
+        {
+          "name": "static-abstract-member",
+          "description": "static abstract/virtual interface members are not supported",
+          "workaround": "Use instance methods or regular static methods"
+        },
+        {
+          "name": "ref-struct",
+          "description": "ref struct types are preserved whole as counted C# interop so stack-only semantics remain exact",
+          "workaround": "Keep the type as exact C# interop or use a regular struct only when stack-only behavior is unnecessary"
+        },
+        {
+          "name": "await-foreach",
+          "description": "Members containing await foreach are preserved whole as counted C# interop so async enumeration and disposal semantics remain exact",
+          "workaround": "Keep the containing member as exact C# interop"
+        },
+        {
+          "name": "await-using",
+          "description": "Members containing await using statements or declarations are preserved whole as counted C# interop so asynchronous disposal remains exact",
+          "workaround": "Keep the containing member as exact C# interop"
+        },
+        {
+          "name": "scoped-parameter",
+          "description": "Members with scoped parameters are preserved whole as counted C# interop so ref-safety semantics are not stripped",
+          "workaround": "Keep the containing member as exact C# interop until scoped ref-safety is modeled"
+        },
+        {
+          "name": "using-declaration",
+          "description": "Using declarations are preserved with their complete containing member because resource lifetime extends to the containing scope",
+          "workaround": "Keep the containing member as exact C# interop or rewrite it as an explicit using statement with the same lifetime"
+        },
+        {
+          "name": "standalone-block",
+          "description": "Members containing bare statement blocks are preserved whole as counted C# interop so lexical scope and every child statement remain exact",
+          "workaround": "Keep the containing member as exact C# interop until standalone lexical scopes have a native Calor node"
+        },
+        {
+          "name": "conditional-member",
+          "description": "Class and struct member branches are native \u00A7PP AST; interface and enum member branches may require verbatim interop",
+          "workaround": "Review interface and enum member-level conditional blocks"
+        },
+        {
+          "name": "conditional-statement",
+          "description": "Method block statement branches preserve #if/#elif/#else nesting as \u00A7PP AST; unsupported statement shapes remain explicit interop",
+          "workaround": "Review counted interop inside complex switch/accessor/lambda directive placements"
+        },
+        {
+          "name": "conditional-unmodeled-placement",
+          "description": "Conditional expressions, accessors, lambdas, switch sections, local functions, and similar unmodeled placements preserve the complete enclosing C# boundary as scoped interop",
+          "workaround": "The source is lossless but non-native; review the counted interop boundary"
+        },
+        {
+          "name": "conditional-top-level-statement",
+          "description": "A compilation unit containing conditional top-level statements is preserved verbatim as global C# interop",
+          "workaround": "Keep the compilation unit as C# interop until top-level conditional statements are modeled natively"
+        },
+        {
+          "name": "top-level-directive-ordering",
+          "description": "Compiler directives interleaved with top-level statements preserve the complete compilation unit verbatim",
+          "workaround": "Keep the compilation unit as C# interop until directives can be represented inside synthetic Main without changing scope"
+        },
+        {
+          "name": "compilation-unit-using-ordering",
+          "description": "A using directive after a declaration or completed conditional region preserves the complete compilation unit verbatim",
+          "workaround": "Keep the source as C# interop so configuration-specific using legality and diagnostics remain unchanged"
+        },
+        {
+          "name": "conditional-namespace",
+          "description": "Conditional namespace wrappers and their branch contents are preserved verbatim at compilation-unit scope",
+          "workaround": "Preserve namespace-wrapped branches as compilation-unit C# interop"
+        },
+        {
+          "name": "interface-method-semantics",
+          "description": "Abstract signature-only interface methods are native; default/private/static/body-bearing methods preserve the declaration as interop",
+          "workaround": "Keep non-signature interface methods as exact C# interop declarations"
+        },
+        {
+          "name": "interface-semantics",
+          "description": "Non-public, partial, or otherwise modified interface declarations preserve the complete interface as exact C# interop",
+          "workaround": "Keep the interface as C# interop until declaration modifiers are represented natively"
+        },
+        {
+          "name": "interface-property-semantics",
+          "description": "Body-bearing, private, static, virtual, or otherwise non-representable interface properties preserve the containing interface as exact C# interop",
+          "workaround": "Keep the containing interface as exact C# interop"
+        },
+        {
+          "name": "interface-indexer-semantics",
+          "description": "Body-bearing, private, static, virtual, or otherwise non-representable interface indexers preserve the containing interface as exact C# interop",
+          "workaround": "Keep the containing interface as exact C# interop"
+        },
+        {
+          "name": "interface-member",
+          "description": "Events, nested types, and other non-representable interface members preserve the containing interface as exact C# interop",
+          "workaround": "Keep the containing interface as exact C# interop"
+        },
+        {
+          "name": "delegate-semantics",
+          "description": "Public non-generic delegates without attributes or extra modifiers are native; all other delegate declarations preserve exact C# interop",
+          "workaround": "Keep attributed, generic, non-public, or modified delegates as exact C# interop"
+        },
+        {
+          "name": "csharp-script",
+          "description": "Script compilation units, including #r and #load, are preserved by exact whole-unit passthrough",
+          "workaround": "Use whole-unit C# script passthrough until native script lowering exists"
+        },
+        {
+          "name": "compilation-unit-attribute",
+          "description": "Assembly/module attributes preserve the complete compilation unit verbatim",
+          "workaround": "Preserve the compilation unit as C# interop"
+        },
+        {
+          "name": "extern-alias",
+          "description": "Compilation units with extern aliases preserve the complete source verbatim",
+          "workaround": "Preserve the compilation unit and aliased references as C# interop"
+        },
+        {
+          "name": "iterator-accessor",
+          "description": "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a \u00A7CSHARP interop block; Calor has no iterator accessors (Calor0209)",
+          "workaround": "Move the iterator body into a method (\u00A7MT with \u00A7YIELD) and have the accessor return its result, or keep the member as a \u00A7CSHARP interop block"
+        },
+        {
+          "name": "partial-property",
+          "description": "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as a \u00A7CSHARP interop block; Calor has no partial members",
+          "workaround": "Merge the defining and implementing declarations into one ordinary property before migration, or keep both as \u00A7CSHARP interop blocks"
+        },
+        {
+          "name": "default-lambda-parameter",
+          "description": "default lambda parameters (C# 12) are not supported",
+          "workaround": "Use method overloads or null checks inside lambda"
+        },
+        {
+          "name": "file-scoped-type",
+          "description": "File-local classes, structs, interfaces, enums, and delegates are preserved whole as counted C# interop so file-only accessibility remains exact",
+          "workaround": "Keep the declaration as exact C# interop"
+        },
+        {
+          "name": "generic-attribute",
+          "description": "generic attributes (C# 11) are not supported",
+          "workaround": "Use typeof() parameter in non-generic attribute"
+        },
+        {
+          "name": "using-type-alias",
+          "description": "using type aliases for tuples/complex types (C# 12) are not supported",
+          "workaround": "Define explicit record or class types"
+        },
+        {
+          "name": "unsupported-binary-operator",
+          "description": "Binary operator has no Calor mapping; the containing member is preserved as \u00A7CSHARP interop (never substituted with \u002B)",
+          "workaround": "Rewrite using a supported operator or keep the member as \u00A7CSHARP interop"
+        },
+        {
+          "name": "unsupported-compound-assignment",
+          "description": "Compound assignment operator (e.g. \u003E\u003E\u003E=) has no Calor mapping; the containing member is preserved as \u00A7CSHARP interop (never emitted as a plain assignment)",
+          "workaround": "Rewrite as x = x OP y with a supported operator, or keep the member as \u00A7CSHARP interop"
+        },
+        {
+          "name": "embedded-assignment",
+          "description": "An assignment used as a value (a = b = G(), int z = y = G(), return x = G()) converts natively when it is the whole statement, a single local initializer or a returned value, that statement sits directly in a block, and every target is a variable, field or property of this or a type: the right-hand side runs once into a typed temp. Other positions (conditions, arguments, unbraced bodies, switch sections, lambdas and expression bodies, indexer or member targets) keep the statement as C# interop",
+          "workaround": "Assign to the variable in its own statement, then use the variable"
+        },
+        {
+          "name": "compound-assignment-order",
+          "description": "Assignments, compound assignments, \u002B\u002B and -- convert natively with C#\u0027s order: the target\u0027s receiver and arguments run first and once, then a compound read, then the right-hand side. A receiver or argument that would run twice or after hoisted statements is bound to a temp. Shapes that cannot keep that order stay C# interop: a struct receiver that would need a temp, a postfix \u002B\u002B/-- whose hoist would pass an earlier read of the same variable or an earlier call, and a do-while condition, catch filter or switch-expression guard that would need hoisted statements",
+          "workaround": "Evaluate the receiver, index or right-hand side into a local in its own statement first"
+        },
+        {
+          "name": "compound-assignment-narrowing",
+          "description": "A compound assignment or \u002B\u002B/-- whose result C# narrows implicitly converts with an explicit cast for built-in numeric and char targets. Other narrowed targets (a nullable small integer, for which Calor\u0027s cast would drop the ?) stay C# interop",
+          "workaround": "Write the assignment with an explicit cast, as in b = (byte)(b \u002B 10)"
+        },
+        {
+          "name": "default-member-collision",
+          "description": "A default value (int x;, default, default(T)) where a symbol named default is in scope, or declared at any accessibility in a containing or base type, keeps its statement as C# interop, because Calor\u0027s default would read that member",
+          "workaround": "Rename the member named default, or initialize the variable with an explicit value"
+        },
+        {
+          "name": "unsupported-switch-label",
+          "description": "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as \u00A7CSHARP interop (never broadened to a wildcard)",
+          "workaround": "Rewrite as a constant case label or if/else chain, or keep the member as \u00A7CSHARP interop"
+        },
+        {
+          "name": "unsupported-pattern-operator",
+          "description": "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as \u00A7CSHARP interop (never defaulted to ==/\u0026\u0026)",
+          "workaround": "Rewrite the pattern with supported operators, or keep the member as \u00A7CSHARP interop"
+        },
+        {
+          "name": "unsupported-prefix-operator",
+          "description": "Prefix unary operator (e.g. unary \u002B) has no Calor node; the containing member is preserved as \u00A7CSHARP interop (never substituted with negation)",
+          "workaround": "Drop the redundant unary \u002B or keep the member as \u00A7CSHARP interop"
+        },
+        {
+          "name": "unsupported-slice-subpattern",
+          "description": "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as \u00A7CSHARP interop (never broadened by dropping the sub-pattern)",
+          "workaround": "Match the remaining elements explicitly, or keep the member as \u00A7CSHARP interop"
+        },
+        {
+          "name": "generic-delegate",
+          "description": "Generic delegate declarations are preserved verbatim as counted \u00A7CSHARP interop so type parameters and constraints remain exact",
+          "workaround": "Use Func\u003C\u003E/Action\u003C\u003E or keep the delegate as \u00A7CSHARP interop"
+        },
+        {
+          "name": "conversion-error",
+          "description": "The converter crashed on this construct; the containing statement/member is preserved as \u00A7CSHARP interop",
+          "workaround": "Simplify the construct or keep it as \u00A7CSHARP interop"
+        },
+        {
+          "name": "unknown-expression",
+          "description": "Unknown or unsupported expression syntax",
+          "workaround": "Review and manually convert the expression"
+        },
+        {
+          "name": "unknown-literal",
+          "description": "Unknown or unsupported literal type",
+          "workaround": "Use a supported literal type"
+        },
+        {
+          "name": "unknown-pattern",
+          "description": "Unrecognized pattern syntax",
+          "workaround": "Simplify pattern or use if-else with explicit conditions"
+        },
+        {
+          "name": "nullable-directive",
+          "description": "#nullable directives use an explicit source-ordered directive node when their boundary is modeled",
+          "workaround": "Unmodeled embedded placement preserves the enclosing C# boundary"
+        },
+        {
+          "name": "warning-directive",
+          "description": "#warning directives use an explicit source-ordered directive node and retain compiler warning behavior",
+          "workaround": "Unmodeled embedded placement preserves the enclosing C# boundary"
+        },
+        {
+          "name": "error-directive",
+          "description": "#error directives use an explicit source-ordered directive node; active errors remain honest compilation failures",
+          "workaround": "Resolve active compiler errors in the selected configuration"
+        },
+        {
+          "name": "line-directive",
+          "description": "#line directives are preserved verbatim in source order",
+          "workaround": "Preserve the complete compilation unit to retain exact line mapping"
+        }
+      ]
+    }
+  }
+}

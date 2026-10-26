@@ -35,24 +35,24 @@ convert natively and the rest stay C#; the description lists which.
 
 | Feature | Level | Native | Stays C# |
 |:--------|:------|:-------|:---------|
-| `ref-parameter` | Partial | `ref` parameters and `§A{ref}` arguments | ref locals and returns, conditional refs, `scoped`/`ref readonly`, by-reference delegates, constructor and indexer arguments, method-generic by-reference parameters |
-| `out-parameter` | Partial | `out` parameters and `§A{out}` arguments, `out _`; flow attributes such as `[NotNullWhen]` are copied but inert | method-generic `out T` |
-| `out-var` | Partial | `out var` in an expression statement, local declaration, `return`, or `if` condition directly in a block | chained assignments, a visible `default` member, loop/`using`/`lock` headers, lambdas, queries, holes, filters, initializers, expression-bodied members |
-| `in-parameter` | Full | `in` parameters and `§A{in}` arguments | call sites that omit `in`, pass a value, or pass an operand that runs code (the statement stays C#), and `in` indexer parameters |
-| `string-interpolation` | Partial | `string`/`object` targets; `FormattableString`/`IFormattable` targets with holes | handler targets, hole-free `FormattableString` targets, holes outside the native subset |
-| `string-interpolation-to-string` | Full | `string`/`object` targets | — |
-| `string-interpolation-formattable` | Partial | targets with at least one hole, via an explicit cast | hole-free targets |
-| `string-interpolation-hole` | Partial | names; regular string, `char`, `bool` and `int` literals; plain-digit `double` literals with a fractional part; dotted member access; operators over those (not `as`, `is` or `??`); `nameof`; `typeof`; dotted calls with positional arguments of those kinds (not `null`, and member access only on a name) | other holes, including `decimal`, `long` and whole-number `double` literals and operators with a call operand, keep their C# text as `§CS{...}` |
-| `string-interpolation-handler` | NotSupported | — | the statement or member |
-| `local-function` | Partial | the bounded slice in the [guide](/docs/guides/csharp-interoperability/#keep-a-small-local-helper-function): non-capturing, declared directly in a method body, plain by-value parameters, used only as a call or in a checked value position | any other local function (the whole member stays C#) |
-| `iterator-accessor` | NotSupported | — | the property or indexer (`§CSHARP`) |
-| `partial-property` | NotSupported | — | each declaration (`§CSHARP`) |
-| `array-element-block` | NotSupported | — | the statement holding a collection-initializer element, or a multi-line element in a rectangular array row |
+| `ref-parameter` | <SupportLevel feature="ref-parameter" /> | `ref` parameters and `§A{ref}` arguments | ref locals and returns, conditional refs, `scoped`/`ref readonly`, by-reference delegates, constructor and indexer arguments, method-generic by-reference parameters |
+| `out-parameter` | <SupportLevel feature="out-parameter" /> | `out` parameters and `§A{out}` arguments, `out _`; flow attributes such as `[NotNullWhen]` are copied but inert | method-generic `out T` |
+| `out-var` | <SupportLevel feature="out-var" /> | `out var` in an expression statement, local declaration, `return`, or `if` condition directly in a block | chained assignments, a visible `default` member, loop/`using`/`lock` headers, lambdas, queries, holes, filters, initializers, expression-bodied members |
+| `in-parameter` | <SupportLevel feature="in-parameter" /> | `in` parameters and `§A{in}` arguments | call sites that omit `in`, pass a value, or pass an operand that runs code (the statement stays C#), and `in` indexer parameters |
+| `string-interpolation` | <SupportLevel feature="string-interpolation" /> | `string`/`object` targets; `FormattableString`/`IFormattable` targets with holes | handler targets, hole-free `FormattableString` targets, holes outside the native subset |
+| `string-interpolation-to-string` | <SupportLevel feature="string-interpolation-to-string" /> | `string`/`object` targets | — |
+| `string-interpolation-formattable` | <SupportLevel feature="string-interpolation-formattable" /> | targets with at least one hole, via an explicit cast | hole-free targets |
+| `string-interpolation-hole` | <SupportLevel feature="string-interpolation-hole" /> | names; regular string, `char`, `bool` and `int` literals; plain-digit `double` literals with a fractional part; dotted member access; operators over those (not `as`, `is` or `??`); `nameof`; `typeof`; dotted calls with positional arguments of those kinds (not `null`, and member access only on a name) | other holes, including `decimal`, `long` and whole-number `double` literals and operators with a call operand, keep their C# text as `§CS{...}` |
+| `string-interpolation-handler` | <SupportLevel feature="string-interpolation-handler" /> | — | the statement or member |
+| `local-function` | <SupportLevel feature="local-function" /> | the bounded slice in the [guide](/docs/guides/csharp-interoperability/#keep-a-small-local-helper-function): non-capturing, declared directly in a method body, plain by-value parameters, used only as a call or in a checked value position | any other local function (the whole member stays C#) |
+| `iterator-accessor` | <SupportLevel feature="iterator-accessor" /> | — | the property or indexer (`§CSHARP`) |
+| `partial-property` | <SupportLevel feature="partial-property" /> | — | each declaration (`§CSHARP`) |
+| `array-element-block` | <SupportLevel feature="array-element-block" /> | — | the statement holding a collection-initializer element, or a multi-line element in a rectangular array row |
 
 **Known gaps between the registry and 0.25 behavior.** One remains; trust the conversion report:
 
-- `yield-return` is Full for iterator *methods* only. Iterator accessors are
-  `iterator-accessor` (NotSupported).
+- `yield-return` is <SupportLevel feature="yield-return" /> for iterator *methods* only. Iterator accessors are
+  `iterator-accessor` (<SupportLevel feature="iterator-accessor" />).
 
 ## Collection Expressions and Patterns in 0.27
 
@@ -62,7 +62,7 @@ The registry entries describe these limits:
 
 | Feature | Level | Native | Stays C# |
 |:--------|:------|:-------|:---------|
-| `collection-expression` | Partial | array targets without spreads; the single-spread case below | other collection targets, to retain their runtime type |
-| `collection-spread` | Partial | a single array spread into an array target | other spreads, to retain enumeration order |
-| `collection-spread-mixed` | Partial | — | mixed spreads, to retain enumeration and element evaluation order |
-| `complex-is-pattern` | Partial | simple `is` checks and declaration patterns | property and positional patterns, and other complex checks whose lowering could change evaluation or binding |
+| `collection-expression` | <SupportLevel feature="collection-expression" /> | array targets without spreads; the single-spread case below | other collection targets, to retain their runtime type |
+| `collection-spread` | <SupportLevel feature="collection-spread" /> | a single array spread into an array target | other spreads, to retain enumeration order |
+| `collection-spread-mixed` | <SupportLevel feature="collection-spread-mixed" /> | — | mixed spreads, to retain enumeration and element evaluation order |
+| `complex-is-pattern` | <SupportLevel feature="complex-is-pattern" /> | simple `is` checks and declaration patterns | property and positional patterns, and other complex checks whose lowering could change evaluation or binding |
