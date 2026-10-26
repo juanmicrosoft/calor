@@ -6,6 +6,29 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Code inside `§PP` blocks is now checked like other code (#1678).** `§PP{COND}` is Calor's
+  form of C# `#if`. The binder used to scan its bodies instead of binding them, so three writes
+  to an immutable binding compiled with exit code 0. Now both branches are bound, including
+  `§PPE` branches and nested `§PP` blocks, and each branch gets its own scope. A binding declared
+  in a branch is still visible after the block, as in C#, because `#if` opens no C# scope. If
+  two branches declare the same name, a later write is checked against the stricter one.
+  - **Breaking:** these programs now fail. A write to a `§PP` binding that shares its name with
+    a writable field is `Calor0213` (before, the write went to the binding and nothing was
+    reported). So is a write to a binding declared in a nested `§PP`. A `§B{~x}` after a `§PP`
+    that declared an immutable `x` is `Calor0260`. A branch binding that reuses a name already
+    declared in the same block is `Calor0258` (C# rejects it with CS0128 when that branch is
+    active). Two branches that declare one name with different types are `Calor0201`, and so is
+    a branch binding that hides a field, parameter or outer local unless every branch declares
+    it (otherwise the name would mean the outer variable when the other branch is active). Code in
+    a branch can also report new errors, such as an undefined name.
+  - Reading a `§PP` binding after the block no longer reports `Calor0200` (undefined variable).
+    A `§B{~x}` in the `§PPE` branch now declares `x` there instead of assigning to the `#if`
+    branch's `x`, which did not exist in that branch (CS0103).
+- **Breaking: three operator forms with too few operands are now `Calor0110` (#1678).** The
+  parser used to fill in the missing operand: `(?? x)` became `x`, `(? c a)` became
+  `c ? a : null`, and `(== x)` or `(!= x)` compared `x` with `null`. None of these is documented
+  and the C# converter never writes them. Write `(?? x fallback)`, `(? c a b)` or
+  `(== x null)`.
 - **Collection and object initializers convert correctly (#1541, #1524, #1595).** These were
   silent wrong-output bugs: the converter changed what the code does and still reported a
   lossless conversion.

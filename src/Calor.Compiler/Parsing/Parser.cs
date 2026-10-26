@@ -3663,11 +3663,19 @@ public sealed class Parser
         {
             return new ConditionalExpressionNode(span, args[0], args[1], args[2]);
         }
-        // Tolerate 2-arg ternary from converter output where §NEW consumed the else-branch
-        if (opText == "?" && args.Count == 2)
+        // #1678: a ternary needs all three operands. `(? c a)` used to be read as
+        // `c ? a : null`, which silently invented an else branch; the converter always emits
+        // three operands (CalorEmitter.Visit(ConditionalExpressionNode)).
+        if (opText == "?")
         {
-            return new ConditionalExpressionNode(span, args[0], args[1],
-                new ReferenceNode(span, "null"));
+            _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
+                $"Conditional '?' requires exactly 3 operands (condition then else), got {args.Count}");
+            return args.Count switch
+            {
+                0 => new IntLiteralNode(span, 0),
+                1 or 2 => args[^1],
+                _ => new ConditionalExpressionNode(span, args[0], args[1], args[2])
+            };
         }
 
         // Handle null-coalescing: (?? x "default")
@@ -3675,11 +3683,8 @@ public sealed class Parser
         {
             return new NullCoalesceNode(span, args[0], args[1]);
         }
-        if (opText == "??" && args.Count == 1)
-        {
-            // Tolerate single-operand ?? from converter output -- treat as identity
-            return args[0];
-        }
+        // #1678: `(?? x)` used to be read as `x`, silently dropping the fallback; the converter
+        // always emits two operands (CalorEmitter.Visit(NullCoalesceNode)).
         if (opText == "??")
         {
             _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
@@ -3763,15 +3768,14 @@ public sealed class Parser
             var binaryOp = BinaryOperatorExtensions.FromString(opText);
             if (binaryOp.HasValue)
             {
-                // For comparison operators with 1 arg (converter output like (== expr ) with missing RHS),
-                // treat as comparison with null. For other operators, report the error.
-                if (binaryOp.Value is BinaryOperator.Equal or BinaryOperator.NotEqual)
-                {
-                    return new BinaryOperationNode(span, binaryOp.Value, args[0],
-                        new ReferenceNode(span, "null"));
-                }
+                // #1678: `(== x)` and `(!= x)` used to compare with null, silently inventing the
+                // right operand. They are arity errors like every other binary operator; write
+                // `(== x null)` to compare with null.
                 _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
-                    $"Binary operator '{opText}' requires at least two operands");
+                    $"Binary operator '{opText}' requires at least two operands" +
+                    (binaryOp.Value is BinaryOperator.Equal or BinaryOperator.NotEqual
+                        ? $"; to compare with null, write ({opText} x null)"
+                        : ""));
                 return args[0];
             }
         }

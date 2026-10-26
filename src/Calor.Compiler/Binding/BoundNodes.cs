@@ -1569,6 +1569,21 @@ public sealed class BoundProofObligation : BoundStatement
 /// unsupported statement. The current model may produce false positives (dead stores that the
 /// opaque statement reads) and false negatives (defs we miss). This is best-effort.
 /// </summary>
+/// <summary>
+/// #1678: a statement-level <c>§PP</c> (<c>#if</c>) block. Its branches are bound (so the binder's
+/// scopes, read-only checks and deferred-callable effects see them), but <see cref="BoundNode.ChildNodes"/>
+/// is empty: analysis passes treat the block as opaque, as they did before it was bound.
+/// </summary>
+public sealed class BoundPreprocessorBlock : BoundStatement
+{
+    public IReadOnlyList<IReadOnlyList<BoundStatement>> Branches { get; }
+
+    public BoundPreprocessorBlock(TextSpan span, IReadOnlyList<IReadOnlyList<BoundStatement>> branches) : base(span)
+    {
+        Branches = branches ?? throw new ArgumentNullException(nameof(branches));
+    }
+}
+
 public sealed class BoundUnsupportedStatement : BoundStatement
 {
     public string NodeTypeName { get; }
