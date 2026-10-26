@@ -13,8 +13,25 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// </summary>
 public class ConverterEvaluationOrderResidualTests
 {
+    [Fact]
+    public void GenericTypeReceiverWithoutMetadata_RemainsNativeWhenArgumentsAreStaged()
+    {
+        const string source = "public static class C { public static object Run() { return MissingCache<object>.Use(typeof(object).GetMethods()); } }";
+        var result = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            DefinedSymbols = Array.Empty<string>(),
+            GracefulFallback = true
+        }).Convert(source);
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Contains("MissingCache<object>.Use", result.CalorSource);
+        Assert.Empty(result.Losses);
+    }
+
     private static IEnumerable<(string Id, string Source, string Allowed)> Rows()
     {
+        yield return ("AUDIT-generic-type-receiver-staging", "public static class Cache<T> { static Cache() { Probe.log += \"C\"; } public static int Use(int n) => n; } public class Item { public int N() { Probe.log += \"N\"; return 7; } } public static class Probe { public static string log = \"\"; static Item F() { log += \"F\"; return new Item(); } public static string Run() { int n = Cache<int>.Use(F().N()); return log + n; } }", "native");
         yield return ("AUDIT-sibling-argument-read", "public class C { public int N() => 2; } public static class Probe { static int x = 1; static C F() { x = 10; return new C(); } static string Use(int a, int b) => a + \",\" + b; public static string Run() { return Use(x, F().N()); } }", "native-or-preserved");
         yield return ("AUDIT-sibling-binary-read", "public class C { public int N() => 2; } public static class Probe { static int x = 1; static C F() { x = 10; return new C(); } public static string Run() { return (x + F().N()).ToString(); } }", "native-or-preserved");
         yield return ("AUDIT-receiver-before-argument", "public class C { public int N() => 2; public int Use(int x) => x; } public static class Probe { static string log = \"\"; static C Receiver() { log += \"R\"; return new C(); } static C F() { log += \"F\"; return new C(); } public static string Run() { int n = 1 + Receiver().Use(F().N()); return log + n; } }", "native-or-preserved");

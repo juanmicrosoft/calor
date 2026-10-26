@@ -221,6 +221,22 @@ public class BinderIncompleteRatchetTests
     }
 
     [SkippableFact]
+    public void SourceCarrierIdentities_SurviveWithoutRegeneratingAggregateCoverage()
+    {
+        var files = SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
+            .Select(evidence => Path.Combine(RepoRoot(), "bench", "corpus", evidence.File))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        Skip.IfNot(files.All(File.Exists), "corpus submodules not initialized");
+        Assert.Multiple(files.Select(file => (Action)(() =>
+        {
+            var coverage = new NativeConversionCoverage();
+            MeasureNative(file, File.ReadAllText(file).Replace("\r\n", "\n"), coverage);
+            Assert.NotNull(coverage.LastSourceCoverage);
+        })).ToArray());
+    }
+
+    [SkippableFact]
     public void ConversionLeg_IncompleteCount_MatchesBaseline()
     {
         var root = RepoRoot();
@@ -409,12 +425,14 @@ public class BinderIncompleteRatchetTests
         var failedBinding = WithBindingCoverage(before, bindDiagnostics);
         Assert.True(failedBinding.BindingErrorCount > 0);
         Assert.NotEqual(WithBindingCoverage(before, new DiagnosticBag()), failedBinding);
-        // #943 (0.25 F1): 4 identities moved to PreservedCases (their member is now §CSHARP).
-        Assert.Equal(68, SourceCarrierCases.Value.Count);
-        Assert.Equal(4, PreservedCarrierCases.Value.Count);
+        // #943 moved four identities; #1588 preserves five more explicit member identities.
+        Assert.Equal(63, SourceCarrierCases.Value.Count);
+        Assert.Equal(9, PreservedCarrierCases.Value.Count);
         Assert.Equal(47, SourceCarrierCases.Value.Count(c => c.SourceKind == "GenericName"));
-        Assert.Equal(21, SourceCarrierCases.Value.Count(c => c.SourceKind == "ConditionalAccessExpression"));
-        Assert.Equal(68, SourceCarrierCases.Value
+        Assert.Equal(16, SourceCarrierCases.Value.Count(c => c.SourceKind == "ConditionalAccessExpression"));
+        Assert.Equal(63, SourceCarrierCases.Value
+            .Select(c => (c.File, c.SourceStart, c.SourceEnd)).Distinct().Count());
+        Assert.Equal(72, SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
             .Select(c => (c.File, c.SourceStart, c.SourceEnd)).Distinct().Count());
         var carrier = new SourceCarrierCase("identity.cs", first.Start, first.End,
             "NumericLiteralExpression", "1", nameof(IntLiteralNode), first.Start, first.End, "1");
@@ -899,8 +917,9 @@ public class BinderIncompleteRatchetTests
         var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
             .Replace('\\', '/');
         var nodes = Walk(module).OfType<ExpressionNode>().ToArray();
-        foreach (var evidence in SourceCarrierCases.Value.Where(c => c.File == relative))
-            AssertSourceCarrierPreserved(nodes, source, evidence);
+        Assert.Multiple(SourceCarrierCases.Value.Where(c => c.File == relative)
+            .Select(evidence => (Action)(() => AssertSourceCarrierPreserved(nodes, source, evidence)))
+            .ToArray());
         foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
         {
             Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
@@ -920,7 +939,12 @@ public class BinderIncompleteRatchetTests
             .SequenceEqual(OpaqueTokens(evidence.CarrierCode))),
             $"Source carrier disappeared or changed for {evidence.File}:"
             + $"{evidence.SourceStart}..{evidence.SourceEnd} ({evidence.SourceKind}). "
-            + "Resolve the source operation explicitly; regenerating aggregate coverage is not sufficient.");
+            + "Resolve the source operation explicitly; regenerating aggregate coverage is not sufficient. "
+            + "Current source-region carriers: " + string.Join("; ",
+                nodes.Where(node => node.Span.Start >= evidence.SourceStart
+                    && node.Span.Start < evidence.SourceEnd).Select(node =>
+                    $"{node.GetType().Name} {node.Span.Start}..{node.Span.End}: "
+                    + node.Accept(new Compiler.CodeGen.CSharpEmitter()))));
     }
 
     private static void AssertOpaqueSerializationPreserved(

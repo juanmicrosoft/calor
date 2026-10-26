@@ -8024,6 +8024,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (converted is ReferenceNode reference
             && _pendingStatements.OfType<BindStatementNode>().Any(bind => bind.Name == reference.Name))
             return;
+        // A generic-name receiver can only name a type, even without its project's metadata.
+        if (expression is GenericNameSyntax && expression.Parent is MemberAccessExpressionSyntax member
+            && ReferenceEquals(member.Expression, expression))
+            return;
         if (_semanticModel != null && expression.SyntaxTree == _semanticModel.SyntaxTree
             && (_semanticModel.GetSymbolInfo(expression).Symbol is INamedTypeSymbol or INamespaceSymbol
                 || !HasEffectfulConversion(expression) && IsFixedValue(expression, later)))
