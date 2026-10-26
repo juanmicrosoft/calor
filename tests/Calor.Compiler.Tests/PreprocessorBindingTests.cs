@@ -50,6 +50,25 @@ public class PreprocessorBindingTests
         "§M{m1:T}\n  §CL{c1:K:pub}\n    §FLD{i32:x:pub}\n    §MT{m2:Run:pub} () -> i32\n" +
         Indent(body, "      ") + "\n";
 
+    [Theory]
+    [InlineData("n", "N", true)]
+    [InlineData("n", "N", false)]
+    [InlineData("N", "n", true)]
+    [InlineData("N", "n", false)]
+    public void TypeChecker_PreprocessorBindingsKeepCaseDistinctRefinements(
+        string naturalName, string positiveName, bool returnNatural)
+    {
+        var branch = $"      §B{{{naturalName}:Nat}} a\n      §B{{{positiveName}:Pos}} b\n";
+        var source = "§M{m:T}\n  §RTYPE{r1:Nat:i32} (>= # 0)\n  §RTYPE{r2:Pos:Nat} (> # 0)\n" +
+            "  §F{f:Run:pub} (Nat:a, Pos:b) -> Pos\n    §PP{DEBUG}\n" + branch +
+            "    §PPE\n" + branch + $"    §R {(returnNatural ? naturalName : positiveName)}\n";
+
+        var result = Compile(source);
+
+        Assert.Equal(returnNatural, result.HasErrors);
+        Assert.All(result.Diagnostics.Errors, error => Assert.Equal("Calor0202", error.Code));
+    }
+
     // ===================================================================
     // Finding 1: a §PP local with the same name as a writable field
     // ===================================================================

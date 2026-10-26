@@ -100,6 +100,13 @@ an `i32` and returns `Nat`, and its return guard checks the value at run time. O
 see a refinement as its base type, so `(+ a p)` is an `i32`. A conditional `(? c a p)` whose arms
 are two different refinements also has the base type.
 
+A `§W` match is checked arm by arm. When the match is bound, returned or assigned where a `Nat`
+is expected, an arm that produces a `Pos` is `Calor0202`. In an `§ASSIGN` to a `Nat` local, an
+arm that produces a plain `i32` is still accepted and guarded at run time. These checks apply everywhere the type checker looks: function and
+lambda bodies, class members (methods, constructors, property and indexer accessors,
+operators), `§P` arguments, `§ASSIGN` right-hand sides, and the bodies of `§TR`, `§EACH` and the
+other block statements.
+
 ### Locals Inferred From a Refined Value
 
 A `§B` without a type takes the type of its initializer, refinement included. After
@@ -126,9 +133,12 @@ Four related rules keep a refined variable checked:
 - A type pattern cannot name a refinement type: `(is a Pos p)` is `Calor0202`. Refinements erase
   at run time, so the test could only check the base type.
 
-The type checker does not visit class members (`§CL` methods), so the `Calor0202` errors on
-this page are not reported there. Runtime guards still apply inside methods, including on
-locals inferred from a refined parameter.
+Inside class members the type checker reports only these refinement errors. Its other checks
+there are left to name binding and the C# compiler, as before, because it does not model
+inherited members, so in a class with a base class a bare call to a method the class does not
+declare is not checked. Members inside a `§PP` block are not type-checked; runtime guards still
+apply there. A write to a refined field or property has no runtime guard yet, so a setter's `value`
+and an indexer's parameters are typed as their base types.
 
 ---
 
