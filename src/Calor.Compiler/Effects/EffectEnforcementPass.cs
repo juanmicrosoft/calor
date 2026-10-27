@@ -3320,8 +3320,8 @@ public sealed class EffectEnforcementPass
                 ThrowStatementNode throwStmt => EffectSet.From("throw")
                     .Union(throwStmt.Exception != null ? InferFromExpression(throwStmt.Exception) : EffectSet.Empty),
                 RethrowStatementNode => EffectSet.From("throw"),
-                ReturnStatementNode ret => ret.Expression != null ? InferFromExpression(ret.Expression) : EffectSet.Empty,
-                BindStatementNode bind => bind.Initializer != null ? InferFromExpression(bind.Initializer) : EffectSet.Empty,
+                ReturnStatementNode ret => ret.Expression != null ? InferFromRowCheckedValue(ret.Expression) : EffectSet.Empty,
+                BindStatementNode bind => bind.Initializer != null ? InferFromRowCheckedValue(bind.Initializer) : EffectSet.Empty,
                 AssignmentStatementNode assign => InferFromAssignment(assign),
                 CompoundAssignmentStatementNode compound => InferFromCompoundAssignment(compound),
                 ExpressionStatementNode exprStmt => InferFromExpression(exprStmt.Expression),
@@ -5450,7 +5450,7 @@ public sealed class EffectEnforcementPass
                 var resolved = FindClassProperty(cls, memberName);
                 var getter = resolved?.Property.Getter;
                 if (getter == null)
-                    return effects;
+                    return effects.Union(MethodGroupEffects(cls, memberName) ?? EffectSet.Empty);
 
                 var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(
                     resolved!.Value.OwnerName,
@@ -5512,10 +5512,26 @@ public sealed class EffectEnforcementPass
                 : resolution.Effects;
         }
 
-        private EffectSet InferFromReference(ReferenceNode reference)
+        private EffectSet InferFromReference(ReferenceNode reference, bool chargeMethodGroup = true)
         {
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))
-                return EffectSet.Empty;
+            {
+                if (!chargeMethodGroup
+                    || IsLocalFunctionName(reference.Name)
+                    || _context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { Id.IsNone: false })
+                    return EffectSet.Empty;
+
+                if (_context.OwnerClass is { } owner
+                    && MethodGroupEffects(owner, reference.Name) is { } memberEffects)
+                    return memberEffects;
+
+                var candidates = _context.Functions.Values
+                    .Where(function => function.Name.Equals(reference.Name, StringComparison.Ordinal)).ToArray();
+                var topLevel = candidates.Where(function => !function.Id.Contains('.')).ToArray();
+                return (topLevel.Length > 0 ? topLevel : candidates)
+                    .Aggregate(EffectSet.Empty, (effects, function) =>
+                        effects.Union(MethodGroupEffects(function.Effects, function.EffectParameters.Count)));
+            }
 
             // #1176: `this.` and `self.` resolve to the enclosing class, the same way the
             // event-accessor path at InferFromEventAccessor already does. Without this,
@@ -5532,10 +5548,47 @@ public sealed class EffectEnforcementPass
             var receiverType = receiver is "this" or "self"
                 ? _context.OwnerClass?.Name
                 : ResolveLocalValueType(receiver);
+            receiverType ??= _context.ClassesByName.ContainsKey(receiver) ? receiver : null;
+            if (chargeMethodGroup && receiverType != null && TryResolveClass(receiverType, out var cls))
+                return InferGetterEffects(receiverType, member, reference.Span, receiver)
+                    .Union(MethodGroupEffects(cls, member) ?? EffectSet.Empty);
             return receiverType == null
                 ? EffectSet.Empty
                 : InferGetterEffects(receiverType, member, reference.Span, receiver);
         }
+
+        private EffectSet? MethodGroupEffects(ClassDefinitionNode cls, string name)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            ClassDefinitionNode? current = cls;
+            while (current != null && visited.Add(current.Name))
+            {
+                if (current.Fields.Any(field => field.Name.Equals(name, StringComparison.Ordinal))
+                    || CallGraphAnalysis.EnumerateProperties(current).Any(property =>
+                        property.Name.Equals(name, StringComparison.Ordinal)))
+                    return EffectSet.Empty;
+                var methods = CallGraphAnalysis.EnumerateMethods(current)
+                    .Where(method => method.Name.Equals(name, StringComparison.Ordinal)).ToArray();
+                if (methods.Length > 0)
+                    return methods.Aggregate(EffectSet.Empty, (effects, method) =>
+                        effects.Union(MethodGroupEffects(method.Effects, method.EffectParameters.Count)));
+                current = ResolveBaseClass(current);
+            }
+            return null;
+        }
+
+        private static EffectSet MethodGroupEffects(EffectsNode? effects, int effectParameterCount) =>
+            effectParameterCount > 0 || effects?.EffectVariables.Count > 0
+                ? EffectSet.Unknown
+                : GetDeclaredEffects(effects);
+
+        // Direct bare-name destinations are checked by RowSiteChecker and carry
+        // their row to later invocations. Nested expressions and qualified stores
+        // have no such check, so creating a method group there charges its row.
+        private EffectSet InferFromRowCheckedValue(ExpressionNode expression) =>
+            expression is ReferenceNode reference && !reference.Name.Contains('.')
+                ? InferFromReference(reference, chargeMethodGroup: false)
+                : InferFromExpression(expression);
 
         private EffectSet InferGetterEffects(
             string receiverType,
@@ -5697,7 +5750,9 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromAssignment(AssignmentStatementNode assign)
         {
             return InferFromAssignmentTarget(assign.Target, readValue: false)
-                .Union(InferFromExpression(assign.Value));
+                .Union(assign.Target is ReferenceNode target && !target.Name.Contains('.')
+                    ? InferFromRowCheckedValue(assign.Value)
+                    : InferFromExpression(assign.Value));
         }
 
         private EffectSet InferFromAssignmentTarget(ExpressionNode target, bool readValue)
@@ -5718,11 +5773,32 @@ public sealed class EffectEnforcementPass
                 return effects.Union(EffectSet.From("mut"))
                     .Union(InferSetterEffects(receiver, member, reference.Span));
             }
+            if (target is ReferenceNode bare && IsBareFieldReference(bare))
+                return EffectSet.From("mut");
 
             var targetEffects = InferFromExpression(target);
             return target is ArrayAccessNode or MultiDimArrayAccessNode
                 ? targetEffects.Union(EffectSet.From("mut"))
                 : targetEffects;
+        }
+
+        private bool IsBareFieldReference(ReferenceNode reference)
+        {
+            if (_context.CallGraph.BoundVariable(_context.CurrentFunctionId, reference.Span) is { } variable)
+                return variable.IsField;
+
+            // AST-only inference has no lexical identity. Never let a possible
+            // shadow make a state write silently pure when binding is unavailable.
+            var owner = _context.OwnerClass;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (owner != null && visited.Add(owner.Name))
+            {
+                if (owner.Fields.Any(field => field.Name.Equals(reference.Name, StringComparison.Ordinal)))
+                    return true;
+                var baseName = StripGenericArguments(owner.BaseClass);
+                owner = baseName != null ? _context.ClassesByName.GetValueOrDefault(baseName) : null;
+            }
+            return false;
         }
 
         private EffectSet InferFromExpression(ExpressionNode expr)

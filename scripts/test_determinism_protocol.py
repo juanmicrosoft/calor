@@ -354,8 +354,15 @@ class NegativeRegistrationControls(unittest.TestCase):
         baseline = dp.load_baseline(ROOT, legacy)
         self.assertIsNotNone(baseline)
         self.assertEqual("1.7.0", baseline[0]["protocolVersion"])
-        self.assertEqual(set(), codes(baseline=baseline))  # the retired main's-validator gates are allowed to go
-        self.assertIn("D016", codes(protocol=mutate(lambda p: p["determinismRows"].pop()), baseline=baseline))
+        # This fixture compares a historical move, not the latest script re-pin against main.
+        moved = copy.deepcopy(PROTOCOL)
+        old_gates = {(g["workflow"], g["job"], g["step"]): g
+                     for g in baseline[0]["gates"]["shardSteps"]}
+        for gate in moved["gates"]["shardSteps"]:
+            gate["repinnedFrom"] = old_gates[(gate["workflow"], gate["job"], gate["step"])]["scriptSha256"]
+        self.assertEqual(set(), codes(protocol=moved, baseline=baseline))
+        moved["determinismRows"].pop()
+        self.assertIn("D016", codes(protocol=moved, baseline=baseline))
         # #1584: a reviewed change that weakens nothing needs no amendment entry.
         reworded = mutate(lambda p: p["limitations"].append("an added limitation"))
         self.assertEqual(set(), codes(protocol=reworded, baseline=(PROTOCOL, CASES)))

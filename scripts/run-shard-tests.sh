@@ -13,10 +13,10 @@
 # from this project's assembly, no test in two parts) and the sum against eng/test-manifest.json.
 # A skipped part leaves no TRX, and a masked failure is still a Failed result in it.
 #
-# #1150: the compiler shard runs in TWO invocations, so each `dotnet test` gets a FRESH test host
+# #1150: the compiler shard runs in FOUR invocations, so each `dotnet test` gets a FRESH test host
 # and no single host accumulates the whole suite. This CAPS THE SYMPTOM; it does not fix the leak
-# (see docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md). The halves come from
-# scripts/compiler-shard-filter.sh, whose part 2 is the exact negation of part 1.
+# (see docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md). The parts come from
+# scripts/compiler-shard-filter.sh, whose final part complements the other three.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -33,9 +33,9 @@ sampler_pid=$!
 trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
 if [ "$name" = "compiler" ]; then
   bash scripts/compiler-shard-filter.sh --self-test
-  # The two invocations pass --no-build, so build once up front.
+  # The invocations pass --no-build, so build once up front.
   dotnet build "$project" -c Release
-  for part in 1 2; do
+  for part in $(bash scripts/compiler-shard-filter.sh --parts); do
     filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
     dotnet test "$project" -c Release --no-build --no-restore \
       --filter "$filter" \

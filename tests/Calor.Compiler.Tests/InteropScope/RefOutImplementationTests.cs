@@ -141,8 +141,10 @@ public class RefOutImplementationTests
               §CL{c1:K:pub:stat}
                 §FLD{?str:slot:pub:stat}
                 §MT{m1:ClearSlot:pub:stat} ()
+                  §E{mut}
                   §ASSIGN slot null
                 §MT{m2:Check:pub:stat} {{parameters}} -> i32
+                  §E{mut}
                   §IF{i1} (!= a null)
                     {{step}}
                     §B{str:u} a

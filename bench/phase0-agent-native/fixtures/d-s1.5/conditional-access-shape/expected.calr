@@ -3,11 +3,12 @@
     §FLD{i32:ArgumentCalls:priv:stat}
 
     §MT{m002:Argument:priv:stat} () -> i32
+      §E{mut}
       §ASSIGN ArgumentCalls (+ ArgumentCalls 1)
       §R 7
 
     §MT{m006:Run:pub:stat} () -> i32
-      §E{alloc}
+      §E{alloc,mut}
       §ASSIGN ArgumentCalls 0
       §B{~target:Holder} null
       §B{?i32:skipped} §C (?. target "M") §A §C{Argument} §/C §/C

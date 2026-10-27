@@ -648,8 +648,8 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
-        "repinnedFrom": "b2e788239d12b5dcd672635e4d08ed21ad657e56ffcf57be16ca8536fcd5d92c",
+        "scriptSha256": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
+        "repinnedFrom": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
           "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
@@ -667,8 +667,8 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
-        "repinnedFrom": "43af29422549f0b21c15e9ca0b7372795c2e7208bc868e4732249052a5be301e",
+        "scriptSha256": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
+        "repinnedFrom": "c10de3ffc7840da703bf783d0f74139383d19e3af3bea1a4df7e511f2c49f30a",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
           "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"

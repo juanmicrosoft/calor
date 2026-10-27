@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Emits the two complementary VSTest filters that split Calor.Compiler.Tests in half.
+# Emits four disjoint VSTest filters covering Calor.Compiler.Tests.
 #
 # WHY — issue #1150. The suite's test host accumulates anonymous memory that no GC
 # setting can reach; it climbs past 9 GB on a 16 GB runner and the job is killed
@@ -7,7 +7,7 @@
 # refuted, so the allocator is still unattributed — see
 # docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md.
 #
-# Running the suite as TWO invocations gives each a fresh test host, so neither
+# Running the suite as FOUR invocations gives each a fresh test host, so none
 # accumulates the whole suite. THIS CAPS THE SYMPTOM AND DOES NOT FIX THE LEAK: a
 # single-host run on Linux still exhausts a 16 GB machine, and a green pipeline here
 # must not be read as #1150 being solved.
@@ -15,15 +15,16 @@
 # WHY A SCRIPT rather than the filters inlined at each call site: the suite runs in
 # compiler test and coverage gates in test.yml and publish-nuget.yml, and all
 # must split the same way. Inlined copies
-# would drift, and a drifted partition fails silently: the halves stop being
-# complementary, tests get skipped or double-run, and nothing says so. One source,
+# would drift, and a drifted partition fails silently: tests get skipped or
+# double-run, and nothing says so. One source,
 # shared callers.
 #
-# THE SPLIT is by test-class initial, balanced from real counts rather than guessed:
-# these letters select 3,996 tests and their complement 3,982, of 7,978.
+# THE SPLIT is by test-class initial, balanced from the 16,040-case inventory:
+# 4,027 / 4,002 / 4,002 / 4,009. The old two-host split dates from 7,978 cases;
+# its hosts now run roughly a whole old suite and can exhaust the runner again.
 #
 # Usage:
-#   eval "$(bash scripts/compiler-shard-filter.sh)"   # sets SHARD1_FILTER, SHARD2_FILTER
+#   bash scripts/compiler-shard-filter.sh --parts    # prints all part numbers
 # or:
 #   filter="$(bash scripts/compiler-shard-filter.sh --part 1)"  # raw filter, no eval
 # or:
@@ -31,32 +32,41 @@
 
 set -euo pipefail
 
-SHARD1_LETTERS="B C G L O Q R S T U Y"
+SHARD_LETTERS=("C D J U" "B F I Y" "A E S T V")
+FILTERS=()
 
 build_filters() {
-    local include="" exclude="" letter
-    for letter in $SHARD1_LETTERS; do
-        include="${include:+$include|}FullyQualifiedName~Calor.Compiler.Tests.$letter"
-        exclude="${exclude:+$exclude&}FullyQualifiedName!~Calor.Compiler.Tests.$letter"
+    local include exclude="" letter group
+    for group in "${SHARD_LETTERS[@]}"; do
+        include=""
+        for letter in $group; do
+            include="${include:+$include|}FullyQualifiedName~Calor.Compiler.Tests.$letter"
+            exclude="${exclude:+$exclude&}FullyQualifiedName!~Calor.Compiler.Tests.$letter"
+        done
+        FILTERS+=("$include")
     done
-    SHARD1_FILTER="$include"
-    SHARD2_FILTER="$exclude"
+    # Include future class initials and shared tests in the final complement.
+    FILTERS+=("$exclude")
 }
 
 usage() {
-    echo "Usage: $0 [--self-test | --part 1|2]" >&2
+    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4]" >&2
     exit 2
 }
 
 if [ "$#" -gt 0 ]; then
     case "$1" in
         --self-test) [ "$#" -eq 1 ] || usage ;;
+        --parts)
+            [ "$#" -eq 1 ] || usage
+            printf '%s\n' 1 2 3 4
+            exit 0
+            ;;
         --part)
             [ "$#" -eq 2 ] || usage
             build_filters
             case "$2" in
-                1) printf '%s\n' "$SHARD1_FILTER" ;;
-                2) printf '%s\n' "$SHARD2_FILTER" ;;
+                1|2|3|4) printf '%s\n' "${FILTERS[$(($2 - 1))]}" ;;
                 *) usage ;;
             esac
             exit 0
@@ -69,28 +79,44 @@ if [ "${1:-}" = "--self-test" ]; then
     build_filters
     fail=0
 
-    # Shard 2 must be the exact NEGATION of shard 1. If it is not, the halves stop
-    # partitioning the suite and tests are silently skipped or run twice.
-    expected_negation="$(printf '%s' "$SHARD1_FILTER" | sed 's/|/\&/g; s/FullyQualifiedName~/FullyQualifiedName!~/g')"
-    [ "$SHARD2_FILTER" = "$expected_negation" ] \
-        || { echo "FAIL: shard 2 is not the negation of shard 1"; fail=1; }
+    # The first three groups must be disjoint; the last is their exact complement.
+    seen=""
+    for group in "${SHARD_LETTERS[@]}"; do
+        for letter in $group; do
+            case " $seen " in
+                *" $letter "*) echo "FAIL: overlapping initial $letter"; fail=1 ;;
+            esac
+            seen="$seen $letter"
+        done
+    done
+    selected="$(printf '%s|' "${FILTERS[@]:0:3}")"
+    expected_negation="$(printf '%s' "${selected%|}" | sed 's/|/\&/g; s/FullyQualifiedName~/FullyQualifiedName!~/g')"
+    [ "${FILTERS[3]}" = "$expected_negation" ] \
+        || { echo "FAIL: shard 4 is not the complement of shards 1-3"; fail=1; }
 
     # Word splitting must actually happen. The interactive shell used to develop this
     # is zsh, which does NOT split an unquoted variable, and the first version of this
     # loop silently produced ONE clause containing the whole letter list — a filter
     # that matched nothing while its negation matched everything.
-    clauses="$(printf '%s' "$SHARD1_FILTER" | tr '|' '\n' | grep -c .)"
-    letters="$(printf '%s' "$SHARD1_LETTERS" | wc -w | tr -d ' ')"
+    clauses="$(printf '%s' "$selected" | tr '|' '\n' | grep -c .)"
+    letters="$(printf '%s' "$seen" | wc -w | tr -d ' ')"
     [ "$clauses" = "$letters" ] \
         || { echo "FAIL: $clauses clauses for $letters letters — word splitting is broken"; fail=1; }
 
-    [ "$(bash "$0" --part 1)" = "$SHARD1_FILTER" ] \
-        && [ "$(bash "$0" --part 2)" = "$SHARD2_FILTER" ] \
-        || { echo "FAIL: raw filter interface differs from the shared partition"; fail=1; }
-    expected_assignments="$(printf 'SHARD1_FILTER=%q\nSHARD2_FILTER=%q\n' "$SHARD1_FILTER" "$SHARD2_FILTER")"
+    [ "$(bash "$0" --parts)" = "$(printf '%s\n' 1 2 3 4)" ] \
+        || { echo "FAIL: part inventory differs from the shared partition"; fail=1; }
+    for part in 1 2 3 4; do
+        [ "$(bash "$0" --part "$part")" = "${FILTERS[$((part - 1))]}" ] \
+            || { echo "FAIL: raw filter interface differs for part $part"; fail=1; }
+    done
+    expected_assignments="$(
+        for part in 1 2 3 4; do
+            printf 'SHARD%s_FILTER=%q\n' "$part" "${FILTERS[$((part - 1))]}"
+        done
+    )"
     [ "$(bash "$0")" = "$expected_assignments" ] \
         || { echo "FAIL: legacy assignment output changed"; fail=1; }
-    for invalid in 0 3 invalid ""; do
+    for invalid in 0 5 invalid ""; do
         if bash "$0" --part "$invalid" >/dev/null 2>&1; then
             echo "FAIL: accepted invalid part '$invalid'"
             fail=1
@@ -99,15 +125,17 @@ if [ "${1:-}" = "--self-test" ]; then
     if bash "$0" --part >/dev/null 2>&1 \
         || bash "$0" --part 1 extra >/dev/null 2>&1 \
         || bash "$0" --self-test extra >/dev/null 2>&1 \
+        || bash "$0" --parts extra >/dev/null 2>&1 \
         || bash "$0" --unknown >/dev/null 2>&1; then
         echo "FAIL: accepted invalid arguments"
         fail=1
     fi
 
-    [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed ($clauses clauses, negation exact)."
+    [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed (four disjoint parts, complement exact)."
     exit "$fail"
 fi
 
 build_filters
-printf 'SHARD1_FILTER=%q\n' "$SHARD1_FILTER"
-printf 'SHARD2_FILTER=%q\n' "$SHARD2_FILTER"
+for part in 1 2 3 4; do
+    printf 'SHARD%s_FILTER=%q\n' "$part" "${FILTERS[$((part - 1))]}"
+done

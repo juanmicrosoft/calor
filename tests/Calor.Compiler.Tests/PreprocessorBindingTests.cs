@@ -47,7 +47,7 @@ public class PreprocessorBindingTests
 
     /// <summary>A method on a class with a writable field <c>x</c>.</summary>
     private static string MethodWithField(string body) =>
-        "§M{m1:T}\n  §CL{c1:K:pub}\n    §FLD{i32:x:pub}\n    §MT{m2:Run:pub} () -> i32\n" +
+        "§M{m1:T}\n  §CL{c1:K:pub}\n    §FLD{i32:x:pub}\n    §MT{m2:Run:pub} () -> i32\n      §E{mut}\n" +
         Indent(body, "      ") + "\n";
 
     [Theory]
