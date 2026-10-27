@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-27
+
+Calor 0.27 fixes silent behavior changes in C# conversion and rejects more invalid Calor
+programs. Unsupported rewrites preserve C# with a reported loss instead of silently changing
+evaluation order, resource lifetimes or query operators. Preprocessor branches and refinement
+types get stricter checks. CI now runs the soundness sweep daily and checks more ways the
+differential oracle and test shards could miss a failure.
+
+This release publishes no new benchmark results.
+
+### Release health
+
+- **Median fix-merge to release-date lag: 3 calendar days.** This is a release-date proxy,
+  not a measurement of when nuget.org first served the packages. The population is seven
+  compiler-fix PRs since 0.26.0: #1672, #1673, #1674 and #1675 merged on 2026-10-24;
+  #1683, #1684 and #1686 merged on 2026-10-26. It excludes website and CI-only changes.
+- **Silent wrong-output reports since 0.26.0: 1 new report (#1677).** It contains six
+  evaluation-order residuals reported against development HEAD after #1673, not against a
+  named package version. These are not confirmed against the published 0.26.0 package.
+  This report inventory is not a measured defect count for that package. Older reports
+  such as #1588, #1541 and #1524 are not counted again.
+- **Remaining limit (#1679).** Some initializers inside calls still preserve C# rather than
+  converting natively. Safe native-coverage recovery is deferred to 0.28. Preservation is
+  reported as a loss, not as successful native conversion.
+
 ### Fixed
 
 - **The converter audit found more silent behavior changes (#1588).** Argument lists,
@@ -250,9 +275,8 @@ new diagnostic. The C# converter emits code that passes all four checks.
   times the loop ran. Writes inside `§PP` blocks and collection statements such as `§PUSH` are
   checked too. Fix: declare the binding mutable, `§B{~x:i32} 1`. Statement-form
   collections (`§LIST`, `§ARR`, `§DICT`, `§HSET`) have no mutability marker and stay assignable.
-  5 of the 217 benchmark programs in `tests/TestData/Benchmarks` had this bug and now fail with
-  `Calor0213`. They are inputs of the published B1 benchmark (#1276), so they stay unchanged and
-  are listed as known failures.
+  Some published B1 benchmark inputs (#1276) also had this bug and now fail with `Calor0213`.
+  Those historical inputs stay unchanged and are listed as known failures.
 - **Unknown visibility words are errors (`Calor0122`, #1607).** A word such as `:bogus`, the typo
   `:prv`, or a modifier in the visibility slot (`§MT{m1:Area:abs}`) compiled silently as
   `private`, and the modifier was dropped. The message lists the accepted words. `pro` and `pri`
