@@ -14,11 +14,11 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.27.0';
+const currentRelease = '0.28.0';
 const releaseDate = '2026-10-27';
 // 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
 const advisoryRelease = '0.24.0';
-// The release that last published static benchmark numbers. 0.24.0 through 0.27.0 publish none:
+// The release that last published static benchmark numbers. 0.24.0 through 0.28.0 publish none:
 // benchmark publication is governed separately (#1276/#1422), through its own benchmark.yml dispatch.
 const benchmarkRelease = '0.22.0';
 const benchmarkReleaseDate = '2026-09-15';
@@ -292,7 +292,7 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'The converter preserves C# behavior or reports a loss; preprocessor branches and refinements get stricter checks.',
+      'Effect checks cross file boundaries; simple event argument initializers convert natively again.',
       { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
@@ -495,9 +495,15 @@ test('research milestones stay distinct from software releases', async () => {
   expect(rootCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
   expect(normalizedRootCurrentSection).toContain('This release publishes no new benchmark results');
   expect(normalizedRootCurrentSection).toContain('### Release health');
-  expect(normalizedRootCurrentSection).toContain('3 calendar days');
-  expect(normalizedRootCurrentSection).toContain('1 new report (#1677)');
-  expect(normalizedRootCurrentSection).toContain('not confirmed against the published 0.26.0 package');
+  expect(normalizedRootCurrentSection).toContain('0 new reports');
+  expect(normalizedRootCurrentSection).toContain('Merge-to-publication lag: not measured');
+  const previousReleaseSection = rootChangelog.match(
+    /^## \[0\.27\.0\][\s\S]*?(?=^## \[)/m,
+  )?.[0] ?? '';
+  const normalizedPreviousReleaseSection = previousReleaseSection.replace(/\s+/g, ' ');
+  expect(normalizedPreviousReleaseSection).toContain('3 calendar days');
+  expect(normalizedPreviousReleaseSection).toContain('1 new report (#1677)');
+  expect(normalizedPreviousReleaseSection).toContain('not confirmed against the published 0.26.0 package');
   const previousKnownIssueSection = rootChangelog.match(
     /^## \[0\.26\.0\][\s\S]*?(?=^## \[)/m,
   )?.[0] ?? '';
