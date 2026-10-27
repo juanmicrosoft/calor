@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Effect variance checks cross file boundaries (#1180).** Overrides and interface
+  implementations are checked against same-compilation declarations, including inherited
+  and partial-class members. Resolution respects namespaces, import scopes, aliases and
+  generic arguments. Changed type contracts invalidate cached checks; unresolved or
+  ambiguous bases remain `Unknown`.
 - **Bare-name field writes require mutation effects (#1551).** Assignments and `ref`/`out`
   arguments now require `mut` for instance, static and inherited fields. Locals and
   parameters that shadow fields keep their existing behavior.
