@@ -21,7 +21,7 @@
       "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 695,
+      "expectedTotal": 722,
       "expectedSkipped": 1,
       "corpusDependent": true,
       "expectedSkippedWithSubmodules": 0,

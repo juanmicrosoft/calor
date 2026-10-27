@@ -916,6 +916,7 @@ public sealed class CallableMutationFlowTests
                 §MT{take:Take:pub} ({{type}}:target) -> void
                   §E{}
                 §MT{probe:Probe:pub} (bool:flag) -> void
+                  §E{mut}
                   §IF{guard} (!= value null)
                     §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } {{(control == "other-storage" ? "otherValue" : "value")}} §/C §/LAM{mutLambda}
                     §W{outer} flag

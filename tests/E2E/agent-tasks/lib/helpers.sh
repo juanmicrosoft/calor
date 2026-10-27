@@ -1046,6 +1046,7 @@ Interface syntax: `§IFACE{id:Name}` with indented method signatures.
   §MT{mt2:Set:pub}
     §I{T:value}
     §O{void}
+    §E{mut}
     §ASSIGN _value value
 ```
 

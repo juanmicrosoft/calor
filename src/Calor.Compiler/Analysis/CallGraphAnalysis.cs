@@ -84,6 +84,8 @@ public sealed class CallGraphAnalysis
         /// variable's <c>DeclarationSpan</c>.</summary>
         public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
 
+        public Dictionary<(string CallerId, int Start, int End), VariableSymbol> Variables { get; } = new();
+
         /// <summary>callerId → the locals with a declared <c>FunctionBoundType</c>,
         /// by name and declaration start.</summary>
         public Dictionary<string, List<(string Name, int DeclarationStart, Binding.BoundTypes.FunctionBoundType Type)>>
@@ -111,6 +113,9 @@ public sealed class CallGraphAnalysis
         _boundValues.Declarations.TryGetValue((callerId, reference.Start, reference.End), out var span)
             ? span
             : null;
+
+    public VariableSymbol? BoundVariable(string callerId, TextSpan reference) =>
+        _boundValues.Variables.GetValueOrDefault((callerId, reference.Start, reference.End));
 
     /// <summary>The declared <c>FunctionBoundType</c> of the LOCAL named
     /// <paramref name="name"/> whose declaration lies inside
@@ -813,6 +818,8 @@ public sealed class CallGraphAnalysis
                         case BoundVariableExpression variable:
                             boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
                                 variable.Variable.DeclarationSpan;
+                            boundValues.Variables[(callerId, node.Span.Start, node.Span.End)] =
+                                variable.Variable.StorageIdentity;
                             break;
                         case BoundCallStatement statement:
                             target = statement.Target;

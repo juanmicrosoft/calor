@@ -10,6 +10,16 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bare-name field writes require mutation effects (#1551).** Assignments and `ref`/`out`
+  arguments now require `mut` for instance, static and inherited fields. Locals and
+  parameters that shadow fields keep their existing behavior.
+- **Method groups cannot bypass effect checks through nested values (#1532).** Creating a
+  delegate in a conditional, null-coalescing expression, collection element or qualified
+  store conservatively charges the referenced method's effects. Direct bindings and returns
+  keep their existing effect-row checks.
+
 ## [0.27.0] - 2026-10-27
 
 Calor 0.27 fixes silent behavior changes in C# conversion and rejects more invalid Calor

@@ -594,7 +594,7 @@
       "id": "D1-LV-09",
       "area": "lvalue",
       "shape": "bare-field",
-      "polarity": "positive",
+      "polarity": "negative",
       "kind": "calor",
       "rules": [
         "RO-LV-1",
@@ -610,15 +610,16 @@
       ],
       "verify": false,
       "expected": {
-        "outcome": "accepted",
-        "emits": [
-          "Bump(ref n)"
-        ]
+        "outcome": "rejected",
+        "diagnostic": "Calor0410"
       },
       "observed": {
-        "errors": []
+        "errors": [
+          "Calor0410"
+        ]
       },
-      "status": "holds"
+      "status": "holds",
+      "note": "#1551: the field is a valid ref operand, but passing it requires mut, in parity with D1-EFF-05. Accepted without mut at the D1 measured commit."
     },
     {
       "id": "D1-LV-10",
@@ -1437,7 +1438,7 @@
       "id": "D1-EFF-05",
       "area": "effects",
       "shape": "bare-field",
-      "polarity": "positive",
+      "polarity": "negative",
       "kind": "calor",
       "rules": [
         "RO-EFF-4"
@@ -1452,13 +1453,16 @@
       ],
       "verify": false,
       "expected": {
-        "outcome": "accepted"
+        "outcome": "rejected",
+        "diagnostic": "Calor0410"
       },
       "observed": {
-        "errors": []
+        "errors": [
+          "Calor0410"
+        ]
       },
       "status": "holds",
-      "note": "Parity control for D1-LV-09: a bare-name field write charges nothing at the measured commit."
+      "note": "#1551: a bare-name field write requires mut, in parity with D1-LV-09. It charged nothing at the D1 measured commit."
     },
     {
       "id": "D1-EFF-06",
