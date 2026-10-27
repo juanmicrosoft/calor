@@ -8295,10 +8295,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle invocation expressions (method calls)
         if (expr is InvocationExpressionSyntax invocation)
         {
-            var target = invocation.Expression.ToString().Replace("!", "");
             // #1677: where the statement's own conversion starts; the fallback below converts the
             // invocation again and must not keep the first conversion's hoists.
             var invocationMark = _pendingStatements.Count;
+            var target = ConvertInvocationTarget(invocation);
             // #1677 (Codex round 1): the receiver's hoists come first; C# evaluates the receiver
             // before the arguments.
             // Handle complex targets that need hoisting (element access, chained calls, new-then-call)
@@ -13126,9 +13126,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || (expr is UnaryOperationNode un && ContainsNestedMarker(un.Operand));
     }
 
-    private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
+    private string ConvertInvocationTarget(InvocationExpressionSyntax invocation)
     {
         var target = invocation.Expression.ToString().Replace("!", "");
+        if (CanHoistInertEventArguments(invocation))
+        {
+            // C# reads the delegate before evaluating its arguments, even if another thread
+            // replaces the event while the argument object is being allocated.
+            target = _context.GenerateId("_receiver");
+            _pendingStatements.Add(new BindStatementNode(
+                GetTextSpan(invocation.Expression), target, null, false,
+                ConvertExpression(invocation.Expression), new AttributeCollection()));
+        }
+        return target;
+    }
+
+    private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
+    {
+        var target = ConvertInvocationTarget(invocation);
         // #1677 (Codex round 1): C# evaluates the receiver before the arguments, so it is
         // converted first and its hoists (`_chainNext = c.Next()`) come before the arguments'.
         // The safety net below reuses it instead of converting it again (a second conversion
@@ -14396,7 +14411,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // defer past the later arguments (review r3).
             ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } list } argument =>
                 argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
-                && HasStableReceiver(invocation) && HasPlainArgumentConversions(list)
+                && (HasStableReceiver(invocation) && HasPlainArgumentConversions(list)
+                    || CanHoistInertEventArguments(invocation))
                 && IsStatementLevelExpression(invocation),
             ArgumentSyntax { Parent: ArgumentListSyntax { Parent: ObjectCreationExpressionSyntax { Initializer: null } outer } list } argument =>
                 argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon == null
@@ -14532,6 +14548,136 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && _semanticModel.GetSymbolInfo(invocation).Symbol is IMethodSymbol { IsStatic: true }
             && (member.Expression is PredefinedTypeSyntax
                 || _semanticModel.GetSymbolInfo(member.Expression).Symbol is ITypeSymbol);
+    }
+
+    private bool CanHoistInertEventArguments(InvocationExpressionSyntax invocation)
+    {
+        if (_semanticModel == null || invocation.SyntaxTree != _semanticModel.SyntaxTree
+            || invocation.Expression is not IdentifierNameSyntax
+            || _semanticModel.GetSymbolInfo(invocation.Expression).Symbol is not IEventSymbol
+            || _semanticModel.GetSymbolInfo(invocation).Symbol is not IMethodSymbol { MethodKind: MethodKind.DelegateInvoke }
+            || !IsStatementLevelExpression(invocation))
+            return false;
+        var arguments = invocation.ArgumentList.Arguments;
+        return arguments.Any(argument => StripParentheses(argument.Expression) is BaseObjectCreationExpressionSyntax
+        { Initializer.Expressions.Count: > 0 })
+            && arguments.All(argument => argument.NameColon == null && argument.RefKindKeyword.IsKind(SyntaxKind.None)
+                && IsInertInitializerValue(argument.Expression));
+    }
+
+    private bool IsInertInitializerValue(ExpressionSyntax expression, HashSet<INamedTypeSymbol>? constructing = null)
+    {
+        if (_semanticModel == null || expression.SyntaxTree != _semanticModel.SyntaxTree)
+            return false;
+        var conversion = _semanticModel.GetConversion(expression);
+        // Check before constants: even `1` can invoke an implicit operator.
+        if (!conversion.Exists || conversion.IsUserDefined
+            || !(conversion.IsIdentity || conversion.IsReference || conversion.IsBoxing
+                || conversion.IsNumeric || conversion.IsNullable || conversion.IsNullLiteral))
+            return false;
+        expression = StripParentheses(expression);
+        if (expression is BaseObjectCreationExpressionSyntax creation)
+            return IsInertCreation(creation, constructing);
+        if (_semanticModel.GetConstantValue(expression).HasValue)
+            return true;
+        if (expression is ThisExpressionSyntax)
+            return _semanticModel.GetTypeInfo(expression).Type is { IsReferenceType: true };
+        return expression is IdentifierNameSyntax
+            && _semanticModel.GetSymbolInfo(expression).Symbol is
+                ILocalSymbol { RefKind: RefKind.None } or IParameterSymbol { RefKind: RefKind.None };
+    }
+
+    private bool IsInertCreation(BaseObjectCreationExpressionSyntax creation, HashSet<INamedTypeSymbol>? constructing)
+    {
+        if (_semanticModel == null || creation.SyntaxTree != _semanticModel.SyntaxTree
+            || creation.ArgumentList is { Arguments.Count: > 0 }
+            || _semanticModel.GetSymbolInfo(creation).Symbol is not IMethodSymbol
+            { MethodKind: MethodKind.Constructor, Parameters.Length: 0, ContainingType.TypeKind: TypeKind.Class } constructor)
+            return false;
+        constructing ??= new(SymbolEqualityComparer.Default);
+        if (!constructing.Add(constructor.ContainingType))
+            return false;
+        try
+        {
+            if (!IsInertConstruction(constructor.ContainingType, constructing))
+                return false;
+            return creation.Initializer == null
+                || creation.Initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
+                    && creation.Initializer.Expressions.All(expression =>
+                        expression is AssignmentExpressionSyntax
+                        {
+                            RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                            Left: IdentifierNameSyntax,
+                        } assignment
+                        && IsInertInitializerMember(_semanticModel.GetSymbolInfo(assignment.Left).Symbol)
+                        && IsInertInitializerValue(assignment.Right, constructing));
+        }
+        finally
+        {
+            constructing.Remove(constructor.ContainingType);
+        }
+    }
+
+    private static bool IsInertInitializerMember(ISymbol? member) => member switch
+    {
+        IFieldSymbol { IsStatic: false, IsConst: false, IsReadOnly: false } => true,
+        IPropertySymbol
+        {
+            IsStatic: false, IsIndexer: false, IsVirtual: false, IsOverride: false,
+            IsAbstract: false, SetMethod: not null, DeclaringSyntaxReferences.Length: 1
+        } property => property.DeclaringSyntaxReferences[0].GetSyntax() is PropertyDeclarationSyntax
+        {
+            ExpressionBody: null, AccessorList: { } accessors
+        } syntax
+            && !syntax.Modifiers.Any(SyntaxKind.PartialKeyword)
+            && accessors.Accessors.All(accessor => accessor.Body == null && accessor.ExpressionBody == null
+                && accessor.SemicolonToken.IsKind(SyntaxKind.SemicolonToken)),
+        _ => false,
+    };
+
+    private bool IsInertConstruction(INamedTypeSymbol type, HashSet<INamedTypeSymbol> constructing)
+    {
+        var coreAssembly = _semanticModel!.Compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
+        var eventArgs = coreAssembly.GetTypeByMetadataName("System.EventArgs");
+        for (INamedTypeSymbol? current = type; current != null; current = current.BaseType)
+        {
+            if (current.SpecialType == SpecialType.System_Object
+                || SymbolEqualityComparer.Default.Equals(current, eventArgs))
+                return true;
+            if (current.IsRecord || current.IsGenericType || current.StaticConstructors.Length != 0
+                || current.GetMembers().OfType<IMethodSymbol>().Any(method => method.MethodKind == MethodKind.Destructor)
+                || current.DeclaringSyntaxReferences.Length == 0
+                || current.InstanceConstructors.FirstOrDefault(ctor => ctor.Parameters.Length == 0) is not { } constructor)
+                return false;
+            foreach (var reference in current.DeclaringSyntaxReferences)
+            {
+                if (reference.GetSyntax() is not ClassDeclarationSyntax { ParameterList: null } declaration)
+                    return false;
+                foreach (var member in declaration.Members)
+                {
+                    var initializers = member switch
+                    {
+                        BaseFieldDeclarationSyntax field when !field.Modifiers.Any(SyntaxKind.StaticKeyword) =>
+                            field.Declaration.Variables.Select(variable => variable.Initializer),
+                        PropertyDeclarationSyntax property when !property.Modifiers.Any(SyntaxKind.StaticKeyword) =>
+                            [property.Initializer],
+                        _ => Enumerable.Empty<EqualsValueClauseSyntax?>(),
+                    };
+                    if (initializers.Any(initializer => initializer != null && !IsInertInitializerValue(initializer.Value, constructing)))
+                        return false;
+                }
+            }
+            if (!constructor.IsImplicitlyDeclared
+                && (constructor.DeclaringSyntaxReferences.Length != 1
+                    || constructor.DeclaringSyntaxReferences[0].GetSyntax() is not ConstructorDeclarationSyntax
+                    {
+                        Body.Statements.Count: 0, ExpressionBody: null
+                    } syntax
+                    || syntax.Initializer is { } initializer
+                        && (!initializer.IsKind(SyntaxKind.BaseConstructorInitializer) || initializer.ArgumentList.Arguments.Count != 0)))
+                return false;
+        }
+        return false;
     }
 
     /// <summary>Every argument converts to its parameter by identity, reference or boxing.</summary>
