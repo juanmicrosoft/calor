@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.26.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.27.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Releases no longer need a review record, and two new CI checks compare converted code with the original.</span>
+            <span className="text-foreground">The converter preserves C# behavior or reports a loss; preprocessor branches and refinements get stricter checks.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
