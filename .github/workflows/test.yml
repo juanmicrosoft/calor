@@ -385,7 +385,7 @@ jobs:
           # a probe that runs and records nothing — the exact silent-instrument
           # failure this issue is about.
           bash scripts/runner-resource-sampler.sh --self-test
-          # #1150: the two shard halves must stay exact complements; a drifted
+          # #1150: the shard filters must stay a disjoint, complete partition; a drifted
           # partition skips or double-runs tests without saying so.
           bash scripts/compiler-shard-filter.sh --self-test
 
@@ -407,8 +407,7 @@ jobs:
           #
           # Safe for coverage: check_coverage.py rglobs every coverage.cobertura.xml
           # under artifacts/coverage/raw and merges by taking max(hits) per
-          # (file, line), so two partial reports for one project union correctly.
-          eval "$(bash scripts/compiler-shard-filter.sh)"
+          # (file, line), so partial reports for one project union correctly.
           for project in \
             Calor.Compiler.Tests \
             Calor.Conversion.Tests \
@@ -417,9 +416,8 @@ jobs:
             Calor.Verification.Tests
           do
             if [ "$project" = "Calor.Compiler.Tests" ]; then
-              for part in 1 2; do
-                filter="$SHARD1_FILTER"
-                [ "$part" = "2" ] && filter="$SHARD2_FILTER"
+              for part in $(bash scripts/compiler-shard-filter.sh --parts); do
+                filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
                 dotnet test "tests/$project/$project.csproj" \
                   -c Release --no-build --no-restore \
                   --filter "$filter" \
@@ -553,7 +551,7 @@ jobs:
       # script; "Enforce test inventory" checks every part's TRX from the test host, so a
       # script that skips or masks its tests fails there even after a re-pin. The script
       # also builds the compiler shard once, streams the #1150 resource sampler, splits the
-      # compiler suite in two fresh hosts, and fails if a Z3-gated test skipped.
+      # compiler suite in four fresh hosts, and fails if a Z3-gated test skipped.
       - name: Run project tests
         run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"
 
@@ -582,7 +580,7 @@ jobs:
 
       - name: Enforce test inventory
         # #1150/#1666: every TRX file the shard script wrote is one part (the compiler shard
-        # writes two). check_trx.py checks each part on its own and the sum against
+        # writes four). check_trx.py checks each part on its own and the sum against
         # eng/test-manifest.json. The determinism protocol freezes this step (D014).
         run: |
           set -euo pipefail

@@ -154,7 +154,7 @@ jobs:
           PY
 
       # #1666: the same checked-in script as test.yml's shard step, called with no inline shell
-      # (D014 checks the call and pins the script). It splits the compiler suite into two fresh
+      # (D014 checks the call and pins the script). It splits the compiler suite into four fresh
       # test hosts (#1150) and writes the TRX files the next step checks part by part.
       - name: Run project tests
         run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"
@@ -303,8 +303,8 @@ jobs:
             Calor.Verification.Tests
           do
             if [ "$project" = "Calor.Compiler.Tests" ]; then
-              # The coverage checker unions both reports under this shared root.
-              for part in 1 2; do
+              # The coverage checker unions all reports under this shared root.
+              for part in $(bash scripts/compiler-shard-filter.sh --parts); do
                 filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
                 dotnet test "tests/$project/$project.csproj" \
                   -c Release --no-build --no-restore \
