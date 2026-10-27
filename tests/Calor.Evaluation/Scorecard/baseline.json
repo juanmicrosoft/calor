@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-10-24T15:48:54.94215Z",
-  "commitHash": "da6d0973c",
+  "timestamp": "2026-10-27T22:58:00.417684Z",
+  "commitHash": "7bf79a5b2",
   "version": "1.0",
   "total": 100,
-  "fullyConverted": 94,
-  "partiallyConverted": 6,
+  "fullyConverted": 95,
+  "partiallyConverted": 5,
   "blocked": 0,
   "crashed": 0,
   "roundTripPassing": 98,
@@ -933,18 +933,18 @@
     },
     "event": {
       "total": 1,
-      "passed": 0,
-      "rate": 0
+      "passed": 1,
+      "rate": 1
     },
     "eventhandler": {
       "total": 1,
-      "passed": 0,
-      "rate": 0
+      "passed": 1,
+      "rate": 1
     },
     "event_args": {
       "total": 1,
-      "passed": 0,
-      "rate": 0
+      "passed": 1,
+      "rate": 1
     },
     "delegate": {
       "total": 1,
@@ -3547,27 +3547,24 @@
         "eventhandler",
         "event_args"
       ],
-      "status": "PartiallyConverted",
+      "status": "FullyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
-      "conversionWarnings": 2,
+      "conversionWarnings": 1,
       "conversionIssues": [
-        "Warning [nullable-oblivious-nested-shape] (line 25, col 22): Nested oblivious reference semantics for \u0027EventHandler\u003CCustomEventArgs\u003E\u0027 are not modeled; preserving syntax-only type mapping.",
-        "Warning [initializer-interop]: Feature \u0027initializer-interop\u0027 is partially supported. "
+        "Warning [nullable-oblivious-nested-shape] (line 25, col 22): Nested oblivious reference semantics for \u0027EventHandler\u003CCustomEventArgs\u003E\u0027 are not modeled; preserving syntax-only type mapping."
       ],
       "compilationSuccess": true,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0535596",
-      "compilationDuration": "00:00:00.0043665",
+      "conversionDuration": "00:00:00.0506437",
+      "compilationDuration": "00:00:00.0044264",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
-      "interopPreservationCount": 1,
-      "interopPreservationDiagnostics": [
-        "[InteropPreserved] Level5_Advanced/092_Events.cs:31 [initializer-interop] Object creation with an initializer preserved verbatim (initializer-position)"
-      ],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {

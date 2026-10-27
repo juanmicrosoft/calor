@@ -222,8 +222,7 @@ public class InitializerConversionTests
                 public static string Run() => new Counter().Go().ToString();
             }
             """, true },
-        // Conversion scorecard sample 092's shape: an initializer passed with `this` to a delegate
-        // field. The delegate is read before the argument in C#, so the creation stays C#.
+        // The delegate snapshot preserves the receiver read before the inert creation.
         { "scorecard-092-delegate-this-argument", """
             using System;
             public class CustomEventArgs : EventArgs { public string Message { get; set; } }
@@ -251,7 +250,7 @@ public class InitializerConversionTests
                     return publisher.Log;
                 }
             }
-            """, true },
+            """, false },
         // `(this)` is `this` after its parentheses are stripped: the struct would be copied late.
         { "parenthesized-this", """
             public class X { public int V; }
@@ -335,6 +334,93 @@ public class InitializerConversionTests
         var generated = Compile(result.CalorSource!, enforceEffects: false);
         Assert.False(generated.HasErrors, name + ": " + string.Join("\n", generated.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(Run(source), Run(generated.GeneratedCode));
+    }
+
+    public static TheoryData<string, string, string> InertEventMutations() => new()
+    {
+        { "literal-user-conversion", """
+            public class Value
+            {
+                public static implicit operator Value(int value) { Probe.N += 1; return new Value(); }
+            }
+            public class Notice { public Value Value { get; set; } }
+            """, "1" },
+        { "instance-event-initializer", """
+            public class Notice
+            {
+                public event System.Action Changed = Probe.Make();
+                public int Value { get; set; }
+            }
+            """, "1" },
+        { "partial-property-definition", """
+            public partial class Notice { public partial int Value { get; set; } }
+            public partial class Notice
+            {
+                private int _value;
+                public partial int Value { get => _value; set { Probe.N += 1; _value = value; } }
+            }
+            """, "1" },
+        { "finalizer", """
+            public class Notice { public int Value { get; set; } ~Notice() { Probe.N += 1; } }
+            """, "1" },
+        { "eventargs-symbol-spoof", """
+            public class EventArgs { public EventArgs() { Probe.N += 1; } }
+            public class Notice : System.EventArgs { public int Value { get; set; } }
+            """, "1" },
+        { "static-constructor", """
+            public class Notice { static Notice() { Probe.N += 1; } public int Value { get; set; } }
+            """, "1" },
+        { "static-field-initializer", """
+            public class Notice { private static int _value = ++Probe.N; public int Value { get; set; } }
+            """, "1" },
+        { "recursive-initializer", """
+            public class Notice { private Notice _child = new Notice(); public int Value { get; set; } }
+            """, "1" },
+        { "expanding-generic-initializer", """
+            public class Chain<T> { private Chain<Chain<T>> _child = new Chain<Chain<T>>(); }
+            public class Notice : Chain<int> { public int Value { get; set; } }
+            """, "1" },
+    };
+
+    [Theory]
+    [MemberData(nameof(InertEventMutations))]
+    public void EventArgument_RunningUserCode_IsPreserved(string name, string declarations, string value)
+    {
+        var result = Convert($$"""
+            namespace System
+            {
+            {{declarations}}
+            public class Publisher
+            {
+                public event System.Action<object, Notice> Sent;
+                public void Send() { Sent(this, new Notice { Value = {{value}} }); }
+            }
+            public static class Probe
+            {
+                public static int N;
+                public static System.Action Make() { N += 1; return Empty; }
+                private static void Empty() { }
+            }
+            }
+            """);
+        Assert.True(result.Success, name + ": " + result.CalorSource);
+        Assert.Contains(result.Context.Losses, loss => loss.Feature == "initializer-interop"
+            && loss.Description.Contains("initializer-position", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Scorecard092_ConvertsNatively_WithReceiverSnapshot()
+    {
+        var source = TestDataLoader.LoadTestFile("Level5_Advanced/092_Events.cs");
+        var result = Convert(source);
+        Assert.True(result.Success, result.CalorSource);
+        Assert.Empty(result.Context.Losses);
+        var generated = Compile(result.CalorSource!, enforceEffects: false);
+        Assert.False(generated.HasErrors, string.Join("\n", generated.Diagnostics.Errors.Select(error => error.Message)));
+        var code = generated.GeneratedCode;
+        var snapshot = code.IndexOf("= MessageSent;", StringComparison.Ordinal);
+        var creation = code.IndexOf("new CustomEventArgs()", StringComparison.Ordinal);
+        Assert.True(snapshot >= 0 && creation > snapshot, code);
     }
 
     // ---- Negative controls -------------------------------------------------------------------
