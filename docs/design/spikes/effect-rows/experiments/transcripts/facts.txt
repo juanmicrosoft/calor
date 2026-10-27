@@ -23,9 +23,10 @@ src/Calor.Compiler/Indexing/ProjectIndexBuilder.cs
 src/Calor.Compiler/Mcp/Tools/QueryTool.cs
 
 ### Effects/*.cs file count
-10
+11
 src/Calor.Compiler/Effects/CrossModuleEffectEnforcementPass.cs
 src/Calor.Compiler/Effects/CrossModuleEffectRegistry.cs
+src/Calor.Compiler/Effects/CrossModuleTypeRegistry.cs
 src/Calor.Compiler/Effects/EffectEnforcementPass.cs
 src/Calor.Compiler/Effects/EffectResolver.cs
 src/Calor.Compiler/Effects/EffectSet.cs

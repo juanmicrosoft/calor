@@ -608,6 +608,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // map the CLI driver builds. Warm-skip validity: a changed map invalidates
         // every skip (a cached .g.cs may carry stale qualification).
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
+        CrossModuleTypeRegistry? crossModuleTypes = null;
         string? crossModuleMapHash = null;
         if (SourceFiles.Length > 1)
         {
@@ -618,8 +619,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     return new FileInfo(string.IsNullOrEmpty(path) ? sf.ItemSpec : path);
                 })
                 .ToList();
-            crossModuleMap = Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(sourceFileInfos);
-            crossModuleMapHash = Calor.Compiler.CompilationDriver.ComputeCrossModuleMapHash(crossModuleMap);
+            crossModuleMap = Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(
+                sourceFileInfos, out crossModuleTypes);
+            crossModuleMapHash = Calor.Compiler.CompilationDriver.ComputeCrossModuleMapHash(
+                crossModuleMap, crossModuleTypes);
         }
         newState.CrossModuleMapHash = crossModuleMapHash;
         if (priorCache != null && priorCache.CrossModuleMapHash != crossModuleMapHash)
@@ -682,6 +685,9 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 priorFiles.TryGetValue(relativePath, out var cachedEntry);
                 var missReason = BuildStateCache.GetFileCacheMissReason(
                     cachedEntry, inputPath, outputPath);
+                if (missReason == null
+                    && crossModuleTypes?.MatchesSourceHash(inputPath, cachedEntry!.ContentHash) == false)
+                    missReason = Calor.Compiler.Incremental.FileCacheMissReason.SourceContentChanged;
                 if (missReason == null)
                 {
                     var trustedEntry = cachedEntry!;
@@ -752,6 +758,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             {
                 var statBeforeRead = BuildStateCache.StatFile(inputPath);
                 var sourceBytes = File.ReadAllBytes(inputPath);
+                crossModuleTypes?.EnsureSourceSnapshot(inputPath, sourceBytes);
                 CacheTestHook?.Invoke(inputPath, CompileCalorTestPhase.AfterSourceRead);
                 var source = DecodeSource(sourceBytes);
                 var compileOptions = new CompilationOptions
@@ -775,6 +782,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 };
                 compileOptions.DeferGeneratedOutputValidation = true;
                 compileOptions.CrossModuleFunctionModules = crossModuleMap;
+                compileOptions.CrossModuleTypes = crossModuleTypes;
                 var result = Program.Compile(source, inputPath, compileOptions);
 
                 // Log ALL diagnostics, not only on failure: verification findings
