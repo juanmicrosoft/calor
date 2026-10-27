@@ -134,4 +134,5 @@ src/Calor.Compiler/Binding/NullabilityResultTypes.cs
 # merging and binder type identities. Calor application source cannot inspect its
 # own AST or participate in this compilation phase. Approve only this exact path
 # on protected main before implementation PR #1691 can pass the Calor-first guard.
+# pending: implementation PR #1691 removes this marker when the file lands.
 src/Calor.Compiler/Effects/CrossModuleTypeRegistry.cs
