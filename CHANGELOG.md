@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Effect variance checks cross file boundaries (#1180).** Overrides and interface
+  implementations are checked against same-compilation declarations, including inherited
+  and partial-class members. Resolution respects namespaces, import scopes, aliases and
+  generic arguments. Changed type contracts invalidate cached checks; unresolved or
+  ambiguous bases remain `Unknown`.
 - **Simple event argument initializers convert natively again (#1679).** The converter
   snapshots the event delegate before creating its arguments. It only recovers creations
   whose constructors, initializers and member assignments run no user code; other cases

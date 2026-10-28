@@ -880,7 +880,10 @@ public class Program
                 resolver: sharedResolver,
                 strictEffects: options.StrictEffects,
                 projectDirectory: options.ProjectDirectory,
-                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys);
+                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
+            {
+                CrossModuleTypes = options.CrossModuleTypes
+            };
             enforcementPass.Enforce(ast);
             phaseSw.Stop();
             telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -1202,6 +1205,8 @@ public class Program
 /// </summary>
 public sealed class CompilationOptions
 {
+    internal CrossModuleTypeRegistry? CrossModuleTypes { get; set; }
+
     /// <summary>
     /// Enable verbose output.
     /// </summary>

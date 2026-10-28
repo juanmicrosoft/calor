@@ -405,13 +405,15 @@ internal static class CompilationDriver
         // two modules is dropped, matching cross-module effect resolution's
         // skip-ambiguous rule so emission and enforcement agree. Warm-skip
         // validity depends on this map: its hash participates in global
-        // invalidation below.
+        // invalidation below, together with the declared type contracts used
+        // by effect variance. A changed base row must recheck cached overrides.
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
+        CrossModuleTypeRegistry? crossModuleTypes = null;
         string? crossModuleMapHash = null;
         if (sources.Count > 1)
         {
-            crossModuleMap = BuildCrossModuleFunctionMap(sources);
-            crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap);
+            crossModuleMap = BuildCrossModuleFunctionMap(sources, out crossModuleTypes);
+            crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap, crossModuleTypes);
         }
         if (newState != null)
         {
@@ -443,6 +445,7 @@ internal static class CompilationDriver
                     // enforcement (its Calor0410 violations would vanish on warm
                     // builds). Recompile to rebuild the summary.
                     && cachedEntry.EffectSummary != null
+                    && crossModuleTypes?.MatchesSourceHash(file.FullName, cachedEntry.ContentHash) != false
                     && BuildStateCache.IsFileUpToDate(cachedEntry, file.FullName))
                 {
                     // The output is only trusted when its content hash matches what
@@ -468,6 +471,7 @@ internal static class CompilationDriver
 
             var options = optionsFactory(file);
             options.CrossModuleFunctionModules = crossModuleMap;
+            options.CrossModuleTypes = crossModuleTypes;
             options.DeferGeneratedOutputValidation = true;
             if (options.Verbose)
             {
@@ -480,6 +484,7 @@ internal static class CompilationDriver
             // or the next run would skip it and the new content would never build.
             var statBeforeRead = BuildStateCache.StatFile(file.FullName);
             var sourceBytes = File.ReadAllBytes(file.FullName);
+            crossModuleTypes?.EnsureSourceSnapshot(file.FullName, sourceBytes);
             var source = DecodeSource(sourceBytes);
             var result = Program.Compile(source, file.FullName, options);
             onFileResult?.Invoke(file, result);
@@ -755,18 +760,26 @@ internal static class CompilationDriver
     /// </summary>
     internal static IReadOnlyDictionary<string, CrossModuleFunctionTarget> BuildCrossModuleFunctionMap(
         IReadOnlyList<FileInfo> sources)
+        => BuildCrossModuleFunctionMap(sources, out _);
+
+    internal static IReadOnlyDictionary<string, CrossModuleFunctionTarget> BuildCrossModuleFunctionMap(
+        IReadOnlyList<FileInfo> sources,
+        out CrossModuleTypeRegistry types)
     {
         var modules = new List<ModuleNode>();
+        var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
         foreach (var file in sources)
         {
             try
             {
-                var text = File.ReadAllText(file.FullName);
+                var bytes = File.ReadAllBytes(file.FullName);
+                sourceHashes[file.FullName] = BuildStateCache.ComputeContentHash(bytes);
+                var text = DecodeSource(bytes);
                 var diagnostics = new Diagnostics.DiagnosticBag();
                 var lexer = new Parsing.Lexer(text, diagnostics);
                 var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
                 var module = parser.Parse();
-                if (module == null)
+                if (module == null || diagnostics.HasErrors)
                 {
                     continue;
                 }
@@ -777,6 +790,7 @@ internal static class CompilationDriver
             }
         }
 
+        types = CrossModuleTypeRegistry.Build(modules, sourceHashes);
         return BuildCrossModuleFunctionMap(modules);
     }
 
@@ -877,11 +891,14 @@ internal static class CompilationDriver
     }
 
     internal static string ComputeCrossModuleMapHash(
-        IReadOnlyDictionary<string, CrossModuleFunctionTarget> map)
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget> map,
+        CrossModuleTypeRegistry? types = null)
     {
         var canonical = string.Join(";", map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv =>
                 $"{kv.Key}={kv.Value.ModuleName}|{kv.Value.NamespaceIdentity}|{kv.Value.ModuleClassName}"));
+        if (types is { HasTypes: true })
+            canonical += "\ntypes:" + types.Fingerprint;
         var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes);
     }

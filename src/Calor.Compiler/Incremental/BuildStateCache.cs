@@ -25,11 +25,11 @@ internal sealed class BuildState
         BuildStateCache.CurrentCompilerSemanticsVersion;
 
     /// <summary>
-    /// Fingerprint of the cross-module function map the outputs were emitted
+    /// Fingerprint of the cross-module function map and declared type contracts
     /// under (G3/#809): emission qualifies cross-module calls from this map, so
     /// a changed map (module added/removed/renamed, ambiguity introduced) must
     /// invalidate every warm skip — a cached .g.cs may carry stale
-    /// qualification. Null/empty when single-module.
+    /// qualification or stale effect-variance results. Null/empty when single-module.
     /// </summary>
     public string? CrossModuleMapHash { get; set; }
     public string CompilerHash { get; set; } = "";

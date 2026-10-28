@@ -19,6 +19,9 @@ public sealed class EffectEnforcementPass
     private readonly UnknownCallPolicy _policy;
     private readonly bool _strictEffects;
     private readonly HashSet<string> _crossModuleFunctionNames;
+    internal CrossModuleTypeRegistry? CrossModuleTypes { get; init; }
+    private CrossModuleTypeRegistry _varianceTypes = null!;
+    private ModuleNode _varianceModule = null!;
 
     /// <summary>
     /// Default cap on the <see cref="ProcessScc"/> fixpoint: how many rounds over
@@ -1057,11 +1060,12 @@ public sealed class EffectEnforcementPass
                 }
             }
 
-            foreach (var iface in ResolveInterfaceChain(cls))
+            foreach (var ifaceType in ResolveInterfaceChain(cls))
             {
+                var iface = (InterfaceDefinitionNode)ifaceType.Declaration;
                 foreach (var signature in iface.Methods)
                 {
-                    var (implementation, _, _) = FindImplementingMethod(cls, signature);
+                    var (implementation, _, _, _) = FindImplementingMethod(cls, signature, ifaceType);
                     if (implementation != null)
                     {
                         changed |= WidenRow(
@@ -1153,14 +1157,16 @@ public sealed class EffectEnforcementPass
     /// an override may declare only effects covered by its base method's declared
     /// set (Calor0420), and an interface implementation only effects covered by the
     /// interface method's declared set (Calor0421). A missing §E declaration is the
-    /// pure contract, consistent with per-function enforcement. Overrides whose base
-    /// class is external C# (not in this module) cannot be checked and route to the
-    /// Assumed channel (Calor0419). Implementations of external interfaces are not
+    /// pure contract, consistent with per-function enforcement. Same-compilation
+    /// declarations participate across files; unresolved bases remain Unknown
+    /// (Calor0425). Implementations of external interfaces are not
     /// per-method attributable and are outside the declared-variance surface; calls
     /// through such receivers hit the unknown-call chain, which fails loud.
     /// </summary>
     private void CheckEffectVariance(ModuleNode module)
     {
+        _varianceModule = module;
+        _varianceTypes = CrossModuleTypes ?? CrossModuleTypeRegistry.Build([module]);
         // v0.15 E3 slice a, design-doc §4.5 — the permissive DEMOTION is GONE.
         // A `DoesNotFit` verdict is never waived, at any of the six sites, by any
         // flag: `--permissive-effects` waives only "we cannot tell" (Calor0425).
@@ -1241,25 +1247,29 @@ public sealed class EffectEnforcementPass
                     // and cannot move a computed effect set or a Calor0410 —
                     // measured on the committed corpus, not assumed.
                     var overrideRow = PolyRow.FromDeclaration(method.Effects);
+                    var unavailableBase = CrossModuleTypes == null
+                        ? $"external base class '{baseClassName}', which is not visible in this module"
+                        : $"base class '{baseClassName}', whose method cannot be resolved unambiguously "
+                            + "in this compilation";
                     ReportRowUnknown(
                         method.Effects?.Span ?? method.Span,
-                        $"Override '{cls.Name}.{method.Name}' overrides a member of external base "
-                        + $"class '{baseClassName}', which is not visible in this module, so the base "
+                        $"Override '{cls.Name}.{method.Name}' overrides a member of {unavailableBase}, so the base "
                         + $"method's effect row is Unknown. The override's declared row "
                         + $"{overrideRow.Display()} is assumed to fit here, not verified.");
                 }
             }
 
-            foreach (var iface in ResolveInterfaceChain(cls))
+            foreach (var ifaceType in ResolveInterfaceChain(cls))
             {
+                var iface = (InterfaceDefinitionNode)ifaceType.Declaration;
                 foreach (var sig in iface.Methods)
                 {
                     // W2 review C3: the implementing member may be INHERITED —
                     // walk the in-module base chain, not just cls.Methods.
                     // Interface dispatch through an inherited implementation
                     // launders exactly like a direct one.
-                    var (impl, implOwnerName, externalBaseName) =
-                        FindImplementingMethod(cls, sig);
+                    var (impl, implOwnerName, externalBaseName, localImplementation) =
+                        FindImplementingMethod(cls, sig, ifaceType);
 
                     if (impl != null)
                     {
@@ -1298,7 +1308,7 @@ public sealed class EffectEnforcementPass
                                 : "";
                             // Point at the implementing member when it is local;
                             // at the implementing class declaration when inherited.
-                            var span = inheritedNote.Length == 0
+                            var span = localImplementation
                                 ? impl.Effects?.Span ?? impl.Span
                                 : cls.Span;
                             _diagnostics.Report(
@@ -2677,39 +2687,51 @@ public sealed class EffectEnforcementPass
 
     /// <summary>
     /// Finds the member implementing an interface method on a class: the class's
-    /// own methods first (including §PP-wrapped ones), then the in-module
+    /// own methods first (including §PP-wrapped ones), then the same-compilation
     /// base-class chain. Returns (method, definingClassName, null) when found;
     /// (null, null, externalBaseName) when the chain leaves the module without a
     /// match; (null, null, null) when there is no match and no external base.
     /// </summary>
-    private (MethodNode? Method, string? OwnerName, string? ExternalBaseName) FindImplementingMethod(
-        ClassDefinitionNode cls, MethodSignatureNode signature)
+    private (MethodNode? Method, string? OwnerName, string? ExternalBaseName, bool Local)
+        FindImplementingMethod(
+            ClassDefinitionNode cls,
+            MethodSignatureNode signature,
+            CrossModuleTypeRegistry.ConstructedType interfaceType)
     {
-        var current = cls;
+        var currentType = _varianceTypes.Open(cls, _varianceModule);
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (current != null && visited.Add(current.Name))
+        while (currentType.Declaration is ClassDefinitionNode current
+            && visited.Add(_varianceTypes.Identity(current, _varianceModule)))
         {
             var matches = CallGraphAnalysis.EnumerateMethods(current)
-                .Where(method => CallableSignatureMatches(method, signature))
+                .Where(method => CallableSignatureMatches(method, currentType, signature, interfaceType))
                 .Take(2)
                 .ToArray();
             if (matches.Length == 1)
-                return (matches[0], current.Name, null);
+            {
+                var local = _varianceTypes.Identity(current, _varianceModule)
+                    == _varianceTypes.Identity(cls, _varianceModule)
+                    ? CallGraphAnalysis.EnumerateMethods(cls).SingleOrDefault(method =>
+                        CallableSignatureMatches(method, currentType, signature, interfaceType))
+                    : null;
+                return (local ?? matches[0], current.Name, null, local != null);
+            }
             if (matches.Length > 1)
-                return (null, null, null);
+                return (null, null, null, false);
 
-            var baseName = StripGenericArguments(current.BaseClass);
+            var baseName = current.BaseClass;
             if (baseName == null)
-                return (null, null, null);
-            if (!_classesByName.TryGetValue(baseName, out var baseCls))
-                return (null, null, baseName); // external base
-            current = baseCls;
+                return (null, null, null, false);
+            var baseType = _varianceTypes.Resolve(currentType, baseName, _varianceModule);
+            if (baseType?.Declaration is not ClassDefinitionNode)
+                return (null, null, baseName, false);
+            currentType = baseType;
         }
-        return (null, null, null);
+        return (null, null, null, false);
     }
 
     /// <summary>
-    /// Walks the in-module base-class chain looking for a method with the given name.
+    /// Walks the same-compilation base-class chain for a matching method signature.
     /// Returns (method, definingClassName) when found; (null, firstUnresolvedBaseName)
     /// when the chain leaves the module (external C# base); (null, null) when there is
     /// no base class at all.
@@ -2718,48 +2740,68 @@ public sealed class EffectEnforcementPass
         ClassDefinitionNode cls,
         MethodNode method)
     {
-        var baseName = StripGenericArguments(cls.BaseClass);
+        var ownerType = _varianceTypes.Open(cls, _varianceModule);
+        var currentType = ownerType;
+        var baseName = ((ClassDefinitionNode)currentType.Declaration).BaseClass;
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (baseName != null && visited.Add(baseName))
+        while (baseName != null)
         {
-            if (!_classesByName.TryGetValue(baseName, out var baseCls))
+            var baseType = _varianceTypes.Resolve(currentType, baseName, _varianceModule);
+            if (baseType?.Declaration is not ClassDefinitionNode baseCls)
                 return (null, baseName); // external base class
+            if (!visited.Add(_varianceTypes.Identity(baseCls, _varianceModule)))
+                return (null, baseName);
             var matches = CallGraphAnalysis.EnumerateMethods(baseCls)
-                .Where(candidate => CallableSignatureMatches(candidate, method))
+                .Where(candidate => CallableSignatureMatches(candidate, baseType, method, ownerType))
                 .Take(2)
                 .ToArray();
             if (matches.Length == 1)
                 return (matches[0], baseName);
             if (matches.Length > 1)
-                return (null, null);
-            baseName = StripGenericArguments(baseCls.BaseClass);
+                return (null, baseName);
+            currentType = baseType;
+            baseName = baseCls.BaseClass;
         }
-        return (null, null);
+        return (null, cls.BaseClass);
     }
 
-    private static bool CallableSignatureMatches(MethodNode method, MethodSignatureNode signature) =>
+    private bool CallableSignatureMatches(
+        MethodNode method,
+        CrossModuleTypeRegistry.ConstructedType methodOwner,
+        MethodSignatureNode signature,
+        CrossModuleTypeRegistry.ConstructedType signatureOwner) =>
         method.Name.Equals(signature.Name, StringComparison.Ordinal)
         && method.TypeParameters.Count == signature.TypeParameters.Count
         && ParametersMatch(
             method.Parameters,
             method.TypeParameters,
+            methodOwner,
             signature.Parameters,
-            signature.TypeParameters);
+            signature.TypeParameters,
+            signatureOwner);
 
-    private static bool CallableSignatureMatches(MethodNode candidate, MethodNode method) =>
+    private bool CallableSignatureMatches(
+        MethodNode candidate,
+        CrossModuleTypeRegistry.ConstructedType candidateOwner,
+        MethodNode method,
+        CrossModuleTypeRegistry.ConstructedType methodOwner) =>
         candidate.Name.Equals(method.Name, StringComparison.Ordinal)
         && candidate.TypeParameters.Count == method.TypeParameters.Count
         && ParametersMatch(
             candidate.Parameters,
             candidate.TypeParameters,
+            candidateOwner,
             method.Parameters,
-            method.TypeParameters);
+            method.TypeParameters,
+            methodOwner);
 
-    private static bool ParametersMatch(
+    private bool ParametersMatch(
         IReadOnlyList<ParameterNode> left,
         IReadOnlyList<TypeParameterNode> leftTypeParameters,
+        CrossModuleTypeRegistry.ConstructedType leftOwner,
         IReadOnlyList<ParameterNode> right,
-        IReadOnlyList<TypeParameterNode> rightTypeParameters)
+        IReadOnlyList<TypeParameterNode> rightTypeParameters,
+        CrossModuleTypeRegistry.ConstructedType rightOwner)
     {
         if (left.Count != right.Count)
             return false;
@@ -2768,12 +2810,10 @@ public sealed class EffectEnforcementPass
         {
             if (left[index].Modifier != right[index].Modifier
                 || !string.Equals(
-                    TypeIdentity.CanonicalizeSignature(
-                        left[index].TypeName,
-                        leftTypeParameters.Select(parameter => parameter.Name).ToArray()),
-                    TypeIdentity.CanonicalizeSignature(
-                        right[index].TypeName,
-                        rightTypeParameters.Select(parameter => parameter.Name).ToArray()),
+                    _varianceTypes.BindParameterType(
+                        left[index].TypeName, leftTypeParameters, leftOwner, _varianceModule),
+                    _varianceTypes.BindParameterType(
+                        right[index].TypeName, rightTypeParameters, rightOwner, _varianceModule),
                     StringComparison.Ordinal))
             {
                 return false;
@@ -2784,34 +2824,44 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
-    /// Resolves the transitive set of in-module interfaces a class implements
+    /// Resolves the transitive set of same-compilation interfaces a class implements
     /// (declared interfaces plus their base-interface chains). External interface
     /// names are skipped: they carry no §E declarations to check against.
     /// </summary>
-    private List<InterfaceDefinitionNode> ResolveInterfaceChain(ClassDefinitionNode cls)
+    private List<CrossModuleTypeRegistry.ConstructedType> ResolveInterfaceChain(ClassDefinitionNode cls)
     {
-        var result = new List<InterfaceDefinitionNode>();
+        var result = new List<CrossModuleTypeRegistry.ConstructedType>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        var queue = new Queue<string>();
-        foreach (var name in cls.ImplementedInterfaces)
+        var queue = new Queue<(CrossModuleTypeRegistry.ConstructedType Owner, string Reference,
+            IReadOnlySet<string> Ancestors)>();
+        var ownerType = _varianceTypes.Open(cls, _varianceModule);
+        foreach (var name in ((ClassDefinitionNode)ownerType.Declaration).ImplementedInterfaces)
         {
-            var stripped = StripGenericArguments(name);
-            if (stripped != null)
-                queue.Enqueue(stripped);
+            queue.Enqueue((ownerType, name, new HashSet<string>(StringComparer.Ordinal)));
         }
         while (queue.Count > 0)
         {
-            var name = queue.Dequeue();
-            if (!visited.Add(name))
+            var (owner, name, ancestors) = queue.Dequeue();
+            var resolved = _varianceTypes.Resolve(owner, name, _varianceModule);
+            if (resolved?.Declaration is not InterfaceDefinitionNode iface)
+            {
+                if (_varianceTypes.HasKnownInterfaceReference(owner, name, _varianceModule))
+                    ReportRowUnknown(cls.Span,
+                        $"Class '{cls.Name}' has interface '{name}' whose effect contracts "
+                        + "cannot be resolved unambiguously in this compilation.");
                 continue;
-            if (!_interfacesByName.TryGetValue(name, out var iface))
+            }
+            if (!visited.Add(_varianceTypes.Identity(iface, _varianceModule) + "<"
+                + string.Join(",", resolved.Substitutions.Values) + ">"))
                 continue;
-            result.Add(iface);
+            var identity = _varianceTypes.Identity(iface, _varianceModule);
+            if (ancestors.Contains(identity))
+                continue;
+            result.Add(resolved);
+            var chain = new HashSet<string>(ancestors, StringComparer.Ordinal) { identity };
             foreach (var baseName in iface.BaseInterfaces)
             {
-                var stripped = StripGenericArguments(baseName);
-                if (stripped != null)
-                    queue.Enqueue(stripped);
+                queue.Enqueue((resolved, baseName, chain));
             }
         }
         return result;

@@ -105,6 +105,34 @@ public class CompileCalorIntegrationTests : IDisposable
         return task;
     }
 
+    [Fact]
+    public void CrossModuleVariance_WarmBuildRechecksChangedBaseContract()
+    {
+        const string baseSource = """
+            §M{m1:Shared}
+              §CL{c1:Base:pub}
+                §MT{mt1:Render:pub:virt} () -> void
+                  §E{cw}
+            """;
+        var basePath = CreateSourceFile("Base.calr", baseSource);
+        var derivedPath = CreateSourceFile("Derived.calr", """
+            §M{m2:Shared}
+              §CL{c2:Derived:Base:pub}
+                §MT{mt2:Render:pub:over} () -> void
+                  §E{cw}
+            """);
+        Assert.True(CreateTask(basePath, derivedPath).Execute());
+        var warm = CreateTask(basePath, derivedPath);
+        Assert.True(warm.Execute());
+        Assert.Equal(2, ((TestBuildEngine)warm.BuildEngine).Messages.Count(
+            message => message.Contains("skipping")));
+
+        File.WriteAllText(basePath, baseSource.Replace("§E{cw}", "§E{}"));
+        var changed = CreateTask(basePath, derivedPath);
+        Assert.False(changed.Execute());
+        Assert.Contains("Calor0420", ((TestBuildEngine)changed.BuildEngine).ErrorCodes);
+    }
+
     // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (1 compiles) → clean → build (all)
     [Theory]
     [InlineData(false, false)]
