@@ -1,0 +1,100 @@
+name: Diagnose 0.28 performance gate
+
+on:
+  push:
+    branches: [diagnostic/v028-performance]
+    paths: [.github/workflows/v028-performance-diagnostic.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 3c04f11179514ac3a0fc10e35175f4c3e4eb5ac8
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: f4c53c0e970b14653f3351ff3e3e3b064b26c934
+          path: control
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./candidate/.github/actions/setup-release-sdk
+      - name: Build both immutable subjects
+        run: |
+          set -euo pipefail
+          for subject in control candidate; do
+            (
+              cd "$subject"
+              bash src/Calor.Compiler/scripts/download-z3.sh
+              dotnet restore --locked-mode
+              dotnet build -c Release --no-restore --verbosity quiet
+              dotnet build tests/Calor.Performance.Tests/ -c Release --no-restore --verbosity quiet
+            )
+          done
+      - name: Compare clean subjects and mutation build state
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+
+          root = Path.cwd()
+          reports = root / "reports"
+          reports.mkdir()
+          outcomes = []
+
+          def snapshot(label):
+              print(f"RESOURCE SNAPSHOT: {label}", flush=True)
+              subprocess.run(
+                  ["bash", "-c",
+                   "lscpu | grep -E 'CPU\\(s\\)|Model name|Hypervisor'; "
+                   "free -m; ps -eo pid,comm,rss,pcpu --sort=-rss | head -15; "
+                   "cat /proc/pressure/cpu /proc/pressure/memory"],
+                  check=True,
+              )
+              for subject in ["control", "candidate"]:
+                  assembly = root / subject / "tests/Calor.Performance.Tests/bin/Release/net10.0/calor.dll"
+                  print(subject, hashlib.sha256(assembly.read_bytes()).hexdigest(), flush=True)
+
+          def measure(subject, label):
+              result = subprocess.run(
+                  ["python3", "scripts/run_performance_gate.py",
+                   "--output", str(reports / label / "report.json")],
+                  cwd=root / subject,
+                  check=False,
+              )
+              outcomes.append({"label": label, "exitCode": result.returncode})
+              (reports / "outcomes.json").write_text(json.dumps(outcomes, indent=2) + "\n")
+              print(f"DIAGNOSTIC RESULT: {label}: exit {result.returncode}", flush=True)
+
+          snapshot("clean builds")
+          measure("control", "control-clean")
+          measure("candidate", "candidate-clean")
+          subprocess.run(
+              ["python3", "scripts/run_mutation_gate.py"],
+              cwd=root / "candidate",
+              check=True,
+          )
+          snapshot("after mutation and original rebuild")
+          measure("candidate", "candidate-after-mutation")
+          subprocess.run(["dotnet", "build-server", "shutdown"], check=True)
+          snapshot("after build-server shutdown")
+          measure("candidate", "candidate-after-shutdown")
+          raise SystemExit(1 if any(row["exitCode"] != 0 for row in outcomes) else 0)
+          PY
+      - name: Preserve diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v028-performance-diagnostic
+          path: |
+            reports/
+            candidate/artifacts/mutation/
