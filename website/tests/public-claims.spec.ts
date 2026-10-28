@@ -15,7 +15,7 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
 const currentRelease = '0.28.0';
-const releaseDate = '2026-10-27';
+const releaseDate = '2026-10-28';
 // 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
 const advisoryRelease = '0.24.0';
 // The release that last published static benchmark numbers. 0.24.0 through 0.28.0 publish none:

@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.28.0] - 2026-10-27
+## [0.28.0] - 2026-10-28
 
 Calor 0.28 checks override and interface effect contracts across files: a method may not
 declare more side effects than its base permits. It also closes field-write and method-group
@@ -18,7 +18,7 @@ This release publishes no new benchmark results.
 - **Regression controls:** 23 cross-file variance cases and 10 initializer cases were added.
   The initializer controls cover all five safety holes reported in #1679.
 - **Silent wrong-output reports since 0.27.0: 0 new reports** in the repository issue
-  inventory checked on 2026-10-27. This is a report count, not proof that the package has
+  inventory checked on 2026-10-28. This is a report count, not proof that the package has
   no defects.
 - **Merge-to-publication lag: not measured.** Package availability is checked separately
   after publication. The release-date proxy recorded for 0.27.0 below is historical.
