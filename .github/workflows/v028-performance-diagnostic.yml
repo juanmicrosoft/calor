@@ -15,31 +15,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 3c04f11179514ac3a0fc10e35175f4c3e4eb5ac8
-          path: candidate
+          ref: e45fa725cbd9717f44d9c29534b81657a1b89ce2
           fetch-depth: 0
           persist-credentials: false
+          submodules: recursive
       - uses: actions/checkout@v4
         with:
           ref: f4c53c0e970b14653f3351ff3e3e3b064b26c934
-          path: control
+          path: .diagnostic/control
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./candidate/.github/actions/setup-release-sdk
-      - name: Build both immutable subjects
+          submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          ref: e45fa725cbd9717f44d9c29534b81657a1b89ce2
+          path: .diagnostic/candidate
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+      - uses: ./.github/actions/setup-release-sdk
+        with:
+          also-install: '8.0.426'
+      - name: Build immutable subjects with the exact release SDK setup
         run: |
           set -euo pipefail
-          for subject in control candidate; do
+          dotnet --info
+          for subject in . .diagnostic/control .diagnostic/candidate; do
             (
               cd "$subject"
               bash src/Calor.Compiler/scripts/download-z3.sh
               dotnet restore --locked-mode
               dotnet build -c Release --no-restore --verbosity quiet
-              dotnet restore tests/Calor.Performance.Tests/ --locked-mode
-              dotnet build tests/Calor.Performance.Tests/ -c Release --no-restore --verbosity quiet
+              dotnet build tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj -c Release --verbosity quiet
             )
           done
-      - name: Compare clean subjects and mutation build state
+      - name: Run the release's preceding self-tests and manifest checks
+        run: |
+          python3 scripts/test_release_checks.py
+          python3 scripts/check_test_quality.py --self-test
+          python3 scripts/check_trx.py --self-test
+          bash scripts/check_sample_ids.sh --self-test
+          python3 scripts/check_coverage.py --self-test
+          python3 scripts/run_mutation_gate.py --self-test
+          python3 scripts/run_performance_gate.py --self-test
+          python3 scripts/run_flake_gate.py --self-test
+          bash scripts/compiler-shard-filter.sh --self-test
+          python3 scripts/check_test_quality.py
+          bash scripts/check_sample_ids.sh
+          dotnet build-server shutdown
+      - name: Compare release-root and nested subjects on one observed runner
         run: |
           python3 - <<'PY'
           import hashlib
@@ -48,9 +72,14 @@ jobs:
           import subprocess
 
           root = Path.cwd()
-          reports = root / "reports"
-          reports.mkdir()
+          reports = root / "artifacts" / "performance-diagnostic"
+          reports.mkdir(parents=True)
           outcomes = []
+          subjects = {
+              "release-root": root,
+              "control": root / ".diagnostic" / "control",
+              "candidate": root / ".diagnostic" / "candidate",
+          }
 
           def snapshot(label):
               print(f"RESOURCE SNAPSHOT: {label}", flush=True)
@@ -58,44 +87,39 @@ jobs:
                   ["bash", "-c",
                    "lscpu | grep -E 'CPU\\(s\\)|Model name|Hypervisor'; "
                    "free -m; ps -eo pid,comm,rss,pcpu --sort=-rss | head -15; "
+                   "cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max; "
                    "cat /proc/pressure/cpu /proc/pressure/memory"],
                   check=True,
               )
-              for subject in ["control", "candidate"]:
-                  assembly = root / subject / "tests/Calor.Performance.Tests/bin/Release/net10.0/calor.dll"
-                  print(subject, hashlib.sha256(assembly.read_bytes()).hexdigest(), flush=True)
+              for name, subject in subjects.items():
+                  output = subject / "tests/Calor.Performance.Tests/bin/Release/net10.0"
+                  for filename in ["calor.dll", "Calor.Performance.Tests.dll"]:
+                      print(name, filename, hashlib.sha256((output / filename).read_bytes()).hexdigest(), flush=True)
+                  print(name, (output / "Calor.Performance.Tests.runtimeconfig.json").read_text(), flush=True)
 
           def measure(subject, label):
               result = subprocess.run(
                   ["python3", "scripts/run_performance_gate.py",
                    "--output", str(reports / label / "report.json")],
-                  cwd=root / subject,
+                  cwd=subjects[subject],
                   check=False,
               )
               outcomes.append({"label": label, "exitCode": result.returncode})
               (reports / "outcomes.json").write_text(json.dumps(outcomes, indent=2) + "\n")
               print(f"DIAGNOSTIC RESULT: {label}: exit {result.returncode}", flush=True)
 
-          snapshot("clean builds")
-          measure("control", "control-clean")
-          measure("candidate", "candidate-clean")
-          subprocess.run(
-              ["python3", "scripts/run_mutation_gate.py"],
-              cwd=root / "candidate",
-              check=True,
-          )
-          snapshot("after mutation and original rebuild")
-          measure("candidate", "candidate-after-mutation")
-          subprocess.run(["dotnet", "build-server", "shutdown"], check=True)
-          snapshot("after build-server shutdown")
-          measure("candidate", "candidate-after-shutdown")
+          snapshot("exact release setup before measurement")
+          measure("release-root", "release-root-before")
+          measure("candidate", "nested-candidate")
+          measure("control", "nested-control")
+          snapshot("before repeated root control")
+          measure("release-root", "release-root-after")
+          snapshot("all measurements complete")
           raise SystemExit(1 if any(row["exitCode"] != 0 for row in outcomes) else 0)
           PY
       - name: Preserve diagnostic reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v028-performance-diagnostic
-          path: |
-            reports/
-            candidate/artifacts/mutation/
+          name: v028-exact-release-diagnostic
+          path: artifacts/performance-diagnostic/
