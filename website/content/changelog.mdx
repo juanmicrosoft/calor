@@ -17,6 +17,10 @@ All notable changes to Calor, organized by release.
   and partial-class members. Resolution respects namespaces, import scopes, aliases and
   generic arguments. Changed type contracts invalidate cached checks; unresolved or
   ambiguous bases remain `Unknown`.
+- **Simple event argument initializers convert natively again (#1679).** The converter
+  snapshots the event delegate before creating its arguments. It only recovers creations
+  whose constructors, initializers and member assignments run no user code; other cases
+  still preserve C# with a reported loss.
 - **Bare-name field writes require mutation effects (#1551).** Assignments and `ref`/`out`
   arguments now require `mut` for instance, static and inherited fields. Locals and
   parameters that shadow fields keep their existing behavior.
