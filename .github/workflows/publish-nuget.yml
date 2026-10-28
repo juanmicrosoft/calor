@@ -236,8 +236,8 @@ jobs:
   release-quality:
     needs: preflight
     runs-on: ubuntu-latest
-    # Main CI allows 50m; this gate also runs 100 flake trials and the full corpus.
-    timeout-minutes: 60
+    # Main CI allows 70m; this gate also runs 100 flake trials and the full corpus.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout code and round-trip corpus
