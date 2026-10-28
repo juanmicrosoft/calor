@@ -35,6 +35,7 @@ jobs:
               bash src/Calor.Compiler/scripts/download-z3.sh
               dotnet restore --locked-mode
               dotnet build -c Release --no-restore --verbosity quiet
+              dotnet restore tests/Calor.Performance.Tests/ --locked-mode
               dotnet build tests/Calor.Performance.Tests/ -c Release --no-restore --verbosity quiet
             )
           done
