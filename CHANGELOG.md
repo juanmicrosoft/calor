@@ -41,6 +41,8 @@ This release publishes no new benchmark results.
   delegate in a conditional, null-coalescing expression, collection element or qualified
   store conservatively charges the referenced method's effects. Direct bindings and returns
   keep their existing effect-row checks.
+- **Taint analysis avoids unused summaries.** Functions with no callers no longer repeat
+  the analysis to compute a summary nobody uses. They are still checked for vulnerabilities.
 
 ## [0.27.0] - 2026-10-27
 
