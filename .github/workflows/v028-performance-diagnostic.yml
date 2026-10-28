@@ -15,20 +15,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: e45fa725cbd9717f44d9c29534b81657a1b89ce2
+          ref: 08179edbb67c767724a5b3934dc333ffeec49323
           fetch-depth: 0
           persist-credentials: false
           submodules: recursive
       - uses: actions/checkout@v4
         with:
-          ref: f4c53c0e970b14653f3351ff3e3e3b064b26c934
+          ref: e45fa725cbd9717f44d9c29534b81657a1b89ce2
           path: .diagnostic/control
           fetch-depth: 0
           persist-credentials: false
           submodules: recursive
       - uses: actions/checkout@v4
         with:
-          ref: e45fa725cbd9717f44d9c29534b81657a1b89ce2
+          ref: 08179edbb67c767724a5b3934dc333ffeec49323
           path: .diagnostic/candidate
           fetch-depth: 0
           persist-credentials: false
