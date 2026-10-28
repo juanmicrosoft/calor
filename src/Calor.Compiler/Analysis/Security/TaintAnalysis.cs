@@ -1963,8 +1963,10 @@ public sealed class TaintAnalysisRunner
     private IReadOnlyDictionary<SymbolId, TaintFunctionSummary> BuildSummaries(
         IReadOnlyList<BoundFunction> functions)
     {
+        // Uncalled functions still run the diagnostic pass, but have no summary consumers.
+        var calleeIds = functions.SelectMany(GetResolvedCallees).ToHashSet();
         var functionsById = functions
-            .Where(function => !function.SymbolId.IsNone)
+            .Where(function => !function.SymbolId.IsNone && calleeIds.Contains(function.SymbolId))
             .ToDictionary(function => function.SymbolId);
         var summaries = functionsById.Keys.ToDictionary(
             id => id,

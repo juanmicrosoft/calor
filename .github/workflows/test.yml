@@ -331,9 +331,11 @@ jobs:
     # SIGTERMs its children, so `dotnet test` under it exits 143, which is also
     # part of what #1150 has been chasing. 35 is ~75% headroom over the observed
     # maximum; the gates themselves are unchanged.
-    # The expanded compiler inventory must finish both coverage hosts and the
+    # The expanded compiler inventory must finish all four coverage hosts and the
     # mutation gate; run 34981014060 reached that gate before its old 35m cap.
-    timeout-minutes: 50
+    # Run 40752376204 spent 41m25s collecting passing coverage; the 50m cap then
+    # killed mutation. Leave time for every gate on slower hosted runners.
+    timeout-minutes: 70
 
     steps:
       - name: Checkout code
