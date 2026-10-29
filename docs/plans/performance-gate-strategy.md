@@ -1,5 +1,34 @@
 # Performance gate — strategy
 
+> **Phases 3–4 implementation (0.29, #1115).** Memory samples now retain the
+> bound module through the post-collection sample and reject nonpositive deltas.
+> They measure **retained managed bytes**, not total allocation, native memory or
+> peak RSS. Verification tests warm parsing, binding, taint, bug patterns and CFG
+> paths in a lazy constructor prerequisite; unlike a warm-up fact, this runs before
+> every measurement regardless of xUnit's class/fact order. Index tests already
+> warm their own paths. The performance test host disables tiered compilation,
+> using a fixed JIT tier: otherwise .NET 10's tiered escape analysis changes
+> allocation counts after other classes run (a 2.7% drop reproduced during the
+> aggregate gate). This standardizes the measurement environment, not the product
+> runtime. Fractional milliseconds replace integer measurements.
+> The two 4x-growth ratio tests are named below-quadratic smoke budgets, not linear
+> guarantees. Timing ceilings, including the 24.0s aggregate, are unchanged.
+>
+> `DeterministicPerformanceTests` pins a 10-function, 50-statement generated
+> module at **4,729 parser tokens, 1,351 bound nodes, 580 CFG blocks, 760 CFG edges,
+> and 580 taint worklist iterations**. Five warm-up passes precede five synchronous
+> current-thread allocation samples, each required within **±2%** of its build
+> configuration's baseline: Debug **11,681,288 bytes**, Release **11,266,312 bytes**.
+> These were measured on macOS ARM64, .NET 10.0.14; they are not claimed to be
+> runtime-independent or CI-calibrated. A separate interprocedural loop subject
+> pins **11 iterations**, checks that summary-pass work is included and counters
+> reset per analysis.
+> Allocations complement retained-memory budgets; neither sees native Z3 memory.
+>
+> The remaining elapsed budgets are catastrophic-regression **smoke checks**.
+> Retuning them to ~5x CI medians remains evidence-dependent: no local observation
+> is used to relax them. The historical analysis and proposals below are retained.
+
 > **Status (2026-08-27, v0.16 kickoff sweep).** This is the document from PR **#976**
 > (revision 2, 2026-08-14), carried into the tree unchanged below this note and credited to
 > that PR; `eng/performance-baselines.json`'s `noisePolicy` has cited it by path since #978

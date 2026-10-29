@@ -24,6 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Pin JIT tier: tiered escape analysis otherwise changes allocation counts with class order. -->
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation" Value="false" />
     <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
   </ItemGroup>
 

@@ -71,9 +71,9 @@
       "path": "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj",
       "workflow": ".github/workflows/performance.yml",
       "releaseCritical": true,
-      "expectedTotal": 26,
+      "expectedTotal": 28,
       "expectedSkipped": 0,
-      "note": "#1420: 21 -> 25, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases. fix/perf-binding-medium-module: 25 -> 26, +1 Binding_ScalesLinearlyWithFunctionCount, a ratio guard (40 vs 320 functions) against the quadratic binding regression that failed Binding_MediumModule_Under500ms."
+      "note": "#1420: 21 -> 25, four fail-closed Z3ConsumerGuardTests. Binding scaling guard: 25 -> 26. #1115: 26 -> 28, exact token/bound-node/CFG/taint work and warm allocation counters plus iteration-reset/interprocedural accounting. The existing timing/memory facts remain; memory is now rooted. No new skipped cases or higher timing ceilings."
     },
     {
       "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj",
@@ -95,9 +95,9 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 135,
+      "expectedTotal": 145,
       "expectedSkipped": 0,
-      "note": "2026-09-08: 123 -> 124. PermissiveEffectsTests' single \"Calor0410 is a warning\" test became two, one per half of the 2026-09-04 adjudication (#1174) — a NAMED Calor0410 is still an error under the property, an Unknown-charged one is still demoted. The pair is what stops an \"always Strict\" or \"always Permissive\" mutation passing the file. #1420: 130 -> 134, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases."
+      "note": "2026-09-08: 123 -> 124, named versus Unknown-charged Calor0410 permissive-effects discrimination (#1174). #1420: 130 -> 134, four fail-closed Z3ConsumerGuardTests. #1116: 135 -> 145, all eight edit scripts through clean/incremental CLI processes versus CompilationDriver (diagnostics, index/cache bytes and cache reuse), the pinned denominator, and UnknownCallPolicy discrimination. This process leg runs in the Tasks shard, not the compiler shard. No new skipped cases."
     },
     {
       "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",

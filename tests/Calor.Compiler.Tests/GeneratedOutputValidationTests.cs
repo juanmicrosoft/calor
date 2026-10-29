@@ -100,13 +100,16 @@ public class GeneratedOutputValidationTests
                 """);
 
             var warm = DriveAll(workspace, clearFirst: false);
+            Assert.False(Incremental.BuildStateCache.Load(workspace)!.Files.ContainsKey("caller.calr"));
+            Assert.Contains("caller.calr", warm.FailedFiles);
+            Assert.False(File.Exists(Path.ChangeExtension(caller, ".g.cs")));
             var cold = DriveAll(workspace, clearFirst: true);
 
             Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, warm.Codes);
             Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, cold.Codes);
             Assert.True(warm.AnyErrors);
             Assert.True(cold.AnyErrors);
-            Assert.Equal(1, warm.Skipped);
+            Assert.Equal(0, warm.Skipped);
         }
         finally
         {
@@ -544,7 +547,11 @@ public class GeneratedOutputValidationTests
                 "effects-on",
                 clearFirst,
                 file => Path.ChangeExtension(file.FullName, ".g.cs")),
-            onFailed: file => failed.Add(Path.GetFileName(file.FullName)));
+            onFailed: file =>
+            {
+                failed.Add(Path.GetFileName(file.FullName));
+                File.Delete(Path.ChangeExtension(file.FullName, ".g.cs"));
+            });
 
         return new DriveOutcome(
             [.. sink.Select(d => d.Code).Distinct().OrderBy(c => c, StringComparer.Ordinal)],

@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="..\Shared\EditScriptCorpus.cs" Link="Shared\EditScriptCorpus.cs" />
+  </ItemGroup>
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>

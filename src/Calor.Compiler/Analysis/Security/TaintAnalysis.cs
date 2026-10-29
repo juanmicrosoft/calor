@@ -412,6 +412,7 @@ public sealed class TaintAnalysis
     public IReadOnlyList<TaintVulnerability> Vulnerabilities => _vulnerabilities;
     public ControlFlowGraph Cfg { get; }
     internal DataflowAnalysisResult<TaintState> DataflowResult { get; }
+    public int Iterations => DataflowResult.Iterations;
 
     public TaintAnalysis(BoundFunction function, TaintAnalysisOptions? options = null)
         : this(function, options, Array.Empty<string>(), null, symbolicParameters: false)
@@ -1927,6 +1928,8 @@ public sealed class TaintAnalysisRunner
     private readonly DiagnosticBag _diagnostics;
     private readonly TaintAnalysisOptions _options;
     public int VulnerabilityCount { get; private set; }
+    /// <summary>Total worklist iterations across summary and diagnostic passes of the last analysis.</summary>
+    public int Iterations { get; private set; }
 
     public TaintAnalysisRunner(DiagnosticBag diagnostics, TaintAnalysisOptions? options = null)
     {
@@ -1938,6 +1941,7 @@ public sealed class TaintAnalysisRunner
     {
         ArgumentNullException.ThrowIfNull(module);
         VulnerabilityCount = 0;
+        Iterations = 0;
         var summaries = BuildSummaries(module.Functions);
         foreach (var function in module.Functions)
         {
@@ -1948,6 +1952,7 @@ public sealed class TaintAnalysisRunner
                 summaries,
                 symbolicParameters: false);
             analysis.ReportDiagnostics(_diagnostics);
+            Iterations += analysis.Iterations;
             VulnerabilityCount += analysis.Vulnerabilities.Count;
         }
     }
@@ -1955,8 +1960,10 @@ public sealed class TaintAnalysisRunner
     public void AnalyzeFunction(BoundFunction function)
     {
         VulnerabilityCount = 0;
+        Iterations = 0;
         var analysis = new TaintAnalysis(function, _options, function.DeclaredEffects);
         analysis.ReportDiagnostics(_diagnostics);
+        Iterations = analysis.Iterations;
         VulnerabilityCount += analysis.Vulnerabilities.Count;
     }
 
@@ -2002,6 +2009,7 @@ public sealed class TaintAnalysisRunner
                 summaries,
                 symbolicParameters: true);
             var joined = TaintFunctionSummary.Join(summaries[id], analysis.CreateSummary());
+            Iterations += analysis.Iterations;
             if (joined.Equals(summaries[id]))
                 continue;
 

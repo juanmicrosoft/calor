@@ -300,7 +300,7 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
 
     private static string CorpusRoot => Path.Combine(RepoRoot, "tests", "TestData", "EditScripts");
 
-    private static string FindCalorDll()
+    internal static string FindCalorDll()
     {
         var candidates = new[] { "Release", "Debug" }
             .Select(config => Path.Combine(RepoRoot, "src", "Calor.Compiler", "bin", config, "net10.0", "calor.dll"))
