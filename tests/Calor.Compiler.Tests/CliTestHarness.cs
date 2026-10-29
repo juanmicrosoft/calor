@@ -9,7 +9,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 internal static class CliTestHarness
 {
-    private static readonly Lazy<string> RepoRoot = new(FindRepoRootCore);
+    private static readonly Lazy<string> RepoRoot = new(() => FindRepoRoot(Directory.GetCurrentDirectory()));
     private static readonly Lazy<string> CalorDll = new(FindCalorDllCore);
 
     /// <summary>Walks up from the test working directory to the repository root.</summary>
@@ -71,22 +71,20 @@ internal static class CliTestHarness
         }
     }
 
-    private static string FindRepoRootCore()
+    internal static string FindRepoRoot(string startDirectory)
     {
-        var dir = Directory.GetCurrentDirectory();
+        var dir = new DirectoryInfo(startDirectory);
         while (dir != null)
         {
-            if (File.Exists(Path.Combine(dir, "Calor.sln")))
+            if (File.Exists(Path.Combine(dir.FullName, "Calor.sln")))
             {
-                return dir;
+                return dir.FullName;
             }
 
-            var parent = Directory.GetParent(dir);
-            if (parent == null) break;
-            dir = parent.FullName;
+            dir = dir.Parent;
         }
 
-        throw new InvalidOperationException("Repository root (Calor.sln) not found from " + Directory.GetCurrentDirectory());
+        throw new InvalidOperationException("Repository root (Calor.sln) not found from " + startDirectory);
     }
 
     /// <summary>
