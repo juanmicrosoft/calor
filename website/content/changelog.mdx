@@ -10,6 +10,60 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-29
+
+Calor 0.29 fixes nullable-reference and shift analysis, receiver taint tracking, and
+verification-context cleanup. It also strengthens incremental-build, language-server and
+round-trip regression checks.
+
+This release publishes no new benchmark results.
+
+### Release health
+
+- **Silent wrong-output reports since 0.28.0: 0 new reports** in the repository issue
+  inventory checked on 2026-10-29. This is a report count, not proof that the package has
+  no defects.
+- **Merge-to-publication lag: not measured.** Package availability is checked separately
+  after publication.
+
+### Fixed
+
+- **Bug-pattern analysis respects nullable references and C# shift counts.** Null checks
+  now refine reference presence on each branch. Shift analysis accounts for C# masking
+  shift counts, including negative values.
+- **Taint tracking includes call receivers.** Data passed through a receiver is no longer
+  omitted from the call's taint analysis. Reusing an incremental cache no longer suppresses
+  findings that a clean analysis reports.
+- **Verification contexts release native resources deterministically.** Compiler-owned Z3
+  contexts are disposed when their work ends; borrowed contexts remain usable. Runtime
+  compilation helpers reuse platform metadata references instead of reopening them for
+  every compilation.
+- **File watching handles synchronization contexts correctly.** Regression tests exercise
+  real filesystem changes, channel delivery and shutdown cleanup.
+- **Test tools locate the right corpus and compiler build.** Corpus discovery uses the
+  repository marker, and CLI tests choose the compiler build deterministically.
+
+### Test and CI health
+
+- **Incremental builds are compared with clean builds.** Edit-script checks compare
+  diagnostics, complete index and cache contents, and reuse in both directions.
+- **Language-server tests share process and protocol handling.** They also cover
+  out-of-order diagnostics and recovery after cancellation.
+- **Normal-form properties check boolean equivalence and node-ID normalization.**
+  Mutation controls check that these tests reject deliberately broken behavior.
+- **Round-trip CI rejects regressions against measured, monotonic floors.** Default and
+  lossy conversion have separate floors. Nightly runs propose updates for review rather
+  than merging them automatically; synthetic tests own their baseline fixtures.
+
+### Remaining limits
+
+- **The historical compiler-CI p90 target remains unmet (#1590, #1594).** This release
+  does not close those issues or relax their acceptance criterion.
+- **Analyzer precision remains incomplete (#1723).** Known safe-control false positives
+  remain for shell escaping, path sanitization, arithmetic preconditions and array-length
+  preconditions. SQL sanitization relies on an explicitly configured model, not a proof
+  from the default analyzer.
+
 ## [0.28.0] - 2026-10-28
 
 Calor 0.28 checks override and interface effect contracts across files: a method may not
