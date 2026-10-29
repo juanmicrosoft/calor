@@ -30,6 +30,13 @@
 > checks**, calibrated below from actual CI rather than relaxed from local results.
 > The historical analysis and proposals below are retained.
 
+The separate native-memory investigation (#1590) is opt-in:
+`gh workflow run performance.yml --ref <branch> -f profile_compiler_memory=true`.
+It runs only the unsplit heaptrack probe, not the ordinary timing gate or the
+entire Tests workflow. Artifacts include managed JIT symbol maps and procfs
+mapping snapshots as well as native allocation traces. A bounded, interrupted
+probe is diagnostic evidence, not a passing full-suite run or a leak proof.
+
 ### 0.29 Linux smoke calibration
 
 [Performance Tests run 40908078723](https://github.com/juanmicrosoft/calor/actions/runs/40908078723)

@@ -107,6 +107,13 @@ sample_linux() {
             END {printf "[#1150 rss   %s] pid=%s VmRSS=%dM anon=%dM file=%dM shmem=%dM\n",
                         t, p, rss/1024, anon/1024, file/1024, shm/1024}
         ' "/proc/${pid}/status" 2>/dev/null || true
+        if [ -n "${CALOR_PROFILE_OUTPUT:-}" ]; then
+            for snapshot in maps smaps; do
+                if ! cp "/proc/${pid}/${snapshot}" "$CALOR_PROFILE_OUTPUT/proc-${pid}-${snapshot}"; then
+                    printf '[#1150 snapshot] pid=%s %s unavailable (process may have exited)\n' "$pid" "$snapshot" >&2
+                fi
+            done
+        fi
     fi
 }
 

@@ -6,84 +6,8 @@ on:
   pull_request:
     branches: [ main, 'release/**' ]
   workflow_dispatch:
-    inputs:
-      profile_compiler_memory:
-        description: Run the unsplit compiler host under heaptrack (#1590)
-        type: boolean
-        default: false
 
 jobs:
-  compiler-memory-profile:
-    if: github.event_name == 'workflow_dispatch' && inputs.profile_compiler_memory
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-      - uses: ./.github/actions/bootstrap-z3
-      - name: Install native allocation profiler
-        run: |
-          if ! command -v heaptrack; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends heaptrack
-          fi
-      - name: Build compiler tests
-        run: dotnet build tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj -c Release
-      - name: Profile one unsplit test host
-        timeout-minutes: 25
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/compiler-memory
-          export CALOR_PROFILE_DOTNET="$(command -v dotnet)"
-          export CALOR_PROFILE_OUTPUT="$PWD/artifacts/compiler-memory"
-          chmod +x scripts/profile-compiler-testhost.sh
-          bash scripts/runner-resource-sampler.sh 10 > artifacts/compiler-memory/resources.log &
-          sampler_pid=$!
-          trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
-          # Runsettings element names are case-sensitive. Prove the hook ran before
-          # spending the full profiling budget on an accidentally unprofiled host.
-          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
-            -c Release --no-build --no-restore \
-            --filter "FullyQualifiedName~CliTestHarnessTests" \
-            --verbosity quiet \
-            -- RunConfiguration.DotNetHostPath="$PWD/scripts/profile-compiler-testhost.sh"
-          if ! compgen -G "$CALOR_PROFILE_OUTPUT/heaptrack.*" > /dev/null; then
-            echo "::error::VSTest did not produce the native profiling smoke trace."
-            exit 1
-          fi
-          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
-            -c Release --no-build --no-restore \
-            --logger "trx;LogFileName=unsplit.trx" \
-            --results-directory artifacts/compiler-memory \
-            --verbosity normal \
-            -- RunConfiguration.DotNetHostPath="$PWD/scripts/profile-compiler-testhost.sh" \
-            2>&1 | tee artifacts/compiler-memory/tests.log
-      - name: Summarize native allocation stacks
-        if: always()
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          profiles=(artifacts/compiler-memory/heaptrack.*.gz artifacts/compiler-memory/heaptrack.*.zst)
-          test "${#profiles[@]}" -gt 0
-          for profile in "${profiles[@]}"; do
-            heaptrack_print "$profile" > "$profile.txt"
-          done
-      - name: Upload native allocation profiles and resource trajectory
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: compiler-memory-profile
-          path: artifacts/compiler-memory/
-          if-no-files-found: error
-          retention-days: 30
-
   # #1009 (audit R13): the roundtrip-verification job takes ~30 minutes running
   # `harness run --all` against MediatR/Serilog/FluentValidation (per leg; the
   # Lossy and default legs run in parallel, #1586). Docs-only PRs
