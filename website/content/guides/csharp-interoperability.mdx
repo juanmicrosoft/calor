@@ -10,9 +10,10 @@ existing code with `calor convert`, `calor migrate`, or the MCP tools. For each 
 shows what becomes native Calor, what stays C#, and how the report tells you which
 happened.
 
-**Version scope.** This page describes the converter on the main branch for the 0.25
-release, which is **not released yet**. Each section says what differs in 0.24, the
-latest release. Every Calor block on this page is real `calor convert` output. CI compiles
+**Version scope.** This guide covers converter support introduced in 0.25.
+The site header shows the current compiler version; 0.25 and 0.24 are earlier
+releases. The "Changed since 0.24" notes explain that historical comparison,
+not the current release status. Every Calor block on this page is real `calor convert` output. CI compiles
 each complete program, and checks each block against the converter's output for the C#
 shown (the interpolation block is a fragment of that output). The C# inputs and the full
 CLI and MCP transcripts are in the repository under `tests/TestData/InteropScope/W1/`.

@@ -72,6 +72,14 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
   }
 });
 
+test('current converter guides do not describe published releases as pending', async () => {
+  for (const document of ['guides/adding-calor-to-existing-projects', 'guides/csharp-interoperability',
+    'cli/self-check', 'cli/feature-check', 'cli/convert']) {
+    const source = (await readFile(`content/${document}.mdx`, 'utf8')).replace(/\s+/g, ' ');
+    expect(source, document).not.toMatch(/unreleased|not (?:yet )?released(?: yet)?|0\.24, the latest release/i);
+  }
+});
+
 test('0.25 C# interoperability guide is discoverable, version-scoped and bounded', async ({ page }) => {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const guide = '/docs/guides/csharp-interoperability/';
@@ -83,12 +91,14 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
   }
   await page.goto(`${base}${guide}`);
   const article = page.locator('article');
-  // Version scope and bounded claims: unreleased behavior is never presented as the current release.
-  for (const text of ['which is not released yet', 'Changed since 0.24', 'Preserved C# is a migration boundary',
+  // Historical comparisons must not imply that earlier releases are still pending.
+  for (const text of ['converter support introduced in 0.25', '0.25 and 0.24 are earlier releases',
+    'Changed since 0.24', 'Preserved C# is a migration boundary',
     'ref returns (block or', 'reports Partial', 'rescueUnusableMembers: true',
     'passthroughOnError: true', 'conversionPaths.outcome', 'In the tested cases']) {
     await expect(article).toContainText(text);
   }
+  await expect(article).not.toContainText('not released yet');
   await expect(article).not.toContainText(/independently (reviewed|verified)/i);
   const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
     [...new Set(elements.map(element => element.getAttribute('href')!))]);
