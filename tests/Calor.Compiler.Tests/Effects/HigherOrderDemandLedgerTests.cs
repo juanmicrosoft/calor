@@ -95,11 +95,11 @@ public class HigherOrderDemandLedgerTests
         + "delegate declared in one file counts where it is used in another.";
 
     private const string NotReachingEffectPassNote =
-        "Known state at registration, not a filter: bench/mcp/tasks/*/expected.calr and "
+        "Known current state, not a filter: bench/mcp/tasks/*/expected.calr and "
         + "input.calr are MCP benchmark fixtures that are deliberately broken or written against "
         + "older syntax (30 of 33 die on Calor0830 legacy closing tags, two on Calor0006, one on "
-        + "Calor0403), benchmarks/* entries are the #901 stale subjects, and "
-        + "tests/TestData/LintScenarios/10_error_cases/* are error fixtures.";
+        + "Calor0403), and tests/TestData/LintScenarios/10_error_cases/* are error fixtures. "
+        + "All seven #901 benchmark subjects now reach the effect pass.";
 
     /// <summary>
     /// The D-B classification, pinned as data: identifiers a declared type syntax

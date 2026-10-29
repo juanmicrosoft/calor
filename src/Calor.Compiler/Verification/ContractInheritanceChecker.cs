@@ -47,13 +47,15 @@ public sealed class ContractInheritanceChecker : IDisposable
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Z3ImplicationProver? CreateZ3Prover(uint timeoutMs)
     {
+        Microsoft.Z3.Context? ctx = null;
         try
         {
-            var ctx = Z3ContextFactory.Create();
-            return new Z3ImplicationProver(ctx, timeoutMs);
+            ctx = Z3ContextFactory.Create();
+            return new Z3ImplicationProver(ctx, timeoutMs, ownsContext: true);
         }
         catch
         {
+            ctx?.Dispose();
             return null;
         }
     }
@@ -63,6 +65,7 @@ public sealed class ContractInheritanceChecker : IDisposable
     /// </summary>
     public ModuleInheritanceResult Check(ModuleNode module)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var results = new List<ClassInheritanceResult>();
         var inheritedContracts =
             new Dictionary<MethodContractKey, InheritedContractInfo>();

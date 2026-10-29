@@ -7,45 +7,10 @@ namespace Calor.Compiler.Tests;
 
 public sealed class StageBReceivingSurfaceTests
 {
-    public static IEnumerable<object[]> Cases()
-    {
-        foreach (var (source, target, shape) in new[]
-        {
-            ("?[str]", "[str]", BindingReceivingShape.Array),
-            ("[?str]", "[str]", BindingReceivingShape.Array),
-            ("List<?str>", "List<str>", BindingReceivingShape.Generic),
-            ("?Widget", "Widget", BindingReceivingShape.Nominal)
-        })
-        foreach (var boundary in new[]
-        {
-            BindingReceivingBoundary.Initializer,
-            BindingReceivingBoundary.NativeReturn,
-            BindingReceivingBoundary.MethodArgument
-        })
-            yield return [source, target, shape, boundary];
-    }
+    public static IEnumerable<object[]> Cases() => BindingReceivingCases.StageB();
 
     internal static string Source(string inputType, string targetType, BindingReceivingBoundary boundary)
-    {
-        var statement = boundary switch
-        {
-            BindingReceivingBoundary.Initializer => $"§B{{required:{targetType}}} value",
-            BindingReceivingBoundary.NativeReturn => "§R value",
-            _ => "§C{Take} §A value §/C"
-        };
-        return $$"""
-            §M{m1:StageBReceiving}
-              §CL{c1:Widget:pub}
-                §MT{id:Id:pub} () -> i32
-                  §E{}
-                  §R 1
-              §F{take:Take:pub} ({{targetType}}:value) -> void
-                §E{}
-              §F{probe:Probe:pub} ({{inputType}}:value) -> {{(boundary == BindingReceivingBoundary.NativeReturn ? targetType : "void")}}
-                §E{}
-                {{statement}}
-            """;
-    }
+        => BindingReceivingCases.Source(inputType, targetType, boundary);
 
     [Theory]
     [MemberData(nameof(Cases))]

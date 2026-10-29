@@ -146,13 +146,49 @@ public class BenchCorpusCompilesTests
             string.Join("\n  ", typeWarnings.Select(d => d.Message)));
     }
 
-    private static string? FindRepoRoot()
+    [Theory]
+    [InlineData("bench")]
+    [InlineData("Bench")]
+    [InlineData("BENCH")]
+    public void FindRepoRoot_IgnoresNestedBenchDirectory(string benchDirectoryName)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "bench")))
+        var root = Directory.CreateTempSubdirectory("calor-corpus-root-");
+        try
         {
-            dir = dir.Parent;
+            File.WriteAllText(Path.Combine(root.FullName, "Calor.sln"), string.Empty);
+            var project = Path.Combine(root.FullName, "tests", "Calor.Compiler.Tests");
+            Directory.CreateDirectory(Path.Combine(project, benchDirectoryName));
+            var output = Directory.CreateDirectory(Path.Combine(project, "bin", "Debug", "net10.0"));
+
+            Assert.Equal(root.FullName, FindRepoRoot(output.FullName));
+            Assert.Equal(root.FullName, FindRepoRoot(root.FullName));
         }
-        return dir?.FullName;
+        finally
+        {
+            root.Delete(recursive: true);
+        }
     }
+
+    [Fact]
+    public void FindRepoRoot_WithoutRepositoryMarker_Throws()
+    {
+        var root = Directory.CreateTempSubdirectory("calor-corpus-no-root-");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root.FullName, "bench"));
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => FindRepoRoot(root.FullName));
+
+            Assert.Contains("Calor.sln", error.Message);
+            Assert.Contains(root.FullName, error.Message);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    private static string FindRepoRoot(string? startDirectory = null)
+        => CliTestHarness.FindRepoRoot(startDirectory ?? AppContext.BaseDirectory);
 }

@@ -1,5 +1,185 @@
 # Performance gate — strategy
 
+> **Phases 3–4 implementation (0.29, #1115).** Memory samples now retain the
+> bound module through the post-collection sample and reject nonpositive deltas.
+> They measure **retained managed bytes**, not total allocation, native memory or
+> peak RSS. Verification tests warm parsing, binding, taint, bug patterns and CFG
+> paths in a lazy constructor prerequisite; unlike a warm-up fact, this runs before
+> every measurement regardless of xUnit's class/fact order. Index tests already
+> warm their own paths. The performance test host disables tiered compilation,
+> using a fixed JIT tier: otherwise .NET 10's tiered escape analysis changes
+> allocation counts after other classes run (a 2.7% drop reproduced during the
+> aggregate gate). This standardizes the measurement environment, not the product
+> runtime. Fractional milliseconds replace integer measurements.
+> The two 4x-growth ratio tests are named below-quadratic smoke budgets, not linear
+> guarantees. The aggregate ceiling remains 24.0s; no timing ceiling is raised.
+>
+> `DeterministicPerformanceTests` pins a 10-function, 50-statement generated
+> module at **4,729 parser tokens, 1,351 bound nodes, 580 CFG blocks, 760 CFG edges,
+> and 580 taint worklist iterations**. Five warm-up passes precede five synchronous
+> current-thread allocation samples, each required within **±2%** of its build
+> configuration's baseline: Debug **11,681,288 bytes**, Release **11,266,312 bytes**.
+> These were measured on macOS ARM64, .NET 10.0.14. Linux x64 validation below
+> confirms the Release pin within tolerance; runtime independence is not claimed.
+> A separate interprocedural loop subject
+> pins **11 iterations**, checks that summary-pass work is included and counters
+> reset per analysis.
+> Allocations complement retained-memory budgets; neither sees native Z3 memory.
+>
+> The remaining verification elapsed budgets are catastrophic-regression **smoke
+> checks**, calibrated below from actual CI rather than relaxed from local results.
+> The historical analysis and proposals below are retained.
+
+The separate native-memory investigation (#1590) is opt-in:
+`gh workflow run performance.yml --ref <branch> -f profile_compiler_memory=true`.
+It runs only the diagnostic memory job, not the ordinary timing gate or the
+entire Tests workflow. Artifacts include managed JIT symbol maps and procfs
+mapping snapshots as well as native allocation traces. A bounded, interrupted
+probe is diagnostic evidence, not a passing full-suite run or a leak proof.
+The instrumented full-inventory attempt has a five-minute soft cutoff, allowing
+artifact capture before the observed runner shutdown. Resource samples also
+stream to the job log because an `always()` upload cannot survive runner death.
+After preserving the native evidence, a separate fresh host attempts the full
+unsplit inventory without profiler overhead, with a 20-minute cutoff and exact
+TRX inventory validation. It still runs if the bounded profiling step fails.
+Its separate TRX and resource log distinguish a complete uninstrumented result
+from partial profiling; a failed profiling step remains a failed workflow.
+
+Compiler wall-time work (#1590) moves the 67 binding-routing CLI cases and 12 W1
+guide transcript cases into the already separate Tasks test lane, beside its
+other CLI integration gates. Recent main measurements attributed 341.5s and
+43.3s respectively to these classes. The test sources, subprocess loops,
+assertions and fixtures stay intact; only their compilation owner changes.
+Shared receiving-case data avoids linking a second copy of the compiler unit
+tests. At relocation, inventories became Compiler 16,068 and Tasks 224, with no change to
+the combined test cases or registered skips. This removes measured work from the
+compiler job; a sub-30-minute p90 still requires the actual main-run window.
+
+The bounded native trace in
+[run 40916256007](https://github.com/juanmicrosoft/calor/actions/runs/40916256007)
+preserves matching JIT maps and native stacks (artifact 12916582455). Managed
+callers resolve repeated native PE metadata creation through
+`CSharpToCalorConverter.GetBasicMetadataReferences`, not the already cached
+`GeneratedCSharpCompiler.References`. The converter now shares its unchanged
+runtime-only reference set through a process-wide, thread-safe `Lazy`, following
+that existing cache pattern. Configured project references remain fresh, with
+their aliases and complete-reference-set policy intact. Three new regressions
+check reference and loaded-metadata identity, concurrent reuse and configured
+reference isolation; all three reject the old per-call factory.
+These bring the compiler inventory to 16,071. This removes a measured allocation
+source, not proof that all anonymous RSS or the full-host failure is resolved;
+the post-repair Linux investigation and main p90 remain acceptance work.
+
+The post-converter-cache probe,
+[run 40918874857](https://github.com/juanmicrosoft/calor/actions/runs/40918874857),
+preserves matching symbols in artifact 12916759609: 299.14s, 1.34GB tracked peak,
+7.67GB RSS including profiler overhead, and 6,706 passed cases before interruption.
+The earlier five-minute probe reached 2,794 cases; different partial inventories
+do not establish a causal throughput or RSS comparison. The surviving 1.30GB
+metadata-allocation category resolves to repeated complete platform-reference
+sets in `Issue769NamespaceTopologyTests.CreateCompilation`. All four test helpers
+that construct complete platform sets now share that exact unchanged set through
+one immutable, thread-safe `Lazy`, without reusing compilations or changing
+diagnostics, assertions or runtime subjects. Configured references remain fresh;
+the independent oracle retains its separate, bounded seven-assembly subset. One new
+invariant rejects fresh references and checks loaded-metadata identity and exact
+platform paths. The current compiler inventory is 16,072. Full-host memory
+acceptance remains unproven until the separate unsplit verification completes.
+
+The next symbolized probe,
+[run 40921813743](https://github.com/juanmicrosoft/calor/actions/runs/40921813743),
+uploaded artifact 12918334179 before uninstrumented verification: 297.44s,
+1.10GB tracked peak and 3.73GB profiler RSS. Its different partial inventory
+(1,945 passed cases) prevents causal RSS comparisons. The dominant 844MB native
+category is now Z3 context creation through `ContractInheritanceChecker`.
+That checker created a context but passed it to a borrowing prover; disposing the
+checker therefore did not dispose its context. It now transfers ownership to an
+internal prover constructor, while the existing public constructor still borrows.
+Failed ownership transfer disposes the new context, and disposed entry points
+reject calls before reaching native code. Three regressions inspect the pinned
+binding's real context handle while keeping the managed wrapper rooted, proving
+deterministic release, idempotence and preserved borrowed-context usability.
+The inventory is now 16,075; prior full-run evidence does not validate this repair.
+
+The post-context probe,
+[run 40926105930](https://github.com/juanmicrosoft/calor/actions/runs/40926105930),
+preserves artifact 12921700398 and actual testhost3640's map: 299.29s,
+1.80GB tracked peak, 3.26GB profiler RSS, and 6,784 passed cases. Its remaining
+1.77GB metadata category includes repeated seven-assembly runtime sets in
+`Calor.Enforcement.Tests.TestHarness.ExecuteGeneratedCode`, reached through
+compiler string-operation execution tests. This harness now shares exactly its
+original seven references through an immutable, thread-safe `Lazy`; generated
+compilations and execution remain fresh. A concurrent exact-path/resource-identity
+regression brings Enforcement to 723 cases without changing compiler inventory.
+The existing full-platform caches are bounded and intentionally separate from
+this subset. The five-minute probe is still partial, not full-host acceptance.
+
+The independent uninstrumented attempt from that same run at `19cf228f0`
+completed all **16,075** cases: **16,072 passed, three registered skips**, exact
+inventory, **13.3216 minutes**, peak sampled RSS **3,183 MiB** and anonymous
+**2,815 MiB**, with no swap. Artifact **12922471001** contains the complete TRX
+and resource trajectory. This validates the context-repaired source before the
+last runtime-harness cache; later-source verification remains separate.
+By contrast, the preceding `896e207f6` attempt in run 40921813743 timed out at
+20 minutes with 14,860 passed, no failed cases and no complete TRX; peak sampled
+RSS was 7,778 MiB. That failed attempt is not a full-suite success.
+
+### 0.29 Linux smoke calibration
+
+After context ownership,
+[run 40926109897](https://github.com/juanmicrosoft/calor/actions/runs/40926109897)
+at `19cf228f0` passed 28/28 in four hosts: 11.812 / 12.156 / 11.896s,
+median 11.896s below 24s, all 20 allocation samples 11,274,312 bytes.
+No pin, tolerance or ceiling changed.
+
+After the converter metadata repair,
+[run 40919565888](https://github.com/juanmicrosoft/calor/actions/runs/40919565888)
+at `3a3fe9c29` passed 28/28 in all four isolated hosts. Measured suite samples were
+12.482 / 12.801 / 12.978s, median 12.801s below the unchanged 24s ceiling.
+All 20 allocation samples remained 11,274,312 bytes, with the same exact pipeline
+counters and unchanged tolerances. This is another measured runner, not proof of
+a population-wide speedup.
+
+[Performance Tests run 40908078723](https://github.com/juanmicrosoft/calor/actions/runs/40908078723)
+ran one warmup and three measured isolated Release hosts on Linux x64. All 28
+tests passed in every host. Aggregate measured samples were 20.060, 20.548 and
+20.371 seconds: median **20.371s**, below the unchanged **24.0s** ceiling.
+All 20 synchronous allocation samples were **11,274,312 bytes**, 0.071% above the
+macOS Release pin and within its unchanged ±2% tolerance.
+
+Verification timing tests now say `IsTimingSmokeTest`. Their limits round roughly
+five times the three measured-host medians, capped by the previous ceiling. The
+small CFG limit uses a 0.1ms floor because its output is rounded to hundredths of
+a millisecond. These are four processes on one runner, not a population-wide
+performance distribution. The separately registered index usability envelopes
+remain unchanged.
+
+| Operation | Measured-host median (ms) | Smoke ceiling (ms) |
+|---|---:|---:|
+| Parse small | 4.418 | 25 |
+| Parse medium | 41.642 | 225 |
+| Parse large | 431.033 | 2000 (previous tighter ceiling retained) |
+| Bind small | 3.676 | 20 |
+| Bind medium | 78.490 | 400 |
+| Full analysis small | 27.908 | 150 |
+| Full analysis medium | 374.058 | 2000 |
+| Full analysis large | 4575.162 | 23000 |
+| Deep taint flow | 116.272 | 600 |
+| Many-function taint | 54.417 | 300 |
+| Complex control-flow graphs | 4.026 | 25 |
+| Nested-loop graphs | 4.145 | 25 |
+| Small CFG, per-iteration average | 0.01 (rounded) | 0.1 |
+| Complex CFG, per-iteration average | 0.19 (rounded) | 1 |
+
+The first tightened Linux run,
+[40909597462](https://github.com/juanmicrosoft/calor/actions/runs/40909597462),
+failed the complex CFG check in its warmup host: its ten-build average was
+1.78ms against the 1ms limit. This observation does not establish a compiler
+regression or identify the source of the variability. Both CFG microbenchmarks
+now build their exact subject once before timing and average 100 builds, rather
+than ten for the complex case. The 1ms limit is unchanged; so are the aggregate,
+allocation and other smoke limits.
+
 > **Status (2026-08-27, v0.16 kickoff sweep).** This is the document from PR **#976**
 > (revision 2, 2026-08-14), carried into the tree unchanged below this note and credited to
 > that PR; `eng/performance-baselines.json`'s `noisePolicy` has cited it by path since #978

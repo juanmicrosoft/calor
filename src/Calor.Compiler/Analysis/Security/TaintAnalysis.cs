@@ -412,6 +412,7 @@ public sealed class TaintAnalysis
     public IReadOnlyList<TaintVulnerability> Vulnerabilities => _vulnerabilities;
     public ControlFlowGraph Cfg { get; }
     internal DataflowAnalysisResult<TaintState> DataflowResult { get; }
+    public int Iterations => DataflowResult.Iterations;
 
     public TaintAnalysis(BoundFunction function, TaintAnalysisOptions? options = null)
         : this(function, options, Array.Empty<string>(), null, symbolicParameters: false)
@@ -730,6 +731,7 @@ public sealed class TaintAnalysis
     {
         var argumentFlows = arguments
             .SelectMany(argument => EvaluateExpression(argument, state))
+            .Concat(call.Receiver == null ? [] : EvaluateExpression(call.Receiver, state))
             .ToArray();
         var source = IdentifySource(call);
         if (source != null)
@@ -1180,7 +1182,8 @@ public sealed class TaintAnalysis
         FunctionSymbol? ResolvedSymbol,
         IReadOnlyList<FunctionSymbol> ResolvedSymbols,
         IReadOnlyList<int>? ArgumentParameterIndices = null,
-        IReadOnlyList<ResolvedOverloadMatch>? SelectedOverloadMatches = null)
+        IReadOnlyList<ResolvedOverloadMatch>? SelectedOverloadMatches = null,
+        BoundExpression? Receiver = null)
     {
         public bool HasResolvedIdentity =>
             ResolvedSymbol != null
@@ -1198,7 +1201,10 @@ public sealed class TaintAnalysis
             call.ResolvedSymbol,
             call.ResolvedSymbols,
             call.ArgumentParameterIndices,
-            call.SelectedOverloadMatches);
+            call.SelectedOverloadMatches,
+            call.Receiver ?? (call.ReceiverSymbol is { } receiver
+                ? new BoundVariableExpression(call.Span, receiver)
+                : null));
 
         public static TaintCallDescriptor From(BoundCallStatement call) => new(
             call.Target,
@@ -1208,7 +1214,10 @@ public sealed class TaintAnalysis
             call.ResolvedSymbol,
             call.ResolvedSymbols,
             call.ArgumentParameterIndices,
-            call.SelectedOverloadMatches);
+            call.SelectedOverloadMatches,
+            call.Receiver ?? (call.ReceiverSymbol is { } receiver
+                ? new BoundVariableExpression(call.Span, receiver)
+                : null));
     }
 
     [Flags]
@@ -1927,6 +1936,8 @@ public sealed class TaintAnalysisRunner
     private readonly DiagnosticBag _diagnostics;
     private readonly TaintAnalysisOptions _options;
     public int VulnerabilityCount { get; private set; }
+    /// <summary>Total worklist iterations across summary and diagnostic passes of the last analysis.</summary>
+    public int Iterations { get; private set; }
 
     public TaintAnalysisRunner(DiagnosticBag diagnostics, TaintAnalysisOptions? options = null)
     {
@@ -1938,6 +1949,7 @@ public sealed class TaintAnalysisRunner
     {
         ArgumentNullException.ThrowIfNull(module);
         VulnerabilityCount = 0;
+        Iterations = 0;
         var summaries = BuildSummaries(module.Functions);
         foreach (var function in module.Functions)
         {
@@ -1948,6 +1960,7 @@ public sealed class TaintAnalysisRunner
                 summaries,
                 symbolicParameters: false);
             analysis.ReportDiagnostics(_diagnostics);
+            Iterations += analysis.Iterations;
             VulnerabilityCount += analysis.Vulnerabilities.Count;
         }
     }
@@ -1955,8 +1968,10 @@ public sealed class TaintAnalysisRunner
     public void AnalyzeFunction(BoundFunction function)
     {
         VulnerabilityCount = 0;
+        Iterations = 0;
         var analysis = new TaintAnalysis(function, _options, function.DeclaredEffects);
         analysis.ReportDiagnostics(_diagnostics);
+        Iterations = analysis.Iterations;
         VulnerabilityCount += analysis.Vulnerabilities.Count;
     }
 
@@ -2002,6 +2017,7 @@ public sealed class TaintAnalysisRunner
                 summaries,
                 symbolicParameters: true);
             var joined = TaintFunctionSummary.Join(summaries[id], analysis.CreateSummary());
+            Iterations += analysis.Iterations;
             if (joined.Equals(summaries[id]))
                 continue;
 

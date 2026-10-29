@@ -2306,9 +2306,7 @@ public sealed class ObligationTests
     {
         var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
             GeneratedCSharpCompiler.GlobalUsingsPreamble + csharp);
-        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Select(path => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path));
+        var references = TrustedPlatformReferences.All;
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
             $"ObligationRuntime_{Guid.NewGuid():N}",
             [syntaxTree],

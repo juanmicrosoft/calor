@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Calor.Compiler.Commands;
 using Xunit;
 
@@ -9,19 +10,13 @@ namespace Calor.Compiler.Tests;
 /// left open on batched change handling and cache-warmth reporting (issue #1002,
 /// audit finding F1 / R6).
 ///
-/// <para><b>Not a full E2E.</b> Renamed from <c>WatchCommandE2ETests</c> per
-/// adversarial-review feedback: this suite drives the session with
-/// <c>useFileSystemWatchers: false</c> and feeds changes through
-/// <see cref="WatchSession.InjectChange"/>, so it bypasses the real
-/// <see cref="FileSystemWatcher"/> — the component that produces most
-/// platform-specific watch flake (debounced editor-save bursts, macOS FSEvents
-/// coalescing, network drives, LastWrite vs. Size notify filters). A follow-up
-/// with a real FS-watcher fixture is tracked in issue #1032.</para>
+/// <para>Scripted tests inject changes for deterministic batching assertions.
+/// Real filesystem tests separately cover watcher delivery for directory and
+/// individual-file roots without relying on platform-specific event counts.</para>
 ///
 /// <para><b>Test-hook flow.</b> <see cref="WatchSession.RebuildCompleted"/>
 /// signals each rebuild's completion so the test can await batches
-/// deterministically rather than polling stdout. See the <c>Task.Run</c>
-/// comment at first use — it is load-bearing, not defensive.</para>
+/// through a channel, including rebuilds completed before the test starts reading.</para>
 ///
 /// <para><b>Cache-hit signal.</b> <see cref="WatchSession.RebuildResult.Compiled"/>
 /// and <see cref="WatchSession.RebuildResult.Skipped"/> are the load-bearing signal:
@@ -48,9 +43,8 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     // review corrected the earlier justification: CompilationDriver sets
     // DeferGeneratedOutputValidation = true, so per-file Roslyn validation
     // does not run in this path and warm rebuilds finish in <500ms. The cap
-    // exists so a stuck session (see the deadlock case tracked in issue
-    // #1032) fails as a normal test failure instead of exhausting the xUnit
-    // per-collection timeout.
+    // exists so a stuck session fails as a normal test failure instead of
+    // exhausting the xUnit per-collection timeout.
     private static readonly TimeSpan RebuildTimeout = TimeSpan.FromSeconds(60);
 
     private readonly string _root;
@@ -111,8 +105,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Bumps a module file's answer (touches content so the incremental cache
-    /// picks it up as changed) then feeds one <c>InjectChange</c> per touched file.
+    /// Bumps a module file's answer so the incremental cache picks it up as changed.
     /// A distinct <paramref name="newAnswer"/> per rebuild guarantees the content
     /// hash actually changes even if the filesystem timestamps do not.
     /// </summary>
@@ -135,53 +128,157 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         using var cts = new CancellationTokenSource();
 
         var results = new List<WatchSession.RebuildResult>();
-        var next = new TaskCompletionSource<WatchSession.RebuildResult>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        session.RebuildCompleted += result =>
+        var completed = Channel.CreateUnbounded<WatchSession.RebuildResult>();
+        session.RebuildCompleted += result => completed.Writer.TryWrite(result);
+        var runTask = session.RunAsync(cts.Token, useFileSystemWatchers: false);
+        try
         {
-            // Snapshot the completion source, replace, then complete — completing
-            // first would race the next rebuild's WaitAsync against the swap.
-            var current = next;
-            next = new TaskCompletionSource<WatchSession.RebuildResult>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            current.TrySetResult(result);
-        };
-
-        // Task.Run is LOAD-BEARING — do not remove it. Adversarial review of
-        // the first draft of this test proved that without the wrapper, all
-        // rebuilds time out at RebuildTimeout. Why:
-        //   1. WatchSession.RunAsync runs Rebuild(initial: true) SYNCHRONOUSLY
-        //      before its first await (see WatchCommand.cs around line 199).
-        //   2. The RebuildCompleted handler below snapshots `next`, reassigns
-        //      it to a fresh TCS, and completes the old one. If the handler
-        //      fires synchronously inside RunAsync's pre-await code, the
-        //      reassignment happens BEFORE the test's `await next.Task`
-        //      resolves — the awaiter then holds a reference to the NEW TCS,
-        //      which will never complete for this rebuild, and hangs.
-        //   3. Task.Run separates threads so the compile pipeline runs off
-        //      the awaiter's stack; by the time RunAsync fires the handler,
-        //      the test is already awaiting on the original `next`.
-        //
-        // The underlying architectural concern (sync-over-async in RunAsync,
-        // swap-vs-await race in the handler) is tracked in issue #1032.
-        // Refactoring the harness to Channel<RebuildResult> would remove
-        // both — that's the intended follow-up. Until then this wrapper stays.
-        var runTask = Task.Run(() => session.RunAsync(cts.Token, useFileSystemWatchers: false), cts.Token);
-
-        // Initial compile is rebuild 0.
-        results.Add(await next.Task.WaitAsync(RebuildTimeout));
-
-        for (int i = 1; i < rebuildCount; i++)
+            results.Add(await completed.Reader.ReadAsync().AsTask().WaitAsync(RebuildTimeout));
+            for (int i = 1; i < rebuildCount; i++)
+            {
+                drive(session, i);
+                results.Add(await completed.Reader.ReadAsync().AsTask().WaitAsync(RebuildTimeout));
+            }
+        }
+        finally
         {
-            drive(session, i);
-            results.Add(await next.Task.WaitAsync(RebuildTimeout));
+            cts.Cancel();
+            Assert.Equal(0, await runTask.WaitAsync(RebuildTimeout));
         }
 
-        cts.Cancel();
-        try { await runTask.WaitAsync(RebuildTimeout); }
-        catch (OperationCanceledException) { /* cancellation is the shutdown path */ }
-
         return results;
+    }
+
+    [Fact]
+    public async Task InitialCompile_DoesNotRunOnCallersSynchronizationContext()
+    {
+        WriteAllModules();
+        var session = new WatchSession([_root], Settings(), TextWriter.Null, TextWriter.Null);
+        using var cts = new CancellationTokenSource();
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource<SynchronizationContext?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        session.RebuildCompleted += _ =>
+        {
+            entered.TrySetResult(SynchronizationContext.Current);
+            Assert.True(release.Wait(RebuildTimeout), "RunAsync blocked its caller during the initial compile.");
+        };
+
+        Task<int> runTask;
+        var previous = SynchronizationContext.Current;
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
+            runTask = session.RunAsync(cts.Token, useFileSystemWatchers: false);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+            release.Set();
+        }
+
+        try
+        {
+            Assert.Null(await entered.Task.WaitAsync(RebuildTimeout));
+        }
+        finally
+        {
+            cts.Cancel();
+            Assert.Equal(0, await runTask.WaitAsync(RebuildTimeout));
+        }
+    }
+
+    private sealed class NonPumpingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state) =>
+            throw new InvalidOperationException("The watch loop must not capture the caller's context.");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RealFileSystemWatcher_Edit_RecompilesChangedFile(bool individualFileRoots)
+    {
+        WriteAllModules();
+        IReadOnlyList<string> roots = individualFileRoots
+            ? Directory.GetFiles(_root, "*.calr")
+            : [_root];
+        var session = new WatchSession(roots, Settings(), TextWriter.Null, TextWriter.Null);
+        var completed = Channel.CreateUnbounded<WatchSession.RebuildResult>();
+        session.RebuildCompleted += result => completed.Writer.TryWrite(result);
+        using var cts = new CancellationTokenSource();
+        var runTask = session.RunAsync(cts.Token, useFileSystemWatchers: true);
+        try
+        {
+            var initial = await completed.Reader.ReadAsync().AsTask().WaitAsync(RebuildTimeout);
+            Assert.Equal(3, initial.Compiled);
+            Assert.False(initial.AnyErrors);
+
+            EditModule("a.calr", "m001", "ModA", "f001", 101);
+            var changed = await ReadUntilAsync(completed.Reader, result => result.Compiled > 0);
+            Assert.Equal(1, changed.Compiled);
+            Assert.Equal(2, changed.Skipped);
+            Assert.False(changed.AnyErrors);
+            Assert.Contains("return 101;", File.ReadAllText(Path.Combine(_root, "a.g.cs")));
+        }
+        finally
+        {
+            cts.Cancel();
+            Assert.Equal(0, await runTask.WaitAsync(RebuildTimeout));
+        }
+    }
+
+    [Fact]
+    public async Task RealDirectoryWatcher_CreateRenameDelete_RefreshesSourceSet()
+    {
+        WriteAllModules();
+        var nested = Directory.CreateDirectory(Path.Combine(_root, "nested")).FullName;
+        var session = new WatchSession([_root], Settings(), TextWriter.Null, TextWriter.Null);
+        var completed = Channel.CreateUnbounded<WatchSession.RebuildResult>();
+        session.RebuildCompleted += result => completed.Writer.TryWrite(result);
+        using var cts = new CancellationTokenSource();
+        var runTask = session.RunAsync(cts.Token, useFileSystemWatchers: true);
+        try
+        {
+            await completed.Reader.ReadAsync().AsTask().WaitAsync(RebuildTimeout);
+            var source = Path.Combine(nested, "d.calr");
+            File.WriteAllText(source, ModuleSource("m004", "ModD", "f004", 4));
+            // Source-set changes can invalidate the cross-module map and recompile
+            // unchanged modules; only ordinary content edits promise cache hits.
+            var created = await ReadUntilAsync(completed.Reader, result =>
+                result.Compiled > 0 && result.Compiled + result.Skipped == 4);
+            Assert.False(created.AnyErrors);
+            Assert.True(File.Exists(Path.ChangeExtension(source, ".g.cs")));
+
+            var renamed = Path.Combine(nested, "renamed.calr");
+            File.Move(source, renamed);
+            var moved = await ReadUntilAsync(completed.Reader, result =>
+                result.Compiled > 0 && File.Exists(Path.ChangeExtension(renamed, ".g.cs")));
+            Assert.Equal(4, moved.Compiled + moved.Skipped);
+            Assert.False(moved.AnyErrors);
+
+            File.Delete(renamed);
+            var deleted = await ReadUntilAsync(completed.Reader, result =>
+                result.Compiled + result.Skipped == 3);
+            Assert.False(deleted.AnyErrors);
+        }
+        finally
+        {
+            cts.Cancel();
+            Assert.Equal(0, await runTask.WaitAsync(RebuildTimeout));
+        }
+    }
+
+    private static async Task<WatchSession.RebuildResult> ReadUntilAsync(
+        ChannelReader<WatchSession.RebuildResult> reader, Func<WatchSession.RebuildResult, bool> predicate)
+    {
+        using var timeout = new CancellationTokenSource(RebuildTimeout);
+        while (true)
+        {
+            var result = await reader.ReadAsync(timeout.Token);
+            if (predicate(result))
+                return result;
+        }
     }
 
     [Fact]

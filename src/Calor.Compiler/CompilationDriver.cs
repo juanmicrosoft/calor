@@ -463,7 +463,6 @@ internal static class CompilationDriver
                             outputPath,
                             file.FullName));
                         moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
-                        onSkipped?.Invoke(file, outputPath);
                         continue;
                     }
                 }
@@ -572,6 +571,8 @@ internal static class CompilationDriver
                 if (!item.Options.UnsafeTranspileOnly)
                     cascadeSuppressed.Add(Path.GetFullPath(item.File.FullName));
             }
+            foreach (var file in skipped)
+                cascadeSuppressed.Add(Path.GetFullPath(file.FullName));
         }
         else if (pending.Any(item => !item.Options.UnsafeTranspileOnly)
             || skippedGeneratedSources.Count > 0)
@@ -631,6 +632,26 @@ internal static class CompilationDriver
                         Calor.Compiler.Telemetry.CalorTelemetry.Instance,
                         validationDiagnostics);
                 }
+            }
+        }
+
+        // A cache hit is not validated when its dependency failed. Treat it like
+        // a suppressed fresh output: discard the artifact and cache entry, and do
+        // not report it up-to-date. Otherwise cold and warm cache contents differ.
+        if (cache != null && fullStateDir != null && newState != null)
+        {
+            foreach (var file in skipped.ToArray())
+            {
+                if (cascadeSuppressed.Contains(Path.GetFullPath(file.FullName)))
+                {
+                    var (key, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(
+                        file.FullName, fullStateDir);
+                    newState.Files.Remove(key);
+                    skipped.Remove(file);
+                    onFailed?.Invoke(file);
+                }
+                else
+                    onSkipped?.Invoke(file, cache.OutputPathFor(file));
             }
         }
 

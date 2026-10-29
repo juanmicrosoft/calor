@@ -48,13 +48,6 @@ public class BinderIncompleteRatchetTests
             ["tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"] =
                 "error fixture (NOTE: currently fails on Calor0830 legacy closers, not the " +
                 "mismatched ids it was built for — stale in its own way, see #901's pattern)",
-            // Known-stale intended-valid benchmark subjects — #901, list shrinks as repaired:
-            ["benchmarks/arithmetic/div-by-zero.calr"] = "#901 multi-generation stale",
-            ["benchmarks/loops/bounds-violation.calr"] = "#901 multi-generation stale",
-            ["benchmarks/null-safety/null-deref.calr"] = "#901 multi-generation stale",
-            ["benchmarks/security/command-injection.calr"] = "#901 multi-generation stale",
-            ["benchmarks/security/path-traversal.calr"] = "#901 multi-generation stale",
-            ["benchmarks/security/sql-injection.calr"] = "#901 multi-generation stale",
         };
 
     private static string RepoRoot()

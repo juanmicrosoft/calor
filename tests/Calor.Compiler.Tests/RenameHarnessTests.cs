@@ -252,11 +252,7 @@ public sealed class RenameHarnessTests : IDisposable
 
     private static IEnumerable<MetadataReference> PlatformReferences()
     {
-        var trusted = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
-            ?? throw new InvalidOperationException("Trusted platform assemblies are unavailable.");
-        return trusted
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path));
+        return TrustedPlatformReferences.All;
     }
 
     // --- corpus ------------------------------------------------------------

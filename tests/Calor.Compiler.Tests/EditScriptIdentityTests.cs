@@ -1,7 +1,7 @@
-using System.Text.Json;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Xunit;
+using static Calor.Tests.Shared.EditScriptCorpus;
 
 namespace Calor.Compiler.Tests;
 
@@ -106,75 +106,6 @@ public sealed class EditScriptIdentityTests : IDisposable
 
         for (var index = 0; index < script.Steps.Count; index++)
             Assert.Equal(fresh[index], sequential[index]);
-    }
-
-    /// <summary>
-    /// The index for a workspace, serialised canonically with the volatile
-    /// header stripped. Compiler and manifest hashes depend on the machine and
-    /// the temp path, not on the workspace's contents, so comparing them would
-    /// make the test fail for reasons that have nothing to do with the index.
-    /// </summary>
-    private static string SerializeIndex(string workspace, ScriptStep step)
-    {
-        var sources = Directory.GetFiles(workspace, "*.calr")
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-        var index = Indexing.ProjectIndexBuilder.Build(
-            new Indexing.ProjectIndexBuilder.Options(workspace, step.Options, sources));
-
-        var lines = new List<string>();
-        foreach (var declaration in index.Declarations)
-        {
-            lines.Add(
-                $"decl|{declaration.File}|{declaration.Line}|{declaration.Column}"
-                    + $"|{declaration.Kind}|{declaration.Name}");
-        }
-        foreach (var edge in index.CallEdges)
-            lines.Add($"edge|{edge.File}|{edge.Line}|{edge.Column}");
-        foreach (var occurrence in index.Occurrences)
-        {
-            lines.Add(
-                $"occ|{occurrence.File}|{occurrence.Line}|{occurrence.Column}|{occurrence.Kind}");
-        }
-        // v0.15 E5's effects facet (ProjectIndex format 4.0). Gate 3 observes
-        // effects "as diagnostics and index bytes"; without these lines an
-        // effect-row edit (ES-08) that moved only the facet would be invisible
-        // to this leg.
-        //
-        // Symbol ids are not printed: they embed the canonicalised source
-        // identity (Binder: `source/<identity>/module/...`), which differs
-        // between the two temp workspaces the way the header hashes do. The
-        // row is identified by file, line, kind and name instead.
-        foreach (var row in index.EffectRows)
-        {
-            lines.Add(
-                $"effrow|{row.File}|{row.Line}|{row.Kind}|{row.Name}"
-                    + $"|declared={row.Declared}"
-                    + $"|{DescribeRow(row.DeclaredRow)}|{DescribeRow(row.InferredRow)}"
-                    + $"|{row.Verdict}|{row.DiagnosticCode}"
-                    + $"|forbidden={string.Join(",", row.Forbidden)}|bound={row.BoundRow}");
-        }
-        foreach (var unavailable in index.Residual.EffectRowsUnavailable)
-            lines.Add($"residual-effect-rows-unavailable|{unavailable}");
-        foreach (var unreadable in index.Residual.UnreadableFiles)
-            lines.Add($"residual-unreadable|{unreadable}");
-        foreach (var unresolved in index.Residual.UnresolvedCalls)
-            lines.Add($"residual-unresolved|{unresolved}");
-        foreach (var ambiguous in index.Residual.AmbiguousCallees)
-            lines.Add($"residual-ambiguous|{ambiguous}");
-
-        return string.Join("\n", lines);
-    }
-
-    private static string DescribeRow(Indexing.IndexedRow? row)
-    {
-        if (row is null)
-            return "-";
-        var variables = string.Join(
-            ",",
-            row.Variables.Select(variable => $"{variable.Ordinal}:{variable.Name}"));
-        return $"{row.State}{{{string.Join(",", row.Effects)}}}<{variables}>"
-            + $"[{string.Join(",", row.Reasons)}]";
     }
 
     [Theory]
@@ -463,14 +394,6 @@ public sealed class EditScriptIdentityTests : IDisposable
         int CompiledCount,
         int SkippedCount);
 
-    private sealed record ScriptStep(string SourceDirectory, string Options);
-
-    private sealed record EditScript(
-        string Id,
-        IReadOnlyList<ScriptStep> Steps,
-        bool ExpectsReuse,
-        string ReuseNote);
-
     private StepOutcome RunStep(string workspace, ScriptStep step, bool clearFirst)
     {
         var sources = Directory.GetFiles(workspace, "*.calr")
@@ -482,11 +405,7 @@ public sealed class EditScriptIdentityTests : IDisposable
 
         var result = CompilationDriver.CompileAll(
             sources,
-            _ => new CompilationOptions
-            {
-                EnforceEffects = step.Options != "effects-off",
-                RequireDocs = step.Options == "docs-required",
-            },
+            _ => OptionsFor(step.Options),
             crossModuleEnforcement: true,
             crossModulePolicy: UnknownCallPolicy.Strict,
             onCompiled: (file, compileResult) =>
@@ -511,111 +430,6 @@ public sealed class EditScriptIdentityTests : IDisposable
             result.AnyErrors,
             compiled,
             result.Skipped.Count);
-    }
-
-    /// <summary>
-    /// Diagnostics as comparable text: workspace-relative paths (the two runs
-    /// use different temp directories) and a fixed ordering, so a difference in
-    /// emission order is not reported as a difference in findings.
-    /// </summary>
-    private static IReadOnlyList<string> Canonicalize(
-        DiagnosticBag diagnostics,
-        string workspace)
-    {
-        return diagnostics
-            .Select(diagnostic =>
-            {
-                var file = diagnostic.FilePath is { Length: > 0 } path
-                    ? Path.GetRelativePath(workspace, path).Replace('\\', '/')
-                    : "";
-                return string.Join(
-                    "|",
-                    file,
-                    diagnostic.Code,
-                    diagnostic.Severity,
-                    diagnostic.Span.Line,
-                    diagnostic.Span.Column,
-                    diagnostic.Message);
-            })
-            .OrderBy(line => line, StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    /// <summary>
-    /// Makes the workspace match a step's file set exactly: additions and edits
-    /// are copied in, and files absent from the step are deleted along with
-    /// their generated output.
-    /// </summary>
-    private static void SyncWorkspace(string workspace, string stepDirectory)
-    {
-        var wanted = Directory.GetFiles(stepDirectory, "*.calr")
-            .Select(Path.GetFileName)
-            .ToHashSet(StringComparer.Ordinal);
-
-        foreach (var existing in Directory.GetFiles(workspace, "*.calr"))
-        {
-            if (wanted.Contains(Path.GetFileName(existing)))
-                continue;
-            File.Delete(existing);
-            var generated = Path.ChangeExtension(existing, ".g.cs");
-            if (File.Exists(generated))
-                File.Delete(generated);
-        }
-
-        foreach (var source in Directory.GetFiles(stepDirectory, "*.calr"))
-        {
-            File.Copy(
-                source,
-                Path.Combine(workspace, Path.GetFileName(source)),
-                overwrite: true);
-        }
-    }
-
-    private static EditScript LoadScript(string scriptName)
-    {
-        var directory = Path.Combine(CorpusRoot, scriptName);
-        using var json = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(directory, "script.json")));
-        var root = json.RootElement;
-        var steps = root.GetProperty("steps")
-            .EnumerateArray()
-            .Select(step => new ScriptStep(
-                Path.Combine(directory, step.GetProperty("dir").GetString()!),
-                step.GetProperty("options").GetString()!))
-            .ToArray();
-
-        Assert.NotEmpty(steps);
-        foreach (var step in steps)
-        {
-            Assert.True(
-                Directory.Exists(step.SourceDirectory),
-                $"{scriptName}: step directory missing: {step.SourceDirectory}");
-            Assert.Contains(
-                step.Options,
-                new[] { "effects-on", "effects-off", "docs-required" });
-        }
-
-        return new EditScript(
-            root.GetProperty("id").GetString()!,
-            steps,
-            root.GetProperty("expectsReuse").GetBoolean(),
-            root.GetProperty("reuseNote").GetString()!);
-    }
-
-    private static string[] EnumerateScriptDirectories() =>
-        Directory.GetDirectories(CorpusRoot)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-
-    private static string CorpusRoot
-    {
-        get
-        {
-            var directory = AppContext.BaseDirectory;
-            while (!File.Exists(Path.Combine(directory, "Calor.sln")))
-                directory = Directory.GetParent(directory)!.FullName;
-            return Path.Combine(directory, "tests", "TestData", "EditScripts");
-        }
     }
 
     private string CreateTempDir()

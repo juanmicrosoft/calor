@@ -3,6 +3,7 @@ using System.Numerics;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 
@@ -209,7 +210,7 @@ internal sealed class TypedBugPatternAnalysis
             var value = bind.Initializer == null
                 ? UnknownForVariable(bind.Variable)
                 : Evaluate(bind.Initializer, state)
-                    .Retype(bind.Variable.TypeName)
+                    .Retype(bind.Variable)
                     .WithFreshIdentityWhenNeeded(bind.Variable, bind.Span);
             if (bind.Initializer != null)
                 state = InvalidateRefArguments(bind.Initializer, state);
@@ -223,7 +224,7 @@ internal sealed class TypedBugPatternAnalysis
             && assignment.Target is BoundVariableExpression target)
         {
             var value = Evaluate(assignment.Value, state)
-                .Retype(target.Variable.TypeName)
+                .Retype(target.Variable)
                 .WithFreshIdentityWhenNeeded(target.Variable, assignment.Span);
             state = InvalidateRefArguments(assignment.Target, state);
             state = InvalidateRefArguments(assignment.Value, state);
@@ -237,7 +238,7 @@ internal sealed class TypedBugPatternAnalysis
             && compound.Target is BoundVariableExpression compoundTarget)
         {
             var result = EvaluateCompound(compound, state)
-                .Retype(compoundTarget.Variable.TypeName)
+                .Retype(compoundTarget.Variable)
                 .WithFreshIdentityWhenNeeded(compoundTarget.Variable, compound.Span);
             state = InvalidateRefArguments(compound.Target, state);
             state = InvalidateRefArguments(compound.Value, state);
@@ -256,7 +257,7 @@ internal sealed class TypedBugPatternAnalysis
             var value = operation.Expression == null
                 ? UnknownForVariable(operation.DefinedVariable)
                 : Evaluate(operation.Expression, state)
-                    .Retype(operation.DefinedVariable.TypeName)
+                    .Retype(operation.DefinedVariable)
                     .WithFreshIdentityWhenNeeded(
                         operation.DefinedVariable,
                         operation.Span);
@@ -291,7 +292,7 @@ internal sealed class TypedBugPatternAnalysis
             var value = operation.Expression == null
                 ? UnknownForVariable(operation.DefinedVariable)
                 : Evaluate(operation.Expression, state)
-                    .Retype(operation.DefinedVariable.TypeName)
+                    .Retype(operation.DefinedVariable)
                     .WithFreshIdentityWhenNeeded(
                         operation.DefinedVariable,
                         operation.Span);
@@ -440,6 +441,26 @@ internal sealed class TypedBugPatternAnalysis
         var op = assumeTrue
             ? comparison.Operator
             : NegateComparison(comparison.Operator);
+
+        if (op is BinaryOperator.Equal or BinaryOperator.NotEqual)
+        {
+            var reference = comparison.Left is BoundVariableExpression leftReference
+                && comparison.Right is BoundNullLiteral
+                    ? leftReference
+                    : comparison.Right is BoundVariableExpression rightReference
+                        && comparison.Left is BoundNullLiteral
+                            ? rightReference
+                            : null;
+            if (reference != null)
+            {
+                var presence = op == BinaryOperator.Equal ? Presence.Absent : Presence.Present;
+                var current = Evaluate(reference, evaluatedState);
+                if (current.Presence is Presence.Absent or Presence.Present
+                    && current.Presence != presence)
+                    return FlowState.Unreachable;
+                return evaluatedState.StrongUpdate(reference.Variable, current.WithPresence(presence));
+            }
+        }
 
         if (TryGetNoneComparison(
                 comparison.Left,
@@ -1239,18 +1260,18 @@ internal sealed class TypedBugPatternAnalysis
         NumericDomain mathematical;
         if (binary.Operator == BinaryOperator.LeftShift)
         {
-            if (!TryGetMaskedShiftCount(
-                    right.Value,
-                    integral,
-                    out var shiftCount))
+            var mask = integral.Bits == 64 ? 0x3f : 0x1f;
+            var firstCount = (int)(right.Value.Minimum & mask);
+            mathematical = left.Value.ShiftLeft(firstCount);
+            // C# masks counts, including negative values. At most one complete
+            // residue cycle is needed to cover an interval of possible counts.
+            var countSpan = (int)BigInteger.Min(right.Value.Maximum - right.Value.Minimum, mask);
+            for (var offset = 1; offset <= countSpan; offset++)
             {
-                ReportUnknown(
-                    TypedBugPatternKind.IntegerOverflow,
-                    binary.Span,
-                    "Shift count range is incomplete");
-                return;
+                mathematical = NumericDomain.Join(
+                    mathematical,
+                    left.Value.ShiftLeft((firstCount + offset) & mask));
             }
-            mathematical = left.Value.ShiftLeft(shiftCount);
         }
         else
         {
@@ -1993,6 +2014,8 @@ internal sealed class TypedBugPatternAnalysis
                 ? value
                 : UnknownForVariable(variable.Variable);
         }
+        if (expression is BoundNullLiteral)
+            return AbstractValue.Unknown(expression.Type.DisplayString).WithPresence(Presence.Absent);
         if (expression is BoundIntLiteral integer)
         {
             var value = integer.IsUnsigned
@@ -2181,10 +2204,12 @@ internal sealed class TypedBugPatternAnalysis
                     kind,
                     $"expression:{expression.Span.Start}",
                     Enumerable.Repeat<NumericDomain?>(null, rank).ToArray()),
-                Presence.Unknown);
+                NullabilityChecker.GetAnnotation(expression.Type) == NullableAnnotation.Annotated
+                    ? Presence.Maybe
+                    : Presence.Unknown);
         }
 
-        return AbstractValue.Unknown(expression.Type.DisplayString);
+        return UnknownForReferenceType(expression.Type);
     }
 
     private AbstractValue EvaluateBinary(
@@ -2357,11 +2382,22 @@ internal sealed class TypedBugPatternAnalysis
                     sequenceKind,
                     $"sequence:{variable.Id.Value}",
                     Enumerable.Repeat<NumericDomain?>(null, rank).ToArray()),
-                Presence.Present);
+                variable.NullableAnnotation == NullableAnnotation.Annotated
+                    ? Presence.Maybe
+                    : Presence.Present);
         }
 
-        return AbstractValue.Unknown(variable.TypeName);
+        return AbstractValue.Unknown(variable.TypeName).WithPresence(
+            variable.NullableAnnotation == NullableAnnotation.Annotated
+                ? Presence.Maybe
+                : Presence.Unknown);
     }
+
+    private static AbstractValue UnknownForReferenceType(BoundType type) =>
+        AbstractValue.Unknown(type.DisplayString).WithPresence(
+            NullabilityChecker.GetAnnotation(type) == NullableAnnotation.Annotated
+                ? Presence.Maybe
+                : Presence.Unknown);
 
     private FlowState InvalidateRefArguments(
         BoundStatement statement,
@@ -3511,6 +3547,12 @@ internal sealed class TypedBugPatternAnalysis
                 variant,
                 Sequence,
                 ValueIdentity);
+
+        public AbstractValue Retype(VariableSymbol variable) =>
+            Retype(variable.TypeName).WithPresence(
+                Presence == Presence.Unknown && variable.NullableAnnotation == NullableAnnotation.Annotated
+                    ? Presence.Maybe
+                    : Presence);
 
         public AbstractValue Retype(string typeName) =>
             new(

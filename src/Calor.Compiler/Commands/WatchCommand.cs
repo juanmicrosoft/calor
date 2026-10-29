@@ -173,8 +173,14 @@ internal sealed class WatchSession
     /// <summary>Test hook: feeds a change event as if the file-system watcher had raised it.</summary>
     internal void InjectChange(string path) => _changes.Writer.TryWrite(path);
 
+    /// <summary>
+    /// Runs on the thread pool, including the initial compile, without capturing
+    /// the caller's synchronization context.
+    /// </summary>
     internal async Task<int> RunAsync(CancellationToken cancellationToken, bool useFileSystemWatchers = true)
     {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
         // Validate the watch roots up front — a nonexistent path is a usage error.
         foreach (var path in _paths)
         {
@@ -203,7 +209,8 @@ internal sealed class WatchSession
             while (!cancellationToken.IsCancellationRequested)
             {
                 var batch = await WatchDebouncer.ReadBatchAsync(
-                    _changes.Reader, TimeSpan.FromMilliseconds(_settings.DebounceMs), TimeProvider.System, cancellationToken);
+                    _changes.Reader, TimeSpan.FromMilliseconds(_settings.DebounceMs), TimeProvider.System, cancellationToken)
+                    .ConfigureAwait(false);
                 if (batch == null)
                 {
                     break; // cancelled or channel completed — clean shutdown

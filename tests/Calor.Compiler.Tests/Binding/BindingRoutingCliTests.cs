@@ -34,12 +34,12 @@ public class BindingRoutingCliTests : IDisposable
     }
 
     [Theory]
-    [MemberData(nameof(StageBReceivingSurfaceTests.Cases), MemberType = typeof(StageBReceivingSurfaceTests))]
+    [MemberData(nameof(BindingReceivingCases.StageB), MemberType = typeof(BindingReceivingCases))]
     public void StageB_CliMatchesApiAndSuppressesOutputAcrossOptOuts(
         string sourceType, string targetType, Binding.BindingReceivingShape shape,
         Binding.BindingReceivingBoundary boundary)
     {
-        var source = StageBReceivingSurfaceTests.Source(sourceType, targetType, boundary);
+        var source = BindingReceivingCases.Source(sourceType, targetType, boundary);
         var file = Path.Combine(_directory, "stage-b.calr");
         var output = Path.Combine(_directory, "stage-b.cs");
         var api = Assert.Single(Program.Compile(source, file).Diagnostics.Errors);
@@ -59,7 +59,7 @@ public class BindingRoutingCliTests : IDisposable
             {
                 ["CALOR_NO_TYPE_CHECK"] = mode == 32 ? "1" : "0"
             };
-            File.WriteAllText(file, StageBReceivingSurfaceTests.Source(targetType, targetType, boundary));
+            File.WriteAllText(file, BindingReceivingCases.Source(targetType, targetType, boundary));
             var safe = CliTestHarness.RunCli(_directory, environment, arguments.ToArray());
             Assert.Equal(0, safe.ExitCode);
             Assert.True(File.Exists(output));
@@ -145,7 +145,7 @@ public class BindingRoutingCliTests : IDisposable
     }
 
     [Theory]
-    [MemberData(nameof(BindingDiagnosticPolicyTests.NullableBoundaries), MemberType = typeof(BindingDiagnosticPolicyTests))]
+    [MemberData(nameof(BindingReceivingCases.NullableBoundaries), MemberType = typeof(BindingReceivingCases))]
     public void RootCli_ActiveScalarNullabilityMatchesApi(
         string code, Binding.BindingReceivingBoundary boundary, string body, string returnType)
     {

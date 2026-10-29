@@ -17,10 +17,23 @@ namespace Calor.Performance.Tests;
 public class VerificationPerformanceTests
 {
     private readonly ITestOutputHelper _output;
+    private static readonly Lazy<bool> Warmed = new(() =>
+    {
+        foreach (var source in new[]
+        {
+            SyntheticCodeGenerator.Generate(functions: 2, statementsPerFunction: 50),
+            SyntheticCodeGenerator.GenerateTaintModule(functions: 3, dataFlowDepth: 10),
+            SyntheticCodeGenerator.GenerateControlFlowModule(functions: 1, branchDepth: 3),
+            SyntheticCodeGenerator.GenerateLoopModule(functions: 1, loopsPerFunction: 2, nestingDepth: 3),
+        })
+            RunFullAnalysis(RequireParsedAndBound(source));
+        return true;
+    });
 
     public VerificationPerformanceTests(ITestOutputHelper output)
     {
         _output = output;
+        _ = Warmed.Value;
     }
 
     #region Helpers
@@ -86,15 +99,16 @@ public class VerificationPerformanceTests
         }
     }
 
-    private static long MeasureMemory(Action action)
+    private static long MeasureMemory(Func<BoundModule> action)
     {
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
 
         var before = GC.GetTotalMemory(true);
-        action();
+        var module = action();
         var after = GC.GetTotalMemory(true);
+        GC.KeepAlive(module);
 
         return after - before;
     }
@@ -104,7 +118,7 @@ public class VerificationPerformanceTests
     #region Parsing Performance Tests
 
     [Fact]
-    public void Parsing_SmallModule_Under100ms()
+    public void Parsing_SmallModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 10, statementsPerFunction: 50);
 
@@ -116,15 +130,15 @@ public class VerificationPerformanceTests
         var module = parser.Parse();
         sw.Stop();
 
-        _output.WriteLine($"Small module parsing: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Small module parsing: {sw.Elapsed.TotalMilliseconds}ms");
         _output.WriteLine($"Functions: 10, Statements/function: 50");
 
-        Assert.True(sw.ElapsedMilliseconds < 100,
-            $"Small module parsing took {sw.ElapsedMilliseconds}ms, expected < 100ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 25,
+            $"Small module parsing took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 25ms");
     }
 
     [Fact]
-    public void Parsing_MediumModule_Under500ms()
+    public void Parsing_MediumModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 50, statementsPerFunction: 100);
 
@@ -136,15 +150,15 @@ public class VerificationPerformanceTests
         var module = parser.Parse();
         sw.Stop();
 
-        _output.WriteLine($"Medium module parsing: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Medium module parsing: {sw.Elapsed.TotalMilliseconds}ms");
         _output.WriteLine($"Functions: 50, Statements/function: 100");
 
-        Assert.True(sw.ElapsedMilliseconds < 500,
-            $"Medium module parsing took {sw.ElapsedMilliseconds}ms, expected < 500ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 225,
+            $"Medium module parsing took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 225ms");
     }
 
     [Fact]
-    public void Parsing_LargeModule_Under2000ms()
+    public void Parsing_LargeModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 200, statementsPerFunction: 200);
 
@@ -156,11 +170,11 @@ public class VerificationPerformanceTests
         var module = parser.Parse();
         sw.Stop();
 
-        _output.WriteLine($"Large module parsing: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Large module parsing: {sw.Elapsed.TotalMilliseconds}ms");
         _output.WriteLine($"Functions: 200, Statements/function: 200");
 
-        Assert.True(sw.ElapsedMilliseconds < 2000,
-            $"Large module parsing took {sw.ElapsedMilliseconds}ms, expected < 2000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 2000,
+            $"Large module parsing took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 2000ms");
     }
 
     #endregion
@@ -168,7 +182,7 @@ public class VerificationPerformanceTests
     #region Binding Performance Tests
 
     [Fact]
-    public void Binding_SmallModule_Under100ms()
+    public void Binding_SmallModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 10, statementsPerFunction: 50);
 
@@ -184,14 +198,14 @@ public class VerificationPerformanceTests
         var module = binder.Bind(ast);
         sw.Stop();
 
-        _output.WriteLine($"Small module binding: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Small module binding: {sw.Elapsed.TotalMilliseconds}ms");
 
-        Assert.True(sw.ElapsedMilliseconds < 100,
-            $"Small module binding took {sw.ElapsedMilliseconds}ms, expected < 100ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 20,
+            $"Small module binding took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 20ms");
     }
 
     [Fact]
-    public void Binding_MediumModule_Under500ms()
+    public void Binding_MediumModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 50, statementsPerFunction: 100);
 
@@ -207,10 +221,10 @@ public class VerificationPerformanceTests
         var module = binder.Bind(ast);
         sw.Stop();
 
-        _output.WriteLine($"Medium module binding: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Medium module binding: {sw.Elapsed.TotalMilliseconds}ms");
 
-        Assert.True(sw.ElapsedMilliseconds < 500,
-            $"Medium module binding took {sw.ElapsedMilliseconds}ms, expected < 500ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 400,
+            $"Medium module binding took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 400ms");
     }
 
     private const int StatementsPerFunction = 100;
@@ -263,7 +277,7 @@ public class VerificationPerformanceTests
     #region Analysis Performance Tests
 
     [Fact]
-    public void FullAnalysis_SmallModule_Under1Second()
+    public void FullAnalysis_SmallModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 10, statementsPerFunction: 50);
 
@@ -273,14 +287,14 @@ public class VerificationPerformanceTests
         RunFullAnalysis(module);
         sw.Stop();
 
-        _output.WriteLine($"Small module full analysis: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Small module full analysis: {sw.Elapsed.TotalMilliseconds}ms");
 
-        Assert.True(sw.ElapsedMilliseconds < 1000,
-            $"Small module analysis took {sw.ElapsedMilliseconds}ms, expected < 1000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 150,
+            $"Small module analysis took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 150ms");
     }
 
     [Fact]
-    public void FullAnalysis_MediumModule_Under5Seconds()
+    public void FullAnalysis_MediumModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 50, statementsPerFunction: 100);
 
@@ -290,14 +304,14 @@ public class VerificationPerformanceTests
         RunFullAnalysis(module);
         sw.Stop();
 
-        _output.WriteLine($"Medium module full analysis: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Medium module full analysis: {sw.Elapsed.TotalMilliseconds}ms");
 
-        Assert.True(sw.ElapsedMilliseconds < 5000,
-            $"Medium module analysis took {sw.ElapsedMilliseconds}ms, expected < 5000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 2000,
+            $"Medium module analysis took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 2000ms");
     }
 
     [Fact]
-    public void FullAnalysis_LargeModule_Under30Seconds()
+    public void FullAnalysis_LargeModule_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.Generate(functions: 200, statementsPerFunction: 200);
 
@@ -307,11 +321,11 @@ public class VerificationPerformanceTests
         RunFullAnalysis(module);
         sw.Stop();
 
-        _output.WriteLine($"Large module full analysis: {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Large module full analysis: {sw.Elapsed.TotalMilliseconds}ms");
         _output.WriteLine($"Functions: {module.Functions.Count}");
 
-        Assert.True(sw.ElapsedMilliseconds < 30000,
-            $"Large module analysis took {sw.ElapsedMilliseconds}ms, expected < 30000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 23000,
+            $"Large module analysis took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 23000ms");
     }
 
     #endregion
@@ -319,7 +333,7 @@ public class VerificationPerformanceTests
     #region Taint Analysis Performance
 
     [Fact]
-    public void TaintAnalysis_DeepDataFlow_Under1Second()
+    public void TaintAnalysis_DeepDataFlow_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.GenerateTaintModule(functions: 20, dataFlowDepth: 50);
 
@@ -331,15 +345,15 @@ public class VerificationPerformanceTests
         runner.Analyze(module);
         sw.Stop();
 
-        _output.WriteLine($"Taint analysis (deep data flow): {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Taint analysis (deep data flow): {sw.Elapsed.TotalMilliseconds}ms");
         _output.WriteLine($"Warnings found: {taintDiagnostics.Count()}");
 
-        Assert.True(sw.ElapsedMilliseconds < 1000,
-            $"Taint analysis took {sw.ElapsedMilliseconds}ms, expected < 1000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 600,
+            $"Taint analysis took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 600ms");
     }
 
     [Fact]
-    public void TaintAnalysis_ManyFunctions_Under2Seconds()
+    public void TaintAnalysis_ManyFunctions_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.GenerateTaintModule(functions: 100, dataFlowDepth: 10);
 
@@ -351,11 +365,11 @@ public class VerificationPerformanceTests
         runner.Analyze(module);
         sw.Stop();
 
-        _output.WriteLine($"Taint analysis (many functions): {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"Taint analysis (many functions): {sw.Elapsed.TotalMilliseconds}ms");
         _output.WriteLine($"Functions: {module.Functions.Count}");
 
-        Assert.True(sw.ElapsedMilliseconds < 2000,
-            $"Taint analysis took {sw.ElapsedMilliseconds}ms, expected < 2000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 300,
+            $"Taint analysis took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 300ms");
     }
 
     #endregion
@@ -363,7 +377,7 @@ public class VerificationPerformanceTests
     #region Dataflow Analysis Performance
 
     [Fact]
-    public void DataflowAnalysis_ComplexCFG_Under2Seconds()
+    public void DataflowAnalysis_ComplexCFG_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.GenerateControlFlowModule(functions: 20, branchDepth: 10);
 
@@ -379,14 +393,14 @@ public class VerificationPerformanceTests
         }
         sw.Stop();
 
-        _output.WriteLine($"CFG construction (complex control flow): {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"CFG construction (complex control flow): {sw.Elapsed.TotalMilliseconds}ms");
 
-        Assert.True(sw.ElapsedMilliseconds < 2000,
-            $"CFG construction took {sw.ElapsedMilliseconds}ms, expected < 2000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 25,
+            $"CFG construction took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 25ms");
     }
 
     [Fact]
-    public void DataflowAnalysis_NestedLoops_Under3Seconds()
+    public void DataflowAnalysis_NestedLoops_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.GenerateLoopModule(functions: 20, loopsPerFunction: 5, nestingDepth: 3);
 
@@ -401,10 +415,10 @@ public class VerificationPerformanceTests
         }
         sw.Stop();
 
-        _output.WriteLine($"CFG construction (nested loops): {sw.ElapsedMilliseconds}ms");
+        _output.WriteLine($"CFG construction (nested loops): {sw.Elapsed.TotalMilliseconds}ms");
 
-        Assert.True(sw.ElapsedMilliseconds < 3000,
-            $"CFG construction took {sw.ElapsedMilliseconds}ms, expected < 3000ms");
+        Assert.True(sw.Elapsed.TotalMilliseconds < 25,
+            $"CFG construction took {sw.Elapsed.TotalMilliseconds}ms, smoke budget < 25ms");
     }
 
     #endregion
@@ -418,17 +432,15 @@ public class VerificationPerformanceTests
 
         var memoryUsed = MeasureMemory(() =>
         {
-            var module = ParseAndBind(source, out var diagnostics);
-            if (module != null)
-            {
-                RunFullAnalysis(module);
-            }
+            var module = RequireParsedAndBound(source);
+            RunFullAnalysis(module);
+            return module;
         });
 
         var memoryMB = memoryUsed / 1024.0 / 1024.0;
         _output.WriteLine($"Small module memory: {memoryMB:F2} MB");
 
-        Assert.True(memoryMB < 10,
+        Assert.True(memoryMB > 0 && memoryMB < 10,
             $"Small module used {memoryMB:F2} MB, expected < 10 MB");
     }
 
@@ -439,17 +451,15 @@ public class VerificationPerformanceTests
 
         var memoryUsed = MeasureMemory(() =>
         {
-            var module = ParseAndBind(source, out var diagnostics);
-            if (module != null)
-            {
-                RunFullAnalysis(module);
-            }
+            var module = RequireParsedAndBound(source);
+            RunFullAnalysis(module);
+            return module;
         });
 
         var memoryMB = memoryUsed / 1024.0 / 1024.0;
         _output.WriteLine($"Medium module memory: {memoryMB:F2} MB");
 
-        Assert.True(memoryMB < 50,
+        Assert.True(memoryMB > 0 && memoryMB < 50,
             $"Medium module used {memoryMB:F2} MB, expected < 50 MB");
     }
 
@@ -460,17 +470,15 @@ public class VerificationPerformanceTests
 
         var memoryUsed = MeasureMemory(() =>
         {
-            var module = ParseAndBind(source, out var diagnostics);
-            if (module != null)
-            {
-                RunFullAnalysis(module);
-            }
+            var module = RequireParsedAndBound(source);
+            RunFullAnalysis(module);
+            return module;
         });
 
         var memoryMB = memoryUsed / 1024.0 / 1024.0;
         _output.WriteLine($"Large module memory: {memoryMB:F2} MB");
 
-        Assert.True(memoryMB < 100,
+        Assert.True(memoryMB > 0 && memoryMB < 100,
             $"Large module used {memoryMB:F2} MB, expected < 100 MB");
     }
 
@@ -479,9 +487,9 @@ public class VerificationPerformanceTests
     #region Scalability Tests
 
     [Fact]
-    public void Scalability_LinearWithFunctions()
+    public void Scalability_FunctionGrowthBelowQuadraticSmokeBudget()
     {
-        var times = new List<(int Functions, long TimeMs)>();
+        var times = new List<(int Functions, double TimeMs)>();
 
         foreach (var funcCount in new[] { 10, 20, 40, 80 })
         {
@@ -492,8 +500,8 @@ public class VerificationPerformanceTests
             RunFullAnalysis(module);
             sw.Stop();
 
-            times.Add((funcCount, sw.ElapsedMilliseconds));
-            _output.WriteLine($"Functions: {funcCount}, Time: {sw.ElapsedMilliseconds}ms");
+            times.Add((funcCount, sw.Elapsed.TotalMilliseconds));
+            _output.WriteLine($"Functions: {funcCount}, Time: {sw.Elapsed.TotalMilliseconds}ms");
         }
 
         Assert.Equal(4, times.Count);
@@ -505,9 +513,9 @@ public class VerificationPerformanceTests
     }
 
     [Fact]
-    public void Scalability_LinearWithStatements()
+    public void Scalability_StatementGrowthBelowQuadraticSmokeBudget()
     {
-        var times = new List<(int Statements, long TimeMs)>();
+        var times = new List<(int Statements, double TimeMs)>();
 
         foreach (var stmtCount in new[] { 25, 50, 100, 200 })
         {
@@ -518,8 +526,8 @@ public class VerificationPerformanceTests
             RunFullAnalysis(module);
             sw.Stop();
 
-            times.Add((stmtCount, sw.ElapsedMilliseconds));
-            _output.WriteLine($"Statements/function: {stmtCount}, Time: {sw.ElapsedMilliseconds}ms");
+            times.Add((stmtCount, sw.Elapsed.TotalMilliseconds));
+            _output.WriteLine($"Statements/function: {stmtCount}, Time: {sw.Elapsed.TotalMilliseconds}ms");
         }
 
         Assert.Equal(4, times.Count);
@@ -535,7 +543,7 @@ public class VerificationPerformanceTests
     #region CFG Construction Performance
 
     [Fact]
-    public void CFGConstruction_SmallFunction_Under10ms()
+    public void CFGConstruction_SmallFunction_IsTimingSmokeTest()
     {
         var source = @"
 §M{m001:Test}
@@ -551,6 +559,7 @@ public class VerificationPerformanceTests
 
         var func = module.Functions.First();
 
+        _ = ControlFlowGraph.Build(func);
         var sw = Stopwatch.StartNew();
         for (var i = 0; i < 100; i++)
         {
@@ -558,15 +567,15 @@ public class VerificationPerformanceTests
         }
         sw.Stop();
 
-        var avgTime = sw.ElapsedMilliseconds / 100.0;
+        var avgTime = sw.Elapsed.TotalMilliseconds / 100.0;
         _output.WriteLine($"CFG construction avg time: {avgTime:F2}ms");
 
-        Assert.True(avgTime < 10,
-            $"CFG construction took {avgTime:F2}ms, expected < 10ms");
+        Assert.True(avgTime < 0.1,
+            $"CFG construction took {avgTime:F2}ms, smoke budget < 0.1ms");
     }
 
     [Fact]
-    public void CFGConstruction_ComplexFunction_Under50ms()
+    public void CFGConstruction_ComplexFunction_IsTimingSmokeTest()
     {
         var source = SyntheticCodeGenerator.GenerateControlFlowModule(functions: 1, branchDepth: 10);
 
@@ -574,18 +583,19 @@ public class VerificationPerformanceTests
 
         var func = module.Functions.First();
 
+        _ = ControlFlowGraph.Build(func);
         var sw = Stopwatch.StartNew();
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 100; i++)
         {
             var cfg = ControlFlowGraph.Build(func);
         }
         sw.Stop();
 
-        var avgTime = sw.ElapsedMilliseconds / 10.0;
+        var avgTime = sw.Elapsed.TotalMilliseconds / 100.0;
         _output.WriteLine($"Complex CFG construction avg time: {avgTime:F2}ms");
 
-        Assert.True(avgTime < 50,
-            $"Complex CFG construction took {avgTime:F2}ms, expected < 50ms");
+        Assert.True(avgTime < 1,
+            $"Complex CFG construction took {avgTime:F2}ms, smoke budget < 1ms");
     }
 
     #endregion

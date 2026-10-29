@@ -9,7 +9,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 internal static class CliTestHarness
 {
-    private static readonly Lazy<string> RepoRoot = new(FindRepoRootCore);
+    private static readonly Lazy<string> RepoRoot = new(() => FindRepoRoot(Directory.GetCurrentDirectory()));
     private static readonly Lazy<string> CalorDll = new(FindCalorDllCore);
 
     /// <summary>Walks up from the test working directory to the repository root.</summary>
@@ -71,22 +71,20 @@ internal static class CliTestHarness
         }
     }
 
-    private static string FindRepoRootCore()
+    internal static string FindRepoRoot(string startDirectory)
     {
-        var dir = Directory.GetCurrentDirectory();
+        var dir = new DirectoryInfo(startDirectory);
         while (dir != null)
         {
-            if (File.Exists(Path.Combine(dir, "Calor.sln")))
+            if (File.Exists(Path.Combine(dir.FullName, "Calor.sln")))
             {
-                return dir;
+                return dir.FullName;
             }
 
-            var parent = Directory.GetParent(dir);
-            if (parent == null) break;
-            dir = parent.FullName;
+            dir = dir.Parent;
         }
 
-        throw new InvalidOperationException("Repository root (Calor.sln) not found from " + Directory.GetCurrentDirectory());
+        throw new InvalidOperationException("Repository root (Calor.sln) not found from " + startDirectory);
     }
 
     /// <summary>
@@ -144,9 +142,14 @@ internal static class CliTestHarness
     }
 
     private static string FindCalorDllCore()
+        => ResolveCalorDll(FindRepoRoot(), AppContext.BaseDirectory,
+            typeof(Program).Assembly.Location, IsProfilerAttached);
+
+    internal static string ResolveCalorDll(
+        string repositoryRoot, string baseDirectory, string loaded, bool profilerAttached)
     {
         var candidates = new[] { "Release", "Debug" }
-            .Select(config => Path.Combine(FindRepoRoot(), "src", "Calor.Compiler", "bin", config, "net10.0", "calor.dll"))
+            .Select(config => Path.Combine(repositoryRoot, "src", "Calor.Compiler", "bin", config, "net10.0", "calor.dll"))
             .Where(File.Exists)
             .ToArray();
         if (candidates.Length == 0)
@@ -157,7 +160,6 @@ internal static class CliTestHarness
         // is a different compiler: its index headers and build-state hashes do
         // not match ours, so a `--no-build` query refuses ("the compiler
         // changed") for a reason that has nothing to do with the test.
-        var loaded = typeof(Program).Assembly.Location;
         if (!string.IsNullOrEmpty(loaded) && File.Exists(loaded))
         {
             var loadedHash = Incremental.BuildStateCache.ComputeCompilerHash([loaded]);
@@ -175,7 +177,7 @@ internal static class CliTestHarness
         // running a stale sibling build of the other configuration would
         // surface as a content diff rather than as "your build is stale". Say
         // so once, loudly, rather than choosing silently.
-        var ownConfiguration = AppContext.BaseDirectory.Replace('\\', '/').Contains("/Release/", StringComparison.Ordinal)
+        var ownConfiguration = baseDirectory.Replace('\\', '/').Contains("/Release/", StringComparison.Ordinal)
             ? "Release"
             : "Debug";
         var own = candidates.FirstOrDefault(candidate =>
@@ -184,7 +186,7 @@ internal static class CliTestHarness
         Console.Error.WriteLine(
             "CliTestHarness: no calor.dll on disk matches the Calor.Compiler assembly this test "
                 + $"process loaded ({loaded}); falling back to {own ?? candidates[0]}. "
-                + (IsProfilerAttached
+                + (profilerAttached
                     ? "A profiler is attached (coverage lane), where this is expected."
                     : "No profiler detected — this usually means a stale build of the other configuration."));
 

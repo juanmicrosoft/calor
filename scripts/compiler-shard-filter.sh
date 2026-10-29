@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # Emits four disjoint VSTest filters covering Calor.Compiler.Tests.
 #
-# WHY — issue #1150. The suite's test host accumulates anonymous memory that no GC
-# setting can reach; it climbs past 9 GB on a 16 GB runner and the job is killed
-# (exit 143) at a measured 14.7 % rate. Six candidate causes have been tested and
-# refuted, so the allocator is still unattributed — see
+# WHY — issue #1150 originally measured a 14.7 % host kill rate after anonymous
+# memory climbed past 9 GB on a 16 GB runner. The original investigation is in
 # docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md.
 #
-# Running the suite as FOUR invocations gives each a fresh test host, so none
-# accumulates the whole suite. THIS CAPS THE SYMPTOM AND DOES NOT FIX THE LEAK: a
-# single-host run on Linux still exhausts a 16 GB machine, and a green pipeline here
-# must not be read as #1150 being solved.
+# The 0.29 native traces (#1590) attributed repeated Roslyn PE metadata and an
+# inheritance-checker Z3 context ownership leak. Bounded reference reuse and
+# deterministic context disposal repair those identified sources. The separate
+# unsplit Linux run at 19cf228f0 completed all 16,075 cases (three registered skips),
+# with peak sampled RSS 3,183 MiB; see docs/plans/performance-gate-strategy.md and
+# PR #1721 for artifacts and later-source verification.
+#
+# FOUR invocations retain process isolation as defense in depth, not a substitute
+# for native allocator evidence. A green split alone never proves a leak fix.
+# The actual latest-30-successful-main-run p90 remains a separate #1590 criterion.
 #
 # WHY A SCRIPT rather than the filters inlined at each call site: the suite runs in
 # compiler test and coverage gates in test.yml and publish-nuget.yml, and all
@@ -19,9 +23,11 @@
 # double-run, and nothing says so. One source,
 # shared callers.
 #
-# THE SPLIT is by test-class initial, balanced from the 16,040-case inventory:
-# 4,027 / 4,002 / 4,002 / 4,009. The old two-host split dates from 7,978 cases;
-# its hosts now run roughly a whole old suite and can exhaust the runner again.
+# THE SPLIT is by test-class initial, remeasured at the 16,075-case inventory:
+# 4,062 / 3,938 / 4,041 / 4,034. Binding-routing CLI and W1 guide transcripts
+# run once in Tasks.Tests instead (#1590); the class-level CLI loops dominated
+# this shard's measured duration. The old two-host split dates from 7,978 cases;
+# each of its halves had grown to roughly a whole old suite before these repairs.
 #
 # Usage:
 #   bash scripts/compiler-shard-filter.sh --parts    # prints all part numbers

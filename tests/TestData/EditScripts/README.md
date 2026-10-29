@@ -7,7 +7,36 @@ The claim under test: **compiling an edit sequence incrementally produces
 byte-identical diagnostics to compiling each of its states from scratch** — and
 does so while actually reusing the cache, not by quietly rebuilding everything.
 
-Harness: `tests/Calor.Compiler.Tests/EditScriptIdentityTests.cs`.
+Harness: `tests/Calor.Compiler.Tests/EditScriptIdentityTests.cs`, with shared
+corpus loading, option profiles and canonical diagnostics/index projection in
+`tests/Shared/EditScriptCorpus.cs`.
+
+The CLI-process leg (#1116) lives in **Calor.Tasks.Tests**, outside the compiler
+shard. `CliEditScriptIdentityTests` runs all eight scripts (including
+`docs-required`) through cached `calor -i ... --format json`, the current
+multi-file compile entry point, and `calor index build`. Each step compares clean
+and incremental CLI diagnostics to both clean and incremental `CompilationDriver`
+runs, plus the existing canonical index projection. The same workspace root lets
+it compare the **complete serialized index bytes**, including symbol IDs and all
+facets, without masking path identity. Index builds still rebuild wholesale;
+this is not evidence of incremental indexing or option-profile-aware indexing.
+
+The cache leg compares CLI/in-process bytes from identical histories exactly.
+For clean-versus-incremental comparison it canonicalizes JSON property order and
+removes only per-file `lastModified`: warm hits deliberately retain their old
+timestamp after identical-content rewrites. Every hash, summary, diagnostic,
+entry and array order remains observed. Failed publication intentionally retains
+the previous warm cache but creates no clean cache; the test asserts that old
+bytes are untouched rather than treating stale history as newly published state.
+Cache **and generated outputs** are restored after oracle probes so later steps
+really consume the CLI history. Reuse expectations are two-sided, and ES-06 must
+skip every file after the first step. ES-08's erased row distinguishes Strict
+defaults from `--permissive-effects` on both surfaces.
+
+The process must load the same compiler bytes as the in-process oracle; a
+different Debug/Release or instrumented binary fails instead of silently comparing
+different compilers. The SDK task leg remains in `SdkSurfaceAgreementTests`,
+including its explicit `docs-required` exclusion.
 
 ## Layout
 

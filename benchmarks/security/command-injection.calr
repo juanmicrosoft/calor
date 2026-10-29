@@ -10,7 +10,9 @@
     §O{i32}
     §E{proc}
     §B{cmd:string} (+ STR:"ls -la " user_input)
-    §C shell cmd
+    §B{slashes:string} §C{cmd.Replace} §A STR:"\\" §A STR:"\\\\" §/C
+    §B{argument:string} §C{slashes.Replace} §A STR:"\"" §A STR:"\\\"" §/C
+    §C{System.Diagnostics.Process.Start} §A STR:"/bin/sh" §A (+ STR:"-c \"" (+ argument STR:"\"")) §/C
     §R INT:0
 
   §F{f002:SafeWhitelistedCommand:pub}
@@ -19,23 +21,25 @@
     §I{i32:option}
     §O{i32}
     §E{proc}
-    §IF (== option INT:1)
-      §C exec STR:"ls"
-      §EIF (== option INT:2)
-      §C exec STR:"pwd"
+    §IF{if1} (== option INT:1)
+      §C{System.Diagnostics.Process.Start} §A STR:"ls" §/C
+    §EI (== option INT:2)
+      §C{System.Diagnostics.Process.Start} §A STR:"pwd" §/C
     §EL
-      §C exec STR:"whoami"
+      §C{System.Diagnostics.Process.Start} §A STR:"whoami" §/C
     §R INT:0
 
   §F{f003:VulnerablePopen:pub}
     // BUG: User input passed to popen
     // EXPECTED: Calor0982 Command Injection
-    §I{string:filename}
+    §I{string:user_input}
     §O{string}
     §E{proc}
-    §B{cmd:string} (+ STR:"cat " filename)
-    §B{result:string} (CALL popen cmd)
-    §R result
+    §B{cmd:string} (+ STR:"cat " user_input)
+    §B{slashes:string} §C{cmd.Replace} §A STR:"\\" §A STR:"\\\\" §/C
+    §B{argument:string} §C{slashes.Replace} §A STR:"\"" §A STR:"\\\"" §/C
+    §B{result} §C{System.Diagnostics.Process.Start} §A STR:"/bin/sh" §A (+ STR:"-c \"" (+ argument STR:"\"")) §/C
+    §R STR:""
 
   §F{f004:SafeEscapedCommand:pub}
     // SAFE: Shell arguments properly escaped
@@ -43,27 +47,35 @@
     §I{string:user_input}
     §O{i32}
     §E{proc}
-    §B{safe:string} (CALL shell_escape user_input)
+    §B{quoted:string} §C{user_input.Replace} §A STR:"'" §A STR:"'\\''" §/C
+    §B{safe:string} (+ STR:"'" (+ quoted STR:"'"))
     §B{cmd:string} (+ STR:"echo " safe)
-    §C shell cmd
+    §B{slashes:string} §C{cmd.Replace} §A STR:"\\" §A STR:"\\\\" §/C
+    §B{argument:string} §C{slashes.Replace} §A STR:"\"" §A STR:"\\\"" §/C
+    §C{System.Diagnostics.Process.Start} §A STR:"/bin/sh" §A (+ STR:"-c \"" (+ argument STR:"\"")) §/C
     §R INT:0
 
   §F{f005:VulnerableSystemCall:pub}
     // BUG: User input in system call
     // EXPECTED: Calor0982 Command Injection
-    §I{string:query_param}
+    §I{string:user_input}
     §O{i32}
     §E{proc}
-    §B{script:string} (+ STR:"python script.py --arg=" query_param)
-    §C system script
+    §B{script:string} (+ STR:"python script.py --arg=" user_input)
+    §B{slashes:string} §C{script.Replace} §A STR:"\\" §A STR:"\\\\" §/C
+    §B{argument:string} §C{slashes.Replace} §A STR:"\"" §A STR:"\\\"" §/C
+    §C{System.Diagnostics.Process.Start} §A STR:"/bin/sh" §A (+ STR:"-c \"" (+ argument STR:"\"")) §/C
     §R INT:0
 
   §F{f006:SafeArrayExec:pub}
     // SAFE: Command executed as array (no shell)
     // EXPECTED: No warnings
-    §I{string:arg}
+    §I{string:user_input}
     §O{i32}
     §E{proc}
-    §B{safeArg:string} (CALL sanitize arg)
-    §C exec_array STR:"ls" STR:"-la" safeArg
+    §B{startInfo} §NEW{System.Diagnostics.ProcessStartInfo} §A STR:"ls" §/NEW
+    §ASSIGN startInfo . UseShellExecute BOOL:false
+    §C{startInfo.ArgumentList.Add} §A STR:"-la" §/C
+    §C{startInfo.ArgumentList.Add} §A user_input §/C
+    §C{System.Diagnostics.Process.Start} §A startInfo §/C
     §R INT:0

@@ -1,4 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="..\Shared\EditScriptCorpus.cs" Link="Shared\EditScriptCorpus.cs" />
+    <Compile Include="..\Shared\BindingReceivingCases.cs" Link="Shared\BindingReceivingCases.cs" />
+    <Compile Include="..\Calor.Compiler.Tests\CliTestHarness.cs" Link="Cli\CliTestHarness.cs" />
+    <Compile Include="..\Calor.Compiler.Tests\Binding\BindingRoutingCliTests.cs" Link="Cli\BindingRoutingCliTests.cs" />
+    <Compile Include="..\Calor.Compiler.Tests\InteropScope\W1GuideTranscriptTests.cs" Link="Cli\W1GuideTranscriptTests.cs" />
+  </ItemGroup>
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

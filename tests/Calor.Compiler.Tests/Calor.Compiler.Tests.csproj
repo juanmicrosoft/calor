@@ -1,4 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="..\Shared\EditScriptCorpus.cs" Link="Shared\EditScriptCorpus.cs" />
+    <Compile Include="..\Shared\BindingReceivingCases.cs" Link="Shared\BindingReceivingCases.cs" />
+    <!-- CLI-heavy coverage runs once in Tasks.Tests; retain source paths for fixture provenance. -->
+    <Compile Remove="Binding\BindingRoutingCliTests.cs;InteropScope\W1GuideTranscriptTests.cs" />
+  </ItemGroup>
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
