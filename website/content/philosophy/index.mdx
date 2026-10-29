@@ -11,8 +11,8 @@ software, can the language make it easier for people to see what a change is
 meant to do and check whether it follows important rules?
 
 Calor is an experimental programming language. It lets a project write down
-some expectations alongside its code, checks certain cases, and creates C#
-that can be built with .NET. It is not a proven way to make software safer or
+some expectations alongside its code, checks certain cases, and runs on the
+.NET runtime. It is not a proven way to make software safer or
 teams more productive.
 
 ## What Calor makes easier to see
@@ -49,7 +49,7 @@ For exact details, see the [guide to check results and limits](/docs/guides/veri
 ## A tradeoff: helpful to tools, unfamiliar to people
 
 Calor is designed so software tools can find important information in a
-program. Its notation looks different from C# and may take time to get used to.
+program. Its notation may look unfamiliar and take time to get used to.
 That is a real cost, not a benefit for everyone.
 
 You do not need to memorize the notation to try Calor. An AI coding assistant
@@ -77,11 +77,11 @@ team performance or prove an advantage. The
 [research status and evidence limits](/docs/benchmarking/evidence-status/)
 explain what has and has not been studied.
 
-## Is Calor a replacement for C#?
+## Can I start with an existing C# project?
 
-No. Calor is focused on exploring how AI-assisted .NET work might be easier to
-review. It creates C# and can be added gradually to a .NET project. It is not
-trying to replace C#, Python, or other programming languages.
+Yes. You can keep your existing C# project and convert to Calor in phases.
+Start with one small, well-tested file, keep the rest as it is, and decide
+whether to convert more after you have tried the workflow.
 
 | Calor may be worth exploring if… | Calor may not be a fit if… |
 |:--------------------------------|:---------------------------|
@@ -89,9 +89,8 @@ trying to replace C#, Python, or other programming languages.
 | You are comfortable testing an early project and keeping your own reviews and tests | You need all code to be easy to read without learning unfamiliar notation |
 | You want to try one small change before deciding whether to continue | You need support for code that Calor does not currently handle well |
 
-The [adoption guide](/docs/guides/adoption-playbook/) explains how to try
-Calor gradually and keep a way to build the generated C# without continuing
-to write Calor.
+The [phased conversion guide](/docs/guides/adding-calor-to-existing-projects/)
+explains that journey, including how to review each step before expanding.
 
 ## Common questions
 
@@ -109,10 +108,9 @@ Calor does not take responsibility for those decisions.
 
 ### Can I still use my .NET tools?
 
-Calor creates C# that you can build and inspect with .NET tools. The generated
-code is useful to review and gives you a way to move away from Calor, but it
-does not guarantee that every output is easy to read or that every feature
-works with every tool.
+Calor applications use the .NET runtime and can be built and tested with
+.NET tools. Try the tools your team relies on during your first small trial;
+not every feature or tool integration is supported.
 
 ### Is Calor ready for production?
 

@@ -39,7 +39,16 @@ for (const width of [1366, 390, 320]) {
     await expect(page.getByRole('heading', { name: 'Built for How AI Actually Writes Code' })).toHaveCount(0);
     await expect(page.getByText('Verified findings default', { exact: true })).toHaveCount(0);
     await expect(page.locator('.animate-pulse-glow')).toHaveCount(0);
-    await expect(page.locator('main')).not.toContainText('§F{');
+    const example = page.getByRole('region', { name: 'Get started: run your first Calor program', exact: true });
+    await expect(example).toContainText('dotnet tool install -g calor');
+    await expect(example).toContainText('calor run Program.calr');
+    await expect(example).toContainText('Hello from Calor!');
+    await expect(example).toContainText('§F{');
+    await expect(page.locator('main')).not.toContainText('generated C#');
+    await page.getByRole('link', { name: 'Follow the phased conversion guide' }).click();
+    await expect(page.getByRole('heading', { name: 'Your journey, one phase at a time' })).toBeVisible();
+    await expect(page.locator('article')).toContainText('no requirement to convert the project in one pass');
+    await page.goBack();
     const help = page.getByRole('region', { name: 'Keep exploring' });
     await expect(help).toContainText('may require a ChatGPT account or plan');
     await expect(help.getByRole('link', { name: 'Ask Calor on ChatGPT (external)' }))

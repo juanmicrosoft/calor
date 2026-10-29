@@ -21,7 +21,7 @@ export function CodeComparison() {
           </div>
           <div className="rounded-lg border p-5">
             <h3 className="font-semibold">Keep control of the result</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Review the generated C#, run your usual tests, and keep using standard .NET tools.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Review the Calor code and its rules, check any warnings, and run your usual tests.</p>
           </div>
         </div>
         <p className="mt-6 text-sm text-muted-foreground">

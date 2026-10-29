@@ -15,8 +15,8 @@ await writeFile(path.join(workspace, 'Directory.Packages.props'), '<Project />')
 const env = { ...process.env, TMPDIR: path.join(workspace, 'scratch'),
   TMP: path.join(workspace, 'scratch'), TEMP: path.join(workspace, 'scratch'),
   CALOR_TELEMETRY: '0', DOTNET_NOLOGO: '1' };
-const section = title => {
-  const body = doc.split(`## ${title}\n`)[1]?.split('\n## ')[0];
+const section = (title, document = doc) => {
+  const body = document.split(`## ${title}\n`)[1]?.split('\n## ')[0];
   assert.ok(body, `Missing published section: ${title}`);
   return body;
 };
@@ -40,9 +40,19 @@ try {
   await writeFile(path.join(cwd, 'Program.calr'), source);
   const expected = section('Run without a project').match(/```text\n([\s\S]*?)```/)?.[1].trim();
   assert.equal(expected, 'Hello from Calor!');
+  const homepage = await readFile('src/components/landing/QuickStart.tsx', 'utf8');
+  const homepageSource = homepage.match(/const helloWorldSource = `([\s\S]*?)`;/)?.[1];
+  assert.equal(homepageSource, source.trimEnd(), 'Homepage must use the tested Hello World program');
+  assert.ok(homepage.includes('<code>dotnet tool install -g calor</code>'));
+  assert.ok(homepage.includes('<code>calor run Program.calr</code>'));
+  assert.ok(homepage.includes(`<code>${expected}</code>`));
   assert.equal(run(blocks(section('Run without a project'))[0]), expected);
+  await writeFile(path.join(cwd, 'Program.calr'), source.replace('Hello from Calor!', 'Hello again!'));
+  assert.equal(run(blocks(section('Try a change'))[0]), 'Hello again!');
+  await writeFile(path.join(cwd, 'Program.calr'), source);
 
-  const [create, remove, compileAndRun] = blocks(section('Optional: inspect a .NET project'));
+  const runReference = await readFile('content/cli/run.mdx', 'utf8');
+  const [create, remove, compileAndRun] = blocks(section('Optional: inspect a .NET project', runReference));
   const [compile, execute] = compileAndRun.split('\n');
   run(create);
   assert.match(await readFile(path.join(cwd, 'Program.cs'), 'utf8'), /Hello, World!/);
@@ -57,14 +67,12 @@ try {
   const workflow = await readFile('content/getting-started/how-it-works.mdx', 'utf8');
   const workflowSource = workflow.match(/```calor\n([\s\S]*?)```/)?.[1];
   assert.ok(workflowSource, 'Missing complete How It Works example');
-  const workflowCommands = blocks(workflow)[1].split('\n');
+  const workflowCommand = blocks(workflow)[1];
   await writeFile(path.join(cwd, 'Program.calr'), workflowSource);
-  run(workflowCommands[0]);
-  assert.equal(run(workflowCommands[1]), expected);
+  assert.equal(run(workflowCommand), expected);
   await writeFile(path.join(cwd, 'Program.calr'), workflowSource.replace('Hello from Calor!', 'Hello again!'));
-  run(workflowCommands[0]);
-  assert.equal(run(workflowCommands[1]), 'Hello again!');
-  console.log('Published How It Works compile/run/revise workflow passed.');
+  assert.equal(run(workflowCommand), 'Hello again!');
+  console.log('Published homepage example and How It Works run/revise workflow passed.');
 
   const effects = await readFile('content/benchmarking/metrics/effect-discipline.mdx', 'utf8');
   const priceSource = effects.match(/```calor\n([\s\S]*?)```/)?.[1];

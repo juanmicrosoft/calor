@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: '%s | Calor',
   },
   description:
-    'Make AI-written .NET code easier to check and review. Calor records important rules, checks supported cases, and creates regular C# code.',
+    'Make AI-written code easier to check and review. Calor records important rules, checks supported cases, and runs on the .NET runtime.',
   keywords: ['Calor', 'programming language', 'AI', 'coding agents', 'compiler', '.NET', 'C#'],
   authors: [{ name: 'Calor Team' }],
   icons: {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     siteName: 'Calor',
     title: 'Calor - Make AI-written .NET code easier to check',
     description:
-      'Calor records important rules for AI-written code, checks supported cases, and creates regular C# code for .NET.',
+      'Calor records important rules for AI-written code, checks supported cases, and runs on the .NET runtime.',
     images: [
       {
         url: publicUrl('/og-image.jpg'),
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Calor - Make AI-written .NET code easier to check',
     description:
-      'Calor records important rules for AI-written code, checks supported cases, and creates regular C# code for .NET.',
+      'Calor records important rules for AI-written code, checks supported cases, and runs on the .NET runtime.',
     images: [publicUrl('/og-image.jpg')],
   },
 };

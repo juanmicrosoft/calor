@@ -34,32 +34,29 @@ module, entry point, and console effect as the
     §P "Hello from Calor!"
 ```
 
-Compile it to inspect the generated C#, then run the Calor source:
+Run the program on .NET:
 
 ```bash
-calor --input Program.calr --output Program.g.cs
 calor run Program.calr
 ```
 
-Compilation creates `Program.g.cs`; the run command prints:
+The run command prints:
 
 ```text
 Hello from Calor!
 ```
 
-Change the string to `"Hello again!"` and repeat both commands. The program
+Change the string to `"Hello again!"` and repeat the run command. The program
 now prints `Hello again!`. No project template, agent, or `calor init` is
-required. `calor run` builds its own managed workspace; the generated C# here
-is for inspection, not an automatically updated project input.
+required. Calor handles the build so you can focus on the program's behavior.
 
 If a command fails, read the first diagnostic's file, location, and message.
 Check that the source uses two-space indentation and that `§E{cw}` declares
-the console output. Fix the source rather than editing generated C#, then
-rerun. A missing tool or SDK is an
+the console output. Fix `Program.calr`, then rerun. A missing tool or SDK is an
 [installation problem](/docs/getting-started/installation/), not a source
 diagnostic. See [compile options](/docs/cli/compile/) for diagnostic output
-and [project integration](/docs/getting-started/) when you want MSBuild to
-regenerate C# automatically.
+and [phased project conversion](/docs/guides/adding-calor-to-existing-projects/)
+when you want to bring Calor into an existing C# project.
 
 ## Add an agent, if useful
 
@@ -80,8 +77,8 @@ where the project requires Calor. They are not a filesystem sandbox:
 configuration, client support, and the tool used determine coverage.
 Hook feedback does not guarantee a correct retry.
 
-Ask for one small change, compile it, inspect diagnostics and generated code,
-and run the behavior tests. Repeat only after understanding the failure.
+Ask for one small change, review the Calor code and its rules, read any check
+results, and run the behavior tests. Repeat only after understanding the failure.
 Supported MCP clients can also request compiler diagnostics through
 `calor_check`; that does not replace executing the application tests.
 

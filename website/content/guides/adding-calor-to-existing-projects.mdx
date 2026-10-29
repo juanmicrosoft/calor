@@ -2,14 +2,48 @@
 title: "Adding Calor to Existing Projects"
 section: "guides"
 order: 1
+description: "Convert an existing C# project to Calor in phases, starting with one small file while the rest of your application stays in place."
 ---
 
 
-This guide takes an existing C# project from Calor setup to a small mixed
-Calor/C# pilot. You will convert one well-tested file, review what could not be
-translated, build it with the rest of the project, and inspect its impact.
+You do not need to rewrite your application to try Calor. Start with your
+existing C# project, convert one small part, and keep the rest in C#. Both can
+remain in the same .NET application while you decide what to convert next.
 
 ---
+
+## Your journey, one phase at a time
+
+### Phase 1: Keep your working project
+
+Run your existing build and tests before making changes. Save a version you
+can return to. Add Calor's build support without replacing the application's
+starting code or converting every file.
+
+### Phase 2: Try one small file
+
+Choose a file whose behavior is easy to test and understand. Convert it on a
+separate branch, read the conversion report, and review the Calor code and its
+rules. Some features may stay in C# or need more work; that is a reason to
+pause and review, not to force a full conversion.
+
+### Phase 3: Check the mixed application
+
+Build and run the whole application with both languages in place. Run the same
+tests you ran before, check the feature you changed, and review any warnings
+or limits in Calor's checks. Conversion success alone does not establish that
+the application's behavior is unchanged.
+
+### Phase 4: Expand only when it is useful
+
+Convert the next small file only after the first step works for your team.
+Repeat the review and tests each time. You can leave parts in C# as long as
+you need, stop after a single file, or return to your saved version. There is
+no requirement to convert the project in one pass.
+
+The steps below are the developer setup and commands for that journey. For
+help evaluating the risks and checks, see the
+[adoption guide](/docs/guides/adoption-playbook/).
 
 ## Overview
 
@@ -22,7 +56,8 @@ Adding Calor to an existing project is a gradual process:
 5. **Convert one C# file** - Validate and review the result
 6. **Inspect project impact** - Query a converted method and its callers
 
-You don't need to convert everything at once. Calor and C# coexist seamlessly.
+You don't need to convert everything at once. Calor and C# can share a .NET
+project, subject to the conversion and integration limits described below.
 
 ---
 
@@ -102,32 +137,27 @@ Create a new `.calr` file alongside your existing code:
 dotnet build
 ```
 
-The build process:
-
-1. Finds all `.calr` files in your project
-2. Compiles each to `.g.cs` in the `obj/calor/` directory
-3. Includes generated C# in the normal compilation
+Your normal .NET build now includes the Calor files alongside the existing
+code. Run your project's tests as well as building it before continuing.
 
 ---
 
-## Step 5: Convert High-Scoring C# Files
+## Step 5: Convert One C# File
 
-Based on your analysis results, convert files that score High or Critical:
+Use the assessment as a starting point, not an instruction to convert your
+most important code first. Choose one small, well-tested file that your team
+can review, then try the conversion on your working branch:
 
 ```bash
 # Convert, parse-check, and return the structured loss report
 calor convert src/Services/PaymentProcessor.cs --validate --format json
 
-# With benchmark comparison
-calor convert src/Services/PaymentProcessor.cs --validate --benchmark
 ```
 
-For bulk conversion:
-
-```bash
-calor migrate ./src --dry-run  # Preview first
-calor migrate ./src            # Execute
-```
+Do not convert the whole source directory for your first trial. Finish the
+review and tests for this file before deciding whether to convert another.
+The [migration command reference](/docs/cli/migrate/) covers project-wide
+options for developers who need them later.
 
 ### Review the Conversion Result
 
@@ -138,7 +168,7 @@ without `--format json`, inspect the equivalent text loss report. Review:
 - every `§CSHARP` block that preserves source the converter could not express
   natively,
 - validation diagnostics,
-- the generated C# and existing tests.
+- the Calor code, its rules, and your existing tests.
 
 When a member cannot be converted safely, `calor convert` can preserve the
 original C# inside `§CSHARP` rather than discarding the whole file. That is a

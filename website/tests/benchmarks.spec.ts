@@ -107,6 +107,9 @@ test('homepage explains benefits before showing technical details', async ({ pag
   await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
   await expect(page.getByText('Make AI-written .NET code easier to check and review.', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'What changes for your team?' })).toBeVisible();
-  await expect(page.locator('main')).not.toContainText('§F{');
+  const hero = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Calor', exact: true }) });
+  await expect(hero).not.toContainText('§F{');
+  await expect(page.getByRole('region', { name: 'Get started: run your first Calor program', exact: true })).toContainText('calor run Program.calr');
+  await expect(page.locator('main')).not.toContainText('generated C#');
   await expect(page.getByRole('link', { name: 'Language reference for developers and coding agents' })).toBeVisible();
 });

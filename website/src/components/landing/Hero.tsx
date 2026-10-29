@@ -218,7 +218,7 @@ export function Hero() {
               Make AI-written .NET code easier to check and review.
             </p>
             <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate style={{ animationDelay: '650ms' }}>
-              Calor helps you state what code should do, checks supported rules, and creates regular C# code.
+              State what code should do, check supported rules, and run your application on .NET.
             </p>
 
             <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate style={{ animationDelay: '800ms' }}>

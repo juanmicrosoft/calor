@@ -16,7 +16,7 @@ export function FirstProgram() {
         </div>
         <div className="rounded-lg border p-5">
           <h3 className="font-semibold">Use familiar .NET tools</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Calor produces C# that your team can build, test, and inspect with the .NET tools it already uses.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Calor applications run on the .NET runtime. Build and test them with familiar .NET tools.</p>
         </div>
       </div>
     </section>

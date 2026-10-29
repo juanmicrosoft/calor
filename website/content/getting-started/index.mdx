@@ -15,8 +15,8 @@ the .NET 10 SDK and a terminal. The steps below explain each part.
 
 ## Quick Overview
 
-Calor lets you record important rules alongside code. It creates C# that you
-can build and run with .NET.
+Calor lets you record important rules alongside code. Your application runs
+on the .NET runtime, using familiar .NET tools to build and test it.
 
 ---
 
@@ -153,7 +153,7 @@ explains the process and its limits.
 | Component | Description |
 |:----------|:------------|
 | MSBuild integration | `.calr` files compile automatically during `dotnet build` |
-| Generated output | C# files go to `obj/` directory, keeping source tree clean |
+| Build files | Temporary build files stay in `obj/`, separate from the code you edit |
 
 ### With Claude (`calor init --ai claude`)
 
