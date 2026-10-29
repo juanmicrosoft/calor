@@ -51,8 +51,8 @@ for (const width of [1366, 390]) {
     await expect(input).toHaveValue('');
     await expect(input).toBeFocused();
     await page.goto(root);
-    await page.getByRole('link', { name: 'Run your first example', exact: true }).click();
-    await expect(page).toHaveURL(/\/hello-world\/$/);
-    await expect(page.locator('article')).toContainText('without an AI subscription');
+    await page.getByRole('link', { name: 'Set up your coding agent', exact: true }).click();
+    await expect(page).toHaveURL(/\/docs\/getting-started\/$/);
+    await expect(page.locator('article')).toContainText('The key setup step is calor init');
   });
 }

@@ -9,6 +9,9 @@ description: "Convert an existing C# project to Calor in phases, starting with o
 You do not need to rewrite your application to try Calor. Start with your
 existing C# project, convert one small part, and keep the rest in C#. Both can
 remain in the same .NET application while you decide what to convert next.
+Initialize Calor for your coding agent, then ask it to propose and carry out
+one small change. The agent writes the code; you review the behavior and
+check results.
 
 ---
 
@@ -17,13 +20,14 @@ remain in the same .NET application while you decide what to convert next.
 ### Phase 1: Keep your working project
 
 Run your existing build and tests before making changes. Save a version you
-can return to. Add Calor's build support without replacing the application's
-starting code or converting every file.
+can return to. [Run `calor init` for your coding agent](/docs/getting-started/#step-3-initialize-calor-for-your-agent)
+without replacing the application's starting code or converting every file.
 
 ### Phase 2: Try one small file
 
-Choose a file whose behavior is easy to test and understand. Convert it on a
-separate branch, read the conversion report, and review the Calor code and its
+Ask the agent to propose a file whose behavior is easy to test and understand.
+Approve the choice, then have it convert that file on a separate branch.
+Read the conversion report, and review the Calor code and its
 rules. Some features may stay in C# or need more work; that is a reason to
 pause and review, not to force a full conversion.
 
@@ -41,7 +45,7 @@ Repeat the review and tests each time. You can leave parts in C# as long as
 you need, stop after a single file, or return to your saved version. There is
 no requirement to convert the project in one pass.
 
-The steps below are the developer setup and commands for that journey. For
+The steps below explain the setup and commands your agent can use. For
 help evaluating the risks and checks, see the
 [adoption guide](/docs/guides/adoption-playbook/).
 
@@ -49,9 +53,9 @@ help evaluating the risks and checks, see the
 
 Adding Calor to an existing project is a gradual process:
 
-1. **Enable Calor** - Add MSBuild integration
+1. **Initialize Calor for your agent** - Add build support and project guidance
 2. **Analyze the codebase** - Find useful pilot candidates
-3. **Add a Calor file** - Confirm the mixed project builds
+3. **Ask for a small Calor change** - Let the agent write the code
 4. **Build and verify** - Exercise the normal project workflow
 5. **Convert one C# file** - Validate and review the result
 6. **Inspect project impact** - Query a converted method and its callers
@@ -63,23 +67,29 @@ project, subject to the conversion and integration limits described below.
 
 ## Step 1: Enable Calor in Your Project
 
-Enable Calor with MSBuild integration:
+In your existing project folder, choose the initialization command for your
+coding agent:
 
 ```bash
-# Initialize Calor in your project
-calor init
-
-# Or specify a specific project file
-calor init --project MyApp.csproj
+# Choose one:
+calor init --ai claude
+calor init --ai codex
+calor init --ai gemini
+calor init --ai github
 ```
 
-Your `.csproj` is updated with MSBuild targets that compile `.calr` files automatically during `dotnet build`.
+This adds build support and the chosen agent's instructions and tools.
+Open or restart the agent in the same folder and follow its setup prompts.
+The [getting-started guide](/docs/getting-started/) covers those steps.
+With multiple projects, add `--project MyApp.csproj` to select one.
+Your normal `dotnet build` will include Calor files.
 
 ---
 
 ## Step 2: Analyze Your Codebase
 
-Use `calor assess` to find C# files that would benefit most from Calor:
+Ask the agent to assess the codebase and propose a small conversion.
+It can use `calor assess` to identify candidates:
 
 ```bash
 # Analyze your source directory
@@ -113,20 +123,16 @@ Top 10 Files for Migration:
 
 ---
 
-## Step 3: Add Your First Calor File
+## Step 3: Ask for a Small Calor Change
 
-Create a new `.calr` file alongside your existing code:
+You can try new functionality before converting existing code. Ask your agent:
 
-```calor
-§M{m001:Calculator}
+> Add a small order-total calculator in Calor. Reject negative prices and
+> quantities, add tests, and run the project's build and tests. Preserve the
+> existing application entry point and leave unrelated code unchanged.
 
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-
-```
+The agent creates the Calor code. Review its rules and the test results.
+You do not need to type a `.calr` file yourself.
 
 ---
 
@@ -146,7 +152,7 @@ code. Run your project's tests as well as building it before continuing.
 
 Use the assessment as a starting point, not an instruction to convert your
 most important code first. Choose one small, well-tested file that your team
-can review, then try the conversion on your working branch:
+can review, then ask the agent to convert it on your working branch. It can use:
 
 ```bash
 # Convert, parse-check, and return the structured loss report
@@ -254,15 +260,9 @@ for the complete pre-edit and post-edit loop.
 
 ---
 
-## Optional: Enable Claude Code Integration
+## Example: Continue with Claude Code
 
-For AI-assisted Calor development:
-
-```bash
-calor init --ai claude
-```
-
-This adds:
+If you chose `calor init --ai claude` during setup, you already have:
 - `/calor` and `/calor-convert` skills
 - `CLAUDE.md` with guidelines instructing Claude to write new code in Calor and analyze C# files before modifying them
 

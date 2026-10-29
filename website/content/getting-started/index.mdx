@@ -3,13 +3,16 @@ title: "Getting Started"
 section: "getting-started"
 order: 0
 hasChildren: true
-description: "Try Calor with a small example, then decide whether to add it to your .NET project or connect an AI coding assistant."
+description: "Initialize a new or existing .NET project for your coding agent, then describe what you want it to build in Calor."
 ---
 
 
-You can try Calor with a small program before connecting an AI coding
-assistant or changing an existing project. To run it yourself, you will need
-the .NET 10 SDK and a terminal. The steps below explain each part.
+The key setup step is `calor init`: it prepares your project and gives your
+coding agent the instructions and tools it needs to work with Calor. You
+describe the task; the agent writes the code. You do not need to type Calor
+code yourself.
+
+The same workflow works for a new project or one you already have.
 
 ---
 
@@ -22,11 +25,11 @@ on the .NET runtime, using familiar .NET tools to build and test it.
 
 ## What You'll Learn
 
-1. **[Hello World](/docs/getting-started/hello-world/)** — Run a small example without an AI account or an existing project.
-2. **[Installation](/docs/getting-started/installation/)** — Set up the tools needed to try Calor.
-3. **[How It Works](/docs/getting-started/how-it-works/)** — See how to make and check a change.
-4. **[Add Calor to a project](/docs/guides/adding-calor-to-existing-projects/)** — Keep your C# code and start with one small part.
-5. **[Connect an AI coding assistant](/docs/getting-started/#step-3-optional-connect-an-ai-coding-assistant)** — Optional setup for supported tools.
+1. **[Install Calor](#installation)** — Get the tools ready.
+2. **[Open a project](#step-1-open-a-new-or-existing-project)** — Use an existing project or create a new one.
+3. **[Initialize your agent](#step-3-initialize-calor-for-your-agent)** — Give your agent Calor instructions and tools.
+4. **[Ask for a change](#step-4-ask-your-agent-to-build-something)** — Describe a task, then review the result.
+5. **[Convert existing code in phases](/docs/guides/adding-calor-to-existing-projects/)** — Keep your C# code and move one small part at a time.
 
 ---
 
@@ -34,6 +37,8 @@ on the .NET runtime, using familiar .NET tools to build and test it.
 
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
 - A terminal or command prompt
+- A supported coding agent: Claude Code, Codex, Gemini CLI, or GitHub Copilot,
+  installed and signed in as required by that tool
 
 ---
 
@@ -58,91 +63,98 @@ dotnet tool update -g calor
 You can add Calor to a new or existing .NET project. The setup adds build
 support for Calor files; your existing C# code can stay as it is.
 
-### Step 1: Start with a .NET project
+### Step 1: Open a new or existing project
+
+For an existing project, open a terminal in its folder. Keep its current
+starting code and run its usual build and tests before making changes.
+
+Starting a new project? Use a new folder name:
 
 ```bash
-# Create a new project, or use an existing one
 dotnet new console -o MyApp
 cd MyApp
 ```
 
-### Step 2: Add Calor to the project
+### Step 2: Check that you are in the project folder
 
-```bash
-calor init
-```
+The folder should contain your `.csproj` project file or solution. This is
+where you will run `calor init` and open your coding agent. If there are
+multiple projects, the [init reference](/docs/cli/init/) explains how to select
+one with `--project` or initialize a solution with `--solution`.
 
-This connects Calor to the .NET build, so Calor files are handled when you
-build the project.
+### Step 3: Initialize Calor for your agent
 
-### Step 3: (Optional) Connect an AI coding assistant
+Choose **one** command for the coding agent you use. Each command adds both
+Calor build support and that agent's project setup; you do not need to run
+plain `calor init` first.
 
-For Claude Code (with enforced Calor-first via hooks):
+For [Claude Code](/docs/getting-started/claude-integration/):
 ```bash
 calor init --ai claude
 ```
 
-For OpenAI Codex CLI (project hooks and MCP):
+For [Codex](/docs/getting-started/codex-integration/):
 ```bash
 calor init --ai codex
 ```
 
-For Google Gemini CLI (with enforced Calor-first via hooks):
+For [Gemini CLI](/docs/getting-started/gemini-integration/):
 ```bash
 calor init --ai gemini
 ```
 
-For GitHub Copilot (guidance-based):
+For [GitHub Copilot](/docs/getting-started/github-integration/):
 ```bash
 calor init --ai github
 ```
 
-This adds project guidance so the assistant knows how to work with Calor and
-your existing C# code.
+This prepares the .NET build for Calor files and adds guidance and tools for
+your agent. Open or restart the agent in the same project folder so it loads
+the new setup, and follow its configuration and trust prompts. Keep your
+existing files; initialization does not mean converting the whole project.
 
 **Note:** Claude Code, Gemini CLI, and Codex can configure Calor-first hooks.
 For Codex, review and trust the generated hooks with `/hooks`, then run the
 generated smoke test because specialized file-change paths may bypass lifecycle
 hooks. GitHub Copilot is guidance-based with MCP tool support.
 
-### Step 4: Add a Calor file
+### Step 4: Ask your agent to build something
 
-After setup, create a `.calr` file. It will be included the next time you
-build the project. For a first example, create `Program.calr`:
+Give the agent a small, concrete task in everyday language. For example:
 
-```calor
-§M{m001:MyApp}
-  §F{f001:Main:pub}
-    §O{void}
-    §E{cw}
-    §P "Hello from Calor!"
-```
+> Use Calor to add a function that calculates an order total from item prices
+> and quantities. Reject negative prices and quantities. Add tests and run
+> the project's build and tests. Leave unrelated code unchanged.
 
-Then build:
+The agent writes the Calor code and tests. You review whether the result
+matches your request, whether its rules make sense, and whether the build
+and tests passed. Read any warnings or checks that could not decide.
 
-```bash
-dotnet build
-```
+If something fails, give the agent the actual error and ask it to fix that
+specific problem. Setup and passing checks do not guarantee correct code.
 
-See [Hello World](/docs/getting-started/hello-world/) for the full example.
+See [How it works](/docs/getting-started/how-it-works/) for the review cycle.
 
 ### Step 5: (Optional) Convert some existing C# code
 
-If you want to convert existing C# files, first check which ones Calor can
-handle well:
+Ask the agent to assess existing C# code and propose one small, well-tested
+file to convert first. It can use:
 
 ```bash
 calor assess ./src --top 10
 ```
 
-Then try converting a file with a high score:
+Review the choice before conversion. The agent can then convert the file:
 
 ```bash
 calor convert HighScoreFile.cs
 ```
 
-The [project integration guide](/docs/guides/adding-calor-to-existing-projects/)
-explains the process and its limits.
+An assessment score is not a reason to convert everything. Review the
+conversion report, keep the rest of the project in place, and run your tests
+before moving to another file. The
+[phased conversion guide](/docs/guides/adding-calor-to-existing-projects/)
+explains the journey and its limits.
 
 ---
 
@@ -160,7 +172,7 @@ explains the process and its limits.
 | Component | Description |
 |:----------|:------------|
 | Claude Code skills | `/calor` to write Calor code, `/calor-convert` to convert C# |
-| Hook configuration | **Enforces Calor-first** - blocks `.cs` file creation |
+| Hook configuration | Validates covered file writes, including attempts to create `.cs` files |
 | CLAUDE.md | Project guidelines instructing Claude to prefer Calor for new code |
 
 ### With Codex (`calor init --ai codex`)
@@ -179,7 +191,7 @@ builds, tests, and repository-wide checks remain necessary.
 | Component | Description |
 |:----------|:------------|
 | Gemini CLI skills | `@calor` to write Calor code, `@calor-convert` to convert C# |
-| Hook configuration | **Enforces Calor-first** - blocks `.cs` file creation via `BeforeTool` hook |
+| Hook configuration | Validates covered file writes through a supported `BeforeTool` hook |
 | GEMINI.md | Project guidelines instructing Gemini to prefer Calor for new code |
 
 ### With GitHub Copilot (`calor init --ai github`)
@@ -202,8 +214,12 @@ builds, tests, and repository-wide checks remain necessary.
 | Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` | `copilot-instructions.md` |
 | Skill invocation | `/calor` | `@calor` | Not applicable | Reference skill name |
 | MCP tools | `~/.claude.json` | `.gemini/settings.json` | `.codex/config.toml` | `.vscode/mcp.json` |
-| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | **Hooks for covered writes** | Guidance + MCP tools |
+| Guardrails | Hooks for covered writes | Hooks for covered writes | Hooks for covered writes | Guidance + MCP tools |
 | Hook mechanism | `PreToolUse` | `BeforeTool` | Codex project hooks | None |
+
+Hooks are not a filesystem sandbox. Their coverage depends on the client,
+configuration, and tools used. Guidance and hooks do not guarantee a correct
+change; keep reviewing results and running tests.
 
 ---
 
@@ -216,7 +232,8 @@ For alternative installation methods (global tool only, manual Claude skills set
 ## Next Steps
 
 - [Installation](/docs/getting-started/installation/) - Detailed setup instructions
-- [Hello World](/docs/getting-started/hello-world/) - Understand the hello world program
+- [How it works](/docs/getting-started/how-it-works/) - Ask your agent for a change and review the result
 - [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) - Complete migration guide
 - [Syntax Reference](/docs/syntax-reference/) - Complete language reference
 - [CLI Reference](/docs/cli/) - All `calor` commands including migration analysis
+- [Manual Hello World](/docs/getting-started/hello-world/) - Optional reference for developers who want to run a hand-written file

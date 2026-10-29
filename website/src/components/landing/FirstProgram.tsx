@@ -8,7 +8,7 @@ export function FirstProgram() {
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border p-5">
           <h3 className="font-semibold">Start with your goal</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Explain the change you want in everyday language. You do not need to start by learning Calor’s notation.</p>
+          <p className="mt-2 text-sm text-muted-foreground">After setup, explain the change you want in everyday language. Your coding agent writes the Calor code.</p>
         </div>
         <div className="rounded-lg border p-5">
           <h3 className="font-semibold">Make expectations visible</h3>

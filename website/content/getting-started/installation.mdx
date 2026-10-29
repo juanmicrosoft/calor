@@ -12,9 +12,9 @@ This guide covers installing the Calor compiler and setting up your development 
 Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), not just the runtime.
 Check `dotnet --version` before the commands below.
 
-- [Try your first program](/docs/getting-started/hello-world/) — a complete new-directory path, without an AI subscription.
+- [Get started with your coding agent](/docs/getting-started/) — initialize a new or existing project, then ask for a change.
 - [Adopt Calor in an existing project](/docs/guides/adoption-playbook/) — preserve your application and its entry point.
-- [Connect an optional agent](#ai-agent-integration) — choose a provider after project setup.
+- [Set up your agent](#ai-agent-integration) — choose your provider's initialization command.
 - [Contribute to the compiler](/docs/contributing/) — source builds and contributor tests are a separate path.
 
 ---
@@ -27,14 +27,14 @@ Install the Calor compiler as a global .NET tool:
 dotnet tool install -g calor
 ```
 
-After installation, run a Calor program on .NET:
+After installation, check that Calor is available:
 
 ```bash
-calor run Program.calr
+calor --version
 ```
 
-The [first-program guide](/docs/getting-started/hello-world/) provides the
-complete `Program.calr` example.
+Next, [open a new or existing project and run `calor init` for your agent](/docs/getting-started/#step-1-open-a-new-or-existing-project).
+The agent writes the Calor code after you describe a task.
 
 To update to the latest version:
 
@@ -304,5 +304,5 @@ ls src/
 
 ## Next Steps
 
-- [Hello World](/docs/getting-started/hello-world/) - Understand Calor syntax
+- [Get started with your agent](/docs/getting-started/) - Initialize your project and ask for a change
 - [Syntax Reference](/docs/syntax-reference/) - Complete language reference

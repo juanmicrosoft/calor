@@ -7,7 +7,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 390, height: 844 
     await page.route('https://**/*', route => route.abort());
     await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
     const hero = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Calor', exact: true }) });
-    const action = hero.getByRole('link', { name: 'Try a guided example' });
+    const action = hero.getByRole('link', { name: 'Get started with your agent' });
     await expect(hero.getByText('Make AI-written .NET code easier to check and review.')).toBeInViewport();
     const box = await action.boundingBox();
     expect(box).not.toBeNull();
@@ -20,9 +20,10 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 390, height: 844 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.width}-first-screen.png`) });
     await action.click();
-    await expect(page).toHaveURL(/\/docs\/getting-started\/hello-world\/$/);
-    await expect(page.getByRole('heading', { name: 'Prerequisites', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Run without a project', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/docs\/getting-started\/$/);
+    await expect(page.getByRole('heading', { name: 'Step 1: Open a new or existing project', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Step 3: Initialize Calor for your agent', exact: true })).toBeVisible();
+    await expect(page.locator('article')).toContainText('You do not need to type Calor code yourself.');
   });
 }
 
@@ -33,17 +34,27 @@ for (const width of [1366, 390, 320]) {
     await page.route('https://**/*', route => route.abort());
     await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
     for (const name of ['What changes for your team?', 'Catch mismatches before you rely on a change',
-      'An early project, with honest limits', 'Choose how you want to explore Calor', 'Keep exploring']) {
+      'An early project, with honest limits', 'Get started with your coding agent', 'Keep exploring']) {
       await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     }
     await expect(page.getByRole('heading', { name: 'Built for How AI Actually Writes Code' })).toHaveCount(0);
     await expect(page.getByText('Verified findings default', { exact: true })).toHaveCount(0);
     await expect(page.locator('.animate-pulse-glow')).toHaveCount(0);
-    const example = page.getByRole('region', { name: 'Get started: run your first Calor program', exact: true });
+    const example = page.getByRole('region', { name: 'Set up once, then ask your agent', exact: true });
     await expect(example).toContainText('dotnet tool install -g calor');
-    await expect(example).toContainText('calor run Program.calr');
-    await expect(example).toContainText('Hello from Calor!');
-    await expect(example).toContainText('§F{');
+    await expect(example).toContainText('dotnet new console -o MyApp');
+    await expect(example).toContainText('existing project folder');
+    for (const agent of ['claude', 'codex', 'gemini', 'github']) {
+      await expect(example).toContainText(`calor init --ai ${agent}`);
+    }
+    await expect(example.locator('blockquote')).toContainText('Add tests and run');
+    await expect(example).toContainText('You do not need to type Calor code yourself.');
+    await expect(example).not.toContainText('§F{');
+    await expect(example).not.toContainText('Program.calr');
+    await example.getByRole('link', { name: 'Follow the complete agent setup' }).click();
+    await expect(page).toHaveURL(/\/docs\/getting-started\/$/);
+    await expect(page.getByRole('heading', { name: 'Step 4: Ask your agent to build something', exact: true })).toBeVisible();
+    await page.goBack();
     await expect(page.locator('main')).not.toContainText('generated C#');
     await page.getByRole('link', { name: 'Follow the phased conversion guide' }).click();
     await expect(page.getByRole('heading', { name: 'Your journey, one phase at a time' })).toBeVisible();

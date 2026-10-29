@@ -5,7 +5,7 @@ for (const dark of [false, true]) {
     await page.route('https://**/*', route => route.abort());
     await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
     await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), dark);
-    const choices = page.getByRole('heading', { name: 'Choose how you want to explore Calor' }).locator('..').locator('..');
+    const choices = page.getByRole('heading', { name: 'Get started with your coding agent' }).locator('..').locator('..');
     const contrast = () => choices.locator('p, a').evaluateAll(nodes => {
       const channels = (color: string) => (color.match(/[\d.]+/g) || []).map(Number);
       const over = (foreground: number[], background: number[]) =>

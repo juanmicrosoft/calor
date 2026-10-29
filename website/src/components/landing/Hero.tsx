@@ -223,8 +223,8 @@ export function Hero() {
 
             <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate style={{ animationDelay: '800ms' }}>
               <Button asChild size="lg" className="bg-gradient-to-r from-calor-pink to-calor-salmon hover:from-calor-pink/90 hover:to-calor-salmon/90 text-white border-0 shadow-lg shadow-calor-pink/25">
-                <Link href="/docs/getting-started/hello-world/" onClick={() => trackCtaClick('get_started')}>
-                  Try a guided example
+                <Link href="/docs/getting-started/" onClick={() => trackCtaClick('get_started')}>
+                  Get started with your agent
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

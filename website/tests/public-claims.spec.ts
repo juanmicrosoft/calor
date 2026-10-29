@@ -320,11 +320,14 @@ for (const width of [1366, 390]) {
   });
 }
 
-test('task-first workflow keeps an account-free path and bounded provider guidance', async ({ page }) => {
+test('agent-first workflow keeps manual reference and bounded provider guidance', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   await page.goto(`${base}/docs/getting-started/how-it-works/`);
   const article = page.locator('article');
+  await expect(article).toContainText('Your coding agent writes the Calor code');
+  await expect(article).toContainText('calor init');
+  await expect(article).toContainText('you do not need to create a .calr file yourself');
   await expect(article).toContainText('without an AI account');
   await expect(article).toContainText('not a filesystem sandbox');
   await expect(article).not.toContainText('reliable system, not a hopeful one');
