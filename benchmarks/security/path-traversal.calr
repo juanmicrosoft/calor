@@ -9,30 +9,30 @@
     §I{string:user_path}
     §O{string}
     §E{fs:r}
-    §B{content:string} (CALL file.read user_path)
+    §B{content:string} §C{System.IO.File.ReadAllText} §A user_path §/C
     §R content
 
   §F{f002:SafeWhitelistedPath:pub}
     // SAFE: Only whitelisted paths allowed
     // EXPECTED: No warnings
-    §I{string:filename}
+    §I{string:user_input}
     §O{string}
     §E{fs:r}
-    §B{basePath:string} STR:"/app/public/"
-    §B{safeName:string} (CALL path.basename filename)
-    §B{fullPath:string} (+ basePath safeName)
-    §B{content:string} (CALL file.read fullPath)
-    §R content
+    §IF{if1} (== user_input STR:"index.html")
+      §R §C{System.IO.File.ReadAllText} §A STR:"/app/public/index.html" §/C
+    §IF{if2} (== user_input STR:"about.html")
+      §R §C{System.IO.File.ReadAllText} §A STR:"/app/public/about.html" §/C
+    §R STR:""
 
   §F{f003:VulnerablePathJoin:pub}
     // BUG: User input used in path.join
     // EXPECTED: Calor0983 Path Traversal
-    §I{string:request_path}
+    §I{string:user_path}
     §O{string}
     §E{fs:r}
-    §B{base:string} STR:"/var/data"
-    §B{fullPath:string} (CALL path.join base request_path)
-    §B{content:string} (CALL fs.read fullPath)
+    §B{basePath:string} STR:"/var/data"
+    §B{fullPath:string} §C{System.IO.Path.Combine} §A basePath §A user_path §/C
+    §B{content:string} §C{System.IO.File.ReadAllText} §A fullPath §/C
     §R content
 
   §F{f004:SafeSanitizedPath:pub}
@@ -41,21 +41,23 @@
     §I{string:user_input}
     §O{string}
     §E{fs:r}
-    §B{sanitized:string} (CALL path_sanitize user_input)
-    §B{base:string} STR:"/safe/directory/"
-    §B{fullPath:string} (+ base sanitized)
-    §B{content:string} (CALL file.read fullPath)
+    §B{sanitized:string} (?? §C{System.IO.Path.GetFileName} §A user_input §/C STR:"")
+    §IF{if3} (|| (== sanitized STR:".") (== sanitized STR:".."))
+      §R STR:""
+    §B{basePath:string} STR:"/safe/directory/"
+    §B{fullPath:string} (+ basePath sanitized)
+    §B{content:string} §C{System.IO.File.ReadAllText} §A fullPath §/C
     §R content
 
   §F{f005:VulnerableFileWrite:pub}
     // BUG: Writing to user-controlled path
     // EXPECTED: Calor0983 Path Traversal
-    §I{string:form_input}
+    §I{string:user_input}
     §I{string:content}
     §O{void}
     §E{fs:w}
-    §B{path:string} (+ STR:"/uploads/" form_input)
-    §C file.write path content
+    §B{path:string} (+ STR:"/uploads/" user_input)
+    §C{System.IO.File.WriteAllText} §A path §A content §/C
 
   §F{f006:SafeConstantPath:pub}
     // SAFE: Path is a constant
@@ -63,6 +65,5 @@
     §O{string}
     §E{fs:r}
     §B{path:string} STR:"/etc/app/config.json"
-    §B{content:string} (CALL file.read path)
+    §B{content:string} §C{System.IO.File.ReadAllText} §A path §/C
     §R content
-

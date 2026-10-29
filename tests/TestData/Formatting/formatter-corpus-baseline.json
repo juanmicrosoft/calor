@@ -1,6 +1,6 @@
 {
   "trackedFileCount": 952,
-  "successfulTransformationCount": 698,
+  "successfulTransformationCount": 702,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -35,18 +35,15 @@
     "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
     "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
     "bench/mcp/tasks/20-fix-unclosed-call/input.calr",
-    "benchmarks/arithmetic/div-by-zero.calr",
-    "benchmarks/loops/bounds-violation.calr",
-    "benchmarks/null-safety/null-deref.calr",
-    "benchmarks/security/command-injection.calr",
-    "benchmarks/security/path-traversal.calr",
-    "benchmarks/security/sql-injection.calr",
     "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
     "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
     "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
   ],
   "conservativeFallbacks": {
     "semanticErrors": [
+      "benchmarks/null-safety/null-deref.calr",
+      "benchmarks/security/command-injection.calr",
+      "benchmarks/security/sql-injection.calr",
       "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-002-inventory/calor+v0.14.3/run-1/final-src/Inventory.calr",
       "bench/phase0-agent-native/epochs/w5-parity-001/N1-002-inventory/calor+treatment/run-4/final-src/Inventory.calr",
       "bench/phase0-agent-native/epochs/w5-parity-001/N1-002-inventory/calor+treatment/run-5/final-src/Inventory.calr",
@@ -139,7 +136,6 @@
       "bench/phase0-agent-native/pairs/W5C-001-catalog-cache/calor/Catalog.calr",
       "bench/phase0-agent-native/pairs/W5C-002-ledger-view/calor/Ledger.calr",
       "bench/phase0-agent-native/pairs/W5C-003-session-index/calor/Session.calr",
-      "benchmarks/arithmetic/overflow.calr",
       "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/11-05.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr",

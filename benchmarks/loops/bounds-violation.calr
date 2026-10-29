@@ -7,18 +7,19 @@
     // BUG: Array access with unchecked index
     // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:index}
-    §I{i32:len}
+    §I{i32[]:items}
     §O{i32}
-    §R (CALL array.get index)
+    §R §IDX items index
 
   §F{f002:SafeBoundsCheck:pub}
     // SAFE: Bounds check before access
     // EXPECTED: No warnings
     §I{i32:index}
-    §I{i32:len}
+    §I{i32[]:items}
     §O{i32}
-    §IF (&& (>= index INT:0) (< index len))
-      §R (CALL array.get index)
+    §B{len:i32} §LEN items
+    §IF{if1} (&& (>= index INT:0) (< index len))
+      §R §IDX items index
     §EL
       §R INT:-1
 
@@ -26,62 +27,68 @@
     // BUG: Loop can exceed array bounds
     // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:n}
-    §I{i32:len}
+    §I{i32[]:items}
     §O{i32}
-    §B{sum:i32} INT:0
+    §B{~sum:i32} INT:0
     §L{l1:i:0:n:1}
-      §B{val:i32} (CALL array.get i)
-      §B{sum:i32} (+ sum val)
+      §B{val:i32} §IDX items i
+      §ASSIGN sum (+ sum val)
     §R sum
 
   §F{f004:SafeLoopWithinBounds:pub}
     // SAFE: Loop bounded by array length
     // EXPECTED: No warnings
-    §I{i32:len}
+    §I{i32[]:items}
     §O{i32}
-    §B{sum:i32} INT:0
-    §L{l1:i:0:len:1}
-      §B{val:i32} (CALL array.get i)
-      §B{sum:i32} (+ sum val)
+    §B{len:i32} §LEN items
+    §B{upper:i32} (- len INT:1)
+    §B{~sum:i32} INT:0
+    §L{l2:i:0:upper:1}
+      §B{val:i32} §IDX items i
+      §ASSIGN sum (+ sum val)
     §R sum
 
   §F{f005:VulnerableNegativeIndex:pub}
     // BUG: Index can be negative
     // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:offset}
-    §I{i32:base}
+    §I{i32:startIndex}
+    §I{i32[]:items}
     §O{i32}
-    §B{index:i32} (- base offset)
-    §R (CALL array.get index)
+    §B{index:i32} (- startIndex offset)
+    §R §IDX items index
 
   §F{f006:SafeClampedIndex:pub}
     // SAFE: Index clamped to valid range
     // EXPECTED: No warnings
     §I{i32:index}
-    §I{i32:len}
+    §I{i32[]:items}
     §O{i32}
-    §B{minIdx:i32} (CALL math.max index INT:0)
-    §B{safeIdx:i32} (CALL math.min minIdx (- len INT:1))
-    §R (CALL array.get safeIdx)
+    §Q (> §LEN items INT:0)
+    §B{len:i32} §LEN items
+    §B{minIdx:i32} §C{System.Math.Max} §A index §A INT:0 §/C
+    §B{safeIdx:i32} §C{System.Math.Min} §A minIdx §A (- len INT:1) §/C
+    §R §IDX items safeIdx
 
   §F{f007:VulnerableOffByOne:pub}
     // BUG: Classic off-by-one error
     // EXPECTED: Calor0921 Index Out of Bounds
-    §I{i32:len}
+    §I{i32[]:items}
     §O{i32}
-    §B{sum:i32} INT:0
-    §L{l1:i:0:(+ len INT:1):1}
-      §B{val:i32} (CALL array.get i)
-      §B{sum:i32} (+ sum val)
+    §B{len:i32} §LEN items
+    §B{~sum:i32} INT:0
+    §B{end:i32} (+ len INT:1)
+    §L{l3:i:0:end:1}
+      §B{val:i32} §IDX items i
+      §ASSIGN sum (+ sum val)
     §R sum
 
   §F{f008:SafeWithPrecondition:pub}
     // SAFE: Precondition guarantees valid index
     // EXPECTED: No warnings
     §I{i32:index}
-    §I{i32:len}
-    §Q (>= index INT:0)
-    §Q (< index len)
+    §I{i32[]:items}
     §O{i32}
-    §R (CALL array.get index)
-
+    §Q (>= index INT:0)
+    §Q (< index §LEN items)
+    §R §IDX items index

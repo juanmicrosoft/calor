@@ -17,7 +17,7 @@
     §I{i32:a}
     §I{i32:b}
     §O{i32}
-    §B{result:i32} (CALL checked_add a b)
+    §B{result:i32} §CS{checked(a + b)}
     §R result
 
   §F{f003:VulnerableMultiplication:pub}
@@ -46,10 +46,12 @@
     §R (<< x n)
 
   §F{f006:SafeBoundedShift:pub}
-    // SAFE: Shift amount bounded
+    // SAFE: Both the operand and shift amount are bounded
     // EXPECTED: No warnings
     §I{i32:x}
     §O{i32}
+    §Q (>= x INT:-536870912)
+    §Q (<= x INT:536870911)
     §R (<< x INT:2)
 
   §F{f007:VulnerableAccumulator:pub}
@@ -57,17 +59,16 @@
     // EXPECTED: Calor0923 Integer Overflow
     §I{i32:n}
     §O{i32}
-    §B{sum:i32} INT:0
+    §B{~sum:i32} INT:0
     §L{l1:i:1:n:1}
-      §B{sum:i32} (+ sum i)
+      §ASSIGN sum (+ sum i)
     §R sum
 
   §F{f008:SafeBoundedAccumulator:pub}
     // SAFE: Loop bound prevents overflow
     // EXPECTED: No warnings
     §O{i32}
-    §B{sum:i32} INT:0
-    §L{l1:i:1:100:1}
-      §B{sum:i32} (+ sum i)
+    §B{~sum:i32} INT:0
+    §L{l2:i:1:100:1}
+      §ASSIGN sum (+ sum i)
     §R sum
-

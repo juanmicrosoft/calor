@@ -9,9 +9,9 @@
     §I{string:user_input}
     §O{string}
     §E{db:w}
-    §B{query:string} (+ STR:"SELECT * FROM users WHERE name = '" user_input)
-    §B{query:string} (+ query STR:"'")
-    §C db.execute query
+    §B{~query:string} (+ STR:"SELECT * FROM users WHERE name = '" user_input)
+    §ASSIGN query (+ query STR:"'")
+    §C{db.execute} §A query §/C
     §R query
 
   §F{f002:SafeParameterizedQuery:pub}
@@ -21,22 +21,22 @@
     §O{string}
     §E{db:w}
     §B{query:string} STR:"SELECT * FROM users WHERE name = ?"
-    §C db.execute_param query user_input
+    §C{db.execute_param} §A query §A user_input §/C
     §R query
 
   §F{f003:VulnerableMultipleConcatenation:pub}
     // BUG: Multiple concatenations with user input
     // EXPECTED: Calor0981 SQL Injection
-    §I{string:name}
-    §I{string:email}
+    §I{string:user_input}
+    §I{string:user_data}
     §O{string}
     §E{db:w}
-    §B{query:string} STR:"INSERT INTO users (name, email) VALUES ('"
-    §B{query:string} (+ query name)
-    §B{query:string} (+ query STR:"', '")
-    §B{query:string} (+ query email)
-    §B{query:string} (+ query STR:"')")
-    §C db.execute query
+    §B{~query:string} STR:"INSERT INTO users (name, email) VALUES ('"
+    §ASSIGN query (+ query user_input)
+    §ASSIGN query (+ query STR:"', '")
+    §ASSIGN query (+ query user_data)
+    §ASSIGN query (+ query STR:"')")
+    §C{db.execute} §A query §/C
     §R query
 
   §F{f004:SafeEscapedInput:pub}
@@ -45,23 +45,23 @@
     §I{string:user_input}
     §O{string}
     §E{db:w}
-    §B{escaped:string} (CALL sql_escape user_input)
-    §B{query:string} (+ STR:"SELECT * FROM users WHERE name = '" escaped)
-    §B{query:string} (+ query STR:"'")
-    §C db.execute query
+    §B{escaped:string} §C{sql_escape} §A user_input §/C
+    §B{~query:string} (+ STR:"SELECT * FROM users WHERE name = '" escaped)
+    §ASSIGN query (+ query STR:"'")
+    §C{db.execute} §A query §/C
     §R query
 
   §F{f005:VulnerableIndirectTaint:pub}
     // BUG: Taint propagates through intermediate variable
     // EXPECTED: Calor0981 SQL Injection
-    §I{string:request_param}
+    §I{string:user_input}
     §O{string}
     §E{db:w}
-    §B{name:string} request_param
+    §B{name:string} user_input
     §B{search:string} name
-    §B{query:string} (+ STR:"SELECT * FROM users WHERE name LIKE '%" search)
-    §B{query:string} (+ query STR:"%'")
-    §C db.query query
+    §B{~query:string} (+ STR:"SELECT * FROM users WHERE name LIKE '%" search)
+    §ASSIGN query (+ query STR:"%'")
+    §C{db.query} §A query §/C
     §R query
 
   §F{f006:SafeConstantQuery:pub}
@@ -71,6 +71,5 @@
     §E{db:w}
     §B{tableName:string} STR:"users"
     §B{query:string} (+ STR:"SELECT COUNT(*) FROM " tableName)
-    §C db.execute query
+    §C{db.execute} §A query §/C
     §R query
-

@@ -17,7 +17,7 @@
     §I{i32:x}
     §I{i32:y}
     §O{i32}
-    §IF (!= y INT:0)
+    §IF{if1} (!= y INT:0)
       §R (/ x y)
     §EL
       §R INT:0
@@ -42,9 +42,9 @@
     // EXPECTED: Calor0920 Division by Zero
     §I{i32:n}
     §O{i32}
-    §B{result:i32} INT:0
+    §B{~result:i32} INT:0
     §L{l1:i:0:n:1}
-      §B{result:i32} (+ result (/ INT:100 i))
+      §ASSIGN result (+ result (/ INT:100 i))
     §R result
 
   §F{f006:SafeDivisionInLoopFromOne:pub}
@@ -52,9 +52,9 @@
     // EXPECTED: No warnings
     §I{i32:n}
     §O{i32}
-    §B{result:i32} INT:0
-    §L{l1:i:1:n:1}
-      §B{result:i32} (+ result (/ INT:100 i))
+    §B{~result:i32} INT:0
+    §L{l2:i:1:n:1}
+      §ASSIGN result (+ result (/ INT:100 i))
     §R result
 
   §F{f007:VulnerableDivisionAfterDecrement:pub}
@@ -74,4 +74,3 @@
     §Q (> y INT:0)
     §O{i32}
     §R (/ x y)
-

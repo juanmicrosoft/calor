@@ -731,6 +731,7 @@ public sealed class TaintAnalysis
     {
         var argumentFlows = arguments
             .SelectMany(argument => EvaluateExpression(argument, state))
+            .Concat(call.Receiver == null ? [] : EvaluateExpression(call.Receiver, state))
             .ToArray();
         var source = IdentifySource(call);
         if (source != null)
@@ -1181,7 +1182,8 @@ public sealed class TaintAnalysis
         FunctionSymbol? ResolvedSymbol,
         IReadOnlyList<FunctionSymbol> ResolvedSymbols,
         IReadOnlyList<int>? ArgumentParameterIndices = null,
-        IReadOnlyList<ResolvedOverloadMatch>? SelectedOverloadMatches = null)
+        IReadOnlyList<ResolvedOverloadMatch>? SelectedOverloadMatches = null,
+        BoundExpression? Receiver = null)
     {
         public bool HasResolvedIdentity =>
             ResolvedSymbol != null
@@ -1199,7 +1201,10 @@ public sealed class TaintAnalysis
             call.ResolvedSymbol,
             call.ResolvedSymbols,
             call.ArgumentParameterIndices,
-            call.SelectedOverloadMatches);
+            call.SelectedOverloadMatches,
+            call.Receiver ?? (call.ReceiverSymbol is { } receiver
+                ? new BoundVariableExpression(call.Span, receiver)
+                : null));
 
         public static TaintCallDescriptor From(BoundCallStatement call) => new(
             call.Target,
@@ -1209,7 +1214,10 @@ public sealed class TaintAnalysis
             call.ResolvedSymbol,
             call.ResolvedSymbols,
             call.ArgumentParameterIndices,
-            call.SelectedOverloadMatches);
+            call.SelectedOverloadMatches,
+            call.Receiver ?? (call.ReceiverSymbol is { } receiver
+                ? new BoundVariableExpression(call.Span, receiver)
+                : null));
     }
 
     [Flags]
