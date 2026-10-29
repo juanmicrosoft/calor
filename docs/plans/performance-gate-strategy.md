@@ -50,6 +50,21 @@ tests. Exact inventories become Compiler 16,068 and Tasks 224, with no change to
 the combined test cases or registered skips. This removes measured work from the
 compiler job; a sub-30-minute p90 still requires the actual main-run window.
 
+The bounded native trace in
+[run 40916256007](https://github.com/juanmicrosoft/calor/actions/runs/40916256007)
+preserves matching JIT maps and native stacks (artifact 12916582455). Managed
+callers resolve repeated native PE metadata creation through
+`CSharpToCalorConverter.GetBasicMetadataReferences`, not the already cached
+`GeneratedCSharpCompiler.References`. The converter now shares its unchanged
+runtime-only reference set through a process-wide, thread-safe `Lazy`, following
+that existing cache pattern. Configured project references remain fresh, with
+their aliases and complete-reference-set policy intact. Three new regressions
+check reference and loaded-metadata identity, concurrent reuse and configured
+reference isolation; all three reject the old per-call factory.
+These bring the compiler inventory to 16,071. This removes a measured allocation
+source, not proof that all anonymous RSS or the full-host failure is resolved;
+the post-repair Linux investigation and main p90 remain acceptance work.
+
 ### 0.29 Linux smoke calibration
 
 [Performance Tests run 40908078723](https://github.com/juanmicrosoft/calor/actions/runs/40908078723)

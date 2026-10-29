@@ -315,6 +315,8 @@ public sealed class ConversionOptions
 /// </summary>
 public sealed class CSharpToCalorConverter
 {
+    // Runtime assemblies are process-stable; share Roslyn's native PE metadata.
+    private static readonly Lazy<MetadataReference[]> BasicMetadataReferences = new(BuildBasicMetadataReferences);
     private readonly ConversionOptions _options;
 
     public CSharpToCalorConverter(ConversionOptions? options = null)
@@ -1905,7 +1907,7 @@ public sealed class CSharpToCalorConverter
 
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
         Justification = "Assembly.Location is checked for empty string; gracefully returns no references in single-file mode.")]
-    private static MetadataReference[] GetBasicMetadataReferences()
+    private static MetadataReference[] BuildBasicMetadataReferences()
     {
         var refs = new List<MetadataReference>();
 
@@ -1943,7 +1945,7 @@ public sealed class CSharpToCalorConverter
         return refs.ToArray();
     }
 
-    private MetadataReference[] GetSemanticMetadataReferences()
+    internal MetadataReference[] GetSemanticMetadataReferences()
     {
         var configured = _options.References
             .Where(reference => File.Exists(reference.Path))
@@ -1956,7 +1958,7 @@ public sealed class CSharpToCalorConverter
             .ToArray();
         return _options.ReferencesAreComplete
             ? configured
-            : GetBasicMetadataReferences().Concat(configured).ToArray();
+            : BasicMetadataReferences.Value.Concat(configured).ToArray();
     }
 
     private static bool IsSameSyntaxTree(SyntaxTree left, SyntaxTree right)
