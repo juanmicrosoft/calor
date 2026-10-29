@@ -28,7 +28,32 @@ class BaselineTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.path = self.root / "baseline.json"
-        self.path.write_bytes((ROOT / "eng/roundtrip-baselines.json").read_bytes())
+        # Synthetic bootstrap state must not change when committed floors ratchet.
+        fixture = {
+            "schema_version": 1,
+            "blocking_floors": {
+                mode: {
+                    project: {
+                        "round_trip_passed": 155 if mode == "lossy" else 0,
+                        "round_trip_total": 157 if mode == "lossy" else 0,
+                        "native_fraction": 0.4 if mode == "lossy" else 0.15625,
+                        "coverage_fraction": 0.75 if mode == "lossy" else 0.25,
+                    }
+                    for project in gate.PROJECTS
+                }
+                for mode in gate.MODES
+            },
+            "projects": {
+                project: {
+                    "round_trip_passed": 155,
+                    "round_trip_total": 157,
+                    "native_fraction": 0.5,
+                    "coverage_fraction": 0.8,
+                }
+                for project in gate.PROJECTS
+            },
+        }
+        self.path.write_text(json.dumps(fixture), encoding="utf-8")
         self.baseline = gate.load_baseline(self.path)
         self.reports = self.root / "reports"
         for mode in gate.MODES:
@@ -115,6 +140,44 @@ class BaselineTests(unittest.TestCase):
         self.assertEqual(10, result["blocking_floors"]["default"]["MediatR"]["round_trip_passed"])
         self.assertEqual(155, result["blocking_floors"]["lossy"]["MediatR"]["round_trip_passed"])
         self.assertEqual(0.15625, result["blocking_floors"]["default"]["MediatR"]["native_fraction"])
+
+    def test_established_higher_floors_reject_each_regression_atomically(self):
+        for mode in gate.MODES:
+            self.mutate(lambda r: r["round_trip"].update(passed=160, total=162, skipped=2),
+                        mode=mode)
+            self.mutate(lambda r: r["fidelity"]["coverage"].update(
+                native_fraction=0.6, coverage_fraction=0.8), mode=mode)
+        established = self.update()
+        for mode in gate.MODES:
+            self.assertEqual(
+                dict(round_trip_passed=160, round_trip_total=162,
+                     native_fraction=0.6, coverage_fraction=0.8),
+                established["blocking_floors"][mode]["MediatR"])
+        self.path.write_text(json.dumps(established), encoding="utf-8")
+        self.assertEqual(established, self.update(established))
+        before = self.path.read_bytes()
+        for mode in gate.MODES:
+            original = self.report_path(mode).read_bytes()
+            for metric in gate.METRICS:
+                with self.subTest(mode=mode, metric=metric):
+                    self.report_path(mode).write_bytes(original)
+                    if metric == "round_trip_passed":
+                        self.mutate(lambda r: r["round_trip"].update(passed=159, skipped=3),
+                                    mode=mode)
+                    elif metric == "round_trip_total":
+                        self.mutate(lambda r: r["round_trip"].update(total=161, skipped=1),
+                                    mode=mode)
+                    else:
+                        self.mutate(lambda r: r["fidelity"]["coverage"].update(
+                            {metric: established["blocking_floors"][mode]["MediatR"][metric] - 0.01}),
+                            mode=mode)
+                    process = self.cli("update", "--source-run", SOURCE_RUN,
+                                       "--source-commit", SOURCE_COMMIT, "--updated-at", UPDATED_AT)
+                    self.assertNotEqual(0, process.returncode)
+                    self.assertIn(f"{mode}/MediatR: {metric}", process.stderr)
+                    self.assertIn("below floor", process.stderr)
+                    self.assertEqual(before, self.path.read_bytes())
+            self.report_path(mode).write_bytes(original)
 
     def test_flat_run_preserves_metadata_and_bytes(self):
         result = self.update()
@@ -305,7 +368,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/roundtrip_baselines.py check", step)
         self.assertIn("--mode '${{ matrix.mode }}'", step)
 
-    def test_initial_fraction_floors_match_product_configs(self):
+    def test_committed_fraction_floors_meet_product_configs(self):
         baseline = gate.load_baseline(ROOT / "eng/roundtrip-baselines.json")
         configs = (ROOT / "tools/Calor.RoundTrip.Harness/ProjectConfigs.cs").read_text()
         for project in gate.PROJECTS:
