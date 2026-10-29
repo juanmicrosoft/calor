@@ -400,3 +400,18 @@ reconciliation caught was between "the OSS corpus is empty" (a local-only
 observation) and "the OSS corpus is deterministic in CI" (correct once
 `submodules: recursive` is accounted for). That discrepancy is itself
 captured as F8.
+
+## Status — 2026-10-29
+
+The original recommendations R1a-R14 shipped through
+[#1011](https://github.com/juanmicrosoft/calor/issues/1011); all of its children
+(#995-#1010) are closed. This document records the August audit, not the current
+test inventory or CI configuration.
+
+Remaining follow-ups are tracked by the
+[0.29 test/CI health epic](https://github.com/juanmicrosoft/calor/issues/1594):
+property tests (#1042), watch and LSP harness repairs (#1032, #1031), monotonic
+round-trip baseline write-back (#1030), deterministic performance and CLI identity
+gates (#1115, #1116), benchmark repairs (#901), and compiler-host memory and
+duration (#1590). Closing the original audit epic does not claim these follow-ups
+are complete.
