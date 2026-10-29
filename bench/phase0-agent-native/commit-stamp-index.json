@@ -66,20 +66,20 @@
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
+      "measuredCommit": "71bc951d33c870e5088d5e680545bc90fd9c1dd6",
       "basis": "post-merge-write-back",
-      "note": "#901 (0.29, PR #1721): regenerated both demand legs against the integrated compiler at f2e848693 with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1. All seven repaired benchmark subjects now reach the effect pass: pre-effect failures 59 -> 52; demandTotal remains 3123. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
+      "note": "#901 (0.29, PR #1721): regenerated both demand legs against finalized integrated inputs at 71bc951d3 with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1. All seven repaired benchmark subjects now reach the effect pass: pre-effect failures 59 -> 52; demandTotal remains 3123. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
+          "headCommit": "71bc951d33c870e5088d5e680545bc90fd9c1dd6",
           "pr": 1721,
           "treeHashes": {
             "src": "e34892325602ba7cbbf573f866c89e49ef44e31c",
             "bench/corpus": "3074c3dad1b808434af71ffda07abfff55943471",
             "benchmarks": "2a01cfa9d194ae23b416ec4a5f4c152456bd0ee3",
             "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
-            "tests/TestData": "59634dae9b6e5c31482813481152bb8ae996b5b1",
+            "tests/TestData": "733b144d2e463c242efcafed2599f34b4908ee20",
             "bench/phase0-agent-native/fixtures": "c14a2177da8346e5eca695c80d6117e46cf4d5cd",
             "tests/Calor.Compiler.Tests/Effects": "59e7c221040010c0f042f4954406838c84356fc5",
             "Directory.Build.props": "565594c0f93c1a010b8cb2ca121b1aa2f6e56c37",
@@ -90,7 +90,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "artifactSha256": "e851c4c97a27a6e361b286eca4c430005f6cac785bf12c28004ab90c1383998a"
+          "artifactSha256": "4aa4509fa4b89d30ad96e6b9ee54f2c34b9d7aff8e865f2bdc7f656133318d7a"
         }
       }
     },
@@ -123,20 +123,20 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
+      "measuredCommit": "71bc951d33c870e5088d5e680545bc90fd9c1dd6",
       "basis": "post-merge-write-back",
-      "note": "#901 (0.29, PR #1721): regenerated with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1 against the integrated compiler at f2e848693. Repaired benchmark filesMeasured 1 -> 7 add 17 bound and 64 string keys; aggregate 265/827 -> 282/891. Floors are unchanged. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
+      "note": "#901 (0.29, PR #1721): regenerated with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1 against finalized integrated inputs at 71bc951d3. Repaired benchmark filesMeasured 1 -> 7 add 17 bound and 64 string keys; aggregate 265/827 -> 282/891. Floors are unchanged. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
+          "headCommit": "71bc951d33c870e5088d5e680545bc90fd9c1dd6",
           "pr": 1721,
           "treeHashes": {
             "src": "e34892325602ba7cbbf573f866c89e49ef44e31c",
             "bench/corpus": "3074c3dad1b808434af71ffda07abfff55943471",
             "benchmarks": "2a01cfa9d194ae23b416ec4a5f4c152456bd0ee3",
             "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
-            "tests/TestData": "59634dae9b6e5c31482813481152bb8ae996b5b1",
+            "tests/TestData": "733b144d2e463c242efcafed2599f34b4908ee20",
             "bench/phase0-agent-native/fixtures": "c14a2177da8346e5eca695c80d6117e46cf4d5cd",
             "tests/Calor.Compiler.Tests/Effects": "59e7c221040010c0f042f4954406838c84356fc5",
             "Directory.Build.props": "565594c0f93c1a010b8cb2ca121b1aa2f6e56c37",
@@ -147,7 +147,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "artifactSha256": "7fdd99313ac2de041fd2e3c2975e26fb5b3ea2fea4dbda846ba812b46deb09ec"
+          "artifactSha256": "0f1d14c6b5610b3db47ced3b55bc2325313c7d93fc8fc4337e2ad236d28a4e8e"
         }
       }
     },
