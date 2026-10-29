@@ -19,8 +19,8 @@
 # double-run, and nothing says so. One source,
 # shared callers.
 #
-# THE SPLIT is by test-class initial, remeasured at the 16,072-case inventory:
-# 4,059 / 3,938 / 4,041 / 4,034. Binding-routing CLI and W1 guide transcripts
+# THE SPLIT is by test-class initial, remeasured at the 16,075-case inventory:
+# 4,062 / 3,938 / 4,041 / 4,034. Binding-routing CLI and W1 guide transcripts
 # run once in Tasks.Tests instead (#1590); the class-level CLI loops dominated
 # this shard's measured duration. The old two-host split dates from 7,978 cases;
 # its hosts now run roughly a whole old suite and can exhaust the runner again.

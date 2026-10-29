@@ -70,6 +70,7 @@ public sealed class Z3ImplicationProver : IDisposable
 {
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private readonly bool _ownsContext;
     private bool _disposed;
 
     /// <summary>
@@ -83,12 +84,18 @@ public sealed class Z3ImplicationProver : IDisposable
     /// <summary>
     /// Creates a new implication prover with the given Z3 context.
     /// </summary>
-    /// <param name="ctx">The Z3 context to use for proving.</param>
+    /// <param name="ctx">The borrowed Z3 context; the caller retains ownership.</param>
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000ms).</param>
     public Z3ImplicationProver(Context ctx, uint timeoutMs = VerificationOptions.DefaultTimeoutMs)
+        : this(ctx, timeoutMs, ownsContext: false)
+    {
+    }
+
+    internal Z3ImplicationProver(Context ctx, uint timeoutMs, bool ownsContext)
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         _timeoutMs = timeoutMs;
+        _ownsContext = ownsContext;
     }
 
     /// <summary>
@@ -104,6 +111,7 @@ public sealed class Z3ImplicationProver : IDisposable
         ExpressionNode antecedent,
         ExpressionNode consequent)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var sw = Stopwatch.StartNew();
 
         if (QuantifierNesting.ContainsNestedQuantifier(antecedent)
@@ -367,6 +375,7 @@ public sealed class Z3ImplicationProver : IDisposable
         ExpressionNode implementerPostcondition,
         ExpressionNode? interfacePrecondition = null)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var sw = Stopwatch.StartNew();
 
         if (QuantifierNesting.ContainsNestedQuantifier(interfacePostcondition)
@@ -457,8 +466,9 @@ public sealed class Z3ImplicationProver : IDisposable
     {
         if (!_disposed)
         {
-            // Context is managed externally, don't dispose it here
             _disposed = true;
+            if (_ownsContext)
+                _ctx.Dispose();
         }
     }
 }

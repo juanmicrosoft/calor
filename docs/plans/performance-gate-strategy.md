@@ -86,6 +86,21 @@ invariant rejects fresh references and checks loaded-metadata identity and exact
 platform paths. The current compiler inventory is 16,072. Full-host memory
 acceptance remains unproven until the separate unsplit verification completes.
 
+The next symbolized probe,
+[run 40921813743](https://github.com/juanmicrosoft/calor/actions/runs/40921813743),
+uploaded artifact 12918334179 before uninstrumented verification: 297.44s,
+1.10GB tracked peak and 3.73GB profiler RSS. Its different partial inventory
+(1,945 passed cases) prevents causal RSS comparisons. The dominant 844MB native
+category is now Z3 context creation through `ContractInheritanceChecker`.
+That checker created a context but passed it to a borrowing prover; disposing the
+checker therefore did not dispose its context. It now transfers ownership to an
+internal prover constructor, while the existing public constructor still borrows.
+Failed ownership transfer disposes the new context, and disposed entry points
+reject calls before reaching native code. Three regressions inspect the pinned
+binding's real context handle while keeping the managed wrapper rooted, proving
+deterministic release, idempotence and preserved borrowed-context usability.
+The inventory is now 16,075; prior full-run evidence does not validate this repair.
+
 ### 0.29 Linux smoke calibration
 
 After the converter metadata repair,

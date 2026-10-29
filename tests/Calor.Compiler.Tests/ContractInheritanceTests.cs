@@ -1,8 +1,10 @@
+using System.Reflection;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
+using Calor.Compiler.Verification.Z3;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -20,6 +22,77 @@ public class ContractInheritanceTests
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
+
+    [Fact]
+    public void CheckerDisposal_ReleasesItsRootedNativeContext()
+    {
+        using var checker = new ContractInheritanceChecker(new DiagnosticBag());
+        var prover = Assert.IsType<Z3ImplicationProver>(
+            typeof(ContractInheritanceChecker)
+                .GetField("_z3Prover", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(checker));
+        var context = ReadProverContext(prover);
+        Assert.NotEqual(IntPtr.Zero, ReadNativeContextHandle(context));
+
+        checker.Dispose();
+        Assert.Equal(IntPtr.Zero, ReadNativeContextHandle(context));
+        checker.Dispose();
+        Assert.Equal(IntPtr.Zero, ReadNativeContextHandle(context));
+
+        var module = Parse("§M{m1:Disposed}", out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Throws<ObjectDisposedException>(() => checker.Check(module));
+        GC.KeepAlive(context);
+    }
+
+    [Fact]
+    public void BorrowedProverDisposal_PreservesTheCallersContext()
+    {
+        using var context = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(context);
+        var handle = ReadNativeContextHandle(context);
+        Assert.NotEqual(IntPtr.Zero, handle);
+
+        prover.Dispose();
+        Assert.Equal(handle, ReadNativeContextHandle(context));
+        using var expression = context.MkTrue();
+        Assert.True(expression.IsTrue);
+
+        var condition = new BoolLiteralNode(default, true);
+        Assert.Throws<ObjectDisposedException>(() =>
+            prover.ProveImplication([], condition, condition));
+        Assert.Throws<ObjectDisposedException>(() =>
+            prover.CheckPreconditionWeakening([], condition, condition));
+        Assert.Throws<ObjectDisposedException>(() =>
+            prover.CheckPostconditionStrengthening([], "bool", condition, condition));
+    }
+
+    [Fact]
+    public void OwnedProverDisposal_ReleasesTheContextOnlyOnce()
+    {
+        using var context = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(context, timeoutMs: 1000, ownsContext: true);
+        Assert.NotEqual(IntPtr.Zero, ReadNativeContextHandle(context));
+
+        prover.Dispose();
+        Assert.Equal(IntPtr.Zero, ReadNativeContextHandle(context));
+        prover.Dispose();
+        Assert.Equal(IntPtr.Zero, ReadNativeContextHandle(context));
+        GC.KeepAlive(context);
+    }
+
+    private static Microsoft.Z3.Context ReadProverContext(Z3ImplicationProver prover)
+        => Assert.IsType<Microsoft.Z3.Context>(
+            typeof(Z3ImplicationProver)
+                .GetField("_ctx", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(prover));
+
+    private static IntPtr ReadNativeContextHandle(Microsoft.Z3.Context context)
+        // Inspect the pinned binding's handle; invoking Z3 after disposal can crash the host.
+        => Assert.IsType<IntPtr>(
+            typeof(Microsoft.Z3.Context)
+                .GetField("m_ctx", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(context));
 
     #region Parsing Tests
 
