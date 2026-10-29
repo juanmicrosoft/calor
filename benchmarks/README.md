@@ -1,8 +1,10 @@
 # Bug-detection subjects
 
 These seven subjects contain 25 deliberately vulnerable cases and 25 safe controls.
-They are analysis inputs, not programs to execute: security cases include shell
-execution, file writes, and SQL sinks. Do not run their generated methods.
+They are analysis inputs, not programs to execute against real services: security
+cases include shell execution, file writes, and SQL sinks. SQL runtime regression
+tests use only an injected recording provider; do not run the security subjects
+against a real shell, filesystem, or database.
 
 Run their executable regression coverage with:
 
@@ -37,12 +39,26 @@ safety verdict.
 
 ## Compilation and API modeling
 
-With effect enforcement disabled (these tests target bug/taint detection), six
-subjects produce Roslyn-clean C#. The SQL subject retains the analyzer's
-documented external `db.execute`, `db.execute_param`, `db.query`, and `sql_escape`
-contracts: no database provider is bundled here. Standalone compilation therefore
-reports seven `Calor1002` errors for these undeclared external names, individually
-checked by the test. This is not a successful executable SQL compilation.
+With effect enforcement disabled (these tests target bug/taint detection), all
+seven subjects produce Roslyn-clean C#, with zero compilation errors required by
+the actual-file tests. The SQL subject declares a native injected `db` interface
+for `execute`, `execute_param`, and `query`, preserving the analyzer's resolved
+database sink identities without bundling or stubbing a database provider.
+`execute_param` must bind its value separately from the query text.
+
+The native `SqlEscaping.Escape` helper doubles apostrophes using `string.Replace`.
+This contract assumes standard SQL single-quoted literals, without dialect-specific
+backslash escapes; it is not a general sanitizer for identifiers or arbitrary SQL
+contexts. The regression harness explicitly registers **only this bound function's
+symbol ID** as a SQL sanitizer through `TaintAnalysisOptions.AdditionalSanitizers`.
+Runtime tests check its actual quote-escaping output and all six subjects' query,
+operation, and separate parameter delivery to a recording provider. Default
+analysis intentionally does not infer a sanitizer from a local helper's name or
+implementation: without the explicit contract, `SafeEscapedInput` is also flagged,
+as a separate regression asserts. Thus the 25/25 seeded findings and 20/25 safe
+controls above describe the benchmark's explicit API model, not an unconditional
+default-analysis proof of SQL escaping.
+
 Default effect enforcement can additionally reject unresolved external effects,
 including calls through `ProcessStartInfo.ArgumentList` and dictionary helpers.
 

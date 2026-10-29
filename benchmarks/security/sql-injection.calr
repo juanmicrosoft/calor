@@ -3,25 +3,42 @@
 
 §M{m001:SqlInjectionBenchmark}
 
+  // Inject a provider using standard SQL literals (no backslash escapes).
+  // execute_param binds value separately; it must not interpolate it into query.
+  §IFACE{i001:db}
+    §MT{mt001:execute} (string:query) -> void
+      §E{db:w}
+    §MT{mt002:execute_param} (string:query, string:value) -> void
+      §E{db:w}
+    §MT{mt003:query} (string:query) -> void
+      §E{db:w}
+
+  §CL{c001:SqlEscaping:pub}
+    // Double SQL literal delimiters; the regression harness models this exact symbol.
+    §MT{mt004:Escape:pub:stat} (string:value) -> string
+      §R §C{value.Replace} §A STR:"'" §A STR:"''" §/C
+
   §F{f001:VulnerableQuery:pub}
     // BUG: Direct SQL concatenation with user input
     // EXPECTED: Calor0981 SQL Injection
     §I{string:user_input}
+    §I{db:connection}
     §O{string}
     §E{db:w}
     §B{~query:string} (+ STR:"SELECT * FROM users WHERE name = '" user_input)
     §ASSIGN query (+ query STR:"'")
-    §C{db.execute} §A query §/C
+    §C{connection.execute} §A query §/C
     §R query
 
   §F{f002:SafeParameterizedQuery:pub}
     // SAFE: Parameterized query with placeholders
     // EXPECTED: No warnings
     §I{string:user_input}
+    §I{db:connection}
     §O{string}
     §E{db:w}
     §B{query:string} STR:"SELECT * FROM users WHERE name = ?"
-    §C{db.execute_param} §A query §A user_input §/C
+    §C{connection.execute_param} §A query §A user_input §/C
     §R query
 
   §F{f003:VulnerableMultipleConcatenation:pub}
@@ -29,6 +46,7 @@
     // EXPECTED: Calor0981 SQL Injection
     §I{string:user_input}
     §I{string:user_data}
+    §I{db:connection}
     §O{string}
     §E{db:w}
     §B{~query:string} STR:"INSERT INTO users (name, email) VALUES ('"
@@ -36,40 +54,43 @@
     §ASSIGN query (+ query STR:"', '")
     §ASSIGN query (+ query user_data)
     §ASSIGN query (+ query STR:"')")
-    §C{db.execute} §A query §/C
+    §C{connection.execute} §A query §/C
     §R query
 
   §F{f004:SafeEscapedInput:pub}
     // SAFE: Input properly escaped before concatenation
     // EXPECTED: No warnings
     §I{string:user_input}
+    §I{db:connection}
     §O{string}
     §E{db:w}
-    §B{escaped:string} §C{sql_escape} §A user_input §/C
+    §B{escaped:string} §C{SqlEscaping.Escape} §A user_input §/C
     §B{~query:string} (+ STR:"SELECT * FROM users WHERE name = '" escaped)
     §ASSIGN query (+ query STR:"'")
-    §C{db.execute} §A query §/C
+    §C{connection.execute} §A query §/C
     §R query
 
   §F{f005:VulnerableIndirectTaint:pub}
     // BUG: Taint propagates through intermediate variable
     // EXPECTED: Calor0981 SQL Injection
     §I{string:user_input}
+    §I{db:connection}
     §O{string}
     §E{db:w}
     §B{name:string} user_input
     §B{search:string} name
     §B{~query:string} (+ STR:"SELECT * FROM users WHERE name LIKE '%" search)
     §ASSIGN query (+ query STR:"%'")
-    §C{db.query} §A query §/C
+    §C{connection.query} §A query §/C
     §R query
 
   §F{f006:SafeConstantQuery:pub}
     // SAFE: Query uses only constants
     // EXPECTED: No warnings
+    §I{db:connection}
     §O{string}
     §E{db:w}
     §B{tableName:string} STR:"users"
     §B{query:string} (+ STR:"SELECT COUNT(*) FROM " tableName)
-    §C{db.execute} §A query §/C
+    §C{connection.execute} §A query §/C
     §R query

@@ -1,8 +1,13 @@
+using Assembly = System.Reflection.Assembly;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Security;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -32,11 +37,7 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     public void Subjects_ParseBindCompileAndVerifySeededFindings_WithNamedSafeCaseGaps(
         string relativePath, int functionCount, int seededFindingCount)
     {
-        var root = AppContext.BaseDirectory;
-        while (!Directory.Exists(Path.Combine(root, "benchmarks")))
-            root = Path.GetDirectoryName(root)
-                ?? throw new DirectoryNotFoundException("Repository benchmarks directory not found.");
-        var source = File.ReadAllText(Path.Combine(root, "benchmarks", relativePath));
+        var source = ReadSubject(relativePath);
         Assert.Equal(seededFindingCount, Regex.Matches(source, @"// EXPECTED: Calor\d+").Count);
         Assert.Equal(functionCount - seededFindingCount, Regex.Matches(source, @"// EXPECTED: No warnings").Count);
         var parseDiagnostics = new DiagnosticBag();
@@ -46,33 +47,26 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
 
         var bindingDiagnostics = new DiagnosticBag();
         var bound = new Binder(bindingDiagnostics).Bind(module);
-        Assert.Equal(functionCount, bound.Functions.Count);
+        Assert.Equal(functionCount + (relativePath == "security/sql-injection.calr" ? 1 : 0), bound.Functions.Count);
         Assert.False(bindingDiagnostics.HasErrors, string.Join("\n", bindingDiagnostics));
         Assert.DoesNotContain(bindingDiagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
-        // Effects are a separate analysis. SQL intentionally uses the legacy external
-        // db/sql_escape contracts; the other six subjects must generate Roslyn-clean C#.
+        // Effects are a separate analysis; every subject must generate Roslyn-clean C#.
         var compilation = Program.Compile(source, relativePath, new CompilationOptions { EnforceEffects = false });
-        if (relativePath == "security/sql-injection.calr")
-        {
-            var errors = compilation.Diagnostics.Errors.ToArray();
-            Assert.Equal(7, errors.Length);
-            Assert.All(errors, d => Assert.Equal(DiagnosticCode.CodeGenCompilationError, d.Code));
-            Assert.Equal(6, errors.Count(d => d.Message.Contains("The name 'db'", StringComparison.Ordinal)));
-            Assert.Single(errors.Where(d => d.Message.Contains("The name 'sql_escape'", StringComparison.Ordinal)));
-        }
-        else
-        {
-            Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics));
-            Assert.NotEmpty(compilation.GeneratedCode);
-        }
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics));
+        Assert.NotEmpty(compilation.GeneratedCode);
 
         var findings = new DiagnosticBag();
-        new VerificationAnalysisPass(findings, new VerificationAnalysisOptions
+        var analysis = new VerificationAnalysisPass(findings, new VerificationAnalysisOptions
         {
             EnableDataflow = false,
             EnableBugPatterns = !relativePath.StartsWith("security/", StringComparison.Ordinal),
             EnableTaintAnalysis = relativePath.StartsWith("security/", StringComparison.Ordinal),
-        }).Analyze(module);
+            TaintOptions = relativePath == "security/sql-injection.calr" ? SqlContracts(bound) : null,
+        });
+        if (relativePath == "security/sql-injection.calr")
+            analysis.AnalyzeBound(bound);
+        else
+            analysis.Analyze(module);
         var targetCodes = relativePath switch
         {
             "arithmetic/div-by-zero.calr" => new[] { DiagnosticCode.DivisionByZero },
@@ -110,6 +104,114 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
         }
         Assert.Equal(SafeCaseGaps.Keys.Where(key => key.StartsWith(relativePath + ":", StringComparison.Ordinal)).Order(),
             observedGaps.Order());
+    }
+
+    private static string ReadSubject(string relativePath)
+    {
+        var root = AppContext.BaseDirectory;
+        while (!Directory.Exists(Path.Combine(root, "benchmarks")))
+            root = Path.GetDirectoryName(root)
+                ?? throw new DirectoryNotFoundException("Repository benchmarks directory not found.");
+        return File.ReadAllText(Path.Combine(root, "benchmarks", relativePath));
+    }
+
+    private static TaintAnalysisOptions SqlContracts(BoundModule module)
+    {
+        var escape = Assert.Single(module.Functions.Where(function =>
+            function.ContainingTypeName == "SqlEscaping" && function.Symbol.Name.EndsWith(".Escape", StringComparison.Ordinal)));
+        return new TaintAnalysisOptions
+        {
+            AdditionalSanitizers =
+            [
+                new TaintSanitizerRule(
+                    new TaintCallIdentity(FunctionSymbolId: escape.Symbol.Id), TaintSink.SqlQuery),
+            ],
+        };
+    }
+
+    [Fact]
+    public void SqlEscaping_RequiresExplicitSymbolContract_NotNameBasedTrust()
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(ReadSubject("security/sql-injection.calr"), diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(4, diagnostics.Where(d => d.Code == DiagnosticCode.SqlInjection)
+            .Select(d => d.Span.Start).Distinct().Count());
+        var escapedControl = Assert.Single(bound.Functions.Where(f => f.Symbol.Name == "SafeEscapedInput"));
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.SqlInjection
+            && d.Span.Start >= escapedControl.Span.Start && d.Span.Start < escapedControl.Span.End);
+    }
+
+    private static readonly Lazy<Assembly> SqlAssembly = new(() =>
+    {
+        var result = Program.Compile(ReadSubject("security/sql-injection.calr"), "sql-injection.calr",
+            new CompilationOptions { EnforceEffects = false });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var syntax = CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode);
+        var recorder = CSharpSyntaxTree.ParseText("""
+            public sealed class RecordingDatabase : SqlInjectionBenchmark.db
+            {
+                public string Operation { get; private set; }
+                public string Query { get; private set; }
+                public string Value { get; private set; }
+                public void execute(string query) { Operation = "execute"; Query = query; }
+                public void execute_param(string query, string value)
+                {
+                    Operation = "execute_param"; Query = query; Value = value;
+                }
+                public void query(string query) { Operation = "query"; Query = query; }
+            }
+            """);
+        var compilation = CSharpCompilation.Create($"SqlBenchmark_{Guid.NewGuid():N}",
+            [syntax, recorder], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emit = compilation.Emit(stream);
+        Assert.True(emit.Success, string.Join("\n", emit.Diagnostics));
+        return Assembly.Load(stream.ToArray());
+    });
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("ordinary", "ordinary")]
+    [InlineData("'", "''")]
+    [InlineData("O'Brien", "O''Brien")]
+    [InlineData("'' OR 1=1 --", "'''' OR 1=1 --")]
+    public void SqlEscaping_DoublesEveryLiteralQuote(string input, string expected)
+    {
+        var helper = SqlAssembly.Value.GetType("SqlInjectionBenchmark.SqlEscaping", throwOnError: true)!;
+        Assert.Equal(expected, helper.GetMethod("Escape")!.Invoke(null, [input]));
+    }
+
+    [Theory]
+    [InlineData("VulnerableQuery", "execute", "SELECT * FROM users WHERE name = 'O'Brien'")]
+    [InlineData("SafeParameterizedQuery", "execute_param", "SELECT * FROM users WHERE name = ?")]
+    [InlineData("VulnerableMultipleConcatenation", "execute", "INSERT INTO users (name, email) VALUES ('O'Brien', 'x@y')")]
+    [InlineData("SafeEscapedInput", "execute", "SELECT * FROM users WHERE name = 'O''Brien'")]
+    [InlineData("VulnerableIndirectTaint", "query", "SELECT * FROM users WHERE name LIKE '%O'Brien%'")]
+    [InlineData("SafeConstantQuery", "execute", "SELECT COUNT(*) FROM users")]
+    public void SqlSubjects_SendRealQueriesToInjectedContract(string function, string operation, string query)
+    {
+        var assembly = SqlAssembly.Value;
+        var recorderType = assembly.GetType("RecordingDatabase", throwOnError: true)!;
+        var recorder = Activator.CreateInstance(recorderType)!;
+        var method = Assert.Single(assembly.GetTypes().SelectMany(t => t.GetMethods())
+            .Where(m => m.IsStatic && m.Name == function));
+        object[] arguments = function switch
+        {
+            "VulnerableMultipleConcatenation" => ["O'Brien", "x@y", recorder],
+            "SafeConstantQuery" => [recorder],
+            _ => ["O'Brien", recorder],
+        };
+        Assert.Equal(query, method.Invoke(null, arguments));
+        Assert.Equal(operation, recorderType.GetProperty("Operation")!.GetValue(recorder));
+        Assert.Equal(query, recorderType.GetProperty("Query")!.GetValue(recorder));
+        Assert.Equal(function == "SafeParameterizedQuery" ? "O'Brien" : null,
+            recorderType.GetProperty("Value")!.GetValue(recorder));
     }
 
     [Theory]
