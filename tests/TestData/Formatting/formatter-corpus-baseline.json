@@ -1,6 +1,6 @@
 {
   "trackedFileCount": 952,
-  "successfulTransformationCount": 702,
+  "successfulTransformationCount": 703,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -43,7 +43,6 @@
     "semanticErrors": [
       "benchmarks/null-safety/null-deref.calr",
       "benchmarks/security/command-injection.calr",
-      "benchmarks/security/sql-injection.calr",
       "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-002-inventory/calor+v0.14.3/run-1/final-src/Inventory.calr",
       "bench/phase0-agent-native/epochs/w5-parity-001/N1-002-inventory/calor+treatment/run-4/final-src/Inventory.calr",
       "bench/phase0-agent-native/epochs/w5-parity-001/N1-002-inventory/calor+treatment/run-5/final-src/Inventory.calr",
