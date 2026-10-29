@@ -12,6 +12,14 @@ round-trip regression checks.
 
 This release publishes no new benchmark results.
 
+### Release health
+
+- **Silent wrong-output reports since 0.28.0: 0 new reports** in the repository issue
+  inventory checked on 2026-10-29. This is a report count, not proof that the package has
+  no defects.
+- **Merge-to-publication lag: not measured.** Package availability is checked separately
+  after publication.
+
 ### Fixed
 
 - **Bug-pattern analysis respects nullable references and C# shift counts.** Null checks
