@@ -14,11 +14,11 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.28.0';
-const releaseDate = '2026-10-28';
+const currentRelease = '0.29.0';
+const releaseDate = '2026-10-29';
 // 0.24.0 carries the 0.21.0 false-proof advisory; its section must keep it.
 const advisoryRelease = '0.24.0';
-// The release that last published static benchmark numbers. 0.24.0 through 0.28.0 publish none:
+// The release that last published static benchmark numbers. 0.24.0 through 0.29.0 publish none:
 // benchmark publication is governed separately (#1276/#1422), through its own benchmark.yml dispatch.
 const benchmarkRelease = '0.22.0';
 const benchmarkReleaseDate = '2026-09-15';
@@ -292,7 +292,7 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'Effect checks cross file boundaries; simple event argument initializers convert natively again.',
+      'Sharper bug analysis, reliable resource cleanup, and stronger test and CI checks.',
       { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
