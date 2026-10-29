@@ -37,6 +37,16 @@ entire Tests workflow. Artifacts include managed JIT symbol maps and procfs
 mapping snapshots as well as native allocation traces. A bounded, interrupted
 probe is diagnostic evidence, not a passing full-suite run or a leak proof.
 
+Compiler wall-time work (#1590) moves the 67 binding-routing CLI cases and 12 W1
+guide transcript cases into the already separate Tasks test lane, beside its
+other CLI integration gates. Recent main measurements attributed 341.5s and
+43.3s respectively to these classes. The test sources, subprocess loops,
+assertions and fixtures stay intact; only their compilation owner changes.
+Shared receiving-case data avoids linking a second copy of the compiler unit
+tests. Exact inventories become Compiler 16,068 and Tasks 224, with no change to
+the combined test cases or registered skips. This removes measured work from the
+compiler job; a sub-30-minute p90 still requires the actual main-run window.
+
 ### 0.29 Linux smoke calibration
 
 [Performance Tests run 40908078723](https://github.com/juanmicrosoft/calor/actions/runs/40908078723)

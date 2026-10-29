@@ -8,18 +8,7 @@ namespace Calor.Compiler.Tests;
 
 public class BindingDiagnosticPolicyTests
 {
-    public static IEnumerable<object[]> NullableBoundaries()
-    {
-        yield return new object[] { DiagnosticCode.NullableToNonNullableBinding,
-            BindingReceivingBoundary.Initializer,
-            "§B{x:str} §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C", "void" };
-        yield return new object[] { DiagnosticCode.NullableReturnFromNonNullable,
-            BindingReceivingBoundary.NativeReturn,
-            "§R §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C", "str" };
-        yield return new object[] { DiagnosticCode.NullableArgumentToNonNullableParameter,
-            BindingReceivingBoundary.MethodArgument,
-            "§R §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_ROUTING_UNSET\" §/C §/C", "i32" };
-    }
+    public static IEnumerable<object[]> NullableBoundaries() => BindingReceivingCases.NullableBoundaries();
 
     [Theory]
     [MemberData(nameof(NullableBoundaries))]
