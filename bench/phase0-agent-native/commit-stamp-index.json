@@ -66,40 +66,31 @@
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
+      "measuredCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
       "basis": "post-merge-write-back",
-      "note": "#1595/#1541/#1524 (0.27, PR #1675): regenerated with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1 at 1cbcc2b2. The only cause is the two committed .calr files of the initializer-interop D-S1.5 fixture (bench/phase0-agent-native/fixtures/d-s1.5/initializer-interop/{expected,test}.calr): D-A fileCount 950 -> 952; demand and D-B unchanged; measured commits advance. #1674's pending identity (bb9393c2, PR #1674) remains in the repository history.",
+      "note": "#901 (0.29, PR #1721): regenerated both demand legs against the integrated compiler at f2e848693 with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1. All seven repaired benchmark subjects now reach the effect pass: pre-effect failures 59 -> 52; demandTotal remains 3123. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "13664e62787942b0d1bbde7e61f71c292e3da3a7",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "ad726b96420f411f902ccff550faed9b349f6554",
-          "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
-          "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30",
-          "/": "7f38e2d467bf67ae90aed683dd8957546f8515b9"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
-          "pr": 1675,
-          "phase1TreeHashes": {
-            "src": "ad726b96420f411f902ccff550faed9b349f6554",
-            "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
-            "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
-            "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+        "status": "pending",
+        "phase1": {
+          "headCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
+          "pr": 1721,
+          "treeHashes": {
+            "src": "e34892325602ba7cbbf573f866c89e49ef44e31c",
+            "bench/corpus": "3074c3dad1b808434af71ffda07abfff55943471",
+            "benchmarks": "2a01cfa9d194ae23b416ec4a5f4c152456bd0ee3",
+            "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
+            "tests/TestData": "59634dae9b6e5c31482813481152bb8ae996b5b1",
+            "bench/phase0-agent-native/fixtures": "c14a2177da8346e5eca695c80d6117e46cf4d5cd",
+            "tests/Calor.Compiler.Tests/Effects": "59e7c221040010c0f042f4954406838c84356fc5",
+            "Directory.Build.props": "565594c0f93c1a010b8cb2ca121b1aa2f6e56c37",
+            "Directory.Packages.props": "27c5b7901def159db761922bc6fa62655e00cf1c",
             "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-            "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+            "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "phase1ArtifactSha256": "42874bbb3a8b76e6db63185ff23a3924c1ebe5bd2d8335eb8b7ab5d76ff28730"
+          "artifactSha256": "e851c4c97a27a6e361b286eca4c430005f6cac785bf12c28004ab90c1383998a"
         }
       }
     },
@@ -132,40 +123,31 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
+      "measuredCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
       "basis": "post-merge-write-back",
-      "note": "#1595/#1541/#1524 (0.27, PR #1675): regenerated with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1 at 1cbcc2b2. The only cause is the two committed .calr files of the initializer-interop D-S1.5 fixture: bench filesMeasured 388 -> 390 and keysFromString 624 -> 626 (aggregate 825 -> 827); floor and notMeasured unchanged. F3's completed identity (dee529b8) remains in the repository history.",
+      "note": "#901 (0.29, PR #1721): regenerated with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1 against the integrated compiler at f2e848693. Repaired benchmark filesMeasured 1 -> 7 add 17 bound and 64 string keys; aggregate 265/827 -> 282/891. Floors are unchanged. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "13664e62787942b0d1bbde7e61f71c292e3da3a7",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "src": "ad726b96420f411f902ccff550faed9b349f6554",
-          "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
-          "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30",
-          "/": "7f38e2d467bf67ae90aed683dd8957546f8515b9"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
-        },
-        "writeBack": {
-          "phase1HeadCommit": "1cbcc2b2ac8590d5c695723f727eb4cfe0b2c1b2",
-          "pr": 1675,
-          "phase1TreeHashes": {
-            "src": "ad726b96420f411f902ccff550faed9b349f6554",
-            "bench/corpus": "61c5f11897fa827a368a177155b2478e2aa05c42",
-            "Directory.Build.props": "29ae5b23cbf08ae9800c68f06272044cef5e7482",
-            "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
+        "status": "pending",
+        "phase1": {
+          "headCommit": "f2e848693142aebbfd15dc23964c2216f17eb0d9",
+          "pr": 1721,
+          "treeHashes": {
+            "src": "e34892325602ba7cbbf573f866c89e49ef44e31c",
+            "bench/corpus": "3074c3dad1b808434af71ffda07abfff55943471",
+            "benchmarks": "2a01cfa9d194ae23b416ec4a5f4c152456bd0ee3",
+            "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
+            "tests/TestData": "59634dae9b6e5c31482813481152bb8ae996b5b1",
+            "bench/phase0-agent-native/fixtures": "c14a2177da8346e5eca695c80d6117e46cf4d5cd",
+            "tests/Calor.Compiler.Tests/Effects": "59e7c221040010c0f042f4954406838c84356fc5",
+            "Directory.Build.props": "565594c0f93c1a010b8cb2ca121b1aa2f6e56c37",
+            "Directory.Packages.props": "27c5b7901def159db761922bc6fa62655e00cf1c",
             "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
           },
-          "phase1InputContentHashes": {
+          "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-            "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+            "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "phase1ArtifactSha256": "cd497444cc07d9bb02f2ee5e94ea48577ba57f23e3f5fd603cc2b9ae2e83fc2e"
+          "artifactSha256": "7fdd99313ac2de041fd2e3c2975e26fb5b3ea2fea4dbda846ba812b46deb09ec"
         }
       }
     },
