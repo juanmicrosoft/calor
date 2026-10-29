@@ -19,8 +19,8 @@
 # double-run, and nothing says so. One source,
 # shared callers.
 #
-# THE SPLIT is by test-class initial, balanced from the 16,040-case inventory:
-# 4,027 / 4,002 / 4,002 / 4,009. The old two-host split dates from 7,978 cases;
+# THE SPLIT is by test-class initial, remeasured at the 16,147-case inventory:
+# 4,056 / 4,016 / 4,041 / 4,034. The old two-host split dates from 7,978 cases;
 # its hosts now run roughly a whole old suite and can exhaust the runner again.
 #
 # Usage:
