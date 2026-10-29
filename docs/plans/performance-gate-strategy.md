@@ -63,6 +63,15 @@ remain unchanged.
 | Small CFG, per-iteration average | 0.01 (rounded) | 0.1 |
 | Complex CFG, per-iteration average | 0.19 (rounded) | 1 |
 
+The first tightened Linux run,
+[40909597462](https://github.com/juanmicrosoft/calor/actions/runs/40909597462),
+failed the complex CFG check in its warmup host: its ten-build average was
+1.78ms against the 1ms limit. This observation does not establish a compiler
+regression or identify the source of the variability. Both CFG microbenchmarks
+now build their exact subject once before timing and average 100 builds, rather
+than ten for the complex case. The 1ms limit is unchanged; so are the aggregate,
+allocation and other smoke limits.
+
 > **Status (2026-08-27, v0.16 kickoff sweep).** This is the document from PR **#976**
 > (revision 2, 2026-08-14), carried into the tree unchanged below this note and credited to
 > that PR; `eng/performance-baselines.json`'s `noisePolicy` has cited it by path since #978

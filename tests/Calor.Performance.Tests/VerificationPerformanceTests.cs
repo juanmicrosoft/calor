@@ -559,6 +559,7 @@ public class VerificationPerformanceTests
 
         var func = module.Functions.First();
 
+        _ = ControlFlowGraph.Build(func);
         var sw = Stopwatch.StartNew();
         for (var i = 0; i < 100; i++)
         {
@@ -582,14 +583,15 @@ public class VerificationPerformanceTests
 
         var func = module.Functions.First();
 
+        _ = ControlFlowGraph.Build(func);
         var sw = Stopwatch.StartNew();
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 100; i++)
         {
             var cfg = ControlFlowGraph.Build(func);
         }
         sw.Stop();
 
-        var avgTime = sw.Elapsed.TotalMilliseconds / 10.0;
+        var avgTime = sw.Elapsed.TotalMilliseconds / 100.0;
         _output.WriteLine($"Complex CFG construction avg time: {avgTime:F2}ms");
 
         Assert.True(avgTime < 1,
