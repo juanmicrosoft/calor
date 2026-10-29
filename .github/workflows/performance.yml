@@ -82,7 +82,7 @@ jobs:
           export CALOR_PROFILE_DOTNET="$(command -v dotnet)"
           export CALOR_PROFILE_OUTPUT="$PWD/artifacts/compiler-memory"
           chmod +x scripts/profile-compiler-testhost.sh
-          bash scripts/runner-resource-sampler.sh 10 > artifacts/compiler-memory/resources.log &
+          bash scripts/runner-resource-sampler.sh 10 > >(tee artifacts/compiler-memory/resources.log) 2>&1 &
           sampler_pid=$!
           trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
           # Runsettings names are case-sensitive; prove native and managed
@@ -97,7 +97,10 @@ jobs:
             echo "::error::VSTest did not produce native profiling and managed symbol smoke traces."
             exit 1
           fi
-          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
+          # Stop the diagnostic process before runner exhaustion prevents all
+          # artifact steps. A timeout is a failed, partial probe, never a pass.
+          timeout --signal=INT --kill-after=30s 5m \
+            dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
             -c Release --no-build --no-restore \
             --logger "trx;LogFileName=unsplit.trx" \
             --results-directory artifacts/compiler-memory \

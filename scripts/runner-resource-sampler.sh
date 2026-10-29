@@ -109,7 +109,7 @@ sample_linux() {
         ' "/proc/${pid}/status" 2>/dev/null || true
         if [ -n "${CALOR_PROFILE_OUTPUT:-}" ]; then
             for snapshot in maps smaps; do
-                if ! cp "/proc/${pid}/${snapshot}" "$CALOR_PROFILE_OUTPUT/proc-${pid}-${snapshot}"; then
+                if ! cat "/proc/${pid}/${snapshot}" > "$CALOR_PROFILE_OUTPUT/proc-${pid}-${snapshot}"; then
                     printf '[#1150 snapshot] pid=%s %s unavailable (process may have exited)\n' "$pid" "$snapshot" >&2
                 fi
             done

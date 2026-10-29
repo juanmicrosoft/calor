@@ -36,6 +36,9 @@ It runs only the unsplit heaptrack probe, not the ordinary timing gate or the
 entire Tests workflow. Artifacts include managed JIT symbol maps and procfs
 mapping snapshots as well as native allocation traces. A bounded, interrupted
 probe is diagnostic evidence, not a passing full-suite run or a leak proof.
+The instrumented full-inventory attempt has a five-minute soft cutoff, allowing
+artifact capture before the observed runner shutdown. Resource samples also
+stream to the job log because an `always()` upload cannot survive runner death.
 
 Compiler wall-time work (#1590) moves the 67 binding-routing CLI cases and 12 W1
 guide transcript cases into the already separate Tasks test lane, beside its
