@@ -1039,11 +1039,7 @@ public sealed class BinderErrorEmissionCatalogTests
 
         private static MetadataReference[] References()
         {
-            var trustedPlatformAssemblies =
-                ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?.Split(Path.PathSeparator)
-                ?? [];
-            var references = trustedPlatformAssemblies
-                .Select(path => MetadataReference.CreateFromFile(path))
+            var references = TrustedPlatformReferences.All
                 .Cast<MetadataReference>()
                 .ToList();
             references.Add(MetadataReference.CreateFromFile(typeof(CalorDiagnostic).Assembly.Location));

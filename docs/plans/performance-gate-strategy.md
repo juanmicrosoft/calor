@@ -32,13 +32,18 @@
 
 The separate native-memory investigation (#1590) is opt-in:
 `gh workflow run performance.yml --ref <branch> -f profile_compiler_memory=true`.
-It runs only the unsplit heaptrack probe, not the ordinary timing gate or the
+It runs only the diagnostic memory job, not the ordinary timing gate or the
 entire Tests workflow. Artifacts include managed JIT symbol maps and procfs
 mapping snapshots as well as native allocation traces. A bounded, interrupted
 probe is diagnostic evidence, not a passing full-suite run or a leak proof.
 The instrumented full-inventory attempt has a five-minute soft cutoff, allowing
 artifact capture before the observed runner shutdown. Resource samples also
 stream to the job log because an `always()` upload cannot survive runner death.
+After preserving the native evidence, a separate fresh host attempts the full
+unsplit inventory without profiler overhead, with a 20-minute cutoff and exact
+TRX inventory validation. It still runs if the bounded profiling step fails.
+Its separate TRX and resource log distinguish a complete uninstrumented result
+from partial profiling; a failed profiling step remains a failed workflow.
 
 Compiler wall-time work (#1590) moves the 67 binding-routing CLI cases and 12 W1
 guide transcript cases into the already separate Tasks test lane, beside its
@@ -46,7 +51,7 @@ other CLI integration gates. Recent main measurements attributed 341.5s and
 43.3s respectively to these classes. The test sources, subprocess loops,
 assertions and fixtures stay intact; only their compilation owner changes.
 Shared receiving-case data avoids linking a second copy of the compiler unit
-tests. Exact inventories become Compiler 16,068 and Tasks 224, with no change to
+tests. At relocation, inventories became Compiler 16,068 and Tasks 224, with no change to
 the combined test cases or registered skips. This removes measured work from the
 compiler job; a sub-30-minute p90 still requires the actual main-run window.
 
@@ -65,7 +70,31 @@ These bring the compiler inventory to 16,071. This removes a measured allocation
 source, not proof that all anonymous RSS or the full-host failure is resolved;
 the post-repair Linux investigation and main p90 remain acceptance work.
 
+The post-converter-cache probe,
+[run 40918874857](https://github.com/juanmicrosoft/calor/actions/runs/40918874857),
+preserves matching symbols in artifact 12916759609: 299.14s, 1.34GB tracked peak,
+7.67GB RSS including profiler overhead, and 6,706 passed cases before interruption.
+The earlier five-minute probe reached 2,794 cases; different partial inventories
+do not establish a causal throughput or RSS comparison. The surviving 1.30GB
+metadata-allocation category resolves to repeated complete platform-reference
+sets in `Issue769NamespaceTopologyTests.CreateCompilation`. All four test helpers
+that construct complete platform sets now share that exact unchanged set through
+one immutable, thread-safe `Lazy`, without reusing compilations or changing
+diagnostics, assertions or runtime subjects. Configured references remain fresh;
+the independent oracle retains its separate, bounded seven-assembly subset. One new
+invariant rejects fresh references and checks loaded-metadata identity and exact
+platform paths. The current compiler inventory is 16,072. Full-host memory
+acceptance remains unproven until the separate unsplit verification completes.
+
 ### 0.29 Linux smoke calibration
+
+After the converter metadata repair,
+[run 40919565888](https://github.com/juanmicrosoft/calor/actions/runs/40919565888)
+at `3a3fe9c29` passed 28/28 in all four isolated hosts. Measured suite samples were
+12.482 / 12.801 / 12.978s, median 12.801s below the unchanged 24s ceiling.
+All 20 allocation samples remained 11,274,312 bytes, with the same exact pipeline
+counters and unchanged tolerances. This is another measured runner, not proof of
+a population-wide speedup.
 
 [Performance Tests run 40908078723](https://github.com/juanmicrosoft/calor/actions/runs/40908078723)
 ran one warmup and three measured isolated Release hosts on Linux x64. All 28

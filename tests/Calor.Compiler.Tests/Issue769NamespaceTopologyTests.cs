@@ -22,6 +22,29 @@ namespace Calor.Compiler.Tests;
 public class Issue769NamespaceTopologyTests
 {
     [Fact]
+    public void CompilationReferences_ReuseTheExactPlatformSetAndLoadedMetadata()
+    {
+        var first = CreateCompilation("public class First {}");
+        var second = CreateCompilation("public class Second {}");
+        var firstReferences = first.References.Cast<PortableExecutableReference>().ToArray();
+        var secondReferences = second.References.Cast<PortableExecutableReference>().ToArray();
+
+        Assert.NotSame(first, second);
+        Assert.Equal(
+            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator),
+            firstReferences.Select(reference => reference.FilePath));
+        Assert.Equal(firstReferences.Length, secondReferences.Length);
+        for (var index = 0; index < firstReferences.Length; index++)
+        {
+            Assert.Same(TrustedPlatformReferences.All[index], firstReferences[index]);
+            Assert.Same(firstReferences[index], secondReferences[index]);
+            Assert.Equal(
+                firstReferences[index].GetMetadataId(),
+                secondReferences[index].GetMetadataId());
+        }
+    }
+
+    [Fact]
     public void NamespaceScope_MultilineEnumValue_DoesNotCaptureFollowingClass()
     {
         const string source =
@@ -1885,16 +1908,13 @@ public class Issue769NamespaceTopologyTests
 
     private static CSharpCompilation CreateCompilation(params string[] sources)
     {
-        var references = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))!
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path));
         return CSharpCompilation.Create(
             $"Issue769_{Guid.NewGuid():N}",
             sources.Select(source =>
                 CSharpSyntaxTree.ParseText(
                     source,
                     new CSharpParseOptions(LanguageVersion.Preview))),
-            references,
+            TrustedPlatformReferences.All,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 

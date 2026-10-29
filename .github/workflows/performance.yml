@@ -73,6 +73,7 @@ jobs:
             sudo apt-get install -y --no-install-recommends heaptrack
           fi
       - name: Build compiler tests
+        id: build
         run: dotnet build tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj -c Release
       - name: Profile one unsplit test host
         timeout-minutes: 25
@@ -131,5 +132,31 @@ jobs:
         with:
           name: compiler-memory-profile
           path: artifacts/compiler-memory/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Verify the full unsplit inventory without profiler overhead
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/compiler-memory/unsplit-verification
+          bash scripts/runner-resource-sampler.sh 10 > >(tee artifacts/compiler-memory/unsplit-verification/resources.log) 2>&1 &
+          sampler_pid=$!
+          trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
+          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
+            -c Release --no-build --no-restore \
+            --logger "trx;LogFileName=unsplit-verification.trx" \
+            --results-directory artifacts/compiler-memory/unsplit-verification \
+            --verbosity normal \
+            2>&1 | tee artifacts/compiler-memory/unsplit-verification/tests.log
+          python3 scripts/check_trx.py \
+            --trx-dir artifacts/compiler-memory/unsplit-verification \
+            --project tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+      - name: Upload full unsplit verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiler-unsplit-verification
+          path: artifacts/compiler-memory/unsplit-verification/
           if-no-files-found: error
           retention-days: 30
