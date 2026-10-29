@@ -132,7 +132,49 @@ Each leg blocks on its own floors (below). In both legs, a file whose converted
 output does not build keeps its original C#. It stays in the denominator as a
 failure, but its behavior is not tested through Calor. The
 pass-count delta alarm (`scripts/roundtrip_delta.py`) compares only the Lossy
-leg against `eng/roundtrip-baselines.json` and never blocks.
+leg against the historical `projects` values in `eng/roundtrip-baselines.json`
+and never blocks. Separately, `scripts/roundtrip_baselines.py check` enforces
+that file's `blocking_floors` for **each mode**: pass count, test inventory,
+native fraction, and coverage fraction. These floors supplement, not replace,
+the harness's `ProjectConfigs.cs` limits.
+
+### Raising roundtrip floors (#1030)
+
+`roundtrip-baselines.yml` measures both modes nightly (or by manual dispatch)
+on main. Measurement jobs have read-only credentials. Only after both jobs
+succeed does a separate job validate all ten reports and propose a PR. It
+never pushes to main or merges a PR. The repository must allow GitHub Actions
+to create pull requests; branch protection and required review still apply.
+PRs opened with `GITHUB_TOKEN` do not automatically trigger other workflows;
+run the Tests workflow on the proposal branch before merging if checks have
+not run. No PAT or privileged `pull_request_target` workflow is needed.
+
+Automatic updates refuse any drop below a committed floor, missing/duplicate
+projects, mixed modes, failed or inconclusive results, malformed metrics, and
+stale main revisions. A flat run creates no commit. An existing open baseline
+proposal suppresses another nightly PR. Every changed baseline records the
+source run URL, measured commit, and SHA-256 hashes of the ten input reports;
+the run retains the reports for 90 days. Initial fraction floors match the
+existing harness limits. Default-mode count floors start at zero because no
+pass-count baseline was previously recorded for that leg; the first successful
+update establishes them. The Lossy historical counts remain the initial floor.
+
+For a manual update, collect fresh reports into `reports/lossy/` and
+`reports/default/` using the two commands above with those output directories:
+
+```bash
+python3 scripts/roundtrip_baselines.py update --reports reports \
+  --source-run https://github.com/juanmicrosoft/calor/actions/runs/RUN_ID \
+  --source-commit FULL_MAIN_SHA --updated-at YYYY-MM-DDTHH:MM:SSZ
+python3 scripts/roundtrip_baselines.py check --reports reports/lossy --mode lossy
+python3 scripts/roundtrip_baselines.py check --reports reports/default --mode default
+```
+
+Commit the resulting JSON in a reviewed PR. Never lower a floor just to make
+the nightly job green. A deliberate floor reduction requires a manual PR
+explaining the regression or corpus change with supporting evidence; update
+`ProjectConfigs.cs` too if its limits change. The JSON's `_update_workflow`
+metadata keeps these instructions machine-readable without invalid JSON comments.
 
 ## Member-level differential oracle (#1587)
 

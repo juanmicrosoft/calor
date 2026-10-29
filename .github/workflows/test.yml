@@ -144,6 +144,7 @@ jobs:
         run: |
           python3 scripts/check_test_quality.py --self-test
           python3 scripts/check_trx.py --self-test
+          python3 scripts/test_roundtrip_baselines.py
 
       # #1545, EXC-RELEASE-GAPS-A-YAML: the release-credential check decides on parsed YAML. Its
       # parser is hash-pinned and installed into its own environment; a missing parser fails it.
@@ -1075,6 +1076,11 @@ jobs:
             --mode ${{ matrix.mode }} \
             --dotnet dotnet \
             --output ./conversion-reports/
+
+      - name: Enforce committed round-trip floors (#1030)
+        run: |
+          python3 scripts/roundtrip_baselines.py check \
+            --reports conversion-reports --mode '${{ matrix.mode }}'
 
       # The per-leg results table is posted by `roundtrip-summary` once both
       # legs finish, so the two legs share one PR comment instead of racing to

@@ -1,7 +1,80 @@
 {
-  "_comment": "Baseline round-trip pass counts per corpus project. Consumed by scripts/roundtrip_delta.py from the roundtrip-verification CI job to detect incremental per-project regressions the absolute-threshold gate misses (issue #1005; audit F3/R9). SEEDED VALUES ARE 'CURRENT STATE', NOT 'KNOWN-GOOD': MediatR 155/157 is exactly the state that surfaced as MinorRegressions on PRs #986/#992 — codifying it here means the alarm treats that as the new floor rather than re-alarming every PR. When a maintainer knows a project should be higher (e.g., the actual known-good MediatR is 157/157), edit this file to the higher value; the next PR that regresses will trigger the alarm. Automated main-branch write-back is tracked in issue #1030.",
+  "schema_version": 1,
+  "_comment": "projects retains the historical Lossy advisory high-water marks (#1005), not known-good results. blocking_floors gates both CI legs in addition to ProjectConfigs.cs (#1586). Initial coverage/native floors equal the existing ProjectConfigs limits. Initial Lossy counts retain the historical baseline; default counts start at zero (no measured pass-count baseline yet) and ratchet on the first successful nightly update. Automatic updates never lower any metric or remove a project/mode (#1030).",
+  "_update_workflow": {
+    "automatic": "roundtrip-baselines.yml runs nightly or by workflow_dispatch on main only. Read-only jobs measure both modes; a separate publication job proposes an auditable PR only if every report passes all existing floors and main still equals the measured commit. Review and merge the PR normally; no direct push to main.",
+    "manual": "Run the harness separately with --mode lossy and --mode default, writing to reports/lossy and reports/default. Run: python3 scripts/roundtrip_baselines.py update --reports reports --source-run https://github.com/juanmicrosoft/calor/actions/runs/RUN_ID --source-commit FULL_MAIN_SHA --updated-at YYYY-MM-DDTHH:MM:SSZ. Commit the diff in a reviewed PR. Never mix legs or reuse old reports.",
+    "lowering": "Only a deliberate, reviewed manual PR may lower a blocking floor. Explain the regression, corpus change, and supporting run in the PR; edit blocking_floors and, if necessary, ProjectConfigs.cs together. The automatic updater refuses regressions rather than acknowledging them.",
+    "validation": "python3 scripts/test_roundtrip_baselines.py; python3 scripts/roundtrip_baselines.py check --reports reports/lossy --mode lossy; python3 scripts/roundtrip_baselines.py check --reports reports/default --mode default"
+  },
   "_source_run": "https://github.com/juanmicrosoft/calor/actions/runs/32280829013",
   "_updated_at": "2026-08-19T17:18:17Z",
+  "blocking_floors": {
+    "lossy": {
+      "FluentValidation": {
+        "round_trip_passed": 865,
+        "round_trip_total": 866,
+        "native_fraction": 0.48,
+        "coverage_fraction": 0.5
+      },
+      "MediatR": {
+        "round_trip_passed": 155,
+        "round_trip_total": 157,
+        "native_fraction": 0.4,
+        "coverage_fraction": 0.55
+      },
+      "Serilog": {
+        "round_trip_passed": 811,
+        "round_trip_total": 811,
+        "native_fraction": 0.25,
+        "coverage_fraction": 0.3
+      },
+      "Synthetic": {
+        "round_trip_passed": 52,
+        "round_trip_total": 52,
+        "native_fraction": 0.625,
+        "coverage_fraction": 0.625
+      },
+      "Synthetic2": {
+        "round_trip_passed": 20,
+        "round_trip_total": 20,
+        "native_fraction": 0.25,
+        "coverage_fraction": 0.25
+      }
+    },
+    "default": {
+      "FluentValidation": {
+        "round_trip_passed": 0,
+        "round_trip_total": 0,
+        "native_fraction": 0.03597122302158273,
+        "coverage_fraction": 0.460431654676259
+      },
+      "MediatR": {
+        "round_trip_passed": 0,
+        "round_trip_total": 0,
+        "native_fraction": 0.15625,
+        "coverage_fraction": 0.25
+      },
+      "Serilog": {
+        "round_trip_passed": 0,
+        "round_trip_total": 0,
+        "native_fraction": 0.08928571428571429,
+        "coverage_fraction": 0.125
+      },
+      "Synthetic": {
+        "round_trip_passed": 0,
+        "round_trip_total": 0,
+        "native_fraction": 1.0,
+        "coverage_fraction": 1.0
+      },
+      "Synthetic2": {
+        "round_trip_passed": 0,
+        "round_trip_total": 0,
+        "native_fraction": 1.0,
+        "coverage_fraction": 1.0
+      }
+    }
+  },
   "projects": {
     "FluentValidation": {
       "round_trip_passed": 865,

@@ -1,0 +1,130 @@
+name: Roundtrip baseline writeback
+
+on:
+  schedule:
+    - cron: '35 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roundtrip-baseline-writeback
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: >-
+      github.repository == 'juanmicrosoft/calor' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [lossy, default]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            8.0.x
+      - uses: ./.github/actions/bootstrap-z3
+      - name: Test baseline controls
+        run: python3 scripts/test_roundtrip_baselines.py
+      - name: Measure and check committed floors
+        run: |
+          set -euo pipefail
+          dotnet run --project tools/Calor.RoundTrip.Harness/ -c Release -- \
+            run --all --mode '${{ matrix.mode }}' --dotnet dotnet --output reports/
+          python3 scripts/roundtrip_baselines.py check \
+            --reports reports --mode '${{ matrix.mode }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline-${{ matrix.mode }}
+          path: reports/*-roundtrip.json
+          if-no-files-found: error
+          retention-days: 90
+
+  propose:
+    needs: [measure]
+    if: >-
+      github.repository == 'juanmicrosoft/calor' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      needs.measure.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No compiler, corpus, or report-provided code executes with this token.
+    # Branch protection and normal review remain responsible for merging.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: baseline-lossy
+          path: reports/lossy
+      - uses: actions/download-artifact@v4
+        with:
+          name: baseline-default
+          path: reports/default
+      - name: Validate reports and prepare monotonic update
+        env:
+          SOURCE_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/roundtrip_baselines.py update --reports reports \
+            --source-run "$SOURCE_RUN" --source-commit "$SOURCE_COMMIT" \
+            --updated-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      - name: Propose baseline PR only for the measured main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          SOURCE_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          UPDATE_BRANCH: automation/roundtrip-baselines-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- eng/roundtrip-baselines.json; then
+            echo "No floor improvements; no PR needed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          current_main="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)"
+          if [ "$current_main" != "$SOURCE_COMMIT" ]; then
+            echo "::error::main advanced during measurement; refusing stale writeback. Run again on current main."
+            exit 1
+          fi
+          # Avoid accumulating nightly PRs while an earlier proposal awaits review.
+          existing="$(gh pr list --base main --state open --json headRefName,url \
+            --jq '.[] | select(.headRefName | startswith("automation/roundtrip-baselines-")) | .url')"
+          if [ -n "$existing" ]; then
+            echo "An earlier baseline proposal awaits review: $existing" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$UPDATE_BRANCH"
+          git add -- eng/roundtrip-baselines.json
+          git -c commit.gpgsign=false commit -m "ci: raise roundtrip blocking floors (#1030)" \
+            -m "Measured main: $SOURCE_COMMIT" -m "Source run: $SOURCE_RUN" \
+            -m "Co-authored-by: Copilot App <223556219+Copilot@users.noreply.github.com>"
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/$UPDATE_BRANCH"
+          gh pr create --base main --head "$UPDATE_BRANCH" \
+            --title "ci: raise roundtrip blocking floors (#1030)" \
+            --body "Ratchet-only update for #1030. Both conversion modes passed their existing floors. Measured main: $SOURCE_COMMIT. Source run and report SHA-256 hashes are recorded in the JSON: $SOURCE_RUN. Review and merge normally; this workflow does not approve or merge its proposal." \
+            | tee -a "$GITHUB_STEP_SUMMARY"

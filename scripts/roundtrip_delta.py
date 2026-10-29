@@ -8,8 +8,8 @@ drops. Intended for CI: warning-only, never blocks merge.
 
 Design notes:
 - Approach (A): committed baseline in bench/. Auditable in git history, doesn't
-  depend on GitHub Actions artifact retention. Read-only for now; a follow-up
-  will teach the harness to update the file on main-branch merges.
+  depend on GitHub Actions artifact retention. Nightly monotonic updates are
+  handled by roundtrip_baselines.py (#1030); this alarm stays read-only.
 - Only pass-count drops trigger the alarm (per the issue). Native% and
   coverage% deltas are surfaced when the pass count already regressed, for
   context.
@@ -193,10 +193,11 @@ def format_markdown(deltas: list[dict[str, Any]]) -> str:
         )
     lines.extend([
         "",
-        "**What to do.** If this regression is expected (e.g. a new corpus test "
-        "surfaced a known gap), update `eng/roundtrip-baselines.json` in this PR "
-        "to acknowledge the new floor. Otherwise investigate whether a recent "
-        "conversion or emitter change lost coverage.",
+        "**What to do.** Investigate whether a recent conversion or emitter "
+        "change lost coverage. Automatic baseline updates never lower a floor. "
+        "An intentional reduction requires a reviewed manual PR explaining "
+        "the regression or corpus change; see `_update_workflow` in "
+        "`eng/roundtrip-baselines.json`.",
         "",
         "_Origin: [issue #1005](https://github.com/juanmicrosoft/calor/issues/1005) "
         "— round-trip corpus incremental delta alarm._",
