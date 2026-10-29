@@ -114,6 +114,16 @@ regression brings Enforcement to 723 cases without changing compiler inventory.
 The existing full-platform caches are bounded and intentionally separate from
 this subset. The five-minute probe is still partial, not full-host acceptance.
 
+The independent uninstrumented attempt from that same run at `19cf228f0`
+completed all **16,075** cases: **16,072 passed, three registered skips**, exact
+inventory, **13.3216 minutes**, peak sampled RSS **3,183 MiB** and anonymous
+**2,815 MiB**, with no swap. Artifact **12922471001** contains the complete TRX
+and resource trajectory. This validates the context-repaired source before the
+last runtime-harness cache; later-source verification remains separate.
+By contrast, the preceding `896e207f6` attempt in run 40921813743 timed out at
+20 minutes with 14,860 passed, no failed cases and no complete TRX; peak sampled
+RSS was 7,778 MiB. That failed attempt is not a full-suite success.
+
 ### 0.29 Linux smoke calibration
 
 After context ownership,
