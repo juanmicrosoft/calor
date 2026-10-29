@@ -66,16 +66,16 @@
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "d86cd25b897cf642849dd7506e2ceecbfa274b03",
+      "measuredCommit": "76270627daf26d4de30c1a98e078b2e2bd53fc8e",
       "basis": "post-merge-write-back",
-      "note": "#901/#1590 (0.29, PR #1721): regenerated both demand legs at d86cd25b8 after runtime PE-metadata reuse, with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1. Corpus inputs and measured counts are unchanged from finalized native SQL: 52 pre-effect failures and demandTotal 3123. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
+      "note": "#901/#1590 (0.29, PR #1721): regenerated both demand legs at 76270627d after runtime PE-metadata reuse and deterministic verification-context ownership, with CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1. Corpus inputs and measured counts are unchanged from finalized native SQL: 52 pre-effect failures and demandTotal 3123. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "d86cd25b897cf642849dd7506e2ceecbfa274b03",
+          "headCommit": "76270627daf26d4de30c1a98e078b2e2bd53fc8e",
           "pr": 1721,
           "treeHashes": {
-            "src": "54efd442f252c26c1f85b303f6621f340abd5e46",
+            "src": "6a097ceeeac92e70bc4525dedd2eb3463b977b85",
             "bench/corpus": "3074c3dad1b808434af71ffda07abfff55943471",
             "benchmarks": "50769d7fe18dce4c519d492744ec21d4d7925a80",
             "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
@@ -90,7 +90,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "artifactSha256": "1b37c19e2727b06810ca806b098350a723661b6df462655b20b4579119bd7afb"
+          "artifactSha256": "1b4d8e38a3344e2f42c9be801b818b1a7d5e34f6d08b8c596e8cdca3584ca648"
         }
       }
     },
@@ -123,16 +123,16 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "d86cd25b897cf642849dd7506e2ceecbfa274b03",
+      "measuredCommit": "76270627daf26d4de30c1a98e078b2e2bd53fc8e",
       "basis": "post-merge-write-back",
-      "note": "#901/#1590 (0.29, PR #1721): regenerated at d86cd25b8 after runtime PE-metadata reuse, with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1. Corpus inputs and counts are unchanged from finalized native SQL: aggregate 283 bound / 880 string keys, including seven benchmark files with 18 bound / 53 string keys. Floors are unchanged. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
+      "note": "#901/#1590 (0.29, PR #1721): regenerated at 76270627d after runtime PE-metadata reuse and deterministic verification-context ownership, with CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1. Corpus inputs and counts are unchanged from finalized native SQL: aggregate 283 bound / 880 string keys, including seven benchmark files with 18 bound / 53 string keys. Floors are unchanged. The previous measurement and completed identity remain in git history. Pending phase 1 is not an authoritative protected-main identity.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "d86cd25b897cf642849dd7506e2ceecbfa274b03",
+          "headCommit": "76270627daf26d4de30c1a98e078b2e2bd53fc8e",
           "pr": 1721,
           "treeHashes": {
-            "src": "54efd442f252c26c1f85b303f6621f340abd5e46",
+            "src": "6a097ceeeac92e70bc4525dedd2eb3463b977b85",
             "bench/corpus": "3074c3dad1b808434af71ffda07abfff55943471",
             "benchmarks": "50769d7fe18dce4c519d492744ec21d4d7925a80",
             "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
@@ -147,7 +147,7 @@
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "cfc83cf5f402c8b85342db433e3521abd02e5809c75c3428f6aa1558959148d4"
           },
-          "artifactSha256": "e3f5916f92c28a39f153e940709b4652fcff35ba5d080832a0307aa84cdc32de"
+          "artifactSha256": "b9e8b01791683e0f4602a933154c5ed1e495c7ce1b31b6f0d22c708626f38da5"
         }
       }
     },
