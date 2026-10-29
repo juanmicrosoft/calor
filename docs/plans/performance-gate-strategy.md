@@ -12,22 +12,56 @@
 > aggregate gate). This standardizes the measurement environment, not the product
 > runtime. Fractional milliseconds replace integer measurements.
 > The two 4x-growth ratio tests are named below-quadratic smoke budgets, not linear
-> guarantees. Timing ceilings, including the 24.0s aggregate, are unchanged.
+> guarantees. The aggregate ceiling remains 24.0s; no timing ceiling is raised.
 >
 > `DeterministicPerformanceTests` pins a 10-function, 50-statement generated
 > module at **4,729 parser tokens, 1,351 bound nodes, 580 CFG blocks, 760 CFG edges,
 > and 580 taint worklist iterations**. Five warm-up passes precede five synchronous
 > current-thread allocation samples, each required within **±2%** of its build
 > configuration's baseline: Debug **11,681,288 bytes**, Release **11,266,312 bytes**.
-> These were measured on macOS ARM64, .NET 10.0.14; they are not claimed to be
-> runtime-independent or CI-calibrated. A separate interprocedural loop subject
+> These were measured on macOS ARM64, .NET 10.0.14. Linux x64 validation below
+> confirms the Release pin within tolerance; runtime independence is not claimed.
+> A separate interprocedural loop subject
 > pins **11 iterations**, checks that summary-pass work is included and counters
 > reset per analysis.
 > Allocations complement retained-memory budgets; neither sees native Z3 memory.
 >
-> The remaining elapsed budgets are catastrophic-regression **smoke checks**.
-> Retuning them to ~5x CI medians remains evidence-dependent: no local observation
-> is used to relax them. The historical analysis and proposals below are retained.
+> The remaining verification elapsed budgets are catastrophic-regression **smoke
+> checks**, calibrated below from actual CI rather than relaxed from local results.
+> The historical analysis and proposals below are retained.
+
+### 0.29 Linux smoke calibration
+
+[Performance Tests run 40908078723](https://github.com/juanmicrosoft/calor/actions/runs/40908078723)
+ran one warmup and three measured isolated Release hosts on Linux x64. All 28
+tests passed in every host. Aggregate measured samples were 20.060, 20.548 and
+20.371 seconds: median **20.371s**, below the unchanged **24.0s** ceiling.
+All 20 synchronous allocation samples were **11,274,312 bytes**, 0.071% above the
+macOS Release pin and within its unchanged ±2% tolerance.
+
+Verification timing tests now say `IsTimingSmokeTest`. Their limits round roughly
+five times the three measured-host medians, capped by the previous ceiling. The
+small CFG limit uses a 0.1ms floor because its output is rounded to hundredths of
+a millisecond. These are four processes on one runner, not a population-wide
+performance distribution. The separately registered index usability envelopes
+remain unchanged.
+
+| Operation | Measured-host median (ms) | Smoke ceiling (ms) |
+|---|---:|---:|
+| Parse small | 4.418 | 25 |
+| Parse medium | 41.642 | 225 |
+| Parse large | 431.033 | 2000 (previous tighter ceiling retained) |
+| Bind small | 3.676 | 20 |
+| Bind medium | 78.490 | 400 |
+| Full analysis small | 27.908 | 150 |
+| Full analysis medium | 374.058 | 2000 |
+| Full analysis large | 4575.162 | 23000 |
+| Deep taint flow | 116.272 | 600 |
+| Many-function taint | 54.417 | 300 |
+| Complex control-flow graphs | 4.026 | 25 |
+| Nested-loop graphs | 4.145 | 25 |
+| Small CFG, per-iteration average | 0.01 (rounded) | 0.1 |
+| Complex CFG, per-iteration average | 0.19 (rounded) | 1 |
 
 > **Status (2026-08-27, v0.16 kickoff sweep).** This is the document from PR **#976**
 > (revision 2, 2026-08-14), carried into the tree unchanged below this note and credited to
