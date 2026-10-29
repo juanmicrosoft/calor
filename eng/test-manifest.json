@@ -63,7 +63,7 @@
       "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 532,
+      "expectedTotal": 534,
       "expectedSkipped": 0,
       "note": "#1420: 528 -> 532, +4 Z3ConsumerGuardTests cases (tests/Shared, linked into every registered test host): the host RID is a supported Z3 RID, Z3 loads at the pinned version, and the output-root and runtimes/<rid>/native libz3 plus Microsoft.Z3.dll match their committed SHA-256 pins. They fail rather than skip. No new skipped cases."
     },
