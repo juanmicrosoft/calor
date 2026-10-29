@@ -22,20 +22,23 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     };
 
     [Theory]
-    [InlineData("security/command-injection.calr", 6)]
-    [InlineData("security/sql-injection.calr", 6)]
-    [InlineData("security/path-traversal.calr", 6)]
-    [InlineData("arithmetic/div-by-zero.calr", 8)]
-    [InlineData("arithmetic/overflow.calr", 8)]
-    [InlineData("loops/bounds-violation.calr", 8)]
-    [InlineData("null-safety/null-deref.calr", 8)]
-    public void Subjects_ParseBindCompileAndVerifySeededFindings_WithNamedSafeCaseGaps(string relativePath, int functionCount)
+    [InlineData("security/command-injection.calr", 6, 3)]
+    [InlineData("security/sql-injection.calr", 6, 3)]
+    [InlineData("security/path-traversal.calr", 6, 3)]
+    [InlineData("arithmetic/div-by-zero.calr", 8, 4)]
+    [InlineData("arithmetic/overflow.calr", 8, 4)]
+    [InlineData("loops/bounds-violation.calr", 8, 4)]
+    [InlineData("null-safety/null-deref.calr", 8, 4)]
+    public void Subjects_ParseBindCompileAndVerifySeededFindings_WithNamedSafeCaseGaps(
+        string relativePath, int functionCount, int seededFindingCount)
     {
         var root = AppContext.BaseDirectory;
         while (!Directory.Exists(Path.Combine(root, "benchmarks")))
             root = Path.GetDirectoryName(root)
                 ?? throw new DirectoryNotFoundException("Repository benchmarks directory not found.");
         var source = File.ReadAllText(Path.Combine(root, "benchmarks", relativePath));
+        Assert.Equal(seededFindingCount, Regex.Matches(source, @"// EXPECTED: Calor\d+").Count);
+        Assert.Equal(functionCount - seededFindingCount, Regex.Matches(source, @"// EXPECTED: No warnings").Count);
         var parseDiagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics).Parse();
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics));
