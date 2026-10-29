@@ -6,7 +6,9 @@ hasChildren: true
 ---
 
 
-Practical guides for common Calor workflows and tasks.
+Practical help for using Calor in a .NET project. If you are new to Calor,
+start with [a small example](/docs/getting-started/hello-world/) first. The
+guides below cover specific tasks and some assume you already use .NET.
 
 ---
 
@@ -14,81 +16,58 @@ Practical guides for common Calor workflows and tasks.
 
 ### [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
 
-Nullable references versus runtime Options, initialization/return/argument
-diagnostics, supported defaults and guards, and Calor 0.22's enforcement limits.
+How Calor handles values that may be missing when they cross between Calor and
+.NET code.
 
 ### [Adoption Playbook](/docs/guides/adoption-playbook/)
 
-The adopter workflow: package setup, dependency import, review packets,
-waiver disclosure, and the tested C# eject path.
+How to try Calor gradually, understand what its checks do not cover, and keep
+the option to return to regular C#.
 
 ### [Verification Guarantees and Limits](/docs/guides/verification-guarantees/)
 
-How to read the seven proof statuses, which soundness boundaries force an
-`assumed` or `unsupported` result, and when runtime checks remain.
+What Calor's different check results mean, which cases it cannot decide, and
+why a successful check is not a guarantee that a whole program is correct.
 
 ### [Project Intelligence for Agents](/docs/guides/project-intelligence-for-agents/)
 
-Use the persistent project index before an edit: inspect callers and callees,
-compare declared and inferred effects, estimate ordinary or effect-row blast
-radius, and read partial-answer residuals. Includes equivalent CLI and MCP
-workflows.
+For developers and coding agents: find what calls a piece of code and what a
+change may affect before editing it.
 
 ### [Converting C#: What Stays C# and Why](/docs/guides/csharp-interoperability/)
 
-Task-by-task guide to the converter for the unreleased 0.25 release: `ref`/`out`/`in` calls such as
-`TryParse`, interpolated-string target types, local functions, arrays, and
-iterator properties. Shows what becomes native Calor, what stays C#, and how
-to read the conversion report on the CLI and MCP surfaces.
+For developers moving existing C# code: see which code Calor can convert,
+which parts stay in C#, and how to review the conversion report.
 
 ### [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/)
 
-A comprehensive guide for integrating Calor into an existing C# codebase. Covers:
-
-- Analyzing your codebase for migration candidates
-- Setting up tooling and MSBuild integration
-- Converting files gradually
-- Using Claude Code for assisted migration
+Step-by-step help for adding Calor to an existing C# project without moving
+everything at once.
 
 ### [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/)
 
-A progressive tutorial on refinement types and the MCP-guided agent repair loop. Covers:
-
-- API parameter validation with inline refinements vs. C# boilerplate
-- Financial calculations with proof obligations and Z3 verification
-- The MCP agent workflow: suggest types → check obligations → discover guards → diagnose and repair
+An advanced tutorial on describing extra rules about values and asking the
+verifier to check them. It assumes familiarity with programming.
 
 ### [Effect Manifests: .NET Ecosystem Coverage](/docs/guides/effect-manifests-dotnet-ecosystem/)
 
-How Calor knows the effects of .NET framework and ecosystem library calls. Covers:
-
-- What's covered: ~170 types across BCL, framework interfaces, and ecosystem libraries
-- How resolution works: short name mapping, variable type tracking, priority layers
-- Adding custom manifests for your own types
-- Effect code reference and CLI tools
+For developers integrating external libraries: how Calor looks up what those
+libraries can do and how to add missing information.
 
 ### [Cross-Assembly IL Analysis](/docs/guides/il-analysis/)
 
-Automatic effect discovery through referenced .NET assemblies. Covers:
-
-- How the compiler traces `SaveChanges → db:w` through your data access layer
-- What it finds (concrete call chains, async, delegates) and what it doesn't (interfaces, reflection)
-- Enabling IL analysis with one MSBuild property
-- Performance, diagnostics, and interaction with manifests
+For developers: how Calor examines compiled .NET libraries to learn what
+actions their code can perform, and where this analysis has limits.
 
 ### [Cross-Module Effect Propagation](/docs/guides/cross-module-effect-propagation/)
 
-How Calor verifies effect declarations stay consistent across files in a multi-file project. Covers:
-
-- The contract model: declared effects propagate between modules
-- Bare-name vs. qualified calls and ambiguity handling
-- The `Calor0417` warning for undeclared public functions
-- Warm-build correctness via cached effect summaries
-- Multi-file CLI and MSBuild integration
+For developers: how Calor checks that action declarations stay consistent
+across multiple files, including its warnings and build behavior.
 
 ### [Telemetry and Privacy](/docs/guides/telemetry/)
 
-The opt-in default, exact metadata inventory, and the data Calor never sends.
+What information Calor sends when optional usage reporting is enabled, and
+what it does not collect.
 
 ---
 

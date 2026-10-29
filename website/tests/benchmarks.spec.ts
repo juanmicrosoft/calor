@@ -4,17 +4,18 @@ import { identifyPrograms } from '../src/lib/benchmark-identity';
 import { staticMetricOrder, staticMetricLabels } from '../src/lib/benchmark-labels';
 
 for (const width of [1366, 390]) {
-  test(`static evidence labels and provenance remain neutral at ${width}px`, async ({ page }) => {
+  test(`homepage explains research limits and links to detailed results at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.route('https://**/*', route => route.abort());
     const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
     await page.goto(`${base}/`);
-    const summary = page.getByRole('region', { name: 'Evidence and its limits' });
-    await expect(summary).toContainText('not all behaviorally equivalent');
-    await expect(summary).toContainText('not independently recorded');
-    await expect(summary).toContainText(String(fixture.programs.length));
+    const summary = page.getByRole('region', { name: 'An early project, with honest limits' });
+    await expect(summary).toContainText('do not show that Calor makes AI agents more productive');
+    await expect(summary).not.toContainText(String(fixture.programs.length));
     await expect(summary).not.toContainText('wins');
-    await summary.getByRole('link', { name: 'Read results and provenance' }).click();
+    await summary.getByRole('link', { name: 'Read about the research and its limits' }).click();
+    await expect(page).toHaveURL(/\/docs\/benchmarking\/$/);
+    await page.locator('article a[href$="/docs/benchmarking/results/"]').click();
     const article = page.locator('article');
     await expect(article).not.toContainText('demonstrating advantages');
     await expect(article).not.toContainText('Calor Wins');
@@ -101,18 +102,11 @@ test('keyboard sort and filter expose state while preserving focus and membershi
   await expect(header).not.toHaveAttribute('aria-sort');
 });
 
-test('comparison buttons expose exclusive pressed state through keyboard operation', async ({ page }) => {
+test('homepage explains benefits before showing technical details', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
   await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
-  const calor = page.getByRole('button', { name: 'Calor contract syntax' });
-  const csharp = page.getByRole('button', { name: 'C# guard clauses' });
-  await expect(calor).toHaveAttribute('aria-pressed', 'true');
-  await csharp.press('Enter');
-  await expect(csharp).toHaveAttribute('aria-pressed', 'true');
-  await expect(calor).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('Program.cs — fragment', { exact: true })).toBeVisible();
-  await calor.press('Space');
-  await expect(calor).toHaveAttribute('aria-pressed', 'true');
-  await expect(csharp).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('program.calr — fragment', { exact: true })).toBeVisible();
+  await expect(page.getByText('Make AI-written .NET code easier to check and review.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What changes for your team?' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('§F{');
+  await expect(page.getByRole('link', { name: 'Language reference for developers and coding agents' })).toBeVisible();
 });

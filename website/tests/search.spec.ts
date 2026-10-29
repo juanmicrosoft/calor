@@ -51,7 +51,7 @@ for (const width of [1366, 390]) {
     await expect(input).toHaveValue('');
     await expect(input).toBeFocused();
     await page.goto(root);
-    await page.getByRole('link', { name: 'Hello World', exact: true }).last().click();
+    await page.getByRole('link', { name: 'Run your first example', exact: true }).click();
     await expect(page).toHaveURL(/\/hello-world\/$/);
     await expect(page.locator('article')).toContainText('without an AI subscription');
   });

@@ -1,90 +1,44 @@
 ---
-title: "Documentation"
-description: "Calor documentation - Learn how to use the Coding Agent Language for Optimized Reasoning"
+title: "Calor Guides and Resources"
+description: "A plain-language introduction to Calor, with paths for trying it, adding it to a .NET project, and finding technical references."
 order: 0
 ---
 
+Calor is an experimental programming language for teams that use AI coding
+assistants to build .NET software. It helps make important rules for a change
+easier to see and check. Calor can also create regular C# code, so teams can
+use their familiar .NET build and test tools.
 
-Welcome to the Calor documentation. Calor is a programming language designed specifically for AI coding agents, compiling to .NET via C# emission.
+Calor does **not** guarantee that software is free of bugs. Its checks cover
+specific, documented cases; people still need to review changes and run tests.
+You can try Calor without connecting an AI assistant.
 
----
+## New to Calor?
 
-## Quick Links
+Start with a short example to see what Calor does. You do not need to know its
+notation or have an AI subscription.
 
-### Choose a task
+- [Run your first example](/docs/getting-started/hello-world/) — follow the steps and see the program work.
+- [How Calor works](/docs/getting-started/how-it-works/) — learn the basic workflow in everyday terms.
+- [Why Calor exists](/docs/philosophy/) — understand the problem it is exploring and its tradeoffs.
 
-- **Try Calor:** install the .NET 10 SDK and Calor, then follow [Hello World](/docs/getting-started/hello-world/). No AI subscription is required.
-- **Add it to an existing project:** keep your entry point and follow the [adoption playbook](/docs/guides/adoption-playbook/).
-- **Connect an agent:** after your project builds, choose an [optional agent integration](/docs/getting-started/#step-3-optional-enable-ai-agent-integration).
-- **Contribute to the compiler:** use the [contributor guide](/docs/contributing/) for source builds and tests.
+## Already use .NET?
 
-Use **Search documentation** above to find diagnostic codes, CLI flags, and syntax across pages.
+- [Add Calor gradually](/docs/guides/adding-calor-to-existing-projects/) — keep your C# code and try Calor one part at a time.
+- [Read the adoption guide](/docs/guides/adoption-playbook/) — understand the limits and how to keep a way back to C#.
+- [Set up an AI assistant](/docs/getting-started/#step-3-optional-connect-an-ai-coding-assistant) — optional setup for supported coding tools.
 
-### Getting Started
+## Technical references
 
-New to Calor? Start here to learn the basics:
+These pages give developers and coding agents precise details. They are
+reference material, not required reading for someone who is just learning what
+Calor is.
 
-- [Installation](/docs/getting-started/installation/) - Set up the Calor compiler
-- [Hello World](/docs/getting-started/hello-world/) - Write your first Calor program
-- [Agent integrations](/docs/getting-started/#step-3-optional-enable-ai-agent-integration) - Choose an optional provider
+- [Language reference](/docs/syntax-reference/) — the symbols and rules used in Calor files.
+- [Command reference](/docs/cli/) — commands for installing, building, checking, and converting code.
+- [Technical specification](/docs/semantics/) — exact rules for how Calor programs behave.
+- [Research and results](/docs/benchmarking/) — what has been measured, and what the results do not prove.
+- [All guides](/docs/guides/) — practical help for using Calor in .NET projects.
 
-### Syntax Reference
-
-Complete language reference:
-
-- [Structure Tags](/docs/syntax-reference/structure-tags/) - Modules, functions, block structure
-- [Types](/docs/syntax-reference/types/) - Type system, Option, Result
-- [Expressions](/docs/syntax-reference/expressions/) - Lisp-style operators
-- [Control Flow](/docs/syntax-reference/control-flow/) - Loops, conditionals
-- [Contracts](/docs/syntax-reference/contracts/) - Requires, ensures
-- [Effects](/docs/syntax-reference/effects/) - Effect declarations
-
-### CLI Reference
-
-Command-line tools:
-
-- [calor](/docs/cli/) - Compile Calor to C#
-- [calor assess](/docs/cli/analyze/) - Score C# files for migration potential
-- [calor import](/docs/cli/import/) - Generate honest effect coverage from a package
-- [calor review-packet](/docs/cli/review-packet/) - Review the unproven remainder and waivers
-- [calor verify](/docs/cli/verify/) - Interpret seven-status contract results
-- [calor query](/docs/cli/query/) - Inspect callers, effect rows, and change impact
-
-### Adoption and Trust
-
-- [Adoption Playbook](/docs/guides/adoption-playbook/) - Add Calor one module at a time and keep an exit path
-- [Project Intelligence for Agents](/docs/guides/project-intelligence-for-agents/) - Query callers, effects, and blast radius before editing
-- [Verification Guarantees](/docs/guides/verification-guarantees/) - Modeled semantics, assumptions, and runtime checks
-- [Telemetry and Privacy](/docs/guides/telemetry/) - Opt-in behavior and exact metadata inventory
-
-### Benchmarking
-
-Evaluation framework and results:
-
-- [Results](/docs/benchmarking/results/) - Benchmark comparison with C#
-- [Methodology](/docs/benchmarking/methodology/) - How benchmarks are measured
-
-### Formal Semantics
-
-Backend-independent language specification:
-
-- [Overview](/docs/semantics/) - Why formal semantics matter for agents
-- [Core Semantics](/docs/semantics/core/) - Evaluation order, scoping, numerics, contracts
-- [Normal Form (CNF)](/docs/semantics/normal-form/) - Intermediate representation
-- [.NET Backend](/docs/semantics/dotnet-backend/) - How the backend implements semantics
-- [Versioning](/docs/semantics/versioning/) - Semantic versioning for stability
-
-### Philosophy
-
-Design decisions and rationale:
-
-- [Why Calor Exists](/docs/philosophy/) - The motivation behind Calor
-- [Design Principles](/docs/philosophy/design-principles/) - Core design principles
-- [Tradeoffs](/docs/philosophy/tradeoffs/) - What Calor gives up for explicitness
-
-### Contributing
-
-Get involved:
-
-- [Development Setup](/docs/contributing/development-setup/) - Set up your dev environment
-- [Adding Benchmarks](/docs/contributing/adding-benchmarks/) - Contribute evaluation programs
+Use **Search documentation** above when you know the name of a command,
+message, or topic you need.

@@ -16,9 +16,9 @@ import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/li
 const basePath = getBasePath();
 
 const navigation = [
-  { name: 'Docs', href: '/docs/', path: `${basePath}/docs/` },
   { name: 'Getting Started', href: '/docs/getting-started/', path: `${basePath}/docs/getting-started/` },
-  { name: 'Benchmarks', href: '/docs/benchmarking/', path: `${basePath}/docs/benchmarking/` },
+  { name: 'How It Works', href: '/docs/getting-started/how-it-works/', path: `${basePath}/docs/getting-started/how-it-works/` },
+  { name: 'Documentation', href: '/docs/', path: `${basePath}/docs/` },
   { name: 'Changelog', href: '/docs/changelog/', path: `${basePath}/docs/changelog/` },
 ];
 

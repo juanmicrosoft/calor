@@ -1,22 +1,22 @@
 import { expect, test } from '@playwright/test';
 
 for (const viewport of [{ width: 1366, height: 768 }, { width: 390, height: 844 }, { width: 320, height: 740 }]) {
-  test(`first action and example at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
+  test(`first action and benefit summary at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.route('https://**/*', route => route.abort());
     await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
     const hero = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Calor', exact: true }) });
-    const action = hero.getByRole('link', { name: 'Get Started' });
-    await expect(hero.getByText('A language for coding agents, compiled to C# and .NET.')).toBeInViewport();
+    const action = hero.getByRole('link', { name: 'Try a guided example' });
+    await expect(hero.getByText('Make AI-written .NET code easier to check and review.')).toBeInViewport();
     const box = await action.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
-    const example = page.getByRole('region', { name: 'From Calor to a .NET program' });
-    const exampleBox = await example.boundingBox();
-    expect(exampleBox!.y + exampleBox!.height).toBeLessThanOrEqual(viewport.height * 2);
+    const benefits = page.getByRole('heading', { name: 'A clearer way to work with AI-written code' });
+    const benefitsBox = await benefits.boundingBox();
+    expect(benefitsBox!.y).toBeLessThanOrEqual(viewport.height * 2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.width}-first-screen.png`) });
     await action.click();
@@ -32,24 +32,19 @@ for (const width of [1366, 390, 320]) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.route('https://**/*', route => route.abort());
     await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
-    for (const name of ['Compare runtime contracts', 'Find an undeclared network effect',
-      'Evidence and its limits', 'Use an existing .NET project', 'Reference and help']) {
+    for (const name of ['What changes for your team?', 'Catch mismatches before you rely on a change',
+      'An early project, with honest limits', 'Choose how you want to explore Calor', 'Keep exploring']) {
       await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     }
     await expect(page.getByRole('heading', { name: 'Built for How AI Actually Writes Code' })).toHaveCount(0);
     await expect(page.getByText('Verified findings default', { exact: true })).toHaveCount(0);
     await expect(page.locator('.animate-pulse-glow')).toHaveCount(0);
-    const comparison = page.getByRole('region', { name: 'Compare runtime contracts' });
-    await expect(comparison).toContainText('function fragments');
-    await comparison.getByRole('button', { name: 'C# guard clauses' }).press('Enter');
-    await expect(comparison).toContainText('checked(x * x)');
-    await expect(comparison).not.toContainText('AI has to read');
-    const help = page.getByRole('region', { name: 'Reference and help' });
-    await expect(help).toContainText('account-free');
+    await expect(page.locator('main')).not.toContainText('§F{');
+    const help = page.getByRole('region', { name: 'Keep exploring' });
     await expect(help).toContainText('may require a ChatGPT account or plan');
     await expect(help.getByRole('link', { name: 'Ask Calor on ChatGPT (external)' }))
       .toHaveAttribute('rel', 'noopener noreferrer');
-    await help.getByRole('link', { name: 'Search the documentation' }).click();
+    await help.getByRole('link', { name: 'Browse all guides and resources' }).click();
     await expect(page).toHaveURL(/\/docs\/$/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

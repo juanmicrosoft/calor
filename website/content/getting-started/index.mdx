@@ -3,36 +3,34 @@ title: "Getting Started"
 section: "getting-started"
 order: 0
 hasChildren: true
+description: "Try Calor with a small example, then decide whether to add it to your .NET project or connect an AI coding assistant."
 ---
 
 
-This guide will help you install Calor, write your first program, and understand how to integrate Calor with AI coding agents.
+You can try Calor with a small program before connecting an AI coding
+assistant or changing an existing project. To run it yourself, you will need
+the .NET 10 SDK and a terminal. The steps below explain each part.
 
 ---
 
 ## Quick Overview
 
-Calor is a programming language that compiles to C# via source-to-source transformation. The workflow is:
-
-```
-your_code.calr → Calor Compiler → your_code.g.cs → .NET Build → executable
-```
+Calor lets you record important rules alongside code. It creates C# that you
+can build and run with .NET.
 
 ---
 
 ## What You'll Learn
 
-1. **[Installation](/docs/getting-started/installation/)** - Set up the Calor compiler
-2. **[Hello World](/docs/getting-started/hello-world/)** - Write and run your first Calor program
-3. **[How It Works](/docs/getting-started/how-it-works/)** - How AI agents work with Calor using in-context examples
-4. **[Claude Integration](/docs/getting-started/claude-integration/)** - Use Calor with Claude Code (enforced Calor-first)
-5. **[Codex Integration](/docs/getting-started/codex-integration/)** - Use Calor with OpenAI Codex CLI
-6. **[Gemini Integration](/docs/getting-started/gemini-integration/)** - Use Calor with Google Gemini CLI (enforced Calor-first)
-7. **[GitHub Copilot Integration](/docs/getting-started/github-integration/)** - Use Calor with GitHub Copilot
+1. **[Hello World](/docs/getting-started/hello-world/)** — Run a small example without an AI account or an existing project.
+2. **[Installation](/docs/getting-started/installation/)** — Set up the tools needed to try Calor.
+3. **[How It Works](/docs/getting-started/how-it-works/)** — See how to make and check a change.
+4. **[Add Calor to a project](/docs/guides/adding-calor-to-existing-projects/)** — Keep your C# code and start with one small part.
+5. **[Connect an AI coding assistant](/docs/getting-started/#step-3-optional-connect-an-ai-coding-assistant)** — Optional setup for supported tools.
 
 ---
 
-## Prerequisites
+## What you need to try it
 
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
 - A terminal or command prompt
@@ -55,11 +53,12 @@ dotnet tool update -g calor
 
 ---
 
-## Quick Start
+## Add Calor to a .NET project
 
-Calor integrates into any .NET project. Start with a C# project (new or existing), enable Calor, and from that point forward all new code is written in Calor.
+You can add Calor to a new or existing .NET project. The setup adds build
+support for Calor files; your existing C# code can stay as it is.
 
-### Step 1: Start with a C# Project
+### Step 1: Start with a .NET project
 
 ```bash
 # Create a new project, or use an existing one
@@ -67,15 +66,16 @@ dotnet new console -o MyApp
 cd MyApp
 ```
 
-### Step 2: Enable Calor
+### Step 2: Add Calor to the project
 
 ```bash
 calor init
 ```
 
-This adds MSBuild integration so `.calr` files compile automatically during `dotnet build`.
+This connects Calor to the .NET build, so Calor files are handled when you
+build the project.
 
-### Step 3: (Optional) Enable AI Agent Integration
+### Step 3: (Optional) Connect an AI coding assistant
 
 For Claude Code (with enforced Calor-first via hooks):
 ```bash
@@ -97,18 +97,18 @@ For GitHub Copilot (guidance-based):
 calor init --ai github
 ```
 
-This adds Calor skills and project documentation that instruct the AI to:
-- Write all new code in Calor (not C#)
-- Analyze existing C# files before modifying them
+This adds project guidance so the assistant knows how to work with Calor and
+your existing C# code.
 
 **Note:** Claude Code, Gemini CLI, and Codex can configure Calor-first hooks.
 For Codex, review and trust the generated hooks with `/hooks`, then run the
 generated smoke test because specialized file-change paths may bypass lifecycle
 hooks. GitHub Copilot is guidance-based with MCP tool support.
 
-### Step 4: Write Calor Code
+### Step 4: Add a Calor file
 
-After init, create `.calr` files and they compile automatically. Create `Program.calr`:
+After setup, create a `.calr` file. It will be included the next time you
+build the project. For a first example, create `Program.calr`:
 
 ```calor
 §M{m001:MyApp}
@@ -124,23 +124,25 @@ Then build:
 dotnet build
 ```
 
-See [Hello World](/docs/getting-started/hello-world/) for a detailed explanation of the syntax.
+See [Hello World](/docs/getting-started/hello-world/) for the full example.
 
-### Step 5: (Optional) Migrate Existing C# Files
+### Step 5: (Optional) Convert some existing C# code
 
-For existing C# codebases, analyze which files are good candidates for migration:
+If you want to convert existing C# files, first check which ones Calor can
+handle well:
 
 ```bash
 calor assess ./src --top 10
 ```
 
-Then convert high-scoring files:
+Then try converting a file with a high score:
 
 ```bash
 calor convert HighScoreFile.cs
 ```
 
-See the [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) guide for the complete walkthrough.
+The [project integration guide](/docs/guides/adding-calor-to-existing-projects/)
+explains the process and its limits.
 
 ---
 

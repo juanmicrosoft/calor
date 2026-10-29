@@ -13,11 +13,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
   alternates: { canonical: canonicalUrl('/') },
   title: {
-    default: 'Calor - Coding Agent Language for Optimized Reasoning',
+    default: 'Calor - Make AI-written .NET code easier to check',
     template: '%s | Calor',
   },
   description:
-    'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
+    'Make AI-written .NET code easier to check and review. Calor records important rules, checks supported cases, and creates regular C# code.',
   keywords: ['Calor', 'programming language', 'AI', 'coding agents', 'compiler', '.NET', 'C#'],
   authors: [{ name: 'Calor Team' }],
   icons: {
@@ -28,23 +28,23 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: canonicalUrl('/'),
     siteName: 'Calor',
-    title: 'Calor - A Programming Language for AI Coding Agents',
+    title: 'Calor - Make AI-written .NET code easier to check',
     description:
-      'Calor is a programming language designed for AI coding agents, compiling to .NET via C#. Build intelligent, optimized agents with ease.',
+      'Calor records important rules for AI-written code, checks supported cases, and creates regular C# code for .NET.',
     images: [
       {
         url: publicUrl('/og-image.jpg'),
         width: 1200,
         height: 630,
-        alt: 'Calor - A Programming Language for AI Coding Agents',
+        alt: 'Calor - Make AI-written .NET code easier to check',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Calor - A Programming Language for AI Coding Agents',
+    title: 'Calor - Make AI-written .NET code easier to check',
     description:
-      'Calor is a programming language designed for AI coding agents, compiling to .NET via C#. Build intelligent, optimized agents with ease.',
+      'Calor records important rules for AI-written code, checks supported cases, and creates regular C# code for .NET.',
     images: [publicUrl('/og-image.jpg')],
   },
 };
