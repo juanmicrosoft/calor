@@ -128,7 +128,7 @@ def usage(input_tokens, output_tokens):
         "cache_read_input_tokens": 0,
         "service_tier": "standard",
         "speed": "standard",
-        "inference_geo": "global",
+        "inference_geo": "not_available",
     }
 
 
@@ -182,7 +182,8 @@ def stream(message_id, content, stop_reason, counters):
     parts.extend([
         event({
             "type": "message_delta",
-            "delta": {"stop_reason": stop_reason, "stop_sequence": None},
+            "delta": {"stop_reason": stop_reason, "stop_sequence": None,
+                      "container": None, "stop_details": None},
             "usage": {"output_tokens": counters["output_tokens"]},
         }),
         event({"type": "message_stop"}),
@@ -860,6 +861,11 @@ class NativeGatewayStartupTests(unittest.TestCase):
                 "modelInvoked": False,
                 "provider": {
                     "kind": "SYNTHETIC/in-process-scripted-provider-v1",
+                    "responseShape": {
+                        "inference_geo": "not_available",
+                        "terminalDeltaNullableFields": ["container", "stop_details"],
+                        "unknownGeographyPricing": "US 1.1x conservative maximum",
+                    },
                     "realUpstreamGuardInstalled": True,
                     "requestCount": len(provider.requests),
                     "requests": provider.requests,

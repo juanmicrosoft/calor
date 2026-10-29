@@ -1,0 +1,637 @@
+{
+  "byteCount": 886967,
+  "fileCount": 126,
+  "files": [
+    {
+      "path": "collection-outcome.json",
+      "sha256": "4240d6dfcd519e7c0e493f843103182e02762be9537ae31b8a3e9037085fc7d9",
+      "size": 31107
+    },
+    {
+      "path": "gateway-admission/stage1-method.json",
+      "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001",
+      "size": 3092
+    },
+    {
+      "path": "gateway-authorization-1434.json",
+      "sha256": "756ab420af2c8e9e9038ccfa68568d0223e0895575cd0bef3f02639b82c5a3e7",
+      "size": 52463
+    },
+    {
+      "path": "gateway-execution-profile-1434.json",
+      "sha256": "3869f2d2b21743f917fe010fbf9b6fdac0f9b51eab55a11d4162a4a1d0a766ee",
+      "size": 3734
+    },
+    {
+      "path": "gateway-forecast/forecast-proposed.json",
+      "sha256": "fe1ddf0cf9995694190acd548e7659e8aee506310438499b5a0fd3bb3718720b",
+      "size": 8334
+    },
+    {
+      "path": "gateway-forecast/forecast-review.json",
+      "sha256": "a0a649b6159fddf38287c4a184facc79bbd98cd25c5ac1862080137a21176d13",
+      "size": 2326
+    },
+    {
+      "path": "gateway-forecast/project_cost.py",
+      "sha256": "1d6168e248dc9a0cf59e5514098363c98a9a1e34b024a85f85c2e7f368435af6",
+      "size": 7793
+    },
+    {
+      "path": "gateway-instrument-amendment-1434.json",
+      "sha256": "5696d88e8edf9f3fc782c25c625ed426f1bfd9ad10a144fb797899b762c76508",
+      "size": 6339
+    },
+    {
+      "path": "gateway-recovery-archive-inventory-1434.json",
+      "sha256": "4f00fdbedcb026eca62386025a826e0e793af1528bb1692b76266cdea74d2c77",
+      "size": 22337
+    },
+    {
+      "path": "gateway-recovery-evidence-1434.json",
+      "sha256": "76ea30f3d4af9bd6af222130654188d4e609886b52edc241ee594e013c070a35",
+      "size": 28885
+    },
+    {
+      "path": "gateway-recovery-original-snapshot-1434.json",
+      "sha256": "2a280f67270053f17532bf93a9c51f81969f0f5b6796d0a4aab0ab42cdb5a75e",
+      "size": 25381
+    },
+    {
+      "path": "gateway-recovery-proof-1434.json",
+      "sha256": "12ff95dd4e1efbb56f6e7bce9099696a56efdd0da2061316854602752981056e",
+      "size": 1687
+    },
+    {
+      "path": "gateway-source-inspections.json",
+      "sha256": "9e443d86d0f1e7b9f926d03427e0f9aaaeee23c81a76796681fadc9c862a356d",
+      "size": 229759
+    },
+    {
+      "path": "gateway-spending-plan-1434.json",
+      "sha256": "f4bfa29abc4cab698fd2d612177b506a1dcc6d7a7c55f16fdee293ec4a58efbd",
+      "size": 16226
+    },
+    {
+      "path": "model-registration.json",
+      "sha256": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27",
+      "size": 1804
+    },
+    {
+      "path": "pins.json",
+      "sha256": "b0212d63947480df98283dda13b1bc6cef0c9a670304996d7480fb6d59738a7f",
+      "size": 4558
+    },
+    {
+      "path": "registration.json",
+      "sha256": "78360bdf01110702e204120e1aa1db9e14ab363e485ca537bd5689fad11b2eb0",
+      "size": 258183
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-permissive/run-1/client-invocation.json",
+      "sha256": "01614b0e7bf86220a2287c6fd76f9b3a5c06913c2e0762c9eb3958c397f0bbee",
+      "size": 20
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-permissive/run-1/invalid.txt",
+      "sha256": "c7eacf169b18bdc01d0bbc4331bb2397c0acb6873f486e79a2376895c08dce64",
+      "size": 125
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-permissive/run-1/result.json",
+      "sha256": "1a8baaa0ff05e66622487054bded12da40f0a9cd3bb896bd7edf6de5852c2aa3",
+      "size": 4926
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/.smokehash",
+      "sha256": "7302c968c8f6eed46caf8b30800c175afdbc2fbc6bd2670cf705ca40c22fbc9f",
+      "size": 41
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/Directory.Build.props",
+      "sha256": "17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea",
+      "size": 12
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/Directory.Build.targets",
+      "sha256": "17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea",
+      "size": 12
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/Directory.Packages.props",
+      "sha256": "a927bac7a1b524f48ffd80dc82ab3014d84b8894c59d82e58263a37e582f3e40",
+      "size": 229
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/agent.err",
+      "sha256": "1045abeb391c38b070685bcc475545aa4c359aa51d141a80ec017f17a104eb42",
+      "size": 14
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/agent.json",
+      "sha256": "f94ff4dd4e4391052748f4364962b55331f7f579ad8327c9b0a42f3acfb03c62",
+      "size": 1726
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/attempt-start.json",
+      "sha256": "ea3c35cf9d81fb2c9b1fbd738a29006aa25dac79ed960250ccffa73f137b881f",
+      "size": 543
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/client-invocation.json",
+      "sha256": "01614b0e7bf86220a2287c6fd76f9b3a5c06913c2e0762c9eb3958c397f0bbee",
+      "size": 20
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/final-src/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/final-src/task.calr.inc",
+      "sha256": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+      "size": 79
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/heldout/HeldOut.csproj",
+      "sha256": "e887b2a2f0318836d811537dce08d8f698171462ba68039060487babb1210f3f",
+      "size": 1503
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/heldout/HeldOutTests.cs",
+      "sha256": "051cf9dc14e036614a3e03cd1d6977b5c2487cb39523fa73c82d0c2c0507590e",
+      "size": 943
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/heldout/TestShim.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/invalid.txt",
+      "sha256": "c7bb596a7eb2073a61992860032a27f92d40728c8f70ec46e667eac938517196",
+      "size": 90
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/policy-after.json",
+      "sha256": "88f98f08cf9a41c9f46630c5c4b7decb6adcd952a1ec7820573f20a4e786de2c",
+      "size": 873
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/policy-before.json",
+      "sha256": "88f98f08cf9a41c9f46630c5c4b7decb6adcd952a1ec7820573f20a4e786de2c",
+      "size": 873
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/result.json",
+      "sha256": "a87d7334e0aa23d351935620fed358cd9b5a80ecc2b4e1f6a4f4ed418b3f7908",
+      "size": 1547
+    },
+    {
+      "path": "runs/C-001-quota-adapter/calor-strict/run-1/transcript.jsonl",
+      "sha256": "36ec097784827518674c1bd9e4c0ee204052c21220a45cfcc18041a17534f3dc",
+      "size": 9464
+    },
+    {
+      "path": "spending-authorization.json",
+      "sha256": "756ab420af2c8e9e9038ccfa68568d0223e0895575cd0bef3f02639b82c5a3e7",
+      "size": 52463
+    },
+    {
+      "path": "spending-initial.json",
+      "sha256": "266af489af71bf254e03d9b74423d21260ab21006505a058818eede4ac5a795e",
+      "size": 26961
+    },
+    {
+      "path": "spending-plan.json",
+      "sha256": "f4bfa29abc4cab698fd2d612177b506a1dcc6d7a7c55f16fdee293ec4a58efbd",
+      "size": 16226
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/evidence/r8/A.generated.cs.txt",
+      "sha256": "baeb928e7b4d61eb1d0e449542b207c0bd94ad617d1a3d9207a6418934f53375",
+      "size": 2952
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/evidence/r8/A.json",
+      "sha256": "a22babf8a43afd4bb0028154335b92a03e88c2eff94272029127bc7d4cf19ece",
+      "size": 890
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/evidence/r8/B.json",
+      "sha256": "4eaaf47a9c81f6e30bf2399e9bd81b2d3374eacb3461fb01949468ea6e70755d",
+      "size": 1180
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/evidence/r8/observation.json",
+      "sha256": "3de8550713adf567dc8be1886f485293d89bab8cb517efcd620eccf86eb378c6",
+      "size": 2771
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/evidence/r8/source.calr.txt",
+      "sha256": "24c90dc237553f3caf6014a5dc267d78c8058ff56da02b9204547b10e089cd16",
+      "size": 706
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/pair.json",
+      "sha256": "052e2cabd47d2f485549521c89b14ed1685135310b3963c3add5d3012f577a7d",
+      "size": 2667
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-throwing-a/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-throwing-a/task.calr.inc",
+      "sha256": "a7041d996f6a1e8ce8a4dc1df2477f9d659d67b90e5fe7ae8a72678f73caa468",
+      "size": 156
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-throwing-b/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-throwing-b/task.calr.inc",
+      "sha256": "a7041d996f6a1e8ce8a4dc1df2477f9d659d67b90e5fe7ae8a72678f73caa468",
+      "size": 156
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-wrong-value-a/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-wrong-value-a/task.calr.inc",
+      "sha256": "cc26d2ec7091bf84931ee444e6e29bbad2540ec0262be424165544527c0df846",
+      "size": 146
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-wrong-value-b/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/effectful-wrong-value-b/task.calr.inc",
+      "sha256": "cc26d2ec7091bf84931ee444e6e29bbad2540ec0262be424165544527c0df846",
+      "size": 146
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/honest-a/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/honest-a/task.calr.inc",
+      "sha256": "8c9b5448c83c077e825be091bf0723413c7736c4043f005e56f2f9cc845a315e",
+      "size": 107
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/honest-b/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/honest-b/task.calr.inc",
+      "sha256": "8c9b5448c83c077e825be091bf0723413c7736c4043f005e56f2f9cc845a315e",
+      "size": 107
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/laundering-a/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/laundering-a/task.calr.inc",
+      "sha256": "dab336f6ad2ce9d7fa304e45d56043ec235335b7c5f716c4f21914e04574d02c",
+      "size": 109
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/laundering-b/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/seeded/laundering-b/task.calr.inc",
+      "sha256": "dab336f6ad2ce9d7fa304e45d56043ec235335b7c5f716c4f21914e04574d02c",
+      "size": 109
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/smoke/VisibleTests.cs",
+      "sha256": "5ec03554921ab01ceaaef274537d35121f408d2c8783096ae2e2705b5f4b79be",
+      "size": 807
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/smoke/shims/SmokeShim.calor.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/spec.md",
+      "sha256": "58d99cfa5da7565296c5e1a29eb8419bdc57b70a9000c88516f37352f68ceedf",
+      "size": 581
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/starter-a/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/starter-a/task.calr.inc",
+      "sha256": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+      "size": 79
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/starter-b/dependency.calr.inc",
+      "sha256": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+      "size": 597
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/starter-b/task.calr.inc",
+      "sha256": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+      "size": 79
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/tests/HeldOutTests.cs",
+      "sha256": "051cf9dc14e036614a3e03cd1d6977b5c2487cb39523fa73c82d0c2c0507590e",
+      "size": 943
+    },
+    {
+      "path": "tasks/C-001-quota-adapter/tests/shims/TestShim.calor.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/evidence/r8/A.generated.cs.txt",
+      "sha256": "e36b2c97b66d318b2f47920d1e5e2f257e697a130cbab89cab4c30833dcc9607",
+      "size": 3988
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/evidence/r8/A.json",
+      "sha256": "4eb72e2f44bbaae5ae56273f6ca4c600b489ce3f52c9a1b22b969c1c08e004fa",
+      "size": 893
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/evidence/r8/B.json",
+      "sha256": "10cae606eafbd74e6439faddb8af4e61376d655150b99bd987a1d6bffc0fbd89",
+      "size": 1470
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/evidence/r8/observation.json",
+      "sha256": "d87277248e027287343277318cd64e45fa0fd2d9f73ad23ec544fe9f03a9042a",
+      "size": 3065
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/evidence/r8/source.calr.txt",
+      "sha256": "6375194cebdee9738a56ddf4471c8b87848f2fef368517e5a6f3d9795c3ca687",
+      "size": 872
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/pair.json",
+      "sha256": "c7541a3e0e131556d8db02b8f4ffa8a786df1be0d7105f65ea9cbee0ac5dda5d",
+      "size": 2390
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/effectful-wrong-value-a/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/effectful-wrong-value-a/task.calr.inc",
+      "sha256": "96d0c188c5688741c78f5887c5b828d4726b994aa880802907b62af0921ab357",
+      "size": 224
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/effectful-wrong-value-b/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/effectful-wrong-value-b/task.calr.inc",
+      "sha256": "96d0c188c5688741c78f5887c5b828d4726b994aa880802907b62af0921ab357",
+      "size": 224
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/honest-a/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/honest-a/task.calr.inc",
+      "sha256": "1300bfca9330fa2f232d494223d0ec436aed1b2634f9f5992ab4573a44ff6361",
+      "size": 244
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/honest-b/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/honest-b/task.calr.inc",
+      "sha256": "1300bfca9330fa2f232d494223d0ec436aed1b2634f9f5992ab4573a44ff6361",
+      "size": 244
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/laundering-a/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/laundering-a/task.calr.inc",
+      "sha256": "54e8ab60b141c05c5821dd4846b02a55bf434b102ade8fa110b2b4813c0cec14",
+      "size": 246
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/laundering-b/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/seeded/laundering-b/task.calr.inc",
+      "sha256": "54e8ab60b141c05c5821dd4846b02a55bf434b102ade8fa110b2b4813c0cec14",
+      "size": 246
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/smoke/VisibleTests.cs",
+      "sha256": "33a0aa3e9cd56b6356c370aa5ae17b60260e0963c9b39320826ad7e0c4bf10f7",
+      "size": 787
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/smoke/shims/SmokeShim.calor.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/spec.md",
+      "sha256": "88623563b46e2847f27f9db670ef29065148ff58642d107479141517f59e2862",
+      "size": 699
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/starter-a/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/starter-a/task.calr.inc",
+      "sha256": "69005c83146160ef2ba226d3599c22572f9c53b1c58fbb8bea8b887925debce7",
+      "size": 77
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/starter-b/dependency.calr.inc",
+      "sha256": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+      "size": 626
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/starter-b/task.calr.inc",
+      "sha256": "69005c83146160ef2ba226d3599c22572f9c53b1c58fbb8bea8b887925debce7",
+      "size": 77
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/tests/HeldOutTests.cs",
+      "sha256": "da45a3637a6da2c6eb8b15b2b3d4c37f63ede18ca44eb28cf24b8bfe59636f77",
+      "size": 948
+    },
+    {
+      "path": "tasks/C-002-shipping-quote/tests/shims/TestShim.calor.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/evidence/r8/A.generated.cs.txt",
+      "sha256": "326ba26c2e9869e0230b4cbd3af2b7bc83e0f99112ff6eeb004d4356ff9637c3",
+      "size": 3490
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/evidence/r8/A.json",
+      "sha256": "90d7065f79bab7f21b4534afd060917b2a22b6502dbb9e16238209e38b6830e0",
+      "size": 902
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/evidence/r8/B.json",
+      "sha256": "ca12fc2997c0e4e5b7e7ed8d7d89aef87aa7933a90cd6a53c588cbf8e9ca94dd",
+      "size": 1496
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/evidence/r8/observation.json",
+      "sha256": "e1f86c0a999d67b2f1e51294513b1a72d4ac16257bfa94edd6a9a7cac2c3b753",
+      "size": 3103
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/evidence/r8/source.calr.txt",
+      "sha256": "8bc89e8688aa56a0d73cbabc4b4fdca66a27830dc58b6c22a53dac5cad847858",
+      "size": 781
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/pair.json",
+      "sha256": "561a950022443b570e7c47b78e4b9939fd4c04d24a784f41b43316c0e08ab84f",
+      "size": 2384
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/effectful-wrong-value-a/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/effectful-wrong-value-a/task.calr.inc",
+      "sha256": "0f1abdc0fdfffbc9e0aef978c9e81e593aff8ebc99db45e6b27a46e46a73c3a0",
+      "size": 255
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/effectful-wrong-value-b/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/effectful-wrong-value-b/task.calr.inc",
+      "sha256": "0f1abdc0fdfffbc9e0aef978c9e81e593aff8ebc99db45e6b27a46e46a73c3a0",
+      "size": 255
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/honest-a/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/honest-a/task.calr.inc",
+      "sha256": "3caa518a0a69122ae02ec204a2f15d82434a951190a9ebc0bedc999311d76f7f",
+      "size": 224
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/honest-b/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/honest-b/task.calr.inc",
+      "sha256": "3caa518a0a69122ae02ec204a2f15d82434a951190a9ebc0bedc999311d76f7f",
+      "size": 224
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/laundering-a/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/laundering-a/task.calr.inc",
+      "sha256": "e663278576c0dd41bd798642140da586922270c7cb06530c42581b231eaaad58",
+      "size": 224
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/laundering-b/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/seeded/laundering-b/task.calr.inc",
+      "sha256": "e663278576c0dd41bd798642140da586922270c7cb06530c42581b231eaaad58",
+      "size": 224
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/smoke/VisibleTests.cs",
+      "sha256": "1d9a5d8b43b41076d71d4cc4ab9f214912c0cecce59588a6d78bc7f33ec2b7ce",
+      "size": 940
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/smoke/shims/SmokeShim.calor.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/spec.md",
+      "sha256": "fe91b274fce9e5b3b52d2c839de8fa532ef2a13f710170dcdffba7bd4fe5210e",
+      "size": 662
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/starter-a/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/starter-a/task.calr.inc",
+      "sha256": "b6bc34212ca22ead1441994f2cded2b91099689f07468881d06ebfaf10f5daad",
+      "size": 91
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/starter-b/dependency.calr.inc",
+      "sha256": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+      "size": 557
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/starter-b/task.calr.inc",
+      "sha256": "b6bc34212ca22ead1441994f2cded2b91099689f07468881d06ebfaf10f5daad",
+      "size": 91
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/tests/HeldOutTests.cs",
+      "sha256": "60d6290f9807c3685bc78f466ab99daa50bdd155c654bf51efdaf2286a6b8714",
+      "size": 1003
+    },
+    {
+      "path": "tasks/C-003-frame-fingerprint/tests/shims/TestShim.calor.cs",
+      "sha256": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+      "size": 72
+    }
+  ],
+  "sha256": "f6d14e04550232e7b420a82a0f6d1efd1b2489863eedcdf7fc9ac6787c0ef513"
+}

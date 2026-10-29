@@ -1,0 +1,95 @@
+{
+  "actualCost": null,
+  "authorizationCanonicalSha256": "4c30ef5bceb432252396b8c0227688f2c47e259bbaa31d1663bf01be72b6b861",
+  "authorizationSha256": "d222ed741841aaf519c62e4fe6829134711b9731819d2ea7d5f591b21b39e25b",
+  "failedArchivePathSha256": "00be2bef81aefe47392b4f2e25723368f7ff49e76d6bea2bbc5fd5630cdd4465",
+  "futureUnknownPolicy": "halt",
+  "historicalRequestIds": [
+    "8d7fa7bf4a31f28ba7f7e8f6802781e8b6d8238fb38d3219",
+    "a24d9933f2d62c0c904eefdb81d9b592b4e36d30a7e577b3"
+  ],
+  "kind": "pp-w-historical-liability-disposition-v1",
+  "ledgerPathSha256": "7f246d8ed33eb569a2e3dde609e36b24eedd484c6894cd9c1570d37b611804ab",
+  "newBackupPathSha256": "2ff8953a98defbf42ab98c4936cfb17ae818389dc2fc923ed788ab3038d3028d",
+  "oldBackupPathSha256": "521ac93c46b072d4bced59046d75429d3b98e2e89183f0c27b13c9b7ad079c7b",
+  "oldBackupSha256": "0f32e092fbd760f7273405b4feda7e107b1a5630c9d98668b90d84a323048295",
+  "oldBindingSha256": "5bf0f7f145e919d7af84172ebeae43d6646e779003db172f8fd041cb3adc68d5",
+  "oldEventCount": 9,
+  "oldLedgerSha256": "464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990",
+  "originalArchivePathSha256": "cf683ce075e84d727a3320e3a8bdbc8d580420a660e215305b1bac53ff4b8ef8",
+  "permanentlyRetainedMicroUsd": 51040000,
+  "predecessorArchiveInventories": [
+    {
+      "archiveRole": "original-epoch-001",
+      "byteCount": 684707,
+      "epochId": "w-rows-pilot-gateway-001",
+      "fileCount": 118,
+      "inventorySha256": "1554f1d841f4e455c36c677b2d9d778d7903c2153bd210efadb1ecc5351973e2",
+      "pinsSha256": "cfe5a103ba114892029e951ba16d0c5d87149a7a616139de3198da0dfa04f642"
+    },
+    {
+      "archiveRole": "failed-epoch-002",
+      "byteCount": 886967,
+      "epochId": "w-rows-pilot-gateway-002",
+      "fileCount": 126,
+      "inventorySha256": "f6d14e04550232e7b420a82a0f6d1efd1b2489863eedcdf7fc9ac6787c0ef513",
+      "pinsSha256": "b0212d63947480df98283dda13b1bc6cef0c9a670304996d7480fb6d59738a7f"
+    }
+  ],
+  "preservedAttemptEvidence": [
+    {
+      "artifactHashes": {
+        "clientInvocationPath": "01614b0e7bf86220a2287c6fd76f9b3a5c06913c2e0762c9eb3958c397f0bbee",
+        "invalidReasonPath": "8f748ff55b788d3045d6ca222e82e5cdcf5477d78cfd06235260bcd63db3c120",
+        "rawRecordPath": "d61b5016b2a8ca1327469abc97205817f60e16f4654b6868753972e46a2cb1c5"
+      },
+      "classification": "HISTORICAL_TERMINAL_INVALID",
+      "epochId": "w-rows-pilot-gateway-001",
+      "slot": "C-001-quota-adapter/calor-permissive/1"
+    },
+    {
+      "artifactHashes": {
+        "attemptStartPath": "ea3c35cf9d81fb2c9b1fbd738a29006aa25dac79ed960250ccffa73f137b881f",
+        "clientInvocationPath": "01614b0e7bf86220a2287c6fd76f9b3a5c06913c2e0762c9eb3958c397f0bbee",
+        "invalidReasonPath": "c7bb596a7eb2073a61992860032a27f92d40728c8f70ec46e667eac938517196",
+        "rawRecordPath": "a87d7334e0aa23d351935620fed358cd9b5a80ecc2b4e1f6a4f4ed418b3f7908"
+      },
+      "classification": "HISTORICAL_RAW_API_INVALID_CENSORED",
+      "epochId": "w-rows-pilot-gateway-002",
+      "slot": "C-001-quota-adapter/calor-strict/1"
+    }
+  ],
+  "preservedSlots": [
+    "C-001-quota-adapter/calor-permissive/1",
+    "C-001-quota-adapter/calor-strict/1"
+  ],
+  "proofSha256": "68fbd1eeb8fb62a518f7dda3e793f0a4b093ea2000d2f6a9b94c0d6818dbec2a",
+  "protectedRootPathSha256": "c3c5870845dd0b8cf9bde50e2f239f5789b97139ddb95de185856c4f82ab63ca",
+  "quiescence": {
+    "criteriaSha256": "2221f5e337281e4e3f2faa5ac56a1d80e0d2594e9736012f89305f7c85d345ce",
+    "descriptorInspection": {
+      "firstCollectorStart": "2026-09-11T01:00:14.806Z",
+      "kind": "pp-w-current-user-cwd-and-text-descriptors-v1",
+      "matchedProcesses": [],
+      "method": "/usr/sbin/lsof -nP -a -u <uid> -d cwd,txt -F0pfn",
+      "preexistingNativePolicy": "kernel start before first collector start; no protected cwd/text match",
+      "uid": 501
+    },
+    "kind": "pp-w-current-process-quiescence-v1",
+    "matchedProcesses": [],
+    "method": "/bin/ps -axww -o pid=,ppid=,pgid=,command="
+  },
+  "remainingSlotCount": 442,
+  "schemaVersion": 1,
+  "sourceEpochIds": [
+    "w-rows-pilot-gateway-001",
+    "w-rows-pilot-gateway-002"
+  ],
+  "targetBindingSha256": "c1c728cae3e8279cf85ef2ca80aa092044c1595294214c97e9b19fe2bd6bd5ea",
+  "trustedLauncherSources": {
+    "ppw-budget-gateway.py": "27abee7b704585dada3a25a6ef0ab4ccefd964035732844e7eeaa123cfe21aab",
+    "ppw-gateway-budget.py": "f6226e98b282043ed70ffc0768ebc9260b754550ac8d06a99e814dede0b46116",
+    "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+    "run-pair.sh": "80cd8a0a32997836c225c7ddabc465eaeab0b1356a6aff7017b0e56c62a9dedc"
+  }
+}

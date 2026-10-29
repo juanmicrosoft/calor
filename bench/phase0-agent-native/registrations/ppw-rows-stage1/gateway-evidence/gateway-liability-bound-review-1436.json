@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-disposition-review-index",
+  "subject": "historical-bound",
+  "verdict": "APPROVE",
+  "artifact": {
+    "path": "gateway-evidence/historical-bound-review-1436.json",
+    "sha256": "a387cc8f7376eb48295f63ac87d3c38d85985ac2fc565c96c9982a4f86f4d1a5"
+  }
+}
