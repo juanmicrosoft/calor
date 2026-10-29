@@ -1,7 +1,8 @@
 # Executed experiments — effect rows, Draft v2
 
-Every claim in `docs/design/effect-rows-in-the-type-system.md` about **how the compiler behaves
-today** is produced by one of these scripts, not by reading source. Draft v1 reasoned from
+The claims in `docs/design/effect-rows-in-the-type-system.md` were produced by these scripts
+at the time of the design, not by reading source. Source censuses and `o53/baseline.json`
+are historical snapshots, not claims about the current checkout. Draft v1 reasoned from
 `CLAUDE.md` and the parser source and was wrong in at least four places (the Calor0410 message
 text, whether `§FLD … §E` parses, how many `§I`/`§O` dispatch arms exist, and whether `!e`
 survives the attribute round-trip). v2 runs everything.
@@ -45,18 +46,17 @@ filesystem**, not `git ls-files`, so scratch files here are counted as corpus an
 exact-equality assertion goes red (observed: 941 files vs the ledger's 886). Gitignoring them is
 not enough.
 
-## This is a test, not a convenience
+## Current behavior versus historical measurements
 
-`tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs` re-runs all six scripts
-and diffs against `transcripts/` (design-doc pin **P29**), and shape-checks `o53/baseline.json`
-(**P30**). It never skips: a missing compiler build is a hard failure.
+`tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs` re-runs `run.py`,
+`run2.py` and `run3.py` and diffs their compiler output against `transcripts/`. A missing
+compiler build is a hard failure.
 
-If the compiler changes, the test goes red naming the script and the first differing line.
-Then:
+The `facts.py`, `facts2.py` and `compile53.py` outputs and the old **P30** baseline are retained
+as historical records only. CI does not compare them with today's source layout, corpus counts
+or line numbers (#1134). Do not regenerate them to accommodate unrelated source edits or
+benchmark repairs.
 
-```bash
-python3 docs/design/spikes/effect-rows/experiments/regenerate-transcripts.py
-```
-
-review the diff, **update the design doc's quoted output**, and commit both in the same PR —
-the same discipline as `CALOR_REGENERATE_S5_LEDGER` for the metadata ledger.
+If an intentional compiler change alters a behavior transcript, run its script, review its
+output, and update that transcript and the design doc's corresponding claim together. The
+all-script regeneration utility also rewrites historical records, so do not use it for this.

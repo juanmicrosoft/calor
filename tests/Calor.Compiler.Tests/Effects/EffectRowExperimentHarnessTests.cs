@@ -17,24 +17,23 @@ namespace Calor.Compiler.Tests;
 /// the design doc false while every test stayed green. That is the exact failure
 /// mode the doc criticises Draft v1 for.</para>
 ///
-/// <para>This test closes it. It re-runs every harness script and compares the
+/// <para>This test closes it. It re-runs the compiler-behavior scripts and compares the
 /// output byte-for-byte against the transcripts committed beside them. A drift is
 /// a red test naming the script, not a stale document.</para>
 ///
-/// <para><b>Regenerating.</b> After an intentional compiler change, run
-/// <c>python3 docs/design/spikes/effect-rows/experiments/regenerate-transcripts.py</c>,
-/// review the diff, update the design doc's quoted output, and commit both in the
-/// same PR. Setting <c>CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1</c> makes this test
+/// <para><b>Regenerating.</b> After an intentional compiler change, review the diff,
+/// update the design doc's quoted output, and commit both in the same PR.
+/// Setting <c>CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1</c> makes this test
 /// rewrite the transcripts instead of asserting — the same discipline as
 /// <c>CALOR_REGENERATE_S5_LEDGER</c> for the metadata ledger.</para>
 ///
-/// <para>Design doc: §13.2 pin <b>P29</b> (transcripts) and <b>P30</b>
-/// (<c>o53/baseline.json</c> shape). Freeze point: before E2 merges.</para>
+/// <para>The source census and <c>o53/baseline.json</c> are historical measurements,
+/// not current behavior contracts. They are not regenerated or compared by this test.</para>
 /// </summary>
 public sealed class EffectRowExperimentHarnessTests
 {
     private static readonly string[] Scripts =
-        ["run.py", "run2.py", "run3.py", "facts.py", "facts2.py", "compile53.py"];
+        ["run.py", "run2.py", "run3.py"];
 
     /// <summary>
     /// P29 — every quoted experiment still produces the output the design doc quotes.
@@ -75,73 +74,8 @@ public sealed class EffectRowExperimentHarnessTests
             + "Either the compiler changed (update the doc AND the transcripts in the same PR) "
             + "or the harness broke.\n  "
             + string.Join("\n  ", drifted)
-            + "\n\nRegenerate: python3 docs/design/spikes/effect-rows/experiments/"
-            + "regenerate-transcripts.py");
-    }
-
-    /// <summary>
-    /// P30 — <c>o53/baseline.json</c> is gate 5's named instrument, so it meets the
-    /// bar the design doc sets for its own ledgers: a schema version, a full commit
-    /// SHA, and the counts §3.2 quotes. (The SHA records when the measurement was
-    /// taken; like the demand ledger it is shape-checked, not compared to HEAD.)
-    /// </summary>
-    [Fact]
-    public void O53Baseline_HasLedgerShape_AndTheCountsTheDocQuotes()
-    {
-        var path = Path.Combine(ExperimentsDirectory(), "o53", "baseline.json");
-        Assert.True(File.Exists(path), $"Missing gate-5 baseline ledger: {path}");
-
-        using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-
-        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
-
-        var sha = root.GetProperty("measuredCommit").GetString();
-        Assert.True(sha is { Length: 40 } && sha.All(Uri.IsHexDigit),
-            $"measuredCommit must be a 40-hex commit SHA, was '{sha}'.");
-        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("scope").GetString()));
-
-        // The four numbers §3.2 and §9 quote — 23 / 54 / 1 / 22 when the doc measured
-        // them. Changing any of them changes the design doc's "zero corpus occurrences
-        // whose meaning changes" argument, so a move is named, never absorbed. PP-E1
-        // leg B (epoch e1-rows-parity-001, design §13.5) archived 40 agent-written
-        // final-src/*.calr; exactly one of them (N1-003 / calor+0.15.0 / run-5 /
-        // CsvRow.calr) writes the canonical two-line §O/§E form, three times, and
-        // compiles green — the form whose meaning the line rule does NOT change. Hence
-        // 24 / 57 / 2 / 22: one more file, three more occurrences, one more green file,
-        // and the 22 already-red files untouched.
-        Assert.Equal(24, root.GetProperty("fileCount").GetInt32());
-        Assert.Equal(57, root.GetProperty("occurrenceCount").GetInt32());
-        Assert.Equal(2, root.GetProperty("compileGreen").GetInt32());
-        Assert.Equal(22, root.GetProperty("compileRed").GetInt32());
-
-        var files = root.GetProperty("files").EnumerateArray().ToArray();
-        Assert.Equal(24, files.Length);
-        Assert.Equal(
-            57,
-            files.Sum(entry => entry.GetProperty("twoLineOE").GetInt32()));
-
-        // §3.2's breakdown of the 22 already-red files: 18 bench/mcp + 3
-        // benchmarks/security + 1 lint error fixture, none of them effect-related.
-        var red = files.Where(entry => entry.GetProperty("exit").GetInt32() != 0).ToArray();
-        Assert.Equal(22, red.Length);
-        Assert.Equal(18, red.Count(e => FilePath(e).StartsWith("bench/mcp/", StringComparison.Ordinal)));
-        Assert.Equal(3, red.Count(e => FilePath(e).StartsWith("benchmarks/", StringComparison.Ordinal)));
-
-        var green = files
-            .Where(entry => entry.GetProperty("exit").GetInt32() == 0)
-            .Select(FilePath)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        string[] expectedGreen =
-        [
-            "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor+0.15.0/run-5/final-src/CsvRow.calr",
-            "tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr",
-        ];
-        Assert.Equal(expectedGreen, green);
-
-        static string FilePath(System.Text.Json.JsonElement entry)
-            => entry.GetProperty("file").GetString() ?? "";
+            + "\n\nRegenerate this test's behavior transcripts with "
+            + "CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1.");
     }
 
     private static string RunScript(string experiments, string script)
