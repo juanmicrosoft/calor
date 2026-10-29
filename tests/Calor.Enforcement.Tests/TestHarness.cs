@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Text.Json;
 using Calor.Runtime;
@@ -17,6 +18,23 @@ namespace Calor.Enforcement.Tests;
 /// </summary>
 public static class TestHarness
 {
+    private static readonly Lazy<ImmutableArray<PortableExecutableReference>> RuntimeReferences = new(() =>
+    {
+        var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        return
+        [
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(ContractViolationException).Assembly.Location),
+            MetadataReference.CreateFromFile(Assembly.Load("System.Runtime").Location),
+            MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Collections.dll")),
+            MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Linq.dll")),
+            MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Text.RegularExpressions.dll"))
+        ];
+    });
+
+    internal static ImmutableArray<PortableExecutableReference> CompilationReferences => RuntimeReferences.Value;
+
     /// <summary>
     /// Compiles Calor source and returns diagnostics and generated code.
     /// </summary>
@@ -95,24 +113,10 @@ public static class TestHarness
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(csharpCode);
 
-            var references = new List<MetadataReference>
-            {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(ContractViolationException).Assembly.Location),
-                MetadataReference.CreateFromFile(Assembly.Load("System.Runtime").Location),
-            };
-
-            // Add additional runtime references
-            var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
-            references.Add(MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Collections.dll")));
-            references.Add(MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Linq.dll")));
-            references.Add(MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Text.RegularExpressions.dll")));
-
             var compilation = CSharpCompilation.Create(
                 "TestAssembly",
                 new[] { syntaxTree },
-                references,
+                CompilationReferences,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             using var ms = new MemoryStream();

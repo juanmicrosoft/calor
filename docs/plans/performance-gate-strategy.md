@@ -101,7 +101,26 @@ binding's real context handle while keeping the managed wrapper rooted, proving
 deterministic release, idempotence and preserved borrowed-context usability.
 The inventory is now 16,075; prior full-run evidence does not validate this repair.
 
+The post-context probe,
+[run 40926105930](https://github.com/juanmicrosoft/calor/actions/runs/40926105930),
+preserves artifact 12921700398 and actual testhost3640's map: 299.29s,
+1.80GB tracked peak, 3.26GB profiler RSS, and 6,784 passed cases. Its remaining
+1.77GB metadata category includes repeated seven-assembly runtime sets in
+`Calor.Enforcement.Tests.TestHarness.ExecuteGeneratedCode`, reached through
+compiler string-operation execution tests. This harness now shares exactly its
+original seven references through an immutable, thread-safe `Lazy`; generated
+compilations and execution remain fresh. A concurrent exact-path/resource-identity
+regression brings Enforcement to 723 cases without changing compiler inventory.
+The existing full-platform caches are bounded and intentionally separate from
+this subset. The five-minute probe is still partial, not full-host acceptance.
+
 ### 0.29 Linux smoke calibration
+
+After context ownership,
+[run 40926109897](https://github.com/juanmicrosoft/calor/actions/runs/40926109897)
+at `19cf228f0` passed 28/28 in four hosts: 11.812 / 12.156 / 11.896s,
+median 11.896s below 24s, all 20 allocation samples 11,274,312 bytes.
+No pin, tolerance or ceiling changed.
 
 After the converter metadata repair,
 [run 40919565888](https://github.com/juanmicrosoft/calor/actions/runs/40919565888)
