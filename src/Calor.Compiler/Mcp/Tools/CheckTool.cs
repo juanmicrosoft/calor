@@ -19,7 +19,7 @@ public sealed class CheckTool : McpToolBase
     public override string Name => "calor_check";
 
     public override string Description =>
-        "Run Calor quality checks: diagnose, lint, typecheck, validate, or loop (build, execute tests and verify a path snapshot; failures only). Loop runs arbitrary test code.";
+        "Run Calor quality checks and snippet validation: diagnose, lint, typecheck, validate, or loop (build, execute tests and verify a path snapshot; failures only). Loop runs arbitrary test code.";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = false, IdempotentHint = false };
 
