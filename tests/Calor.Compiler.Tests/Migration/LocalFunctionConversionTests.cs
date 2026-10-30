@@ -19,9 +19,9 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// #1600: safe non-capturing local functions become same-point lambda bindings.
 /// Forward calls, recursion and method-group conversions preserve the member.
-/// Every registered row is converted on every surface, compiled with DEFAULT options
-/// (effects enforced, no <c>--permissive-effects</c>), run, and compared with the
-/// original C#. Shapes outside the slice stay preserved as <c>§CSHARP</c>.
+/// Native rows compile with default effect enforcement and run against the original C#.
+/// Preserved members retain counted losses and the existing permissive unknown-call
+/// policy for callers without native declarations.
 /// </summary>
 public class LocalFunctionConversionTests
 {
@@ -211,6 +211,20 @@ public class LocalFunctionConversionTests
         }
         """;
 
+    private const string LambdaInvocationTiming = """
+        public static class Probe
+        {
+            public static int Visits;
+            public static string Run()
+            {
+                static int Bump() => ++Visits;
+                int Post(int value) => value++;
+                int before = Visits;
+                return before + ":" + Bump() + ":" + Post(4) + ":" + Bump() + ":" + Visits;
+            }
+        }
+        """;
+
     public static TheoryData<string, string, Surface> NativeRows()
     {
         var data = new TheoryData<string, string, Surface>();
@@ -218,8 +232,47 @@ public class LocalFunctionConversionTests
         {
             data.Add("F3-LOCAL-02", "3|1002", surface);
             data.Add("same-point", "6:4:2:first", surface);
+            data.Add("invocation-timing", "0:1:4:2:2", surface);
         }
         return data;
+    }
+
+    public static IEnumerable<object[]> Surfaces() =>
+        Enum.GetValues<Surface>().Select(surface => new object[] { surface });
+
+    [Theory]
+    [MemberData(nameof(Surfaces))]
+    public async Task PreservedInitializerInsideLambda_RunsAtInvocation_NotDeclaration(Surface surface)
+    {
+        const string source = """
+            public static class Probe
+            {
+                public static int Constructions;
+                public sealed class Box
+                {
+                    public int Value;
+                    public Box() { Constructions++; }
+                }
+                public static string Run()
+                {
+                    static int Fresh() => new Box { Value = 2 }.Value;
+                    int before = Constructions;
+                    return before + ":" + Fresh() + ":" + Fresh() + ":" + Constructions;
+                }
+            }
+            """;
+        const string expected = "0:2:2:2";
+        Assert.Equal(expected, Run(source));
+        var (calor, losses) = await ConvertAsync(source, surface);
+        Assert.Equal(["initializer-interop"], losses);
+        Assert.DoesNotContain("§CSHARP", calor);
+        Assert.Contains("§CS{", calor);
+        Assert.Contains("§LAM{", calor);
+        var compilation = Program.Compile(calor, "initializer-lambda.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
     }
 
     [Theory]
@@ -232,6 +285,7 @@ public class LocalFunctionConversionTests
             "more-shapes" => MoreShapes,
             "edge-shapes" => EdgeShapes,
             "same-point" => SamePointLambdas,
+            "invocation-timing" => LambdaInvocationTiming,
             _ => R0Fixture(row)
         };
         Assert.Equal(expected, Run(source));
@@ -374,7 +428,7 @@ public class LocalFunctionConversionTests
     [InlineData("public static int S(int value) => value; public int M() { int L() => S(value: 3); return L(); }", true)]
     [InlineData("private static int _s = 4; public int M() { int L() => _s; return L(); }", true)]
     [InlineData("private int _f = 1; public int M() { static int L(int x) => x; return L(_f); }", true)]
-    public void NonCapturingShapes_ConvertNatively(string members, bool compile)
+    public void NonCapturingLocalDeclaration_LowersWithoutCaptureOrRebinding(string members, bool compile)
     {
         var source = "public class C\n{\n" + members + "\n}\n";
         var result = new CSharpToCalorConverter().Convert(source);
@@ -384,7 +438,13 @@ public class LocalFunctionConversionTests
         Assert.Contains("§LAM{", result.CalorSource!);
         Assert.DoesNotMatch(@"\n {6,}§F\{f\d+:L\}", result.CalorSource!);
         if (!compile)
+        {
+            Assert.Contains(result.Losses, loss =>
+                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "initializer-interop");
+            Assert.Contains("§CS{", result.CalorSource);
             return;
+        }
+        Assert.Empty(result.Losses);
         var compilation = Program.Compile(result.CalorSource!, "shape.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
