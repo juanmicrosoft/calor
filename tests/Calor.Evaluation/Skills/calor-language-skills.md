@@ -50,7 +50,7 @@ Calor natively supports far more C# constructs than you might expect. Before usi
 | lambda expressions | `§LAM{id:param:type} body §/LAM{id}` | Full |
 | null-coalescing (??) | `expr §??{default}` | Full |
 | string interpolation | `STR:"text ${expr}"` or `§INTERP ... §EXP ... §/INTERP` | Full |
-| records | `§D{id:Name:vis}` | Full |
+| record declarations | Preserved C# interop | Interop |
 | nested types | Nested `§CL`, `§IFACE`, `§EN` | Full |
 | partial classes | `§CL{id:Name:vis:partial}` | Full |
 | attributes | `[@AttributeName]` or `[@Attr(args)]` | Full |
@@ -987,7 +987,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 ```calor
 §CL{id:Name:modifiers}    // Class definition
-  // modifiers: abs, seal, pub, pri
+  // modifiers: abs, seal, pub, priv
 §EXT{BaseClass}           // Extends (class inheritance)
 §IMPL{InterfaceName}      // Implements (interface)
 ```
@@ -1002,10 +1002,10 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 ### Method Modifiers
 
 ```calor
-§VR                       // Virtual method modifier
-§OV                       // Override method modifier
-§AB                       // Abstract method modifier
-§SD                       // Sealed method modifier
+§MT{id:Name:pub:vr}        // Virtual method modifier
+§MT{id:Name:pub:ov}        // Override method modifier
+§MT{id:Name:pub:abs}       // Abstract method modifier
+§MT{id:Name:pub:seal}      // Sealed method modifier
 ```
 
 ### Template: Class Inheritance
@@ -1329,25 +1329,19 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 For lexicographic comparison, compare character by character using `(char-at)` and `(char-code)`.
 
-## Records and Union Types
+## Result Types
 
-```
-§D{Name} (type:field, ...)   Record (data class)
-§/D{Name}                    End record (if block form)
-
-§T{Name}                     Type/Union definition
-  §V{VariantName}            Variant case
-  §V{VariantName} (fields)   Variant with data
-§/T{Name}                    End type
-```
+Use the built-in result type for success/error alternatives. General record and
+discriminated-union declarations are not native Calor syntax.
 
 ### Template: Result Type
 
 ```calor
-§T{Result}
-  §V{Ok} (i32:value)
-  §V{Err} (str:message)
-§/T{Result}
+§F{f1:Choose:pub} (bool:valid) -> i32!str
+  §IF{if1} valid
+    §R §OK 42
+  §EL
+    §R §ERR "invalid"
 ```
 
 ## Properties
@@ -1361,7 +1355,6 @@ For lexicographic comparison, compare character by character using `(char-at)` a
   §INIT                   Init-only setter (C# 9+)
 
 §FLD{type:name:vis}       Field definition
-§DEFAULT                  Default value expression
 ```
 
 ## Indexers
@@ -1423,7 +1416,6 @@ C# `this[string key] { get; set; }` becomes `§IXER{ix1:str:pub:get,set} (str:ke
 §RANGE start end          Range: start..end
 §^ n                      Index from end: ^n
 §EXP expr                 Expression (for complex expressions)
-§DEFAULT                  Default value (default(T))
 ```
 
 ### With Expression (Records)
@@ -1504,13 +1496,10 @@ word is "a" or "an"   →  (|| (== word "a") (== word "an"))
 
 No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, and any expression context.
 
-## Explicit Body Markers
+## Function Bodies
 
-```
-§BODY                 Start function body (optional)
-...statements...
-§END_BODY             End function body (optional)
-```
+Indent statements beneath their function or method header. A dedent ends the body;
+there are no explicit body markers.
 
 ## Enum Extensions
 
@@ -1523,17 +1512,18 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
     // First param becomes 'this'; extension block ends at the next dedent
 ```
 
-## Extended Features: Metadata
+## Documentation and Executable Examples
 
-### Issue Tracking
+Put `///` documentation comments immediately before the declaration they describe.
+Use prose for issues, dependencies, complexity, design decisions, and agent context.
+Blank lines or ordinary `//` comments detach documentation from the next declaration.
 
-```
-§TD "description"            Todo marker
-§TD{id:category:priority}    Todo with metadata
-§FX "description"            Fixme marker (bug to fix)
-§FX{id:category:priority}    Fixme with metadata
-§HK "description"            Hack marker (workaround)
-§HK{id} "description"        Hack with id
+```calor
+/// Arithmetic helpers.
+§M{m1:Arithmetic}
+  /// Adds two integers.
+  §F{f1:Add:pub} (i32:x, i32:y) -> i32
+    §R (+ x y)
 ```
 
 ### Inline Examples
@@ -1543,64 +1533,12 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 §EX{id:msg:"desc"} expr → expected   Example with metadata
 ```
 
-### Dependencies
-
-```
-§US{target1, target2}        Uses (dependencies)
-§/US                         End uses block
-§UB{caller1, caller2}        Used by (reverse dependencies)
-§/UB                         End used by block
-```
-
 ### Versioning and Stability
 
 ```
 §SN{1.0.0}                   Since (version introduced)
 §DP{since:1.0.0}             Deprecated marker
 §BR{1.5.0} "description"     Breaking change marker
-§XP                          Experimental (unstable API)
-§SB                          Stable (API guaranteed stable)
-```
-
-### Complexity Contracts
-
-```
-§CX{time:O(n)}               Time complexity
-§CX{time:O(n):space:O(1)}    Time and space complexity
-```
-
-### Context and Decisions
-
-```
-§CT                          Context section start
-§/CT                         End context
-
-§DC{id}                      Decision record
-  §CHOSEN option             Chosen option
-  §REJECTED option           Rejected alternative
-  §REASON "explanation"      Rationale
-§/DC{id}                     End decision
-```
-
-### Visibility Sections
-
-```
-§VS                          Visible section (for agents/users)
-§/VS                         End visible
-
-§HD                          Hidden section (implementation details)
-§/HD                         End hidden
-
-§FC target                   Focus marker (highlight importance)
-```
-
-### Agent Authorship
-
-```
-§AU{agent:agent-id}          Author marker
-§TASK{PROJ-123} "description"  Task reference
-§DATE{2024-01-15}            Date marker
-§LK{agent:id:expires:time}   Lock (multi-agent editing)
 ```
 
 ### Property Testing
@@ -1609,16 +1547,10 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 §PT predicate                Property test
 ```
 
-### File References
-
-```
-§FILE{path/to/file.cs}       Reference external file
-```
-
 ### Field and Invariant
 
 ```
-§FL{type:name}               Field definition (in types)
+§FLD{type:name:vis}          Field definition
 §IV condition                Invariant (must always hold)
 §IV{msg:"error"} condition   Invariant with message
 ```
@@ -1643,11 +1575,9 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 §WHERE T : constraint        Where clause
 ```
 
-### Async Modifier
+### Async Declarations
 
-```
-§ASYNC                    Async modifier (standalone)
-```
+Use `§AF` for an async function and `§AMT` for an async method.
 
 ### Adding to Collections
 

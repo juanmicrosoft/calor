@@ -156,7 +156,7 @@ The loop variable must be declared MUTABLE (`§B{~name:type}`) and updated with 
 §B{~success:bool} false
 §DO{do1}
   §ASSIGN success §C{TryOperation} §/C
-§/DO{do1} (not success)
+§/DO{do1} (! success)
 ```
 
 ---

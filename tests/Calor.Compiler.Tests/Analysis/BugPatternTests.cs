@@ -347,8 +347,8 @@ public class BugPatternTests
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §Q (AND (>= x INT:0) (<= x INT:100))
-      §Q (AND (>= y INT:0) (<= y INT:100))
+      §Q (&& (>= x INT:0) (<= x INT:100))
+      §Q (&& (>= y INT:0) (<= y INT:100))
       §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
