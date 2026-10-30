@@ -1046,6 +1046,7 @@ public sealed class Parser
     /// </summary>
     private bool IsClassMemberOpener()
         => Check(TokenKind.Method) || Check(TokenKind.AsyncMethod)
+            || Check(TokenKind.Module)
             || Check(TokenKind.Property) || Check(TokenKind.FieldDef)
             || Check(TokenKind.Constructor) || Check(TokenKind.OperatorOverload)
             || Check(TokenKind.Indexer) || Check(TokenKind.Event)
@@ -1063,6 +1064,11 @@ public sealed class Parser
     /// </summary>
     private bool IsMemberBlockEnd(TokenKind explicitCloser)
         => IsBlockEnd(explicitCloser) || IsClassMemberOpener();
+
+    private bool IsModuleFunctionSibling(Token owner)
+        => _parsingModuleMembers
+           && (Check(TokenKind.Func) || Check(TokenKind.AsyncFunc))
+           && Current.Span.Column <= owner.Span.Column;
 
     /// <summary>
     /// Phase 3 -- consume the end of a class / interface member body and
@@ -1095,7 +1101,7 @@ public sealed class Parser
             endToken = signatureStart;
             return false;
         }
-        if (IsClassMemberOpener())
+        if (IsClassMemberOpener() || IsModuleFunctionSibling(signatureStart))
         {
             endToken = signatureStart;
             return false;
@@ -1230,7 +1236,7 @@ public sealed class Parser
                 interfaces.Add(node);
                 moduleItems.Add(node);
             }
-            else if (Check(TokenKind.Class))
+            else if (Check(TokenKind.Class) || Check(TokenKind.Module))
             {
                 var node = ParseClassDefinition();
                 classes.Add(node);
@@ -1471,7 +1477,7 @@ public sealed class Parser
                 parsed = ParseInterfaceDefinition();
                 interfaces.Add((InterfaceDefinitionNode)parsed);
             }
-            else if (Check(TokenKind.Class))
+            else if (Check(TokenKind.Class) || Check(TokenKind.Module))
             {
                 parsed = ParseClassDefinition();
                 classes.Add((ClassDefinitionNode)parsed);
@@ -1568,6 +1574,7 @@ public sealed class Parser
             or TokenKind.Namespace
             or TokenKind.Interface
             or TokenKind.Class
+            or TokenKind.Module
             or TokenKind.Func
             or TokenKind.AsyncFunc
             or TokenKind.Delegate
@@ -9093,9 +9100,27 @@ public sealed class Parser
     ///   §METHOD[m001:Area:pub:abs] §O[f64] §E[] §/METHOD[m001]
     /// §/CLASS[c001]
     /// </summary>
+    private bool _parsingModuleMembers;
+
     private ClassDefinitionNode ParseClassDefinition()
     {
-        var startToken = Expect(TokenKind.Class);
+        var previous = _parsingModuleMembers;
+        _parsingModuleMembers = Check(TokenKind.Module);
+        try
+        {
+            return ParseTypeMemberDeclaration();
+        }
+        finally
+        {
+            _parsingModuleMembers = previous;
+        }
+    }
+
+    private ClassDefinitionNode ParseTypeMemberDeclaration()
+    {
+        var isModule = _parsingModuleMembers;
+        var startToken = Expect(isModule ? TokenKind.Module : TokenKind.Class);
+        var closer = isModule ? TokenKind.EndModule : TokenKind.EndClass;
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -9196,7 +9221,7 @@ public sealed class Parser
             || t.Equals("abstract", StringComparison.Ordinal));
         var isSealed = modifierTokens.Any(t => t.Equals("seal", StringComparison.Ordinal)
             || t.Equals("sealed", StringComparison.Ordinal));
-        var isStatic = modifierTokens.Any(t => t.Equals("st", StringComparison.Ordinal)
+        var isStatic = isModule || modifierTokens.Any(t => t.Equals("st", StringComparison.Ordinal)
             || t.Equals("stat", StringComparison.Ordinal)
             || t.Equals("static", StringComparison.Ordinal));
         var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.Ordinal));
@@ -9277,9 +9302,9 @@ public sealed class Parser
 
         // #1485: a class owns only the lines indented under it, so an empty
         // class does not adopt a same-column sibling type as a nested type.
-        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndClass, id);
+        var bodyOwner = BeginBlockBody(startToken, closer, id);
         while (!IsAtEnd
-               && !IsBlockEnd(TokenKind.EndClass)
+               && !IsBlockEnd(closer)
                && !Check(TokenKind.Namespace)
                && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
         {
@@ -9336,13 +9361,13 @@ public sealed class Parser
                 operatorOverloads.Add(node);
                 classItems.Add(node);
             }
-            else if (Check(TokenKind.Method))
+            else if (Check(TokenKind.Method) || (isModule && Check(TokenKind.Func)))
             {
                 var node = ParseMethodDefinition();
                 methods.Add(node);
                 classItems.Add(node);
             }
-            else if (Check(TokenKind.AsyncMethod))
+            else if (Check(TokenKind.AsyncMethod) || (isModule && Check(TokenKind.AsyncFunc)))
             {
                 var node = ParseAsyncMethodDefinition();
                 methods.Add(node);
@@ -9370,7 +9395,7 @@ public sealed class Parser
                 preprocessorBlocks.Add(node);
                 classItems.Add(node);
             }
-            else if (Check(TokenKind.Class))
+            else if (Check(TokenKind.Class) || Check(TokenKind.Module))
             {
                 var node = ParseClassDefinition();
                 nestedClasses.Add(node);
@@ -9431,7 +9456,7 @@ public sealed class Parser
         }
         else
         {
-            endToken = ExpectOwnedBlockEnd(TokenKind.EndClass, bodyOwner);
+            endToken = ExpectOwnedBlockEnd(closer, bodyOwner);
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
 
@@ -9460,7 +9485,8 @@ public sealed class Parser
             identifierSpan: identifierSpan,
             baseClassSpan: baseClassSpan,
             implementedInterfaceSpans: implementedInterfaceSpans,
-            items: classItems), startToken);
+            items: classItems,
+            isModule: isModule), startToken);
     }
 
     /// <summary>
@@ -9510,6 +9536,8 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var fieldModifiers = ParseMethodModifiers(modStr, startToken.Span);
+        if (_parsingModuleMembers && !fieldModifiers.HasFlag(MethodModifiers.Const))
+            fieldModifiers |= MethodModifiers.Static;
 
         // Position 8 (§3.3): §FLD{Action<i32>:onChange:priv} §E{cw}. Read BEFORE the
         // default-value branch. X9b is the executed proof this did not already parse:
@@ -9555,7 +9583,9 @@ public sealed class Parser
     /// </summary>
     private MethodNode ParseMethodDefinition()
     {
-        var startToken = Expect(TokenKind.Method);
+        var isModuleFunction = _parsingModuleMembers && Check(TokenKind.Func);
+        var startToken = Expect(isModuleFunction ? TokenKind.Func : TokenKind.Method);
+        var closer = isModuleFunction ? TokenKind.EndFunc : TokenKind.EndMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
@@ -9592,6 +9622,8 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr, startToken.Span);
+        if (_parsingModuleMembers)
+            modifiers |= MethodModifiers.Static;
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -9637,7 +9669,7 @@ public sealed class Parser
 
         // Parse signature and body until END_METHOD
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndMethod))
+        while (!IsAtEnd && !IsMemberBlockEnd(closer) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.Where))
             {
@@ -9681,7 +9713,7 @@ public sealed class Parser
             }
         }
 
-        if (TryExpectMemberBlockEnd(TokenKind.EndMethod, startToken, bodyHadContent, out var endToken))
+        if (TryExpectMemberBlockEnd(closer, startToken, bodyHadContent, out var endToken))
         {
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
@@ -9711,7 +9743,9 @@ public sealed class Parser
     /// </summary>
     private MethodNode ParseAsyncMethodDefinition()
     {
-        var startToken = Expect(TokenKind.AsyncMethod);
+        var isModuleFunction = _parsingModuleMembers && Check(TokenKind.AsyncFunc);
+        var startToken = Expect(isModuleFunction ? TokenKind.AsyncFunc : TokenKind.AsyncMethod);
+        var closer = isModuleFunction ? TokenKind.EndAsyncFunc : TokenKind.EndAsyncMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
@@ -9747,6 +9781,8 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr, startToken.Span);
+        if (_parsingModuleMembers)
+            modifiers |= MethodModifiers.Static;
 
         // Parse optional type parameters §AMT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -9792,7 +9828,7 @@ public sealed class Parser
 
         // Parse signature and body until END_AMT
         var bodyHadContent = false;
-        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndAsyncMethod))
+        while (!IsAtEnd && !IsMemberBlockEnd(closer) && !IsModuleFunctionSibling(startToken))
         {
             if (Check(TokenKind.Where))
             {
@@ -9836,7 +9872,7 @@ public sealed class Parser
             }
         }
 
-        if (TryExpectMemberBlockEnd(TokenKind.EndAsyncMethod, startToken, bodyHadContent, out var endToken))
+        if (TryExpectMemberBlockEnd(closer, startToken, bodyHadContent, out var endToken))
         {
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
@@ -10828,6 +10864,8 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr, startToken.Span);
+        if (_parsingModuleMembers)
+            modifiers |= MethodModifiers.Static;
 
         // --- Compact accessor shorthand ---
         // Detect accessor shorthand in accessorStr position
@@ -12121,7 +12159,7 @@ public sealed class Parser
             usings.Add(node);
             items?.Add(node);
         }
-        else if (Check(TokenKind.Class))
+        else if (Check(TokenKind.Class) || Check(TokenKind.Module))
         {
             var node = ParseClassDefinition();
             classes.Add(node);
@@ -12229,13 +12267,13 @@ public sealed class Parser
             operatorOverloads.Add(node);
             items?.Add(node);
         }
-        else if (Check(TokenKind.Method))
+        else if (Check(TokenKind.Method) || (_parsingModuleMembers && Check(TokenKind.Func)))
         {
             var node = ParseMethodDefinition();
             methods.Add(node);
             items?.Add(node);
         }
-        else if (Check(TokenKind.AsyncMethod))
+        else if (Check(TokenKind.AsyncMethod) || (_parsingModuleMembers && Check(TokenKind.AsyncFunc)))
         {
             var node = ParseAsyncMethodDefinition();
             methods.Add(node);
@@ -12261,7 +12299,7 @@ public sealed class Parser
         {
             items?.Add(ParseMemberPreprocessorBlock());
         }
-        else if (Check(TokenKind.Class))
+        else if (Check(TokenKind.Class) || Check(TokenKind.Module))
         {
             items?.Add(ParseClassDefinition());
         }

@@ -282,6 +282,12 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public bool IsStatic { get; }
 
     /// <summary>
+    /// A named module uses the shared type-member representation, but owns
+    /// static functions rather than instance methods. C# lowers it to a static class.
+    /// </summary>
+    public bool IsModule { get; }
+
+    /// <summary>
     /// True if this is a struct (value type).
     /// </summary>
     public bool IsStruct { get; }
@@ -529,13 +535,15 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         TextSpan? identifierSpan = null,
         TextSpan? baseClassSpan = null,
         IReadOnlyList<TextSpan>? implementedInterfaceSpans = null,
-        IReadOnlyList<AstNode>? items = null)
+        IReadOnlyList<AstNode>? items = null,
+        bool isModule = false)
         : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
         IsPartial = isPartial;
-        IsStatic = isStatic;
+        IsModule = isModule;
+        IsStatic = isStatic || isModule;
         IsStruct = isStruct;
         IsReadOnly = isReadOnly;
         Visibility = visibility;

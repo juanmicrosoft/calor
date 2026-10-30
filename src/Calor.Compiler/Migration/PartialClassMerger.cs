@@ -236,7 +236,8 @@ public sealed class PartialClassMerger
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
             identifierSpan: primary.IdentifierSpan,
-            items: items.Count > 0 ? items : null));
+            items: items.Count > 0 ? items : null,
+            isModule: partials.Any(part => part.IsModule)));
 
         // Tag with source files
         if (sourceFiles.Count > 0)

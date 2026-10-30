@@ -677,15 +677,20 @@ public class ArrayExpressionConversionTests
     }
 
     [Fact]
-    public async Task StatementPositionArrays_AreUnchangedApartFromOrdinaryLength()
+    public async Task StatementPositionArrays_PreserveEmittedCSharpAcrossModuleMigration()
     {
-        // Keep the historical R0 baseline; only the approved Length spelling changes.
+        // Keep the historical R0 bytes; compare codegen across the approved Length/module spellings.
         var baseline = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
             "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt"));
         var (calor, _) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
-        Assert.Equal(baseline.Replace("(len one)", "one.Length", StringComparison.Ordinal)
-            .Replace("(len two)", "two.Length", StringComparison.Ordinal)
-            .ReplaceLineEndings().TrimEnd(), calor.ReplaceLineEndings().TrimEnd());
+        var old = Program.Compile(baseline.Replace("(len one)", "one.Length", StringComparison.Ordinal)
+            .Replace("(len two)", "two.Length", StringComparison.Ordinal), "arrays.calr");
+        var current = Program.Compile(calor, "arrays.calr");
+        Assert.False(old.HasErrors, string.Join("\n", old.Diagnostics.Errors));
+        Assert.False(current.HasErrors, string.Join("\n", current.Diagnostics.Errors));
+        Assert.Equal(old.GeneratedCode, current.GeneratedCode);
+        Assert.Contains("§M{c001:Probe:pub}", calor);
+        Assert.Contains("§F{m002:Run:pub}", calor);
     }
 
     [Fact]

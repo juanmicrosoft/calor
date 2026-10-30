@@ -46,7 +46,7 @@ public sealed class BinderErrorEmissionCatalogTests
 
         var binderRoutes = routes.Where(route =>
             route.SiteId.StartsWith("src/Calor.Compiler/Binding/Binder.cs::", StringComparison.Ordinal)).ToArray();
-        Assert.Equal(26, binderRoutes.Count(route => // #1617 removes the Option/reference representation check; all surviving routes stay unchanged.
+        Assert.Equal(30, binderRoutes.Count(route => // #1617 removes one Option site; #1619 adds four module/extension sites.
             route.Sink is "DiagnosticBag.ReportError" or "DiagnosticBag.ReportErrorWithFix"));
         Assert.Equal(4, binderRoutes.Count(route => route.Sink == "DiagnosticBag.Report"));
         Assert.Equal(3, binderRoutes

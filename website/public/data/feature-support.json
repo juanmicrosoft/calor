@@ -14,7 +14,7 @@
       "full": [
         {
           "name": "class",
-          "description": "Classes are converted to Calor class definitions"
+          "description": "Instance classes become class definitions; static classes become named modules with static functions and members, preserving their C# type names and lexical namespace scopes"
         },
         {
           "name": "struct",

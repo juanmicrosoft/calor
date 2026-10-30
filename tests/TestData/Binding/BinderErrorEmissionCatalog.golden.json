@@ -388,6 +388,19 @@
     ]
   },
   {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckGeneratedModuleNameCollisions::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.CheckGeneratedModuleNameCollisions",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.DeclareParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
     "member": "Calor.Compiler.Binding.Binder.DeclareParameters",
     "sink": "DiagnosticBag.ReportDuplicateDefinitionWithFix",
@@ -432,12 +445,51 @@
     "sink": "DiagnosticBag.ReportError",
     "helperPath": "DiagnosticBag.ReportError",
     "possibleCodes": [
+      "Calor0203"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1619,
+    "reason": "Invalid module instance shapes and extension declaration containers must fail before C# emission."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
       "Calor0201"
     ],
     "severity": "Error",
     "disposition": "CompilationError",
     "owningIssue": 1396,
     "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#04",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#05",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0203"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1619,
+    "reason": "Invalid module instance shapes and extension declaration containers must fail before C# emission."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportDuplicateSignature::DiagnosticBag.ReportError#01",

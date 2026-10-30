@@ -2,8 +2,8 @@
   §U{System}
   §U{System.Linq}
 
-  §CL{c001:BlockLambdaDemo:pub:stat}
-    §MT{m002:Run:pub:stat}
+  §M{c001:BlockLambdaDemo:pub}
+    §F{m002:Run:pub}
       §B{_lam005} §LAM{lam003}
         §B{_chainRange004} §C{Enumerable.Range} §A 1 §A 5 §/C
         §B{nums} §C{_chainRange004.ToArray}
@@ -12,7 +12,6 @@
       §/LAM{lam003}
       §C{Handle} §A "/x" §A _lam005 §/C
 
-    §MT{m006:Handle:pub:stat} (str:route, Func<i32>:handler)
+    §F{m006:Handle:pub} (str:route, Func<i32>:handler)
       §R
-
 

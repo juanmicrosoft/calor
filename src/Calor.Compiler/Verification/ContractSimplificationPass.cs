@@ -189,7 +189,8 @@ public sealed class ContractSimplificationPass
             items: RemapItems(
                 cls.Items,
                 cls.Methods,
-                simplifiedMethods)));
+                simplifiedMethods),
+            isModule: cls.IsModule));
     }
 
     private InterfaceDefinitionNode SimplifyInterface(InterfaceDefinitionNode iface)

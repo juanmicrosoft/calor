@@ -40,7 +40,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void EveryCatalogEntry_HasAnExplicitDispositionReasonAndOwner()
     {
-        Assert.Equal(20, BindingDiagnosticPolicy.Catalog.Count); // #1617 retires the runtime Option mismatch rule.
+        Assert.Equal(21, BindingDiagnosticPolicy.Catalog.Count); // #1617 retires Option mismatch; #1619 adds module/extension validation.
         Assert.DoesNotContain(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticPolicy.Catalog.Keys);
         foreach (var (code, rule) in BindingDiagnosticPolicy.Catalog)
         {

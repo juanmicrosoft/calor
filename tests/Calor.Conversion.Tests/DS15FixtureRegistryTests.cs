@@ -73,10 +73,13 @@ public class DS15FixtureRegistryTests
         Assert.True(File.Exists(manifestPath), $"{name}: fixture.json missing");
         var inputPath = Path.Combine(dir, "input.cs");
         Assert.True(File.Exists(inputPath), $"{name}: input.cs missing");
-        var expectedPath = Path.Combine(dir, "expected.calr");
-        Assert.True(File.Exists(expectedPath), $"{name}: expected.calr missing");
-        var testPath = Path.Combine(dir, "test.calr");
-        Assert.True(File.Exists(testPath), $"{name}: test.calr missing");
+        var originalExpectedPath = Path.Combine(dir, "expected.calr");
+        Assert.True(File.Exists(originalExpectedPath), $"{name}: expected.calr missing");
+        var originalTestPath = Path.Combine(dir, "test.calr");
+        Assert.True(File.Exists(originalTestPath), $"{name}: test.calr missing");
+        var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
+        var expectedPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, originalExpectedPath);
+        var testPath = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, originalTestPath);
 
         // 2. Manifest: featureKey named; the DIRECTORY is the sanitized form of the key
         // (keys may contain spaces/parens/slashes — see README) and must match it.

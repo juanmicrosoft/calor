@@ -136,6 +136,22 @@ If `--output` is not specified:
 
 ## C# to Calor Conversion
 
+C# static classes convert to **named modules**, using the existing `§M`
+declaration and `§F`/`§AF` function tags. Their C# names are unchanged: a module
+converted from `Example.Utilities` still emits `Example.Utilities`, not a new
+wrapper type. Nested modules retain their containing type. Static fields,
+properties, constructors, attributes, generic parameters and constraints retain
+their member metadata.
+
+Extension functions keep their `this` parameter and must belong to a non-nested,
+non-generic module, as required by C#. Shapes outside native conversion support,
+including by-reference extension receivers, unsafe module declarations and
+attributes on generic type parameters, remain explicitly reported C#
+interop rather than losing part of their signature. Modules and classes cannot
+share a name and generic arity in the same namespace or containing type
+(`Calor0201`). Existing `§CL` static declarations remain accepted during migration;
+this does not retire their grammar or select a new namespace-header spelling.
+
 When converting C# to Calor, the converter:
 
 1. Parses the C# source code

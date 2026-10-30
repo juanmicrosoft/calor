@@ -562,8 +562,9 @@ public class CSharpToCalorConversionTests
         var cls = result.Ast.Classes[0];
         Assert.True(cls.IsPartial);
         Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
         Assert.Contains("partial", result.CalorSource);
-        Assert.Contains("stat", result.CalorSource);
+        Assert.DoesNotContain("§CL{", result.CalorSource);
     }
 
     #endregion
@@ -2525,7 +2526,7 @@ public class CSharpToCalorConversionTests
     }
 
     [Fact]
-    public void Convert_StaticMethod_RoundtripsWithStModifier()
+    public void Convert_StaticMethod_RoundtripsAsModuleFunction()
     {
         var csharpSource = """
             public static class MathHelper
@@ -2539,9 +2540,10 @@ public class CSharpToCalorConversionTests
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
 
-        // Verify :stat appears for both class and methods
-        var statCount = conversionResult.CalorSource!.Split(":stat").Length - 1;
-        Assert.True(statCount >= 3, $"Expected at least 3 :stat occurrences (1 class + 2 methods), got {statCount}");
+        Assert.True(Assert.Single(conversionResult.Ast!.Classes).IsModule);
+        Assert.DoesNotContain("§CL{", conversionResult.CalorSource);
+        Assert.DoesNotContain("§MT{", conversionResult.CalorSource);
+        Assert.Equal(2, conversionResult.CalorSource!.Split("§F{").Length - 1);
 
         // Full roundtrip
         var compilationResult = Program.Compile(conversionResult.CalorSource!);

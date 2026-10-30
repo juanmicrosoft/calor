@@ -3,6 +3,8 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
@@ -261,7 +263,6 @@ public class LocalFunctionConversionTests
         Assert.Equal(preservedMembers, Regex.Matches(calor, @"§CSHARP\{").Count);
         Assert.Equal(preservedMembers, losses.Count(feature => feature == "method"));
         Assert.DoesNotContain("post-validation-fallback", losses);
-        Assert.DoesNotMatch(@"\n {6,}§F\{", calor);
 
         // The callers of preserved members charge assumed effects (R0 baseline),
         // so behaviour is compared under --permissive-effects, as at R0.
@@ -272,6 +273,8 @@ public class LocalFunctionConversionTests
         });
         Assert.False(compilation.HasErrors,
             string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(compilation.Ast!),
+            node => node is LocalFunctionStatementNode);
         Assert.Equal(expected, Run(compilation.GeneratedCode));
     }
 

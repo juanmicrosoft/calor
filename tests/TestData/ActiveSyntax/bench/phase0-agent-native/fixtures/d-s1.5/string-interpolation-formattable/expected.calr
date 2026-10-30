@@ -1,0 +1,14 @@
+§M{m001:Fixture:overflow=unchecked}
+  §U{System}
+
+  §M{c001:InterpolationFormattable:pub}
+    §F{m002:Kind:pub} (FormattableString:f) -> i32
+      §R 1
+
+    §F{m003:Kind:pub} (any:o) -> i32
+      §R (- 1)
+
+    §F{m004:Verify:pub} () -> i32
+      §B{i32:x} 42
+      §B{str:s} "k=${x},${(+ x 1)}"
+      §R (+ (* §C{Kind} §A (cast global::System.FormattableString "k=${x},${(+ x 1)}") §/C 100) (len s))

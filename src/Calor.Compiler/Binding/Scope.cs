@@ -130,6 +130,8 @@ public static class BindingDiagnosticPolicy
             Active(DiagnosticCode.NoMatchingOverload, "Failed internal overload selection is already a compilation error."),
             Active(DiagnosticCode.BindRequiresTypeOrInitializer, "A missing binding type/value is already a compilation error."),
             Active(DiagnosticCode.InstanceMemberInStaticContext, "Illegal static-context member access is already a compilation error."),
+            new(DiagnosticCode.InvalidReference, BindingDiagnosticDisposition.CompilationError,
+                "Invalid module instance shapes and extension declaration containers must fail before C# emission.", 1619),
             Active(DiagnosticCode.EffectRowMisplaced, "Effect-row declaration placement is already enforced."),
             Active(DiagnosticCode.EffectVariableScope, "Unbound effect-row variables are already enforced."),
             new(DiagnosticCode.InvalidByReferenceOperand, BindingDiagnosticDisposition.CompilationError,

@@ -38,7 +38,10 @@ internal static class ActiveSyntaxInputs
 
     private static readonly Lazy<FrozenSet<string>> Registry = new(() =>
     {
-        var root = CliTestHarness.FindRepoRoot();
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "Directory.Build.props")))
+            root = Directory.GetParent(root)?.FullName
+                ?? throw new DirectoryNotFoundException("Repository root not found.");
         using var document = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(root, RelativeRoot, "inputs.json")));
         var paths = document.RootElement.GetProperty("originalPaths").EnumerateArray()

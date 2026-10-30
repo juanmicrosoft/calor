@@ -911,14 +911,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    private bool _emittingModuleMembers;
+
     public string Visit(ClassDefinitionNode node)
+    {
+        var previous = _emittingModuleMembers;
+        _emittingModuleMembers = node.IsModule;
+        try
+        {
+            return EmitTypeDeclaration(node);
+        }
+        finally
+        {
+            _emittingModuleMembers = previous;
+        }
+    }
+
+    private string EmitTypeDeclaration(ClassDefinitionNode node)
     {
         EmitDocComment(node);
         var modifiers = new List<string>();
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("seal");
         if (node.IsPartial) modifiers.Add("partial");
-        if (node.IsStatic) modifiers.Add("stat");
+        if (node.IsStatic && !node.IsModule) modifiers.Add("stat");
         if (node.IsStruct) modifiers.Add("struct");
         if (node.IsReadOnly) modifiers.Add("readonly");
 
@@ -930,7 +946,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
+        var declarationTag = node.IsModule ? "M" : "CL";
+        AppendLine($"§{declarationTag}{{{node.Id}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
@@ -1021,7 +1038,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/CL{{{node.Id}}}");
+        EmitBlockEnd($"§/{declarationTag}{{{node.Id}}}");
 
         return "";
     }
@@ -1481,7 +1498,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsOverride) modifiers.Add("over");
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("seal");
-        if (node.IsStatic) modifiers.Add("stat");
+        if (node.IsStatic && !_emittingModuleMembers) modifiers.Add("stat");
         if (node.IsUnsafe) modifiers.Add("unsafe");
         if (node.IsExtern) modifiers.Add("ext");
 
@@ -1494,7 +1511,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         // Use §AMT for async methods, §MT for regular methods
-        var methodTag = node.IsAsync ? "AMT" : "MT";
+        var methodTag = _emittingModuleMembers
+            ? (node.IsAsync ? "AF" : "F")
+            : (node.IsAsync ? "AMT" : "MT");
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {

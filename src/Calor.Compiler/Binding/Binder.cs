@@ -87,6 +87,7 @@ public sealed class Binder
     private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
+    private readonly Dictionary<ClassDefinitionNode, ClassDefinitionNode> _containingClasses = new();
     private readonly Dictionary<ClassDefinitionNode, string> _qualifiedClassNames = new();
     private readonly Dictionary<ClassDefinitionNode, SymbolId> _classSymbolIds = new();
     private readonly Dictionary<ClassDefinitionNode, TypeSymbol> _classSymbols = new();
@@ -740,6 +741,7 @@ public sealed class Binder
         _functionSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
+        _containingClasses.Clear();
         _qualifiedClassNames.Clear();
         _classSymbolIds.Clear();
         _classSymbols.Clear();
@@ -768,6 +770,7 @@ public sealed class Binder
         CollectDelegateDefinitions(module);
 
         RegisterTopLevelFunctions(module);
+        CheckGeneratedModuleNameCollisions(module);
         RegisterAdditionalTypes(module);
         foreach (var cls in module.Classes)
             RegisterClassTree(cls, _moduleSymbolId, null);
@@ -874,6 +877,26 @@ public sealed class Binder
         }
     }
 
+    private void CheckGeneratedModuleNameCollisions(ModuleNode module)
+    {
+        var fallbackNamespace = module.Name == "_global" ? "" : module.Name;
+        var generatedNames = module.Functions
+            .Select(function => function.NamespaceIdentity ?? fallbackNamespace)
+            .Distinct(StringComparer.Ordinal)
+            .Select(ns => (Namespace: ns, Name: string.IsNullOrEmpty(ns)
+                ? "GlobalModule" : ns.Split('.').Last() + "Module"))
+            .ToHashSet();
+        foreach (var cls in module.Classes)
+        {
+            if (cls.TypeParameters.Count == 0
+                && generatedNames.Contains((cls.NamespaceIdentity ?? fallbackNamespace, cls.Name)))
+            {
+                _diagnostics.ReportError(cls.IdentifierSpan, DiagnosticCode.DuplicateDefinition,
+                    $"Type '{cls.Name}' collides with the generated module in the same namespace.");
+            }
+        }
+    }
+
     private void RegisterTypeSymbol(
         SymbolId parentIdentity,
         string kind,
@@ -905,7 +928,7 @@ public sealed class Binder
         SymbolId parentIdentity,
         string? containingTypeName)
     {
-        var classIdentity = CreateDeclarationId(parentIdentity, "class", cls.Id, cls.Name);
+        var classIdentity = CreateDeclarationId(parentIdentity, cls.IsModule ? "module" : "class", cls.Id, cls.Name);
         var qualifiedClassName = containingTypeName == null
             ? GetQualifiedTypeName(cls)
             : $"{containingTypeName}.{GetTypeNameWithArity(cls.Name, cls.TypeParameters.Count)}";
@@ -923,10 +946,28 @@ public sealed class Binder
         TrackSymbol(classSymbol);
 
         _classScopes.Add(cls, classScope);
+        if (containingTypeName is not null)
+            _containingClasses.Add(cls, _classesByQualifiedName[containingTypeName]);
         _qualifiedClassNames.Add(cls, qualifiedClassName);
         _classSymbolIds.Add(cls, classIdentity);
         _classSymbols.Add(cls, classSymbol);
+        if (_classesByQualifiedName.TryGetValue(qualifiedClassName, out var previous)
+            && (cls.IsModule || previous.IsModule)
+            && !(cls.IsModule && previous.IsModule && cls.IsPartial && previous.IsPartial))
+        {
+            _diagnostics.ReportError(cls.IdentifierSpan, DiagnosticCode.DuplicateDefinition,
+                $"Module/type name '{qualifiedClassName}' is already defined in this namespace or containing type.");
+        }
         _classesByQualifiedName[qualifiedClassName] = cls;
+        if (cls.IsModule
+            && (cls.IsAbstract || cls.IsSealed || cls.IsStruct || cls.IsReadOnly
+                || cls.BaseClass != null || cls.ImplementedInterfaces.Count > 0
+                || cls.Indexers.Count > 0 || cls.OperatorOverloads.Count > 0
+                || cls.Constructors.Any(constructor => !constructor.IsStatic)))
+        {
+            _diagnostics.ReportError(cls.IdentifierSpan, DiagnosticCode.InvalidReference,
+                $"Module '{qualifiedClassName}' cannot declare instance-type modifiers, inheritance, indexers, operators, or instance constructors.");
+        }
         var simpleLookupName = GetTypeNameWithArity(
             cls.Name,
             cls.TypeParameters.Count);
@@ -953,7 +994,7 @@ public sealed class Binder
                 visibility: field.Visibility,
                 declaringTypeName: qualifiedClassName,
                 isField: true,
-                isStatic: field.IsStatic,
+                isStatic: field.IsStatic || field.Modifiers.HasFlag(MethodModifiers.Const),
                 conditionalAlternative: conditionalAlternative,
                 // v0.14 nullability workstream (task #3) — inherit declared
                 // STRING nullability on fields so subsequent references
@@ -1009,6 +1050,18 @@ public sealed class Binder
         for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
         {
             var (method, conditionalAlternative) = methods[methodIndex];
+            var extensionParameters = method.Parameters
+                .Select((parameter, index) => (parameter, index))
+                .Where(item => item.parameter.Modifier.HasFlag(ParameterModifier.This))
+                .ToArray();
+            if (extensionParameters.Length > 0
+                && (!cls.IsStatic || !method.IsStatic || containingTypeName is not null
+                    || cls.TypeParameters.Count > 0
+                    || extensionParameters.Length != 1 || extensionParameters[0].index != 0))
+            {
+                _diagnostics.ReportError(method.IdentifierSpan, DiagnosticCode.InvalidReference,
+                    $"Extension function '{method.Name}' must be static in a non-nested, non-generic module (or legacy static class), with 'this' only on its first parameter.");
+            }
             var lookupName = GetCallableLookupName(method.Name);
             var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";
             var symbol = CreateFunctionSymbol(
@@ -6238,6 +6291,17 @@ public sealed class Binder
             current = ResolveBaseClass(current);
         }
 
+        var enclosing = start;
+        while (enclosing != null && _containingClasses.TryGetValue(enclosing, out enclosing))
+        {
+            var declared = _classScopes[enclosing].LookupAllLocal(memberName);
+            if (declared.Count > 0)
+            {
+                return declared.All(symbol => symbol is VariableSymbol { IsStatic: true })
+                    ? declared
+                    : Array.Empty<Symbol>();
+            }
+        }
         return Array.Empty<Symbol>();
     }
 

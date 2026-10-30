@@ -1,4 +1,9 @@
 using Calor.Compiler.Migration;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -23,6 +28,60 @@ public class SnapshotConversionTests
     {
         foreach (var snippet in ConversionCatalog.SupportedSnippets)
             yield return new object[] { snippet.Id, snippet.Description, snippet.CSharpSource };
+    }
+
+    public static IEnumerable<object[]> StaticModuleSnippetData() =>
+        SupportedSnippetData().Where(row => row[0] is "01-04" or "07-04" or "10-01" or "10-02" or "12-05" or "13-04");
+
+    [Theory]
+    [MemberData(nameof(StaticModuleSnippetData))]
+    public void StaticModuleSnapshot_PreservesCSharpDeclarationSignatures(string id, string description, string csharpSource)
+    {
+        var diagnostics = new DiagnosticBag();
+        var approved = TestHelpers.ReadSnapshot($"{id}.approved.calr")!;
+        var module = new Parser(new Lexer(approved, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, $"{description}: " + string.Join("\n", diagnostics.Errors));
+        var generated = new CSharpEmitter().Emit(module);
+        // Snapshot conversion explicitly assigns this namespace to namespace-free snippets.
+        var originalInSnapshotNamespace = $"namespace Test_{id.Replace("-", "_")} {{\n{csharpSource}\n}}";
+        Assert.Equal(Signatures(originalInSnapshotNamespace), Signatures(generated));
+    }
+
+    private static string[] Signatures(string source)
+    {
+        var compilation = CSharpCompilation.Create("SignatureControl",
+            [CSharpSyntaxTree.ParseText(source)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        var signatures = new List<string>();
+        Collect(compilation.Assembly.GlobalNamespace);
+        return signatures.Order(StringComparer.Ordinal).ToArray();
+
+        void Collect(INamespaceOrTypeSymbol owner)
+        {
+            foreach (var member in owner.GetMembers())
+            {
+                if (member is INamespaceSymbol ns)
+                    Collect(ns);
+                else if (member is INamedTypeSymbol type)
+                {
+                    signatures.Add($"{type.ToDisplayString()}:{type.DeclaredAccessibility}:{type.IsStatic}:{type.IsAbstract}:{type.IsSealed}");
+                    Collect(type);
+                }
+                else if (!member.IsImplicitlyDeclared)
+                {
+                    var resultType = member switch
+                    {
+                        IMethodSymbol method => method.ReturnType.ToDisplayString(),
+                        IFieldSymbol field => field.Type.ToDisplayString(),
+                        IPropertySymbol property => property.Type.ToDisplayString(),
+                        _ => ""
+                    };
+                    signatures.Add($"{member.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}:{member.DeclaredAccessibility}:{member.IsStatic}:{resultType}");
+                }
+            }
+        }
     }
 
     [Theory]

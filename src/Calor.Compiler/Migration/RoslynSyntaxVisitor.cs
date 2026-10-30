@@ -2504,6 +2504,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
+        catch (MemberInteropEscalationException ex)
+        {
+            AddModuleInteropBlock(CreateInteropBlock(node, ex.FeatureName, InteropMemberKind.Class));
+        }
         catch (Exception)
         {
             // Unconditional catch for class conversion — if any class member crashes,
@@ -2774,6 +2778,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
         if (unsupported?.FeatureName == "file-scoped-type")
             throw EscalateExpression(node, unsupported.FeatureName);
+        if (node.Modifiers.Any(SyntaxKind.StaticKeyword)
+            && node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+            throw EscalateExpression(node, "unsafe");
 
         var id = _context.GenerateId("c");
         var name = node.Identifier.Text;
@@ -3197,7 +3204,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedInterfaces,
                     nestedEnums,
                     nestedDelegates)
-                : null);
+                : null,
+            isModule: isStatic);
         return PreserveTypeCompilerDirectives(node, convertedClass);
     }
 
@@ -3855,7 +3863,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             identifierSpan: converted.IdentifierSpan,
             baseClassSpan: converted.BaseClassSpan,
             implementedInterfaceSpans: converted.ImplementedInterfaceSpans,
-            items: items);
+            items: items,
+            isModule: converted.IsModule);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -4815,7 +4824,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var scope = _namespaceScopes
                 .Where(candidate =>
                     block.Span.Start >= candidate.Span.Start
-                    && block.Span.End <= candidate.Span.End)
+                    && (candidate.IsFileScoped || block.Span.End <= candidate.Span.End))
                 .OrderBy(candidate => candidate.Span.Length)
                 .FirstOrDefault();
             if (scope == null)
@@ -16062,6 +16071,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (typeParamList == null)
             return Array.Empty<TypeParameterNode>();
+        if (typeParamList.Parameters.Any(parameter => parameter.AttributeLists.Count > 0))
+            throw EscalateExpression(typeParamList, "attributes");
 
         _context.RecordFeatureUsage("generics");
 

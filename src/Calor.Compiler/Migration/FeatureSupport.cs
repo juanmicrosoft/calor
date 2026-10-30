@@ -48,7 +48,7 @@ public static class FeatureSupport
         {
             Name = "class",
             Support = SupportLevel.Full,
-            Description = "Classes are converted to Calor class definitions"
+            Description = "Instance classes become class definitions; static classes become named modules with static functions and members, preserving their C# type names and lexical namespace scopes"
         },
         ["interface"] = new FeatureInfo
         {

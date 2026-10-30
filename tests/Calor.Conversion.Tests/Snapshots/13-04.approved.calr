@@ -19,10 +19,9 @@
       §ASSIGN Message message
 
 
-  §CL{c008:ResultExtensions:pub:stat}
-    §MT{m009:Describe<T>:pub:stat} (Result<T>:result) -> str
+  §M{c008:ResultExtensions:pub}
+    §F{m009:Describe<T>:pub} (Result<T>:result) -> str
       §R §W{match010} result
         §K §PTYPE{Ok<T>:ok} → "Success: ${ok.Value}"
         §K §PTYPE{Error<T>:err} → "Error: ${err.Message}"
         §K _ → "Unknown"
-

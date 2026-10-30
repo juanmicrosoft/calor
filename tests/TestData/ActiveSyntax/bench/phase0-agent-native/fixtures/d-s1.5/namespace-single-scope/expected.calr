@@ -1,0 +1,5 @@
+§M{m001:Fixture:overflow=unchecked}
+  §NS{ns001:SingleScope}
+    §M{c002:Value:pub}
+      §F{m003:Get:pub} () -> i32
+        §R 42
