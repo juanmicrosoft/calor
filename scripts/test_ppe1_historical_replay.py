@@ -12,6 +12,43 @@ import ppe1_historical_replay as replay
 
 
 class HistoricalReplayTests(unittest.TestCase):
+    def test_both_dotnet_launches_disable_persistent_servers(self):
+        project = "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj"
+        environment = {
+            "LC_ALL": "C",
+            "CALOR_HOME": "/isolated/empty-calor-home",
+            "MSBUILDDISABLENODEREUSE": "0",
+            "DOTNET_CLI_USE_MSBUILD_SERVER": "1",
+        }
+        launches = (
+            (["restore", project, "--locked-mode"], 300),
+            ([
+                "test", project, "-c", "Release", "--no-restore",
+                "--filter", f"FullyQualifiedName={replay.TEST}",
+                "--logger", "trx;LogFileName=historical.trx",
+                "--results-directory", "/isolated/results",
+            ], 600),
+        )
+        for arguments, timeout in launches:
+            with self.subTest(command=arguments[0]):
+                with patch.object(replay.subprocess, "run") as run:
+                    replay.run_dotnet(arguments, Path("/isolated/source"), environment, timeout)
+                    run.assert_called_once_with(
+                        [
+                            "dotnet", *arguments, "--disable-build-servers",
+                            "-nr:false", "-p:UseSharedCompilation=false",
+                        ],
+                        cwd=Path("/isolated/source"),
+                        env={
+                            **environment,
+                            "MSBUILDDISABLENODEREUSE": "1",
+                            "DOTNET_CLI_USE_MSBUILD_SERVER": "0",
+                        },
+                        check=True, timeout=timeout,
+                    )
+        self.assertEqual("0", environment["MSBUILDDISABLENODEREUSE"])
+        self.assertEqual("1", environment["DOTNET_CLI_USE_MSBUILD_SERVER"])
+
     def test_frozen_bytes_must_match(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "fixture.calr"

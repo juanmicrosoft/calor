@@ -67,6 +67,9 @@ the final immutable release ledger without changing its `measuredCommit`.
 Historical demand evidence comes from the same pinned tree, not today's corpus.
 No existing compiler binary, active-syntax copy or regenerated ledger is accepted.
 Missing prerequisites, changed inputs, test failures and skipped/empty runs fail.
+Both nested .NET launches disable node reuse, persistent build servers and shared
+compilation. The outer test uses the shared process capture helper with a 20-minute
+deadline covering root exit and stdout/stderr EOF, including inherited pipes.
 
 The unfiltered compiler suite invokes this runner through
 `PpE1LedgerMatchesRecomputation`; the full compiler CI shards already fetch full

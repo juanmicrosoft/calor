@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Commands;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -120,22 +121,11 @@ public sealed class EffectRowsProbeLedgerTests
     [Trait("Category", "HistoricalReplay")]
     public async Task PpE1LedgerMatchesRecomputation()
     {
-        var start = new ProcessStartInfo("python3")
-        {
-            WorkingDirectory = RepoRoot(),
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        start.ArgumentList.Add(Path.Combine(RepoRoot(), "scripts", "ppe1_historical_replay.py"));
-        using var process = Process.Start(start);
-        Assert.NotNull(process);
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        Assert.True(process.ExitCode == 0,
-            $"Pinned historical PP-E1 replay failed (exit {process.ExitCode}).\n"
-            + await stdout + "\n" + await stderr);
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "ppe1_historical_replay.py")],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Pinned historical PP-E1 replay failed (exit {result.ExitCode}).\n{result.Output}");
     }
 
     /// <summary>

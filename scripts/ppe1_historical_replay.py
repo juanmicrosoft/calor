@@ -46,6 +46,16 @@ def verify_result(path: Path) -> None:
         raise ValueError("historical replay must execute exactly the named test once and pass (no skips)")
 
 
+def run_dotnet(arguments: list[str], source: Path, environment: dict[str, str], timeout: int) -> None:
+    environment = environment.copy()
+    environment["MSBUILDDISABLENODEREUSE"] = "1"
+    environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0"
+    subprocess.run(
+        ["dotnet", *arguments, "--disable-build-servers", "-nr:false", "-p:UseSharedCompilation=false"],
+        cwd=source, env=environment, check=True, timeout=timeout,
+    )
+
+
 def replay() -> None:
     if os.environ.get("CALOR_REGENERATE_PPE1_LEDGER"):
         raise ValueError("historical replay forbids CALOR_REGENERATE_PPE1_LEDGER")
@@ -98,18 +108,18 @@ def replay() -> None:
         environment.pop("CALOR_REGENERATE_PPE1_LEDGER", None)
         project = "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj"
         print(f"PP-E1 historical exact replay: compiler {COMMIT}", flush=True)
-        subprocess.run(
-            ["dotnet", "restore", project, "--locked-mode"],
-            cwd=source, env=environment, check=True, timeout=300,
+        run_dotnet(
+            ["restore", project, "--locked-mode"],
+            source, environment, timeout=300,
         )
-        subprocess.run(
+        run_dotnet(
             [
-                "dotnet", "test", project, "-c", "Release", "--no-restore",
+                "test", project, "-c", "Release", "--no-restore",
                 "--filter", f"FullyQualifiedName={TEST}",
                 "--logger", "trx;LogFileName=historical.trx",
                 "--results-directory", str(scratch / "results"),
             ],
-            cwd=source, env=environment, check=True, timeout=600,
+            source, environment, timeout=600,
         )
         verify_result(scratch / "results/historical.trx")
 
