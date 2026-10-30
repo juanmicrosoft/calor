@@ -504,21 +504,16 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
                 §M{Nested:pub}
                   §F{Inner:pub} () -> i32
                     §R 2
-              §CL{Legacy:pub:stat}
-                §MT{Keep:pub:stat} () -> i32
-                  §R 3
             """;
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
         Assert.All(before.Declarations.Where(d => d.Name is "Demo" or "Tools" or "Nested"),
             declaration => Assert.Equal(IdKind.Module, declaration.Kind));
-        Assert.Equal(IdKind.Class, before.Declarations.Single(d => d.Name == "Legacy").Kind);
         var updated = source.Replace("Tools", "Helpers");
         var after = Store.Apply([new(file, source, updated)]);
         Assert.Equal(before.Declarations.Select(d => d.Id).Order(), after.Declarations.Select(d => d.Id).Order());
         var ast = CalorSourceHelper.Parse(updated, file).Ast!;
         Assert.True(ast.Classes.Single(node => node.Name == "Helpers").IsModule);
-        Assert.False(ast.Classes.Single(node => node.Name == "Legacy").IsModule);
         Assert.Equal(after.Declarations.Select(d => d.Id).Order(),
             new IdScanner().Scan(ast, file).Select(d => d.Id).Order());
         var bound = new Binder(new DiagnosticBag(), file).Bind(ast);
@@ -528,6 +523,21 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.Contains("§M{", emitted);
         foreach (var declaration in after.Declarations)
             Assert.DoesNotContain(declaration.Id, emitted);
+    }
+
+    [Fact]
+    public void LegacyStaticAstRemainsAClassIdentityWithoutRequiringRetiredSourceSyntax()
+    {
+        var legacy = new ClassDefinitionNode(TextSpan.Empty, IdGenerator.Generate(IdKind.Class), "Legacy",
+            isAbstract: false, isSealed: false, isPartial: false, isStatic: true, baseClass: null,
+            implementedInterfaces: [], typeParameters: [], fields: [], properties: [], constructors: [],
+            methods: [], attributes: new AttributeCollection(), csharpAttributes: []);
+        var module = CalorSourceHelper.Parse("§M{Demo}").Ast!.With(update => update.Items = [legacy]);
+        Assert.True(legacy.IsStatic);
+        Assert.False(legacy.IsModule);
+        var identity = Assert.Single(new IdScanner().Scan(module, "legacy-ast.calr").Where(d => d.Name == "Legacy"));
+        Assert.Equal(IdKind.Class, identity.Kind);
+        Assert.Equal(legacy.SourceId, identity.Id);
     }
 
     [Fact]
