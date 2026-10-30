@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Calor.Compiler.Tests\ActiveSyntaxInputs.cs" Link="Shared\ActiveSyntaxInputs.cs" />
     <!-- Exclude Analyzers folder - it's a separate project -->
     <Compile Remove="Analyzers\**\*.cs" />
     <None Remove="Analyzers\**\*" />

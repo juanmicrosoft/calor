@@ -31,7 +31,8 @@ public class JsonReportGenerator
             },
             Summary = MapSummary(result.Summary),
             CategoryResults = GroupByCategory(result),
-            DetailedResults = MapDetailedResults(result)
+            DetailedResults = MapDetailedResults(result),
+            BugScenarioInputs = result.BugScenarioInputs
         };
 
         return JsonSerializer.Serialize(report, DefaultOptions);
@@ -115,6 +116,7 @@ public class JsonReportGenerator
             FileName = c.FileName,
             Level = c.Level,
             Features = c.Features,
+            InputMetadata = c.InputMetadata,
             CalorSuccess = c.CalorSuccess,
             CSharpSuccess = c.CSharpSuccess,
             AverageAdvantage = Math.Round(c.AverageAdvantage, 2),
@@ -131,6 +133,7 @@ internal class JsonReport
     public required JsonSummary Summary { get; set; }
     public required Dictionary<string, JsonCategoryResult> CategoryResults { get; set; }
     public required List<JsonCaseResult> DetailedResults { get; set; }
+    public List<BugScenarioInputMetadata> BugScenarioInputs { get; set; } = new();
 }
 
 internal class ReportMetadata
@@ -174,6 +177,7 @@ internal class JsonMetric
 
 internal class JsonCaseResult
 {
+    public Dictionary<string, object> InputMetadata { get; set; } = new();
     public string CaseId { get; set; } = "";
     public string FileName { get; set; } = "";
     public int Level { get; set; }

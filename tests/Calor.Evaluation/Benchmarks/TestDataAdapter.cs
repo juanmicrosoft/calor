@@ -1,20 +1,29 @@
 using System.Text.RegularExpressions;
 using Calor.Evaluation.Core;
+using Calor.Compiler.Tests;
 
 namespace Calor.Evaluation.Benchmarks;
 
 /// <summary>
-/// Adapts existing test data from the CSharpImport test suite for use in benchmarks.
+/// Loads current-compiler inputs, resolving explicitly registered active Calor copies.
+/// This is not a replay of a historical producer or its original measured input bytes.
 /// </summary>
 public class TestDataAdapter
 {
     private readonly string _testDataPath;
     private readonly string _benchmarkPath;
+    private readonly string _repositoryRoot;
 
     public TestDataAdapter(string testDataPath, string benchmarkPath)
+        : this(testDataPath, benchmarkPath, ActiveSyntaxInputs.RepositoryRoot)
+    {
+    }
+
+    internal TestDataAdapter(string testDataPath, string benchmarkPath, string repositoryRoot)
     {
         _testDataPath = testDataPath;
         _benchmarkPath = benchmarkPath;
+        _repositoryRoot = repositoryRoot;
     }
 
     /// <summary>
@@ -23,10 +32,14 @@ public class TestDataAdapter
     public string BenchmarkPath => _benchmarkPath;
 
     /// <summary>
-    /// Gets the path to the TestData directory, searching relative to the assembly location.
+    /// Gets canonical repository inputs first, so registered mirrors are not bypassed by output copies.
     /// </summary>
     public static string GetTestDataPath()
     {
+        var currentInputs = Path.Combine(ActiveSyntaxInputs.RepositoryRoot, "tests", "TestData");
+        if (Directory.Exists(currentInputs))
+            return currentInputs;
+
         // Try relative to assembly location first
         var assemblyLocation = Path.GetDirectoryName(typeof(TestDataAdapter).Assembly.Location);
         if (assemblyLocation != null)
@@ -63,20 +76,25 @@ public class TestDataAdapter
     }
 
     /// <summary>
-    /// Creates an EvaluationContext from a benchmark entry.
+    /// Creates a current-compiler context without changing the manifest's logical entry.
+    /// Metadata retains the original and resolved Calor paths and the unchanged paired C# path.
     /// </summary>
     public async Task<EvaluationContext> CreateContextAsync(BenchmarkEntry entry)
     {
         var calorPath = Path.Combine(_benchmarkPath, entry.CalorFile);
         var csharpPath = Path.Combine(_benchmarkPath, entry.CSharpFile);
+        var resolvedCalorPath = ResolveCurrentCalorPath(_repositoryRoot, calorPath);
 
         // Try benchmark path first, then fall back to test data path
-        if (!File.Exists(calorPath))
+        if (!File.Exists(resolvedCalorPath))
+        {
             calorPath = Path.Combine(_testDataPath, entry.CalorFile);
+            resolvedCalorPath = ResolveCurrentCalorPath(_repositoryRoot, calorPath);
+        }
         if (!File.Exists(csharpPath))
             csharpPath = Path.Combine(_testDataPath, entry.CSharpFile);
 
-        var calorSource = File.Exists(calorPath) ? await File.ReadAllTextAsync(calorPath) : "";
+        var calorSource = File.Exists(resolvedCalorPath) ? await File.ReadAllTextAsync(resolvedCalorPath) : "";
         var csharpSource = File.Exists(csharpPath) ? await File.ReadAllTextAsync(csharpPath) : "";
 
         return new EvaluationContext
@@ -85,12 +103,14 @@ public class TestDataAdapter
             CSharpSource = csharpSource,
             FileName = entry.Id,
             Level = entry.Level,
-            Features = entry.Features
+            Features = entry.Features,
+            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath)
         };
     }
 
     /// <summary>
-    /// Creates an EvaluationContext from paired file paths.
+    /// Creates a current-compiler context from paired file paths. Registered repository
+    /// Calor inputs use required active copies; external inputs remain literal.
     /// </summary>
     public static async Task<EvaluationContext> CreateContextFromFilesAsync(
         string calorPath,
@@ -98,7 +118,8 @@ public class TestDataAdapter
         int level = 1,
         List<string>? features = null)
     {
-        var calorSource = await File.ReadAllTextAsync(calorPath);
+        var resolvedCalorPath = ResolveCurrentCalorPath(ActiveSyntaxInputs.RepositoryRoot, calorPath);
+        var calorSource = await File.ReadAllTextAsync(resolvedCalorPath);
         var csharpSource = await File.ReadAllTextAsync(csharpPath);
 
         return new EvaluationContext
@@ -107,9 +128,29 @@ public class TestDataAdapter
             CSharpSource = csharpSource,
             FileName = Path.GetFileNameWithoutExtension(calorPath),
             Level = level,
-            Features = features ?? new List<string>()
+            Features = features ?? new List<string>(),
+            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath)
         };
     }
+
+    private static string ResolveCurrentCalorPath(string root, string path)
+    {
+        var original = Path.GetFullPath(path);
+        var relative = Path.GetRelativePath(root, original).Replace('\\', '/');
+        return Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith("../", StringComparison.Ordinal)
+            ? original
+            : ActiveSyntaxInputs.ForCurrentCompiler(root, original);
+    }
+
+    private static Dictionary<string, object> InputMetadata(string original, string resolved, string csharp)
+        => new()
+        {
+            ["inputContract"] = "current-compiler-active-syntax",
+            ["originalCalorPath"] = Path.GetFullPath(original),
+            ["resolvedCalorPath"] = Path.GetFullPath(resolved),
+            ["csharpPath"] = Path.GetFullPath(csharp),
+            ["usesActiveSyntax"] = !string.Equals(Path.GetFullPath(original), Path.GetFullPath(resolved), StringComparison.Ordinal)
+        };
 
     /// <summary>
     /// Loads all benchmark entries from a manifest and creates contexts.
@@ -121,15 +162,8 @@ public class TestDataAdapter
 
         foreach (var entry in manifest.Benchmarks)
         {
-            try
-            {
-                var context = await CreateContextAsync(entry);
-                results.Add((entry, context));
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Warning: Failed to load benchmark {entry.Id}: {ex.Message}");
-            }
+            var context = await CreateContextAsync(entry);
+            results.Add((entry, context));
         }
 
         return results;

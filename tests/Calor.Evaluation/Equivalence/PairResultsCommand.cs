@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Calor.Evaluation.Benchmarks;
+using Calor.Evaluation.Core;
 using Calor.Evaluation.Metrics;
 
 namespace Calor.Evaluation.Equivalence;
@@ -84,7 +84,8 @@ public static class PairResultsCommand
                 Console.Error.WriteLine($"pair-metrics refused: {Str(pair, "pairId")} differs from its registered bytes");
                 return 2;
             }
-            var result = await new TokenEconomicsCalculator().CalculateAsync(await TestDataAdapter.CreateContextFromFilesAsync(calor, csharp));
+            // These hash-checked registered bytes are historical metric inputs, not current active syntax.
+            var result = await new TokenEconomicsCalculator().CalculateAsync(await EvaluationContext.FromFilesAsync(calor, csharp));
             var r = result.AdvantageRatio;
             rows.Add(new JsonObject
             {
