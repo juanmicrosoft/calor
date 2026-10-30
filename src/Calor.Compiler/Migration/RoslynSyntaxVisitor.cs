@@ -11740,8 +11740,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertImplicitObjectCreationCore(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
-        if (implicitNew.ArgumentList?.Arguments.Any(argument => argument.NameColon != null) == true)
-            throw EscalateExpression(implicitNew, "named-argument");
+        if (implicitNew.ArgumentList.Arguments.Any(argument => !argument.RefKindKeyword.IsKind(SyntaxKind.None)))
+            throw EscalateExpression(implicitNew, "ref-parameter");
         if (HasDictionaryInitializerOperations(implicitNew.Initializer))
             return PreserveDictionaryInitializer(implicitNew);
         if (InitializerPreservationReason(implicitNew) is { } preservationReason)
@@ -11811,7 +11811,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
         }
-        return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers);
+        var argumentNames = implicitNew.ArgumentList.Arguments.Any(argument => argument.NameColon != null)
+            ? implicitNew.ArgumentList.Arguments.Select(argument => argument.NameColon?.Name.Identifier.ValueText).ToArray()
+            : null;
+        return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers,
+            argumentNames: argumentNames);
     }
 
     /// <summary>
@@ -13693,8 +13697,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertObjectCreationCore(ObjectCreationExpressionSyntax objCreation)
     {
-        if (objCreation.ArgumentList?.Arguments.Any(argument => argument.NameColon != null) == true)
-            throw EscalateExpression(objCreation, "named-argument");
+        if (objCreation.ArgumentList?.Arguments.Any(argument => !argument.RefKindKeyword.IsKind(SyntaxKind.None)) == true)
+            throw EscalateExpression(objCreation, "ref-parameter");
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
 
@@ -13789,6 +13793,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // (`new StringBuilder { Capacity = 64 }`); the native sb-new form has no place for it.
         if ((typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")
             && IsMetadataMember(objCreation, "System.Text.StringBuilder")
+            && objCreation.ArgumentList?.Arguments.Any(argument => argument.NameColon != null) != true
             && objCreation.Initializer is not { Expressions.Count: > 0 })
         {
             _context.RecordFeatureUsage("native-stringbuilder-op");
@@ -13836,7 +13841,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
+        var argumentNames = objCreation.ArgumentList?.Arguments.Any(argument => argument.NameColon != null) == true
+            ? objCreation.ArgumentList.Arguments.Select(argument => argument.NameColon?.Name.Identifier.ValueText).ToArray()
+            : null;
+        return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers,
+            argumentNames: argumentNames);
     }
 
     private ExpressionNode ConvertAnonymousObjectCreation(AnonymousObjectCreationExpressionSyntax anonObj)

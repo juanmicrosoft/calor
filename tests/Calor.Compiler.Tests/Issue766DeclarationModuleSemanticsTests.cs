@@ -1,5 +1,6 @@
 using System.Reflection;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -7,6 +8,7 @@ using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using Binder = Calor.Compiler.Binding.Binder;
 
 namespace Calor.Compiler.Tests;
 
@@ -809,6 +811,168 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.Equal(
             "§D{Pair} §FL{Right} \"r\" §FL{Left} \"l\"",
             creation.Accept(new CalorEmitter()));
+    }
+
+    [Theory]
+    [InlineData("§A[Right] \"right\" §A[Left] \"left\"", "Right", "Left")]
+    [InlineData("§A \"left\" §A[Right] \"right\"", null, "Right")]
+    public void NamedConstructorArguments_SurviveParserBindingAndBothEmitters(
+        string arguments, string? firstName, string secondName)
+    {
+        var module = Parse(
+            $$"""
+            §M{m1:NamedConstruction}
+              §F{f1:Create:pub} () -> Pair
+                §R §NEW{Pair} {{arguments}}
+            """);
+        var creation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
+        Assert.Equal([firstName, secondName], creation.ArgumentNames);
+
+        var bound = new Binder(new DiagnosticBag()).Bind(module);
+        var boundCreation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+        Assert.Equal(creation.ArgumentNames, boundCreation.ArgumentNames);
+
+        var emitted = new CalorEmitter().Emit(module);
+        var reparsed = Parse(emitted);
+        var replay = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(reparsed.Functions).Body[0]).Expression);
+        Assert.Equal(creation.ArgumentNames, replay.ArgumentNames);
+        var expression = replay.Accept(new CSharpEmitter());
+        var assembly = CompileAssembly(
+            $$"""
+            public record Pair(string Left, string Right);
+            public static class RecordHarness
+            {
+                public static Pair Create() => {{expression}};
+            }
+            """);
+        var pair = assembly.GetType("RecordHarness")!.GetMethod("Create")!.Invoke(null, null)!;
+        Assert.Equal("left", pair.GetType().GetProperty("Left")!.GetValue(pair));
+        Assert.Equal("right", pair.GetType().GetProperty("Right")!.GetValue(pair));
+    }
+
+    [Fact]
+    public void NamedConstructorArguments_ResolveTheCorrectInternalOverload()
+    {
+        var module = Parse(
+            """
+            §M{m1:ConstructorResolution}
+              §CL{c1:Pair:pub}
+                §CTOR{ctor1:pub} (i32:Left, str:Right)
+                §CTOR{ctor2:pub} (str:Left, i32:Right)
+              §F{f1:Create:pub} () -> Pair
+                §R §NEW{Pair} §A[Right] "right" §A[Left] 1
+            """);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.AmbiguousOverload or DiagnosticCode.NoMatchingOverload);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                bound.Functions.Single(function => function.Symbol.Name == "Create").Body[0]).Expression);
+        Assert.NotNull(creation.ResolvedConstructor);
+        Assert.Equal("Left", creation.ResolvedConstructor.Parameters[0].Name);
+        Assert.Equal("i32", creation.ResolvedConstructor.Parameters[0].TypeName);
+        Assert.Equal("str", creation.ResolvedConstructor.Parameters[1].TypeName);
+        Assert.Equal(["Right", "Left"], creation.ArgumentNames);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NamedConstructorConversion_PreservesReorderedValuesAndEvaluationOrder(bool targetTyped)
+    {
+        var creation = targetTyped
+            ? "new(Right: Next(\"right\"), Left: Next(\"left\"))"
+            : "new Pair(Right: Next(\"right\"), Left: Next(\"left\"))";
+        var conversion = ConvertWithoutPreprocessorStripping(
+            $$"""
+            public sealed class Pair
+            {
+                public string Left { get; }
+                public string Right { get; }
+                public Pair(string Left, string Right)
+                {
+                    this.Left = Left;
+                    this.Right = Right;
+                }
+            }
+            public static class ConstructorHarness
+            {
+                public static string Log = "";
+                private static string Next(string value)
+                {
+                    Log += value;
+                    return value;
+                }
+                public static Pair Create()
+                {
+                    return {{creation}};
+                }
+            }
+            """);
+        Assert.Contains("§A[Right]", conversion.CalorSource);
+        Assert.Contains("§A[Left]", conversion.CalorSource);
+        Assert.DoesNotContain("§CS", conversion.CalorSource);
+        var assembly = CompileAssembly(CompileConvertedCalor(conversion));
+        var harness = assembly.GetTypes().Single(type => type.Name == "ConstructorHarness");
+        var pair = harness.GetMethod("Create")!.Invoke(null, null)!;
+        Assert.Equal("left", pair.GetType().GetProperty("Left")!.GetValue(pair));
+        Assert.Equal("right", pair.GetType().GetProperty("Right")!.GetValue(pair));
+        Assert.Equal("rightleft", harness.GetField("Log")!.GetValue(null));
+    }
+
+    [Fact]
+    public void SimplifyingConstructorArguments_PreservesTheirNames()
+    {
+        var module = Parse(
+            """
+            §M{m1:ConstructorSimplification}
+              §F{f1:Create:pub} () -> Pair
+                §R §NEW{Pair} §A[Right] (+ 1 2) §A[Left] 4
+            """);
+        var creation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression);
+        var simplified = Assert.IsType<NewExpressionNode>(
+            creation.Accept(new Calor.Compiler.Verification.ExpressionSimplifier()));
+        Assert.Equal(creation.ArgumentNames, simplified.ArgumentNames);
+        Assert.Equal("new Pair(Right: 3, Left: 4)", simplified.Accept(new CSharpEmitter()));
+    }
+
+    [Fact]
+    public void NamedStringBuilderConstructor_DoesNotLoseNamesInNativeLowering()
+    {
+        var conversion = ConvertWithoutPreprocessorStripping(
+            """
+            using System.Text;
+            public static class ConstructorHarness
+            {
+                public static int Run()
+                {
+                    var builder = new StringBuilder(maxCapacity: 100, capacity: 16);
+                    return builder.Capacity * 1000 + builder.MaxCapacity;
+                }
+            }
+            """);
+        Assert.Contains("§NEW{StringBuilder}", conversion.CalorSource);
+        Assert.Contains("§A[maxCapacity]", conversion.CalorSource);
+        Assert.Contains("§A[capacity]", conversion.CalorSource);
+        Assert.DoesNotContain("§CS", conversion.CalorSource);
+        var assembly = CompileAssembly(CompileConvertedCalor(conversion));
+        var harness = assembly.GetTypes().Single(type => type.Name == "ConstructorHarness");
+        Assert.Equal(16100, harness.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Fact]
+    public void NamedConstructorKeywordArgument_IsEscapedOnlyInCSharp()
+    {
+        var creation = new NewExpressionNode(
+            Span, "Keyword", [], [new StringLiteralNode(Span, "value")], [],
+            argumentNames: ["class"]);
+        Assert.Equal("new Keyword(@class: \"value\")", creation.Accept(new CSharpEmitter()));
+        Assert.Equal("§NEW{Keyword} §A[class] \"value\" §/NEW", creation.Accept(new CalorEmitter()));
     }
 
     [Fact]

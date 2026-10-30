@@ -929,6 +929,7 @@ public sealed class NewExpressionNode : ExpressionNode
     public TypeReferenceNode TypeReference { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
 
     /// <summary>
     /// Object initializer property assignments (e.g., new Person { Name = "John", Age = 30 }).
@@ -951,7 +952,8 @@ public sealed class NewExpressionNode : ExpressionNode
         IReadOnlyList<ExpressionNode> arguments,
         IReadOnlyList<ObjectInitializerAssignment> initializers,
         TextSpan? typeNameSpan = null,
-        TypeReferenceNode? typeReference = null)
+        TypeReferenceNode? typeReference = null,
+        IReadOnlyList<string?>? argumentNames = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -964,6 +966,9 @@ public sealed class NewExpressionNode : ExpressionNode
                 .Select(argument => new TypeReferenceNode(TextSpan.Empty, argument))
                 .ToArray());
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        if (argumentNames != null && argumentNames.Count != Arguments.Count)
+            throw new ArgumentException("Argument names must align with constructor arguments.", nameof(argumentNames));
+        ArgumentNames = argumentNames;
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
     }
 

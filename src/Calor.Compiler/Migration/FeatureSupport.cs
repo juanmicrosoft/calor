@@ -500,7 +500,7 @@ public static class FeatureSupport
         {
             Name = "named-argument",
             Support = SupportLevel.Full,
-            Description = "Named arguments (param: value) are supported in both statement and expression contexts"
+            Description = "Named arguments (param: value) are supported on method and constructor calls, including target-typed new"
         },
         ["declaration-pattern"] = new FeatureInfo
         {

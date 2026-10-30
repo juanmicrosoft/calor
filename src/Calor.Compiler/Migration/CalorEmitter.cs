@@ -3414,7 +3414,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Inside interpolation, use C# new() syntax instead of §NEW tags
         if (_inInterpolation)
         {
-            var inlineArgs = node.Arguments.Select(a => a.Accept(this));
+            var inlineArgs = node.Arguments.Select((argument, index) =>
+                node.ArgumentNames?[index] is { } name
+                    ? $"{name}: {argument.Accept(this)}"
+                    : argument.Accept(this));
             return $"new {node.TypeName}{typeArgs}({string.Join(", ", inlineArgs)})";
         }
 
@@ -3425,7 +3428,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // as the nested call's inline argument (silent AST corruption).
         // #1132: if one argument is hoisted, every non-literal argument is, in order
         // (`new Cell(x, Next())` read x after Next() ran).
-        var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true).Select(val => $"§A {val}");
+        var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true)
+            .Select((value, index) => node.ArgumentNames?[index] is { } name
+                ? $"§A[{(name.StartsWith('@') ? name[1..] : name)}] {value}"
+                : $"§A {value}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
         // Handle object initializers (multi-line block format)

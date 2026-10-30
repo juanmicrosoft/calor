@@ -2956,8 +2956,11 @@ public sealed class Parser
     }
 
     private ExpressionNode ParseArgument()
+        => ParseArgument(out _);
+
+    private ExpressionNode ParseArgument(out string? argumentName)
     {
-        var argument = ParseArgument(out _, out var modifier);
+        var argument = ParseArgument(out argumentName, out var modifier);
         if (modifier != null)
             _diagnostics.ReportError(argument.Span, DiagnosticCode.InvalidModifier,
                 "Argument modifiers are only supported on named-target calls.");
@@ -10113,6 +10116,7 @@ public sealed class Parser
         // When inside an argument context, only consume §A tokens if a §/NEW exists
         // between here and the next §/C (indicating these args belong to this §NEW).
         var arguments = new List<ExpressionNode>();
+        var argumentNames = new List<string?>();
         if (_insideArgContext)
         {
             // Peek ahead: is there a §/NEW before §/C?
@@ -10122,7 +10126,8 @@ public sealed class Parser
                 _insideArgContext = false;
                 while (Check(TokenKind.Arg))
                 {
-                    arguments.Add(ParseArgument());
+                    arguments.Add(ParseArgument(out var argumentName));
+                    argumentNames.Add(argumentName);
                 }
                 _insideArgContext = savedArgContext;
             }
@@ -10131,7 +10136,8 @@ public sealed class Parser
         {
             while (Check(TokenKind.Arg))
             {
-                arguments.Add(ParseArgument());
+                arguments.Add(ParseArgument(out var argumentName));
+                argumentNames.Add(argumentName);
             }
         }
 
@@ -10242,7 +10248,8 @@ public sealed class Parser
             arguments,
             initializers,
             typeNameSpan,
-            typeReference);
+            typeReference,
+            argumentNames.Any(name => name != null) ? argumentNames : null);
 
         // Handle trailing member access (e.g., §NEW{Type}§/NEW.Method or §NEW{Type}§/NEW?.Prop)
         return ParseTrailingMemberAccess(expr);

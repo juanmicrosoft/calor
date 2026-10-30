@@ -544,7 +544,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 newArgs,
                 newInitializers,
                 node.TypeNameSpan,
-                node.TypeReference)
+                node.TypeReference,
+                node.ArgumentNames)
             : node;
     }
 

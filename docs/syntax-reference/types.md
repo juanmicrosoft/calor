@@ -53,6 +53,16 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 §O{[u8}}            // returns byte[]
 ```
 
+### Constructor arguments
+
+`§NEW{Type}` calls a constructor. Use `§A[name] value` for a named argument;
+names select constructor parameters, not object-initializer properties.
+Arguments are evaluated in source order, even when names reorder the parameters.
+
+```
+§B{pair:Pair} §NEW{Pair} §A[Right] "right" §A[Left] "left"
+```
+
 ### Single-precision literals
 
 The lowercase `f` suffix selects a 32-bit floating-point literal, including

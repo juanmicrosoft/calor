@@ -3684,7 +3684,8 @@ public sealed class Binder
                 resolvedType: null,
                 typeNameSpan: newExpr.TypeNameSpan,
                 resolvedConstructors: Array.Empty<FunctionSymbol>(),
-                typeReference: boundTypeReference);
+                typeReference: boundTypeReference,
+                argumentNames: newExpr.ArgumentNames);
         }
 
         var constructorTypeName = TypeIdentity.ToLookupName(
@@ -3694,7 +3695,7 @@ public sealed class Binder
             newExpr.Span,
             $"{constructorTypeName}..ctor",
             boundArgs,
-            argumentNames: null,
+            argumentNames: newExpr.ArgumentNames,
             argumentModifiers: null,
             typeArguments: null);
 
@@ -3708,7 +3709,8 @@ public sealed class Binder
             boundTypeReference.ResolvedType,
             newExpr.TypeNameSpan,
             resolution.Functions,
-            boundTypeReference);
+            boundTypeReference,
+            newExpr.ArgumentNames);
     }
 
     private BoundTypeReference BindTypeReference(TypeReferenceNode typeReference)

@@ -6572,7 +6572,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             typeName += "<" + string.Join(", ", node.TypeArguments.Select(MapTypeName)) + ">";
         }
 
-        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        var args = string.Join(", ", node.Arguments.Select((argument, index) =>
+        {
+            var value = argument.Accept(this);
+            return node.ArgumentNames?[index] is { } name
+                ? $"{SanitizeSingleIdentifier(name)}: {value}"
+                : value;
+        }));
         var result = $"new {typeName}({args})";
 
         if (node.Initializers.Count > 0)

@@ -1151,7 +1151,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                             replacements,
                             typeReplacements)))
                     .ToArray(),
-                newExpression.TypeNameSpan);
+                newExpression.TypeNameSpan,
+                argumentNames: newExpression.ArgumentNames);
         }
         if (expression is AnonymousObjectCreationNode anonymousObject)
         {

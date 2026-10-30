@@ -1867,6 +1867,7 @@ public sealed class BoundNewExpression : BoundExpression
     public TextSpan TypeNameSpan { get; }
     public BoundTypeReference TypeReference { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<BoundObjectInitializer> Initializers { get; }
     public FunctionSymbol? ResolvedConstructor { get; }
@@ -1899,7 +1900,8 @@ public sealed class BoundNewExpression : BoundExpression
         TypeSymbol? resolvedType = null,
         TextSpan? typeNameSpan = null,
         IReadOnlyList<FunctionSymbol>? resolvedConstructors = null,
-        BoundTypeReference? typeReference = null)
+        BoundTypeReference? typeReference = null,
+        IReadOnlyList<string?>? argumentNames = null)
         : base(span)
     {
         // v0.14 nullability §NEW annotation flow — a `§NEW{Foo}` expression
@@ -1914,6 +1916,9 @@ public sealed class BoundNewExpression : BoundExpression
         TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();
+        if (argumentNames != null && argumentNames.Count != Arguments.Count)
+            throw new ArgumentException("Argument names must align with constructor arguments.", nameof(argumentNames));
+        ArgumentNames = argumentNames;
         Initializers = initializers ?? Array.Empty<BoundObjectInitializer>();
         ResolvedConstructor = resolvedConstructor;
         ResolvedConstructors = resolvedConstructors
