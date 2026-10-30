@@ -163,7 +163,7 @@ public sealed class CliEditScriptIdentityTests : IDisposable
 
     private static Outcome CompileCli(string workspace, string profile, bool clear, bool permissive = false)
     {
-        var arguments = new List<string> { "--cache", "--format", "json" };
+        var arguments = new List<string> { "--cache", "--format", "json", "--verbose" };
         foreach (var source in Directory.GetFiles(workspace, "*.calr").Order(StringComparer.Ordinal))
         {
             arguments.Add("-i");
