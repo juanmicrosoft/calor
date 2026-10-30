@@ -455,11 +455,14 @@ public sealed class SpikeVerdictTests
     /// </summary>
     private static string? ReEmit(string source)
     {
-        var output = Path.Combine(Path.GetTempPath(),
-            $"calor-spike-{Guid.NewGuid():N}.g.cs");
+        var directory = Path.Combine(Path.GetTempPath(), $"calor-spike-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var staged = Path.Combine(directory, Path.GetFileName(source));
+        var output = Path.Combine(directory, "output.g.cs");
 
         try
         {
+            File.Copy(source, staged);
             var start = new ProcessStartInfo("dotnet")
             {
                 RedirectStandardOutput = true,
@@ -469,7 +472,7 @@ public sealed class SpikeVerdictTests
             };
             start.ArgumentList.Add(CompilerDll());
             start.ArgumentList.Add("-i");
-            start.ArgumentList.Add(source);
+            start.ArgumentList.Add(staged);
             start.ArgumentList.Add("-o");
             start.ArgumentList.Add(output);
             // The BEFORE artifacts are row-less programs that today's compiler
@@ -488,13 +491,13 @@ public sealed class SpikeVerdictTests
 
             var root = RepositoryRoot();
             return File.ReadAllText(output)
-                .Replace(Path.GetFullPath(source), "<source>.calr", StringComparison.Ordinal)
+                .Replace(Path.GetFullPath(staged), "<source>.calr", StringComparison.Ordinal)
                 .Replace(root + Path.DirectorySeparatorChar, "", StringComparison.Ordinal)
                 .Replace(root + "/", "", StringComparison.Ordinal);
         }
         finally
         {
-            if (File.Exists(output)) File.Delete(output);
+            Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -1097,12 +1100,23 @@ public sealed class SpikeVerdictTests
     /// mutants use translated copies, never the historical measurement lane.</summary>
     private static (int ExitCode, string[] Diagnostics) CompileControlSource(string source)
     {
-        var (exitCode, diagnostics) = PpE1Probe.Compile(source);
-        string[] formatted = [.. diagnostics
-            .Select(d => $"{d.Severity} {d.Code}@{d.Line},{d.Column}"
-                + (d.Code == "Calor1312" ? $": {d.Message}" : ""))
-            .OrderBy(s => s, StringComparer.Ordinal)];
-        return (exitCode, formatted);
+        var directory = Path.Combine(Path.GetTempPath(), $"calor-active-control-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var staged = Path.Combine(directory, Path.GetFileName(source));
+            File.Copy(source, staged);
+            var (exitCode, diagnostics) = PpE1Probe.Compile(staged);
+            string[] formatted = [.. diagnostics
+                .Select(d => $"{d.Severity} {d.Code}@{d.Line},{d.Column}"
+                    + (d.Code == "Calor1312" ? $": {d.Message}" : ""))
+                .OrderBy(s => s, StringComparer.Ordinal)];
+            return (exitCode, formatted);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]

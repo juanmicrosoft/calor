@@ -83,8 +83,10 @@ MCP refactor actions reject stale source or sidecar snapshots and parameters
 belonging to a different action.
 
 `Calor0806` reports unavailable or ambiguous sidecar identity. Invalid active
-source retains its original lexer/parser diagnostics; synchronization writes
-neither a partial sidecar nor generated output for that source.
+source retains its original lexer/parser diagnostics. When duplicate declarations
+prevent synchronization, their binding diagnostics take precedence over a generic
+identity failure. Synchronization writes neither a partial sidecar nor generated
+output for that source.
 
 ## 1. What IDs Represent
 

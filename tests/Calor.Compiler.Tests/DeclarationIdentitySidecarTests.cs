@@ -1036,6 +1036,25 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.Contains(result.Failures, item => item.Diagnostic != null && item.Diagnostic.Code != DiagnosticCode.CliInternalError);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AmbiguousDeclarationsKeepBindingDiagnosticsWithoutWritingIdentity(bool registered)
+    {
+        var file = Write("active.calr", Original);
+        if (registered) Store.Sync([file]);
+        var before = File.Exists(Store.SidecarPath) ? File.ReadAllText(Store.SidecarPath) : null;
+        var duplicate = Original + "\n  §F{OtherId:Add:pub} (i32:x) -> i32\n    §R x\n";
+        File.WriteAllText(file, duplicate);
+        var failure = Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync([file]));
+        var diagnostic = Assert.Single(failure.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.DuplicateFunctionSignature, diagnostic.Code);
+        Assert.Equal(file, diagnostic.FilePath);
+        Assert.Equal(before, File.Exists(Store.SidecarPath) ? File.ReadAllText(Store.SidecarPath) : null);
+        Assert.Equal(duplicate, File.ReadAllText(file));
+        Assert.False(File.Exists(PathFor(".calor/ids.transaction.json")));
+    }
+
     [Fact]
     public void ConditionalDeclarationsHaveDistinctStableIdentities()
     {

@@ -525,10 +525,7 @@ public sealed class DeclarationIdentityStore
             {
                 var parts = group.ToArray();
                 if (parts.Length == 1) return parts[0].Identity;
-                var partialType = parts.All(d => d.Node is ClassDefinitionNode { IsPartial: true });
-                var partialMethod = parts.Length == 2 && parts.All(d => d.Node is MethodNode { IsPartial: true })
-                    && parts.Count(d => ((MethodNode)d.Node).Body.Count == 0) == 1;
-                if (!partialType && !partialMethod)
+                if (!IsPartialDeclaration(parts))
                     throw new InvalidOperationException("Ambiguous declaration keys; identity sync cannot distinguish these declarations.");
                 // A logical partial declaration has several legacy source IDs,
                 // not one source identity that tooling can import.
@@ -699,6 +696,11 @@ public sealed class DeclarationIdentityStore
         }
     }
 
+    private static bool IsPartialDeclaration(IReadOnlyList<ParsedDeclaration> parts) =>
+        parts.All(d => d.Node is ClassDefinitionNode { IsPartial: true })
+        || (parts.Count == 2 && parts.All(d => d.Node is MethodNode { IsPartial: true })
+            && parts.Count(d => ((MethodNode)d.Node).Body.Count == 0) == 1);
+
     private static IReadOnlyList<ParsedDeclaration> ParseDeclarations(string file, string source, string? diagnosticPath = null)
     {
         var diagnostics = new DiagnosticBag();
@@ -706,7 +708,15 @@ public sealed class DeclarationIdentityStore
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         if (diagnostics.HasErrors)
             throw new DeclarationIdentityParseException(diagnosticPath ?? file, diagnostics);
-        return Describe(file, module);
+        var declarations = Describe(file, module);
+        if (declarations.GroupBy(d => d.Identity.Key, StringComparer.Ordinal)
+            .Any(group => group.Count() > 1 && !IsPartialDeclaration(group.ToArray())))
+        {
+            new Binding.Binder(diagnostics, diagnosticPath ?? file).Bind(module);
+            if (diagnostics.HasErrors)
+                throw new DeclarationIdentityParseException(diagnosticPath ?? file, diagnostics);
+        }
+        return declarations;
     }
 
     public static IReadOnlyList<DeclarationIdentity> Describe(string file, string source) =>
