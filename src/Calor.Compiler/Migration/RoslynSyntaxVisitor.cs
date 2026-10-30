@@ -9077,7 +9077,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// check here, or those chains will be incorrectly decomposed instead of using native ops.
     /// See also: CSharpToCalorConversionTests.StringBuilderChainPreservesNativeOps_* tests.
     /// </summary>
-    private static bool WouldChainUseNativeOps(InvocationExpressionSyntax invocation)
+    private bool WouldChainUseNativeOps(InvocationExpressionSyntax invocation)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess)
             return false;
@@ -9085,8 +9085,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var methodName = memberAccess.Name.Identifier.Text;
         var targetStr = memberAccess.Expression.ToString();
 
-        // StringBuilder operations: target contains "StringBuilder" or starts with "sb"/"_sb"
-        if (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb") || targetStr.StartsWith("_sb"))
+        if (IsStringBuilderReceiver(memberAccess.Expression))
         {
             return methodName is "Append" or "AppendLine" or "Insert" or "Remove" or "Clear" or "ToString";
         }
@@ -9114,6 +9113,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return false;
     }
+
+    private bool IsStringBuilderReceiver(ExpressionSyntax receiver)
+        => _semanticModel?.GetTypeInfo(receiver).Type is INamedTypeSymbol type
+            && type.DeclaringSyntaxReferences.Length == 0
+            && SymbolEqualityComparer.Default.Equals(type,
+                _semanticModel.Compilation.GetTypeByMetadataName("System.Text.StringBuilder"));
 
     /// <summary>
     /// Collects all steps in a method chain from innermost to outermost.
@@ -13208,9 +13213,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var targetStr = memberAccess.Expression.ToString();
             var span = GetTextSpan(invocation);
 
-            // Try StringBuilder instance methods first (heuristic: target looks like StringBuilder)
-            // This prevents sb.ToString() from matching StringOp.ToString
-            if (!hasNamedArgs && (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb") || targetStr.StartsWith("_sb")))
+            if (!hasNamedArgs && IsStringBuilderReceiver(memberAccess.Expression))
             {
                 var sbOp = TryGetStringBuilderOperation(methodName, targetExpr, args, span);
                 if (sbOp != null)
@@ -13225,14 +13228,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 _context.RecordFeatureUsage("native-string-op");
                 return stringOp;
-            }
-
-            // Try StringBuilder instance methods (for other naming patterns)
-            var sbOp2 = hasNamedArgs ? null : TryGetStringBuilderOperation(methodName, targetExpr, args, span);
-            if (sbOp2 != null)
-            {
-                _context.RecordFeatureUsage("native-stringbuilder-op");
-                return sbOp2;
             }
 
             // Handle cast-then-call pattern: ((SomeType)expr).Method()
@@ -13650,26 +13645,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        // Convert string.Length to native string operation
-        // Note: We can't reliably detect if target is a string without type info,
-        // but Length is commonly used on strings so we'll optimistically convert it.
-        // The generated Calor will still work since (len s) maps to s.Length.
-        if (memberName == "Length")
+        if (memberName == "Length"
+            && _semanticModel?.GetTypeInfo(memberAccess.Expression).Type?.SpecialType == SpecialType.System_String)
         {
-            // Check if it looks like a string context (heuristic: not array access pattern)
-            var targetStr = memberAccess.Expression.ToString();
-            if (!targetStr.Contains("["))
-            {
-                // Heuristic: if the target looks like a StringBuilder (contains "StringBuilder" or starts with "sb")
-                // use sb-length, otherwise use len (string length)
-                if (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb"))
-                {
-                    _context.RecordFeatureUsage("native-stringbuilder-op");
-                    return new StringBuilderOperationNode(span, StringBuilderOp.Length, new[] { target });
-                }
-                _context.RecordFeatureUsage("native-string-op");
-                return new StringOperationNode(span, StringOp.Length, new[] { target });
-            }
+            _context.RecordFeatureUsage("native-string-op");
+            return new StringOperationNode(span, StringOp.Length, new[] { target });
         }
 
         return new FieldAccessNode(span, target, memberName);

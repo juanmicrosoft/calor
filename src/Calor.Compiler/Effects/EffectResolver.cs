@@ -253,6 +253,14 @@ public sealed class EffectResolver
     /// </summary>
     private EffectResolution ResolveAccessorInternal(EffectResolverKey key)
     {
+        // Array Length is declared on System.Array, not on the element/rank-specific receiver.
+        if (key.Kind == EffectMemberKind.Getter && key.MemberName == "Length"
+            && (key.DeclaringType.StartsWith("ARRAY[element=", StringComparison.Ordinal) && key.DeclaringType.EndsWith(']')
+                || key.DeclaringType.StartsWith('[') && key.DeclaringType.EndsWith(']')
+                || key.DeclaringType.LastIndexOf('[') is var rank && rank > 0 && key.DeclaringType.EndsWith(']')
+                    && key.DeclaringType[(rank + 1)..^1].All(character => character == ',')))
+            key = EffectResolverKey.ForManifestEntry(EffectMemberKind.Getter, "System.Array", "Length", null);
+
         // Accessor entries are name-only in every manifest, so the probe drops
         // the parameter list even when the caller supplied an empty one.
         var probe = key.WithoutParameterList();

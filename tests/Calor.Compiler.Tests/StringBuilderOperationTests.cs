@@ -493,7 +493,7 @@ public class Test { public StringBuilder M(StringBuilder sb) { return sb.Remove(
     [Fact]
     public void Migration_StringBuilderLength_ConvertsToSbLength()
     {
-        // The C# to Calor converter converts sb.Length to sb-length
+        // Length remains an ordinary property, independent of the receiver's name.
         var csharp = @"
 using System.Text;
 public class Test { public int M(StringBuilder sb) { return sb.Length; } }";
@@ -502,10 +502,11 @@ public class Test { public int M(StringBuilder sb) { return sb.Length; } }";
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
 
-        // Check via round-trip - the emitted Calor should contain sb-length
+        // Check via round-trip.
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("sb-length", calor);
+        Assert.Contains("sb.Length", calor);
+        Assert.DoesNotContain("sb-length", calor);
     }
 
     [Theory]

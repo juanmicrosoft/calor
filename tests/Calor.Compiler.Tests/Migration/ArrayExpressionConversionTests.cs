@@ -593,7 +593,8 @@ public class ArrayExpressionConversionTests
 
         var strict = Program.Compile(calor, row + ".calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Equal(unknownEffects, strict.HasErrors);
+        Assert.True(strict.HasErrors == unknownEffects,
+            string.Join(Environment.NewLine, strict.Diagnostics.Errors) + "\n" + calor);
         Assert.All(strict.Diagnostics.Errors, error =>
             Assert.True(error.Code == "Calor0410" && error.Message.Contains("'unknown'", StringComparison.Ordinal), error.ToString()));
         var compilation = Program.Compile(calor, row + ".calr",
@@ -676,13 +677,15 @@ public class ArrayExpressionConversionTests
     }
 
     [Fact]
-    public async Task StatementPositionControl_IsUnchanged()
+    public async Task StatementPositionArrays_AreUnchangedApartFromOrdinaryLength()
     {
-        // F5-ARRAY-03: statement-position arrays keep exactly the R0 baseline output.
+        // Keep the historical R0 baseline; only the approved Length spelling changes.
         var baseline = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
             "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt"));
         var (calor, _) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
-        Assert.Equal(baseline.ReplaceLineEndings().TrimEnd(), calor.ReplaceLineEndings().TrimEnd());
+        Assert.Equal(baseline.Replace("(len one)", "one.Length", StringComparison.Ordinal)
+            .Replace("(len two)", "two.Length", StringComparison.Ordinal)
+            .ReplaceLineEndings().TrimEnd(), calor.ReplaceLineEndings().TrimEnd());
     }
 
     [Fact]

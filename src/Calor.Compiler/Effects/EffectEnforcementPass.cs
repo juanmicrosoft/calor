@@ -4997,6 +4997,9 @@ public sealed class EffectEnforcementPass
 
         private string? InferKnownCallResultType(CallExpressionNode call)
         {
+            var internalReturnType = InferCallReturnType(call);
+            if (internalReturnType != "?")
+                return internalReturnType;
             var target = call.Target;
             var lastDot = target.LastIndexOf('.');
             if (lastDot <= 0)
@@ -5437,6 +5440,8 @@ public sealed class EffectEnforcementPass
                     ResolveLocalValueType(reference.Name) ?? "?"),
                 NewExpressionNode creation => EffectResolver.NormalizeParameterType(
                     GetConstructedTypeName(creation)),
+                ArrayCreationNode array => $"{array.ElementType}[]",
+                MultiDimArrayCreationNode array => $"{array.ElementType}[{new string(',', array.Rank - 1)}]",
                 ThisExpressionNode => EffectResolver.NormalizeParameterType(
                     _context.OwnerClass?.Name ?? "?"),
                 BaseExpressionNode => EffectResolver.NormalizeParameterType(
