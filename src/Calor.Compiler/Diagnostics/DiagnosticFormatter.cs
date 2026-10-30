@@ -7,13 +7,23 @@ namespace Calor.Compiler.Diagnostics;
 /// <summary>Authored text summaries; unknown message shapes remain lossless, not truncated.</summary>
 internal static class DiagnosticText
 {
-    internal static string OneLine(string text) => text
-        .Replace("\r", "\\r", StringComparison.Ordinal)
-        .Replace("\n", "\\n", StringComparison.Ordinal)
-        .Replace("\t", "\\t", StringComparison.Ordinal)
-        .Replace("\u0085", "\\u0085", StringComparison.Ordinal)
-        .Replace("\u2028", "\\u2028", StringComparison.Ordinal)
-        .Replace("\u2029", "\\u2029", StringComparison.Ordinal);
+    internal static string OneLine(string text)
+    {
+        var result = new System.Text.StringBuilder(text.Length);
+        foreach (var character in text)
+        {
+            result.Append(character switch
+            {
+                '\r' => "\\r",
+                '\n' => "\\n",
+                '\t' => "\\t",
+                _ when char.IsControl(character) || character is '\u2028' or '\u2029'
+                    => $"\\u{(int)character:x4}",
+                _ => character.ToString()
+            });
+        }
+        return result.ToString();
+    }
 
     internal static string ShortMessage(Diagnostic diagnostic)
     {

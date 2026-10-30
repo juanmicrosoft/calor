@@ -94,6 +94,8 @@ Text mode prints only failures, or one concise success line. `--timeout` sets
 the per-build/test timeout in seconds (1–600, default 600).
 `--verification-timeout` sets the solver timeout per contract in milliseconds
 (positive, default 5000). These are not a total-call deadline.
+The process deadline includes output draining after the root process exits.
+Redirected standard input is closed; validation does not answer interactive prompts.
 
 **Only validate trusted code.** Tests and preserved C# execute with the current
 user's permissions. Temporary workspaces isolate build files, not execution.

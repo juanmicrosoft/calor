@@ -64,6 +64,8 @@ visible.
 `--timeout <seconds>` bounds each build/test process (1–600, default 600).
 `--verification-timeout <milliseconds>` bounds each contract check (positive,
 default 5000). Neither is a total-call deadline.
+The process timeout also bounds output draining after the root exits.
+Standard input is closed rather than waiting for interactive answers.
 
 **Only run trusted code.** Tests and preserved C# run with your permissions;
 temporary projects are not a sandbox. Package restore may contact NuGet.

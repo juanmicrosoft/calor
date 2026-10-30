@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Mcp;
@@ -104,6 +105,10 @@ public sealed class ValidationLoopTests : IDisposable
         Assert.False(result.GetProperty("success").GetBoolean());
         Assert.Equal("failed", Stage(result, "compile").GetProperty("status").GetString());
         Assert.Equal("skipped", Stage(result, "test").GetProperty("status").GetString());
+        Assert.Equal("incomplete", Stage(result, "verify").GetProperty("status").GetString());
+        Assert.Contains(result.GetProperty("failures").EnumerateArray(),
+            f => f.GetProperty("stage").GetString() == "verify"
+                && f.GetProperty("message").GetString()!.Contains("did not complete", StringComparison.Ordinal));
         var diagnostic = result.GetProperty("failures").EnumerateArray()
             .Select(f => f.GetProperty("diagnostic")).First(d => d.GetProperty("code").GetString() == "Calor0830");
         Assert.Equal(SourcePath, diagnostic.GetProperty("location").GetProperty("file").GetString());
@@ -327,18 +332,148 @@ public sealed class ValidationLoopTests : IDisposable
     }
 
     [Fact]
-    public async Task RunningProcess_CancellationAndTimeoutTerminateProcessTree()
+    public async Task RedirectedStdin_IsClosedWhenNoInputIsSupplied()
     {
         var dotnet = ExecutionWorkspace.FindDotnet()!;
-        // The MCP server waits on stdin, providing a real blocking child without a shell.
         var compiler = typeof(Program).Assembly.Location;
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ExecutionWorkspace.CaptureProcessAsync(
-            dotnet, [compiler, "mcp"], _directory, TimeSpan.FromSeconds(30), cts.Token));
-        var timedOut = await ExecutionWorkspace.CaptureProcessAsync(
-            dotnet, [compiler, "mcp"], _directory, TimeSpan.FromMilliseconds(300), CancellationToken.None);
-        Assert.True(timedOut.TimedOut);
-        Assert.Equal(2, timedOut.ExitCode);
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            dotnet, [compiler, "mcp"], _directory, TimeSpan.FromSeconds(5), CancellationToken.None);
+        Assert.False(result.TimedOut);
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExitedRootWithDescendantHoldingPipes_IsBounded(bool cancel)
+    {
+        var pidPath = Path.Combine(_directory, "child.pid");
+        var rootExitPath = Path.Combine(_directory, "root-exiting");
+        var project = ExecutionWorkspace.WriteProject(Path.Combine(_directory, "helper"), "PipeHolder", true,
+        [
+            new ExecutionWorkspace.CompiledUnit("Program.cs", """
+                using System.Diagnostics;
+                using System.Reflection;
+                if (args[0] == "child")
+                {
+                    Thread.Sleep(30000);
+                    return;
+                }
+                var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+                start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
+                start.ArgumentList.Add("child");
+                using var child = Process.Start(start)!;
+                File.WriteAllText(args[1], child.Id.ToString());
+                File.WriteAllText(args[2], Environment.ProcessId.ToString());
+                """)
+        ]);
+        var dotnet = ExecutionWorkspace.FindDotnet()!;
+        var build = await ExecutionWorkspace.CaptureProcessAsync(dotnet,
+            ["build", project, "--nologo", "-v", "quiet"], _directory, TimeSpan.FromSeconds(30), CancellationToken.None);
+        Assert.Equal(0, build.ExitCode);
+        using var cts = new CancellationTokenSource();
+        var stopwatch = Stopwatch.StartNew();
+        var running = ExecutionWorkspace.CaptureProcessAsync(dotnet,
+            [Path.Combine(_directory, "helper", "bin", "Debug", "net10.0", "PipeHolder.dll"), "root", pidPath, rootExitPath],
+            _directory, TimeSpan.FromSeconds(2), cts.Token);
+        int? descendantId = null;
+        try
+        {
+            for (var i = 0; i < 100 && !File.Exists(rootExitPath) && !running.IsCompleted; i++)
+                await Task.Delay(10);
+            Assert.True(File.Exists(rootExitPath), "The helper root did not reach exit.");
+            descendantId = int.Parse(File.ReadAllText(pidPath));
+            // Let the root actually exit, while its descendant still owns both pipes.
+            await Task.Delay(150);
+            var rootId = int.Parse(File.ReadAllText(rootExitPath));
+            try
+            {
+                using var root = Process.GetProcessById(rootId);
+                Assert.True(root.HasExited, "The helper root is still running.");
+            }
+            catch (ArgumentException)
+            {
+                // The exact root PID was already reaped.
+            }
+            Assert.False(running.IsCompleted, "The descendant did not retain the inherited pipes.");
+            if (cancel)
+            {
+                cts.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running.WaitAsync(TimeSpan.FromSeconds(5)));
+            }
+            else
+            {
+                var result = await running.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.True(result.TimedOut);
+                Assert.Equal(2, result.ExitCode);
+            }
+            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            cts.Cancel();
+            if (descendantId == null && File.Exists(pidPath))
+                descendantId = int.Parse(File.ReadAllText(pidPath));
+            if (descendantId is { } pid)
+            {
+                using var descendant = Process.GetProcessById(pid);
+                if (!descendant.HasExited) descendant.Kill();
+                await descendant.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("error")]
+    [InlineData("warning")]
+    [InlineData("info")]
+    public void TextDiagnostics_UseAuthoredShortRenderingAndEscapeEveryLine(string severity)
+    {
+        const string message = "Legacy structural closing tag '§/M' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends.";
+        var diagnostic = new EnvelopeDiagnostic
+        {
+            Code = DiagnosticCode.LegacyCloserForm, Severity = severity, Message = message,
+            Location = new EnvelopeLocation { File = "C:\\src\\file\tname\n\u001b.calr", Line = 2, Column = 3 },
+            Verification = new EnvelopeVerification
+            {
+                Status = "refuted",
+                Counterexample = new EnvelopeCounterexample
+                {
+                    Rendered = "Counterexample: a=\"first\r\nsecond\t\u0085\u2028\u2029\u0000\u001b\"",
+                    Bindings = [new EnvelopeBinding { Name = "a", Value = "first\r\nsecond" }]
+                }
+            }
+        };
+        var result = new TestCommand.LoopResult { ExitCode = 1 };
+        result.Failures.Add(new("compile", message, diagnostic));
+        var text = result.ToText();
+        Assert.StartsWith(@"C:\src\file\tname\n\u001b.calr:2:3 Calor0830 ", text);
+        Assert.Contains("Remove legacy closer '§/M'; blocks end at dedent", text);
+        Assert.DoesNotContain("Phase 4d", text);
+        Assert.Contains(@"first\r\nsecond\t\u0085\u2028\u2029\u0000\u001b", text);
+        Assert.DoesNotContain(text, c => char.IsControl(c) || c is '\u2028' or '\u2029');
+        Assert.Equal(severity == "error", !text.Contains($"{severity}: ", StringComparison.Ordinal));
+        var json = JsonSerializer.SerializeToElement(result, TestCommand.LoopJsonOptions);
+        var entry = json.GetProperty("failures")[0].GetProperty("diagnostic");
+        Assert.Equal(message, entry.GetProperty("message").GetString());
+        Assert.Equal(diagnostic.Verification.Counterexample.Rendered,
+            entry.GetProperty("verification").GetProperty("counterexample").GetProperty("rendered").GetString());
+    }
+
+    [Fact]
+    public void MultilineUnknownMessagesAndNonDiagnosticFailures_AreOneLineWithoutLosingDetails()
+    {
+        var result = new TestCommand.LoopResult { ExitCode = 1 };
+        result.Failures.Add(new("compile", "", new EnvelopeDiagnostic
+        {
+            Code = "Calor9999", Severity = "error", Message = "first\nsecond\rthird\tend",
+            Location = new EnvelopeLocation { File = @"C:\work\source.calr", Line = 1, Column = 1 }
+        }));
+        result.Failures.Add(new("verify", "Contract verification did not complete.\nreason\t\u001b"));
+        var lines = result.ToText().Split(Environment.NewLine);
+        Assert.Equal(2, lines.Length);
+        Assert.Equal(@"C:\work\source.calr:1:1 Calor9999 first\nsecond\rthird\tend", lines[0]);
+        Assert.Equal(@"verify: Contract verification did not complete.\nreason\t\u001b", lines[1]);
     }
 
     [Theory]

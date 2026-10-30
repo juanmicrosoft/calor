@@ -548,13 +548,17 @@ internal static class ExecutionWorkspace
             return new ProcessResult(2, $"Failed to start process: {fileName}: {ex.Message}");
         }
 
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
+        process.StandardInput.Close();
         using var deadline = new CancellationTokenSource(timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+        var stdout = process.StandardOutput.ReadToEndAsync(linked.Token);
+        var stderr = process.StandardError.ReadToEndAsync(linked.Token);
+        var completion = Task.WhenAll(process.WaitForExitAsync(linked.Token), stdout, stderr);
         try
         {
-            await process.WaitForExitAsync(linked.Token);
+            // A descendant can retain a pipe after the root exits. The deadline
+            // covers both root exit and stream EOF, not only WaitForExitAsync.
+            await completion.WaitAsync(linked.Token);
             return new ProcessResult(process.ExitCode, (await stdout) + (await stderr));
         }
         catch (OperationCanceledException)
@@ -568,8 +572,14 @@ internal static class ExecutionWorkspace
             {
                 // The process exited between inspection and termination.
             }
-            await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(stdout, stderr);
+            process.StandardOutput.BaseStream.Dispose();
+            process.StandardError.BaseStream.Dispose();
+            // Observe read failures without waiting indefinitely for an inherited
+            // handle in an already-orphaned descendant.
+            _ = completion.ContinueWith(
+                task => { _ = task.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
             cancellationToken.ThrowIfCancellationRequested();
             return new ProcessResult(TimeoutExitCode, $"Process timed out after {timeout.TotalSeconds:0}s.", TimedOut: true);
         }

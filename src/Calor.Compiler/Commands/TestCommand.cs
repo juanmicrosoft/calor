@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Ids;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3.Cache;
 
@@ -108,9 +109,16 @@ public static class TestCommand
         internal string ToText() => Success
             ? $"Validation passed: build succeeded, {TestsRun} tests passed, {ContractsChecked} contracts proven."
             : string.Join(Environment.NewLine, Failures.Select(f => f.Diagnostic is { } d
-                ? $"{d.Location.File}:{d.Location.Line}:{d.Location.Column} {d.Code} {d.Severity}: {d.Message.ReplaceLineEndings(" ")}"
-                    + (d.Verification?.Counterexample is { } counterexample ? $" {counterexample.Rendered}" : "")
-                : $"{f.Stage}: {f.Message.ReplaceLineEndings(" ")}"));
+                ? new Diagnostic(d.Code, d.Message,
+                        new TextSpan(0, d.Location.Length, d.Location.Line, d.Location.Column),
+                        d.Severity switch
+                        {
+                            "warning" => DiagnosticSeverity.Warning,
+                            "info" => DiagnosticSeverity.Info,
+                            _ => DiagnosticSeverity.Error
+                        }, d.Location.File).ToString()
+                    + (d.Verification?.Counterexample is { } counterexample ? $" {DiagnosticText.OneLine(counterexample.Rendered)}" : "")
+                : $"{f.Stage}: {DiagnosticText.OneLine(f.Message)}"));
     }
 
     // Both surfaces use the same frozen inputs, compilation and proof outcomes.
@@ -186,6 +194,8 @@ public static class TestCommand
                 output.Failures.Add(new("verify", entry.Message, Remap(entry)));
             output.ContractsChecked = options.Sum(o => o.VerificationResults?.GetSummary().Total ?? 0);
             var verificationComplete = options.Count == snapshots.Count && options.All(o => o.VerificationResults != null);
+            if (!verificationComplete)
+                output.Failures.Add(new("verify", "Contract verification did not complete for all source files."));
             // Unavailable Z3 is a module-level diagnostic, including modules without contracts.
             var unavailable = entries.Where(d => d.Code == DiagnosticCode.Z3Unavailable).ToList();
             foreach (var entry in unavailable)
