@@ -9,6 +9,31 @@ namespace Calor.Compiler.Tests;
 
 public class GenericSyntaxTests
 {
+    [Theory]
+    [InlineData("result")]
+    [InlineData("Result")]
+    public void Convert_GenericSizedArray_PreservesElementType(string name)
+    {
+        var source = $$"""
+            public static class Arrays
+            {
+                public static T[] Create<T>(int count)
+                {
+                    T[] {{name}} = new T[count];
+                    return {{name}};
+                }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        var compiled = Program.Compile(result.CalorSource!, "array.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("new T[count]", compiled.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(compiled.GeneratedCode!).CompilationSuccess);
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();

@@ -24,8 +24,9 @@ public class ConversionScorecardTests
     // 0.25 F3 (#847): 94 -> 95 fully converted, 074_LocalFunctions converts natively in place.
     // 0.28 (#1679): 94 -> 95. 092_Events.cs snapshots the delegate before hoisting an
     // initializer proved to run no user code. Round-trip stays 98.
-    private const int BASELINE_FULLY_CONVERTED = 95;
-    private const int BASELINE_ROUNDTRIP = 98;
+    // 0.30: full indexer parameters and generic sized arrays survive reparse.
+    private const int BASELINE_FULLY_CONVERTED = 96;
+    private const int BASELINE_ROUNDTRIP = 100;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
     {

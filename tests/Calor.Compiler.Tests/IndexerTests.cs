@@ -452,6 +452,31 @@ public class IndexerTests
     #region Round-Trip Tests
 
     [Fact]
+    public void RoundTrip_IndexerBodies_ReparsePreservesParameters()
+    {
+        const string csharp = """
+            public class Matrix
+            {
+                private int[,] data = new int[2, 2];
+                public int this[int row, int col]
+                {
+                    get { return data[row, col]; }
+                    set { data[row, col] = value; }
+                }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter().Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+
+        var compiled = Program.Compile(result.CalorSource!, "indexer.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("this[int row, int col]", compiled.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(compiled.GeneratedCode!).CompilationSuccess);
+    }
+
+    [Fact]
     public void RoundTrip_CSharpToCalorToCSharp_PreservesIndexer()
     {
         var csharp = """
