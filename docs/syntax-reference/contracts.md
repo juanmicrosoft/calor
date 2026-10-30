@@ -124,8 +124,8 @@ Receiver identities come from the binder. String overloads must resolve against
 are also supported. Culture-sensitive, named, by-reference, generic and other
 overloads remain unverifiable, with runtime checks retained.
 
-`s.Length`, `array.Length` and `List<T>.Count` are recognized through receiver
-types, including inside integer quantifiers. Their results are signed `int`
+`s.Length`, integer-array `.Length` and metadata-resolvable `List<T>.Count` are
+recognized through receiver types, including inside integer quantifiers. Their results are signed `int`
 values bounded between zero and `Int32.MaxValue`. Lists use a count function
 on their reference sort; list element access is not added. The legacy length
 nodes retain their existing unsigned model.
@@ -135,6 +135,8 @@ applied. String/reference assumptions, substring range conditions, result bindin
 and conditional-position refusals are unchanged. Lowering affects verification
 only, not the executable AST, effects or evaluation order. This adds no grammar
 for computed callees or indexed assignment.
+The converter still emits legacy string built-ins during this staged migration;
+recognizing ordinary calls in contracts does not remove that vocabulary.
 
 ### Range Validation
 
