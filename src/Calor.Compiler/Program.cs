@@ -810,6 +810,13 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        ContractVerifier.VerifyNamedRefinementPredicates(ast, diagnostics);
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
         CSharpEmitter.ValidateMatchExpressions(ast, diagnostics);
         if (diagnostics.HasErrors)
         {

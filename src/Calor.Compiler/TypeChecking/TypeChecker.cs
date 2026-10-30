@@ -95,6 +95,7 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        Verification.ContractVerifier.VerifyNamedRefinementPredicates(module, _diagnostics);
         _hasNamedRefinements = module.RefinementTypes.Count > 0;
         _patternBindingTypes.Clear();
         _moduleDeclaredValueTypes.Clear();

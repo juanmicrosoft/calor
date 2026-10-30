@@ -408,7 +408,7 @@ public class TypeCheckerDefectTests
             §M{m001:RtBase}
               §CL{c001:Money:pub}
                 §FLD{i32:V:pub}
-              §RTYPE{r001:PosMoney:Money} (> value INT:0)
+              §RTYPE{r001:PosMoney:Money} (> # INT:0)
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'Money' is not known"));
@@ -430,8 +430,8 @@ public class TypeCheckerDefectTests
             §M{m001:Dup2}
               §CL{c001:Positive:pub}
                 §FLD{i32:V:pub}
-              §RTYPE{r001:Positive:i32} (> value INT:0)
-              §RTYPE{r002:Positive:i32} (> value INT:1)
+              §RTYPE{r001:Positive:i32} (> # INT:0)
+              §RTYPE{r002:Positive:i32} (> # INT:1)
             """);
 
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name 'Positive'"));
@@ -475,7 +475,7 @@ public class TypeCheckerDefectTests
             §M{m001:RtTest}
               §CL{c001:Positive:pub}
                 §FLD{i32:V:pub}
-              §RTYPE{r001:Positive:i32} (> value INT:0)
+              §RTYPE{r001:Positive:i32} (> # INT:0)
               §F{f001:Use:pub} () -> void
                 §E{}
                 §R

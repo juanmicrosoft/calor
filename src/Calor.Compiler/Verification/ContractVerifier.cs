@@ -49,10 +49,121 @@ public sealed class ContractVerifier
     private readonly HashSet<string> _indexedTypeSizeParams = new(StringComparer.Ordinal);
 
     /// <summary>
+    /// Validates declaration-site closure without borrowing any use-site scope.
+    /// </summary>
+    internal static void VerifyNamedRefinementPredicates(ModuleNode module, DiagnosticBag diagnostics)
+    {
+        foreach (var refinement in module.RefinementTypes)
+            Check(refinement.Predicate, new HashSet<string>(StringComparer.Ordinal), refinement.Name);
+
+        void Check(ExpressionNode expression, HashSet<string> bound, string name)
+        {
+            switch (expression)
+            {
+                case SelfRefNode or IntLiteralNode or FloatLiteralNode or DecimalLiteralNode
+                    or BoolLiteralNode or StringLiteralNode:
+                    return;
+                case ReferenceNode { Name: "null" or "true" or "false" }:
+                    // The emitter always treats these as literals, never as use-site storage.
+                    return;
+                case ReferenceNode reference:
+                    if (!bound.Contains(reference.Name))
+                        Reject(reference, name,
+                            $"cannot capture '{reference.Name}'; only # and locally quantified variables may name values");
+                    return;
+                case ForallExpressionNode forall:
+                    CheckQuantifier(forall.BoundVariables, forall.Body);
+                    return;
+                case ExistsExpressionNode exists:
+                    CheckQuantifier(exists.BoundVariables, exists.Body);
+                    return;
+                case BinaryOperationNode binary when Enum.IsDefined(binary.Operator):
+                    Check(binary.Left, bound, name);
+                    Check(binary.Right, bound, name);
+                    return;
+                case UnaryOperationNode unary when unary.Operator is
+                    UnaryOperator.Negate or UnaryOperator.Not or UnaryOperator.BitwiseNot:
+                    Check(unary.Operand, bound, name);
+                    return;
+                case ConditionalExpressionNode conditional:
+                    Check(conditional.Condition, bound, name);
+                    Check(conditional.WhenTrue, bound, name);
+                    Check(conditional.WhenFalse, bound, name);
+                    return;
+                case ImplicationExpressionNode implication:
+                    Check(implication.Antecedent, bound, name);
+                    Check(implication.Consequent, bound, name);
+                    return;
+                case StringOperationNode text when IsClosedStringOperation(text):
+                    foreach (var argument in text.Arguments)
+                        Check(argument, bound, name);
+                    return;
+                case CharOperationNode character when character.Operation is
+                    CharOp.CharLiteral or CharOp.CharAt or CharOp.CharCode or CharOp.CharFromCode
+                    or CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace or CharOp.IsUpper or CharOp.IsLower:
+                    foreach (var argument in character.Arguments)
+                        Check(argument, bound, name);
+                    return;
+                case TypeOperationNode conversion when conversion.Operation == TypeOp.Cast
+                    && PrimitiveType.FromName(conversion.TargetType) != null:
+                    Check(conversion.Operand, bound, name);
+                    return;
+                case CallExpressionNode call:
+                    // A callee is not a variable reference. Without exact declaration binding,
+                    // even a type-looking receiver can resolve to use-site storage or a member.
+                    diagnostics.ReportError(call.CalleeSpan, DiagnosticCode.NamedRefinementNotClosed,
+                        $"Named refinement '{name}' cannot use call '{call.Target}': its binding and state are not modeled. Use closed native operators instead.");
+                    return;
+                default:
+                    Reject(expression, name,
+                        $"cannot use {expression.GetType().Name}: closure and state are not modeled");
+                    return;
+            }
+
+            void CheckQuantifier(IReadOnlyList<QuantifierVariableNode> variables, ExpressionNode body)
+            {
+                // Copy the scope: a binder in one operand must not leak into its sibling.
+                var nested = new HashSet<string>(bound, StringComparer.Ordinal);
+                foreach (var variable in variables)
+                {
+                    if (!Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsValidIdentifier(variable.Name)
+                        || PrimitiveType.FromName(AttributeHelper.ToSurfaceSpelling(variable.TypeName))?.Name
+                            != PrimitiveType.Int.Name)
+                    {
+                        diagnostics.ReportError(variable.Span, DiagnosticCode.NamedRefinementNotClosed,
+                            $"Named refinement '{name}' requires simple integer quantifier binders; '{variable.Name}: {variable.TypeName}' is not modeled.");
+                        return;
+                    }
+                    nested.Add(variable.Name);
+                }
+                Check(body, nested, name);
+            }
+        }
+
+        void Reject(ExpressionNode expression, string name, string reason)
+            => diagnostics.ReportError(expression.Span, DiagnosticCode.NamedRefinementNotClosed,
+                $"Named refinement '{name}' {reason}.");
+    }
+
+    private static bool IsClosedStringOperation(StringOperationNode operation)
+        => operation.Operation switch
+        {
+            StringOp.Length or StringOp.Contains or StringOp.Equals or StringOp.IsNullOrEmpty
+                or StringOp.IsNullOrWhiteSpace or StringOp.Substring or StringOp.SubstringFrom
+                or StringOp.Replace or StringOp.Trim or StringOp.TrimStart or StringOp.TrimEnd
+                or StringOp.PadLeft or StringOp.PadRight or StringOp.Split
+                => operation.ComparisonMode == null || Enum.IsDefined(operation.ComparisonMode.Value),
+            StringOp.StartsWith or StringOp.EndsWith or StringOp.IndexOf
+                => operation.ComparisonMode is { } mode && Enum.IsDefined(mode),
+            _ => false
+        };
+
+    /// <summary>
     /// Verifies all contracts in a module.
     /// </summary>
     public void Verify(ModuleNode module)
     {
+        VerifyNamedRefinementPredicates(module, _diagnostics);
         // Collect indexed type size parameter names
         foreach (var itype in module.IndexedTypes)
         {

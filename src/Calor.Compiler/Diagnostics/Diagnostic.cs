@@ -1140,6 +1140,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string RefinedVariableByReference = "Calor1104";
 
+    /// <summary>
+    /// Error: a named refinement captures a free value or uses an unmodeled predicate form.
+    /// </summary>
+    public const string NamedRefinementNotClosed = "Calor1105";
+
     // Obligation verification diagnostics (Calor1120-1141)
 
     /// <summary>

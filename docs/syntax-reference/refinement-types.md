@@ -39,6 +39,31 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 - `baseType` — the underlying type (`i32`, `str`, etc.)
 - `predicate` — a boolean expression using `#` for the value
 
+Named predicates are **closed**: `#` is their only external value input. They
+cannot capture a parameter, local, global, receiver, property or function reference
+from a later use site. For example, `§RTYPE{r1:Above:i32} (> # n)` is rejected with
+`Calor1105` at `n`, even when every use happens to have a parameter named `n`.
+Use an inline parameter predicate for relationships such as `(i32:n, i32:x | (> # n))`.
+
+Closed predicates may compose literal constants, native arithmetic (including
+`**`), comparisons, logic, `?` conditionals and primitive casts. Composing named
+base refinements preserves each closed predicate. Quantifier-local variables are
+lexically bound, not captures; they do not escape their quantifier. Quantifiers
+still need the existing finite-runtime certificate: passing hygiene does not
+establish that certificate or a Z3 proof.
+
+Supported native text operations are length, containment, equality, emptiness,
+substring, replacement, trimming, padding and splitting. Prefix/suffix/index
+queries require an explicit comparison mode, rather than ambient culture.
+Character literals, indexing, code conversion and classification are supported.
+Their operands must also be closed. Ordinary calls (including type-looking
+`Math.Abs` calls), member reads, mutation, raw code, lambdas and other unmodeled
+forms fail closed with `Calor1105`. A call target is diagnosed as an unmodeled
+call, not mistaken for a free variable; use native mathematical operators
+instead. Culture-dependent case conversion and formatting are not closed
+operations. These errors are reported at the offending reference/expression
+(or callee name) even with type checking disabled.
+
 ### Examples
 
 ```
