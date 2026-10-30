@@ -238,7 +238,7 @@ Func<T, U>              // Function from T to U
 §I{List<i32>:numbers}           // List<int> parameter
 §I{Dictionary<str, i32>:scores} // Dictionary<string, int>
 §O{IEnumerable<str>}            // Returns IEnumerable<string>
-§FLD{HashSet<T>:_items:pri}     // Generic field with type parameter T
+§FLD{HashSet<T>:_items:priv}     // Generic field with type parameter T
 ```
 
 ### Nested Generic Types

@@ -27,8 +27,8 @@
     §R §C{MatchOption} §A h §A v §A Shout §A Zero §/C
 
   §CL{c001:Matcher:pub}
-    §FLD{Func<i32,i32>:onSome:pri} §E{cw}
-    §FLD{Func<i32>:none:pri} §E{}
+    §FLD{Func<i32,i32>:onSome:priv} §E{cw}
+    §FLD{Func<i32>:none:priv} §E{}
     §CTOR{ctor001:pub} ()
       §ASSIGN onSome MatchAfterModule.Shout
       §ASSIGN none MatchAfterModule.Zero

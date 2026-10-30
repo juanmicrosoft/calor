@@ -56,7 +56,7 @@ public class CompactIdMigratorTests
         var src = $"§F{{f_{Ulid1}:divide:i32:public}}";
         var (migrated, _) = Sut.Migrate(Dict(("f.calr", src)));
 
-        Assert.Equal("§F{f_stabwxyz1234:divide:i32:public}", migrated["f.calr"]);
+        Assert.Equal("§F{f_stabwxyz1234:divide:i32:pub}", migrated["f.calr"]);
     }
 
     [Fact]

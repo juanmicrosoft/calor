@@ -223,7 +223,7 @@ public class ClassVisibilityTests
         // Private visibility can appear in hand-written Calor (e.g., nested class scenarios)
         var calorSource = """
             §M{m1:Test}
-                §CL{c1:Inner:pri}
+                §CL{c1:Inner:priv}
             """;
 
         var compilationResult = Program.Compile(

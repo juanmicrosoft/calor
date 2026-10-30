@@ -379,7 +379,7 @@ Refactor this to extract the calculation into a separate function:
 
 **Response:**
 ```
-§F{f001:Square:pri}
+§F{f001:Square:priv}
   §I{i32:n}
   §O{i32}
   §R (* n n)

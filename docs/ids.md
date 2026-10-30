@@ -183,7 +183,7 @@ c001, c002          Classes
 | Operation | Before | After | ID |
 |-----------|--------|-------|-----|
 | Rename | `§F{f_01...:OldName:pub}` | `§F{f_01...:NewName:pub}` | Same |
-| Change visibility | `§F{f_01...:Calc:pub}` | `§F{f_01...:Calc:pri}` | Same |
+| Change visibility | `§F{f_01...:Calc:pub}` | `§F{f_01...:Calc:priv}` | Same |
 | Move file | `src/old.calr` | `src/new.calr` | Same |
 | Reformat | Any formatting | Any formatting | Same |
 | Add/remove comments | Any comments | Any comments | Same |
@@ -319,7 +319,7 @@ AI agents and code assistants MUST follow these rules:
 
 ```calor
 // CORRECT: Agent creates function without ID
-§F{:NewHelper:pri}
+§F{:NewHelper:priv}
   §O{void}
   §C{Console.WriteLine!}("helper")
 ```
@@ -330,10 +330,10 @@ AI agents and code assistants MUST follow these rules:
 
 ```calor
 // WRONG: Agent copied ID to new function
-§F{f_01OLD:ExtractedHelper:pri}  // Copied from original
+§F{f_01OLD:ExtractedHelper:priv}  // Copied from original
 
 // CORRECT: Agent omitted ID for new function
-§F{:ExtractedHelper:pri}  // No ID, will be assigned
+§F{:ExtractedHelper:priv}  // No ID, will be assigned
 ```
 
 ### 7.4 Verification Rule

@@ -95,7 +95,7 @@ permissions.
     §E{cw}
 
   §CL{c001:Callbacks:pub}
-    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §FLD{Action<i32>:onChange:priv} §E{cw}
     §PROP{p001:Current:Action<i32>:pub:get,set} §E{cw}
 ```
 
@@ -156,7 +156,7 @@ compiler infers one from the body when it can.
 the wrong line, or duplicates another row:
 
 ```calor
-§FLD{i32:count:pri}
+§FLD{i32:count:priv}
 §E{cw} // Wrong: count is not a function value, and this is a separate line.
 ```
 
@@ -339,7 +339,7 @@ Or explicitly:
   §E{db:rw,cw}            // Must include f002's effects
   §C{f002:Process} ... §/C
 
-§F{f002:Process:pri}
+§F{f002:Process:priv}
   §E{cw}                  // Has console write effect
   // ...
 ```

@@ -589,7 +589,7 @@ public sealed class ClassFieldNode : AstNode
 
     /// <summary>
     /// Optional effect row annotating the field type, written same-line-adjacent to
-    /// the header group: <c>§FLD{Action&lt;i32&gt;:onChange:pri} §E{cw}</c>.
+    /// the header group: <c>§FLD{Action&lt;i32&gt;:onChange:priv} §E{cw}</c>.
     /// Position 8 of docs/design/effect-rows-in-the-type-system.md §3.3. A <c>§E</c>
     /// on a later line is Calor0405 — the class-member loop has no <c>§E</c> arm.
     /// </summary>

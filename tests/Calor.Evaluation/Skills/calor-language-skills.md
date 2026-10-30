@@ -694,8 +694,8 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
 ```calor
 §M{m001:PointModule}
   §CL{cl01:Point:pub}
-    §FLD{i32:_x:pri}
-    §FLD{i32:_y:pri}
+    §FLD{i32:_x:priv}
+    §FLD{i32:_y:priv}
 
     §CTOR{ct01:pub} (i32:x, i32:y)
       §ASSIGN §THIS._x x
@@ -773,7 +773,7 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
 ```calor
 §M{m001:HybridModule}
   §CL{cl01:DataProcessor:pub}
-    §FLD{str:_connStr:pri}
+    §FLD{str:_connStr:priv}
 
     §CTOR{ct01:pub} (str:connStr)
       §ASSIGN §THIS._connStr connStr
@@ -782,7 +782,7 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
       §B{query} (concat "SELECT COUNT(*) FROM " table)
       §R §C{Execute} §A _connStr §A query §/C
 
-    §MT{mt02:Execute:pri} (str:connStr, str:query) -> i32
+    §MT{mt02:Execute:priv} (str:connStr, str:query) -> i32
       §R 0
 
     §CSHARP{
@@ -969,7 +969,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 §M{m001:GenericDemo}
   §CL{c001:Repository:pub}<T>
     §WHERE T : class
-    §FLD{List<T>:_items:pri}
+    §FLD{List<T>:_items:priv}
 
     §CTOR{ct001:pub} ()
       §ASSIGN _items §NEW{List<T>}
@@ -1017,7 +1017,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
   §CL{c002:Circle:pub}
     §EXT{Shape}
-    §FLD{f64:radius:pri}
+    §FLD{f64:radius:priv}
     §MT{mt001:Area:pub:over} () -> f64
       §R (* 3.14159 (* radius radius))
 ```
@@ -1036,13 +1036,13 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 ```calor
 §M{m001:Animals}
   §CL{c001:Animal:pub}
-    §FLD{str:_name:pro}
+    §FLD{str:_name:prot}
     §CTOR{ctor001:pub} (str:name)
       §ASSIGN §THIS._name name
 
   §CL{c002:Dog:pub}
     §EXT{Animal}
-    §FLD{str:_breed:pri}
+    §FLD{str:_breed:priv}
     §CTOR{ctor001:pub} (str:name, str:breed)
       §BASE §A name §/BASE
       §ASSIGN §THIS._breed breed

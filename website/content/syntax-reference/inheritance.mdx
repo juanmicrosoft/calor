@@ -66,7 +66,7 @@ Use `§EXT{ClassName}` to inherit from a base class.
 ```calor
 §CL{c1:Circle:pub}
   §EXT{Shape}
-  §FLD{f64:_radius:pri}
+  §FLD{f64:_radius:priv}
   // ...
 ```
 
@@ -253,7 +253,7 @@ Use `§BASE §A args §/BASE` in a constructor to call the base constructor.
 ```calor
 §CL{c1:Dog:pub}
   §EXT{Animal}
-  §FLD{str:_breed:pri}
+  §FLD{str:_breed:priv}
 
   §CTOR{ctor1:pub}
     §I{str:name}
@@ -286,9 +286,9 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
 
 ```calor
 §CL{c1:Shape:abs}
-  §FLD{str:_name:pro}
+  §FLD{str:_name:prot}
 
-  §CTOR{ctor1:pro}
+  §CTOR{ctor1:prot}
     §I{str:name}
     §ASSIGN §THIS._name name
 
@@ -305,7 +305,7 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
 ```calor
 §CL{c2:Circle:pub}
   §EXT{Shape}
-  §FLD{double:_radius:pri}
+  §FLD{double:_radius:priv}
 
   §CTOR{ctor1:pub}
     §I{double:radius}

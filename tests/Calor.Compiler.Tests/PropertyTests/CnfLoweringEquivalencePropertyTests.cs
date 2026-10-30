@@ -165,7 +165,9 @@ public sealed class CnfLoweringEquivalencePropertyTests
         "true" or "false" => $"BOOL:{term.Operation}",
         "not" => $"(! {Render(term.Left!)})",
         "if" => $"(? {Render(term.Left!)} {Render(term.Right!)} {Render(term.Third!)})",
-        "and" or "or" or "==" or "!=" =>
+        "and" => $"(&& {Render(term.Left!)} {Render(term.Right!)})",
+        "or" => $"(|| {Render(term.Left!)} {Render(term.Right!)})",
+        "==" or "!=" =>
             $"({term.Operation} {Render(term.Left!)} {Render(term.Right!)})",
         _ => throw new NotSupportedException(term.Operation)
     };

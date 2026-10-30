@@ -86,25 +86,7 @@ public static class AttributeHelper
     /// </summary>
     public static (string Id, string Name, string Visibility) InterpretFuncAttributes(AttributeCollection attrs)
     {
-        var visibility = attrs["_pos2"] ?? "";
-        if (string.IsNullOrEmpty(visibility))
-        {
-            visibility = "private";
-        }
-        else if (visibility == "pub")
-        {
-            visibility = "public";
-        }
-        else if (visibility == "pri")
-        {
-            visibility = "private";
-        }
-        else if (visibility == "int")
-        {
-            visibility = "internal";
-        }
-
-        return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "", visibility);
+        return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "", attrs["_pos2"] ?? "");
     }
 
     /// <summary>
@@ -112,7 +94,7 @@ public static class AttributeHelper
     /// the compact <c>§F{Name:vis}</c> form.
     /// </summary>
     public static bool IsVisibilityToken(string value) => value is
-        "pub" or "pri" or "int" or "public" or "private" or "internal";
+        "pub" or "int" or "prot" or "priv" or "prot-int" or "priv-prot";
 
     /// <summary>
     /// Interprets attributes for END_FUNC/§/F: {id}

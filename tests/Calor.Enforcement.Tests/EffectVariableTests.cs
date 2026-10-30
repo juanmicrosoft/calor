@@ -239,7 +239,7 @@ public class EffectVariableTests
         Parse("""
             §M{m001:R}
               §CL{c001:C:pub}
-                §FLD{Action<i32>:onChange:pri} §E{e}
+                §FLD{Action<i32>:onChange:priv} §E{e}
                 §MT{mt001:M:pub}<eff e> (Func<i32>:g §E{e}) -> void
                   §E{e}
             """, out var diagnostics);

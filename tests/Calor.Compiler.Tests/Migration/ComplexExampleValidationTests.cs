@@ -17,8 +17,8 @@ public class ComplexExampleValidationTests
         var source = """
             §M{m001:PointModule}
               §CL{cl01:Point:pub}
-                  §FLD{i32:_x:pri}
-                  §FLD{i32:_y:pri}
+                  §FLD{i32:_x:priv}
+                  §FLD{i32:_y:priv}
 
                   §CTOR{ct01:pub}
                     §I{i32:x}
@@ -135,7 +135,7 @@ public class ComplexExampleValidationTests
         var source = """
             §M{m001:HybridModule}
               §CL{cl01:DataProcessor:pub}
-                  §FLD{str:_connStr:pri}
+                  §FLD{str:_connStr:priv}
 
                   §CTOR{ct01:pub}
                     §I{str:connStr}

@@ -338,7 +338,7 @@ public class EffectEnforcementTests
         var source = @"
 §M{m001:Test}
   §CL{c001:Person:pub}
-      §FLD{str:_name:pri}
+      §FLD{str:_name:priv}
       §CTOR{ctor1:pub}
         §I{str:name}
         §ASSIGN §THIS._name name
@@ -568,7 +568,7 @@ public class EffectEnforcementTests
           §E{cw}
           §P msg
   §CL{c002:App:pub}
-      §FLD{Printer:_printer:pri}
+      §FLD{Printer:_printer:priv}
       §MT{mt002:Run:pub}
           §O{void}
           §E{cw}
@@ -595,7 +595,7 @@ public class EffectEnforcementTests
           §E{cw}
           §P msg
   §CL{c002:App:pub}
-      §FLD{Printer:_printer:pri}
+      §FLD{Printer:_printer:priv}
       §MT{mt002:Run:pub}
           §O{void}
           §C{_printer.PrintMessage}
@@ -622,14 +622,14 @@ public class EffectEnforcementTests
           §E{cw}
           §P ""output""
   §CL{c002:ServiceB:pub}
-      §FLD{ServiceC:_c:pri}
+      §FLD{ServiceC:_c:priv}
       §MT{mt002:Process:pub}
           §O{void}
           §E{cw}
           §C{_c.WriteOutput}
           §/C
   §CL{c003:ServiceA:pub}
-      §FLD{ServiceB:_b:pri}
+      §FLD{ServiceB:_b:priv}
       §MT{mt003:Execute:pub}
           §O{void}
           §E{cw}

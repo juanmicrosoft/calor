@@ -417,7 +417,7 @@ public class MigrateToolTests
             """
             §M{m1:TestModule}
               §C{c1:Foo:public}
-                §F{f1:Bar:public} §O{Int32}
+                §F{f1:Bar:pub} §O{Int32}
                     → §R 42
               §/C{c1}
             """);

@@ -7710,8 +7710,7 @@ public sealed class Parser
     /// <see cref="DiagnosticCode.UnknownVisibility"/> message lists them.
     /// </summary>
     internal const string ValidVisibilityWords =
-        "pub/public, int/internal, prot/pro/protected, priv/pri/private, " +
-        "prot-int/protected-internal, priv-prot/private-protected";
+        "pub, int, prot, priv, prot-int, priv-prot";
 
     /// <summary>
     /// Maps a visibility word to its <see cref="Visibility"/>. Returns false for a
@@ -7721,14 +7720,14 @@ public sealed class Parser
     /// </summary>
     private static bool TryParseVisibilityWord(string? value, out Visibility visibility)
     {
-        Visibility? parsed = value?.ToLowerInvariant() switch
+        Visibility? parsed = value switch
         {
-            "public" or "pub" => Visibility.Public,
-            "protected-internal" or "prot-int" => Visibility.ProtectedInternal,
-            "private-protected" or "priv-prot" => Visibility.PrivateProtected,
-            "internal" or "int" => Visibility.Internal,
-            "protected" or "prot" or "pro" => Visibility.Protected,
-            "private" or "priv" or "pri" => Visibility.Private,
+            "pub" => Visibility.Public,
+            "prot-int" => Visibility.ProtectedInternal,
+            "priv-prot" => Visibility.PrivateProtected,
+            "int" => Visibility.Internal,
+            "prot" => Visibility.Protected,
+            "priv" => Visibility.Private,
             _ => null
         };
         visibility = parsed ?? Visibility.Private;
@@ -9580,7 +9579,7 @@ public sealed class Parser
                 };
                 _diagnostics.ReportError(collectionSpan, DiagnosticCode.UnexpectedToken,
                     $"{tag} is a statement and cannot appear in a class body; declare a field or property " +
-                    "with an inline initializer instead (for example §FLD{List<i32>:xs:pri} = §NEW{List<i32>} §/NEW)");
+                    "with an inline initializer instead (for example §FLD{List<i32>:xs:priv} = §NEW{List<i32>} §/NEW)");
             }
             else
             {
@@ -9665,7 +9664,7 @@ public sealed class Parser
         // Positional: [type:name:visibility?:modifiers?]
         var typeName = attrs["_pos0"] ?? "object";
         var name = attrs["_pos1"] ?? "";
-        var visStr = attrs["_pos2"] ?? "private";
+        var visStr = attrs["_pos2"] ?? "priv";
         var modStr = attrs["_pos3"] ?? "";
 
         if (string.IsNullOrEmpty(name))
@@ -9676,7 +9675,7 @@ public sealed class Parser
         var visibility = ParseVisibility(visStr, startToken.Span);
         var fieldModifiers = ParseMethodModifiers(modStr);
 
-        // Position 8 (§3.3): §FLD{Action<i32>:onChange:pri} §E{cw}. Read BEFORE the
+        // Position 8 (§3.3): §FLD{Action<i32>:onChange:priv} §E{cw}. Read BEFORE the
         // default-value branch. X9b is the executed proof this did not already parse:
         // the class-member loop rejected Effects four diagnostics earlier.
         var row = TryParseSameLineRow(EffectRowPosition.Field);
@@ -9729,7 +9728,7 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
         var methodNameKey = "_pos1";
-        var visStr = attrs["_pos2"] ?? "private";
+        var visStr = attrs["_pos2"] ?? "priv";
         var modStr = attrs["_pos3"] ?? "";
 
         // --- Compact syntax: optional ID ---
@@ -9885,7 +9884,7 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
         var methodNameKey = "_pos1";
-        var visStr = attrs["_pos2"] ?? "private";
+        var visStr = attrs["_pos2"] ?? "priv";
         var modStr = attrs["_pos3"] ?? "";
 
         // --- Compact syntax: optional ID ---
@@ -10919,7 +10918,7 @@ public sealed class Parser
         var propertyNameKey = "_pos1";
         var propertyTypeKey = "_pos2";
         var typeName = attrs["_pos2"] ?? "object";
-        var visStr = attrs["_pos3"] ?? "public";
+        var visStr = attrs["_pos3"] ?? "pub";
         var modStr = attrs["_pos4"] ?? "";
         var accessorStr = attrs["_pos5"] ?? "";  // 6th positional for accessor shorthand
 
@@ -11096,7 +11095,7 @@ public sealed class Parser
         // Positional: {id:returnType:visibility[:modifiers[:accessors]]}
         var id = attrs["_pos0"] ?? "";
         var typeName = attrs["_pos1"] ?? "object";
-        var visStr = attrs["_pos2"] ?? "public";
+        var visStr = attrs["_pos2"] ?? "pub";
         var modStr = attrs["_pos3"] ?? "";
         var accessorStr = attrs["_pos4"] ?? "";
 
@@ -11346,7 +11345,7 @@ public sealed class Parser
 
         // Positional: [id:visibility?]
         var id = attrs["_pos0"] ?? "";
-        var visStr = attrs["_pos1"] ?? "public";
+        var visStr = attrs["_pos1"] ?? "pub";
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
@@ -12755,7 +12754,7 @@ public sealed class Parser
         // Positional: [id:name:visibility:delegateType]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
-        var visStr = attrs["_pos2"] ?? "private";
+        var visStr = attrs["_pos2"] ?? "priv";
         var delegateType = attrs["_pos3"] ?? "";
 
         // --- Compact syntax: optional ID (§EVT{Click:pub:EventHandler}, as documented) ---
@@ -14329,10 +14328,9 @@ public sealed class Parser
         return TryParseVisibilityWord(value, out _);
     }
 
-    private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.Ordinal)
     {
-        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot", "prot-int",
-        "public", "private", "private-protected", "protected", "internal", "protected-internal"
+        "pub", "prot", "priv", "int", "priv-prot", "prot-int"
     };
 
     /// <summary>
@@ -14367,12 +14365,11 @@ public sealed class Parser
         return vis;
     }
 
-    private static readonly HashSet<string> ClassModifierKeywords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> ClassModifierKeywords = new(StringComparer.Ordinal)
     {
         "abs", "abstract", "seal", "sealed", "st", "stat", "static",
         "partial", "struct", "readonly",
-        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot", "prot-int",
-        "public", "private", "private-protected", "protected", "internal", "protected-internal"
+        "pub", "prot", "priv", "int", "priv-prot", "prot-int"
     };
 
     private static bool IsClassModifierOrVisibility(string value)
@@ -14536,7 +14533,7 @@ public sealed class Parser
     /// Includes short form (g, s, i) and long form (get, set, init) with optional
     /// visibility prefixes (priget, proset, intinit).
     /// </summary>
-    private static readonly HashSet<string> AccessorKeywords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> AccessorKeywords = new(StringComparer.Ordinal)
     {
         "g", "s", "i", "gs", "gi", "si", "gsi", "gis",
         "get", "set", "init",
@@ -14584,7 +14581,7 @@ public sealed class Parser
         var parts = spec.Split(',');
         foreach (var part in parts)
         {
-            var trimmed = part.Trim().ToLowerInvariant();
+            var trimmed = part.Trim();
 
             // Long form with optional visibility prefix
             if (trimmed.EndsWith("get"))

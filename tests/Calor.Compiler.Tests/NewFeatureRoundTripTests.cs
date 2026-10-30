@@ -658,7 +658,7 @@ public class NewFeatureRoundTripTests
     [InlineData("""
         §M{m001:R}
           §CL{c001:C:pub}
-            §FLD{Action<i32>:onChange:pri} §E{cw}
+            §FLD{Action<i32>:onChange:priv} §E{cw}
             §MT{mt001:M:pub} () -> void
               §E{}
         """, "§FLD{Action<i32>:onChange:priv} §E{cw}")]

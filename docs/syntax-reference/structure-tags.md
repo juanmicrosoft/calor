@@ -932,7 +932,7 @@ Generic types are written inline using angle bracket syntax.
 §I{List<T>:items}                   // Parameter of type List<T>
 §I{Dictionary<str, T>:lookup}       // Nested generic types
 §O{IEnumerable<T>}                  // Generic return type
-§FLD{List<T>:_items:pri}            // Generic field type
+§FLD{List<T>:_items:priv}            // Generic field type
 ```
 
 ### Examples
@@ -949,7 +949,7 @@ Generic types are written inline using angle bracket syntax.
 ```
 §CL{c001:Repository:pub}<T>
   §WHERE T : class
-  §FLD{List<T>:_items:pri}
+  §FLD{List<T>:_items:priv}
 
   §MT{m001:Add:pub}
     §I{T:item}

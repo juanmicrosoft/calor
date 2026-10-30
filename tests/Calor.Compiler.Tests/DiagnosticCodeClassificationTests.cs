@@ -252,7 +252,7 @@ public class DiagnosticCodeClassificationTests
             §M{m001:Test}
               §CL{c001:MyClass:pub}<T>
                   §WHERE U : class
-                  §FLD{T:_item:pri}
+                  §FLD{T:_item:priv}
             """;
         Parse(source, out var diagnostics);
 

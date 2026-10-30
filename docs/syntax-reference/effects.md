@@ -95,7 +95,7 @@ Almost everyone already writes the second form, so almost nothing changes.
 §O{Func<i32>} §E{cw}                        // 6. a return type
 () -> Func<i32> §E{cw}                      //    …or the arrow spelling
 §B{f:Func<i32,i32>} §E{cw} <initializer>    // 7. a binding
-§FLD{Action<i32>:onChange:pri} §E{cw}       // 8. a field
+§FLD{Action<i32>:onChange:priv} §E{cw}       // 8. a field
 §PROP{p1:OnChange:Action<i32>:pub:get,set} §E{cw}  // 9. a property (0.17)
 ```
 
@@ -128,7 +128,7 @@ could not be written inside the declaration.
 line:
 
 ```
-§FLD{i32:x:pri}
+§FLD{i32:x:priv}
 §E{cw}            // Calor0405: move it onto the end of the 'x' field line
 ```
 
@@ -382,7 +382,7 @@ Or explicitly:
   §E{db:rw,cw}            // Must include f002's effects
   §C{f002:Process} ... §/C
 
-§F{f002:Process:pri}
+§F{f002:Process:priv}
   §E{cw}                  // Has console write effect
   // ...
 ```
@@ -425,7 +425,7 @@ The compiler doesn't just check individual functions. It performs **interprocedu
 You cannot hide an effect by burying it in helper functions.
 
 ```
-§F{f001:Helper:pri}
+§F{f001:Helper:priv}
   §C{Console.WriteLine} "hidden"   // Has cw effect
 
 §F{f002:Main:pub}

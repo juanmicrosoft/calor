@@ -159,7 +159,7 @@ public class EffectRowSyntaxTests
     [InlineData("""
         §M{m001:Z1}
           §CL{c001:C:pub}
-            §FLD{i32:x:pri}
+            §FLD{i32:x:priv}
             §E{cw}
             §MT{mt001:M:pub} () -> void
               §E{}
@@ -330,7 +330,7 @@ public class EffectRowSyntaxTests
         var module = Parse("""
             §M{m001:P}
               §CL{c001:C:pub}
-                §FLD{Action<i32>:onChange:pri} §E{cw}
+                §FLD{Action<i32>:onChange:priv} §E{cw}
                 §MT{mt001:M:pub} () -> void
                   §E{}
             """, out var diagnostics);
@@ -408,7 +408,7 @@ public class EffectRowSyntaxTests
         Parse("""
             §M{m001:F5}
               §CL{c001:C:pub}
-                §FLD{i32:x:pri}
+                §FLD{i32:x:priv}
                 §MT{mt001:M:pub} () -> void
                   §E{}
               §CL{c002:D:pub}

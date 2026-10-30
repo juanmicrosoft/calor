@@ -129,7 +129,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(3, "own rowed §FLD by simple name", Frozen.Charged, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri} §E{cw}
+            §FLD{Func<i32>:stage:priv} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt001:Twice:pub} () -> i32
@@ -139,7 +139,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(4, "static rowed §FLD by simple name", Frozen.Charged, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri:stat} §E{cw}
+            §FLD{Func<i32>:stage:priv:stat} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt001:Twice:pub} () -> i32
@@ -149,7 +149,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(5, "local bound from such a field", Frozen.Charged, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri} §E{cw}
+            §FLD{Func<i32>:stage:priv} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt001:Twice:pub} () -> i32
@@ -170,7 +170,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(7, "direct invocation of a this.-qualified field", Frozen.Charged, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri} §E{cw}
+            §FLD{Func<i32>:stage:priv} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt001:Twice:pub} () -> i32
@@ -182,7 +182,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(8, "own §FLD via this.", Frozen.Escaped, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri} §E{cw}
+            §FLD{Func<i32>:stage:priv} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt001:Twice:pub} () -> i32
@@ -202,7 +202,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(10, "own §FLD via a local alias of this", Frozen.Escaped, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri} §E{cw}
+            §FLD{Func<i32>:stage:priv} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt001:Twice:pub} () -> i32
@@ -213,7 +213,7 @@ public sealed class RowEscapeTableTests
 
         data.Add(new Shape(11, "§FLD on another instance of the same class", Frozen.Escaped, Src("""
           §CL{c001:Holder:pub}
-            §FLD{Func<i32>:stage:pri} §E{cw}
+            §FLD{Func<i32>:stage:priv} §E{cw}
             §CTOR{ctor001:pub} ()
               §ASSIGN stage RowTableModule.Beat
             §MT{mt002:TwiceOf:pub} (Holder:other) -> i32
@@ -329,7 +329,7 @@ public sealed class RowEscapeTableTests
         // Disclosure 1 — inherited field, unqualified. Blocked end-to-end pre-#1137.
         var inheritedField = TestHarness.Compile(Src("""
           §CL{c000:Base:pub}
-            §FLD{Func<i32>:stage:pro} §E{cw}
+            §FLD{Func<i32>:stage:prot} §E{cw}
 
           §CL{c001:Holder:pub}
             §EXT{Base}

@@ -3,14 +3,14 @@
     §E{fs:w}
     §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
 
-  §F{f002:KeyOf:pri} (str:line) -> str
+  §F{f002:KeyOf:priv} (str:line) -> str
     §E{}
     §B{eq:i32} (indexof line "=" :ordinal)
     §IF{if1} (< eq 0)
       §R line
     §R (substr line 0 eq)
 
-  §F{f003:ValueOf:pri} (str:line) -> str
+  §F{f003:ValueOf:priv} (str:line) -> str
     §E{}
     §B{eq:i32} (indexof line "=" :ordinal)
     §IF{if2} (< eq 0)

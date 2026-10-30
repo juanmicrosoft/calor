@@ -102,7 +102,7 @@ public class GenericSyntaxTests
             §M{m001:Test}
               §CL{c001:Repository:pub}<T>
                   §WHERE T : class
-                  §FLD{T:_item:pri}
+                  §FLD{T:_item:priv}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -246,7 +246,7 @@ public class GenericSyntaxTests
             §M{m001:Test}
               §CL{c001:Repository:pub}<T>
                   §WHERE T : class
-                  §FLD{List<T>:_items:pri}
+                  §FLD{List<T>:_items:priv}
             """;
 
         var csharp = CompileToCS(calor);
@@ -430,7 +430,7 @@ public class GenericSyntaxTests
             §M{m001:Test}
               §CL{c001:Cache:pub}<TKey, TValue>
                   §WHERE TKey : class
-                  §FLD{Dictionary<TKey, TValue>:_data:pri}
+                  §FLD{Dictionary<TKey, TValue>:_data:priv}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -521,7 +521,7 @@ public class GenericSyntaxTests
             §M{m001:Test}
               §CL{c001:Repository:pub}<T>
                   §WHERE T : class
-                  §FLD{T:_item:pri}
+                  §FLD{T:_item:priv}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -842,8 +842,8 @@ public class GenericSyntaxTests
         var source = """
             §M{m001:Test}
               §CL{c001:Container:pub}<T>
-                  §FLD{List<T>:_items:pri}
-                  §FLD{Dictionary<str, T>:_lookup:pri}
+                  §FLD{List<T>:_items:priv}
+                  §FLD{Dictionary<str, T>:_lookup:priv}
             """;
 
         var module = Parse(source, out var diagnostics);

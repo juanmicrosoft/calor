@@ -277,7 +277,7 @@ file once (the first build after the switch is a full one).
 
 ```
 §M{m1:App}
-  §F{f001:LoadUserName:pri}
+  §F{f001:LoadUserName:priv}
     §I{i32:userId}
     §O{str}
     §E{fs:r}

@@ -69,9 +69,9 @@ public sealed class SymbolAndOverloadBindingTests
     {
         const string source = """
             §M{m1:Test}
-              §F{f1:Pick:pri} (i32:value) -> i32
+              §F{f1:Pick:priv} (i32:value) -> i32
                 §R value
-              §F{f2:Pick:pri} (str:value) -> str
+              §F{f2:Pick:priv} (str:value) -> str
                 §R value
               §F{f3:Use:pub} () -> i32
                 §R §C{Pick} §A (?? §SM INT:1 INT:0) §/C
@@ -212,7 +212,7 @@ public sealed class SymbolAndOverloadBindingTests
     {
         const string source = """
             §M{m1:Test}
-              §F{f1:Pick:pri} (i32:value) -> i32
+              §F{f1:Pick:priv} (i32:value) -> i32
                 §R value
               §F{f2:Use:pub} () -> i32
                 §R §C{Pick} §A STR:"wrong" §/C
@@ -231,9 +231,9 @@ public sealed class SymbolAndOverloadBindingTests
     {
         const string source = """
             §M{m1:Test}
-              §F{f1:Pick<T>:pri} (T:value, i32:other) -> T
+              §F{f1:Pick<T>:priv} (T:value, i32:other) -> T
                 §R value
-              §F{f2:Pick<T>:pri} (i32:value, T:other) -> T
+              §F{f2:Pick<T>:priv} (i32:value, T:other) -> T
                 §R other
               §F{f3:Use:pub} () -> i32
                 §R §C{Pick} §A INT:1 §A INT:2 §/C
@@ -430,9 +430,9 @@ public sealed class SymbolAndOverloadBindingTests
     {
         const string source = """
             §M{m1:Test}
-              §F{f1:Select<T>:pri} (T:value) -> T
+              §F{f1:Select<T>:priv} (T:value) -> T
                 §R value
-              §F{f2:Select<T,U>:pri} (T:value) -> T
+              §F{f2:Select<T,U>:priv} (T:value) -> T
                 §R value
               §F{f3:Use:pub} () -> void
                 §C{Select<i32>} §A INT:1 §/C
@@ -1031,7 +1031,7 @@ public sealed class SymbolAndOverloadBindingTests
                   §E{cw}
                   §P STR:"pick"
                   §R value
-                §MT{hidden:Hidden:pri} () -> i32
+                §MT{hidden:Hidden:priv} () -> i32
                   §R 0
               §CL{c2:Derived:Base:pub}
                 §MT{use:Use:pub} () -> i32
@@ -1122,7 +1122,7 @@ public sealed class SymbolAndOverloadBindingTests
     {
         const string source = """
             §M{m1:Test}
-              §F{f1:Echo:pri} (str:value) -> str
+              §F{f1:Echo:priv} (str:value) -> str
                 §R value
               §F{f2:Use:pub} ([str]:values) -> void
                 §EACH{e1:item} values

@@ -109,7 +109,7 @@ public class EndToEndTests
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-              §F{f002:Bar:pri}
+              §F{f002:Bar:priv}
                   §O{void}
             """;
 

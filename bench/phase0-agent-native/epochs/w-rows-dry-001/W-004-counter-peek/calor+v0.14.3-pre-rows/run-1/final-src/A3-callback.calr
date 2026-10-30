@@ -1,11 +1,11 @@
 §M{m001:CallbackAfter}
   §CL{c001:Counter:pub}
-    §FLD{Action<i32>:onChange:pri}
-    §FLD{i32:total:pri}
+    §FLD{Action<i32>:onChange:priv}
+    §FLD{i32:total:priv}
     §CTOR{ctor001:pub} ()
       §ASSIGN this.total INT:0
       §ASSIGN this.onChange this.Emit
-    §MT{mt002:Emit:pri} (i32:value) -> void
+    §MT{mt002:Emit:priv} (i32:value) -> void
       §E{cw}
       §P value
     §MT{mt001:Bump:pub} (i32:n) -> void

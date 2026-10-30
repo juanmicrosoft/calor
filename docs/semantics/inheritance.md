@@ -365,7 +365,7 @@ These rules ensure that objects of derived classes can substitute for objects of
 **Example:**
 ```calor
 // Base class
-§MT{mt1:Method:pro:virt}
+§MT{mt1:Method:prot:virt}
   §O{void}
 
 // Derived - OK: increasing visibility

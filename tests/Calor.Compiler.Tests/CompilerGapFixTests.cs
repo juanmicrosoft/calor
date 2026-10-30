@@ -147,7 +147,7 @@ public class CompilerGapFixTests
         var source = @"
 §M{m1:TestMod}
   §CL{c1:MyClass:pub}
-      §FLD{str:_name:pri}
+      §FLD{str:_name:priv}
 ";
 
         var result = ParseAndEmit(source);

@@ -277,7 +277,7 @@ none of the three has a `§E` arm, so today a non-adjacent `§E` there is a four
 that never mentions effects:
 
 ```
-CASE Z1  §CL{…} / §FLD{i32:x:pri} ⏎ §E{cw}
+CASE Z1  §CL{…} / §FLD{i32:x:priv} ⏎ §E{cw}
   (4,5)  Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD,
                     AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Effects
   (4,7)  … but found OpenBrace      (4,8) … but found Identifier      (4,10) … but found CloseBrace
@@ -355,7 +355,7 @@ position 6 simply has two spellings. Renumbered here and used consistently throu
 | 5 | Parameter, inline form | `(Func<i32,i32>:f §E{…}, i32:v)` | **no** — **X9c**: `Calor0100: Expected CloseParen but found Effects` |
 | 6 | Return (two spellings) | `§O{Func<i32>} §E{…}` and `-> Func<i32> §E{…}` | parses, **wrong meaning** — X2b, Y5a |
 | 7 | Binding | `§B{f:Func<i32,i32>} §E{…} <init>` | **no** — **Y3a**: `Calor0100: Expected statement but found Effects` |
-| 8 | Field | `§FLD{Action<i32>:onChange:pri} §E{…}` | **no** — **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects` |
+| 8 | Field | `§FLD{Action<i32>:onChange:priv} §E{…}` | **no** — **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects` |
 
 (Draft v1's §14 Q4 closed position 8 by *reading* `ParseClassField`'s default-value guard and
 concluded it already parsed. **X9b disproves that**: the class-member loop rejects `Effects`
@@ -1259,7 +1259,7 @@ interface Calor does not own.
 ```text
 §M{m001:After}
   §CL{c001:Counter:pub}
-    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §FLD{Action<i32>:onChange:priv} §E{cw}
     §MT{mt001:Bump:pub} (i32:n) -> void
       §E{cw}
       §C{onChange} §A n §/C
@@ -1802,7 +1802,7 @@ Binder symbols BEFORE: `onChange` is a `VariableSymbol` whose `TypeName` is the 
 field by **name** on the owner class (`EEP:1738-1741`) and string-matches `Action<`
 (`:1946`).
 
-AFTER — `§FLD{Action<i32>:onChange:pri} §E{cw}` (position 8; **X9b** shows this does not parse
+AFTER — `§FLD{Action<i32>:onChange:priv} §E{cw}` (position 8; **X9b** shows this does not parse
 today) and `§E{cw}` on `Bump`. `onChange`'s `BoundType` becomes
 `FunctionBoundType([i32], void, ParameterRows: [Unknown], Row: Concrete({cw}))`;
 `DisplayString` is `"(i32) -> void"` — unchanged per §8.3 — and `RowDisplayString` is `"cw"`. No
@@ -2494,9 +2494,9 @@ the transcripts are E2's frozen evidence base and a throwaway prototype does not
 | # | Script / case | Committed | With rows | Why |
 |---|---|---|---|---|
 | 1 | `run.py` **X6a** (`§F{…}<T, U, eff e>`) | exit 1; a **14-line** `Calor0100`/`Calor0114` cascade from `Expected Greater but found Identifier` | the type-parameter list parses; the case's own `§E{}` then under-declares its body → one `Calor0410 … uses effect 'alloc'` | **Intended.** X6a exists to show `eff e` is new syntax *today* (§7.2). E2 must **re-author** it as a positive case, not merely regenerate it |
-| 2 | `run.py` **X9b** (`§FLD{Action<i32>:onChange:pri} §E{cw}`) | exit 1; **4×** `Calor0100 … but found Effects` | **exit 0**, `Compilation successful` | **Intended** — **position 8** doing what §3.3 promises. X9b is the case §14.1 cites to disprove Draft v1's claim that `§FLD` already parsed a row; once position 8 lands it *must* compile |
+| 2 | `run.py` **X9b** (`§FLD{Action<i32>:onChange:priv} §E{cw}`) | exit 1; **4×** `Calor0100 … but found Effects` | **exit 0**, `Compilation successful` | **Intended** — **position 8** doing what §3.3 promises. X9b is the case §14.1 cites to disprove Draft v1's claim that `§FLD` already parsed a row; once position 8 lands it *must* compile |
 | 3 | `run.py` **X9c** (`(Func<i32,i32>:transform §E{cw}, i32:value)`) | exit 1; **12×** `Calor0100` from `Expected CloseParen but found Effects` | **exit 0**, `Compilation successful` | **Intended** — **position 5**, §3.3. Same disposition as X9b |
-| 4 | `run3.py` **Z1** (`§FLD{i32:x:pri}` ⏎ `§E{cw}`) | **4×** `Calor0100` cascade | one `Calor0405` naming the `x` field line | **Intended** — §3.1's row-aware recovery. The 4→1 collapse is exactly the claim **P2(b)** makes |
+| 4 | `run3.py` **Z1** (`§FLD{i32:x:priv}` ⏎ `§E{cw}`) | **4×** `Calor0100` cascade | one `Calor0405` naming the `x` field line | **Intended** — §3.1's row-aware recovery. The 4→1 collapse is exactly the claim **P2(b)** makes |
 | 5 | `run3.py` **Z3** (wrapped inline signature) | **8×** `Calor0100` through the rest of the signature and body | one `Calor0405` naming the `transform` parameter line | **Intended**, and the strongest Calor0405 case: §3.1 calls Z3 *not hypothetical* because **Z5** shows wrapped parameter lists really are written. 8→1 |
 | 6 | `facts.py` line 6 | `Ast/FunctionNode.cs:252` | `Ast/FunctionNode.cs:283` | **Unavoidable.** `facts.py` pins `file:line` structural facts; adding `ParameterNode.Row` moves the line, and any E2 implementation moves it too |
 | 7 | `facts.py` — the `IsSubsetOf` compatibility-site sweep | `EffectEnforcementPass.cs:533` and `:571` are listed | both **vanish**; five `EffectSet.cs` lines appear instead | **Intended, and it is R2's own evidence moving a pinned fact.** §6.3 says those two calls "become calls to the shared `EffectRow.Fits`"; this sweep is the instrument that observes it, so when the claim comes true the transcript *must* change |

@@ -1240,7 +1240,7 @@ internal static class PpE1Probe
             RegisteredCode: "Calor0425", RegisteredDeclaration: "f001 (§C{g})", RegisteredLine: 4,
             BeforeCode: "Calor0100", MessageRule: null),
         new("L7-CB", "L7 row erasure", "A3-callback",
-            Anchor: "§FLD{Action<i32>:onChange:pri} §E{cw}", Replacement: "§FLD{Action<i32>:onChange:pri}",
+            Anchor: "§FLD{Action<i32>:onChange:priv} §E{cw}", Replacement: "§FLD{Action<i32>:onChange:priv}",
             CommittedMutant: null,
             RegisteredCode: "Calor0425", RegisteredDeclaration: "mt001 (§C{onChange})", RegisteredLine: 6,
             BeforeCode: "Calor0100", MessageRule: null),

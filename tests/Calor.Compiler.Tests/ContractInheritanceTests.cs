@@ -1379,7 +1379,7 @@ public class ContractInheritanceTests
       §MT{m001:Use}
           §I{i32:x}
           §O{i32}
-          §Q (IsValid x)
+          §Q (CALL IsValid x)
   §CL{c001:Service:pub}
       §IMPL{IService}
       §MT{mt001:Use:pub}
@@ -1612,7 +1612,7 @@ public class ContractInheritanceTests
           §Q (> value INT:0)
   §CL{c001:Service:pub}
       §IMPL{IService}
-      §MT{mt001:IService.Use:pri}
+      §MT{mt001:IService.Use:priv}
           §I{i32:value}
           §O{i32}
           §R value

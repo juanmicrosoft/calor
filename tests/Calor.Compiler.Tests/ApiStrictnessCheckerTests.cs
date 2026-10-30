@@ -42,7 +42,7 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-  §F{f001:Test:pri}
+  §F{f001:Test:priv}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
@@ -83,7 +83,7 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-  §F{f001:PrivateHelper:pri}
+  §F{f001:PrivateHelper:priv}
       §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);

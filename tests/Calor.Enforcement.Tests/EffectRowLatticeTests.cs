@@ -171,7 +171,7 @@ public class EffectRowLatticeTests
     [InlineData("""
         §M{m001:R2A}
           §CL{c001:Box:pub}
-            §FLD{:c:pri} §E{cw}
+            §FLD{:c:priv} §E{cw}
         """)]
     public void RowOnNonFunctionTypedPosition_IsCalor0405(string source)
     {
@@ -213,7 +213,7 @@ public class EffectRowLatticeTests
         var compiled = TestHarness.Compile("""
             §M{m001:M}
               §CL{c001:Holder:pub}
-                §FLD{i32:count:pri} §E{cw}
+                §FLD{i32:count:priv} §E{cw}
             """);
 
         Assert.Single(compiled.Diagnostics.Where(d => d.Code == DiagnosticCode.EffectRowMisplaced));

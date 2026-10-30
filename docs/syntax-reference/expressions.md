@@ -22,6 +22,11 @@ Function bodies are delimited by indentation, not `§BODY`/`§END_BODY`.
 Generic types and parameters use inline angle brackets (`List<i32>`, `<T>`),
 not the removed `§G`/`§TP` markers.
 
+Declaration visibility is also exact-case: `pub`, `int`, `prot`, `priv`,
+`prot-int`, or `priv-prot`. Long forms such as `public` and older short
+forms such as `pri` are errors. Omitting visibility keeps the declaration's
+existing default.
+
 ## Integer literals
 
 Integer literals preserve sign, base, width, and signedness through compilation.

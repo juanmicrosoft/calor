@@ -8519,7 +8519,7 @@ public sealed class Binder
         // corpus, which is a change with a blast radius and nothing to do with
         // rows.
         // Canonicalize throws on an empty/whitespace name (Binding/Scope.cs:323) --
-        // a `§FLD{:c:pri}` parses with an empty type, so guard on whitespace, not null
+        // a `§FLD{:c:priv}` parses with an empty type, so guard on whitespace, not null
         // (review round 2 of PR #1102, R2-A).
         var displayed = string.IsNullOrWhiteSpace(typeName)
             ? "?"

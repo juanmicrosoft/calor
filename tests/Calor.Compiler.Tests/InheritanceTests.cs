@@ -41,7 +41,7 @@ public class InheritanceTests
           §O{double}
   §CL{c2:Circle:pub}
       §EXT{Shape}
-      §FLD{f64:radius:pri}
+      §FLD{f64:radius:priv}
       §MT{mt1:Area:pub:over}
           §O{double}
           §R (* 3.14159 (* radius radius))
@@ -122,14 +122,14 @@ public class InheritanceTests
         var source = @"
 §M{m1:Test}
   §CL{c1:Animal:pub}
-      §FLD{str:_name:pro}
+      §FLD{str:_name:prot}
       §CTOR{ctor1:pub}
         §I{str:name}
         §ASSIGN §THIS._name name
       §/CTOR{ctor1}
   §CL{c2:Dog:pub}
       §EXT{Animal}
-      §FLD{str:_breed:pri}
+      §FLD{str:_breed:priv}
       §CTOR{ctor1:pub}
         §I{str:name}
         §I{str:breed}
@@ -350,7 +350,7 @@ public class InheritanceTests
         var source = @"
 §M{m1:Test}
   §CL{c1:Parent:pub}
-    §FLD{i32:Dummy:pri}
+    §FLD{i32:Dummy:priv}
   §CL{c2:Child:pub}
       §EXT{Parent}
 ";
@@ -644,7 +644,7 @@ public class InheritanceTests
         var source = @"
 §M{m1:Test}
   §CL{c1:Service:pub}
-      §MT{mt1:Helper:pri}
+      §MT{mt1:Helper:priv}
           §O{str}
           §R ""done""
       §MT{mt2:Process:pub}
@@ -720,7 +720,7 @@ public class InheritanceTests
           §O{void}
       §MT{mt2:StaticMethod:pub:stat}
           §O{void}
-      §MT{mt3:PrivateMethod:pri}
+      §MT{mt3:PrivateMethod:priv}
           §O{void}
 ";
 
@@ -761,7 +761,7 @@ public class InheritanceTests
         var source = @"
 §M{m1:Test}
   §CL{c1:Person:pub}
-      §FLD{str:_name:pri}
+      §FLD{str:_name:priv}
       §CTOR{ctor1:pub}
         §I{str:name}
         §ASSIGN §THIS._name name

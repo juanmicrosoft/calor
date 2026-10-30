@@ -183,7 +183,7 @@ public class CompactSyntaxTests
                 §PROP{p001:Name:str:pub}
                 §GET
                 §/GET
-                §SET{pri}
+                §SET{priv}
                 §/SET
                 §/PROP{p001}
             """;
@@ -660,7 +660,7 @@ public class CompactSyntaxTests
         var source = """
             §M{m001:Test}
               §CL{c001:Person}
-                §FLD{str:_name:pri}
+                §FLD{str:_name:priv}
                 §CTOR{ctor1:pub} (str:name)
                 §C{Console.WriteLine} name
                 §/CTOR{ctor1}
@@ -754,7 +754,7 @@ public class CompactSyntaxTests
         var source = """
             §M{m001:Test}
               §CL{c001:Widget}
-                §FLD{str:_name:pri}
+                §FLD{str:_name:priv}
                 §CTOR{ctor1:pub}
                 §I{str:name}
                 §I{i32:count}
@@ -830,7 +830,7 @@ public class CompactSyntaxTests
         var source = """
             §M{m001:Test}
               §CL{c001:DataHolder}
-                §FLD{str:_label:pri}
+                §FLD{str:_label:priv}
                 §PROP{p001:Value:i32:pub}
                 §GET
                 §/GET
@@ -879,19 +879,19 @@ public class CompactSyntaxTests
         var source = """
             §M{m001:Test}
               §CL{c001:Item}
-                §PROP{p001:Name:string:public}
+                §PROP{p001:Name:string:pub}
                 §GET
                 §/GET
-                §SET{private}
+                §SET{priv}
                 §/SET
                 §/PROP{p001}
-                §PROP{p002:Value:int:public}
+                §PROP{p002:Value:int:pub}
                 §GET
                 §/GET
                 §SET
                 §/SET
                 §/PROP{p002}
-              §F{f001:Main:public}
+              §F{f001:Main:pub}
                 §I{string:name}
                 §I{int:count}
                 §O{void}

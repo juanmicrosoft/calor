@@ -207,7 +207,7 @@ public class RunTestCommandTests : IDisposable
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
               §CL{c001:Holder:pub}
-                §FLD{Func<i32>:stage:pri} §E{cw}
+                §FLD{Func<i32>:stage:priv} §E{cw}
                 §MT{mt001:Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A this.stage §/C

@@ -387,7 +387,7 @@ public class CodeGenBugFixTests
   §CL{c1:CyrillicToLatin:pub}
       §EXT{TransliteratorBase}
 
-      §FLD{str:_mappings:pri}
+      §FLD{str:_mappings:priv}
 
       §PROP{p001:Name:str:pub:over}
         §GET

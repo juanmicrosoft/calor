@@ -322,7 +322,7 @@ public class SemanticTokensHandlerTests
     {
         var source = @"§M{m1:Test}
   §CL{c1:Person:pub}
-      §FLD{str:_name:pri}
+      §FLD{str:_name:priv}
       §PROP{str:Name:pub}
         §GET
           §R §THIS._name

@@ -60,8 +60,7 @@ public class SilentAcceptanceLanguageTests
         Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    {header}\n      §R 1\n", out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, e => e.Code == DiagnosticCode.UnknownVisibility);
-        Assert.Contains("pub/public", error.Message);
-        Assert.Contains("priv-prot/private-protected", error.Message);
+        Assert.Contains("pub, int, prot, priv, prot-int, priv-prot", error.Message);
     }
 
     [Theory]
@@ -79,24 +78,35 @@ public class SilentAcceptanceLanguageTests
 
     [Theory]
     [InlineData("pub", Visibility.Public)]
-    [InlineData("public", Visibility.Public)]
     [InlineData("int", Visibility.Internal)]
     [InlineData("prot", Visibility.Protected)]
-    [InlineData("pro", Visibility.Protected)]
-    [InlineData("protected", Visibility.Protected)]
     [InlineData("priv", Visibility.Private)]
-    [InlineData("pri", Visibility.Private)]
-    [InlineData("private", Visibility.Private)]
     [InlineData("prot-int", Visibility.ProtectedInternal)]
-    [InlineData("protected-internal", Visibility.ProtectedInternal)]
     [InlineData("priv-prot", Visibility.PrivateProtected)]
-    [InlineData("private-protected", Visibility.PrivateProtected)]
     public void Parser_EveryValidVisibilityWord_ParsesToItsLevel(string word, Visibility expected)
     {
         var module = Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(e => e.Message)));
         Assert.Equal(expected, module.Classes.Single().Methods.Single().Visibility);
+    }
+
+    [Theory]
+    [InlineData("public")]
+    [InlineData("private")]
+    [InlineData("internal")]
+    [InlineData("protected")]
+    [InlineData("pri")]
+    [InlineData("pro")]
+    [InlineData("protected-internal")]
+    [InlineData("private-protected")]
+    [InlineData("PUB")]
+    [InlineData("Priv")]
+    public void Parser_VisibilitySynonymsAndCaseVariants_AreErrors(string word)
+    {
+        Parse($"§M{{m1:V}}\n  §CL{{c1:K:pub}}\n    §MT{{m2:A:{word}}} () -> i32\n      §R 1\n",
+            out var diagnostics);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownVisibility);
     }
 
     // Review round 1: compact headers must not swallow an unknown visibility word.
@@ -190,7 +200,7 @@ public class SilentAcceptanceLanguageTests
     [Fact]
     public void Emitter_ProtectedShortForm_EmitsProtectedNotPrivate()
     {
-        var result = Compile("§M{m1:V}\n  §CL{c1:K:pub}\n    §MT{m2:A:pro} () -> i32\n      §R 1\n");
+        var result = Compile("§M{m1:V}\n  §CL{c1:K:pub}\n    §MT{m2:A:prot} () -> i32\n      §R 1\n");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors.Select(e => e.Message)));
         Assert.Contains("protected int A()", result.GeneratedCode);

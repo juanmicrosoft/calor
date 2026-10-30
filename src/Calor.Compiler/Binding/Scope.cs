@@ -546,7 +546,7 @@ public static class TypeIdentity
         // No type at all is "nothing is known" and must stay silent.
         if (typeName is null) return false;
 
-        // A type position the author left BLANK (`§FLD{:c:pri}`) is different:
+        // A type position the author left BLANK (`§FLD{:c:priv}`) is different:
         // there is no type for a row to attach to, so the row is provably
         // misplaced. This is the R2-A case PR #1102's review round 2 added, and
         // it must keep reporting rather than fall through the fail-open rule.

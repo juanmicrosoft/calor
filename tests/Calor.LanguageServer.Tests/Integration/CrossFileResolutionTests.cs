@@ -289,7 +289,7 @@ public class CrossFileResolutionTests
             DocumentUri.From("file:///private.calr"),
             """
             §M{m001:Utils}
-              §F{f001:Hidden:pri} () -> i32
+              §F{f001:Hidden:priv} () -> i32
                 §R 1
             """);
         var use = """
@@ -345,7 +345,7 @@ public class CrossFileResolutionTests
         var source = """
             §M{m001:Main}
               §CL{c1:Worker:pub}
-                §MT{m1:Hidden:pri} () -> i32
+                §MT{m1:Hidden:priv} () -> i32
                   §R 1
               §F{f2:Run:pub} () -> i32
                 §R §C{Worker.Hidden} §/C
@@ -367,7 +367,7 @@ public class CrossFileResolutionTests
         var source = """
             §M{m001:Main}
               §CL{c1:Worker:pub}
-                §MT{m1:Hidden:pri} () -> i32
+                §MT{m1:Hidden:priv} () -> i32
                   §R 1
                 §MT{m2:Run:pub} () -> i32
                   §R §C{Hidden} §/C

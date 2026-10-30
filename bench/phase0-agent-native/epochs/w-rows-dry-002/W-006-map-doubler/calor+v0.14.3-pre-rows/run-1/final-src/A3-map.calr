@@ -25,7 +25,7 @@
     §R §C{Map} §A xs §A Announce §/C
 
   §CL{c001:Doubler:pub}
-    §FLD{Func<i32,i32>:stage:pri}
+    §FLD{Func<i32,i32>:stage:priv}
 
     §CTOR{ctor001:pub}
       §ASSIGN stage MapAfterModule.Double

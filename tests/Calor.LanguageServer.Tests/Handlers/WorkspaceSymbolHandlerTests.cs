@@ -56,9 +56,9 @@ public class WorkspaceSymbolHandlerTests
         var source = """
             §M{m001:TestModule}
               §CL{c001:PersonService}
-                §FLD{i32:dummy:pri}
+                §FLD{i32:dummy:priv}
               §CL{c002:OrderService}
-                §FLD{i32:dummy:pri}
+                §FLD{i32:dummy:priv}
             """;
 
         var workspace = CreateWorkspace(source);

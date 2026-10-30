@@ -86,7 +86,7 @@ public class StrictnessBatchTests
         // The delegate error must NOT hit same-module bare-name calls.
         var source = @"
 §M{m001:Test}
-  §F{f001:Helper:pri}
+  §F{f001:Helper:priv}
       §I{i32:x}
       §O{i32}
       §R (+ x 1)
@@ -954,7 +954,7 @@ var x = 1;
         var result = TestHarness.Compile("""
             §M{m001:M}
               §CL{c001:Holder:pub}
-                §FLD{Func<i32,i32>:cb:pri} §E{}
+                §FLD{Func<i32,i32>:cb:priv} §E{}
                 §MT{mt001:Set:pub} (Func<i32,i32>:src §E{cw}) -> void
                   §E{}
                   §ASSIGN cb src
@@ -1720,7 +1720,7 @@ var x = 1;
     private static string CallbackField(string bumpRow) => $$"""
         §M{m001:CallbackAfter}
           §CL{c001:Counter:pub}
-            §FLD{Action<i32>:onChange:pri} §E{cw}
+            §FLD{Action<i32>:onChange:priv} §E{cw}
             §MT{mt001:Bump:pub} (i32:n) -> void
               {{bumpRow}}
               §C{onChange} §A n §/C
@@ -2142,7 +2142,7 @@ var x = 1;
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
               §CL{c001:Holder:pub}
-                §FLD{Func<i32>:stage:pri} §E{cw}
+                §FLD{Func<i32>:stage:priv} §E{cw}
                 §MT{mt001:Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A this.stage §/C

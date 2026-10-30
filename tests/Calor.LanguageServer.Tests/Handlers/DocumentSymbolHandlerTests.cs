@@ -173,7 +173,7 @@ public class DocumentSymbolHandlerTests
               §F{f001:Helper}
                 §R 0
               §CL{c001:MyClass}
-                §FLD{i32:dummy:pri}
+                §FLD{i32:dummy:priv}
               §IFACE{i001:IMyInterface}
                 §MT{m001:Foo:pub}
                   §O{void}

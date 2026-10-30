@@ -1,10 +1,10 @@
 §M{m001:CallbackAfter}
   §CL{c001:Counter:pub}
-    §FLD{Action<i32>:onChange:pri} §E{cw}
-    §FLD{i32:total:pri} 0
+    §FLD{Action<i32>:onChange:priv} §E{cw}
+    §FLD{i32:total:priv} 0
     §CTOR{ctor002:pub}
       §ASSIGN onChange Emit
-    §MT{mt005:Emit:pri} (i32:value) -> void
+    §MT{mt005:Emit:priv} (i32:value) -> void
       §E{cw}
       §P value
     §MT{mt001:Bump:pub} (i32:n) -> void

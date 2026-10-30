@@ -70,7 +70,7 @@ public sealed class Issue785ClosureTests
             """
             §M{m1:Test}
               §CL{c1:Person:pub}
-                §FLD{str:_name:pri}
+                §FLD{str:_name:priv}
                 §CTOR{ctor1:pub}
                   §I{str:name}
                   §ASSIGN §THIS._name name

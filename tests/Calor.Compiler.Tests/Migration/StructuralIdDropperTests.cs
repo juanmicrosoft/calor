@@ -34,10 +34,10 @@ public class StructuralIdDropperTests
     [Fact]
     public void T_5_7_b_DropsFunctionIdKeepsNameAndVis()
     {
-        const string src = "§F{f_01j5x7abcdef01j5x7abcdef01:divide:i32:public}";
+        const string src = "§F{f_01j5x7abcdef01j5x7abcdef01:divide:i32:pub}";
         var (out_, removals) = Sut.Process(src, "f.calr");
 
-        Assert.Equal("§F{divide:i32:public}", out_);
+        Assert.Equal("§F{divide:i32:pub}", out_);
         Assert.Single(removals);
     }
 
@@ -66,7 +66,7 @@ public class StructuralIdDropperTests
     [Fact]
     public void T_5_7_e_RoundTripIsByteEqual()
     {
-        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n§F{f_01j5x7abcdef01j5x7abcdef01:add:i32:public}\n\n\n";
+        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n§F{f_01j5x7abcdef01j5x7abcdef01:add:i32:pub}\n\n\n";
         var (migrated, removals) = Sut.Process(src, "rt.calr");
 
         var originalBytes = Utf8.GetBytes(src);
@@ -102,10 +102,10 @@ public class StructuralIdDropperTests
     [Fact]
     public void HandlesMultipleSectionsOnSameLine()
     {
-        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:X} §F{f_01j5x7abcdef01j5x7abcdef01:y:i32:public}";
+        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:X} §F{f_01j5x7abcdef01j5x7abcdef01:y:i32:pub}";
         var (out_, removals) = Sut.Process(src, "m.calr");
 
-        Assert.Equal("§M{X} §F{y:i32:public}", out_);
+        Assert.Equal("§M{X} §F{y:i32:pub}", out_);
         Assert.Equal(2, removals.Count);
     }
 

@@ -1,5 +1,5 @@
 §M{m001:Billing}
-  §F{f001:NormalizeUsage:pri} (i32:units) -> i32
+  §F{f001:NormalizeUsage:priv} (i32:units) -> i32
     §E{}
     §S (>= result 0)
     §S (<= result 100000)

@@ -1081,7 +1081,7 @@ internal sealed class SnippetWrapper
         }
 
         // Function header
-        sb.AppendLine("§F{_:_validate_:pri}");
+        sb.AppendLine("§F{_:_validate_:priv}");
         currentLine++;
 
         // Parameters
