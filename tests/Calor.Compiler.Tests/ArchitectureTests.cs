@@ -314,7 +314,7 @@ public class ArchitectureTests
     {
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
-            "Migration/CSharpToCalorConverter.cs:ConvertWholeFileNamespaceInterop",
+            "Migration/CSharpToCalorConverter.cs:PreserveCompilationUnit",
             "Migration/CSharpToCalorConverter.cs:MemberParsesCleanly",
             "Migration/RoslynSyntaxVisitor.cs:Convert",
             "Parsing/Parser.cs:ParseModule",
