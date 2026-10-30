@@ -69,6 +69,7 @@ jobs:
             echo "::error::fonts.googleapis.com is still reachable; the offline-fonts check would prove nothing"; exit 1
           fi
       - run: npm run build
+      - run: npm run test:landing
       - name: Check the build serves only self-hosted fonts (#1548)
         run: python3 ../scripts/check_website_fonts.py --out out
       - run: npm run test:e2e
