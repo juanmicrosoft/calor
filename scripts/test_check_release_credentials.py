@@ -668,8 +668,8 @@ class CredentialCheckTests(unittest.TestCase):
         self.assertIn(guard, original)
         checkout = "      - name: Checkout the candidate\n"
         start = original.index(guard)
-        end = original.index(checkout)
-        later = "      - name: Download the release bundle\n"
+        end = original.index(checkout, start)
+        later = "      - name: Download and verify the approved immutable artifact\n"
         moved = original[:start] + original[end:].replace(later, original[start:end] + later, 1)
         for mutant in (original.replace(guard, guard + "        continue-on-error: true\n"),
                        original.replace(guard, guard + "        if: false\n"),

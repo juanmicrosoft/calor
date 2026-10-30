@@ -204,7 +204,7 @@ def bundle_problems(nuget_dir: Path, version: str) -> list[str]:
 
 
 BUNDLE_SUMS = "SHA256SUMS"
-BUNDLE_PATH_RE = re.compile(r"^(?:nupkg/[A-Za-z0-9._-]+\.nupkg|release-metadata/[A-Za-z0-9._-]+\.json|release-notes/notes\.md)$")
+BUNDLE_PATH_RE = re.compile(r"^(?:nupkg/[A-Za-z0-9._-]+\.nupkg|release-metadata/[A-Za-z0-9._-]+\.json|release-notes/notes\.md|site/site\.tar)$")
 
 
 def bundle_inventory_problems(root: Path, version: str, sums_sha256: str) -> list[str]:
@@ -272,6 +272,32 @@ def http_fetch(url: str, dest: Path) -> int:
             return response.status
     except urllib.error.HTTPError as error:
         return error.code
+
+
+def http_status(url: str) -> int:
+    request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "calor-release-checks"})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def unpublished_problems(version: str, status: Callable[[str], int] = http_status) -> list[str]:
+    """A fresh dispatch may not rebuild a version whose publication already started."""
+    problems = []
+    for package_id in PACKAGE_IDS:
+        try:
+            code = status(f"{REGISTRY}/{package_id}/{version}/{package_id}.{version}.nupkg")
+        except OSError as error:
+            problems.append(f"cannot check whether publication already started: {error}")
+            continue
+        if code == 200:
+            problems.append(f"{ALREADY_RELEASED}nuget.org has {package_id} {version}; "
+                            "rerun failed jobs of the original run, never rebuild this version")
+        elif code != 404:
+            problems.append(f"cannot check whether publication already started (HTTP {code})")
+    return problems
 
 
 def registry_problems(version: str, nuget_dir: Path, mode: str, work: Path, fetch: Fetch = http_fetch,
@@ -371,6 +397,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--repo", default=".")
     p.add_argument("--github-output", default=os.environ.get("GITHUB_OUTPUT"))
     p.add_argument("--dry-run", choices=("true", "false"), default="false")
+    p.add_argument("--require-unpublished", action="store_true")
     b = sub.add_parser("bundle")
     b.add_argument("--version", required=True)
     b.add_argument("--nuget-dir", required=True)
@@ -392,6 +419,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "preflight":
             problems, outputs = preflight(Path(args.repo), args.version)
+            if not problems and args.require_unpublished:
+                problems += unpublished_problems(args.version)
             dry = args.dry_run == "true"
             if outputs and all(dry and p.startswith(ALREADY_RELEASED) for p in problems):
                 for key, value in outputs.items():

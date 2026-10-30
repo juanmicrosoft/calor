@@ -83,6 +83,20 @@ class RegistryTests(unittest.TestCase):
     def test_absent_version_passes_the_existing_check(self) -> None:
         self.assertEqual([], self.check("existing", FakeRegistry({})))
 
+    def test_new_dispatch_refuses_any_started_publication(self) -> None:
+        self.assertEqual([], rc.unpublished_problems(VERSION, lambda _: 404))
+        for package_id in rc.PACKAGE_IDS:
+            found = rc.unpublished_problems(VERSION, lambda url: 200 if f"/{package_id}/" in url else 404)
+            self.assertEqual(1, len(found))
+            self.assertTrue(found[0].startswith(rc.ALREADY_RELEASED))
+        for code in (401, 403, 429, 500):
+            problems = rc.unpublished_problems(VERSION, lambda _: code)
+            self.assertEqual(2, len(problems))
+            self.assertTrue(all(not p.startswith(rc.ALREADY_RELEASED) for p in problems))
+        def disconnected(_):
+            raise OSError("network unavailable")
+        self.assertEqual(2, len(rc.unpublished_problems(VERSION, disconnected)))
+
     def test_same_package_with_a_repository_signature_passes(self) -> None:
         self.assertEqual([], self.check("existing", FakeRegistry(self.served())))
         self.assertEqual([], self.check("served", FakeRegistry(self.served())))
@@ -286,4 +300,7 @@ class PreflightTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    # Keep the new promotion boundary in both existing CI and release self-test entry points.
+    from test_release_promotion import PromotionTests
+
     unittest.main()
