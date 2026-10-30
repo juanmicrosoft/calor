@@ -132,7 +132,7 @@ public class IntegrationTests
   §F{f001:Echo:pub} (str:s) -> str
     §E{}
     §Q (== s STR:""abc"")
-    §S (! (Equals result STR:""ABC"" :ignore-case))
+    §S (! (equals result STR:""ABC"" :ignore-case))
     §R s";
 
         var result = Program.Compile(source, "test.calr", NoCache());
