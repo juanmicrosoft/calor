@@ -102,6 +102,8 @@ public sealed class WebsiteFeatureSupportParityTests
         ("guides/csharp-interoperability.mdx", "(fragments of the full output)", "the complete output, not a level"),
         ("syntax-reference/contracts.mdx", "seven explicit outcomes: `proven`, `refuted`,\n`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`",
             "proof statuses, not converter levels"),
+        ("cli/test.mdx", "Conditional proofs (`assumed`) and inconclusive results\n(`unknown`, `timeout`, `unsupported`, `unavailable`) remain failures.",
+            "validation proof statuses, not converter levels"),
         ("syntax-reference/structure-tags.mdx", "accept the full set\nof C# accessibility levels", "the whole set of accessibility levels, not a level"),
     ];
 
