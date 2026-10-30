@@ -39,11 +39,11 @@ namespace Calor.Compiler.Tests;
 /// recomputed here — reads that E2, E3 and E4 all shipped; the own-goal flag
 /// requires an <c>ownGoalArtifact</c> that exists.</para>
 ///
-/// <para>Regenerate with <c>CALOR_REGENERATE_PPE1_LEDGER=1 dotnet test
-/// --filter EffectRowsProbeLedger</c> — and only in the PR that names what
-/// moved. The failure message below says the same thing, because the one
-/// mistake A-1.11.1 was written to correct was a baseline quietly regenerated
-/// to whatever the compiler happened to emit.</para>
+/// <para>The exact historical pin runs the original test and compiler from the
+/// recorded commit in an isolated source archive. Current-compiler semantic
+/// replay uses separate active fixtures; it must never assemble translated
+/// measurements under the historical compiler identity. See
+/// <c>scripts/ppe1_historical_replay.py</c>. Regeneration is forbidden.</para>
 /// </summary>
 public sealed class EffectRowsProbeLedgerTests
 {
@@ -117,59 +117,25 @@ public sealed class EffectRowsProbeLedgerTests
     /// recorded (booleans re-derived), verdict derived — see the class summary.
     /// </summary>
     [Fact]
-    public void PpE1LedgerMatchesRecomputation()
+    [Trait("Category", "HistoricalReplay")]
+    public async Task PpE1LedgerMatchesRecomputation()
     {
-        var measurement = Measure();
-
-        if (Regenerate())
+        var start = new ProcessStartInfo("python3")
         {
-            // Recorded judgement fields survive a regeneration; a fresh ledger
-            // starts with none of them set.
-            var previous = File.Exists(LedgerPath())
-                ? JsonSerializer.Deserialize<PpE1Ledger>(File.ReadAllText(LedgerPath()), JsonOptions)
-                : null;
-            var regenerated = Assemble(measurement, HeadSha(), AnalysisPath(),
-                previous?.Routes.D.Fires ?? false, previous?.Routes.D.CutCitation,
-                previous?.Routes.OwnGoal ?? false, previous?.Routes.OwnGoalArtifact);
-            File.WriteAllText(LedgerPath(), Serialize(regenerated));
-            AssertRecordedFieldsAreNotFree(regenerated);
-            return;
-        }
-
-        Assert.True(File.Exists(LedgerPath()),
-            $"PP-E1 ledger missing: {LedgerPath()}. It is the instrument annex A-1.11 registers; "
-            + $"generate it in a PR that says so with {RegenerateEnvVar}=1.");
-
-        var actualText = File.ReadAllText(LedgerPath()).Replace("\r\n", "\n", StringComparison.Ordinal);
-        var recorded = JsonSerializer.Deserialize<PpE1Ledger>(actualText, JsonOptions);
-        Assert.NotNull(recorded);
-
-        AssertCommitSha(recorded!.MeasuredCommit);
-        var recomputed = Assemble(measurement, recorded.MeasuredCommit, AnalysisPath(),
-            recorded.Routes.D.Fires, recorded.Routes.D.CutCitation,
-            recorded.Routes.OwnGoal, recorded.Routes.OwnGoalArtifact);
-        var expectedText = Serialize(recomputed);
-
-        // The named cause first (review round 2, minor e): a leg-B boolean the
-        // numbers do not imply, or a free route (d), is what the adjudicator
-        // must read — not the generic first-differing-line diff.
-        AssertRecordedFieldsAreNotFree(recomputed);
-
-        var moved = DescribeWhatMoved(recorded, recomputed);
-        if (expectedText != actualText)
-        {
-            var (lineNumber, expectedLine, actualLine) = FirstDifferingLine(expectedText, actualText);
-            moved.Add($"first differing line {lineNumber}:\n      ledger:      {actualLine}\n      recomputed:  {expectedLine}");
-        }
-
-        Assert.True(moved.Count == 0,
-            "PP-E1's ledger (bench/phase0-agent-native/effect-rows-probe-ledger.json) no longer "
-            + "matches its recomputation. Something moved:\n  " + string.Join("\n  ", moved)
-            + "\nThis ledger is the instrument annex A-1.11 registers, adjudicated at the 0.15.0 "
-            + "release commit. Do NOT regenerate it silently: a cell that stopped detecting, a "
-            + "control that drew a new diagnostic, or a verdict that changed is a finding to be "
-            + "published with the change that caused it. Regenerate only in a PR that names what "
-            + $"moved and why ({RegenerateEnvVar}=1 dotnet test --filter EffectRowsProbeLedger).");
+            WorkingDirectory = RepoRoot(),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        start.ArgumentList.Add(Path.Combine(RepoRoot(), "scripts", "ppe1_historical_replay.py"));
+        using var process = Process.Start(start);
+        Assert.NotNull(process);
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.True(process.ExitCode == 0,
+            $"Pinned historical PP-E1 replay failed (exit {process.ExitCode}).\n"
+            + await stdout + "\n" + await stderr);
     }
 
     /// <summary>

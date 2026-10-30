@@ -17,7 +17,7 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 
 ### Run Tests Locally
 
-Three lanes, ordered fastest to slowest. See the [Corpus Submodules](#corpus-submodules-round-trip-harness)
+The lanes below separate current semantics from historical replay. See the [Corpus Submodules](#corpus-submodules-round-trip-harness)
 section below for **which** projects touch `bench/corpus/`.
 
 **First-time setup (once per clone).** `Calor.Verification.Tests` links
@@ -32,7 +32,7 @@ src/Calor.Compiler/scripts/download-z3.sh    # or .ps1 on Windows
 **Fast unit-test lane** (seconds; no submodules required):
 
 ```bash
-dotnet test tests/Calor.Compiler.Tests/     # lexer/parser/emitter/analysis
+dotnet test tests/Calor.Compiler.Tests/ --filter "Category!=HistoricalReplay"
 dotnet test tests/Calor.Conversion.Tests/   # C# → Calor snapshots
 dotnet test tests/Calor.Semantics.Tests/    # binding/semantic analysis
 dotnet test tests/Calor.Verification.Tests/ # Z3 contract verification
@@ -49,6 +49,32 @@ silently skip on a bare clone (it uses `Skip.IfNot` when `bench/corpus/`
 is empty); everything else runs green without submodules. To iterate on a
 single class, use the CLAUDE-standard filter:
 `dotnet test --filter "FullyQualifiedName~ClassName"`.
+
+**Historical PP-E1 exact replay** (separate from current-compiler semantics):
+
+```bash
+python3 scripts/test_ppe1_historical_replay.py
+python3 scripts/ppe1_historical_replay.py
+```
+
+Requires Python 3.12+, the .NET 10 SDK, verified Z3 assets from the setup above,
+NuGet restore access (or cached locked packages), and Git history containing
+`72d060f400b5787ba4ec11cb4dd8860c95173da3` (fetch full history on a shallow clone).
+The runner archives that recorded compiler commit into a disposable temporary
+directory, restores its locked dependencies, builds its original compiler and
+test, and requires exactly one passing exact-recomputation result. It checks the
+current frozen fixture, ramp and analysis bytes against that commit, and compares
+the final immutable release ledger without changing its `measuredCommit`.
+Historical demand evidence comes from the same pinned tree, not today's corpus.
+No existing compiler binary, active-syntax copy or regenerated ledger is accepted.
+Missing prerequisites, changed inputs, test failures and skipped/empty runs fail.
+
+The unfiltered compiler suite invokes this runner through
+`PpE1LedgerMatchesRecomputation`; the full compiler CI shards already fetch full
+history and bootstrap verified Z3. The fast command above explicitly excludes
+this historical category, so it is **not** a full compiler-suite result.
+Current-compiler semantic replay uses separate active-syntax fixtures and cannot
+replace this historical check. Neither command reruns paid epochs or token collection.
 
 **Full-corpus lane** (adds ~500 MB and a few minutes; needed to unskip
 `BinderIncompleteRatchetTests`):
