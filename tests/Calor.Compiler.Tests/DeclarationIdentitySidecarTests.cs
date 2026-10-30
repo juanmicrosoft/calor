@@ -101,6 +101,52 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void CompileRecoversItsOwnedStoreIncludingPendingNewRegistration(bool previouslyRegistered)
+    {
+        var file = Write("active.calr", Original);
+        Store.Sync(previouslyRegistered ? [file] : []);
+        var sidecar = File.ReadAllText(Store.SidecarPath);
+        var updated = Original.Replace("Add", "Sum");
+        var next = Store.Preview([new(file, Original, updated)]);
+        File.WriteAllText(file, updated);
+        File.WriteAllText(PathFor(".calor/ids.transaction.json"), JsonSerializer.Serialize(new
+        {
+            BeforeSidecar = sidecar, AfterSidecar = JsonSerializer.Serialize(next),
+            Changes = new[] { new DeclarationIdentityStore.SourceChange("active.calr", Original, updated) }
+        }));
+        var result = Program.Compile(File.ReadAllText(file), file);
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
+        Assert.Equal(updated, File.ReadAllText(file));
+        Assert.Equal(next.Declarations.Single(d => d.Kind == IdKind.Function).Id, result.Ast!.Functions.Single().Id);
+        Assert.Equal(next.Declarations, Store.Sync().Declarations);
+        Assert.False(File.Exists(PathFor(".calor/ids.transaction.json")));
+    }
+
+    [Fact]
+    public void CompileDoesNotRecoverUnrelatedAncestorTransactions()
+    {
+        var unrelated = Write("unrelated.calr", Original);
+        Store.Sync([unrelated]);
+        var ancestor = File.ReadAllText(Store.SidecarPath);
+        var journal = JsonSerializer.Serialize(new
+        {
+            BeforeSidecar = ancestor, AfterSidecar = ancestor,
+            Changes = new[] { new DeclarationIdentityStore.SourceChange("unrelated.calr", Original, Original + "\n") }
+        });
+        File.WriteAllText(PathFor(".calor/ids.transaction.json"), journal);
+        Write("project/project.csproj", "<Project />");
+        var active = Write("project/A.calr", Original.Replace("Demo", "NewProject"));
+        var result = Program.Compile(File.ReadAllText(active), active);
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
+        Assert.Equal(Original, File.ReadAllText(unrelated));
+        Assert.Equal(ancestor, File.ReadAllText(Store.SidecarPath));
+        Assert.Equal(journal, File.ReadAllText(PathFor(".calor/ids.transaction.json")));
+        Assert.False(File.Exists(PathFor("project/.calor/ids.json")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void TextClassRenamePreservesSelfTypedMemberIdentity(bool canonicalSourceId)
     {
         var methodId = canonicalSourceId ? CompactIdGenerator.Generate(IdKind.Method) + ":" : "";

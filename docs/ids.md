@@ -18,6 +18,8 @@ Building one registered file or adding a migration output in a subdirectory
 reuses its owning project sidecar rather than creating a shadow store.
 Unregistered inputs do not adopt a store above a nearer project boundary or
 an ambient temporary, home or filesystem root.
+Compile-time recovery requires a confirmed registration in the current or
+pending sidecar; merely finding an ancestor store never recovers its journal.
 
 For tooling integration and recovery, use:
 

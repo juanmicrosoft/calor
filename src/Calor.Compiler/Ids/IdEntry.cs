@@ -96,9 +96,7 @@ public sealed class DeclarationIdentityStore
     {
         var store = Find(file);
         if (store == null) return null;
-        using (var gate = store.Acquire())
-            if (store.Read(resolveMerge: true).Files.Contains(store.Relative(file), StringComparer.Ordinal))
-                return store;
+        if (store.IncludesRegistration(file)) return store;
         if (projectRoot != null)
         {
             var relative = Path.GetRelativePath(Path.GetFullPath(projectRoot), store.Root);
@@ -130,7 +128,10 @@ public sealed class DeclarationIdentityStore
         file = Path.GetFullPath(file);
         var store = Find(file);
         if (store == null) return;
-        try { store.Attach(file, source, module); }
+        try
+        {
+            if (store.IncludesRegistration(file)) store.Attach(file, source, module);
+        }
         catch (DeclarationIdentityParseException) { throw; }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException)
         {
@@ -142,7 +143,7 @@ public sealed class DeclarationIdentityStore
     {
         if (file == null || !file.EndsWith(".calr", StringComparison.Ordinal) || !Path.IsPathFullyQualified(file)) return;
         var store = Find(file);
-        if (store == null) return;
+        if (store == null || !store.IncludesRegistration(file)) return;
         store.Recover();
         if (store.IsRegistered(file)) store.Sync();
     }
@@ -209,6 +210,14 @@ public sealed class DeclarationIdentityStore
         if (File.Exists(JournalPath))
             throw new IOException("Incomplete identity transaction; run calor ids sync to recover.");
         return Read().Files.Contains(Relative(file), StringComparer.Ordinal);
+    }
+
+    private bool IncludesRegistration(string file)
+    {
+        using var gate = Acquire();
+        var relative = Relative(file);
+        if (Read(resolveMerge: true).Files.Contains(relative, StringComparer.Ordinal)) return true;
+        return File.Exists(JournalPath) && ReadTransaction().Next.Files.Contains(relative, StringComparer.Ordinal);
     }
 
     private string Relative(string file)
@@ -438,11 +447,7 @@ public sealed class DeclarationIdentityStore
     private void RecoverCore()
     {
         if (!File.Exists(JournalPath)) return;
-        var journal = JsonSerializer.Deserialize<Journal>(File.ReadAllText(JournalPath), JsonOptions)
-            ?? throw new InvalidDataException("Empty identity transaction.");
-        var next = JsonSerializer.Deserialize<State>(journal.AfterSidecar, JsonOptions)
-            ?? throw new InvalidDataException("Empty transaction sidecar.");
-        ValidateState(next);
+        var (journal, _) = ReadTransaction();
         if (journal.Changes.Select(c => c.File).Distinct(StringComparer.Ordinal).Count() != journal.Changes.Count)
             throw new InvalidDataException("Duplicate source change in identity transaction.");
         var sidecar = File.Exists(SidecarPath) ? File.ReadAllText(SidecarPath) : null;
@@ -462,6 +467,16 @@ public sealed class DeclarationIdentityStore
             Write(ValidatePath(change.File), change.After);
         Write(SidecarPath, journal.AfterSidecar);
         File.Delete(JournalPath);
+    }
+
+    private (Journal Journal, State Next) ReadTransaction()
+    {
+        var journal = JsonSerializer.Deserialize<Journal>(File.ReadAllText(JournalPath), JsonOptions)
+            ?? throw new InvalidDataException("Empty identity transaction.");
+        var next = JsonSerializer.Deserialize<State>(journal.AfterSidecar, JsonOptions)
+            ?? throw new InvalidDataException("Empty transaction sidecar.");
+        ValidateState(next);
+        return (journal, next);
     }
 
     private void Commit(State next, IReadOnlyList<SourceChange> changes, string? before)
