@@ -150,6 +150,9 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        precondition = new RequiresNode(precondition.Span,
+            translator.NormalizeBclExpression(precondition.Condition), precondition.Message, precondition.Attributes);
+
         // Positive-whitelist gate (guarantees plan D-G2.3): unsupported is decided by
         // ModeledForms, not by whichever translator branch happens to return null.
         if (!ModeledForms.TryValidate(precondition.Condition, out var preOffending))
@@ -183,6 +186,8 @@ public sealed class Z3Verifier : IDisposable
         {
             using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(preconditionExpr);
+            foreach (var binding in translator.BindingConstraints)
+                solver.Assert(binding);
 
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
@@ -279,6 +284,13 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        preconditions = preconditions.Select(pre => new RequiresNode(pre.Span,
+            translator.NormalizeBclExpression(pre.Condition), pre.Message, pre.Attributes)).ToArray();
+        postcondition = new EnsuresNode(postcondition.Span,
+            translator.NormalizeBclExpression(postcondition.Condition), postcondition.Message, postcondition.Attributes);
+        if (body != null)
+            body = translator.NormalizeBclBody(body);
+
         // Positive-whitelist gate over every contract expression in this obligation
         // (guarantees plan D-G2.3).
         foreach (var contractExpr in preconditions.Select(p => p.Condition).Append(postcondition.Condition))
@@ -327,6 +339,8 @@ public sealed class Z3Verifier : IDisposable
             try
             {
                 using var preSolver = new IsolatedSolver(_ctx, _timeoutMs);
+                foreach (var binding in translator.BindingConstraints)
+                    preSolver.Assert(binding);
                 foreach (var preExpr in preconditionExprs)
                 {
                     preSolver.Assert(preExpr);

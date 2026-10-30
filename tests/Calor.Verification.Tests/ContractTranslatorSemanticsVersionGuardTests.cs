@@ -39,9 +39,9 @@ public class ContractTranslatorSemanticsVersionGuardTests
     //   2. If it IS intentional, bump ContractTranslator.SemanticsVersion (so old
     //      on-disk cache entries are invalidated) AND replace the two constants
     //      below with the reported new values, in the SAME commit.
-    private const string ExpectedSemanticsVersion = "z3-executable-semantics-v2";
+    private const string ExpectedSemanticsVersion = "z3-executable-semantics-v3";
     private const string ExpectedFixtureHash =
-        "95e8039c7ea350581bc5c32b530d75576ae296c26850eec2056235d6847f0d86";
+        "f58ee927a0ae8fa8fe5bf2af5dbf0ea78b989ca4264fc055bc027f583b51628a";
 
     [SkippableFact]
     public void TranslatorOutputMatchesCommittedBaseline()
@@ -137,6 +137,22 @@ public class ContractTranslatorSemanticsVersionGuardTests
     /// </summary>
     private static readonly IReadOnlyList<Fixture> Fixtures = new[]
     {
+        new Fixture("bcl_contains", t =>
+        {
+            t.DeclareVariable("s", "str");
+            return Render(t.Translate(new CallExpressionNode(TextSpan.Empty, "s.Contains",
+                [new StringLiteralNode(TextSpan.Empty, "a")])));
+        }),
+        new Fixture("bcl_array_length", t =>
+        {
+            t.DeclareVariable("a", "i32[]");
+            return Render(t.Translate(new ReferenceNode(TextSpan.Empty, "a.Length")));
+        }),
+        new Fixture("bcl_list_count", t =>
+        {
+            t.DeclareVariable("items", "List<i32>");
+            return Render(t.Translate(new ReferenceNode(TextSpan.Empty, "items.Count")));
+        }),
         // 1. Simple integer postcondition: result == a + b
         new Fixture("post_add_i32", t =>
         {

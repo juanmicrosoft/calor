@@ -1,5 +1,7 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.TypeChecking;
@@ -14,6 +16,8 @@ namespace Calor.Compiler.Verification;
 public sealed class ContractVerifier
 {
     private readonly DiagnosticBag _diagnostics;
+    private readonly Binder _contractBinder = new(new DiagnosticBag());
+    private IReadOnlyList<(string Name, string Type)> _contractVariables = [];
 
     public ContractVerifier(DiagnosticBag diagnostics)
     {
@@ -47,6 +51,8 @@ public sealed class ContractVerifier
     /// </summary>
     public void VerifyFunction(FunctionNode function)
     {
+        _contractVariables = function.Parameters.Select(parameter => (parameter.Name, parameter.TypeName))
+            .Concat(function.Output == null ? [] : new[] { ("result", function.Output.TypeName) }).ToArray();
         // Verify preconditions
         foreach (var requires in function.Preconditions)
         {
@@ -218,6 +224,7 @@ public sealed class ContractVerifier
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
+            CallExpressionNode call => InferBclCallType(call),
             CharOperationNode operation => operation.Operation switch
             {
                 CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
@@ -231,6 +238,31 @@ public sealed class ContractVerifier
             ExistsExpressionNode => PrimitiveType.Bool,
             ImplicationExpressionNode => PrimitiveType.Bool,
             ReferenceNode => null, // Would need symbol table to determine
+            _ => null
+        };
+    }
+
+    private CalorType? InferBclCallType(CallExpressionNode call)
+    {
+        var dot = call.Target.LastIndexOf('.');
+        if (dot <= 0)
+            return null;
+        var receiver = _contractBinder.BindVerificationReceiver(
+            new ReferenceNode(call.Span, call.Target[..dot]), _contractVariables);
+        if (receiver.Type is not NominalBoundType
+            { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String })
+            return null;
+        var comparison = call.Arguments.LastOrDefault() is ReferenceNode reference
+            && reference.Name.StartsWith("StringComparison.", StringComparison.Ordinal)
+            || call.Arguments.LastOrDefault() is ReferenceNode fullReference
+            && fullReference.Name.StartsWith("System.StringComparison.", StringComparison.Ordinal);
+        var method = _contractBinder.ResolveVerificationStringCall(
+            call, receiver is BoundTypeReferenceExpression, comparison, _contractVariables);
+        return method?.ReturnType.SpecialType switch
+        {
+            Microsoft.CodeAnalysis.SpecialType.System_Boolean => PrimitiveType.Bool,
+            Microsoft.CodeAnalysis.SpecialType.System_Int32 => PrimitiveType.Int,
+            Microsoft.CodeAnalysis.SpecialType.System_String => PrimitiveType.String,
             _ => null
         };
     }
@@ -282,9 +314,27 @@ public sealed class ContractVerifier
     {
         if (expr is ReferenceNode reference)
         {
-            if (!boundVariables.Contains(reference.Name))
-                references.Add(reference.Name);
+            var root = reference.Name.Split('.')[0];
+            if (reference.Name.Contains('.')
+                && (root is "StringComparison" || reference.Name.StartsWith("System.StringComparison.", StringComparison.Ordinal))
+                && !_contractVariables.Any(variable => variable.Name == root))
+                return;
+            if (!boundVariables.Contains(root))
+                references.Add(root);
             return;
+        }
+
+        if (expr is CallExpressionNode call)
+        {
+            var dot = call.Target.LastIndexOf('.');
+            if (dot > 0)
+            {
+                var name = call.Target[..dot];
+                var receiver = _contractBinder.BindVerificationReceiver(
+                    new ReferenceNode(call.Span, name), _contractVariables);
+                if (receiver is not BoundTypeReferenceExpression)
+                    CollectReferencesInternal(new ReferenceNode(call.Span, name), references, boundVariables);
+            }
         }
 
         if (expr is ForallExpressionNode forall)

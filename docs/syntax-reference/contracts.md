@@ -105,6 +105,37 @@ In postconditions, `result` refers to the return value:
 
 ## Contract Patterns
 
+### Typed .NET calls in verified contracts
+
+The verifier recognizes ordinary .NET string calls through the existing call AST.
+For example, the current syntax accepts:
+
+```
+§Q §C{s.Contains} §A "b" §/C
+§S (== result §C{s.StartsWith} §A "a" §A System.StringComparison.Ordinal §/C)
+```
+
+Receiver identities come from the binder. String overloads must resolve against
+.NET metadata with exact parameter types. Supported calls are `s.Contains(value)`,
+`s.Equals(value)`, `s.Substring(start[, count])`, `string.IsNullOrEmpty(s)`,
+`string.Equals(a, b)`, and `string.Concat` with two to four string arguments.
+`StartsWith`, `EndsWith` and `IndexOf` require an explicit
+`StringComparison.Ordinal`; the ordinal overloads of `Contains` and `Equals`
+are also supported. Culture-sensitive, named, by-reference, generic and other
+overloads remain unverifiable, with runtime checks retained.
+
+`s.Length`, `array.Length` and `List<T>.Count` are recognized through receiver
+types, including inside integer quantifiers. Their results are signed `int`
+values bounded between zero and `Int32.MaxValue`. Lists use a count function
+on their reference sort; list element access is not added. The legacy length
+nodes retain their existing unsigned model.
+
+These forms lower to existing verifier operations before the whitelist is
+applied. String/reference assumptions, substring range conditions, result binding
+and conditional-position refusals are unchanged. Lowering affects verification
+only, not the executable AST, effects or evaluation order. This adds no grammar
+for computed callees or indexed assignment.
+
 ### Range Validation
 
 ```

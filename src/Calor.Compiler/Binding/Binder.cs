@@ -3147,6 +3147,79 @@ public sealed class Binder
         return bound;
     }
 
+    internal BoundExpression BindVerificationReceiver(
+        ExpressionNode receiver, IEnumerable<(string Name, string Type)> variables)
+    {
+        using var scope = PushVerificationScope(variables, receiver.Span);
+        if (receiver is ReferenceNode reference && GetOrCreateMetadataBinder() is { } metadata)
+        {
+            if (_scope.Lookup(reference.Name) is VariableSymbol variable
+                && ResolveVerificationType(metadata.Context, variable.TypeName) is { } variableType)
+                return new BoundVariableExpression(receiver.Span, variable,
+                    typeOverride: Metadata.MetadataBinderResult.ToBoundType(variableType));
+            if (_scope.Lookup(reference.Name) is null
+                && ResolveVerificationType(metadata.Context, reference.Name) is { } staticType)
+                return new BoundTypeReferenceExpression(receiver.Span, reference.Name,
+                    Metadata.MetadataBinderResult.ToNominalBoundType(staticType));
+        }
+        return TryBindMetadataTypeReceiver(receiver) ?? BindExpression(receiver);
+    }
+
+    private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveVerificationType(
+        Metadata.MetadataContext context, string typeName)
+    {
+        var open = typeName.IndexOf('<');
+        if (open > 0 && typeName.EndsWith('>')
+            && typeName[..open] is "List" or "System.Collections.Generic.List"
+            && ResolveBclArgumentType(context, typeName[(open + 1)..^1]) is { } element
+            && context.TryResolveType("System.Collections.Generic.List`1") is { } list)
+            return list.Construct(element);
+        return ResolveBclArgumentType(context, typeName);
+    }
+
+    private IDisposable PushVerificationScope(
+        IEnumerable<(string Name, string Type)> variables, Parsing.TextSpan span)
+    {
+        var scope = PushScope(_scope.CreateChild());
+        foreach (var (name, type) in variables)
+            _scope.TryDeclare(new VariableSymbol(
+                SymbolId.Create("verification", name), name, type,
+                isMutable: false, isParameter: true, ParameterModifier.None, span)
+            {
+                MethodInputArrayType = TryBuildMethodInputArrayType(type, out var array) ? array : null,
+                GenericNullabilityType = TryParseGenericStringTarget(type, out var generic) ? generic : null
+            });
+        return scope;
+    }
+
+    internal Microsoft.CodeAnalysis.IMethodSymbol? ResolveVerificationStringCall(
+        CallExpressionNode call, bool isStatic, bool ordinal,
+        IEnumerable<(string Name, string Type)> variables)
+    {
+        using var scope = PushVerificationScope(variables, call.Span);
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata?.Context.TryResolveType("System.String") is not { } receiver)
+            return null;
+        var args = new List<Metadata.MetadataArgument>();
+        for (var index = 0; index < call.Arguments.Count; index++)
+        {
+            var type = ordinal && index == call.Arguments.Count - 1
+                ? metadata.Context.TryResolveType("System.StringComparison")
+                : ResolveBclArgumentType(metadata.Context, BindExpression(call.Arguments[index]).Type.DisplayString);
+            if (type is null)
+                return null;
+            args.Add(new Metadata.MetadataArgument(type));
+        }
+        var resolution = metadata.ResolveCall(receiver, call.Target[(call.Target.LastIndexOf('.') + 1)..], args);
+        if (!resolution.IsResolved || resolution.Symbol is not { } method
+            || method.IsStatic != isStatic || method.Parameters.Length != args.Count
+            || method.ContainingType.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            || method.Parameters.Where((parameter, index) =>
+                !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(parameter.Type, args[index].Type)).Any())
+            return null;
+        return method;
+    }
+
     private BoundExpression BindIntLiteral(IntLiteralNode literal)
     {
         var typeName = literal.IsUnsigned
