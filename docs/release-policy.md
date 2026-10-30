@@ -97,6 +97,7 @@ nothing. Benchmark publication remains a separate explicit dispatch.
 
 ### Timing evidence and estimate
 
+<!-- drift:ignore -->
 The v0.29.0 baseline is historical GitHub API evidence, read on 2026-10-30:
 
 | Existing run | Elapsed minutes | Sum of job-minutes |
