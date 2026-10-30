@@ -442,7 +442,7 @@
         },
         {
           "name": "ref-parameter",
-          "description": "ref parameters and ref arguments convert natively (\u00A7A{ref}) and pass the caller\u0027s storage, never a copy. Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, by-reference delegates, constructor and indexer arguments, and method-generic by-reference parameters are preserved as C#",
+          "description": "ref parameters and ref arguments convert natively (\u00A7A{ref}) and pass the caller\u0027s storage, never a copy. Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, by-reference delegates, constructor and indexer arguments, and method-generic out/in or nullable-type-parameter ref declarations are preserved as C#. Plain ref T method parameters use the same native storage-preserving form",
           "workaround": "Keep the preserved member as C# interop; no tuple or wrapper form is equivalent"
         },
         {
@@ -743,8 +743,8 @@
         },
         {
           "name": "unsupported-prefix-operator",
-          "description": "Prefix unary operator (e.g. unary \u002B) has no Calor node; the containing member is preserved as \u00A7CSHARP interop (never substituted with negation)",
-          "workaround": "Drop the redundant unary \u002B or keep the member as \u00A7CSHARP interop"
+          "description": "Built-in numeric unary \u002B converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary \u002B is preserved as \u00A7CSHARP interop (never dropped or substituted with negation)",
+          "workaround": "Keep user-defined or unresolved unary \u002B as C# interop"
         },
         {
           "name": "unsupported-slice-subpattern",
