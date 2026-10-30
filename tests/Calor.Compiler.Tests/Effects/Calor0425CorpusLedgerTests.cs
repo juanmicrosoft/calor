@@ -325,6 +325,7 @@ public class Calor0425CorpusLedgerTests
     /// the two legs differ ONLY in what runs after it: in-process
     /// <c>EffectEnforcementPass</c> versus the shipping CLI, which additionally
     /// runs the documented CLI-only passes (<c>Program.cs:760-808</c>).
+    /// Each unrelated module gets its own input directory and identity store.
     /// </summary>
     private static CliCrossCheckSubject MeasureCliSubject(string root, string subject)
     {
@@ -352,9 +353,7 @@ public class Calor0425CorpusLedgerTests
                     continue;
                 }
 
-                var modulePath = Path.Combine(scratch, "m.calr");
-                File.WriteAllText(modulePath, calor);
-                var output = RunCli(cli, scratch);
+                var output = RunCliModule(cli, scratch, calor);
                 var codes = output.Diagnostics.Select(d => d.Code).ToHashSet(StringComparer.Ordinal);
 
                 var sites = output.Diagnostics.Count(d => d.Code == "Calor0425");
@@ -473,6 +472,94 @@ public class Calor0425CorpusLedgerTests
         Assert.Equal("clean", CliDisposition(ParseCliProbe(Output(code, "info"), noisyStderr, 0)));
         Assert.Throws<InvalidDataException>(() => ParseCliProbe(Output(code, "warning"), noisyStderr, 1));
         Assert.Throws<InvalidDataException>(() => ParseCliProbe(Output(code, "error"), noisyStderr, 0));
+    }
+
+    private const string FirstCliModule = """
+        §M{Probe}
+          §F{First:pub} (i32:x) -> i32
+            §E{}
+            §R x
+          §F{Second:pub} (i32:x) -> i32
+            §E{}
+            §R x
+        """;
+
+    private static string NextCliModule => FirstCliModule.Replace("First", "Third").Replace("Second", "Fourth");
+
+    [Fact]
+    public void CliModules_PooledInputRejectsAmbiguousPreviousModuleIdentity()
+    {
+        var scratch = Path.Combine(Path.GetTempPath(), "calor-cli-pooled-control-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        try
+        {
+            var store = new Compiler.Ids.DeclarationIdentityStore(scratch);
+            store.Sync([]);
+            var modulePath = Path.Combine(scratch, "m.calr");
+            var cli = Path.Combine(RepoRoot(), "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+            File.WriteAllText(modulePath, FirstCliModule);
+            Assert.Equal("clean", CliDisposition(RunCli(cli, scratch)));
+            var sidecar = File.ReadAllBytes(store.SidecarPath);
+
+            File.WriteAllText(modulePath, NextCliModule);
+            var pooled = RunCli(cli, scratch);
+            Assert.NotEqual(0, pooled.ExitCode);
+            Assert.Contains(pooled.Diagnostics, diagnostic => diagnostic is ("Calor1312", "error"));
+            Assert.Equal("other", CliDisposition(pooled));
+            Assert.Equal(sidecar, File.ReadAllBytes(store.SidecarPath));
+            Assert.Equal(NextCliModule, File.ReadAllText(modulePath));
+        }
+        finally
+        {
+            Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CliModules_IndependentInputsPreserveBytesAndSeparateIdentityStores()
+    {
+        var scratch = Path.Combine(Path.GetTempPath(), "calor-cli-isolated-control-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        try
+        {
+            var cli = Path.Combine(RepoRoot(), "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+            var sources = new[] { FirstCliModule, NextCliModule, FirstCliModule.Replace("\n", "\r\n") + "\r\n" };
+            foreach (var source in sources)
+                Assert.Equal("clean", CliDisposition(RunCliModule(cli, scratch, source)));
+
+            Assert.False(Directory.Exists(Path.Combine(scratch, ".calor")));
+            var directories = Directory.GetDirectories(scratch);
+            Assert.Equal(sources.Length, directories.Length);
+            var measuredSources = new List<string>();
+            foreach (var directory in directories)
+            {
+                var modulePath = Path.Combine(directory, "m.calr");
+                var source = File.ReadAllText(modulePath);
+                measuredSources.Add(source);
+                Assert.Equal(System.Text.Encoding.UTF8.GetBytes(source), File.ReadAllBytes(modulePath));
+                var store = new Compiler.Ids.DeclarationIdentityStore(directory);
+                var state = store.Sync();
+                Assert.Equal(["m.calr"], state.Files);
+                Assert.Equal(source == NextCliModule ? ["Fourth", "Third"] : ["First", "Second"],
+                    state.Declarations.Where(d => d.Kind == Compiler.Ids.IdKind.Function)
+                        .Select(d => d.Name).Order(StringComparer.Ordinal).ToArray());
+            }
+            Assert.Equal(sources.Order(StringComparer.Ordinal), measuredSources.Order(StringComparer.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    private static CliProbe RunCliModule(string cliDll, string scratch, string calor)
+    {
+        var directory = Path.Combine(scratch, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        // Establish ownership without enrolling or parsing the measured input.
+        new Compiler.Ids.DeclarationIdentityStore(directory).Sync([]);
+        File.WriteAllText(Path.Combine(directory, "m.calr"), calor);
+        return RunCli(cliDll, directory);
     }
 
     private static CliProbe RunCli(string cliDll, string workingDirectory)
