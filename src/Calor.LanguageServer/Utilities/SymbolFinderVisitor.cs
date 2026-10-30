@@ -746,7 +746,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitForStatement(ForStatementNode forStmt)
     {
-        PushScope(ScopeKind.Loop, forStmt.Id);
+        PushScope(ScopeKind.Loop, forStmt.Span);
 
         // For loop variable
         AddToScope(forStmt.VariableName, "loop variable", "i32", forStmt.Span, forStmt);
@@ -774,7 +774,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitWhileStatement(WhileStatementNode whileStmt)
     {
-        PushScope(ScopeKind.Loop, whileStmt.Id);
+        PushScope(ScopeKind.Loop, whileStmt.Span);
 
         if (SpanContainsOffset(whileStmt.Condition.Span))
         {
@@ -790,7 +790,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitDoWhileStatement(DoWhileStatementNode doWhileStmt)
     {
-        PushScope(ScopeKind.Loop, doWhileStmt.Id);
+        PushScope(ScopeKind.Loop, doWhileStmt.Span);
 
         if (SpanContainsOffset(doWhileStmt.Condition.Span))
         {
@@ -912,7 +912,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitForeachStatement(ForeachStatementNode foreachStmt)
     {
-        PushScope(ScopeKind.Loop, foreachStmt.Id);
+        PushScope(ScopeKind.Loop, foreachStmt.Span);
 
         AddToScope(foreachStmt.VariableName, "iteration variable",
             foreachStmt.VariableType, foreachStmt.Span, foreachStmt);
@@ -1038,7 +1038,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitDictionaryForeach(DictionaryForeachNode dictForeach)
     {
-        PushScope(ScopeKind.Loop, dictForeach.Id);
+        PushScope(ScopeKind.Loop, dictForeach.Span);
 
         AddToScope(dictForeach.KeyName, "key variable", null, dictForeach.Span, dictForeach);
         AddToScope(dictForeach.ValueName, "value variable", null, dictForeach.Span, dictForeach);
@@ -1685,6 +1685,11 @@ public sealed class SymbolFinderVisitor
     private void PushScope(ScopeKind kind, string name)
     {
         _scopeStack.Add(new ScopeInfo(kind, name));
+    }
+
+    private void PushScope(ScopeKind kind, TextSpan span)
+    {
+        PushScope(kind, $"{span.Start}:{span.Length}");
     }
 
     private void PopScope()

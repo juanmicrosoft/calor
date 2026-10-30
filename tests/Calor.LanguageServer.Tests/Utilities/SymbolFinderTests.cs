@@ -8,6 +8,35 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class SymbolFinderTests
 {
+    [Theory]
+    [InlineData("§L{same:item:0:1:1}", "§L{same:item:2:3:1}")]
+    [InlineData("§EACH{same:item:i32} items", "§EACH{same:item:i32} items")]
+    [InlineData("§WH{same} BOOL:false", "§WH{same} BOOL:false")]
+    public void Visitor_LoopScopesDoNotDependOnStatementIds(string firstHeader, string secondHeader)
+    {
+        var source = $$"""
+            §M{m1:Test}
+              §F{f1:Probe:pub} ([i32]:items) -> void
+                {{firstHeader}}
+                  §B{local:i32} 1
+                  §P local
+                {{secondHeader}}
+                  §B{local:i32} 2
+                  §P local
+            """;
+        var ast = LspTestHarness.GetAst(source);
+        Assert.NotNull(ast);
+        var firstOffset = source.IndexOf("§P local", StringComparison.Ordinal) + "§P ".Length;
+        var secondOffset = source.LastIndexOf("§P local", StringComparison.Ordinal) + "§P ".Length;
+        var first = new SymbolFinderVisitor(firstOffset, source).FindSymbol(ast);
+        var second = new SymbolFinderVisitor(secondOffset, source).FindSymbol(ast);
+
+        Assert.Equal("local", first?.Name);
+        Assert.Equal("local", second?.Name);
+        Assert.NotEqual(first!.Span, second!.Span);
+        Assert.NotSame(first.Node, second.Node);
+    }
+
     [Fact]
     public void FindBoundReferences_SameNameSymbolsRemainSeparatedBySymbolId()
     {
