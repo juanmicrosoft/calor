@@ -267,6 +267,25 @@ public class ExtendedFeaturesTests
 
     #region Phase 4: Future Extensions - Properties (§PT)
 
+    [Theory]
+    [InlineData("forall", false)]
+    [InlineData("Forall", true)]
+    [InlineData("FORALL", true)]
+    public void PropertyQuantifier_RequiresExactCase(string quantifier, bool hasError)
+    {
+        var module = Parse($$"""
+            §M{m1:Properties}
+              §F{f1:Check:pub} (i32:x, i32:y) -> bool
+                §PT {{quantifier}} x,y: (== x y)
+                §R true
+            """, out var diagnostics);
+        Assert.Equal(hasError, diagnostics.HasErrors);
+        if (!hasError)
+            Assert.Equal(new[] { "x", "y" }, module.Functions.Single().Properties.Single().Quantifiers);
+        else
+            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Message.Contains("Use 'forall'"));
+    }
+
     [Fact]
     public void Lexer_RecognizesPropertyKeyword()
     {

@@ -10,6 +10,28 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ExceptionHandlingTests
 {
+    [Theory]
+    [InlineData("§WHEN", false)]
+    [InlineData("when", true)]
+    [InlineData("WhEn", true)]
+    [InlineData("WHEN", true)]
+    public void CatchFilter_RequiresCanonicalMarker(string marker, bool hasError)
+    {
+        var source = $$"""
+            §M{m1:Filters}
+              §F{f1:Run:pub} () -> void
+                §TR{t1}
+                  §TH §NEW{Exception} §/NEW
+                §CA{Exception:e} {{marker}} true
+                  §P "caught"
+            """;
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Equal(hasError, diagnostics.HasErrors);
+        if (hasError)
+            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Message.Contains("Use §WHEN"));
+    }
+
     #region Code Generation Tests
 
     [Fact]

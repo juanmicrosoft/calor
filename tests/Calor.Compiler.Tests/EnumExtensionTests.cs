@@ -466,23 +466,23 @@ public class EnumExtensionTests
         Assert.Empty(module.EnumExtensions[0].Methods);
     }
 
-    [Fact]
-    public void Parser_EnumExtension_CaseInsensitiveEnumTypeMatch()
+    [Theory]
+    [InlineData("Color", false)]
+    [InlineData("color", true)]
+    public void Parser_EnumExtension_RequiresExactEnumTypeMatch(string parameterType, bool hasError)
     {
-        // Type matching should be case-insensitive
-        var source = """
+        var source = $$"""
             §M{m001:Test}
               §EEXT{ext001:Color}
                 §F{f001:ToHex:pub}
-                    §I{color:self}
+                    §I{{{parameterType}}:self}
                     §O{str}
                     §R "hex"
               §/EEXT{ext001}
             """;
         var module = Parse(source, out var diagnostics);
 
-        // Should not have missing extension self error due to case-insensitive match
-        Assert.DoesNotContain(diagnostics.Errors, e => e.Code == DiagnosticCode.MissingExtensionSelf);
+        Assert.Equal(hasError, diagnostics.Errors.Any(e => e.Code == DiagnosticCode.MissingExtensionSelf));
     }
 
     #endregion

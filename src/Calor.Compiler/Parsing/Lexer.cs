@@ -2222,19 +2222,37 @@ public sealed class Lexer
         {
             var upperText = text.ToUpperInvariant();
             var lookahead = Peek(1);
+            var suffix = _source.AsSpan(_position + 1);
+            var looksLikeLiteral = upperText switch
+            {
+                "STR" => lookahead == '"',
+                "BOOL" => suffix.StartsWith("true", StringComparison.Ordinal)
+                    && (suffix.Length == 4 || !char.IsLetterOrDigit(suffix[4]))
+                    || suffix.StartsWith("false", StringComparison.Ordinal)
+                    && (suffix.Length == 5 || !char.IsLetterOrDigit(suffix[5])),
+                "INT" or "LONG" or "UINT" or "ULONG" => char.IsDigit(lookahead) || lookahead == '-',
+                "FLOAT" or "SINGLE" or "DEC" or "DECIMAL" => char.IsDigit(lookahead) || lookahead is '-' or '.',
+                _ => false
+            };
+            if (looksLikeLiteral && text != upperText)
+            {
+                _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidTypedLiteral,
+                    $"Literal prefixes are case-sensitive. Use '{upperText}:' instead of '{text}:'.");
+                return MakeToken(TokenKind.Error);
+            }
 
             // INT:digits or INT:-digits
-            if (upperText == "INT" && (char.IsDigit(lookahead) || lookahead == '-'))
+            if (text == "INT" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
                 return ScanTypedIntLiteral();
             }
             // STR:"string"
-            if (upperText == "STR" && lookahead == '"')
+            if (text == "STR" && lookahead == '"')
             {
                 return ScanTypedStringLiteral();
             }
             // BOOL:true or BOOL:false
-            if (upperText == "BOOL" && (lookahead == 't' || lookahead == 'f'))
+            if (text == "BOOL" && (lookahead == 't' || lookahead == 'f'))
             {
                 // Extra check: make sure it's exactly "true" or "false", not an identifier
                 // like "trueTestPermits..." — require word boundary after the literal
@@ -2249,30 +2267,30 @@ public sealed class Lexer
                 }
             }
             // FLOAT:digits or FLOAT:-digits or FLOAT:.digits
-            if (upperText == "FLOAT" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            if (text == "FLOAT" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
             {
                 return ScanTypedFloatLiteral();
             }
             // DECIMAL:digits or DEC:digits (decimal literal)
-            if ((upperText == "DECIMAL" || upperText == "DEC") && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            if ((text == "DECIMAL" || text == "DEC") && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
             {
                 return ScanTypedDecimalLiteral();
             }
             // SINGLE:digits (single-precision float literal, #774 width preservation)
-            if (upperText == "SINGLE" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            if (text == "SINGLE" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
             {
                 return ScanTypedFloatLiteral(isSingle: true);
             }
             // LONG:digits / UINT:digits / ULONG:digits (explicit int width/signedness, #774)
-            if (upperText == "LONG" && (char.IsDigit(lookahead) || lookahead == '-'))
+            if (text == "LONG" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
                 return ScanTypedIntLiteral(isUnsigned: false, isLong: true);
             }
-            if (upperText == "UINT" && (char.IsDigit(lookahead) || lookahead == '-'))
+            if (text == "UINT" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
                 return ScanTypedIntLiteral(isUnsigned: true, isLong: false);
             }
-            if (upperText == "ULONG" && (char.IsDigit(lookahead) || lookahead == '-'))
+            if (text == "ULONG" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
                 return ScanTypedIntLiteral(isUnsigned: true, isLong: true);
             }
@@ -2398,7 +2416,7 @@ public sealed class Lexer
             Advance();
         }
 
-        var valueText = _source[valueStart.._position].ToLowerInvariant();
+        var valueText = _source[valueStart.._position];
         if (valueText == "true")
         {
             return MakeToken(TokenKind.BoolLiteral, true);

@@ -8,6 +8,37 @@ namespace Calor.Compiler.Tests;
 public class LexerTests
 {
     [Theory]
+    [InlineData("int:42", "INT:")]
+    [InlineData("Str:\"x\"", "STR:")]
+    [InlineData("bool:true", "BOOL:")]
+    [InlineData("Float:1.5", "FLOAT:")]
+    [InlineData("single:1.5", "SINGLE:")]
+    [InlineData("long:42", "LONG:")]
+    [InlineData("Uint:42", "UINT:")]
+    [InlineData("ulong:42", "ULONG:")]
+    [InlineData("dec:1.5", "DEC:")]
+    [InlineData("decimal:1.5", "DECIMAL:")]
+    public void Tokenize_LiteralPrefixCaseVariant_ReportsExactSpelling(string source, string canonical)
+    {
+        var tokens = Tokenize(source, out var diagnostics);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.InvalidTypedLiteral && diagnostic.Message.Contains(canonical));
+    }
+
+    [Theory]
+    [InlineData("bool:trueTest")]
+    [InlineData("bool:falseAlarm")]
+    public void Tokenize_BooleanParameterName_IsNotALiteralPrefix(string source)
+    {
+        var tokens = Tokenize(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
+        Assert.Equal(TokenKind.Colon, tokens[1].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[2].Kind);
+    }
+
+    [Theory]
     [InlineData("T", "§CL")]
     [InlineData("/T", "§CL")]
     [InlineData("V", "§EN")]

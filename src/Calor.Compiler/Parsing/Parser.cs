@@ -11702,7 +11702,7 @@ public sealed class Parser
         var exceptionType = attrs["_pos0"];
         var variableName = attrs["_pos1"];
 
-        // Check for when filter (§WHEN or bare "when" from legacy converter output)
+        // Catch filters use the section marker; bare legacy spellings are errors.
         ExpressionNode? filter = null;
         if (Check(TokenKind.When))
         {
@@ -11711,8 +11711,8 @@ public sealed class Parser
         }
         else if (Check(TokenKind.Identifier) && Current.Text.Equals("when", StringComparison.OrdinalIgnoreCase))
         {
-            Advance(); // consume bare "when"
-            filter = ParseExpression();
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                $"Removed catch-filter spelling '{Current.Text}'. Use §WHEN instead.");
         }
 
         // Parse catch body (#1485: only lines indented under the §CA).
@@ -13311,7 +13311,7 @@ public sealed class Parser
 
     /// <summary>
     /// Parses a PROPERTY (property-based testing) declaration.
-    /// §PROPERTY ∀arr: (== (Reverse (Reverse arr)) arr)
+    /// §PT forall arr: (== (CALL Reverse (CALL Reverse arr)) arr)
     /// </summary>
     private PropertyTestNode ParsePropertyTest()
     {
@@ -13320,48 +13320,24 @@ public sealed class Parser
 
         var quantifiers = new List<string>();
 
-        // Check for universal quantifier ∀ or "forall" keyword
-        if (Check(TokenKind.Identifier))
+        if (Check(TokenKind.Identifier) && Current.Text == "forall")
         {
-            var quantifierText = Current.Text;
-            if (quantifierText.StartsWith("∀") || quantifierText.Equals("forall", StringComparison.OrdinalIgnoreCase))
+            Advance();
+            while (Check(TokenKind.Identifier))
             {
+                quantifiers.Add(Advance().Text);
+                if (!Check(TokenKind.Comma))
+                {
+                    break;
+                }
                 Advance();
-                // Parse variable names: ∀x,y,z:
-                if (quantifierText.StartsWith("∀") && quantifierText.Length > 1)
-                {
-                    // ∀x format - variable is part of the token
-                    var varPart = quantifierText[1..];
-                    if (varPart.EndsWith(':'))
-                        varPart = varPart[..^1];
-                    foreach (var v in varPart.Split(','))
-                    {
-                        if (!string.IsNullOrWhiteSpace(v))
-                            quantifiers.Add(v.Trim());
-                    }
-                }
-                else
-                {
-                    // Separate variable list
-                    while (Check(TokenKind.Identifier))
-                    {
-                        var varName = Advance().Text;
-                        if (varName.EndsWith(':'))
-                            varName = varName[..^1];
-                        foreach (var v in varName.Split(','))
-                        {
-                            if (!string.IsNullOrWhiteSpace(v))
-                                quantifiers.Add(v.Trim());
-                        }
-                        // Skip colon if present
-                        if (Check(TokenKind.Colon))
-                        {
-                            Advance();
-                            break;
-                        }
-                    }
-                }
             }
+            Expect(TokenKind.Colon);
+        }
+        else if (Check(TokenKind.Identifier) && Current.Text.Equals("forall", StringComparison.OrdinalIgnoreCase))
+        {
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                "Property quantifiers are case-sensitive. Use 'forall'.");
         }
 
         var predicate = ParseExpression();
@@ -13740,7 +13716,7 @@ public sealed class Parser
             foreach (var method in methods)
             {
                 var hasEnumParam = method.Parameters.Any(p =>
-                    string.Equals(p.TypeName, enumName, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(p.TypeName, enumName, StringComparison.Ordinal));
 
                 if (!hasEnumParam)
                 {
