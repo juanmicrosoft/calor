@@ -9645,7 +9645,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return [new RawCSharpNode(GetTextSpan(node), node.ToString())];
         }
 
-        if (!CanUseNativeForRange(node))
+        if (!CanUseNativeForRange(node, out var stepValue))
         {
             return [ConvertReevaluatedFor(node)];
         }
@@ -9656,28 +9656,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var declaration = node.Declaration!.Variables[0];
         var varName = declaration.Identifier.Text;
-        var from = ConvertExpression(declaration.Initializer!.Value);
+        var from = ConvertForHeaderExpression(declaration.Initializer!.Value);
         var condition = (BinaryExpressionSyntax)node.Condition!;
         var to = ConvertExpression(condition.Right);
         if (condition.IsKind(SyntaxKind.LessThanExpression))
             to = new BinaryOperationNode(span, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(span, 1));
         else if (condition.IsKind(SyntaxKind.GreaterThanExpression))
             to = new BinaryOperationNode(span, Ast.BinaryOperator.Add, to, new IntLiteralNode(span, 1));
-        var incrementor = node.Incrementors[0];
-        var step = new IntLiteralNode(span,
-            incrementor.IsKind(SyntaxKind.PostIncrementExpression)
-                || incrementor.IsKind(SyntaxKind.PreIncrementExpression) ? 1 : -1);
+        var step = new IntLiteralNode(span, stepValue);
 
         var body = ConvertEmbeddedStatement(node.Statement);
 
-        bool CanUseNativeForRange(ForStatementSyntax node)
+        bool CanUseNativeForRange(ForStatementSyntax node, out int step)
         {
+            step = 0;
             if (_semanticModel == null
                 || node.Declaration?.Variables.Count != 1
                 || node.Declaration.Variables[0] is not { Initializer: { } initializer } declaration
                 || _semanticModel.GetDeclaredSymbol(declaration) is not ILocalSymbol variable
                 || variable.Type.SpecialType != SpecialType.System_Int32
-                || _semanticModel.GetConstantValue(initializer.Value) is not { HasValue: true, Value: int }
+                || _semanticModel.GetTypeInfo(initializer.Value).ConvertedType?.SpecialType != SpecialType.System_Int32
                 || node.Condition is not BinaryExpressionSyntax condition
                 || !SymbolEqualityComparer.Default.Equals(
                     _semanticModel.GetSymbolInfo(condition.Left).Symbol, variable)
@@ -9690,23 +9688,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 PostfixUnaryExpressionSyntax postfix => postfix.Operand,
                 PrefixUnaryExpressionSyntax prefix => prefix.Operand,
+                AssignmentExpressionSyntax assignment when assignment.IsKind(SyntaxKind.AddAssignmentExpression)
+                    || assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) => assignment.Left,
                 _ => null
             };
             if (operand == null
                 || !SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(operand).Symbol, variable))
                 return false;
 
-            var ascending = incrementor.IsKind(SyntaxKind.PostIncrementExpression)
-                || incrementor.IsKind(SyntaxKind.PreIncrementExpression);
-            var descending = incrementor.IsKind(SyntaxKind.PostDecrementExpression)
-                || incrementor.IsKind(SyntaxKind.PreDecrementExpression);
+            if (incrementor.IsKind(SyntaxKind.PostIncrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreIncrementExpression))
+                step = 1;
+            else if (incrementor.IsKind(SyntaxKind.PostDecrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreDecrementExpression))
+                step = -1;
+            else if (incrementor is AssignmentExpressionSyntax assignment
+                && _semanticModel.GetConstantValue(assignment.Right) is { HasValue: true, Value: int amount })
+            {
+                var signedAmount = assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) ? -(long)amount : amount;
+                if (signedAmount < int.MinValue || signedAmount > int.MaxValue)
+                    return false;
+                step = (int)signedAmount;
+            }
+            if (step == 0)
+                return false;
+
             // Native ranges stop at overflow. C# may wrap or throw instead, so the
             // final increment must remain representable as well as the endpoint.
-            var safeCondition = ascending
+            var safeCondition = step > 0
                 ? condition.IsKind(SyntaxKind.LessThanExpression) && bound > int.MinValue
-                    || condition.IsKind(SyntaxKind.LessThanOrEqualExpression) && bound < int.MaxValue
-                : descending && (condition.IsKind(SyntaxKind.GreaterThanExpression) && bound < int.MaxValue
-                    || condition.IsKind(SyntaxKind.GreaterThanOrEqualExpression) && bound > int.MinValue);
+                    && (long)bound - 1 + step <= int.MaxValue
+                    || condition.IsKind(SyntaxKind.LessThanOrEqualExpression) && (long)bound + step <= int.MaxValue
+                : condition.IsKind(SyntaxKind.GreaterThanExpression) && bound < int.MaxValue
+                    && (long)bound + 1 + step >= int.MinValue
+                    || condition.IsKind(SyntaxKind.GreaterThanOrEqualExpression) && (long)bound + step >= int.MinValue;
             var flow = _semanticModel.AnalyzeDataFlow(node.Statement);
             return safeCondition && flow is { Succeeded: true }
                 && !flow.WrittenInside.Contains(variable, SymbolEqualityComparer.Default)

@@ -6,7 +6,7 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Active regression pin for #774/#996, resolved by #1194.
-/// Compound incrementors retain their C# operations instead of becoming
+/// Non-additive incrementors retain their C# operations instead of becoming
 /// additive range steps. Runtime controls live in ForLoopConditionSemanticsTests.
 /// </summary>
 public class Issue774ForLoopNonAdditiveIncrementorTests
@@ -19,7 +19,6 @@ public class Issue774ForLoopNonAdditiveIncrementorTests
     [InlineData("i /= 2",   "for (int i = 100; i > 1; i /= 2)",     "divide")]
     [InlineData("i <<= 1",  "for (int i = 1; i < 1024; i <<= 1)",   "left-shift")]
     [InlineData("i >>= 1",  "for (int j = 1024; j > 0; j >>= 1)",   "right-shift")]
-    [InlineData("i -= 2",   "for (int i = 10; i > 0; i -= 2)",      "subtract-assign")]
     public void NonAdditiveIncrementor_MustNotBecomeAdditiveForLoop(
         string incrementor,
         string forHeader,
@@ -59,5 +58,26 @@ public class Issue774ForLoopNonAdditiveIncrementorTests
 
         Assert.Empty(forNodes);
         Assert.Contains("§WH{", result.CalorSource);
+    }
+
+    [Fact]
+    public void SubtractIncrementor_UsesNegativeRangeStep()
+    {
+        var result = _converter.Convert("""
+            public class Test
+            {
+                public void Run()
+                {
+                    for (int i = 10; i > 0; i -= 2)
+                        System.Console.WriteLine(i);
+                }
+            }
+            """);
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+        var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
+        var loop = Assert.IsType<ForStatementNode>(Assert.Single(method.Body));
+        Assert.Equal(-2, Assert.IsType<IntLiteralNode>(loop.Step).Value);
+        Assert.Contains("§L{", result.CalorSource);
     }
 }

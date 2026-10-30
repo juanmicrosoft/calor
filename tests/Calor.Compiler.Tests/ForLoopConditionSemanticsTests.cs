@@ -17,7 +17,7 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (int i = 100; i > 1; i /= 2) count++; return count;", "6", false)]
     [InlineData("int count = 0; for (int i = 1; i < 16; i <<= 1) count++; return count;", "4", false)]
     [InlineData("int count = 0; for (int i = 16; i > 0; i >>= 1) count++; return count;", "5", false)]
-    [InlineData("int count = 0; for (int i = 10; i > 0; i -= 2) count++; return count;", "5", false)]
+    [InlineData("int count = 0; for (int i = 10; i > 0; i -= 2) count++; return count;", "5", true)]
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i++) { if (i == 1) continue; count++; } return count;", "2:BBBB", false)]
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i++) { try { if (i == 1) continue; count++; } finally { Trace += \"F\"; } } return count;", "2:BFBFBFB", false)]
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i++) { for (int j = 0; j < 2; j++) { if (j == 0) continue; count++; } if (i == 1) continue; count++; } return count;", "5:BBBB", false)]
@@ -48,11 +48,46 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (byte i = 0; i < 3; i++) count++; return count;", "3", false)]
     [InlineData("int count = 0; for (short i = 0; i < 3; i += 1) count++; return count;", "3", false)]
     [InlineData("int count = 0; for (int i = 0; i == i++;) { count++; if (count == 3) break; } return count;", "3", false)]
-    [InlineData("int count = 0; for (int i = (count = Step()); i < 0; i++) { } return count;", "1:S", false)]
+    [InlineData("int count = 0; for (int i = (count = Step()); i < 0; i++) { } return count;", "1:S", true)]
     [InlineData("int count = 0; for (int i = 0; i < 2; i.ToString(), i.ToString()) { i++; count++; } return count;", "2", false)]
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i++) { int Bound = 1; Bound++; count += Bound; } return count;", "6:BBBB", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
         => AssertEquivalent(body, expected, native);
+
+    [Theory]
+    [InlineData("int start = 1; int n = 0; for (int i = start; i < 6; i += 2) n += i; return n;", "9")]
+    [InlineData("int n = 0; for (int i = Step(); i <= 5; i += 2) n += i; return n;", "9:S")]
+    [InlineData("int n = 0; for (int i = Step(); i >= -3; i += -2) { if (i == -1) continue; n += i; } return n;", "-2:S")]
+    [InlineData("int n = 0; for (int i = Step(); i <= 3; i -= -1) n += i; return n;", "6:S")]
+    [InlineData("int n = 0; for (int i = Step(); i < 0; i++) n++; return n;", "0:S")]
+    [InlineData("int n = 0; for (int i = (n = Step()); i < 0; i++) { } return n;", "1:S")]
+    public void CountedRange_ExpressionInitializerAndConstantStep_PreserveObservations(string body, string expected)
+        => AssertEquivalent(body, expected, native: true);
+
+    [Theory]
+    [InlineData("int n = 0; for (int i = int.MaxValue - 1; i < int.MaxValue; i += 2) { n++; if (n == 2) break; } return n;", "2")]
+    [InlineData("int n = 0; for (int i = int.MinValue + 1; i > int.MinValue; i -= 2) { n++; if (n == 2) break; } return n;", "2")]
+    [InlineData("int n = 0; for (int i = 1; i <= 2; i += 0) { n++; break; } return n;", "1")]
+    [InlineData("int n = 0; for (int i = int.MinValue; i <= 2; i -= int.MinValue) { n++; if (n == 2) break; } return n;", "2")]
+    public void CountedRange_UnsafeOrZeroStep_RetainsExactLowering(string body, string expected)
+        => AssertEquivalent(body, expected, native: false);
+
+    [Fact]
+    public void NativeDoWhile_PreservesUnassignedLocalDefiniteAssignment()
+        => AssertEquivalent(
+            "int result; int i = 0; do { result = i; i++; } while (i < 2); return result;",
+            "1", native: false, loopMarker: "§DO{");
+
+    [Fact]
+    public void NativeDoWhile_PreservesOutParameterDefiniteAssignment()
+        => AssertEquivalent("int result; Assign(out result); return result;",
+            "1", native: false, loopMarker: "§DO{", members: """
+            private static void Assign(out int result)
+            {
+                int i = 0;
+                do { result = i; i++; } while (i < 2);
+            }
+            """);
 
     [Theory]
     [InlineData("Change(in i);")]
@@ -149,7 +184,8 @@ public class ForLoopConditionSemanticsTests
             """);
 
     private static void AssertEquivalent(string body, string expected, bool native, string members = "",
-        bool preserved = false, string types = "", bool asyncProbe = false, bool memberPreserved = false)
+        bool preserved = false, string types = "", bool asyncProbe = false, bool memberPreserved = false,
+        string? loopMarker = null)
     {
         var returnType = asyncProbe ? "async System.Threading.Tasks.Task<int>" : "int";
         var source = $$"""
@@ -185,6 +221,8 @@ public class ForLoopConditionSemanticsTests
                 loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
             Assert.Contains("for (", conversion.CalorSource);
         }
+        else if (loopMarker != null)
+            Assert.Contains(loopMarker, conversion.CalorSource);
         else if (native)
             Assert.Contains("§L{", conversion.CalorSource);
         else if (memberPreserved)

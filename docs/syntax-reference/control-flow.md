@@ -39,6 +39,14 @@ When `step` is omitted, Calor advances with a checked increment of the evaluated
 induction value itself. This keeps the implicit `+1` in the loop variable's
 integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
 
+C# conversion uses this range form for `int` loops with an expression initializer,
+a constant bound, and a nonzero constant `++`, `--`, `+=`, or `-=` step when the
+loop variable is not modified or exposed by reference in the body and the final
+increment cannot overflow. The initializer still runs once, even for an empty
+range. Other C# `for` loops retain exact condition reevaluation and overflow
+behavior through the existing `§WH` lowering or C# preservation; they are not
+silently treated as snapshot ranges.
+
 ### Examples
 
 **Count 1 to 10:**

@@ -15,6 +15,57 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public sealed class FactScopingTests
 {
+    [Fact]
+    public void DoWhile_FirstIterationIsExactWithoutAssumingItsCondition()
+    {
+        var module = Parse("""
+            §M{m1:Test}
+              §F{f1:Probe:pub} (i32:n) -> void
+                §DO{d1}
+                  §PROOF{p1} (== n 0)
+                §/DO{d1} (> n 0)
+                §PROOF{p2} (== n 0)
+            """, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
+        var function = Assert.Single(module.Functions);
+        var loop = Assert.IsType<DoWhileStatementNode>(function.Body[0]);
+        var collector = new FactCollector();
+        collector.CollectFromFunction(function);
+
+        Assert.True(collector.IsExact(Assert.Single(loop.Body).Span));
+        Assert.False(collector.IsExact(function.Body[1].Span));
+        Assert.DoesNotContain(collector.ScopedFacts, fact =>
+            fact.Fact is BinaryOperationNode { Operator: BinaryOperator.GreaterThan });
+    }
+
+    [Theory]
+    [InlineData("1", BinaryOperator.GreaterOrEqual, BinaryOperator.LessOrEqual)]
+    [InlineData("-1", BinaryOperator.LessOrEqual, BinaryOperator.GreaterOrEqual)]
+    public void ExpressionBounds_AreScopedToTheCountedLoopBody(
+        string step, BinaryOperator fromOperator, BinaryOperator toOperator)
+    {
+        var module = Parse($$"""
+            §M{m1:Test}
+              §F{f1:Probe:pub} (i32:start, i32:end) -> void
+                §L{l1:i:start:end:{{step}}}
+                  §PROOF{p1} (== i i)
+                §PROOF{p2} (== start start)
+            """, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
+        var function = Assert.Single(module.Functions);
+        var loop = Assert.IsType<ForStatementNode>(function.Body[0]);
+        var collector = new FactCollector();
+        collector.CollectFromFunction(function);
+
+        Assert.Contains(collector.ScopedFacts, fact =>
+            fact.Fact is BinaryOperationNode { Right: ReferenceNode { Name: "start" } } bound
+            && bound.Operator == fromOperator && fact.AppliesTo(loop.Body[0].Span));
+        Assert.Contains(collector.ScopedFacts, fact =>
+            fact.Fact is BinaryOperationNode { Right: ReferenceNode { Name: "end" } } bound
+            && bound.Operator == toOperator && fact.AppliesTo(loop.Body[0].Span));
+        Assert.All(collector.ScopedFacts, fact => Assert.False(fact.AppliesTo(function.Body[1].Span)));
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
