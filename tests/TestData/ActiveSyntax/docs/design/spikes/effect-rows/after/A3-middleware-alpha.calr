@@ -1,0 +1,10 @@
+§M{m001:MiddlewareAlpha}
+  §IFACE{i001:IPipelineBehavior}
+    §MT{mt001:Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e}
+
+  §CL{c001:PassThroughBehavior:pub}
+    §IMPL{IPipelineBehavior}
+    §MT{mt002:Handle:pub}<eff f> (i32:request, Func<i32>:next §E{f}) -> i32
+      §E{f}
+      §R §C{next} §/C

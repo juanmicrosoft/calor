@@ -233,6 +233,7 @@ public sealed class EffectRowCorpusShapeTests
             //     the other two options it listed are unavailable. Counts are unchanged either way.
             .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
             .Where(line => !PpwFixture.IsMatch(line))
+            .Where(line => !ActiveSyntaxInputs.IsActiveCopy(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

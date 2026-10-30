@@ -20,8 +20,8 @@
 
   §CL{c001:RetryBehavior:pub}
     §IMPL{IPipelineBehavior}
-    §FLD{Func<i32>:loud:priv}
-    §FLD{Func<i32>:quiet:priv}
+    §FLD{Func<i32>:loud:pri}
+    §FLD{Func<i32>:quiet:pri}
     §CTOR{ctor001:pub} ()
       §ASSIGN loud MiddlewareAfterModule.Beat
       §ASSIGN quiet MiddlewareAfterModule.Tick

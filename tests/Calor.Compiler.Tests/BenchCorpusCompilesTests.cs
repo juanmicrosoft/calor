@@ -63,7 +63,7 @@ public class BenchCorpusCompilesTests
         var root = FindRepoRoot();
         Assert.NotNull(root);
 
-        var full = Path.Combine(root!, relativePath);
+        var full = ActiveSyntaxInputs.ForCurrentCompiler(root!, relativePath);
         var result = Program.Compile(File.ReadAllText(full), full, new CompilationOptions());
 
         Assert.False(result.HasErrors,

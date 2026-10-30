@@ -39,7 +39,7 @@ files = subprocess.run(["git","ls-files","*.calr"],capture_output=True,text=True
 # a PP-W epoch's per-run archives are measurement inputs, not corpus. None of them writes
 # the two-line §O/§E form this script compiles, so the transcript is unchanged today.
 PPW = re.compile(r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-[0-9]{3}-")
-files = [f for f in files if not PPW.match(f)]
+files = [f for f in files if not PPW.match(f) and not f.startswith("tests/TestData/ActiveSyntax/")]
 hits=[]
 for f in files:
     L=open(f,encoding="utf-8",errors="replace").read().split("\n")

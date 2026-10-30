@@ -78,6 +78,7 @@ print("\n### whole-corpus function-typed positions (IsFunctionTypeName shapes)")
 # later W-010 pair stays covered. Matches nothing else in the tree — counts unchanged.
 PPW = r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-[0-9]{3}-"
 CORPUS = ("git ls-files '*.calr' | grep -v '^docs/design/spikes/' "
+          "| grep -v '^tests/TestData/ActiveSyntax/' "
           f"| grep -Ev '{PPW}'")
 print(sh(f"{CORPUS} | xargs grep -hoE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null | wc -l"))
 print(sh_sorted(f"{CORPUS} | xargs grep -lE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))

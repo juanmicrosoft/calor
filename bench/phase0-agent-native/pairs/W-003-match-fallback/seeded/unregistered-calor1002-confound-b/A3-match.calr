@@ -27,7 +27,7 @@
     §R §C{MatchOption} §A h §A v §A Shout §A Zero §/C
 
   §CL{c001:Matcher:pub}
-    §FLD{Func<i32,i32>:onSome:priv} §E{cw}
+    §FLD{Func<i32,i32>:onSome:pri} §E{cw}
     §CTOR{ctor001:pub} ()
       §ASSIGN onSome MatchAfterModule.Shout
     §MT{mt001:Twice:pub} (bool:h, i32:v) -> i32

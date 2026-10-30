@@ -150,6 +150,7 @@ public class BinderIncompleteRatchetTests
             .SelectMany(r => Directory.EnumerateFiles(r, "*.calr", SearchOption.AllDirectories))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
                      && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Where(f => !ActiveSyntaxInputs.IsActiveCopy(Path.GetRelativePath(root, f).Replace('\\', '/')))
             .OrderBy(f => f, StringComparer.Ordinal)
             .ToList();
         Assert.NotEmpty(files);

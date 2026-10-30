@@ -359,18 +359,18 @@ below were measured for this draft on both arms (v0.14.3 `--permissive-effects` 
 
 | Pair | Starter A (`before/`) / B (`after/`) | Extension the task asks for | Arm A emission on the shortcut | Arm B emission | Class |
 |---|---|---|---|---|---|
-| **W-001** A3-middleware | `2d351d10` / `e5ee81e2` | a **field-stored** stage `§FLD{Func<i32>:stage:priv}` (row `§E{cw}` in B) passed to `RunTwice` from a new pure `§MT{mt003:Twice} §E{}` | only the pre-existing Calor0418 warnings on `g` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` (rank-1 charge) | **blind** |
+| **W-001** A3-middleware | `2d351d10` / `e5ee81e2` | a **field-stored** stage `§FLD{Func<i32>:stage:pri}` (row `§E{cw}` in B) passed to `RunTwice` from a new pure `§MT{mt003:Twice} §E{}` | only the pre-existing Calor0418 warnings on `g` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` (rank-1 charge) | **blind** |
 | W-001s (published sibling, not adjudicated) | same | a printing `§LAM` bound by `§B` and passed to `RunTwice` | `warning Calor0410` (reviewer-measured) | error Calor0410 | warning-vs-error |
 | W-002 A3-map | `9f108655` / `0885b3dd` | `MapAndReport`: a printing `§LAM` bound by `§B` and passed to `Map` | `warning Calor0410` (an inline `§LAM` as `§A` draws Calor0208 on both arms; the `§B`-bound form compiles) | error Calor0410 | warning-vs-error |
 | W-003 A3-match | `1f36ea6e` / `c1ce7517` | a logging fallback via a `§B`-bound `§LAM` | `warning Calor0410` | error Calor0410 | warning-vs-error |
 | **W-004** A3-callback | `f2dca4a6` / `05ddc23d` | a new pure `§MT{mt002:Peek} §E{}` invoking `onChange` (`Bump` is `§E{cw}` in both blobs; the field row `§E{cw}` exists in B only — A's field has no row) | two Calor0418 warnings on `onChange`, **no Calor0410** | `error Calor0410: 'Peek' uses 'cw'` | **blind** |
 | W-005 A2 | `d49d0017` / `93ecdf16` | a `§P` pre-processor step inside `Handle` | `warning Calor0410` (reviewer-measured) | error Calor0410; **arm B's starter does not build** (exit 1, PP-E1's frozen post-E4 multiset, A:338-450) | warning-vs-error, **leg A only** |
-| **W-006** A3-map | `9f108655` / `0885b3dd` | a **field-stored** stage `§FLD{Func<i32,i32>:stage:priv}` (row `§E{cw}` in B) passed to `Map` from a new `§MT{mt001:Twice} §E{alloc, mut}` | only the pre-existing Calor0418 warning on `f` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` | **blind** |
+| **W-006** A3-map | `9f108655` / `0885b3dd` | a **field-stored** stage `§FLD{Func<i32,i32>:stage:pri}` (row `§E{cw}` in B) passed to `Map` from a new `§MT{mt001:Twice} §E{alloc, mut}` | only the pre-existing Calor0418 warning on `f` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` | **blind** |
 
 The same field-stored shape on A3-match is **not registrable with a module-level method group**:
 passing `Zero` for `onNone` from inside a class draws `error Calor1002` on arm A (generated C#
 cannot resolve it — a codegen confound unrelated to effects). With a second field
-`§FLD{Func<i32>:none:priv}` (row `§E{}` in B) for `onNone` the shape compiles on both arms and is
+`§FLD{Func<i32>:none:pri}` (row `§E{}` in B) for `onNone` the shape compiles on both arms and is
 **blind** (arm A: 2× Calor0418 only; arm B: `error Calor0410 'Twice'`) — measured in review round
 4; it is available as a fourth blind cell if S3 wants one, and is recorded here so the
 method-group variant is not re-proposed. **W-005 stays as a warning-vs-error, leg-A-only cell** rather than being dropped,

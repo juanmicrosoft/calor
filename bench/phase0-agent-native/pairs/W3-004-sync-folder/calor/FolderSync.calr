@@ -1,12 +1,12 @@
 §M{m001:FolderSync}
-  §F{f001:EntryName:priv} (str:line) -> str
+  §F{f001:EntryName:pri} (str:line) -> str
     §E{}
     §B{sep:i32} (indexof line "|" :ordinal)
     §IF{if1} (< sep 0)
       §R line
     §R (substr line 0 sep)
 
-  §F{f002:EntryStamp:priv} (str:line) -> i32
+  §F{f002:EntryStamp:pri} (str:line) -> i32
     §E{}
     §B{sep:i32} (indexof line "|" :ordinal)
     §IF{if2} (< sep 0)
@@ -14,7 +14,7 @@
     §B{digits:str} (substr line (+ sep 1) (- (len line) (+ sep 1)))
     §R §C{Int32.Parse} §A digits §/C
 
-  §F{f003:FormatEntry:priv} (str:name, i32:stamp) -> str
+  §F{f003:FormatEntry:pri} (str:name, i32:stamp) -> str
     §E{}
     §R (+ name (+ "|" §C{stamp.ToString} §/C))
 

@@ -278,7 +278,8 @@ public class EffectResolverKeyLedgerTests
             try
             {
                 var diagnostics = new DiagnosticBag();
-                var source = File.ReadAllText(file).Replace("\r\n", "\n");
+                var active = ActiveSyntaxInputs.ForCurrentCompiler(root, file);
+                var source = File.ReadAllText(active).Replace("\r\n", "\n");
                 // TokenizeAllForParser, not Tokenize: the parser-facing token
                 // stream is what Program.Compile feeds the parser, and the two
                 // are not interchangeable — measuring through the wrong one
@@ -347,7 +348,8 @@ public class EffectResolverKeyLedgerTests
                     //     dispositioned when the pairs landed; PpwFixture records that disposition and why
                     //     the other two options it listed are unavailable. Counts are unchanged either way.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !PpwFixture.IsMatch(rel);
+                    && !PpwFixture.IsMatch(rel)
+                    && !ActiveSyntaxInputs.IsActiveCopy(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

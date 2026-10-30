@@ -6,14 +6,14 @@
 // The module prose belongs in §CT, not a comment; §CT currently breaks the
 // dedent that closes a later §IF (#929), which this program is full of.
 §M{m001:AllowlistAudit}
-  §F{f001:StartsWith:priv} (str:text, str:prefix) -> bool
+  §F{f001:StartsWith:pri} (str:text, str:prefix) -> bool
     §E{}
     §B{n:i32} (len prefix)
     §IF{if1} (> n (len text))
       §R BOOL:false
     §R (== (substr text 0 n) prefix)
 
-  §F{f002:EndsWith:priv} (str:text, str:suffix) -> bool
+  §F{f002:EndsWith:pri} (str:text, str:suffix) -> bool
     §E{}
     §B{n:i32} (len suffix)
     §B{m:i32} (len text)
@@ -21,19 +21,19 @@
       §R BOOL:false
     §R (== (substr text (- m n) n) suffix)
 
-  §F{f003:IsSkippable:priv} (str:line) -> bool
+  §F{f003:IsSkippable:pri} (str:line) -> bool
     §E{}
     §B{t:str} (trim line)
     §IF{if3} (== (len t) 0)
       §R BOOL:true
     §R §C{StartsWith} §A t §A "#" §/C
 
-  §F{f007:IsPendingMarker:priv} (str:line) -> bool
+  §F{f007:IsPendingMarker:pri} (str:line) -> bool
     §E{}
     §B{t:str} (trim line)
     §R §C{StartsWith} §A t §A "# pending" §/C
 
-  §F{f004:IsStructurallyExempt:priv} (str:path) -> bool
+  §F{f004:IsStructurallyExempt:pri} (str:path) -> bool
     §E{}
     §IF{if4} §C{StartsWith} §A path §A "tests/" §/C
       §R BOOL:true
@@ -43,7 +43,7 @@
       §R BOOL:true
     §R BOOL:false
 
-  §F{f005:Report:priv} (str:entry, str:problem) -> void
+  §F{f005:Report:pri} (str:entry, str:problem) -> void
     §E{cw}
     §P (+ "  " (+ entry (+ " — " problem)))
 

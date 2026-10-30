@@ -257,12 +257,11 @@ public sealed class SpikeVerdictTests
     /// §8.5's "the semantics stamp does not change" both rest on this being true
     /// rather than assumed. If it fails, E2 does not ship — monomorphic or not.
     ///
-    /// <para>Two legs. <b>Leg 1 recomputes</b>: A1's and A2's <c>before/</c>
-    /// sources are re-emitted with the CURRENT compiler and diffed against the
-    /// committed <c>before/*.g.cs</c>. On main that answers "is the recorded
-    /// BEFORE still what this compiler produces?" — and once E2 lands it becomes
-    /// "did the row feature move codegen for a row-less program?", which is the
-    /// question A1 exists to ask. <b>Leg 2 compares</b> the committed
+    /// <para>Two legs. <b>Leg 1 checks current semantics</b>: A1's and A2's
+    /// explicitly translated active copies are emitted with the CURRENT compiler
+    /// and diffed against the committed <c>before/*.g.cs</c>. This checks that
+    /// syntax migration preserves codegen; it does not recompile historical raw
+    /// input or remeasure the original experiment. <b>Leg 2 compares</b> the committed
     /// before/after pairs, which needs no compiler.</para>
     ///
     /// <para>A <c>#line N "&lt;source&gt;.calr"</c> directive tracks the SOURCE,
@@ -276,18 +275,19 @@ public sealed class SpikeVerdictTests
     {
         var failures = new List<string>();
 
-        // Leg 1 — recompute the BEFORE side with this compiler.
+        // Leg 1 — compare active-copy codegen to the archived BEFORE artifact.
         foreach (var artifact in BlockingArtifacts)
         {
             var committed = Path.Combine(SpikeDirectory(), "before", artifact + ".g.cs.txt");
             Assert.True(File.Exists(committed), $"Missing before/{artifact}.g.cs");
 
-            var reEmitted = ReEmit(Path.Combine(SpikeDirectory(), "before", artifact + ".calr"));
+            var active = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+                Path.Combine(SpikeDirectory(), "before", artifact + ".calr"));
+            var reEmitted = ReEmit(active);
             if (reEmitted == null)
             {
                 failures.Add(
-                    $"{artifact}: before/{artifact}.calr did not emit with this compiler, so the "
-                    + "committed BEFORE artifact cannot be recomputed.");
+                    $"{artifact}: active migration copy {active} did not emit with this compiler.");
                 continue;
             }
 
@@ -295,10 +295,9 @@ public sealed class SpikeVerdictTests
                     StringComparison.Ordinal))
             {
                 failures.Add(
-                    $"{artifact}: re-emitting before/{artifact}.calr with this compiler no longer "
-                    + $"reproduces the committed before/{artifact}.g.cs. Either codegen changed — "
-                    + "in which case G-CODEGEN's baseline moved and the spike verdict must be "
-                    + "re-measured — or the artifact was hand-edited.");
+                    $"{artifact}: active migration copy {active} no longer reproduces the committed "
+                    + $"before/{artifact}.g.cs. Investigate syntax migration or codegen without "
+                    + "rewriting the historical artifact or its measurement.");
             }
         }
 
@@ -856,7 +855,8 @@ public sealed class SpikeVerdictTests
     public void A3Fixtures_AreExactlyZeroCalor0418_PostE4(
         string fixture, int expected0421)
     {
-        var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+        var path = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+            Path.Combine(SpikeDirectory(), "after", fixture + ".calr"));
         Assert.True(File.Exists(path), $"A3 fixture missing: {path}");
 
         var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
@@ -992,9 +992,9 @@ public sealed class SpikeVerdictTests
     /// and the mutant both drew Calor0418 at the same invocation. E4 is what
     /// makes them discriminate — the unmutated fixture is exit 0 with zero
     /// diagnostics (the pin above), and each mutant draws Calor0425 at the
-    /// registered invocation. Applied TEXTUALLY to a copy of the frozen fixture
-    /// (blob SHAs untouched) with each anchor asserted to occur exactly once,
-    /// as the catalogue registers, and compiled with the pinned invocation.
+    /// registered invocation. The frozen original's anchor is checked untouched;
+    /// the mutation is applied to an explicitly translated active semantic copy,
+    /// whose anchor is checked independently. This is not a historical remeasurement.
     /// The registered declaration is the callable containing the invocation;
     /// the assertion is on the invocation's line, which the catalogue names
     /// (`at §C{f} in f001`). This is leg A's detection for L7, not the ledger
@@ -1015,15 +1015,22 @@ public sealed class SpikeVerdictTests
     public void PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4(
         string cell, string fixture, string anchor, string replacement, int invocationLine)
     {
-        var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+        var original = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+        Assert.Equal(1, CountOccurrences(File.ReadAllText(original), anchor));
+        var path = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(), original);
         var source = File.ReadAllText(path);
-        Assert.True(CountOccurrences(source, anchor) == 1,
-            $"{cell}: the registered anchor must occur exactly once in {fixture}.calr");
+        // The archived catalogue keeps its exact original bytes. Only this active
+        // mutation's field visibility differs after the explicit syntax migration.
+        var (activeAnchor, activeReplacement) = cell == "L7-CB"
+            ? ("§FLD{Action<i32>:onChange:priv} §E{cw}", "§FLD{Action<i32>:onChange:priv}")
+            : (anchor, replacement);
+        Assert.True(CountOccurrences(source, activeAnchor) == 1,
+            $"{cell}: the registered anchor must also occur exactly once in active input {path}");
 
         var mutant = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{cell}-{Guid.NewGuid():N}.calr");
         try
         {
-            File.WriteAllText(mutant, source.Replace(anchor, replacement, StringComparison.Ordinal));
+            File.WriteAllText(mutant, source.Replace(activeAnchor, activeReplacement, StringComparison.Ordinal));
 
             var (_, baseline) = CompileControlFixture(fixture);
             var (_, mutated) = CompileControlSource(mutant);
@@ -1066,10 +1073,10 @@ public sealed class SpikeVerdictTests
     /// </summary>
     /// <summary>
     /// Memoised across the whole assembly (review round 1, m3): three pins now
-    /// compile the same five unmutated fixtures with the same pinned, flagless
+    /// compile the same five active semantic copies with the same flagless
     /// invocation — the barred-code control, the A-1.11.1 multiset control, and
     /// each L7 cell's baseline. The invocation is deterministic and the fixtures
-    /// are blob-SHA frozen, so one process per fixture answers all of them; this
+    /// are registered explicitly, so one process per fixture answers all of them; this
     /// removes five process spawns per run without weakening any assertion.
     /// </summary>
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<
@@ -1079,14 +1086,15 @@ public sealed class SpikeVerdictTests
     {
         return PpE1ControlCompiles.GetOrAdd(fixture, static key =>
         {
-            var source = Path.Combine(SpikeDirectory(), "after", key + ".calr");
+            var source = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+                Path.Combine(SpikeDirectory(), "after", key + ".calr"));
             Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
             return CompileControlSource(source);
         });
     }
 
-    /// <summary>The pinned invocation over an arbitrary source path — the L7
-    /// mutants are copies of a frozen fixture, compiled exactly as the control is.</summary>
+    /// <summary>The flagless invocation over an active semantic input. L7
+    /// mutants use translated copies, never the historical measurement lane.</summary>
     private static (int ExitCode, string[] Diagnostics) CompileControlSource(string source)
     {
         var (exitCode, diagnostics) = PpE1Probe.Compile(source);
@@ -1109,7 +1117,8 @@ public sealed class SpikeVerdictTests
         // Kept as an explicit pin rather than folded into the sweep above,
         // because it is the clause of PP-E1 this branch had to repair, and a
         // regression in either half must name A2.
-        var path = Path.Combine(SpikeDirectory(), "after", "A2.calr");
+        var path = ActiveSyntaxInputs.ForCurrentCompiler(RepositoryRoot(),
+            Path.Combine(SpikeDirectory(), "after", "A2.calr"));
         var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
         var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
         var module = new Compiler.Parsing.Parser(
@@ -1240,7 +1249,7 @@ internal static class PpE1Probe
             RegisteredCode: "Calor0425", RegisteredDeclaration: "f001 (§C{g})", RegisteredLine: 4,
             BeforeCode: "Calor0100", MessageRule: null),
         new("L7-CB", "L7 row erasure", "A3-callback",
-            Anchor: "§FLD{Action<i32>:onChange:priv} §E{cw}", Replacement: "§FLD{Action<i32>:onChange:priv}",
+            Anchor: "§FLD{Action<i32>:onChange:pri} §E{cw}", Replacement: "§FLD{Action<i32>:onChange:pri}",
             CommittedMutant: null,
             RegisteredCode: "Calor0425", RegisteredDeclaration: "mt001 (§C{onChange})", RegisteredLine: 6,
             BeforeCode: "Calor0100", MessageRule: null),

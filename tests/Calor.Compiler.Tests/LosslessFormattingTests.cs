@@ -812,7 +812,7 @@ public sealed class LosslessFormattingTests : IDisposable
 
         foreach (var relativePath in files)
         {
-            var path = Path.Combine(repoRoot, relativePath);
+            var path = ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, relativePath);
             var source = File.ReadAllText(path);
             var classification = formatter.FormatSource(source, path);
             if (!classification.Success)
@@ -956,6 +956,7 @@ public sealed class LosslessFormattingTests : IDisposable
             //     the other two options it listed are unavailable. Counts are unchanged either way.
             .Where(path => !path.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
             .Where(path => !PpwFixture.IsMatch(path))
+            .Where(path => !ActiveSyntaxInputs.IsActiveCopy(path))
             .Order(StringComparer.Ordinal)
             .ToArray();
     }

@@ -1,5 +1,5 @@
 §M{m001:TempConvert}
-  §F{f005:ClampToCeiling:priv} (i32:value, i32:ceiling) -> i32
+  §F{f005:ClampToCeiling:pri} (i32:value, i32:ceiling) -> i32
     §E{}
     §S (<= result ceiling)
     §IF{if4} (> value ceiling)

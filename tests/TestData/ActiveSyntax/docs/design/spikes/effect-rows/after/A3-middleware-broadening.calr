@@ -1,0 +1,11 @@
+§M{m001:MiddlewareBroadening}
+  §IFACE{i001:IPipelineBehavior}
+    §MT{mt001:Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e}
+
+  §CL{c001:LoggingBehavior:pub}
+    §IMPL{IPipelineBehavior}
+    §MT{mt002:Handle:pub}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e, cw}
+      §P "before"
+      §R §C{next} §/C

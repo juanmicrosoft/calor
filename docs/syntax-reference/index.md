@@ -12,6 +12,12 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 Keywords, operators, literal prefixes, and declaration modifiers are case-sensitive.
 Use the spelling shown in the reference; capitalization is not an alias.
 
+Frozen benchmark archives and spike inputs preserve the syntax originally measured.
+They are historical exceptions, not parser compatibility examples. Current-compiler
+semantic checks use explicitly registered copies under `tests/TestData/ActiveSyntax/`.
+Those checks do not remeasure the historical experiments or change their hashes,
+anchors, ledgers, or measured commits.
+
 ---
 
 ## Quick Reference Table

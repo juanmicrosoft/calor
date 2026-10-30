@@ -16,7 +16,7 @@
 
   §CL{c001:RetryBehavior:pub}
     §IMPL{IPipelineBehavior}
-    §FLD{Func<i32>:stage:priv}
+    §FLD{Func<i32>:stage:pri}
     §CTOR{ctor001:pub} ()
       §ASSIGN stage MiddlewareAfterModule.Beat
     §MT{mt002:Handle:pub} (i32:request, Func<i32>:next) -> i32

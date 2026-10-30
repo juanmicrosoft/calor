@@ -31,8 +31,8 @@
     §R y
 
   §CL{c001:Doubler:pub}
-    §FLD{Func<i32,i32>:stage:priv}
-    §FLD{Func<i32,i32>:loud:priv}
+    §FLD{Func<i32,i32>:stage:pri}
+    §FLD{Func<i32,i32>:loud:pri}
     §CTOR{ctor001:pub} ()
       §ASSIGN stage MapAfterModule.Double
       §ASSIGN loud MapAfterModule.Trace

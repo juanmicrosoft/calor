@@ -31,7 +31,7 @@
     §R y
 
   §CL{c001:Doubler:pub}
-    §FLD{Func<i32,i32>:stage:priv} §E{cw}
+    §FLD{Func<i32,i32>:stage:pri} §E{cw}
     §CTOR{ctor001:pub} ()
       §ASSIGN stage MapAfterModule.Trace
     §MT{mt001:Twice:pub} ([i32]:xs) -> [i32]

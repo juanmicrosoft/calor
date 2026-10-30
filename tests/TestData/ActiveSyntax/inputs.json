@@ -1,0 +1,30 @@
+{
+  "purpose": "Active migration/semantic checks, not replays or remeasurements of historical raw inputs.",
+  "originalPaths": [
+    "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-1/final-src/Inventory.calr",
+    "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-2/final-src/Inventory.calr",
+    "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-3/final-src/Inventory.calr",
+    "bench/phase0-agent-native/epochs/w5-parity-001/N1-001-string-utils/calor+treatment/run-1/final-src/TextUtils.calr",
+    "bench/phase0-agent-native/epochs/w5-parity-001/N1-001-string-utils/calor+treatment/run-2/final-src/TextUtils.calr",
+    "bench/phase0-agent-native/pairs/W1-001-temperature-converter/reference/calor/TempConvert.calr",
+    "bench/phase0-agent-native/pairs/W1-002-usage-billing/reference/calor/Billing.calr",
+    "bench/phase0-agent-native/pairs/W3-003-kv-journal/reference/calor/KvJournal.calr",
+    "bench/phase0-agent-native/pairs/W3-004-sync-folder/calor/FolderSync.calr",
+    "bench/phase0-agent-native/pairs/W3-004-sync-folder/reference/calor/FolderSync.calr",
+    "docs/design/spikes/effect-rows/after/A1.calr",
+    "docs/design/spikes/effect-rows/after/A2-broadening.calr",
+    "docs/design/spikes/effect-rows/after/A2.calr",
+    "docs/design/spikes/effect-rows/after/A3-callback.calr",
+    "docs/design/spikes/effect-rows/after/A3-map.calr",
+    "docs/design/spikes/effect-rows/after/A3-match.calr",
+    "docs/design/spikes/effect-rows/after/A3-middleware-alpha.calr",
+    "docs/design/spikes/effect-rows/after/A3-middleware-broadening.calr",
+    "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+    "docs/design/spikes/effect-rows/before/A1.calr",
+    "docs/design/spikes/effect-rows/before/A2.calr",
+    "docs/design/spikes/effect-rows/before/A3-callback.calr",
+    "docs/design/spikes/effect-rows/before/A3-map.calr",
+    "docs/design/spikes/effect-rows/before/A3-match.calr",
+    "docs/design/spikes/effect-rows/before/A3-middleware.calr"
+  ]
+}

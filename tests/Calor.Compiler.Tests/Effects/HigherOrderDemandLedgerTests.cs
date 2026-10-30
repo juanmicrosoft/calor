@@ -42,6 +42,12 @@ namespace Calor.Compiler.Tests;
 /// declared names. Independent of Calor's rejection.</item>
 /// </list>
 ///
+/// <para>After syntax retirement, D-A retains its original raw-source census,
+/// but current semantic checks use explicitly registered <see cref="ActiveSyntaxInputs"/>
+/// where needed. Mirrors are not extra subjects. Equality checks current semantics
+/// against the frozen counts; it does not remeasure historical raw inputs, stamp
+/// translated-source results with the old commit, or rewrite the ledger.</para>
+///
 /// <para><b>Anti-tautology pin</b> (the <c>MetadataBinderCorpusMeasurementTests</c>
 /// / <c>BinderIncompleteRatchetTests</c> pattern): each leg re-executes the
 /// measurement live and asserts EXACT per-file / per-subject and aggregate
@@ -241,7 +247,10 @@ public class HigherOrderDemandLedgerTests
                 Assert.True(options.EnforceEffects, "default CompilationOptions must enforce effects");
                 Assert.Equal(UnknownCallPolicy.Strict, options.UnknownCallPolicy);
                 Assert.False(options.StrictEffects);
-                result = Program.Compile(File.ReadAllText(file).Replace("\r\n", "\n"), file, options);
+                // Preserve the frozen census identity, but check explicitly migrated source
+                // with today's compiler. This is not a replay of the archived raw program.
+                var active = ActiveSyntaxInputs.ForCurrentCompiler(root, file);
+                result = Program.Compile(File.ReadAllText(active).Replace("\r\n", "\n"), active, options);
             }
             catch (Exception ex)
             {
@@ -321,7 +330,8 @@ public class HigherOrderDemandLedgerTests
                     //     dispositioned when the pairs landed; PpwFixture records that disposition and why
                     //     the other two options it listed are unavailable. Counts are unchanged either way.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !PpwFixture.IsMatch(rel);
+                    && !PpwFixture.IsMatch(rel)
+                    && !ActiveSyntaxInputs.IsActiveCopy(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))
