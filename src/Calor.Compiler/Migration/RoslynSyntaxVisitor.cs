@@ -2778,8 +2778,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
         if (unsupported?.FeatureName == "file-scoped-type")
             throw EscalateExpression(node, unsupported.FeatureName);
-        if (node.Modifiers.Any(SyntaxKind.StaticKeyword)
-            && node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+        if (node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
             throw EscalateExpression(node, "unsafe");
 
         var id = _context.GenerateId("c");
@@ -4219,6 +4218,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private IReadOnlyList<EventDefinitionNode> ConvertEventFields(EventFieldDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("event-definition");
+        if (node.Modifiers.Any(SyntaxKind.StaticKeyword))
+            throw EscalateExpression(node, "event-definition", preserveMember: true);
         // #1524 review: §EVT has no initializer, so `event Action E = Make();` lost the handler and
         // never ran Make(). Keep the member as C#.
         if (node.Declaration.Variables.FirstOrDefault(variable => variable.Initializer != null) is { } initialized)
@@ -4252,6 +4253,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private EventDefinitionNode ConvertEventDeclaration(EventDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("event-definition");
+        if (node.Modifiers.Any(SyntaxKind.StaticKeyword))
+            throw EscalateExpression(node, "event-definition", preserveMember: true);
 
         var id = _context.GenerateId("evt");
         var name = node.Identifier.ValueText;

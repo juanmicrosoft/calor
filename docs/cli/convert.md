@@ -145,7 +145,7 @@ their member metadata.
 
 Extension functions keep their `this` parameter and must belong to a non-nested,
 non-generic module, as required by C#. Shapes outside native conversion support,
-including by-reference extension receivers, unsafe module declarations and
+including by-reference extension receivers, static events, unsafe type declarations and
 attributes on generic type parameters, remain explicitly reported C#
 interop rather than losing part of their signature. Modules and classes cannot
 share a name and generic arity in the same namespace or containing type

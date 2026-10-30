@@ -72,6 +72,8 @@ public class StaticModuleDeclarationTests
 
         var assembly = Compile(generated);
         var utilities = assembly.GetType("Library.Utilities")!;
+        Assert.Equal(1, utilities.GetMethod("Add")!.GetParameters()[0].DefaultValue);
+        Assert.Equal(4, utilities.GetField("Seed")!.GetRawConstantValue());
         Assert.Equal(12, utilities.GetMethod("Add")!.Invoke(null, [3]));
         var nested = assembly.GetType("Library.Utilities+Nested")!;
         Assert.Equal(10, nested.GetMethod("Twice")!.Invoke(null, [5]));
@@ -113,6 +115,9 @@ public class StaticModuleDeclarationTests
         Assert.Contains(extensions.InteropBlocks, block => block.CSharpCode.Contains("this ref int"));
         Assert.Contains("this ref int", generated);
         Assert.Contains("Obsolete(\"extension\")]", generated);
+        var extensionType = Compile(generated).GetType("Extensions.TextExtensions")!;
+        Assert.Equal(2, extensionType.GetMethod("Bump")!.GetParameters()[1].DefaultValue);
+        Assert.True(extensionType.GetMethod("Bump")!.GetParameters()[0].ParameterType.IsByRef);
         Assert.Equal(5, Compile(generated).GetType("Extensions.Caller")!
             .GetMethod("Run")!.Invoke(null, null));
         AssertSignaturesEqual(source, generated, "Extensions.TextExtensions");
@@ -336,6 +341,62 @@ public class StaticModuleDeclarationTests
         Assert.Contains(result.Losses, loss => loss.Feature == "unsafe");
         Assert.Contains(module.InteropBlocks, block => block.CSharpCode.Contains("unsafe static class Pointers"));
         AssertSignaturesEqual(source, generated, "Library.Pointers");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("static ")]
+    public void NestedUnsafeType_KeepsItsUnsafeContextInsideTheModule(string staticModifier)
+    {
+        var source = $$"""
+            namespace Library;
+            public static class Helpers
+            {
+                public unsafe {{staticModifier}}class Pointers
+                {
+                    public static int* Identity(int* value) { return value; }
+                }
+                public static int Value() { return 42; }
+            }
+            """;
+        var (result, module, generated) = RoundTrip(source);
+        var helpers = Assert.Single(module.Classes);
+        Assert.True(helpers.IsModule);
+        Assert.Empty(helpers.NestedClasses);
+        Assert.Contains(result.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "class");
+        Assert.Contains(helpers.InteropBlocks, block => block.CSharpCode.Contains($"unsafe {staticModifier}class Pointers"));
+        AssertSignaturesEqual(source, generated, "Library.Helpers+Pointers");
+        Assert.Equal(42, Compile(generated).GetType("Library.Helpers")!.GetMethod("Value")!.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData(";")]
+    [InlineData("{ add { } remove { } }")]
+    public void StaticEvents_AreExplicitInteropWithoutLosingAttributesOrStaticness(string body)
+    {
+        var source = $$"""
+            namespace Library;
+            public static class Helpers
+            {
+                [System.Obsolete("kept")]
+                public static event System.Action Changed{{body}}
+                public static int Value() { return 42; }
+            }
+            """;
+        var (result, module, generated) = RoundTrip(source);
+        var helpers = Assert.Single(module.Classes);
+        Assert.True(helpers.IsModule);
+        Assert.Empty(helpers.Events);
+        Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved
+            && loss.Feature == (body == ";" ? "eventfield" : "event"));
+        Assert.Contains(helpers.InteropBlocks, block => block.CSharpCode.Contains("static event"));
+        var @event = Assert.IsAssignableFrom<IEventSymbol>(
+            Assert.Single(Compilation(generated).GetTypeByMetadataName("Library.Helpers")!.GetMembers("Changed")));
+        Assert.True(@event.IsStatic);
+        Assert.Equal(Accessibility.Public, @event.DeclaredAccessibility);
+        Assert.Contains(@event.GetAttributes(), attribute => attribute.AttributeClass?.Name == "ObsoleteAttribute");
+        Assert.Equal(42, Compile(generated).GetType("Library.Helpers")!.GetMethod("Value")!.Invoke(null, null));
     }
 
     [Theory]
