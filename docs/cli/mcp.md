@@ -33,6 +33,19 @@ The `mcp` command starts an MCP server that exposes Calor compiler capabilities 
 
 The server communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io/) specification.
 
+For one build/test/contract call, use the existing tool:
+
+```json
+{"name":"calor_check","arguments":{"action":"loop","path":"/absolute/source/directory","timeoutSeconds":600,"verificationTimeoutMs":5000}}
+```
+
+This returns the same failure-only result as `calor check --format json`
+([validation semantics](/calor/cli/#single-call-validation)). `source` is not
+required for `loop`; the other actions still require it. `loop` does not apply
+fixes. It executes arbitrary tests, so `calor_check` no longer advertises
+read-only or idempotent annotations. Tool and schema inspection never executes
+tests. Use only trusted inputs; `--root` does not sandbox test execution.
+
 ---
 
 ## Options

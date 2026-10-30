@@ -26,3 +26,46 @@ calor test <path> [options]
 
 The command does not replace repository-level `dotnet test`; it is a compact
 execution path for a Calor file or source directory.
+
+## Single-Call Validation
+
+`calor check <path>` compiles, builds, tests, and verifies contracts in one
+call. It snapshots source and test files before compiling, uses one compilation
+for both execution and proof results, and leaves original files unchanged.
+Tests use the same directory layout as `calor test`, including the optional
+`tests/shims/TestShim.calor.cs`. A single-file target does not discover tests;
+pass a directory to run them.
+
+```bash
+calor check path/to/sources --format json
+```
+
+Text mode returns only failures or one success line. JSON contains `success`,
+`exitCode`, `stages`, `failures`, `testsRun`, and `contractsChecked`. Each
+compiler failure carries the shared diagnostic shape, preserving severity,
+code, safe-fix edits, declaration IDs and verification details. Edit paths
+refer to original files; fixes are not applied. Passing test output and proven
+contract details are omitted. Failed tests retain their TRX error details.
+
+Exit 0 requires a build, at least one test, all tests passed, and all contracts
+proven without vacuity. Conditional proofs (`assumed`) and inconclusive results
+(`unknown`, `timeout`, `unsupported`, `unavailable`) remain failures. No contracts
+means zero checked, not a proof of unspecified properties. Exit 3 means no tests;
+compile or verification failures use 1; input/process errors and timeouts use 2.
+Child build/test exit codes are preserved. CLI cancellation exits 130; MCP
+cancellation propagates.
+
+Stages report `passed`, `failed`, `incomplete`, `skipped`, `no_tests`, or
+`timeout`. Generated C# validation errors belong to `compile`; SDK and
+test-project build failures belong to `build`. Compilation failure skips build
+and test; build failure skips test. Already-computed proof failures remain
+visible.
+
+`--timeout <seconds>` bounds each build/test process (1–600, default 600).
+`--verification-timeout <milliseconds>` bounds each contract check (positive,
+default 5000). Neither is a total-call deadline.
+
+**Only run trusted code.** Tests and preserved C# run with your permissions;
+temporary projects are not a sandbox. Package restore may contact NuGet.
+Timeouts and cancellation terminate child process trees and clean temporary
+files. This command does not replace repository-level `dotnet test`.

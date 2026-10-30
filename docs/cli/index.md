@@ -35,6 +35,7 @@ dotnet tool update -g calor
 | `calor` (default) | Compile Calor source files to C# |
 | `calor run` | Compile and execute a Calor program in one step (no project file required) |
 | `calor test` | Compile Calor sources and run xUnit tests against them (no project file required) |
+| `calor check` | Build, test and verify one source snapshot; return failures only |
 | `calor --analyze` | Static analysis: find bugs via dataflow, Z3 verification, and taint tracking |
 | [`calor assess`](/calor/cli/assess/) | Score C# files for Calor migration potential |
 | [`calor init`](/calor/cli/init/) | Initialize Calor with AI agent support and .csproj integration |
@@ -56,6 +57,48 @@ dotnet tool update -g calor
 Machine-readable diagnostics: the compile and lint commands support
 `--format json|sarif` — see [Structured Output](/calor/cli/structured-output/)
 for the JSON schema, SARIF mapping, and exit-code contract.
+
+## Single-call validation
+
+```bash
+calor check path/to/sources --format json
+```
+
+`check` snapshots `.calr` files and the existing `tests/*.cs` xUnit layout,
+including `tests/shims/TestShim.calor.cs`. Discovery excludes `bin/`, `obj/`,
+and `reference/`. It compiles the snapshot once with strict effects and contract
+verification, builds an isolated temporary project, then runs tests with
+`--no-build`. It does not repair source or modify project files. A file target
+builds without discovering adjacent tests; use a directory to run tests.
+
+The JSON result contains `success`, `exitCode`, `stages`, `failures`,
+`testsRun`, and `contractsChecked`. Compiler failures retain the shared
+diagnostic shape, including safe-fix edits, declaration IDs, severity, proof
+status and counterexamples. Fix paths point to the original source. Build and
+runner failures include process errors; failed tests include their TRX details,
+not passing-test output. Generated C# validation errors belong to `compile`;
+SDK and test-project build errors belong to `build`. Each stage reports
+`passed`, `failed`, `incomplete`, `skipped`, `no_tests`, or `timeout`.
+
+Exit 0 requires a successful build, at least one test, all tests passed, and
+every contract proven without vacuity. `assumed`, `unknown`, `timeout`,
+`unsupported`, `unavailable`, and vacuous proofs remain failures, with their
+original proof metadata. No contracts means zero contracts checked, not evidence
+about unspecified properties. Exit 3 means no tests; compilation or verification
+failures use 1; input/process errors and timeouts use 2. Child build/test exit
+codes are preserved. CLI cancellation exits 130; MCP cancellation propagates.
+Compilation failure skips building and testing. Build failure skips testing;
+verification findings already computed from the snapshot remain in the result.
+
+Text mode prints only failures, or one concise success line. `--timeout` sets
+the per-build/test timeout in seconds (1–600, default 600).
+`--verification-timeout` sets the solver timeout per contract in milliseconds
+(positive, default 5000). These are not a total-call deadline.
+
+**Only validate trusted code.** Tests and preserved C# execute with the current
+user's permissions. Temporary workspaces isolate build files, not execution.
+Package restore may access NuGet. Cancellation and timeouts terminate the child
+process tree and clean up the temporary workspace.
 
 ---
 

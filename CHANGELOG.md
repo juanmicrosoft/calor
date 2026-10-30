@@ -21,6 +21,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`calor check` builds, tests and verifies one snapshot.** The matching MCP
+  call is `calor_check` with `action: "loop"`. Both return only failures, keeping
+  diagnostic fixes, proof assumptions and counterexamples. Missing tests,
+  inconclusive contracts and timeouts are not success. Tests run with your
+  permissions; this is not a sandbox.
 - **`calor fix --apply` applies safe diagnostic patches.** It accepts a file or
   directory, supports read-only previews, preserves source encoding, and rejects
   invalid, overlapping or stale edits. It rechecks patched source and reports

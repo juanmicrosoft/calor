@@ -320,6 +320,7 @@ public class Program
         rootCommand.AddCommand(EvaluationCommand.Create());
         rootCommand.AddCommand(RunCommand.Create());
         rootCommand.AddCommand(TestCommand.Create());
+        rootCommand.AddCommand(TestCommand.CreateLoop());
         rootCommand.AddCommand(WatchCommand.Create());
 
         // Parse telemetry options through System.CommandLine so every accepted

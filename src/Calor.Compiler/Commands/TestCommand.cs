@@ -1,5 +1,13 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Xml.Linq;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Ids;
+using Calor.Compiler.Verification;
+using Calor.Compiler.Verification.Z3.Cache;
 
 namespace Calor.Compiler.Commands;
 
@@ -42,6 +50,273 @@ public static class TestCommand
 
         return command;
     }
+
+    public static Command CreateLoop()
+    {
+        var path = new Argument<string>("path", "Calor source file or directory with tests/*.cs xUnit tests");
+        var format = new Option<string>("--format", () => "text", "Output format: text or json");
+        format.FromAmong("text", "json");
+        var timeout = new Option<int>("--timeout", () => 600, "Timeout per build/test process in seconds");
+        var solverTimeout = new Option<int>("--verification-timeout", () => 5000, "Solver timeout per contract in milliseconds");
+        foreach (var option in new[] { timeout, solverTimeout })
+            option.AddValidator(r => { if (r.GetValueOrDefault<int>() <= 0) r.ErrorMessage = "Timeout must be positive."; });
+        var command = new Command("check", "Build, test and verify one source snapshot; return only failures")
+        {
+            path, format, timeout, solverTimeout
+        };
+        command.SetHandler(async (InvocationContext context) =>
+        {
+            try
+            {
+                var result = await RunLoopAsync(
+                    context.ParseResult.GetValueForArgument(path),
+                    context.ParseResult.GetValueForOption(timeout),
+                    context.ParseResult.GetValueForOption(solverTimeout),
+                    context.GetCancellationToken());
+                Console.WriteLine(context.ParseResult.GetValueForOption(format) == "json"
+                    ? JsonSerializer.Serialize(result, LoopJsonOptions)
+                    : result.ToText());
+                context.ExitCode = result.ExitCode;
+            }
+            catch (OperationCanceledException)
+            {
+                Console.Error.WriteLine("Validation cancelled.");
+                context.ExitCode = 130;
+            }
+        });
+        return command;
+    }
+
+    internal static readonly JsonSerializerOptions LoopJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    internal sealed record LoopStage(string Name, string Status, int? ExitCode = null);
+    internal sealed record LoopFailure(string Stage, string Message, EnvelopeDiagnostic? Diagnostic = null);
+    internal sealed class LoopResult
+    {
+        public string Version => JsonDiagnosticFormatter.SchemaVersion;
+        public bool Success => ExitCode == 0;
+        public int ExitCode { get; set; }
+        public List<LoopStage> Stages { get; } = [];
+        public List<LoopFailure> Failures { get; } = [];
+        public int TestsRun { get; set; }
+        public int ContractsChecked { get; set; }
+
+        internal string ToText() => Success
+            ? $"Validation passed: build succeeded, {TestsRun} tests passed, {ContractsChecked} contracts proven."
+            : string.Join(Environment.NewLine, Failures.Select(f => f.Diagnostic is { } d
+                ? $"{d.Location.File}:{d.Location.Line}:{d.Location.Column} {d.Code} {d.Severity}: {d.Message.ReplaceLineEndings(" ")}"
+                    + (d.Verification?.Counterexample is { } counterexample ? $" {counterexample.Rendered}" : "")
+                : $"{f.Stage}: {f.Message.ReplaceLineEndings(" ")}"));
+    }
+
+    // Both surfaces use the same frozen inputs, compilation and proof outcomes.
+    // No original source, project file or test is written or repaired.
+    internal static async Task<LoopResult> RunLoopAsync(
+        string path, int timeoutSeconds = 600, int verificationTimeoutMs = 5000,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var output = new LoopResult();
+        var activeStage = "compile";
+        string? workspace = null;
+        try
+        {
+            if (timeoutSeconds <= 0 || timeoutSeconds > 600 || verificationTimeoutMs <= 0)
+                throw new ArgumentException("Process timeout must be 1..600 seconds and verification timeout must be positive.");
+            var sources = ExecutionWorkspace.ResolveSources(path, out var error);
+            if (sources == null)
+            {
+                output.ExitCode = 2;
+                output.Failures.Add(new("compile", error));
+                output.Stages.Add(new("compile", "failed", 2));
+                return Finish();
+            }
+
+            workspace = ExecutionWorkspace.CreateWorkspace("calor-check");
+            var root = Directory.Exists(path) ? Path.GetFullPath(path) : Path.GetDirectoryName(Path.GetFullPath(path))!;
+            var originals = new Dictionary<string, string>(StringComparer.Ordinal);
+            var snapshots = new List<FileInfo>();
+            foreach (var source in sources)
+            {
+                var snapshot = Path.Combine(workspace, "snapshot", Path.GetRelativePath(root, source.FullName));
+                Directory.CreateDirectory(Path.GetDirectoryName(snapshot)!);
+                await File.WriteAllBytesAsync(snapshot, await File.ReadAllBytesAsync(source.FullName, cancellationToken), cancellationToken);
+                originals.Add(snapshot, source.FullName);
+                snapshots.Add(new FileInfo(snapshot));
+            }
+            // Capture tests before compilation: an edit during build cannot change this run.
+            var testFiles = FindTestFiles(path);
+            var testProject = testFiles.Count > 0
+                ? WriteTestProject(Path.Combine(workspace, "tests"), testFiles)
+                : null;
+            var diagnostics = new DiagnosticBag();
+            var resolver = new DeclarationIdResolver();
+            var options = new List<CompilationOptions>();
+            var units = new List<ExecutionWorkspace.CompiledUnit>();
+            var compiled = CompilationDriver.CompileAll(snapshots, file =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var settings = new CompilationOptions
+                {
+                    EnforceEffects = true,
+                    UnknownCallPolicy = UnknownCallPolicy.Strict,
+                    VerifyContracts = true,
+                    VerificationTimeoutMs = (uint)verificationTimeoutMs,
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                    CancellationToken = cancellationToken,
+                    ProjectDirectory = Path.GetDirectoryName(originals[file.FullName])
+                };
+                options.Add(settings);
+                return settings;
+            }, crossModuleEnforcement: true, crossModulePolicy: UnknownCallPolicy.Strict,
+                diagnosticSink: diagnostics,
+                onAst: (file, source, ast) => resolver.AddFile(file.FullName, source, ast),
+                onCompiled: (_, result) => units.Add(new($"source{units.Count}.g.cs", result.GeneratedCode)));
+            cancellationToken.ThrowIfCancellationRequested();
+            var entries = DiagnosticEnvelope.Build(diagnostics, resolver);
+            foreach (var entry in entries.Where(d => d.Severity == "error"))
+                output.Failures.Add(new("compile", entry.Message, Remap(entry)));
+            output.Stages.Add(new("compile", compiled.AnyErrors ? "failed" : "passed", compiled.AnyErrors ? 1 : 0));
+            var verificationFailures = entries.Where(d => IsProofFailure(d.Verification)).ToList();
+            foreach (var entry in verificationFailures.Where(d => d.Severity != "error"))
+                output.Failures.Add(new("verify", entry.Message, Remap(entry)));
+            output.ContractsChecked = options.Sum(o => o.VerificationResults?.GetSummary().Total ?? 0);
+            var verificationComplete = options.Count == snapshots.Count && options.All(o => o.VerificationResults != null);
+            // Unavailable Z3 is a module-level diagnostic, including modules without contracts.
+            var unavailable = entries.Where(d => d.Code == DiagnosticCode.Z3Unavailable).ToList();
+            foreach (var entry in unavailable)
+                output.Failures.Add(new("verify", entry.Message, Remap(entry,
+                    DiagnosticEnvelope.BuildVerification(ProofOutcome.Assign(ProofEvidence.SolverUnavailable(entry.Message))))));
+            var verificationPassed = verificationComplete && verificationFailures.Count == 0 && unavailable.Count == 0;
+            var verificationStage = new LoopStage("verify",
+                verificationPassed ? "passed" : verificationComplete ? "failed" : "incomplete",
+                verificationComplete ? verificationPassed ? 0 : 1 : null);
+            if (compiled.AnyErrors)
+            {
+                output.ExitCode = 1;
+                output.Stages.Add(new("build", "skipped"));
+                output.Stages.Add(new("test", "skipped"));
+                output.Stages.Add(verificationStage);
+                return output;
+            }
+            activeStage = "build";
+            var dotnet = ExecutionWorkspace.FindDotnet();
+            if (dotnet == null)
+                throw new InvalidOperationException(ExecutionWorkspace.DotnetMissingMessage);
+            var project = ExecutionWorkspace.WriteProject(Path.Combine(workspace, "src"), "CalorSrc", false, units);
+            var build = await ExecutionWorkspace.CaptureProcessAsync(dotnet,
+                ["build", testProject ?? project, "--nologo", "-v", "quiet", "-clp:ErrorsOnly;NoSummary"],
+                workspace, TimeSpan.FromSeconds(timeoutSeconds), cancellationToken);
+            output.Stages.Add(new("build", build.TimedOut ? "timeout" : build.ExitCode == 0 ? "passed" : "failed", build.ExitCode));
+            if (build.ExitCode != 0)
+            {
+                output.ExitCode = build.ExitCode;
+                output.Failures.Add(new("build", $"Build exited with code {build.ExitCode}. {build.Output.Trim()}"));
+                output.Stages.Add(new("test", "skipped"));
+            }
+            else if (testProject == null)
+            {
+                output.ExitCode = NoTestsExitCode;
+                output.Stages.Add(new("test", "no_tests", NoTestsExitCode));
+                output.Failures.Add(new("test", "No tests found: expected tests/*.cs in the target directory."));
+            }
+            else
+            {
+                activeStage = "test";
+                var resultsDir = Path.Combine(workspace, "results");
+                var test = await ExecutionWorkspace.CaptureProcessAsync(dotnet,
+                    ["test", testProject, "--no-build", "--no-restore", "--nologo", "-v", "quiet",
+                        "--logger", "trx;LogFileName=validation.trx", "--results-directory", resultsDir],
+                    workspace, TimeSpan.FromSeconds(timeoutSeconds), cancellationToken);
+                var trxPath = Path.Combine(resultsDir, "validation.trx");
+                var status = test.TimedOut ? "timeout" : "failed";
+                output.ExitCode = test.ExitCode;
+                if (!test.TimedOut && File.Exists(trxPath))
+                {
+                    var trx = XDocument.Load(trxPath);
+                    XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+                    var results = trx.Descendants(ns + "UnitTestResult").ToList();
+                    output.TestsRun = results.Count(r => (string?)r.Attribute("outcome") != "NotExecuted");
+                    foreach (var failed in results.Where(r => (string?)r.Attribute("outcome") != "Passed")
+                                 .OrderBy(r => (string?)r.Attribute("testName"), StringComparer.Ordinal))
+                        output.Failures.Add(new("test", $"{failed.Attribute("testName")?.Value}: {failed.Attribute("outcome")?.Value}: "
+                            + failed.Element(ns + "Output")?.Value.Trim()));
+                    if (results.Count == 0)
+                    {
+                        output.ExitCode = test.ExitCode == 0 ? NoTestsExitCode : test.ExitCode;
+                        status = "no_tests";
+                        output.Failures.Add(new("test", "No tests were executed."));
+                    }
+                    else if (test.ExitCode == 0 && results.All(r => (string?)r.Attribute("outcome") == "Passed"))
+                        status = "passed";
+                    else if (test.ExitCode == 0)
+                        output.ExitCode = 1;
+                    if (status == "failed" && output.Failures.All(f => f.Stage != "test"))
+                        output.Failures.Add(new("test", $"Test runner exited with code {test.ExitCode}. {test.Output.Trim()}"));
+                }
+                else
+                {
+                    if (output.ExitCode == 0) output.ExitCode = 2;
+                    output.Failures.Add(new("test", test.TimedOut ? test.Output : $"Test runner did not produce results. {test.Output.Trim()}"));
+                }
+                output.Stages.Add(new("test", status, output.ExitCode));
+            }
+            output.Stages.Add(verificationStage);
+            if (!verificationPassed && output.ExitCode == 0) output.ExitCode = 1;
+            return output;
+
+            EnvelopeDiagnostic Remap(EnvelopeDiagnostic d, EnvelopeVerification? verification = null)
+            {
+                string? Original(string? value) => value != null && originals.TryGetValue(value, out var original) ? original : value;
+                return new EnvelopeDiagnostic
+                {
+                    Code = d.Code, Message = d.Message, Severity = d.Severity, DeclarationId = d.DeclarationId,
+                    Verification = verification ?? d.Verification, Suggestion = d.Suggestion,
+                    Location = new EnvelopeLocation
+                    {
+                        File = Original(d.Location.File), Line = d.Location.Line,
+                        Column = d.Location.Column, Length = d.Location.Length
+                    },
+                    Fix = d.Fix == null ? null : new EnvelopeFix
+                    {
+                        Description = d.Fix.Description, IsSafeToApply = d.Fix.IsSafeToApply,
+                        Edits = d.Fix.Edits.Select(e => new EnvelopeEdit
+                        {
+                            FilePath = Original(e.FilePath)!, StartLine = e.StartLine, StartColumn = e.StartColumn,
+                            EndLine = e.EndLine, EndColumn = e.EndColumn, NewText = e.NewText
+                        }).ToList()
+                    }
+                };
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Xml.XmlException)
+        {
+            output.ExitCode = 2;
+            output.Failures.Add(new(activeStage, ex.Message));
+            if (output.Stages.All(s => s.Name != activeStage))
+                output.Stages.Add(new(activeStage, "failed", 2));
+            return Finish();
+        }
+        finally
+        {
+            if (workspace != null) ExecutionWorkspace.FinishWorkspace(workspace, keepTemp: false);
+        }
+
+        LoopResult Finish()
+        {
+            foreach (var stage in new[] { "compile", "build", "test", "verify" })
+                if (output.Stages.All(s => s.Name != stage))
+                    output.Stages.Add(new(stage, "skipped"));
+            return output;
+        }
+    }
+
+    internal static bool IsProofFailure(EnvelopeVerification? proof)
+        => proof != null && (proof.Status != "proven" || proof.Vacuous == true);
 
     private static int Execute(string path, ExecutionWorkspace.ExecutionSettings settings)
     {

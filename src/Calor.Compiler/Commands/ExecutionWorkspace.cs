@@ -519,6 +519,62 @@ internal static class ExecutionWorkspace
         return process.ExitCode;
     }
 
+    internal sealed record ProcessResult(int ExitCode, string Output, bool TimedOut = false);
+
+    internal static async Task<ProcessResult> CaptureProcessAsync(
+        string fileName, IReadOnlyList<string> arguments, string workingDirectory,
+        TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var startInfo = new ProcessStartInfo(fileName)
+        {
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        using var process = new Process { StartInfo = startInfo };
+        try
+        {
+            if (!process.Start())
+                return new ProcessResult(2, $"Failed to start process: {fileName}");
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return new ProcessResult(2, $"Failed to start process: {fileName}: {ex.Message}");
+        }
+
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        using var deadline = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+        try
+        {
+            await process.WaitForExitAsync(linked.Token);
+            return new ProcessResult(process.ExitCode, (await stdout) + (await stderr));
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) when (process.HasExited)
+            {
+                // The process exited between inspection and termination.
+            }
+            await process.WaitForExitAsync(CancellationToken.None);
+            await Task.WhenAll(stdout, stderr);
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ProcessResult(TimeoutExitCode, $"Process timed out after {timeout.TotalSeconds:0}s.", TimedOut: true);
+        }
+    }
+
     private static void KillProcessTree(Process process)
     {
         try

@@ -6,6 +6,7 @@ using Calor.Compiler.Formatting;
 using Calor.Compiler.Ids;
 using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Commands;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -18,9 +19,11 @@ public sealed class CheckTool : McpToolBase
     public override string Name => "calor_check";
 
     public override string Description =>
-        "Run code quality checks on Calor source code — diagnostics, lint, typecheck, or snippet validation";
+        "Run Calor quality checks: diagnose, lint, typecheck, validate, or loop (build, execute tests and verify a path snapshot; failures only). Loop runs arbitrary test code.";
 
-    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = false, IdempotentHint = false };
+
+    public override int TimeoutSeconds => 1800;
 
     protected override string GetInputSchemaJson() => """
         {
@@ -28,13 +31,25 @@ public sealed class CheckTool : McpToolBase
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["diagnose", "lint", "typecheck", "validate"],
-                    "description": "Quality check to perform. diagnose=machine-readable diagnostics, lint=format compliance, typecheck=type checking, validate=validate a code snippet",
+                    "enum": ["diagnose", "lint", "typecheck", "validate", "loop"],
+                    "description": "diagnose=diagnostics, lint=format compliance, typecheck=types, validate=snippet, loop=build+tests+contracts for path",
                     "default": "diagnose"
                 },
                 "source": {
                     "type": "string",
                     "description": "Calor source code to check (used as snippet for validate action)"
+                },
+                "path": {
+                    "type": "string",
+                    "description": "File or directory to snapshot, build, test (tests/*.cs xUnit) and verify (loop only). Executes arbitrary tests; does not edit sources."
+                },
+                "timeoutSeconds": {
+                    "type": "integer", "minimum": 1, "maximum": 600, "default": 600,
+                    "description": "Per build/test process timeout (loop only)."
+                },
+                "verificationTimeoutMs": {
+                    "type": "integer", "minimum": 1, "default": 5000,
+                    "description": "Solver timeout per contract (loop only)."
                 },
                 "apply": {
                     "type": "boolean",
@@ -102,7 +117,10 @@ public sealed class CheckTool : McpToolBase
                     "description": "Include token stream in output (validate action)"
                 }
             },
-            "required": ["source"]
+            "anyOf": [
+                { "required": ["source"] },
+                { "required": ["action", "path"], "properties": { "action": { "const": "loop" } } }
+            ]
         ,
 
         "additionalProperties": false
@@ -120,8 +138,21 @@ public sealed class CheckTool : McpToolBase
             "lint" => HandleLint(arguments),
             "typecheck" => HandleTypecheck(arguments, cancellationToken),
             "validate" => HandleValidate(arguments),
-            _ => Task.FromResult(McpToolResult.Error($"Unknown action: {action}. Valid actions: diagnose, lint, typecheck, validate"))
+            "loop" => HandleLoopAsync(arguments, cancellationToken),
+            _ => Task.FromResult(McpToolResult.Error($"Unknown action: {action}. Valid actions: diagnose, lint, typecheck, validate, loop"))
         };
+    }
+
+    private static async Task<McpToolResult> HandleLoopAsync(JsonElement? arguments, CancellationToken cancellationToken)
+    {
+        var path = GetString(arguments, "path");
+        if (string.IsNullOrWhiteSpace(path))
+            return McpToolResult.Error("Missing required parameter: path");
+        if (GetBool(arguments, "apply"))
+            return McpToolResult.Error("loop does not apply fixes; use diagnose with apply explicitly.");
+        var result = await TestCommand.RunLoopAsync(path, GetInt(arguments, "timeoutSeconds", 600),
+            GetInt(arguments, "verificationTimeoutMs", 5000), cancellationToken);
+        return McpToolResult.Json(result, isError: !result.Success);
     }
 
     // ===== Diagnose =====

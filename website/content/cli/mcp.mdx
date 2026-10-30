@@ -31,7 +31,7 @@ assuming names from pre-consolidation documentation.
 | Tool | Purpose |
 |:-----|:--------|
 | `calor_compile` | Compile source to C# and return auto-fix suggestions without writing |
-| `calor_check` | Diagnostics, lint, type checking, or snippet validation |
+| `calor_check` | Diagnostics, lint, type checking, snippet validation, or a build/test/contract loop |
 | `calor_verify` | Seven-status Z3 contract verification with counterexamples |
 | `calor_analyze` | Bug/security analysis, migration assessment, or interop minimization |
 | `calor_convert` | Convert C# to Calor with issues and validation diagnostics |
@@ -53,6 +53,23 @@ assuming names from pre-consolidation documentation.
 Diagnostic-producing tools use the shared [schema 2.0 envelope](/docs/cli/envelope-schema/)
 inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`.
+
+## Build, Test, and Verify in One Call
+
+```json
+{"name":"calor_check","arguments":{"action":"loop","path":"/absolute/source/directory","timeoutSeconds":600,"verificationTimeoutMs":5000}}
+```
+
+`loop` uses the same snapshot and failure-only result as
+[`calor check`](/docs/cli/test/#single-call-validation). It requires `path`,
+not `source`; existing actions still require `source`. It returns safe-fix
+metadata but never applies fixes. Missing tests and non-proven contracts are
+not success.
+
+**Use trusted inputs.** This action executes arbitrary tests with your
+permissions and may restore NuGet packages. `calor_check` therefore advertises
+neither read-only nor idempotent behavior. `--root` does not sandbox test
+execution. Listing tools or inspecting their schemas does not execute code.
 
 ## Conversion Paths in calor_convert, calor_migrate, and calor_batch
 
