@@ -14,6 +14,10 @@ active input files automatically; no manual registration step is required.
 Their existing project/compilation inputs define the boundary:
 they do not discover or rewrite historical inputs. Add the sidecar to version
 control. Agents should edit names and signatures, not identity records.
+Building one registered file or adding a migration output in a subdirectory
+reuses its owning project sidecar rather than creating a shadow store.
+Unregistered inputs do not adopt a store above a nearer project boundary or
+an ambient temporary, home or filesystem root.
 
 For tooling integration and recovery, use:
 
@@ -28,6 +32,9 @@ with the same kind and signature in the same container or file, but only when
 both ends have exactly one candidate. Ambiguous changes fail without changing
 the sidecar. Refactoring integrations can provide explicit identity relocations,
 including moves across both files and containers.
+Container renames are reconciled before retrying unique signature edits, so a
+class rename preserves a self-typed member such as `Echo(A) -> A`. Multiple
+changed overloads remain ambiguous unless tooling supplies an explicit mapping.
 
 Source edits made through the identity transaction API and MCP file-write path
 are journaled with their sidecar update. An interrupted transaction rolls forward
@@ -48,7 +55,9 @@ optional `action` also accepts `rename` and `move`, addressed by `projectDirecto
 `changes` snapshots plus `destinationFile`, `destinationLine` and
 `destinationColumn`. Set `preview: true` to validate without applying. Moves
 validate parsing and identity, not behavioral equivalence. There is no new
-top-level MCP tool. LSP rename returns source and sidecar text changes together
+top-level MCP tool. MCP type rename retains the existing explicit
+`TypeReferencesNotIndexed` refusal; LSP type rename uses its type-aware index.
+LSP rename returns source and sidecar text changes together
 in one client-applied `WorkspaceEdit`; server-side preparation writes neither.
 Sidecar-backed LSP rename requires transactional text-edit support from the
 client and currently refuses unsaved source buffers that differ from disk.
@@ -61,6 +70,7 @@ The shared declaration inventory includes delegates, events, records, unions,
 fields, variants, local functions and proof obligations, including declarations
 inside accessor bodies and conditional branches. Unsupported declaration kinds
 and indistinguishable unnamed proofs fail explicitly rather than disappearing.
+Accessor-local declarations have separate get, set, init, add and remove scopes.
 Named modules use module identities; legacy static classes remain class identities.
 MCP refactor actions reject stale source or sidecar snapshots and parameters
 belonging to a different action.

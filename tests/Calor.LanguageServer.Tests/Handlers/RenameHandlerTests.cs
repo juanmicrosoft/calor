@@ -14,6 +14,54 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class RenameHandlerTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClassRenameKeepsSelfTypedMemberIdentityAsync(bool canonicalSourceId)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var methodId = canonicalSourceId
+                ? Calor.Compiler.Ids.CompactIdGenerator.Generate(Calor.Compiler.Ids.IdKind.Method) + ":" : "";
+            var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{" + methodId
+                + "Echo:pub} (A:value) -> A\n      §R value\n";
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            var before = store.Sync([file]);
+            var originalSidecar = File.ReadAllText(store.SidecarPath);
+            var uri = DocumentUri.FromFileSystemPath(file);
+            var workspace = new WorkspaceState();
+            workspace.GetOrCreate(uri, source, version: 3);
+            var edit = await RenameAtAsync(workspace, uri, source, "A:pub", "B",
+                supportsTransactionalEdits: true);
+            var changes = edit!.DocumentChanges!.ToArray();
+            var sidecarEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit?.TextDocument.Uri.GetFileSystemPath() == store.SidecarPath)).TextDocumentEdit!;
+            var sourceEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit is { } documentEdit && documentEdit.TextDocument.Uri == uri));
+            var updated = ApplySingleDocumentEdit(source, new WorkspaceEdit
+            {
+                DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceEdit)
+            });
+            Assert.Contains("(B:value) -> B", updated);
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.Equal(originalSidecar, File.ReadAllText(store.SidecarPath));
+            File.WriteAllText(file, updated);
+            File.WriteAllText(store.SidecarPath, Assert.Single(sidecarEdit.Edits).NewText);
+            var after = store.Sync();
+            Assert.Equal(before.Declarations.Single(d => d.Name == "Echo").Id,
+                after.Declarations.Single(d => d.Name == "Echo").Id);
+            Assert.Equal(before.Declarations.Single(d => d.Name == "A").Id,
+                after.Declarations.Single(d => d.Name == "B").Id);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
     [InlineData(true, false, false)]
     [InlineData(true, true, false)]
     [InlineData(true, true, true)]

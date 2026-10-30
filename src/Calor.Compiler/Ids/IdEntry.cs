@@ -92,6 +92,38 @@ public sealed class DeclarationIdentityStore
         return null;
     }
 
+    internal static DeclarationIdentityStore? FindForActiveInput(string file, string? projectRoot = null)
+    {
+        var store = Find(file);
+        if (store == null) return null;
+        using (var gate = store.Acquire())
+            if (store.Read(resolveMerge: true).Files.Contains(store.Relative(file), StringComparer.Ordinal))
+                return store;
+        if (projectRoot != null)
+        {
+            var relative = Path.GetRelativePath(Path.GetFullPath(projectRoot), store.Root);
+            return relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !Path.IsPathRooted(relative) ? store : null;
+        }
+
+        // An inferred input directory is not an ownership boundary. A nearer
+        // actual project is; ambient temp/home/root stores are not projects.
+        if (store.Root == Path.GetPathRoot(store.Root)
+            || store.Root == Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()))
+            || store.Root == Path.TrimEndingDirectorySeparator(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)))
+            return null;
+        for (var directory = Path.GetDirectoryName(Path.GetFullPath(file)); directory != null && directory != store.Root;
+             directory = Path.GetDirectoryName(directory))
+        {
+            if (File.Exists(Path.Combine(directory, ".git")) || Directory.Exists(Path.Combine(directory, ".git"))
+                || File.Exists(Path.Combine(directory, "Directory.Build.props"))
+                || File.Exists(Path.Combine(directory, "global.json"))
+                || Directory.EnumerateFiles(directory, "*.csproj", SearchOption.TopDirectoryOnly).Any())
+                return null;
+        }
+        return store;
+    }
+
     public static void AttachIfRegistered(string? file, string source, ModuleNode module)
     {
         if (file == null || !file.EndsWith(".calr", StringComparison.Ordinal) || !File.Exists(file)) return;
@@ -118,7 +150,7 @@ public sealed class DeclarationIdentityStore
     public static void SyncActiveFileInExistingProject(string file)
     {
         if (!file.EndsWith(".calr", StringComparison.Ordinal)) return;
-        var store = Find(file);
+        var store = FindForActiveInput(file);
         if (store == null) return;
         store.Recover();
         store.Sync([file]);
@@ -137,9 +169,7 @@ public sealed class DeclarationIdentityStore
             : Path.GetFullPath(projectRoot);
         string RootFor(string file)
         {
-            var existing = Find(file);
-            return existing != null && !Path.GetRelativePath(common, existing.Root).StartsWith("..", StringComparison.Ordinal)
-                ? existing.Root : common;
+            return FindForActiveInput(file, projectRoot)?.Root ?? common;
         }
         foreach (var group in files.GroupBy(RootFor, StringComparer.Ordinal))
             new DeclarationIdentityStore(group.Key).Sync(group);
@@ -532,17 +562,20 @@ public sealed class DeclarationIdentityStore
         foreach (var old in remainingOld.Values.ToArray())
             if (remainingNew.TryGetValue(old.Key, out var exact)) Match(old, exact);
 
-        // A signature edit at one qualified declaration location preserves that
-        // identity; multiple changed overloads need an explicit tooling mapping.
-        var signatures = remainingOld.Values.ToDictionary(old => old.Id, old => remainingNew.Values
-            .Where(added => old.Kind == added.Kind && old.Name == added.Name && old.File == added.File
-                && TranslateContainer(old.Container) == added.Container).ToArray(), StringComparer.Ordinal);
-        foreach (var old in remainingOld.Values.ToArray())
+        void MatchSignatureEdits()
         {
-            var matches = signatures[old.Id];
-            if (matches.Length > 1 || (matches.Length == 1 && signatures.Values.Count(set => set.Any(d => d.Key == matches[0].Key)) > 1))
-                throw new InvalidOperationException($"Ambiguous signature edit for '{old.Name}'; use an explicit tooling relocation.");
-            if (matches.Length == 1) Match(old, matches[0]);
+            // Unchanged overloads are matched first. A remaining signature edit
+            // must have a unique match in the translated declaration scope.
+            var signatures = remainingOld.Values.ToDictionary(old => old.Id, old => remainingNew.Values
+                .Where(added => old.Kind == added.Kind && old.Name == added.Name && old.File == added.File
+                    && TranslateContainer(old.Container) == added.Container).ToArray(), StringComparer.Ordinal);
+            foreach (var old in remainingOld.Values.ToArray())
+            {
+                var matches = signatures[old.Id];
+                if (matches.Length > 1 || (matches.Length == 1 && signatures.Values.Count(set => set.Any(d => d.Key == matches[0].Key)) > 1))
+                    throw new InvalidOperationException($"Ambiguous signature edit for '{old.Name}'; use an explicit tooling relocation.");
+                if (matches.Length == 1) Match(old, matches[0]);
+            }
         }
 
         var moved = remainingOld.Values.ToDictionary(old => old.Id, old => remainingNew.Values
@@ -554,6 +587,7 @@ public sealed class DeclarationIdentityStore
             if (matches.Length == 1 && moved.Values.Count(set => set.Any(d => d.Key == matches[0].Key)) == 1)
                 Match(old, matches[0]);
         }
+        MatchSignatureEdits();
 
         bool mappedContainer;
         do
@@ -583,6 +617,7 @@ public sealed class DeclarationIdentityStore
                 if (matches.Length == 1 && members.Values.Count(set => set.Any(d => d.Key == matches[0].Key)) == 1)
                     Match(old, matches[0]);
             }
+            MatchSignatureEdits();
         } while (mappedContainer);
 
         // Match an entire bipartite graph, not a greedy sequence: both ends must
@@ -764,6 +799,9 @@ public sealed class DeclarationIdentityStore
                         Add(i, scope, IdKind.Indexer, "this[]", Signature(i.Parameters, new OutputNode(TextSpan.Empty, i.TypeName)));
                         Members(RecursiveAstWalker.GetAllChildren(i), scope + ".this[]#" + Signature(i.Parameters, new OutputNode(TextSpan.Empty, i.TypeName)));
                         break;
+                    case PropertyAccessorNode accessor:
+                        Members(RecursiveAstWalker.GetAllChildren(accessor), scope + ".#" + accessor.Kind.ToString().ToLowerInvariant());
+                        break;
                     case ConstructorNode c:
                         Add(c, scope, IdKind.Constructor, c.IsStatic ? ".cctor" : ".ctor", Signature(c.Parameters, null));
                         Members(RecursiveAstWalker.GetAllChildren(c).Where(n => n is StatementNode), scope + ".ctor#" + Signature(c.Parameters, null));
@@ -775,7 +813,8 @@ public sealed class DeclarationIdentityStore
                     case DelegateDefinitionNode d: Add(d, scope, IdKind.Delegate, d.Name, Signature(d.Parameters, d.Output)); break;
                     case EventDefinitionNode e:
                         Add(e, scope, IdKind.Event, e.Name, e.DelegateType);
-                        Members(RecursiveAstWalker.GetAllChildren(e), scope + "." + e.Name);
+                        Members(e.AddBody ?? [], scope + "." + e.Name + ".#add");
+                        Members(e.RemoveBody ?? [], scope + "." + e.Name + ".#remove");
                         break;
                     case RecordDefinitionNode r:
                         Add(r, scope, IdKind.Record, r.Name, "");

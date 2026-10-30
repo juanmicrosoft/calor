@@ -38,6 +38,191 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Fact]
+    public void NarrowActiveInputSyncRetainsAuthoritativeAncestorStore()
+    {
+        var file = Write("src/A.calr", Original);
+        var before = Store.Sync([file]);
+        DeclarationIdentityStore.SyncActiveInputs([file]);
+        Assert.False(File.Exists(PathFor("src/.calor/ids.json")));
+        Assert.Equal(before.Declarations, Store.Sync().Declarations);
+        var module = CalorSourceHelper.Parse(File.ReadAllText(file), file).Ast!;
+        Assert.Equal(before.Declarations.Single(d => d.Kind == IdKind.Function).Id, module.Functions.Single().Id);
+    }
+
+    [Fact]
+    public void MigrationOutputUsesExistingProjectStoreWithoutShadowingRegisteredSiblings()
+    {
+        var sibling = Write("src/A.calr", Original);
+        var before = Store.Sync([sibling]);
+        var output = PathFor("src/B.calr");
+        ConversionFileWriter.WriteAtomic(output, Original.Replace("Demo", "Added"));
+        Assert.False(File.Exists(PathFor("src/.calor/ids.json")));
+        var after = Store.Sync();
+        Assert.Contains("src/B.calr", after.Files);
+        Assert.Equal(before.Declarations.Single(d => d.Kind == IdKind.Function).Id,
+            CalorSourceHelper.Parse(File.ReadAllText(sibling), sibling).Ast!.Functions.Single().Id);
+    }
+
+    [Fact]
+    public void NewProjectInputsDoNotAdoptUnrelatedAncestorStore()
+    {
+        Store.Sync([Write("unrelated.calr", Original)]);
+        var ancestor = File.ReadAllText(Store.SidecarPath);
+        Write("project/project.csproj", "<Project />");
+        var active = Write("project/A.calr", Original.Replace("Demo", "NewProject"));
+        DeclarationIdentityStore.SyncActiveInputs([active]);
+        ConversionFileWriter.WriteAtomic(PathFor("project/B.calr"), Original.Replace("Demo", "Converted"));
+        Assert.Equal(ancestor, File.ReadAllText(Store.SidecarPath));
+        var project = new DeclarationIdentityStore(PathFor("project"));
+        Assert.Equal(["A.calr", "B.calr"], project.Sync().Files);
+    }
+
+    [Fact]
+    public void NewProjectInputsDoNotRecoverUnrelatedAncestorTransactions()
+    {
+        var unrelated = Write("unrelated.calr", Original);
+        Store.Sync([unrelated]);
+        var ancestor = File.ReadAllText(Store.SidecarPath);
+        var journal = JsonSerializer.Serialize(new
+        {
+            BeforeSidecar = ancestor, AfterSidecar = ancestor,
+            Changes = new[] { new DeclarationIdentityStore.SourceChange("unrelated.calr", Original, Original + "\n") }
+        });
+        File.WriteAllText(PathFor(".calor/ids.transaction.json"), journal);
+        Write("project/project.csproj", "<Project />");
+        var active = Write("project/A.calr", Original.Replace("Demo", "NewProject"));
+        DeclarationIdentityStore.SyncActiveInputs([active]);
+        ConversionFileWriter.WriteAtomic(PathFor("project/B.calr"), Original.Replace("Demo", "Converted"));
+        Assert.Equal(Original, File.ReadAllText(unrelated));
+        Assert.Equal(ancestor, File.ReadAllText(Store.SidecarPath));
+        Assert.Equal(journal, File.ReadAllText(PathFor(".calor/ids.transaction.json")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TextClassRenamePreservesSelfTypedMemberIdentity(bool canonicalSourceId)
+    {
+        var methodId = canonicalSourceId ? CompactIdGenerator.Generate(IdKind.Method) + ":" : "";
+        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{" + methodId
+            + "Echo:pub} (A:value) -> A\n      §R value\n";
+        var file = Write("active.calr", source);
+        var before = Store.Sync([file]);
+        var after = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value)", "(B:value)").Replace("-> A", "-> B");
+        var result = Store.Apply([new(file, source, after)]);
+        Assert.Equal(before.Declarations.Single(d => d.Name == "Echo").Id,
+            result.Declarations.Single(d => d.Name == "Echo").Id);
+        Assert.Equal(before.Declarations.Single(d => d.Name == "A").Id,
+            result.Declarations.Single(d => d.Name == "B").Id);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task McpClassRenameReportsExistingTypeIndexLimitationWithoutEdits(bool canonicalSourceId)
+    {
+        var methodId = canonicalSourceId ? CompactIdGenerator.Generate(IdKind.Method) + ":" : "";
+        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{" + methodId
+            + "Echo:pub} (A:value) -> A\n      §R value\n"
+            + "    §MT{Echo:pub} (i32:value) -> i32\n      §R value\n";
+        var file = Write("active.calr", source);
+        Store.Sync([file]);
+        var sidecar = File.ReadAllText(Store.SidecarPath);
+        var result = await new FileWriteTool(new ProjectSessionManager(), _root).ExecuteAsync(
+            JsonSerializer.SerializeToElement(new
+            {
+                action = "rename", projectDirectory = _root, filePath = file,
+                line = 2, column = 7, newName = "B"
+            }));
+        Assert.True(result.IsError);
+        Assert.Contains("TypeReferencesNotIndexed", result.Content.Single().Text);
+        Assert.Equal(source, File.ReadAllText(file));
+        Assert.Equal(sidecar, File.ReadAllText(Store.SidecarPath));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClassRenamePreservesSelfTypedOverloadsWithOrWithoutExplicitRelocation(bool explicitRelocation)
+    {
+        const string source = """
+            §M{Demo}
+              §CL{A:pub}
+                §MT{Echo:pub} (A:value) -> A
+                  §R value
+                §MT{Echo:pub} (i32:value) -> i32
+                  §R value
+            """;
+        var file = Write("active.calr", source);
+        var before = Store.Sync([file]);
+        var renamed = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value)", "(B:value)").Replace("-> A", "-> B");
+        var relocation = new DeclarationRelocation(before.Declarations.Single(d => d.Name == "A").Id,
+            DeclarationIdentityStore.Describe("active.calr", renamed).Single(d => d.Name == "B").Key);
+        Store.Apply([new(file, source, renamed)], explicitRelocation ? [relocation] : []);
+        var after = Store.Sync();
+        foreach (var method in before.Declarations.Where(d => d.Kind == IdKind.Method))
+            Assert.Equal(method.Id, after.Declarations.Single(d => d.Kind == IdKind.Method
+                && d.Signature == method.Signature.Replace("\"A\"", "\"B\"")).Id);
+    }
+
+    [Fact]
+    public void AmbiguousSelfTypedOverloadEditsAfterClassRenameWriteNothing()
+    {
+        const string source = """
+            §M{Demo}
+              §CL{A:pub}
+                §MT{Echo:pub} (A:value) -> A
+                  §R value
+                §MT{Echo:pub} (A:value, i32:count) -> A
+                  §R value
+            """;
+        var file = Write("active.calr", source);
+        Store.Sync([file]);
+        var sidecar = File.ReadAllText(Store.SidecarPath);
+        var renamed = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value", "(B:value").Replace("-> A", "-> B");
+        Assert.Contains("Ambiguous", Assert.Throws<InvalidOperationException>(() =>
+            Store.Apply([new(file, source, renamed)])).Message);
+        Assert.Equal(source, File.ReadAllText(file));
+        Assert.Equal(sidecar, File.ReadAllText(Store.SidecarPath));
+        Assert.False(File.Exists(PathFor(".calor/ids.transaction.json")));
+    }
+
+    [Theory]
+    [InlineData(false, "property")]
+    [InlineData(true, "property")]
+    [InlineData(false, "indexer")]
+    [InlineData(true, "indexer")]
+    [InlineData(false, "init")]
+    [InlineData(true, "init")]
+    [InlineData(false, "event")]
+    [InlineData(true, "event")]
+    public void AccessorLocalDeclarationsHaveDistinctStableScopes(bool sourceIds, string memberKind)
+    {
+        var member = memberKind switch
+        {
+            "property" => "§PROP{" + (sourceIds ? "p001:" : "") + "P:i32:pub}",
+            "init" => "§PROP{" + (sourceIds ? "p001:" : "") + "P:i32:pub}",
+            "indexer" => "§IXER{ix001:i32:pub}\n      §I{i32:index}",
+            _ => "§EVT{" + (sourceIds ? "e001:" : "") + "Changed:pub:EventHandler}"
+        };
+        var firstAccessor = memberKind == "event" ? "§EADD" : "§GET";
+        var secondAccessor = memberKind == "event" ? "§EREM" : memberKind == "init" ? "§INIT" : "§SET";
+        var source = "§M{Demo}\n  §CL{A:pub}\n    " + member + "\n"
+            + "      " + firstAccessor + "\n        §F{" + (sourceIds ? "f001:" : "") + "Helper:priv} () -> i32\n          §R 1\n"
+            + "      " + secondAccessor + "\n        §F{" + (sourceIds ? "f002:" : "") + "Helper:priv} () -> i32\n          §R 2\n";
+        var file = Write("active.calr", source);
+        var before = Store.Sync([file]).Declarations.Where(d => d.Name == "Helper").ToArray();
+        Assert.Equal(2, before.Length);
+        Assert.NotEqual(before[0].Container, before[1].Container);
+        Assert.NotEqual(before[0].Id, before[1].Id);
+        File.WriteAllText(file, source.Replace("§R 1", "§R 3").Replace("§R 2", "§R 4"));
+        Assert.Equal(before, Store.Sync().Declarations.Where(d => d.Name == "Helper"));
+        var renamed = File.ReadAllText(file).Replace("§CL{A:", "§CL{B:");
+        Store.Apply([new(file, File.ReadAllText(file), renamed)]);
+        Assert.Equal(before.Select(d => d.Id).Order(), Store.Sync().Declarations.Where(d => d.Name == "Helper").Select(d => d.Id).Order());
+    }
+
+    [Fact]
     public void SyncRegistersExplicitInputsWithoutChangingAnySourceBytes()
     {
         var file = Write("active.calr", Original);
