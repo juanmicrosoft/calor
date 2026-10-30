@@ -523,7 +523,6 @@ public sealed class CSharpToCalorConverter
             {
                 return ConvertWholeFileNamespaceInterop(
                     csharpSource,
-                    root,
                     context,
                     startTime,
                     parseOptions,
@@ -1142,28 +1141,12 @@ public sealed class CSharpToCalorConverter
 
     private ConversionResult ConvertWholeFileNamespaceInterop(
             string csharpSource,
-            CompilationUnitSyntax root,
             ConversionContext context,
             DateTime startTime,
             CSharpParseOptions parseOptions,
             OutputKind outputKind,
             CancellationToken cancellationToken)
         {
-            var interop = new CSharpInteropBlockNode(
-                new Parsing.TextSpan(
-                    0,
-                    csharpSource.Length,
-                    1,
-                    1),
-                csharpSource,
-                featureName: "namespace-topology",
-                reason:
-                    "Multiple lexical namespace scopes are preserved as one whole-file interop boundary in lossless mode.")
-            {
-                NamespaceIdentity = "",
-                NamespaceScopeId = "",
-                FullyQualifiedSymbolIdentity = "global::<compilation-unit>"
-            };
             context.RecordLoss(
                 ConversionLossKind.InteropPreserved,
                 "namespace-topology",
@@ -1175,24 +1158,10 @@ public sealed class CSharpToCalorConverter
                 feature: "namespace-topology",
                 line: 1);
 
-            var module = new ModuleNode(
-                GetRootSpan(root),
-                "m001",
-                "_global",
-                Array.Empty<UsingDirectiveNode>(),
-                Array.Empty<InterfaceDefinitionNode>(),
-                Array.Empty<ClassDefinitionNode>(),
-                Array.Empty<EnumDefinitionNode>(),
-                Array.Empty<EnumExtensionNode>(),
-                Array.Empty<DelegateDefinitionNode>(),
-                Array.Empty<FunctionNode>(),
-                new AttributeCollection(),
-                Array.Empty<IssueNode>(),
-                Array.Empty<AssumeNode>(),
-                Array.Empty<InvariantNode>(),
-                Array.Empty<DecisionNode>(),
-                null,
-                [interop]);
+            var module = PreserveCompilationUnit(
+                csharpSource,
+                "namespace-topology",
+                "Multiple lexical namespace scopes are preserved as one whole-file interop boundary.");
             var calorSource = new CalorEmitter(context).Emit(module);
             if (!ParsesCleanly(calorSource))
             {
@@ -1219,14 +1188,27 @@ public sealed class CSharpToCalorConverter
             };
         }
 
-    private static Parsing.TextSpan GetRootSpan(CompilationUnitSyntax root)
+    // Transport-independent final fallback boundary. In particular, do not
+    // reconstruct source from Roslyn tokens or normalize literal indentation.
+    internal static ModuleNode PreserveCompilationUnit(
+        string source,
+        string feature,
+        string reason)
+    {
+        var span = new Parsing.TextSpan(0, source.Length, 1, 1);
+        var interop = new CSharpInteropBlockNode(
+            span, source, feature, reason,
+            isCompilationUnitPassthrough: true)
         {
-            var lineSpan = root.GetLocation().GetLineSpan();
-            return new Parsing.TextSpan(
-                root.SpanStart,
-                root.Span.Length,
-                lineSpan.StartLinePosition.Line + 1,
-                lineSpan.StartLinePosition.Character + 1);
+            NamespaceIdentity = "",
+            NamespaceScopeId = "",
+            FullyQualifiedSymbolIdentity = "global::<compilation-unit>"
+        };
+        return new ModuleNode(
+            span, "m001", "_global",
+            [], [], [], [], [], [], [],
+            new AttributeCollection(),
+            [], [], [], [], null, [interop]);
     }
 
     private static List<int> FindFallbackTokenLines(string text)

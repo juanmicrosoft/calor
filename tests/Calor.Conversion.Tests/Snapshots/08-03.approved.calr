@@ -3,6 +3,5 @@
 
   §CL{c001:Container:pub}
     §CSHARP{    public List<string> Items { get; set; } = [];
-    }§/CSHARP
-
+}§/CSHARP
 

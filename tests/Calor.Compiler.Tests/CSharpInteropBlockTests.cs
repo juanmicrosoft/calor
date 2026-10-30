@@ -11,6 +11,69 @@ namespace Calor.Compiler.Tests;
 
 public class CSharpInteropBlockTests
 {
+    [Theory]
+    [InlineData("\n", true)]
+    [InlineData("\r\n", true)]
+    [InlineData("\n", false)]
+    [InlineData("\r\n", false)]
+    public void WholeCompilationUnitBoundary_PreservesExactSource(string newline, bool finalNewline)
+    {
+        var source = string.Join(newline, new[]
+        {
+            "#if NEVER",
+            "  unmatched \"\"\" {",
+            "#endif",
+            "namespace First { public class A {} }",
+            "namespace Second { public class B {",
+            "  public const string Unicode = \"\u03c0\U0001f600\";",
+            "  public const string Raw = \"\"\"",
+            "      raw }§/CSHARP",
+            "        indentation",
+            "      \"\"\";",
+            "  public const string Verbatim = @\"first",
+            "    second \"\"quoted\"\" }§/CSHARP\";",
+            "} }",
+            "// final comment"
+        }) + (finalNewline ? newline : "");
+        Assert.True(GeneratedCSharpCompiler.Validate(source).CompilationSuccess);
+        var module = CSharpToCalorConverter.PreserveCompilationUnit(
+            source, "validation-failure", "Preserve exact source after validation failure.");
+        var block = Assert.Single(module.InteropBlocks);
+        Assert.True(block.IsCompilationUnitPassthrough);
+        Assert.Equal("validation-failure", block.FeatureName);
+        Assert.Equal(source, block.CSharpCode);
+        Assert.Equal(
+            System.Text.Encoding.UTF8.GetBytes(source),
+            System.Text.Encoding.UTF8.GetBytes(new CSharpEmitter().Emit(module)));
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void WholeCompilationUnitPayload_WithFinalNewline_DoesNotAcquireIndentation(string newline)
+    {
+        var source = string.Join(newline, new[]
+        {
+            "namespace First { public class A {} }",
+            "namespace Second { public class B {",
+            "  public const string Raw = \"\"\"",
+            "      raw }§/CSHARP",
+            "        indentation",
+            "      \"\"\";",
+            "  public const string Verbatim = @\"first",
+            "    second \"\"quoted\"\" }§/CSHARP\";",
+            "} }"
+        }) + newline;
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser();
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal(source, Assert.Single(module.InteropBlocks).CSharpCode);
+        Assert.Equal(source, new CSharpEmitter().Emit(module));
+    }
+
     #region 1. Lexer Tests
 
     [Fact]
