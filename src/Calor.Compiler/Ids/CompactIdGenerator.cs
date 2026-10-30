@@ -70,9 +70,7 @@ public static class CompactIdGenerator
 
     /// <summary>
     /// Deterministically derive a compact payload from a legacy 26-char
-    /// Crockford-uppercase ULID payload. Used by the
-    /// <c>calor fix --compact-ids</c> migrator so that semantic
-    /// identity is preserved when rewriting existing ULIDs.
+    /// Crockford-uppercase ULID payload.
     /// </summary>
     /// <param name="ulidPayload">The 26-char ULID payload (no prefix).</param>
     /// <returns>

@@ -10,8 +10,8 @@ namespace Calor.Compiler.Tests.PropertyTests;
 
 /// <summary>
 /// IdScanner observes declaration identities; it does not rewrite them.
-/// Parse/emit materializes optional IDs; the production compact-ID migrator
-/// canonicalizes legacy ULIDs. Short, compact, and parser-assigned IDs stay stable.
+/// Parse/emit materializes optional IDs. Explicit IDs are preserved, not
+/// rewritten by a legacy migration command.
 /// </summary>
 public sealed class NodeIdCanonicalizationPropertyTests
 {
@@ -58,40 +58,25 @@ public sealed class NodeIdCanonicalizationPropertyTests
 
         var emitted = new CalorEmitter().Emit(before);
         Assert.Equal(original.Select(Identity), scanner.Scan(Parse(emitted), Path).Select(Identity));
-        var migrator = new CompactIdMigrator();
-        var (canonical, log) = migrator.Migrate(new Dictionary<string, string> { [Path] = emitted });
-        Assert.Equal(original.Count(entry => IdValidator.IsLegacyUlidId(entry.Id)), log.Entries.Count);
-        Assert.NotEmpty(log.Entries);
-        var canonicalModule = Parse(canonical[Path]);
+        var canonicalModule = Parse(emitted);
         var canonicalEntries = scanner.Scan(canonicalModule, Path);
         Assert.Equal(expectedCount, canonicalEntries.Count);
         Assert.Equal(expectedCount, canonicalEntries.Select(entry => entry.Id).Distinct(StringComparer.Ordinal).Count());
-        Assert.DoesNotContain(canonicalEntries, entry => string.IsNullOrEmpty(entry.Id) || IdValidator.IsLegacyUlidId(entry.Id));
+        Assert.DoesNotContain(canonicalEntries, entry => string.IsNullOrEmpty(entry.Id));
         Assert.Equal(Shape(before), Shape(canonicalModule));
         foreach (var (oldEntry, newEntry) in original.Zip(canonicalEntries))
         {
             Assert.Equal((oldEntry.Kind, oldEntry.Name), (newEntry.Kind, newEntry.Name));
-            if (IdValidator.IsLegacyUlidId(oldEntry.Id))
-            {
-                Assert.NotEqual(oldEntry.Id, newEntry.Id);
-                Assert.True(IdValidator.IsCompactId(newEntry.Id));
-            }
-            else
-                Assert.Equal(oldEntry.Id, newEntry.Id);
+            Assert.Equal(oldEntry.Id, newEntry.Id);
             if (!newEntry.Id.Contains("_auto", StringComparison.Ordinal))
                 Assert.Equal(IdValidationResult.Valid, IdValidator.Validate(newEntry.Id, newEntry.Kind, isTestPath: true));
         }
 
-        // Fresh passes must discover a fixed point, not depend on cached scanner
-        // state or a retained migration mapping.
-        var emittedAgain = new CalorEmitter().Emit(Parse(canonical[Path]));
-        var (twice, noMigrations) = new CompactIdMigrator().Migrate(
-            new Dictionary<string, string> { [Path] = emittedAgain });
-        Assert.Empty(noMigrations.Entries);
-        Assert.Equal(canonical[Path], twice[Path]);
-        var rescanned = new IdScanner().Scan(Parse(twice[Path]), Path);
+        // Fresh parse/emit passes must discover the same fixed point.
+        var emittedAgain = new CalorEmitter().Emit(canonicalModule);
+        Assert.Equal(emitted, emittedAgain);
+        var rescanned = new IdScanner().Scan(Parse(emittedAgain), Path);
         Assert.Equal(canonicalEntries, rescanned);
-        Assert.Equal(emitted, migrator.Revert(canonical, log)[Path]);
     }
 
     private static ModuleNode Parse(string source)

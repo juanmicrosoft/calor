@@ -107,12 +107,8 @@ payloads.
 | Constructor | `ctor_9m4z7x2qhwjt` |
 
 Short sequential IDs are accepted in `tests/`, `docs/`, and `examples/`.
-Use `calor fix --compact-ids` for a reversible legacy-ULID migration rather
-than regenerating IDs:
-
-```bash
-calor fix src/ --compact-ids --log compact-ids.json
-```
+Formatting preserves explicit IDs. The legacy `calor fix --compact-ids`
+migration option has been removed.
 
 ---
 
@@ -134,5 +130,5 @@ calor ids index src/ --output calor.ids.json
 ## See Also
 
 - [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Identity semantics and limits
-- [calor fix](/docs/cli/fix/) - Reversible ID and syntax migrations
+- [calor fix](/docs/cli/fix/) - Reversible syntax migrations
 - [Structured Output](/docs/cli/structured-output/) - Envelope behavior and exit codes

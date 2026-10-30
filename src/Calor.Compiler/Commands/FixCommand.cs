@@ -11,15 +11,6 @@ namespace Calor.Compiler.Commands;
 ///
 /// Subcommands:
 /// <list type="bullet">
-///   <item><description><c>--drop-structural-ids</c>: strips the leading
-///   <c>{id…}</c> blocks from structural closing tags
-///   (<c>§/M{id}</c> → <c>§/M</c>, etc.). Closing-tag IDs are optional
-///   since v0.5.x — the lexer accepts both forms.</description></item>
-///   <item><description><c>--compact-ids</c>: rewrites legacy
-///   26-character Crockford-uppercase ULID payloads to the v6 12-character
-///   Crockford-lowercase compact form (saves ~9.7 tokens per ID).
-///   The mapping is collision-detected across all files in
-///   <c>root</c>.</description></item>
 ///   <item><description><c>--elide-call-closers</c>: elides <c>§/C</c> on
 ///   zero-arg and one-arg same-line calls.</description></item>
 ///   <item><description><c>--heal-closers</c>: deletes legacy structural
@@ -39,14 +30,6 @@ public static class FixCommand
         {
             Arity = ArgumentArity.ExactlyOne
         };
-
-        var dropStructuralIdsOption = new Option<bool>(
-            aliases: ["--drop-structural-ids"],
-            description: "Drop {id...} blocks from structural closing tags");
-
-        var compactIdsOption = new Option<bool>(
-            aliases: ["--compact-ids"],
-            description: "Rewrite legacy ULID payloads to v6 12-char compact form");
 
         var elideCallClosersOption = new Option<bool>(
             aliases: ["--elide-call-closers"],
@@ -76,8 +59,6 @@ public static class FixCommand
         var command = new Command("fix", "Apply mechanical, reversible source rewrites")
         {
             rootArgument,
-            dropStructuralIdsOption,
-            compactIdsOption,
             elideCallClosersOption,
             healClosersOption,
             revertOption,
@@ -91,8 +72,6 @@ public static class FixCommand
             var parse = context.ParseResult;
             context.ExitCode = await ExecuteAsync(
                 parse.GetValueForArgument(rootArgument),
-                parse.GetValueForOption(dropStructuralIdsOption),
-                parse.GetValueForOption(compactIdsOption),
                 parse.GetValueForOption(elideCallClosersOption),
                 parse.GetValueForOption(healClosersOption),
                 parse.GetValueForOption(revertOption),
@@ -121,8 +100,6 @@ public static class FixCommand
 
     private static async Task<int> ExecuteAsync(
         DirectoryInfo root,
-        bool dropStructuralIds,
-        bool compactIds,
         bool elideCallClosers,
         bool healClosers,
         bool revert,
@@ -137,47 +114,31 @@ public static class FixCommand
             Console.Error.WriteLine($"root directory not found: {root.FullName}");
             return 2;
         }
-        var selectedCount = (dropStructuralIds ? 1 : 0)
-                          + (compactIds ? 1 : 0)
-                          + (elideCallClosers ? 1 : 0)
-                          + (healClosers ? 1 : 0);
+        var selectedCount = (elideCallClosers ? 1 : 0) + (healClosers ? 1 : 0);
         if (selectedCount == 0)
         {
             EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
-                "specify --drop-structural-ids, --compact-ids, --elide-call-closers, or --heal-closers", filePath: null);
-            Console.Error.WriteLine("specify --drop-structural-ids, --compact-ids, --elide-call-closers, or --heal-closers");
+                "specify --elide-call-closers or --heal-closers", filePath: null);
+            Console.Error.WriteLine("specify --elide-call-closers or --heal-closers");
             return 2;
         }
         if (selectedCount > 1)
         {
             EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
-                "--drop-structural-ids, --compact-ids, --elide-call-closers, and --heal-closers are mutually exclusive; run them separately", filePath: null);
-            Console.Error.WriteLine("--drop-structural-ids, --compact-ids, --elide-call-closers, and --heal-closers are mutually exclusive; run them separately");
+                "--elide-call-closers and --heal-closers are mutually exclusive; run them separately", filePath: null);
+            Console.Error.WriteLine("--elide-call-closers and --heal-closers are mutually exclusive; run them separately");
             return 2;
         }
 
-        if (dropStructuralIds)
-        {
-            return revert
-                ? await RevertStructuralIdsAsync(root, log, dryRun, json)
-                : await DropStructuralIdsAsync(root, log, dryRun, json);
-        }
         if (elideCallClosers)
         {
             return revert
                 ? await RevertElideCallClosersAsync(root, log, dryRun, json)
                 : await ElideCallClosersAsync(root, log, dryRun, json);
         }
-        if (healClosers)
-        {
-            return revert
-                ? await RevertHealClosersAsync(root, log, dryRun, json)
-                : await HealClosersAsync(root, log, dryRun, json);
-        }
-        // compactIds
         return revert
-            ? await RevertCompactIdsAsync(root, log, dryRun, json)
-            : await DoCompactIdsAsync(root, log, dryRun, json);
+            ? await RevertHealClosersAsync(root, log, dryRun, json)
+            : await HealClosersAsync(root, log, dryRun, json);
     }
 
     /// <summary>
@@ -241,173 +202,11 @@ public static class FixCommand
         }));
     }
 
-    private static async Task<int> DropStructuralIdsAsync(
-        DirectoryInfo root, FileInfo? logFile, bool dryRun, bool json)
-    {
-        var dropper = new StructuralIdDropper();
-        var migrationLog = new StructuralIdDropper.MigrationLog();
-        int filesChanged = 0;
-        int totalRemovals = 0;
-
-        foreach (var path in EnumerateCalrFiles(root))
-        {
-            var rel = MakeRelativePosix(root, path);
-            var original = await File.ReadAllTextAsync(path, Encoding.UTF8);
-            var (migrated, removals) = dropper.Process(original, rel);
-            if (removals.Count == 0)
-            {
-                continue;
-            }
-            migrationLog.Entries.AddRange(removals);
-            totalRemovals += removals.Count;
-            filesChanged++;
-
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(path, migrated, new UTF8Encoding(false));
-            }
-        }
-
-        if (logFile != null)
-        {
-            var logJson = StructuralIdDropper.SerializeLog(migrationLog);
-            await File.WriteAllTextAsync(logFile.FullName, logJson, new UTF8Encoding(false));
-        }
-
-        EmitSummary(json, "drop-structural-ids", dryRun, filesChanged, totalRemovals,
-            migrationLog.Entries.Select(e => e.File), logFile,
-            $"drop-structural-ids: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} removals={totalRemovals}");
-
-        return 0;
-    }
-
-    private static async Task<int> RevertStructuralIdsAsync(
-        DirectoryInfo root, FileInfo? logFile, bool dryRun, bool json)
-    {
-        if (logFile == null || !logFile.Exists)
-        {
-            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
-                "--revert requires --log <existing migration.log.json>", logFile?.FullName);
-            Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
-            return 2;
-        }
-        var logJson = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
-        var migrationLog = StructuralIdDropper.DeserializeLog(logJson);
-
-        int filesRestored = 0;
-        foreach (var group in migrationLog.Entries.GroupBy(e => e.File))
-        {
-            var migPath = Path.Combine(root.FullName, group.Key.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(migPath))
-            {
-                Console.Error.WriteLine($"skip missing file: {migPath}");
-                continue;
-            }
-            var migrated = await File.ReadAllBytesAsync(migPath);
-            var restored = ReinsertRemovals(migrated, group);
-            if (!dryRun)
-            {
-                await File.WriteAllBytesAsync(migPath, restored);
-            }
-            filesRestored++;
-        }
-        EmitRevertSummary(json, "drop-structural-ids", dryRun, filesRestored);
-        return 0;
-    }
-
-    private static async Task<int> DoCompactIdsAsync(
-        DirectoryInfo root, FileInfo? logFile, bool dryRun, bool json)
-    {
-        // Load every .calr file into memory so the migrator can detect
-        // cross-file collisions in a single pass.
-        var sources = new Dictionary<string, string>(StringComparer.Ordinal);
-        var pathByRel = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var path in EnumerateCalrFiles(root))
-        {
-            var rel = MakeRelativePosix(root, path);
-            sources[rel] = await File.ReadAllTextAsync(path, Encoding.UTF8);
-            pathByRel[rel] = path;
-        }
-
-        var migrator = new CompactIdMigrator();
-        var (migrated, log) = migrator.Migrate(sources);
-
-        int filesChanged = 0;
-        foreach (var (rel, newText) in migrated)
-        {
-            if (newText == sources[rel])
-            {
-                continue;
-            }
-            filesChanged++;
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(pathByRel[rel], newText, new UTF8Encoding(false));
-            }
-        }
-
-        if (logFile != null)
-        {
-            var logJson = CompactIdMigrator.SerializeLog(log);
-            await File.WriteAllTextAsync(logFile.FullName, logJson, new UTF8Encoding(false));
-        }
-
-        EmitSummary(json, "compact-ids", dryRun, filesChanged, log.Entries.Count,
-            log.Entries.Select(e => e.File), logFile,
-            $"compact-ids: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} replacements={log.Entries.Count}");
-
-        return 0;
-    }
-
-    private static async Task<int> RevertCompactIdsAsync(
-        DirectoryInfo root, FileInfo? logFile, bool dryRun, bool json)
-    {
-        if (logFile == null || !logFile.Exists)
-        {
-            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
-                "--revert requires --log <existing migration.log.json>", logFile?.FullName);
-            Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
-            return 2;
-        }
-        var logJson = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
-        var log = CompactIdMigrator.DeserializeLog(logJson);
-
-        // Read every file that the log references.
-        var migrated = new Dictionary<string, string>(StringComparer.Ordinal);
-        var pathByRel = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var rel in log.Entries.Select(e => e.File).Distinct(StringComparer.Ordinal))
-        {
-            var migPath = Path.Combine(root.FullName, rel.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(migPath))
-            {
-                Console.Error.WriteLine($"skip missing file: {migPath}");
-                continue;
-            }
-            migrated[rel] = await File.ReadAllTextAsync(migPath, Encoding.UTF8);
-            pathByRel[rel] = migPath;
-        }
-
-        var migrator = new CompactIdMigrator();
-        var restored = migrator.Revert(migrated, log);
-
-        int filesRestored = 0;
-        foreach (var (rel, restoredText) in restored)
-        {
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(pathByRel[rel], restoredText, new UTF8Encoding(false));
-            }
-            filesRestored++;
-        }
-        EmitRevertSummary(json, "compact-ids", dryRun, filesRestored);
-        return 0;
-    }
-
     private static async Task<int> ElideCallClosersAsync(
         DirectoryInfo root, FileInfo? logFile, bool dryRun, bool json)
     {
         var elider = new CallCloserElider();
-        var migrationLog = new StructuralIdDropper.MigrationLog();
+        var migrationLog = new BytePreservationVerifier.MigrationLog();
         int filesChanged = 0;
         int totalRemovals = 0;
         int filesSkipped = 0;
@@ -489,7 +288,7 @@ public static class FixCommand
         DirectoryInfo root, FileInfo? logFile, bool dryRun, bool json)
     {
         var migrator = new CloserHealMigrator();
-        var migrationLog = new StructuralIdDropper.MigrationLog();
+        var migrationLog = new BytePreservationVerifier.MigrationLog();
         int filesChanged = 0;
         int totalRemovals = 0;
 
@@ -561,7 +360,7 @@ public static class FixCommand
 
     private static byte[] ReinsertRemovals(
         ReadOnlySpan<byte> migrated,
-        IEnumerable<StructuralIdDropper.LogEntry> entries)
+        IEnumerable<BytePreservationVerifier.LogEntry> entries)
     {
         var sorted = entries.OrderBy(e => e.RemovedOffset).ToList();
         int totalLen = migrated.Length + sorted.Sum(e => e.RemovedLength);

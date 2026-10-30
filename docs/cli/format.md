@@ -271,9 +271,8 @@ The lossless Calor formatter applies these rules:
 ### Encoding and IDs
 
 - UTF-8, UTF-8 BOM, UTF-16 LE/BE BOM, and UTF-32 LE/BE BOM are retained
-- Structural IDs are never canonicalized by formatting. Use the dedicated
-  `calor fix --compact-ids` migration for ID changes; it classifies explicit
-  structural marker kinds rather than applying a generic identifier regex
+- Explicit declaration IDs are preserved by formatting. The obsolete
+  `calor fix --compact-ids` migration option has been removed.
 
 ### Before and After
 

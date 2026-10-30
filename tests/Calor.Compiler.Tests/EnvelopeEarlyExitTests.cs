@@ -12,6 +12,16 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class EnvelopeEarlyExitTests : IDisposable
 {
+    [Theory]
+    [InlineData("--compact-ids")]
+    [InlineData("--drop-structural-ids")]
+    public void Fix_RemovedMigrationOption_IsRejected(string option)
+    {
+        var (exitCode, _, stderr) = CliTestHarness.RunCli(_tempDir, "fix", _tempDir, option);
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains(option, stderr);
+    }
+
     private readonly string _tempDir;
 
     public EnvelopeEarlyExitTests()
@@ -181,7 +191,7 @@ public class EnvelopeEarlyExitTests : IDisposable
     {
         var missing = Path.Combine(_tempDir, "no-such-root");
         AssertErrorEnvelope(2, "fix", DiagnosticCode.CliInputNotFound,
-            "fix", missing, "--drop-structural-ids", "--format", "json");
+            "fix", missing, "--heal-closers", "--format", "json");
     }
 
     [Fact]

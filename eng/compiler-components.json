@@ -28,7 +28,7 @@
     {
       "name": "Migration",
       "path": "Migration",
-      "allowedDependencies": ["Analysis", "Ast", "CodeGen", "Ids", "Parsing", "Verification"]
+      "allowedDependencies": ["Analysis", "Ast", "CodeGen", "Parsing", "Verification"]
     },
     {
       "name": "CodeGen",

@@ -41,7 +41,7 @@ namespace Calor.Compiler.Migration;
 ///   absorb into the call's arg expression).</description></item>
 /// </list>
 ///
-/// <para>The <see cref="StructuralIdDropper.LogEntry"/> shape is reused
+/// <para>The <see cref="BytePreservationVerifier.LogEntry"/> shape is reused
 /// so the same <c>--revert --log &lt;file&gt;</c> round-trip semantics
 /// used by <c>calor fix --drop-structural-ids</c> apply to this
 /// migrator as well.</para>
@@ -53,7 +53,7 @@ public sealed class CallCloserElider
     /// </summary>
     public sealed record FileResult(
         string MigratedSource,
-        List<StructuralIdDropper.LogEntry> Removals,
+        List<BytePreservationVerifier.LogEntry> Removals,
         int CallsElided,
         bool Skipped,
         string? SkipReason);
@@ -110,16 +110,16 @@ public sealed class CallCloserElider
         }
 
         // Build log entries in ascending offset order so the revert path
-        // (which reuses StructuralIdDropper.ReinsertRemovals) works.
+        // (which reuses BytePreservationVerifier.ReinsertRemovals) works.
         var originalBytes = Encoding.UTF8.GetBytes(source);
-        var logEntries = new List<StructuralIdDropper.LogEntry>(removals.Count);
+        var logEntries = new List<BytePreservationVerifier.LogEntry>(removals.Count);
         foreach (var (startChar, endChar) in removals.OrderBy(r => r.Start))
         {
             var byteStart = Utf8ByteCount(source, 0, startChar);
             var byteLen = Utf8ByteCount(source, startChar, endChar);
             var removedBytes = new byte[byteLen];
             Array.Copy(originalBytes, byteStart, removedBytes, 0, byteLen);
-            logEntries.Add(new StructuralIdDropper.LogEntry
+            logEntries.Add(new BytePreservationVerifier.LogEntry
             {
                 File = relativeFilePath,
                 RemovedOffset = byteStart,
@@ -415,17 +415,17 @@ public sealed class CallCloserElider
         return true;
     }
 
-    public static string SerializeLog(StructuralIdDropper.MigrationLog log)
+    public static string SerializeLog(BytePreservationVerifier.MigrationLog log)
         => JsonSerializer.Serialize(log, new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         });
 
-    public static StructuralIdDropper.MigrationLog DeserializeLog(string json)
-        => JsonSerializer.Deserialize<StructuralIdDropper.MigrationLog>(json, new JsonSerializerOptions
+    public static BytePreservationVerifier.MigrationLog DeserializeLog(string json)
+        => JsonSerializer.Deserialize<BytePreservationVerifier.MigrationLog>(json, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             PropertyNameCaseInsensitive = true,
-        }) ?? new StructuralIdDropper.MigrationLog();
+        }) ?? new BytePreservationVerifier.MigrationLog();
 }

@@ -215,7 +215,7 @@ public class CallCloserEliderTests
 
     private static byte[] ReinsertRemovals(
         byte[] migrated,
-        IEnumerable<StructuralIdDropper.LogEntry> entries)
+        IEnumerable<BytePreservationVerifier.LogEntry> entries)
     {
         var sorted = entries.OrderBy(e => e.RemovedOffset).ToList();
         var totalLen = migrated.Length + sorted.Sum(e => e.RemovedLength);

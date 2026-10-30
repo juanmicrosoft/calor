@@ -12,7 +12,7 @@ namespace Calor.Compiler.Migration;
 /// level via <see cref="LegacyCloserFormLint.ScanForHeal"/>.
 ///
 /// <para>Removals are recorded as UTF-8 <em>byte</em> ranges plus the removed
-/// bytes (base64) using the shared <see cref="StructuralIdDropper.LogEntry"/>
+/// bytes (base64) using the shared <see cref="BytePreservationVerifier.LogEntry"/>
 /// schema, so a <c>migration.log.json</c> can byte-exactly revert the change via
 /// the same <c>ReinsertRemovals</c> path the other <c>fix</c> subcommands use.
 /// <see cref="LegacyCloserFormLint.ScanForHeal"/> returns offsets in CHARACTER
@@ -26,10 +26,10 @@ public sealed class CloserHealMigrator
     /// Heal one file. Returns the rewritten source and the byte-accurate
     /// removal records (empty when there is nothing to heal).
     /// </summary>
-    public (string Migrated, List<StructuralIdDropper.LogEntry> Removals) Process(
+    public (string Migrated, List<BytePreservationVerifier.LogEntry> Removals) Process(
         string source, string relativeFilePath)
     {
-        var removals = new List<StructuralIdDropper.LogEntry>();
+        var removals = new List<BytePreservationVerifier.LogEntry>();
         var findings = LegacyCloserFormLint.ScanForHeal(source, relativeFilePath);
         if (findings.Count == 0)
         {
@@ -58,7 +58,7 @@ public sealed class CloserHealMigrator
             // shared byte-based revert can reconstruct the file exactly.
             int removedByteStart = Encoding.UTF8.GetByteCount(source.AsSpan(0, startChar));
             var removedBytes = Encoding.UTF8.GetBytes(source.Substring(startChar, endChar - startChar));
-            removals.Add(new StructuralIdDropper.LogEntry
+            removals.Add(new BytePreservationVerifier.LogEntry
             {
                 File = relativeFilePath,
                 RemovedOffset = removedByteStart,
@@ -74,10 +74,10 @@ public sealed class CloserHealMigrator
     }
 
     /// <summary>Serialise a heal log (delegates to the shared schema).</summary>
-    public static string SerializeLog(StructuralIdDropper.MigrationLog log)
-        => StructuralIdDropper.SerializeLog(log);
+    public static string SerializeLog(BytePreservationVerifier.MigrationLog log)
+        => BytePreservationVerifier.SerializeLog(log);
 
     /// <summary>Deserialise a heal log (delegates to the shared schema).</summary>
-    public static StructuralIdDropper.MigrationLog DeserializeLog(string json)
-        => StructuralIdDropper.DeserializeLog(json);
+    public static BytePreservationVerifier.MigrationLog DeserializeLog(string json)
+        => BytePreservationVerifier.DeserializeLog(json);
 }

@@ -15,8 +15,8 @@ Exactly one operation is required:
 |:----------|:--------|
 | `--heal-closers` | Delete removed structural closers such as `§/F` and `§/M` while leaving strings and comments untouched |
 | `--elide-call-closers` | Elide `§/C` for safe zero- and one-argument same-line calls |
-| `--compact-ids` | Convert legacy 26-character ULID payloads to compact IDs with collision detection |
-| `--drop-structural-ids` | Historical intermediate migration that removes IDs from old closer tags |
+
+The obsolete `--compact-ids` and `--drop-structural-ids` options are errors.
 
 ```bash
 calor fix src/ --heal-closers --dry-run
