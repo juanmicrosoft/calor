@@ -3380,16 +3380,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UnaryOperationNode node)
     {
+        if (node.Operator is UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+            or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
+            throw new InvalidOperationException("Increment/decrement expressions must be lowered to §ASSIGN before Calor emission");
         var operand = node.Operand.Accept(this);
         var opSymbol = node.Operator switch
         {
             UnaryOperator.Negate => "-",
             UnaryOperator.Not => "!",
             UnaryOperator.BitwiseNot => "~",
-            UnaryOperator.PreIncrement => "inc",
-            UnaryOperator.PreDecrement => "dec",
-            UnaryOperator.PostIncrement => "post-inc",
-            UnaryOperator.PostDecrement => "post-dec",
             _ => throw new ArgumentOutOfRangeException(nameof(node.Operator), node.Operator, null)
         };
 
