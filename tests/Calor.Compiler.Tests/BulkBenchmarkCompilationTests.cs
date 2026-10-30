@@ -88,7 +88,8 @@ public class BulkBenchmarkCompilationTests
     public void BenchmarkFile_HasExpectedValidatedOutcome(string id, string name, string category, string calorFile)
     {
         var benchmarksDir = GetBenchmarksDir();
-        var fullPath = Path.Combine(benchmarksDir, calorFile);
+        var fullPath = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(),
+            Path.Combine(benchmarksDir, calorFile));
 
         Assert.True(File.Exists(fullPath), $"Missing .calr file: {calorFile}");
 

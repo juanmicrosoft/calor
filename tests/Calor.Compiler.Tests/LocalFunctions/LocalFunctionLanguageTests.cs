@@ -20,7 +20,7 @@ public class LocalFunctionLanguageTests
 
     private const string ShadowingModule = """
         §M{m001:Shadow}
-          §CL{c001:Probe:pub:stat}
+          §M{c001:Probe:pub}
             §MT{m002:Add:pub:stat} (i32:x) -> i32
               §E{cw}
               §P "noisy"
@@ -56,7 +56,7 @@ public class LocalFunctionLanguageTests
     [InlineData("§F{f001:Help} (i32:x) -> i32\n        §R x\n      §R §C{Help} §A 1 §/C", null)]
     public void NativeLocal_EffectsAreChargedToTheEnclosingCallable(string body, string? expectedCode)
     {
-        var source = "§M{m001:E}\n  §CL{c001:Probe:pub:stat}\n    §MT{m002:Get:pub:stat} () -> i32\n      §E{}\n      "
+        var source = "§M{m001:E}\n  §M{c001:Probe:pub}\n    §MT{m002:Get:pub:stat} () -> i32\n      §E{}\n      "
             + body + "\n";
         var compilation = Program.Compile(source, "effects.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -93,7 +93,7 @@ public class LocalFunctionLanguageTests
     {
         var source = """
             §M{m001:Escape}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Help:pub:stat} (i32:x) -> i32
                   §E{}
                   §R x
@@ -116,7 +116,7 @@ public class LocalFunctionLanguageTests
     {
         var source = """
             §M{m001:Del}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Run:pub:stat} () -> str
                   §E{cw}
                   §B{Func<i32, i32>:f} Later
@@ -154,7 +154,7 @@ public class LocalFunctionLanguageTests
         // makes that a compile error rather than a silent rebind to the field.
         var source = """
             §M{m001:Cap}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §FLD{i32:n:priv:stat} 5
 
                 §MT{m002:Get:pub:stat} (i32:n) -> i32
@@ -175,7 +175,7 @@ public class LocalFunctionLanguageTests
     {
         var source = $$"""
             §M{m001:Ver}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Five:pub:stat} () -> i32
                   §S (== result 5)
                   §F{f001:Value} () -> i32
@@ -213,7 +213,7 @@ public class LocalFunctionLanguageTests
                 §E{cw}
                 §P "wrong"
                 §R (+ x 1000)
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Run:pub:stat} () -> str
                   §E{}
                   §B{Func<i32, i32>:g} Add
@@ -235,7 +235,7 @@ public class LocalFunctionLanguageTests
             §M{m001:Cap}
               §F{f001:Add:pub} (i32:x) -> i32
                 §R (+ x 1000)
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Get:pub:stat} (Func<i32, i32>:Add) -> i32
                   §E{cw}
                   §F{f003:L} () -> i32
@@ -253,7 +253,7 @@ public class LocalFunctionLanguageTests
     [InlineData("§R §LAM{l001:x:i32} §C{Help} §A x §/C §/LAM{l001}")]
     public void Review1_LambdaUsingALocalFunction_CarriesItsEffects(string returned)
     {
-        var source = "§M{m001:Escape}\n  §CL{c001:Probe:pub:stat}\n"
+        var source = "§M{m001:Escape}\n  §M{c001:Probe:pub}\n"
             + "    §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}\n      §E{cw}\n"
             + "      §F{f001:Help} (i32:x) -> i32\n        §P \"hidden\"\n        §R x\n"
             + "      " + returned + "\n";
@@ -268,7 +268,7 @@ public class LocalFunctionLanguageTests
     {
         var source = """
             §M{m001:Escape}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §FLD{Func<i32, i32>:Help:priv:stat} §E{}
                 §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
@@ -289,7 +289,7 @@ public class LocalFunctionLanguageTests
         // and not the sibling local Add: no Calor0208, and its row is Unknown.
         var source = """
             §M{m001:Binder}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m001:Add:pub:stat} (str:x) -> str
                   §R x
                 §MT{m002:M:pub:stat} () -> i32
@@ -344,7 +344,7 @@ public class LocalFunctionLanguageTests
         // an escaping lambda it must carry cw.
         var source = """
             §M{m001:Escape}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §FLD{Func<i32, i32>:Help:priv:stat} §E{}
                 §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
@@ -367,7 +367,7 @@ public class LocalFunctionLanguageTests
             §M{m001:Cap}
               §F{f001:Add:pub} (i32:x) -> i32
                 §R (+ x 1000)
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Get:pub:stat} (object:o) -> i32
                   §IF{i1} (is o Func<i32, i32> Add)
                     §R 1
@@ -386,7 +386,7 @@ public class LocalFunctionLanguageTests
     {
         var source = """
             §M{m001:Escape}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §FLD{Func<i32, i32>:Help:priv:stat} §E{}
                 §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}
                   §E{cw}
@@ -405,7 +405,7 @@ public class LocalFunctionLanguageTests
     {
         var source = """
             §M{m001:Escape}
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Get:pub:stat} (bool:c) -> Func<i32, i32> §E{}
                   §E{cw}
                   §R (? c Help Help)
@@ -428,7 +428,7 @@ public class LocalFunctionLanguageTests
     [InlineData("§ASSIGN Probe.Saved Help\n      §R f")]
     public void Review3_LocalFunctionValueInAnUncheckedPosition_IsCalor0211(string body)
     {
-        var source = "§M{m001:Escape}\n  §CL{c001:Probe:pub:stat}\n"
+        var source = "§M{m001:Escape}\n  §M{c001:Probe:pub}\n"
             + "    §FLD{Func<i32, i32>:Saved:pub:stat} §E{}\n"
             + "    §MT{m001:Take:pub:stat} (Func<i32, i32>:g §E{}) -> i32\n      §E{}\n      §R §C{g} §A 1 §/C\n"
             + "    §MT{m002:Get:pub:stat} (Func<i32, i32>:f) -> Func<i32, i32> §E{}\n      §E{cw,mut}\n      "
@@ -469,7 +469,7 @@ public class LocalFunctionLanguageTests
             §M{m001:Shadow}
               §F{f001:Add:pub} (i32:x) -> i32
                 §R (+ x 1000)
-              §CL{c001:Probe:pub:stat}
+              §M{c001:Probe:pub}
                 §MT{m002:Get:pub:stat} () -> i32
                   §L{l001:Add:0:1:1}
                     §B{i32:t} Add

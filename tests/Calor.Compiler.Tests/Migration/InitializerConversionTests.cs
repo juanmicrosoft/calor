@@ -460,7 +460,7 @@ public class InitializerConversionTests
                   §FLD{List<i32>:Xs:pub} = §NEW{List<i32>} §A 5 §/NEW
                   §PROP{p002:Sb:StringBuilder:pub:get,set} = (sb-new)
                   §FLD{i32:After:pub} = 2
-                §CL{c003:Probe:pub:stat}
+                §M{c003:Probe:pub}
                   §MT{m004:Run:pub:stat} () -> str
                     §B{h} §NEW{Holder} §/NEW
                     §R (+ (+ (+ (+ (+ (+ h.Xs.Count ":") (join "," h.Xs)) "|") h.Sb.Capacity) "|") h.After)

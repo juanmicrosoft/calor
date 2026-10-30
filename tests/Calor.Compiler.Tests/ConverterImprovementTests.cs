@@ -1197,18 +1197,19 @@ public class ConverterImprovementTests
     #region Modifier Abbreviation Tests
 
     [Fact]
-    public void CalorEmitter_StaticClass_EmitsStatAbbreviation()
+    public void CalorEmitter_NamedModule_EmitsNoRedundantStaticModifier()
     {
         var source = """
             §M{m1:TestMod}
-              §CL{c1:Helper:pub:stat}
+              §M{c1:Helper:pub}
             """;
 
         var ast = Parse(source);
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains(":stat}", output);
+        Assert.Contains("§M{c1:Helper:pub}", output);
+        Assert.DoesNotContain(":stat}", output);
         Assert.DoesNotContain(":static}", output);
     }
 
@@ -1229,11 +1230,11 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void RoundTrip_StaticClass_PreservesModifier()
+    public void RoundTrip_NamedModule_PreservesStaticIdentity()
     {
         var source = """
             §M{m1:TestMod}
-              §CL{c1:Helper:pub:stat}
+              §M{c1:Helper:pub}
             """;
 
         // Step 1: Parse original

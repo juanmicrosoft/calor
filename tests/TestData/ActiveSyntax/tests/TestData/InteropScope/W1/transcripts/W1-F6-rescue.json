@@ -1,0 +1,109 @@
+{
+  "cli-convert": {
+    "command": "calor convert Counter.cs -o Counter.calr",
+    "exit": 0,
+    "stdout": [
+      "✓ Conversion successful",
+      "Output: <dir>/Counter.calr"
+    ],
+    "stderr": [],
+    "calor": "§M{m001:Counter:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{p002:Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{m003:Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Counter.cs -o Counter.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 8,
+    "interopPreservationCount": 0,
+    "lossCount": 0,
+    "losses": [],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": []
+  },
+  "cli-convert-json-verbose": {
+    "command": "calor convert Counter.cs -o Counter.calr --format json --verbose",
+    "stdoutIsOneJsonDocument": true,
+    "firstStdoutLine": "{"
+  },
+  "cli-compile": {
+    "command": "calor --input Counter.calr --output Counter.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "deferred"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 8,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{p002:Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{m003:Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 8,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [],
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Counter:pub}\n      §FLD{i32:count:priv:stat}\n\n      §PROP{p002:Count:i32:priv:stat}\n        §GET{priv}\n          §R count\n        §SET{priv}\n          §ASSIGN count value\n\n      §MT{m003:Next:pub} () -> i32\n        §ASSIGN Count (+ Count 1)\n        §R Count\n\n\n\n"
+  }
+}

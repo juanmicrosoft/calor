@@ -466,7 +466,7 @@ public sealed class HelpTool : McpToolBase
                 ### Types and Classes
                 ```
                 §CL{id:Name:vis}          Class (body indented)
-                §CL{id:Name:vis:stat}     Static class
+                §M{id:Name:vis}          Named module (static container; functions use §F)
                 §CL{id:Name:vis:struct}   Struct
                 §IFACE{id:Name}           Interface (body indented)
                 §MT{id:name:vis} (type:name, ...) -> retType   Method (body indented)

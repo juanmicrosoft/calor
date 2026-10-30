@@ -115,28 +115,28 @@ with default options:
   §U{System.Collections.Generic}
 
   §NS{ns_global:_global:global}
-    §CL{c001:Inventory:pub:stat}
-      §MT{m002:ParseOr:pub:stat} (str:text, i32:fallback) -> i32
+    §M{c001:Inventory:pub}
+      §F{m002:ParseOr:pub} (str:text, i32:fallback) -> i32
         §B{~n:i32} `default`
         §IF{if003} §C{int.TryParse} §A text §A{out} n §/C
           §R n
         §R fallback
 
-      §MT{m004:CountOf:pub:stat} (Dict<str, i32>:stock, str:item) -> i32
+      §F{m004:CountOf:pub} (Dict<str, i32>:stock, str:item) -> i32
         §B{~count:i32} `default`
         §C{stock.TryGetValue} §A item §A{out} count §/C
         §R count
 
-      §MT{m005:IsNumber:pub:stat} (str:text) -> bool
+      §F{m005:IsNumber:pub} (str:text) -> bool
         §R §C{int.TryParse} §A text §A{out} _ §/C
 
-      §MT{m006:Bump:pub:stat} (i32:x:ref)
+      §F{m006:Bump:pub} (i32:x:ref)
         §ASSIGN x (+ x 1)
 
-      §MT{m007:Twice:pub:stat} (i32:x:in) -> i32
+      §F{m007:Twice:pub} (i32:x:in) -> i32
         §R (* x 2)
 
-      §MT{m008:Run:pub:stat} () -> i32
+      §F{m008:Run:pub} () -> i32
         §B{~total:i32} 1
         §C{Bump} §A{ref} total §/C
         §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A "40" §A 0 §/C)
@@ -317,8 +317,8 @@ public static class Shapes
 ```calor
 §M{m001:Shapes:overflow=unchecked}
   §NS{ns_global:_global:global}
-    §CL{c001:Shapes:pub:stat}
-      §MT{m002:Area:pub:stat} (i32:w, i32:h) -> i32
+    §M{c001:Shapes:pub}
+      §F{m002:Area:pub} (i32:w, i32:h) -> i32
         §F{f003:Clamp} (i32:v) -> i32
           §R (? (< v 0) 0 v)
         §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)
@@ -388,22 +388,22 @@ public static class Grid
   §U{System.Collections.Generic}
 
   §NS{ns_global:_global:global}
-    §CL{c001:Grid:pub:stat}
-      §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]
+    §M{c001:Grid:pub}
+      §F{m002:Pick:pub} (bool:wide, i32:v) -> i32[,]
         §E{alloc}
         §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}
 
-      §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32
+      §F{m007:Sum:pub} (i32[]:xs, i32:start) -> i32
         §B{~s:i32} start
         §EACH{each008:x:var} xs
           §ASSIGN s (+ s x)
         §R s
 
-      §MT{m009:Total:pub:stat} (i32:v) -> i32
+      §F{m009:Total:pub} (i32:v) -> i32
         §E{alloc}
         §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
 
-      §MT{m011:Mixed:pub:stat} () -> i32
+      §F{m011:Mixed:pub} () -> i32
         §RAW
         object[] items = { new List<int> { 1 }, 2 };
         §/RAW
@@ -497,9 +497,10 @@ file is refused, rather than converted to Calor that would behave differently.
 
 **Reading the counts.** `nativeConversionCount` (CLI JSON) and `nativeConversions` (MCP)
 count constructs the converter wrote as Calor, not members. They still include the
-constructs of a type that a rescue later replaced with its original C#. For example, the
-`W1-F6-rescue` fixture reports 8 native conversions and 1 rescue, yet its output is all
-C#. To know whether a file is fully native, read `conversionPaths.outcome` (`native`,
+constructs of a type that a rescue later replaced with its original C#. The historical
+`W1-F6-rescue` private-property fixture did that; it now reports 8 native conversions
+and 0 rescues after the accessor-visibility fix. To distinguish native output from preservation,
+read `conversionPaths.outcome` (`native`,
 `preserved`, `lossy`, `unverified` or `refused`) and the per-path counts next to it.
 `unverified` appears only with `--lossy`: the file was written, but its C# does not
 compile.
@@ -528,9 +529,10 @@ reports in `conversionPaths`:
 | `CSharpToCalorConverter` (library) | No | `PassthroughOnError` |
 
 A member whose Calor does not parse is rescued on every surface in the default lossless
-mode. The private-property example `W1-F6-rescue` shows the difference: `calor convert`
-rescues it and exits 0, MCP `calor_convert` refuses it unless you pass `passthroughOnError`,
-and `calor migrate` refuses the whole one-file project with exit code 1. The
+mode. The private-property example `W1-F6-rescue` no longer needs rescue: every
+surface converts it natively. Its two-file `W1-F6-project` control now writes both
+files successfully; MCP batch reports `failedFiles: 0`. This is a generated-C#
+correctness fix, not a change to the rescue defaults in the table. The
 [`calor convert`](/docs/cli/convert/#which-path-preserved-each-member) and
 [MCP](/docs/cli/mcp/#conversion-paths-in-calor-convert-calor-migrate-and-calor-batch)
 pages show the exact output.

@@ -149,8 +149,10 @@ including by-reference extension receivers, static events, unsafe type declarati
 attributes on generic type parameters, remain explicitly reported C#
 interop rather than losing part of their signature. Modules and classes cannot
 share a name and generic arity in the same namespace or containing type
-(`Calor0201`). Existing `§CL` static declarations remain accepted during migration;
-this does not retire their grammar or select a new namespace-header spelling.
+(`Calor0201`). A static `§CL` declaration is rejected with `Calor0107`: replace
+the container with a named `§M` and write its functions with `§F`. Ordinary
+non-static classes may still declare static members. This uses the existing
+module spelling; it does not select a new namespace-header spelling.
 
 When converting C# to Calor, the converter:
 

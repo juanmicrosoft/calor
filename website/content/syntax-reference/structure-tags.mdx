@@ -44,6 +44,24 @@ Modules are like C# namespaces. They group related functions.
 - A legacy `§/M` closer raises `Calor0830`; migrate with
   [`calor fix --heal-closers`](/docs/cli/fix/)
 
+### Named static containers
+
+A named module inside the compilation unit groups static members and emits as a
+C# static class with the same name. The converter uses this existing form for
+C# static classes, including nested ones:
+
+```calor
+§M{m0:Library}
+  §M{c1:Utilities:pub}
+    §F{f1:Twice:pub} (i32:value) -> i32
+      §R (* value 2)
+```
+
+Static `§CL` declarations are rejected with `Calor0107`; replace the container
+with `§M` and use `§F` for its functions. An ordinary non-static class may still
+have static methods, fields and properties. This does not change namespace-header
+syntax.
+
 ---
 
 ## Functions
@@ -369,16 +387,16 @@ Leave out the visibility segment: a local function is never visible outside its 
 
 ```calor
 §M{m001:LocalFunctions}
-  §CL{c001:Probe:pub:stat}
-    §MT{m002:Add:pub:stat} (i32:x) -> i32
+  §M{c001:Probe:pub}
+    §F{m002:Add:pub} (i32:x) -> i32
       §R (+ x 1000)
 
-    §MT{m003:UseShadow:pub:stat} () -> i32
+    §F{m003:UseShadow:pub} () -> i32
       §F{f001:Add} (i32:x) -> i32
         §R (+ x 1)
       §R §C{Add} §A 2 §/C
 
-    §MT{m004:Fact:pub:stat} (i32:n) -> i32
+    §F{m004:Fact:pub} (i32:n) -> i32
       §R §C{Go} §A n §/C
       §F{f002:Go} (i32:k) -> i32
         §IF{if1} (<= k 1)

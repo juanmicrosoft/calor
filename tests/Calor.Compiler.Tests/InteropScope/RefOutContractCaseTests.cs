@@ -23,7 +23,9 @@ public class RefOutContractCaseTests
 {
     public const string CasesPath = "tests/TestData/InteropScope/D1/refout-cases.json";
 
-    internal static JsonNode Contract() => JsonNode.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(), CasesPath)))!;
+    internal static JsonNode Contract() => JsonNode.Parse(File.ReadAllText(
+        ActiveSyntaxInputs.ForCurrentTypedInput(CliTestHarness.FindRepoRoot(), CasesPath,
+            ActiveSyntaxInputs.InputKind.Structured)))!;
 
     /// <summary>A csharp case's inline source, or an r0-fixture case's committed fixture file.</summary>
     internal static string SourceText(JsonNode c)

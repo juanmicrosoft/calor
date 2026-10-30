@@ -1,0 +1,130 @@
+{
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "calrFilesWritten": 2,
+    "files": [
+      {
+        "file": "Counter.cs",
+        "conversionPaths": {
+          "schemaVersion": 2,
+          "outcome": "native",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false,
+          "roundTrip": "deferred"
+        },
+        "issues": []
+      },
+      {
+        "file": "Inventory.cs",
+        "conversionPaths": {
+          "schemaVersion": 2,
+          "outcome": "native",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false,
+          "roundTrip": "deferred"
+        },
+        "issues": []
+      }
+    ]
+  },
+  "mcp-migrate": {
+    "arguments": "{ projectPath, phase: \"convert\" }",
+    "isError": false,
+    "files": [
+      {
+        "file": "Counter.cs",
+        "conversionPaths": {
+          "schemaVersion": 2,
+          "outcome": "native",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false,
+          "roundTrip": "deferred"
+        },
+        "issues": []
+      },
+      {
+        "file": "Inventory.cs",
+        "conversionPaths": {
+          "schemaVersion": 2,
+          "outcome": "native",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false,
+          "roundTrip": "deferred"
+        },
+        "issues": [
+          "warning:Calor1343:nullable-oblivious-nested-shape",
+          "warning:Calor1343:out-var"
+        ]
+      }
+    ]
+  },
+  "mcp-batch": {
+    "arguments": "{ action: \"convert\", projectPath }",
+    "isError": false,
+    "failedFiles": 0,
+    "files": [
+      {
+        "file": "Counter.cs",
+        "conversionPaths": {
+          "schemaVersion": 2,
+          "outcome": "native",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false,
+          "roundTrip": "deferred"
+        },
+        "issues": []
+      },
+      {
+        "file": "Inventory.cs",
+        "conversionPaths": {
+          "schemaVersion": 2,
+          "outcome": "native",
+          "interop": 0,
+          "rescue": 0,
+          "passthrough": 0,
+          "lossy": 0,
+          "dropped": 0,
+          "triggers": {},
+          "rescueUnusableMembers": false,
+          "passthroughOnError": false,
+          "roundTrip": "deferred"
+        },
+        "issues": [
+          "warning:Calor1343:nullable-oblivious-nested-shape",
+          "warning:Calor1343:out-var"
+        ]
+      }
+    ]
+  }
+}

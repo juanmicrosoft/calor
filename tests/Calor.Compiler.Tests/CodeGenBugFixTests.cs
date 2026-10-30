@@ -1022,15 +1022,15 @@ public class CodeGenBugFixTests
 
     #endregion
 
-    #region Static Class :st Modifier
+    #region Named Static Modules
 
     [Fact]
-    public void StaticClass_StModifier_ParsedCorrectly()
+    public void NamedModule_EmitsStaticClass()
     {
-        // §CL{c1:Utils:st} should produce a static class
+        // Named modules retain the original C# static type name.
         var source = @"
 §M{m1:Test}
-  §CL{c1:Utils:st}
+  §M{c1:Utils}
       §MT{mt1:Add:pub:stat}
           §I{i32:a}
           §I{i32:b}
@@ -1043,12 +1043,11 @@ public class CodeGenBugFixTests
     }
 
     [Fact]
-    public void StaticClass_StatModifier_StillWorks()
+    public void NamedModule_StaticMethod_RemainsCallable()
     {
-        // Backward compat: §CL{c1:Utils:stat} should still work
         var source = @"
 §M{m1:Test}
-  §CL{c1:Utils:stat}
+  §M{c1:Utils}
       §MT{mt1:Add:pub:stat}
           §I{i32:a}
           §I{i32:b}
@@ -1061,12 +1060,11 @@ public class CodeGenBugFixTests
     }
 
     [Fact]
-    public void StaticClass_StaticModifier_StillWorks()
+    public void NamedModule_ExplicitStaticMember_EmitsNoDuplicateModifier()
     {
-        // Backward compat: §CL{c1:Utils:static} should still work
         var source = @"
 §M{m1:Test}
-  §CL{c1:Utils:static}
+  §M{c1:Utils}
       §MT{mt1:Add:pub:stat}
           §I{i32:a}
           §I{i32:b}

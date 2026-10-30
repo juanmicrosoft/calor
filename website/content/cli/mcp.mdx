@@ -119,7 +119,7 @@ Before 0.25, a custom `moduleName` (or an `inputPath`, from which the module
 name is derived) stopped the rescue from finding a global-namespace type's
 original C#, so these calls failed. They now rescue like the others.
 
-### Defaults, Counts, and Partial Failures
+### Defaults, Counts, and Per-File Outcomes
 
 Every conversion result reports the two options that applied, so you can check
 the defaults below in `paths` or `conversionPaths`:
@@ -150,12 +150,13 @@ Partial results look like this:
   return such output with `isError: false`.
 - **`calor_batch` and `calor_migrate`:** in the default lossless mode, one failed
   file means no file is written. Every file then reports `outcome: "refused"` with
-  its counts, and the result has `isError: true`. In the `W1-F6-project` fixture, a
-  two-file project with one file that needs a rescue, `calor_batch` reports
-  `failedFiles: 2`. With `skipOnError: false`, the response also carries `error`,
+  its counts, and the result has `isError: true`. With `skipOnError: false`,
+  the response also carries `error`,
   naming the first failed file, and a `preservationPaths` line. Their
   `conversionPaths.roundTrip` is `deferred`: the project-wide compile does the
-  round-trip check, and a failure there refuses the file.
+  round-trip check, and a failure there refuses the file. The current two-file
+  `W1-F6-project` fixture succeeds after the private-property accessor fix:
+  both files report `native`, and `calor_batch` reports `failedFiles: 0`.
 
 The [C# interoperability guide](/docs/guides/csharp-interoperability/) shows, per
 C# feature, what `calor_convert` returns with and without `passthroughOnError`.

@@ -261,7 +261,7 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:st}";
+  §M{c1:Helper}";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.True(cls.IsStatic);
@@ -284,7 +284,7 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:st}";
+  §M{c1:Helper}";
         var csharp = ParseAndEmit(source);
         Assert.Contains("static class Helper", csharp);
     }
@@ -455,16 +455,15 @@ public class Test
     #region Edge cases: st + struct interaction
 
     [Fact]
-    public void Parser_StStruct_DoesNotProduceStaticStruct()
+    public void Parser_StaticStructDeclaration_IsRejected()
     {
-        // "st struct" should parse as static struct, not double-stat
         var source = @"
 §M{m1:Test}
   §CL{c1:Point:st struct}";
-        var module = ParseModule(source);
-        var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic, "Should be static");
-        Assert.True(cls.IsStruct, "Should be struct");
+        var result = Program.Compile(source, "static-struct.calr");
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.InvalidModifier
+            && diagnostic.Message.Contains("Static class declarations are removed", StringComparison.Ordinal));
     }
 
     [Fact]

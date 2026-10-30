@@ -262,8 +262,9 @@ public class IteratorAccessorConversionTests
     public void NativeYieldInAnAccessor_IsStillCalor0209()
     {
         // F4-ITER-03: the regression control. Native illegal yields stay rejected.
-        var calor = File.ReadAllText(Path.Combine(
-            CliTestHarness.FindRepoRoot(), R0Fixtures, "F4-ITER-03.calr.txt"));
+        var calor = File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
+            CliTestHarness.FindRepoRoot(), R0Fixtures + "/F4-ITER-03.calr.txt",
+            ActiveSyntaxInputs.InputKind.CalorText));
         var compilation = Program.Compile(calor, "F4-ITER-03.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0209");

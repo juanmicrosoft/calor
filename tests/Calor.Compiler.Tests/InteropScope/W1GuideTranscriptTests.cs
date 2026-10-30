@@ -12,7 +12,9 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// JSON), the CLI output is compiled with default options, the fixture is migrated with
 /// <c>calor migrate</c>, and it is converted with MCP <c>calor_convert</c> with and without
 /// <c>passthroughOnError</c>. The observation must equal the committed transcript in
-/// <c>transcripts/</c>; regenerate with <c>CALOR_REGENERATE_W1_TRANSCRIPTS=1</c> (a changed
+/// the typed active transcript when registered, otherwise the unchanged original. Regenerate
+/// registered current copies only with <c>CALOR_REGENERATE_W1_TRANSCRIPTS=1</c>; historical
+/// originals are never regeneration targets (a changed
 /// transcript is a review decision, and the pages that quote it must change with it). A website
 /// fence preceded by <c>{/* w1-transcript: ID */}</c> must equal that fixture's CLI output.
 /// </summary>
@@ -59,8 +61,8 @@ public sealed class W1GuideTranscriptTests : IDisposable
     public async Task Transcript_MatchesTheCommittedFixture(string id) => Compare(id, await ObserveAsync(id));
 
     /// <summary>
-    /// W1-F6-project: a two-file project (W1-F1-refout, native; W1-F6-rescue, needs a round-trip
-    /// rescue). Project surfaces never rescue a round-trip failure, so the lossless project is refused.
+    /// W1-F6-project: the historical refusal now has a native current result after the
+    /// private-property accessor fix. Both files must be written, without changing rescue policy.
     /// </summary>
     [Fact]
     public async Task ProjectTranscript_MatchesTheCommittedFixture()
@@ -117,8 +119,9 @@ public sealed class W1GuideTranscriptTests : IDisposable
 
     private static void Compare(string id, JsonObject observed)
     {
-        var path = Path.Combine(CliTestHarness.FindRepoRoot(), Dir, "transcripts", id + ".json");
-        if (Regenerate)
+        var original = $"{Dir}/transcripts/{id}.json";
+        var path = CurrentTranscript(id);
+        if (Regenerate && ActiveSyntaxInputs.TypedRegistrations.ContainsKey(original))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, observed.ToJsonString(new JsonSerializerOptions
@@ -135,6 +138,9 @@ public sealed class W1GuideTranscriptTests : IDisposable
                 $"{id} {surface} changed: committed {committed[surface]?.ToJsonString()}, observed {cell?.ToJsonString()}");
         Assert.Equal(observed.AsObject().Count, committed.AsObject().Count);
     }
+
+    private static string CurrentTranscript(string id) => ActiveSyntaxInputs.ForCurrentTranscript(
+        CliTestHarness.FindRepoRoot(), $"{Dir}/transcripts/{id}.json");
 
     private static readonly Regex SourceMarker = new(@"\{/\* w1-source: (?<id>[A-Za-z0-9-]+) \*/\}\s*\n```csharp[^\n]*\n(?<body>.*?)\n```", RegexOptions.Singleline);
 
@@ -213,7 +219,7 @@ public sealed class W1GuideTranscriptTests : IDisposable
             foreach (Match m in Marker.Matches(text))
             {
                 var id = m.Groups["id"].Value;
-                var transcript = Path.Combine(root, Dir, "transcripts", id + ".json");
+                var transcript = CurrentTranscript(id);
                 Assert.True(File.Exists(transcript), $"{Path.GetFileName(page)} names unknown transcript {id}");
                 var calor = JsonNode.Parse(File.ReadAllText(transcript))!["cli-convert"]!["calor"]!.GetValue<string>();
                 if (m.Groups["lines"].Success)

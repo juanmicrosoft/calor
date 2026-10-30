@@ -9212,7 +9212,7 @@ public sealed class Parser
                 var lower = token.ToLowerInvariant();
                 var hint = ClassModifierKeywords.Contains(lower)
                     ? $"Use '{lower}' instead."
-                    : "Use a supported class modifier such as 'abs', 'stat', or 'struct'.";
+                    : "Use a supported class modifier such as 'abs' or 'struct'; static containers use a named module.";
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
                     $"Unknown class modifier '{token}'. Modifiers are case-sensitive. {hint}");
             }
@@ -9224,6 +9224,11 @@ public sealed class Parser
         var isStatic = isModule || modifierTokens.Any(t => t.Equals("st", StringComparison.Ordinal)
             || t.Equals("stat", StringComparison.Ordinal)
             || t.Equals("static", StringComparison.Ordinal));
+        if (!isModule && isStatic)
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                $"Static class declarations are removed. Replace '§CL{{{id}:{name}:...}}' with a named module '§M{{{id}:{name}:...}}'; use §F for its functions. Static members of non-static classes remain supported.");
+        }
         var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.Ordinal));
         var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.Ordinal));
         var isReadOnly = modifierTokens.Any(t => t.Equals("readonly", StringComparison.Ordinal));

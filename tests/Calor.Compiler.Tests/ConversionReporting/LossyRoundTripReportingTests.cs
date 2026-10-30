@@ -18,10 +18,9 @@ namespace Calor.Compiler.Tests.ConversionReporting;
 public class LossyRoundTripReportingTests : IDisposable
 {
     /// <summary>
-    /// A private static property with accessor bodies: the lossy output does not compile (CS0273/CS0274).
-    /// #1632 fixed the previous input, a label before the last statement, whose statement was dropped.
+    /// A nullable array local still fails the round trip, unlike the repaired label/property fixtures.
     /// </summary>
-    private const string TrailingLabel = "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }";
+    private const string NullableArray = ConversionPathReportingTests.RoundTripFailure;
 
     /// <summary>A second, unrelated input: yield inside try/finally emits C# that does not compile.</summary>
     private const string YieldInTryFinally =
@@ -33,7 +32,7 @@ public class LossyRoundTripReportingTests : IDisposable
     /// <summary>Negative control with a recorded lossy drop (the destructor) whose output still compiles.</summary>
     private const string Destructor = "public class D { public int V = 1; ~D() { V = 0; } public int M() => V; }";
 
-    private static readonly string[] FailingInputs = [TrailingLabel, YieldInTryFinally];
+    private static readonly string[] FailingInputs = [NullableArray, YieldInTryFinally];
 
     private readonly string _tempDir = Directory.CreateTempSubdirectory("calor-1514-").FullName;
 
@@ -94,12 +93,12 @@ public class LossyRoundTripReportingTests : IDisposable
     [Fact]
     public void Library_Lossless_IsUnchanged_RefusesAndReportsTheFailedCheck()
     {
-        var refused = Convert(TrailingLabel, new ConversionOptions());
+        var refused = Convert(NullableArray, new ConversionOptions());
         Assert.False(refused.Success);
         Assert.Equal("refused", refused.Paths.Outcome);
         Assert.Equal(ConversionRoundTrip.Failed, refused.Paths.RoundTrip);
         Assert.Contains(refused.Issues, i =>
-            i.Severity == ConversionIssueSeverity.Error && i.Feature == "roundtrip-csharp-validation");
+            i.Severity == ConversionIssueSeverity.Error && i.Feature == "roundtrip-calor-validation");
         Assert.DoesNotContain(refused.Issues, i => i.Feature == "lossy-roundtrip-unverified");
 
         var native = Convert(Plain, new ConversionOptions());
@@ -141,7 +140,7 @@ public class LossyRoundTripReportingTests : IDisposable
         // depends on a sibling file also fails a standalone compile, and a rescue that cannot
         // recover would turn PassthroughOnError's completed lossy conversion into a refusal
         // (Issue769NamespaceTopologyTests pins that case).
-        var result = Convert(TrailingLabel, new ConversionOptions
+        var result = Convert(NullableArray, new ConversionOptions
         {
             Fidelity = ConversionFidelity.Lossy,
             PassthroughOnError = true
@@ -256,7 +255,7 @@ public class LossyRoundTripReportingTests : IDisposable
     [Fact]
     public void Cli_Default_IsUnchanged_RescuesAndVerifies()
     {
-        var (exit, stdout, stderr, _) = Cli(TrailingLabel, "--format", "json");
+        var (exit, stdout, stderr, _) = Cli(NullableArray, "--format", "json");
         Assert.True(exit == 0, stderr);
         var paths = Data(stdout).GetProperty("conversionPaths");
         Assert.Equal("preserved", paths.GetProperty("outcome").GetString());
@@ -278,7 +277,7 @@ public class LossyRoundTripReportingTests : IDisposable
         var documented = JsonDocument.Parse(example.Groups[1].Value).RootElement
             .EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
-        var (_, stdout, _, _) = Cli(TrailingLabel, "--lossy", "--format", "json");
+        var (_, stdout, _, _) = Cli(NullableArray, "--lossy", "--format", "json");
         var actual = Data(stdout).GetProperty("conversionPaths")
             .EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
         Assert.Equal(documented, actual);

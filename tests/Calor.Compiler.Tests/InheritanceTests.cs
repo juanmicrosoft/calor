@@ -586,7 +586,8 @@ public class InheritanceTests
     [Fact]
     public void Benchmark_TemplateMethod_ParsesSuccessfully()
     {
-        var testDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData", "Benchmarks", "DesignPatterns", "TemplateMethod.calr");
+        var testDataPath = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr");
         var source = File.ReadAllText(testDataPath);
         var module = Parse(source, out var diagnostics);
 
@@ -597,7 +598,8 @@ public class InheritanceTests
     [Fact]
     public void Benchmark_Visitor_ParsesSuccessfully()
     {
-        var testDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData", "Benchmarks", "DesignPatterns", "Visitor.calr");
+        var testDataPath = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr");
         var source = File.ReadAllText(testDataPath);
         var module = Parse(source, out var diagnostics);
 

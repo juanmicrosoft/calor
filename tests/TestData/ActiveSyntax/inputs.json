@@ -48,7 +48,27 @@
     "docs/design/spikes/effect-rows/before/A3-map.calr",
     "docs/design/spikes/effect-rows/before/A3-match.calr",
     "docs/design/spikes/effect-rows/before/A3-middleware.calr",
-    "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
+    "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr",
+    "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr",
+    "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr"
+  ],
+  "calorTextPaths": [
+    "tests/TestData/InteropScope/R0/fixtures/F4-ITER-03.calr.txt",
+    "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt"
+  ],
+  "structuredPaths": [
+    "tests/TestData/InteropScope/D1/refout-cases.json"
+  ],
+  "transcriptPaths": [
+    "tests/TestData/InteropScope/W1/transcripts/W1-F1-notnullwhen.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F1-ref-return-expression.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F5-arrays.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F1-outvar-statement.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F3-local-functions.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F2-interpolation.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F1-refout.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F6-rescue.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F6-project.json"
   ],
   "executables": [
     {

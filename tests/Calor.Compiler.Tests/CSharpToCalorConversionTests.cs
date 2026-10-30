@@ -2609,7 +2609,7 @@ public class CSharpToCalorConversionTests
     {
         var calorSource = """
             §M{m1:TestModule}
-                §CL{c001:Utils:pub:st}
+                §M{c001:Utils:pub}
                     §MT{m001:Add:pub:st}
                         §I{i32:a}
                         §I{i32:b}
@@ -2662,7 +2662,7 @@ public class CSharpToCalorConversionTests
             §M{m1:TestModule}
                 §F{main:Main:pub}
                     §O{void}
-                §CL{c001:Foo:pub:st}
+                §M{c001:Foo:pub}
             """;
 
         var diagnostics = new DiagnosticBag();

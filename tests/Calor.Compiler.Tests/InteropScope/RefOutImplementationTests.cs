@@ -143,8 +143,8 @@ public class RefOutImplementationTests
         "  §CL{c1:K:pub}\n    §PROP{p1:N:i32:pub}\n      §GET\n      §SET\n    §MT{m1:Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C",
         "  §CL{c1:K:pub}\n    §FLD{i32:N:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C")]
     [InlineData("static readonly field outside its static constructor",
-        "  §CL{c1:K:pub:stat}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> void\n      §C{Bump} §A{ref} n §/C",
-        "  §CL{c1:K:pub:stat}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> i32\n      §R §C{Twice} §A{in} n §/C")]
+        "  §M{c1:K:pub}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> void\n      §C{Bump} §A{ref} n §/C",
+        "  §M{c1:K:pub}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> i32\n      §R §C{Twice} §A{in} n §/C")]
     [InlineData("in parameter passed as ref",
         "  §F{f1:Run:pub} (i32:p:in) -> void\n    §C{Bump} §A{ref} p §/C",
         "  §F{f1:Run:pub} (i32:p:in) -> i32\n    §R §C{Twice} §A{in} p §/C")]
@@ -226,7 +226,7 @@ public class RefOutImplementationTests
     public void AliasNarrowing_IsInvalidatedOnlyWhenStorageMayBeShared(string parameters, string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §CL{c1:K:pub:stat}
+              §M{c1:K:pub}
                 §FLD{?str:slot:pub:stat}
                 §MT{m1:ClearSlot:pub:stat} ()
                   §E{mut}
@@ -276,7 +276,7 @@ public class RefOutImplementationTests
               §CL{c001:Box:pub}
                 §OP{op001:+:pub} (Box:x, Box:y) -> Box
                   §R x
-              §CL{c002:K:pub:stat}
+              §M{c002:K:pub}
                 §MT{mt002:Check:pub:stat} (?str:a:ref, Box:x) -> i32
                   §IF{if001} (!= a null)
                     {{step}}
@@ -295,7 +295,7 @@ public class RefOutImplementationTests
                 §IMPL{System.IDisposable}
                 §MT{mt001:Dispose:pub} () -> void
                   §R
-              §CL{c002:K:pub:stat}
+              §M{c002:K:pub}
                 §MT{mt002:Check:pub:stat} (?str:a:ref, D:d) -> i32
                   §IF{if001} (!= a null)
                     §L{l001:i:0:1:1}

@@ -202,7 +202,7 @@ public class ClassVisibilityTests
     {
         var calorSource = """
             §M{m1:Test}
-                §CL{c1:Foo:int:static}
+                §M{c1:Foo:int}
             """;
 
         var compilationResult = Program.Compile(

@@ -21,7 +21,7 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
+              §M{c001:Tuples:pub}
                 §MT{m002:GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
                   §IF{if003} (< a b)
                     §R (a, b)
@@ -44,7 +44,7 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
+              §M{c001:Tuples:pub}
                 §MT{m002:GetPerson:pub:stat} () -> (str Name, i32 Age)
                   §R ("Alice", 30)
             """;
@@ -63,7 +63,7 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
+              §M{c001:Tuples:pub}
                 §MT{m002:GetFirst:pub:stat} ((i32, i32):tuple) -> i32
                   §R tuple.Item1
             """;
@@ -87,7 +87,7 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
+              §M{c001:Tuples:pub}
                 §MT{m002:MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
                   §R (a, b)
             """;
@@ -113,7 +113,7 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
+              §M{c001:Tuples:pub}
                 §MT{m002:GetPair:pub:stat} () -> (i32, i32)
                   §R (10, 20)
             """;
@@ -132,7 +132,7 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
+              §M{c001:Tuples:pub}
                 §MT{m002:GetPerson:pub:stat} () -> (str, i32)
                   §R ("Alice", 30)
             """;

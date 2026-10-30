@@ -31,7 +31,7 @@ public sealed class FloatLiteralConversionTests
     {
         var source = $$"""
             §M{m1:Singles}
-              §CL{c1:Migrated:pub:stat}
+              §M{c1:Migrated:pub}
                 §MT{mt1:Probe:pub:stat} () -> object
                   §E{}
                   §R {{literal}}

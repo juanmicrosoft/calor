@@ -2,8 +2,8 @@
   §U{System}
   §U{Calor.Runtime}
 
-  §CL{c001:CollectionsModule:int:stat}
-    §MT{m002:Main:pub:stat}
+  §M{c001:CollectionsModule:int}
+    §F{m002:Main:pub}
       §LIST{numbers:i32}
         1
         2

@@ -702,12 +702,12 @@
       "id": "static_class",
       "csharpConstruct": "static class",
       "keywords": ["static", "static class", "utility", "helper"],
-      "calorSyntax": "§CL{id:Name:pub:stat}",
-      "description": "Defines a static class (utility class). Use 'stat' modifier.",
+      "calorSyntax": "§M{id:Name:pub}",
+      "description": "Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.",
       "examples": [
         {
           "csharp": "public static class StringHelper { }",
-          "calor": "§CL{c001:StringHelper:pub:stat}\n  ..."
+          "calor": "§M{c001:StringHelper:pub}"
         }
       ]
     },

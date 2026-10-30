@@ -116,11 +116,11 @@ reported as `passthrough`; C# the converter keeps in every mode stays `interop`.
 So on the command line `--passthrough` rarely changes the report unless you also
 pass `--lossy`.
 
-Try it on a class with a private static property that has accessor bodies (its
-converted C# does not compile yet, so the round trip fails):
+Private static properties with accessor bodies now convert natively. Previously,
+redundant accessor visibility made the generated C# invalid and triggered rescue:
 
+{/* w1-source: W1-F6-rescue */}
 ```csharp
-// Counter.cs
 public class Counter
 {
     private static int count;
@@ -135,14 +135,29 @@ calor convert Counter.cs -o Counter.calr
 ```
 
 ```text
-Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:
-  InteropPreserved: 1
-    /home/you/demo/Counter.cs:? [post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter' did not parse or did not survive the C# round trip; original C# preserved (#717).
-  ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.
-  Preservation paths: 1 by automatic rescue (round-trip-failure: 1; no passthrough request needed)
+✓ Conversion successful
+Output: Counter.calr
 ```
 
-The CLI prints the input's full path; `/home/you/demo` stands in for yours.
+The current output keeps the ordinary class and its static members:
+
+{/* w1-transcript: W1-F6-rescue */}
+```calor
+§M{m001:Counter:overflow=unchecked}
+  §NS{ns_global:_global:global}
+    §CL{c001:Counter:pub}
+      §FLD{i32:count:priv:stat}
+
+      §PROP{p002:Count:i32:priv:stat}
+        §GET{priv}
+          §R count
+        §SET{priv}
+          §ASSIGN count value
+
+      §MT{m003:Next:pub} () -> i32
+        §ASSIGN Count (+ Count 1)
+        §R Count
+```
 
 With `--format json`, every `data.losses[]` entry carries `path`, and `trigger`
 and `enabledBy` when they apply. `data.conversionPaths` summarizes the file:
@@ -150,9 +165,9 @@ and `enabledBy` when they apply. `data.conversionPaths` summarizes the file:
 ```json illustrative
 "conversionPaths": {
   "schemaVersion": 2,
-  "outcome": "preserved",
-  "interop": 0, "rescue": 1, "passthrough": 0, "lossy": 0, "dropped": 0,
-  "triggers": { "round-trip-failure": 1 },
+  "outcome": "native",
+  "interop": 0, "rescue": 0, "passthrough": 0, "lossy": 0, "dropped": 0,
+  "triggers": {},
   "rescueUnusableMembers": true,
   "passthroughOnError": false,
   "roundTrip": "verified"
@@ -261,11 +276,11 @@ converts to:
 
 ```calor
 §M{m001:Probe}
-  §CL{c001:Probe:pub:stat}
-    §MT{m002:Add:pub:stat} (i32:x) -> i32
+  §M{c001:Probe:pub}
+    §F{m002:Add:pub} (i32:x) -> i32
       §R (+ x 1000)
 
-    §MT{m003:UseShadow:pub:stat} () -> i32
+    §F{m003:UseShadow:pub} () -> i32
       §F{f001:Add} (i32:x) -> i32
         §R (+ x 1)
       §R §C{Add} 2
@@ -466,18 +481,18 @@ converts to:
 
 ```calor
 §M{m001:Grids}
-  §CL{c001:Grid:pub:stat}
-    §MT{m002:Pick:pub:stat} (bool:wide, i32:v) -> i32[,]
+  §M{c001:Grid:pub}
+    §F{m002:Pick:pub} (bool:wide, i32:v) -> i32[,]
       §E{alloc}
       §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}
 
-    §MT{m007:Sum:pub:stat} (i32[]:xs, i32:start) -> i32
+    §F{m007:Sum:pub} (i32[]:xs, i32:start) -> i32
       §B{~s:i32} start
       §EACH{each008:x:var} xs
         §ASSIGN s (+ s x)
       §R s
 
-    §MT{m009:Total:pub:stat} (i32:v) -> i32
+    §F{m009:Total:pub} (i32:v) -> i32
       §E{alloc}
       §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
 ```

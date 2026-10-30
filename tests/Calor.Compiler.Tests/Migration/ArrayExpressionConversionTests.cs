@@ -680,11 +680,11 @@ public class ArrayExpressionConversionTests
     public async Task StatementPositionArrays_PreserveEmittedCSharpAcrossModuleMigration()
     {
         // Keep the historical R0 bytes; compare codegen across the approved Length/module spellings.
-        var baseline = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
-            "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt"));
+        var baseline = File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt",
+            ActiveSyntaxInputs.InputKind.CalorText));
         var (calor, _) = await ConvertAsync(R0Fixture("F5-ARRAY-03"), Surface.McpDefault);
-        var old = Program.Compile(baseline.Replace("(len one)", "one.Length", StringComparison.Ordinal)
-            .Replace("(len two)", "two.Length", StringComparison.Ordinal), "arrays.calr");
+        var old = Program.Compile(baseline, "arrays.calr");
         var current = Program.Compile(calor, "arrays.calr");
         Assert.False(old.HasErrors, string.Join("\n", old.Diagnostics.Errors));
         Assert.False(current.HasErrors, string.Join("\n", current.Diagnostics.Errors));
@@ -978,7 +978,7 @@ public class ArrayExpressionConversionTests
     public void EmptyJaggedArray_KeepsItsElementRank()
     {
         // PR 2 Codex round 3: an empty §ARR of i32[] is Array.Empty<int[]>(), not Array.Empty<int>().
-        const string calor = "§M{m1:T}\n  §CL{c1:P:pub:stat}\n    §MT{f1:Make:pub:stat} () -> i32[][]\n      §E{alloc}\n      §R §ARR{a:i32[]} §/ARR{a}\n";
+        const string calor = "§M{m1:T}\n  §M{c1:P:pub}\n    §MT{f1:Make:pub:stat} () -> i32[][]\n      §E{alloc}\n      §R §ARR{a:i32[]} §/ARR{a}\n";
         var compilation = Program.Compile(calor, "empty.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
         Assert.Contains("Array.Empty<int[]>()", compilation.GeneratedCode);
@@ -992,7 +992,7 @@ public class ArrayExpressionConversionTests
             §M{m1:T}
               §CL{c1:Cell:pub}
                 §FLD{i32:V:pub}
-              §CL{c2:G:pub:stat}
+              §M{c2:G:pub}
                 §MT{m2:Get:pub:stat} (Cell[,]:g, [Cell]:xs) -> i32
                   §R (+ (§IDX2D g 0 1).V (§IDX{xs} 0).V)
             """;
@@ -1011,7 +1011,7 @@ public class ArrayExpressionConversionTests
         // Rank 3+ and sized initializers: the rows are innermost vectors, regrouped by
         // the sizes. A row count that disagrees with the sizes is rejected (CS0847),
         // never padded or truncated.
-        var calor = $"§M{{m1:T}}\n  §CL{{c1:G:pub:stat}}\n    §MT{{m2:Make:pub:stat}} () -> {type}\n      §E{{alloc}}\n      §R {array}\n";
+        var calor = $"§M{{m1:T}}\n  §M{{c1:G:pub}}\n    §MT{{m2:Make:pub:stat}} () -> {type}\n      §E{{alloc}}\n      §R {array}\n";
         var compilation = Program.Compile(calor, "sized.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(csharp, compilation.GeneratedCode ?? "");
         Assert.Equal(!compiles, compilation.HasErrors);
@@ -1024,7 +1024,7 @@ public class ArrayExpressionConversionTests
     {
         // The elements of §ARR2D rows are effect-inferred (they were not, so a row could
         // carry an effect its function did not declare).
-        var calor = $"§M{{m1:T}}\n  §CL{{c1:G:pub:stat}}\n    §MT{{m2:Go:pub:stat}} () -> void\n      §E{{alloc}}\n      {statement}\n";
+        var calor = $"§M{{m1:T}}\n  §M{{c1:G:pub}}\n    §MT{{m2:Go:pub:stat}} () -> void\n      §E{{alloc}}\n      {statement}\n";
         var compilation = Program.Compile(calor, "effects.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Equal(undeclaredEffect, compilation.Diagnostics.Errors.Any(d => d.Code == "Calor0410"));
     }

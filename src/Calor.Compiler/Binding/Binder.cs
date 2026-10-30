@@ -1062,7 +1062,7 @@ public sealed class Binder
                     || extensionParameters.Length != 1 || extensionParameters[0].index != 0))
             {
                 _diagnostics.ReportError(method.IdentifierSpan, DiagnosticCode.InvalidReference,
-                    $"Extension function '{method.Name}' must be static in a non-nested, non-generic module (or legacy static class), with 'this' only on its first parameter.");
+                    $"Extension function '{method.Name}' must be static in a non-nested, non-generic module, with 'this' only on its first parameter.");
             }
             var lookupName = GetCallableLookupName(method.Name);
             var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";

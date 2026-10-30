@@ -41,7 +41,7 @@ public class ArrayMemberEffectParityTests
     [InlineData("System.Threading.Tasks.ValueTask[]", "§C{g.Initialize} §/C", false)]
     public void ArrayInstanceMembers_HaveMainsEffectResult(string receiver, string statement, bool unknown)
     {
-        var calor = $"§M{{m1:T}}\n  {Extensions}\n  §CL{{c1:G:pub:stat}}\n    §MT{{m2:Go:pub:stat}} ({receiver}:g) -> void\n      §E{{}}\n      {statement}\n";
+        var calor = $"§M{{m1:T}}\n  {Extensions}\n  §M{{c1:G:pub}}\n    §MT{{m2:Go:pub:stat}} ({receiver}:g) -> void\n      §E{{}}\n      {statement}\n";
         var compilation = Program.Compile(calor, "parity.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         var effects = compilation.Diagnostics
             .Where(d => d.Code.StartsWith("Calor04", StringComparison.Ordinal))

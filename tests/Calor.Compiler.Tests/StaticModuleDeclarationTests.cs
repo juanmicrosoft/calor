@@ -17,7 +17,9 @@ public class StaticModuleDeclarationTests
 {
     public static IEnumerable<object[]> ActiveStaticModuleInputs() =>
         ActiveSyntaxInputs.OriginalPaths
-            .Where(path => path.StartsWith("bench/phase0-agent-native/fixtures/d-s1.5/", StringComparison.Ordinal))
+            .Where(path => path.StartsWith("bench/phase0-agent-native/fixtures/d-s1.5/", StringComparison.Ordinal)
+                || path is "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr"
+                    or "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr")
             .Order(StringComparer.Ordinal)
             .Select(path => new object[] { path });
 
@@ -26,10 +28,27 @@ public class StaticModuleDeclarationTests
     public void RegisteredActiveMirror_PreservesExactReleaseCSharp(string original)
     {
         var root = CliTestHarness.FindRepoRoot();
-        var originalModule = Parse(File.ReadAllText(Path.Combine(root, original)));
+        var source = File.ReadAllText(Path.Combine(root, original));
+        var originalModule = ParseRejectedHistoricalStatic(source);
         var activeModule = Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root, original)));
         Assert.Equal(new CSharpEmitter(EmitContractMode.Release).Emit(originalModule),
             new CSharpEmitter(EmitContractMode.Release).Emit(activeModule));
+    }
+
+    [Theory]
+    [InlineData("tests/TestData/InteropScope/R0/fixtures/F4-ITER-03.calr.txt")]
+    [InlineData("tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt")]
+    public void CalorTextMirror_PreservesExactReleaseCSharp(string original)
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var source = File.ReadAllText(Path.Combine(root, original))
+            .Replace("(len one)", "one.Length", StringComparison.Ordinal)
+            .Replace("(len two)", "two.Length", StringComparison.Ordinal);
+        var historical = ParseRejectedHistoricalStatic(source);
+        var active = Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentTypedInput(
+            root, original, ActiveSyntaxInputs.InputKind.CalorText)));
+        Assert.Equal(new CSharpEmitter(EmitContractMode.Release).Emit(historical),
+            new CSharpEmitter(EmitContractMode.Release).Emit(active));
     }
 
     [Fact]
@@ -463,19 +482,26 @@ public class StaticModuleDeclarationTests
         }
     }
 
-    [Fact]
-    public void LegacyStaticClasses_RemainAcceptedUntilGrammarRetirement()
+    [Theory]
+    [InlineData("st")]
+    [InlineData("stat")]
+    [InlineData("static")]
+    [InlineData("stat,partial")]
+    [InlineData("partial,static")]
+    [InlineData("pub,st")]
+    public void LegacyStaticClasses_AreRejectedWithNamedModuleReplacement(string modifiers)
     {
-        var module = Parse("""
+        var source = $$"""
             §M{m0:Library}
-              §CL{c1:Helpers:pub:stat}
+              §CL{c1:Helpers:{{modifiers}}}
                 §MT{mt1:Get:pub:stat} () -> i32
                   §R 1
-            """);
-        var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic);
-        Assert.False(cls.IsModule);
-        Compile(new CSharpEmitter().Emit(module));
+            """;
+        var result = Program.Compile(source, "legacy-static.calr");
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.InvalidModifier
+            && diagnostic.Message.Contains("§M{c1:Helpers:", StringComparison.Ordinal));
+        Assert.True(result.HasErrors);
     }
 
     [Fact]
@@ -625,6 +651,20 @@ public class StaticModuleDeclarationTests
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Parser(tokens, diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)) + "\n" + source);
+        return module;
+    }
+
+    private static ModuleNode ParseRejectedHistoricalStatic(string source)
+    {
+        // Recovery AST is only a negative old-form/codegen control, never accepted compilation.
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.NotEmpty(diagnostics.Errors);
+        Assert.All(diagnostics.Errors, diagnostic =>
+        {
+            Assert.Equal(DiagnosticCode.InvalidModifier, diagnostic.Code);
+            Assert.Contains("Static class declarations are removed", diagnostic.Message);
+        });
         return module;
     }
 

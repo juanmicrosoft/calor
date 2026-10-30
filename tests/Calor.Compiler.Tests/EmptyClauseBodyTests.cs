@@ -23,7 +23,7 @@ public class EmptyClauseBodyTests
           §U{System}
 
           §NS{ns_global:_global:global}
-            §CL{c001:Probe:pub:stat}
+            §M{c001:Probe:pub}
               §FLD{i32:counter:priv:stat} = 0
 
               §MT{m002:Work:pub:stat} (bool:fail)

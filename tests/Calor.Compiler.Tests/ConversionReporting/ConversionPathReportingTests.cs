@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Calor.Compiler.Mcp;
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests.ConversionReporting;
@@ -10,18 +12,28 @@ namespace Calor.Compiler.Tests.ConversionReporting;
 /// each member (converter interop, automatic rescue, requested passthrough) with the
 /// trigger that fired, or reports the file as refused. Test names carry the registered
 /// F6-REPORT case ids. Fixtures are the R0 (#1426) C# inputs in tests/TestData/InteropScope/R0/, plus
-/// one inline input (a trailing label) that only rescue or passthrough can convert.
+/// one inline nullable-array input that still requires round-trip rescue or passthrough.
 /// </summary>
 public class ConversionPathReportingTests : IDisposable
 {
     private const string Fixtures = "tests/TestData/InteropScope/R0/fixtures";
 
     /// <summary>
-    /// A private static property with accessor bodies: the native output fails the C# round trip
-    /// (CS0273/CS0274), so the library default refuses. #1632 fixed the previous stand-in, a label
-    /// before the last statement (`here: return x;`), whose statement the converter dropped.
+    /// A reduced version of RoundTripFailureStandIn: current Calor compilation refuses
+    /// its nullable array boundary. Labels and private properties no longer supply a failure.
     /// </summary>
-    private const string TrailingLabel = "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }";
+    internal const string RoundTripFailure = """
+        #nullable enable
+        public class G
+        {
+            public object[] Build()
+            {
+                object[]? cells = Make();
+                return cells;
+            }
+            private static string[] Make() => new string[] { "a", "b" };
+        }
+        """;
 
     private readonly string _tempDir = Directory.CreateTempSubdirectory("calor-f6-").FullName;
 
@@ -104,7 +116,15 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public void F6_REPORT_07_LibraryDefault_RefusesRoundTripFailure_AndSaysRescueWasOff()
     {
-        var result = Convert(TrailingLabel, new ConversionOptions());
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator).Select(path => MetadataReference.CreateFromFile(path));
+        var original = CSharpCompilation.Create("PolicyStandIn",
+            [CSharpSyntaxTree.ParseText(RoundTripFailure)], references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var output = new MemoryStream();
+        var compiled = original.Emit(output);
+        Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));
+        var result = Convert(RoundTripFailure, new ConversionOptions());
 
         Assert.False(result.Success);
         Assert.Equal("refused", result.Paths.Outcome);
@@ -116,7 +136,7 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public void F6_REPORT_12_Library_RescueOnly_PassthroughOnly_Both_AreDistinguished()
     {
-        var source = TrailingLabel;
+        var source = RoundTripFailure;
 
         var rescue = Convert(source, new ConversionOptions { RescueUnusableMembers = true });
         AssertPaths(rescue, ConversionPath.Rescue, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.RescueUnusableMembers, 1);
@@ -152,11 +172,11 @@ public class ConversionPathReportingTests : IDisposable
     [Fact]
     public void F6_REPORT_11_CustomModuleName_NoLongerDisablesRescue()
     {
-        var passthrough = Convert(TrailingLabel, new ConversionOptions { PassthroughOnError = true, ModuleName = "Custom" });
+        var passthrough = Convert(RoundTripFailure, new ConversionOptions { PassthroughOnError = true, ModuleName = "Custom" });
         Assert.True(passthrough.Success);
         AssertPaths(passthrough, ConversionPath.Passthrough, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.PassthroughOnError, 1);
 
-        var rescue = Convert(TrailingLabel, new ConversionOptions { RescueUnusableMembers = true, ModuleName = "Custom" });
+        var rescue = Convert(RoundTripFailure, new ConversionOptions { RescueUnusableMembers = true, ModuleName = "Custom" });
         Assert.True(rescue.Success);
         AssertPaths(rescue, ConversionPath.Rescue, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.RescueUnusableMembers, 1);
         Assert.Contains("§CSHARP", rescue.CalorSource);
@@ -194,12 +214,12 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
-    public void Library_TrailingLabel_DiscriminatesRefusedPassthroughAndRescue()
+    public void Library_RoundTripFailure_DiscriminatesRefusedPassthroughAndRescue()
     {
-        Assert.Equal("refused", Convert(TrailingLabel, new ConversionOptions()).Paths.Outcome);
-        AssertPaths(Convert(TrailingLabel, new ConversionOptions { PassthroughOnError = true }),
+        Assert.Equal("refused", Convert(RoundTripFailure, new ConversionOptions()).Paths.Outcome);
+        AssertPaths(Convert(RoundTripFailure, new ConversionOptions { PassthroughOnError = true }),
             ConversionPath.Passthrough, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.PassthroughOnError, 1);
-        AssertPaths(Convert(TrailingLabel, new ConversionOptions { RescueUnusableMembers = true }),
+        AssertPaths(Convert(RoundTripFailure, new ConversionOptions { RescueUnusableMembers = true }),
             ConversionPath.Rescue, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.RescueUnusableMembers, 1);
     }
 
@@ -315,8 +335,8 @@ public class ConversionPathReportingTests : IDisposable
             PassthroughOnError = passthrough
         };
 
-        Assert.Equal("refused", Convert(TrailingLabel, Options(rescue: true, passthrough: false)).Paths.Outcome);
-        AssertPaths(Convert(TrailingLabel, Options(rescue: true, passthrough: true)),
+        Assert.Equal("refused", Convert(RoundTripFailure, Options(rescue: true, passthrough: false)).Paths.Outcome);
+        AssertPaths(Convert(RoundTripFailure, Options(rescue: true, passthrough: true)),
             ConversionPath.Passthrough, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.PassthroughOnError, 1);
     }
 
@@ -390,14 +410,14 @@ public class ConversionPathReportingTests : IDisposable
 
         var (exit, stdout, stderr) = CliNamed("Counter.cs", counter);
         Assert.True(exit == 0, stderr);
-        // The CLI prints the input's full path before "Counter.cs".
-        Assert.Contains("/Counter.cs:? [post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter' did not parse or did not survive the C# round trip; original C# preserved (#717).", stdout);
-        Assert.Contains("  Preservation paths: 1 by automatic rescue (round-trip-failure: 1; no passthrough request needed)", stdout);
+        Assert.DoesNotContain("post-validation-fallback", stdout);
+        Assert.DoesNotContain("Preservation paths:", stdout);
 
         var (_, json, _) = Cli(counter, "--format", "json");
         var paths = Data(json).GetProperty("conversionPaths");
-        Assert.Equal("preserved", paths.GetProperty("outcome").GetString());
-        Assert.Equal(1, paths.GetProperty("triggers").GetProperty("round-trip-failure").GetInt32());
+        Assert.Equal("native", paths.GetProperty("outcome").GetString());
+        Assert.Equal(0, paths.GetProperty("rescue").GetInt32());
+        Assert.Empty(paths.GetProperty("triggers").EnumerateObject());
         Assert.False(paths.GetProperty("passthroughOnError").GetBoolean());
     }
 
@@ -419,7 +439,7 @@ public class ConversionPathReportingTests : IDisposable
         // reported unverified (exit 2): no rescue, no trigger.
         foreach (var flags in new[] { new[] { "--lossy", "--format", "json" }, new[] { "--lossy", "--passthrough", "--format", "json" } })
         {
-            var (exit, stdout, stderr) = Cli(TrailingLabel, flags);
+            var (exit, stdout, stderr) = Cli(RoundTripFailure, flags);
             Assert.True(exit == 2, stderr);
             var paths = Data(stdout).GetProperty("conversionPaths");
             Assert.Equal("unverified", paths.GetProperty("outcome").GetString());
@@ -435,7 +455,7 @@ public class ConversionPathReportingTests : IDisposable
         // The output path is an existing directory, so the write fails after conversion.
         var dir = Path.Combine(_tempDir, "w" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(dir, "Out.calr"));
-        File.WriteAllText(Path.Combine(dir, "In.cs"), TrailingLabel);
+        File.WriteAllText(Path.Combine(dir, "In.cs"), RoundTripFailure);
 
         var (exit, stdout, _) = CliTestHarness.RunCli(dir, "convert", "In.cs", "-o", "Out.calr", "--format", "json");
 
@@ -488,13 +508,13 @@ public class ConversionPathReportingTests : IDisposable
         Assert.Equal(2, iteratorPaths.GetProperty("interop").GetInt32());
         Assert.Equal(0, iteratorPaths.GetProperty("rescue").GetInt32() + iteratorPaths.GetProperty("passthrough").GetInt32());
 
-        var (defaultError, defaultPayload) = await Mcp("calor_convert", new { source = TrailingLabel });
+        var (defaultError, defaultPayload) = await Mcp("calor_convert", new { source = RoundTripFailure });
         Assert.True(defaultError);
         var defaultPaths = defaultPayload.GetProperty("lossSummary").GetProperty("paths");
         Assert.Equal("refused", defaultPaths.GetProperty("outcome").GetString());
         Assert.False(defaultPaths.GetProperty("rescueUnusableMembers").GetBoolean());
 
-        var (ptError, ptPayload) = await Mcp("calor_convert", new { source = TrailingLabel, passthroughOnError = true });
+        var (ptError, ptPayload) = await Mcp("calor_convert", new { source = RoundTripFailure, passthroughOnError = true });
         Assert.False(ptError);
         var summary = ptPayload.GetProperty("lossSummary");
         Assert.Equal(1, summary.GetProperty("paths").GetProperty("passthrough").GetInt32());
@@ -510,7 +530,7 @@ public class ConversionPathReportingTests : IDisposable
     public async Task F6_REPORT_11_McpPassthroughWithCustomModuleName_Rescues()
     {
         var (isError, payload) = await Mcp("calor_convert",
-            new { source = TrailingLabel, passthroughOnError = true, moduleName = "Custom" });
+            new { source = RoundTripFailure, passthroughOnError = true, moduleName = "Custom" });
 
         Assert.False(isError);
         Assert.Equal(1, payload.GetProperty("lossSummary").GetProperty("paths").GetProperty("passthrough").GetInt32());
@@ -525,22 +545,22 @@ public class ConversionPathReportingTests : IDisposable
         var (ptError, ptPayload) = await Mcp("calor_convert", new { source, passthroughOnError = true });
         Assert.False(ptError);
         var paths = ptPayload.GetProperty("lossSummary").GetProperty("paths");
-        Assert.Equal("preserved", paths.GetProperty("outcome").GetString());
-        Assert.Equal(1, paths.GetProperty("passthrough").GetInt32());
-        Assert.Equal(1, paths.GetProperty("triggers").GetProperty("round-trip-failure").GetInt32());
+        Assert.Equal("native", paths.GetProperty("outcome").GetString());
+        Assert.Equal(0, paths.GetProperty("passthrough").GetInt32());
+        Assert.Empty(paths.GetProperty("triggers").EnumerateObject());
         Assert.False(paths.GetProperty("rescueUnusableMembers").GetBoolean());
         Assert.True(paths.GetProperty("passthroughOnError").GetBoolean());
 
         var (defaultError, defaultPayload) = await Mcp("calor_convert", new { source });
-        Assert.True(defaultError);
-        Assert.Equal("refused", defaultPayload.GetProperty("lossSummary").GetProperty("paths").GetProperty("outcome").GetString());
+        Assert.False(defaultError);
+        Assert.Equal("native", defaultPayload.GetProperty("lossSummary").GetProperty("paths").GetProperty("outcome").GetString());
     }
 
     [Fact]
     public async Task F6_REPORT_11_McpInputPath_DerivedModuleName_Rescues()
     {
         var input = Path.Combine(_tempDir, "IterBag.cs");
-        File.WriteAllText(input, TrailingLabel);
+        File.WriteAllText(input, RoundTripFailure);
 
         var (isError, payload) = await Mcp("calor_convert", new { inputPath = input, passthroughOnError = true });
 
@@ -555,7 +575,7 @@ public class ConversionPathReportingTests : IDisposable
         var validatePaths = validate.GetProperty("lossSummary").GetProperty("paths");
         Assert.Equal(1, validatePaths.GetProperty("rescue").GetInt32());
 
-        var (_, roundtrip) = await Mcp("calor_convert", new { source = TrailingLabel, mode = "roundtrip", passthroughOnError = true });
+        var (_, roundtrip) = await Mcp("calor_convert", new { source = RoundTripFailure, mode = "roundtrip", passthroughOnError = true });
         var location = Assert.Single(roundtrip.GetProperty("lossSummary").GetProperty("locations").EnumerateArray());
         Assert.Equal("passthrough", location.GetProperty("path").GetString());
         Assert.Equal("round-trip-failure", location.GetProperty("trigger").GetString());
@@ -598,7 +618,7 @@ public class ConversionPathReportingTests : IDisposable
     private string ProjectWithRoundTripFailure(params string[] fixtureIds)
     {
         var dir = Project(fixtureIds);
-        File.WriteAllText(Path.Combine(dir, "RoundTripFailure.cs"), TrailingLabel);
+        File.WriteAllText(Path.Combine(dir, "RoundTripFailure.cs"), RoundTripFailure);
         return dir;
     }
 

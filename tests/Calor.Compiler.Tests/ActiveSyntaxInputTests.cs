@@ -1,5 +1,6 @@
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -21,6 +22,7 @@ public class ActiveSyntaxInputTests
         {
             var mirrors = Directory.EnumerateFiles(activeRoot, "*" + extension, SearchOption.AllDirectories)
                 .Select(path => Path.GetRelativePath(activeRoot, path).Replace('\\', '/'))
+                .Where(path => !ActiveSyntaxInputs.TypedRegistrations.ContainsKey(path))
                 .Order(StringComparer.Ordinal);
             var registered = registrations.Select(entry => extension == ".py"
                 ? entry.OriginalPath : entry.TranscriptPath).Order(StringComparer.Ordinal);
@@ -68,6 +70,43 @@ public class ActiveSyntaxInputTests
         var exception = Assert.Throws<FileNotFoundException>(() =>
             ActiveSyntaxInputs.ForCurrentExecutable(root, original));
         Assert.Equal(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, original), exception.FileName);
+    }
+
+    [Fact]
+    public void TypedRegistry_IsDisjointExhaustiveAndRequiresEveryMirror()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
+        var registered = ActiveSyntaxInputs.OriginalPaths
+            .Concat(ActiveSyntaxInputs.TypedRegistrations.Keys)
+            .Concat(ActiveSyntaxInputs.ExecutableRegistrations.Values.SelectMany(entry =>
+                new[] { entry.OriginalPath, entry.TranscriptPath })).ToArray();
+        Assert.Equal(registered.Length, registered.Distinct(StringComparer.Ordinal).Count());
+        var mirrors = Directory.EnumerateFiles(activeRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(activeRoot, path).Replace('\\', '/'))
+            .Where(path => path != "inputs.json").Order(StringComparer.Ordinal);
+        Assert.Equal(registered.Order(StringComparer.Ordinal), mirrors);
+        foreach (var (original, kind) in ActiveSyntaxInputs.TypedRegistrations)
+        {
+            Assert.True(File.Exists(Path.Combine(root, original)));
+            var mirror = ActiveSyntaxInputs.ForCurrentTypedInput(root, original, kind);
+            Assert.Equal(Path.Combine(activeRoot, original), mirror);
+            Assert.Throws<FileNotFoundException>(() => ActiveSyntaxInputs.ForCurrentTypedInput(
+                Path.Combine(root, "artifacts", "missing-" + Guid.NewGuid().ToString("N")), original, kind));
+            Assert.Throws<InvalidDataException>(() => ActiveSyntaxInputs.ForCurrentCompiler(root, original));
+            foreach (var wrongKind in Enum.GetValues<ActiveSyntaxInputs.InputKind>().Where(value => value != kind))
+                Assert.Throws<ArgumentException>(() => ActiveSyntaxInputs.ForCurrentTypedInput(root, original, wrongKind));
+            foreach (var alias in new[] { "./" + original, Path.Combine(root, original), ActiveSyntaxInputs.RelativeRoot + original })
+                Assert.Throws<ArgumentException>(() => ActiveSyntaxInputs.ForCurrentTypedInput(root, alias, kind));
+            if (kind == ActiveSyntaxInputs.InputKind.CalorText)
+            {
+                var diagnostics = new DiagnosticBag();
+                new Parser(new Lexer(File.ReadAllText(mirror), diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+            }
+            else
+                Assert.NotNull(JsonNode.Parse(File.ReadAllText(mirror)));
+        }
     }
 
     [Fact]

@@ -17,11 +17,11 @@ public class CodegenBug3_5_6_Tests
     #region Bug 6: static class not emitted
 
     [Fact]
-    public void Bug6_Parser_StaticModifier_SetsIsStatic()
+    public void Bug6_Parser_NamedModule_SetsIsStatic()
     {
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:static}
+  §M{c1:Helper}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -35,7 +35,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:pub:static}
+  §M{c1:Helper:pub}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -99,7 +99,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:pub:static,partial}
+  §M{c1:Helper:pub:partial}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static partial class Helper", result);
@@ -118,41 +118,40 @@ public class CodegenBug3_5_6_Tests
     }
 
     [Fact]
-    public void Bug6_Parser_StShortFormModifier_SetsIsStatic()
+    public void Bug6_Parser_NamedModule_KeepsModuleIdentity()
     {
-        // R1: "st" short form should be recognized as "static"
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:st}
+  §M{c1:Helper}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic, "IsStatic should be true for 'st' short-form modifier");
+        Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
     }
 
     [Fact]
-    public void Bug6_ParseAndEmit_StShortForm_EmitsStaticKeyword()
+    public void Bug6_ParseAndEmit_PublicModule_EmitsStaticKeyword()
     {
-        // R1: "st" short form should emit as "static" in C#
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:pub:st}
+  §M{c1:Helper:pub}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
     }
 
     [Fact]
-    public void Bug6_Parser_StWithOtherModifiers_WorksCorrectly()
+    public void Bug6_Parser_PartialModule_KeepsBothFlags()
     {
-        // R1: "st" combined with other modifiers
         var source = @"
 §M{m1:Test}
-  §CL{c1:Helper:st,partial}
+  §M{c1:Helper:partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic, "IsStatic should be true for 'st' in comma-separated modifiers");
+        Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
         Assert.True(cls.IsPartial, "IsPartial should also be true");
     }
 

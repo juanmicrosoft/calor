@@ -12,6 +12,34 @@ internal static class ActiveSyntaxInputs
     internal const string RelativeRoot = "tests/TestData/ActiveSyntax/";
 
     internal sealed record ExecutableRegistration(string OriginalPath, string TranscriptPath);
+    internal enum InputKind { CalorText, Structured, Transcript }
+
+    private static readonly Lazy<FrozenDictionary<string, InputKind>> TypedRegistry = new(() =>
+    {
+        var root = FindRepoRoot();
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, RelativeRoot, "inputs.json")));
+        var entries = new Dictionary<string, InputKind>(StringComparer.Ordinal);
+        foreach (var (property, kind, extension) in new[]
+        {
+            ("calorTextPaths", InputKind.CalorText, ".txt"),
+            ("structuredPaths", InputKind.Structured, ".json"),
+            ("transcriptPaths", InputKind.Transcript, ".json")
+        })
+        {
+            foreach (var entry in document.RootElement.GetProperty(property).EnumerateArray())
+            {
+                var path = entry.GetString() ?? throw new InvalidDataException("Null typed active input.");
+                ValidateExecutablePath(root, path, extension);
+                if (kind == InputKind.CalorText && !path.EndsWith(".calr.txt", StringComparison.Ordinal))
+                    throw new InvalidDataException($"Not a Calor-text input: {path}.");
+                if (!entries.TryAdd(path, kind) || OriginalPaths.Contains(path)
+                    || ExecutableRegistrations.Values.Any(executable =>
+                        executable.OriginalPath == path || executable.TranscriptPath == path))
+                    throw new InvalidDataException($"Overlapping typed active input: {path}.");
+            }
+        }
+        return entries.ToFrozenDictionary(StringComparer.Ordinal);
+    });
 
     private static readonly Lazy<FrozenDictionary<string, ExecutableRegistration>> Executables = new(() =>
     {
@@ -55,6 +83,21 @@ internal static class ActiveSyntaxInputs
     internal static IReadOnlyDictionary<string, ExecutableRegistration> ExecutableRegistrations
         => Executables.Value;
 
+    internal static IReadOnlyDictionary<string, InputKind> TypedRegistrations => TypedRegistry.Value;
+    internal static string RepositoryRoot => FindRepoRoot();
+
+    internal static string ForCurrentTypedInput(string repoRoot, string originalPath, InputKind kind)
+    {
+        if (!TypedRegistrations.TryGetValue(originalPath, out var registered) || registered != kind)
+            throw new ArgumentException("Pass an exactly registered original of the required input kind.", nameof(originalPath));
+        return RequiredMirror(repoRoot, originalPath);
+    }
+
+    internal static string ForCurrentTranscript(string repoRoot, string originalPath)
+        => TypedRegistrations.ContainsKey(originalPath)
+            ? ForCurrentTypedInput(repoRoot, originalPath, InputKind.Transcript)
+            : ForCurrentCompiler(repoRoot, originalPath);
+
     private static string FindRepoRoot()
     {
         var root = AppContext.BaseDirectory;
@@ -77,7 +120,7 @@ internal static class ActiveSyntaxInputs
     {
         var mirror = Path.Combine(repoRoot, RelativeRoot, relativePath);
         if (!File.Exists(mirror))
-            throw new FileNotFoundException($"Registered active executable input is missing for {relativePath}.", mirror);
+            throw new FileNotFoundException($"Registered active input is missing for {relativePath}.", mirror);
         return mirror;
     }
 
@@ -103,6 +146,8 @@ internal static class ActiveSyntaxInputs
             throw new ArgumentException("The original must be inside the repository.", nameof(originalPath));
         if (IsActiveCopy(relative))
             throw new ArgumentException("Pass the original subject, not its active copy.", nameof(originalPath));
+        if (TypedRegistrations.ContainsKey(relative))
+            throw new InvalidDataException($"Use the registered typed resolver for {relative}.");
 
         var active = Path.Combine(repoRoot, RelativeRoot, relative);
         if (OriginalPaths.Contains(relative))
