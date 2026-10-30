@@ -15,7 +15,7 @@ internal static class ActiveSyntaxInputs
 
     private static readonly Lazy<FrozenDictionary<string, ExecutableRegistration>> Executables = new(() =>
     {
-        var root = CliTestHarness.FindRepoRoot();
+        var root = FindRepoRoot();
         using var document = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(root, RelativeRoot, "inputs.json")));
         var entries = document.RootElement.GetProperty("executables").EnumerateArray()
@@ -38,10 +38,7 @@ internal static class ActiveSyntaxInputs
 
     private static readonly Lazy<FrozenSet<string>> Registry = new(() =>
     {
-        var root = AppContext.BaseDirectory;
-        while (!File.Exists(Path.Combine(root, "Directory.Build.props")))
-            root = Directory.GetParent(root)?.FullName
-                ?? throw new DirectoryNotFoundException("Repository root not found.");
+        var root = FindRepoRoot();
         using var document = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(root, RelativeRoot, "inputs.json")));
         var paths = document.RootElement.GetProperty("originalPaths").EnumerateArray()
@@ -57,6 +54,15 @@ internal static class ActiveSyntaxInputs
 
     internal static IReadOnlyDictionary<string, ExecutableRegistration> ExecutableRegistrations
         => Executables.Value;
+
+    private static string FindRepoRoot()
+    {
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "Directory.Build.props")))
+            root = Directory.GetParent(root)?.FullName
+                ?? throw new DirectoryNotFoundException("Repository root not found.");
+        return root;
+    }
 
     internal static (string ScriptPath, string TranscriptPath) ForCurrentExecutable(
         string repoRoot, string originalPath)
