@@ -57,20 +57,20 @@
       "title": "Array Type Syntax",
       "matchPatterns": ["i32[]", "string[]", "wrong type syntax", "array type"],
       "matchCodes": ["Calor0113"],
-      "description": "Array type brackets go BEFORE the type name in Calor, not after.",
-      "wrongExample": "§F{f1:UseItems:pub} (i32[]:items) -> i32     // ERROR - wrong array type syntax",
-      "correctExample": "§F{f1:UseItems:pub} ([i32]:items) -> i32\n  §R (len items)",
-      "explanation": "In Calor, array types use [T] syntax with brackets before the type name: [i32], [str], [f64]."
+      "description": "Array types require balanced brackets. Both [i32] and i32[] are accepted.",
+      "wrongExample": "§F{f1:UseItems:pub} ([i32:items) -> i32     // ERROR - missing closing bracket",
+      "correctExample": "§F{f1:UseItems:pub} ([i32]:items) -> i32\n  §R (len items)\n§F{f2:UseOtherItems:pub} (i32[]:items) -> i32\n  §R (len items)",
+      "explanation": "Use a complete array type such as [i32], [str] or [f64]. The corresponding suffix spellings i32[], str[] and f64[] are also accepted."
     },
     {
       "id": "array-indexing",
       "title": "Array Element Access",
       "matchPatterns": ["get arr", "at arr", "arr[", "element access", "§IDX inside", "tag inside Lisp"],
       "matchCodes": ["Calor0106", "Calor0104"],
-      "description": "Use §IDX for array element access. Cannot nest §IDX inside Lisp expressions.",
-      "wrongExample": "§B{x} (get arr i)      // ERROR - 'get' doesn't exist\n§B{x} arr[i]           // ERROR - no C# indexer\n§B{~sum} (+ sum §IDX data i)  // ERROR - tag inside Lisp expr",
-      "correctExample": "§B{x} §IDX arr i       // arr[i]\n§SETIDX{arr} i value   // arr[i] = value\n\n// For use in expressions, extract to binding first:\n§B{val} §IDX data i\n§B{~sum} (+ sum val)",
-      "explanation": "Use §IDX for reading (no braces), §SETIDX{arr} for writing. §IDX cannot be nested inside Lisp expressions — extract to a binding first."
+      "description": "Use §IDX for array element access. It can nest inside operators and contracts.",
+      "wrongExample": "§B{x} (get arr i)      // ERROR - 'get' doesn't exist\n§B{x} arr[i]           // ERROR - no C# indexer",
+      "correctExample": "§B{x} §IDX arr i       // arr[i]\n§SETIDX{arr} i value   // arr[i] = value\n\n§B{~sum} 0\n§ASSIGN sum (+ sum §IDX data i)",
+      "explanation": "Use §IDX for reading and §SETIDX{arr} for writing. §IDX arr i is an expression, so it can be used directly inside another expression. A temporary binding is optional."
     },
     {
       "id": "string-comparison",

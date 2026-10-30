@@ -31,6 +31,57 @@ namespace Calor.Compiler.Tests.Mcp;
 /// </summary>
 public class AgentDocsSyntaxGuardTests
 {
+    [Fact]
+    public void Skills_NestedArrayExample_CompilesAndRuns()
+    {
+        var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
+        var skills = File.ReadAllText(Path.Combine(root, "tests", "Calor.Evaluation", "Skills",
+            "calor-language-skills.md"));
+        var example = Assert.Single(Regex.Matches(skills,
+            @"```calor\s*\n(?<source>§M\{m001:NestedArrayExpressions\}.*?)\n```",
+            RegexOptions.Singleline).Cast<Match>());
+        var module = CompileTeachingModule(example.Groups["source"].Value, "NestedArrayExpressions");
+        Assert.Equal(5, module.GetMethod("SumPair")!.Invoke(null, [new[] { 2, 3 }]));
+        Assert.Equal(8, module.GetMethod("MixFirst")!.Invoke(null, [new[] { 2 }, 10]));
+    }
+
+    [Fact]
+    public void ErrorSuggestions_ArrayTypeExamples_CompileAndRun()
+    {
+        var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
+        using var suggestions = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "src",
+            "Calor.Compiler", "Resources", "error-suggestions.json")));
+        var pattern = Assert.Single(suggestions.RootElement.GetProperty("patterns").EnumerateArray()
+            .Where(item => item.GetProperty("id").GetString() == "array-type-syntax"));
+        var source = "§M{m001:ArrayTypeExamples}\n"
+            + string.Join("\n", pattern.GetProperty("correctExample").GetString()!.Split('\n')
+                .Select(line => "  " + line));
+        var module = CompileTeachingModule(source, "ArrayTypeExamples");
+        Assert.Equal(2, module.GetMethod("UseItems")!.Invoke(null, [new[] { 2, 3 }]));
+        Assert.Equal(2, module.GetMethod("UseOtherItems")!.Invoke(null, [new[] { 2, 3 }]));
+        var unbalanced = Program.Compile(source.Replace("[i32]", "[i32", StringComparison.Ordinal),
+            "unbalanced-array-example.calr");
+        Assert.True(unbalanced.HasErrors);
+    }
+
+    private static Type CompileTeachingModule(string source, string moduleName)
+    {
+        var result = Program.Compile(source, "teaching-example.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "TeachingExample_" + Guid.NewGuid().ToString("N"),
+            [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(result.GeneratedCode)],
+            Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+        return Assert.Single(assembly.GetTypes().Where(type => type.Name == moduleName + "Module"));
+    }
+
     private static readonly Regex FourFieldHeader =
         new(@"§A?F\{[^}]*:[^}]*:[^}]*:[^}]*\}", RegexOptions.Compiled);
 

@@ -386,7 +386,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 
 ### Array Operations
 
-**IMPORTANT: Array syntax is different from C#. Do NOT use C#-style array syntax.**
+**Array element access uses Calor expressions. Both array type spellings below are accepted.**
 
 ```calor
 // Array Types (use square brackets BEFORE the element type)
@@ -394,8 +394,8 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 [str]       // string[] - array of strings
 [[i32]]     // int[][] - jagged array
 
-// WRONG: C#-style type syntax
-// i32[]      ❌ ERROR - don't put brackets after type
+// Equivalent suffix spelling
+i32[]       // int[] - array of integers
 ```
 
 **Array Creation:**
@@ -452,7 +452,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
   §B{~sum} 0
   §B{~i} 0
   §WH{wh1} (< i (len nums))
-    // IMPORTANT: Get element into a binding first, THEN use in expression
+    // A binding is useful when reusing an element; it is not required for nesting.
     §B{val} §IDX nums i
     §ASSIGN sum (+ sum val)
     §ASSIGN i (+ i 1)
@@ -460,21 +460,24 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
   §R sum
 ```
 
-**CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions or contracts:**
+**Tag-style expressions can nest inside operators and contracts:**
 ```calor
-// WRONG: §IDX inside Lisp expression
-§ASSIGN sum (+ sum §IDX data i)     // ❌ ERROR - can't nest §IDX in (...)
+§M{m001:NestedArrayExpressions}
+  §F{f001:SumPair:pub} ([i32]:data) -> i32
+    §E{}
+    §S (== result (+ §IDX data 0 §IDX data 1))
+    §B{~sum} 0
+    §ASSIGN sum (+ sum §IDX data 0)
+    §R (+ sum §IDX data 1)
 
-// WRONG: §IDX inside contract
-§S (== result §IDX arr 0)           // ❌ ERROR - can't nest §IDX in contracts
-
-// CORRECT: Use a binding first
-§B{val} §IDX data i
-§ASSIGN sum (+ sum val)             // ✓ Works - val is a simple identifier
-
-// CORRECT: For contracts referencing array elements, use simple postconditions
-§S (>= result 0)                    // ✓ Simple value constraint
+  §F{f002:MixFirst:pub} ([i32]:data, i32:hash) -> i32
+    §E{}
+    §R (^ hash §IDX data 0)
 ```
+
+These examples expect at least two elements for `SumPair` and one for `MixFirst`.
+Introduce a binding when an element is reused or when it makes the expression
+easier to read, not because nesting is forbidden.
 
 ### Control Flow
 
@@ -1246,9 +1249,6 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 **WRONG - C#-style array syntax:**
 ```calor
-// WRONG: Type with brackets after
-§F{f001:UseItems:pub} (i32[]:items) -> i32  // ❌ ERROR - wrong type syntax
-
 // WRONG: C#-style element access
 §B{x} (get arr i)               // ❌ ERROR - 'get' doesn't exist
 §B{x} (at arr i)                // ❌ ERROR - 'at' doesn't exist
@@ -1263,8 +1263,9 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 **CORRECT - Calor array syntax:**
 ```calor
-// CORRECT: Type with brackets before
-§F{f001:UseItems:pub} ([i32]:items) -> i32  // ✓ Array of i32
+// Both array type spellings are currently accepted.
+§F{f001:UseItems:pub} ([i32]:items) -> i32  // Array of i32
+§F{f002:UseOtherItems:pub} (i32[]:items) -> i32
 
 // CORRECT: Element access with §IDX (both forms valid)
 §B{x} §IDX arr i                // ✓ arr[i]
@@ -1278,16 +1279,13 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 §B{n} §LEN arr                  // ✓ arr.Length (alternative)
 ```
 
-**WRONG - Mixing tag-style §IDX inside Lisp expressions:**
+**CORRECT - Nesting tag-style expressions:**
 ```calor
-// WRONG: Can't nest §IDX inside (...)
-§ASSIGN sum (+ sum §IDX data i)     // ❌ ERROR - tag inside Lisp expr
-
-// WRONG: Can't use §IDX directly in operators
-§R (^ hash §IDX arr j)              // ❌ ERROR - tag inside Lisp expr
+§ASSIGN sum (+ sum §IDX data i)
+§R (^ hash §IDX arr j)
 ```
 
-**CORRECT - Use a binding first:**
+**Optional - Use a binding for reuse or readability:**
 ```calor
 // CORRECT: Extract to binding, then use in expression
 §B{val} §IDX data i
