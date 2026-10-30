@@ -9,6 +9,9 @@ public abstract class AstNode
 {
     public TextSpan Span { get; }
 
+    /// <summary>Tooling-owned identity projected from the registered project sidecar.</summary>
+    public string? ToolingId { get; internal set; }
+
     /// <summary>
     /// Fully-qualified C# namespace associated with this declaration.
     /// <c>null</c> means legacy module-level namespace inheritance and an empty
@@ -43,6 +46,7 @@ public abstract class AstNode
     internal T CopyMetadataTo<T>(T target) where T : AstNode
     {
         ArgumentNullException.ThrowIfNull(target);
+        target.ToolingId = ToolingId;
         target.NamespaceIdentity = NamespaceIdentity;
         target.NamespaceScopeId = NamespaceScopeId;
         target.FullyQualifiedSymbolIdentity = FullyQualifiedSymbolIdentity;

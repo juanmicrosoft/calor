@@ -1436,7 +1436,7 @@ public sealed class CSharpToCalorConverter
         IReadOnlyList<DelegateDefinitionNode>? delegates = null)
     {
         var solo = new ModuleNode(
-            module.Span, module.Id, module.Name, module.Usings,
+            module.Span, module.SourceId, module.Name, module.Usings,
             interfaces ?? Array.Empty<InterfaceDefinitionNode>(),
             classes ?? Array.Empty<ClassDefinitionNode>(),
             enums ?? Array.Empty<EnumDefinitionNode>(),
@@ -2023,6 +2023,20 @@ internal static class ConversionFileWriter
         var directory = Path.GetDirectoryName(fullPath)
             ?? throw new InvalidOperationException($"Output path has no directory: {path}");
         Directory.CreateDirectory(directory);
+
+        if (fullPath.EndsWith(".calr", StringComparison.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (encoding != null && encoding.CodePage != System.Text.Encoding.UTF8.CodePage)
+                throw new InvalidOperationException("Identity-managed Calor output must use UTF-8.");
+            var existingStore = Ids.DeclarationIdentityStore.Find(fullPath);
+            var store = existingStore != null && (existingStore.Root == directory || existingStore.IsRegistered(fullPath))
+                ? existingStore : new Ids.DeclarationIdentityStore(directory);
+            var before = File.Exists(fullPath) ? await File.ReadAllTextAsync(fullPath, cancellationToken) : null;
+            store.Sync(before == null ? [] : [fullPath]);
+            store.Apply([new(fullPath, before, content)]);
+            return;
+        }
 
         var tempPath = Path.Combine(
             directory,

@@ -861,20 +861,22 @@ public sealed class ProjectMigrator
             return;
         }
 
-        foreach (var result in converted)
+        var outputs = converted.Where(result => result.OutputPath != null && result.ConvertedSource != null).ToArray();
+        if (outputs.Length == 0) return;
+        var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
+            outputs.Select(result => new FileInfo(result.OutputPath!)).ToArray());
+        var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
+        identityStore.Sync(outputs.Select(result => result.OutputPath!).Where(File.Exists));
+        var identityChanges = new List<Ids.DeclarationIdentityStore.SourceChange>();
+        foreach (var result in outputs)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (result.OutputPath != null && result.ConvertedSource != null)
-            {
-                await ConversionFileWriter.WriteAtomicAsync(
-                    result.OutputPath,
-                    result.ConvertedSource,
-                    new System.Text.UTF8Encoding(
-                        encoderShouldEmitUTF8Identifier: false,
-                        throwOnInvalidBytes: false),
-                    cancellationToken: cancellationToken);
-            }
+            var before = File.Exists(result.OutputPath!)
+                ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
+            identityChanges.Add(new(result.OutputPath!, before, result.ConvertedSource));
         }
+        cancellationToken.ThrowIfCancellationRequested();
+        identityStore.Apply(identityChanges);
 
         static ProjectCompilationInputs
             CreateLooseDirectoryInputs(

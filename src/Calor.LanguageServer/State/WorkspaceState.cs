@@ -1737,7 +1737,9 @@ public sealed class WorkspaceState
             if (boundModule == null)
                 continue;
 
-            var moduleId = SymbolId.Create(
+            var moduleId = document.Analysis.Ast!.ToolingId != null
+                ? SymbolId.Create("declaration", document.Analysis.Ast.ToolingId)
+                : SymbolId.Create(
                 "source",
                 GetCanonicalSourceIdentity(document.Document.Uri),
                 "module",

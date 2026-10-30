@@ -90,7 +90,8 @@ public sealed class ValidationLoopTests : IDisposable
         Assert.Equal(1, result.GetProperty("contractsChecked").GetInt32());
         Assert.All(result.GetProperty("stages").EnumerateArray(), s => Assert.Equal("passed", s.GetProperty("status").GetString()));
         Assert.Equal(before, File.ReadAllBytes(SourcePath));
-        Assert.Equal(new[] { "math.calr", "tests" }, Directory.GetFileSystemEntries(_directory).Select(Path.GetFileName).Order().ToArray());
+        Assert.Equal(new[] { ".calor", "math.calr", "tests" }, Directory.GetFileSystemEntries(_directory).Select(Path.GetFileName).Order().ToArray());
+        Assert.True(File.Exists(Path.Combine(_directory, ".calor", "ids.json")));
     }
 
     [Theory]

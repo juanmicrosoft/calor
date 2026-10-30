@@ -48,28 +48,8 @@ public sealed class IdScanner : IAstVisitor
         return allEntries;
     }
 
-    public void Visit(ModuleNode node)
-    {
-        AddEntry(node.Id, IdKind.Module, node.Name, node.Span);
-
-        foreach (var function in node.Functions)
-            function.Accept(this);
-
-        foreach (var iface in node.Interfaces)
-            iface.Accept(this);
-
-        foreach (var cls in node.Classes)
-            cls.Accept(this);
-
-        foreach (var enumDef in node.Enums)
-            enumDef.Accept(this);
-
-        foreach (var rtype in node.RefinementTypes)
-            rtype.Accept(this);
-
-        foreach (var itype in node.IndexedTypes)
-            itype.Accept(this);
-    }
+    public void Visit(ModuleNode node) =>
+        _entries.AddRange(DeclarationIdentityStore.ScanDeclarations(node, _currentFilePath));
 
     public void Visit(FunctionNode node)
     {
@@ -92,6 +72,8 @@ public sealed class IdScanner : IAstVisitor
 
         foreach (var method in node.Methods)
             method.Accept(this);
+        foreach (var block in node.PreprocessorBlocks)
+            block.Accept(this);
     }
 
     public void Visit(MethodSignatureNode node)
@@ -117,6 +99,15 @@ public sealed class IdScanner : IAstVisitor
 
         foreach (var op in node.OperatorOverloads)
             op.Accept(this);
+
+        foreach (var nested in node.NestedClasses)
+            nested.Accept(this);
+        foreach (var nested in node.NestedInterfaces)
+            nested.Accept(this);
+        foreach (var nested in node.NestedEnums)
+            nested.Accept(this);
+        foreach (var block in node.PreprocessorBlocks)
+            block.Accept(this);
     }
 
     public void Visit(PropertyNode node)
@@ -316,8 +307,16 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(CompilerDirectiveNode node) { }
     public void Visit(RawCSharpExpressionNode node) { }
     public void Visit(PreprocessorDirectiveNode node) { }
-    public void Visit(MemberPreprocessorBlockNode node) { }
-    public void Visit(TypePreprocessorBlockNode node) { }
+    public void Visit(MemberPreprocessorBlockNode node)
+    {
+        foreach (var item in node.Items) item.Accept(this);
+        node.ElseBranch?.Accept(this);
+    }
+    public void Visit(TypePreprocessorBlockNode node)
+    {
+        foreach (var item in node.Items) item.Accept(this);
+        node.ElseBranch?.Accept(this);
+    }
     public void Visit(CSharpInteropBlockNode node) { }
     public void Visit(StackAllocNode node) { }
     public void Visit(UnsafeBlockNode node) { }

@@ -306,7 +306,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
         var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
-        AppendLine($"§M{{{node.Id}:{moduleName}{overflow}}}");
+        AppendLine($"§M{{{node.SourceId}:{moduleName}{overflow}}}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)
@@ -326,7 +326,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/M{{{node.Id}}}");
+        EmitBlockEnd($"§/M{{{node.SourceId}}}");
 
         return _builder.ToString();
     }
@@ -774,7 +774,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§IFACE{{{node.Id}:{node.Name}{typeParams}{baseList}}}{attrs}");
+        AppendLine($"§IFACE{{{node.SourceId}:{node.Name}{typeParams}{baseList}}}{attrs}");
         Indent();
 
         EmitTypeParameterConstraints(node.TypeParameters);
@@ -824,7 +824,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/IFACE{{{node.Id}}}");
+        EmitBlockEnd($"§/IFACE{{{node.SourceId}}}");
 
         return "";
     }
@@ -877,11 +877,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendLine($"§MT{{{node.SourceId}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
+            AppendLine($"§MT{{{node.SourceId}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
             Indent();
             EmitParameterLines(node.Parameters);
             EmitOutputLine(node.Output);
@@ -906,7 +906,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         EmitEffects(node.Effects);
         Dedent();
 
-        EmitBlockEnd($"§/MT{{{node.Id}}}");
+        EmitBlockEnd($"§/MT{{{node.SourceId}}}");
 
         return "";
     }
@@ -947,7 +947,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var declarationTag = node.IsModule ? "M" : "CL";
-        AppendLine($"§{declarationTag}{{{node.Id}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
+        AppendLine($"§{declarationTag}{{{node.SourceId}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
@@ -1038,7 +1038,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/{declarationTag}{{{node.Id}}}");
+        EmitBlockEnd($"§/{declarationTag}{{{node.SourceId}}}");
 
         return "";
     }
@@ -1248,12 +1248,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // (Parser.cs TryParseSameLineRow(EffectRowPosition.Property)).
             // Omitting it let a Calor -> Calor re-emit silently strip a
             // hand-written `§PROP{...} §E{cw}` and reopen the escape S1 closed.
-            AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+            AppendLine($"§PROP{{{node.SourceId}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
             return "";
         }
 
         // Full property syntax with body and closing tag
-        AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}");
+        AppendLine($"§PROP{{{node.SourceId}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}");
         Indent();
 
         if (node.Getter != null) Visit(node.Getter);
@@ -1266,7 +1266,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/PROP{{{node.Id}}}");
+        EmitBlockEnd($"§/PROP{{{node.SourceId}}}");
 
         return "";
     }
@@ -1308,12 +1308,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 return $"{pType}:{p.Name}";
             });
             var paramStr = string.Join(", ", paramParts);
-            AppendLine($"§IXER{{{node.Id}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs} ({paramStr})");
+            AppendLine($"§IXER{{{node.SourceId}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs} ({paramStr})");
             return "";
         }
 
         // Full indexer syntax with body and closing tag
-        AppendLine($"§IXER{{{node.Id}:{typeName}:{visibility}{modStr}}}{attrs}");
+        AppendLine($"§IXER{{{node.SourceId}:{typeName}:{visibility}{modStr}}}{attrs}");
         Indent();
 
         foreach (var param in node.Parameters)
@@ -1326,7 +1326,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initer != null) Visit(node.Initer);
 
         Dedent();
-        EmitBlockEnd($"§/IXER{{{node.Id}}}");
+        EmitBlockEnd($"§/IXER{{{node.SourceId}}}");
 
         return "";
     }
@@ -1376,9 +1376,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Inline params: §CTOR{id:vis} (type:name, type:name)
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null && node.Parameters.Count > 0)
-            AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs} ({inlineFmt})");
+            AppendLine($"§CTOR{{{node.SourceId}:{visibility}}}{attrs} ({inlineFmt})");
         else
-            AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs}");
+            AppendLine($"§CTOR{{{node.SourceId}:{visibility}}}{attrs}");
         Indent();
 
         if (inlineFmt == null)
@@ -1426,7 +1426,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/CTOR{{{node.Id}}}");
+        EmitBlockEnd($"§/CTOR{{{node.SourceId}}}");
 
         return "";
     }
@@ -1442,11 +1442,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}{inlineParams}{inlineReturn}");
+            AppendLine($"§OP{{{node.SourceId}:{node.OperatorToken}:{visibility}}}{attrs}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}");
+            AppendLine($"§OP{{{node.SourceId}:{node.OperatorToken}:{visibility}}}{attrs}");
             Indent();
             EmitParameterLines(node.Parameters);
             EmitOutputLine(node.Output);
@@ -1475,7 +1475,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/OP{{{node.Id}}}");
+        EmitBlockEnd($"§/OP{{{node.SourceId}}}");
 
         return "";
     }
@@ -1519,11 +1519,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendLine($"§{methodTag}{{{node.SourceId}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
+            AppendLine($"§{methodTag}{{{node.SourceId}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
         }
         Indent();
 
@@ -1569,7 +1569,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/{methodTag}{{{node.Id}}}");
+        EmitBlockEnd($"§/{methodTag}{{{node.SourceId}}}");
 
         return "";
     }
@@ -1620,11 +1620,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendLine($"§{funcTag}{{{node.SourceId}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
+            AppendLine($"§{funcTag}{{{node.SourceId}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
         }
         Indent();
 
@@ -1672,7 +1672,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/{funcTag}{{{node.Id}}}");
+        EmitBlockEnd($"§/{funcTag}{{{node.SourceId}}}");
 
         return "";
     }
@@ -4232,8 +4232,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var vis = GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var header = node.UnderlyingType != null
-            ? $"§EN{{{node.Id}:{node.Name}:{vis}:{node.UnderlyingType}}}{attrs}"
-            : $"§EN{{{node.Id}:{node.Name}:{vis}}}{attrs}";
+            ? $"§EN{{{node.SourceId}:{node.Name}:{vis}:{node.UnderlyingType}}}{attrs}"
+            : $"§EN{{{node.SourceId}:{node.Name}:{vis}}}{attrs}";
         AppendLine(header);
         Indent();
 
@@ -4243,7 +4243,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EN{{{node.Id}}}");
+        EmitBlockEnd($"§/EN{{{node.SourceId}}}");
         return "";
     }
 
@@ -4286,7 +4286,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         EmitDocComment(node);
         // Format: §EEXT{id:EnumName} (note: §EXT is for class inheritance)
-        AppendLine($"§EEXT{{{node.Id}:{node.EnumName}}}");
+        AppendLine($"§EEXT{{{node.SourceId}:{node.EnumName}}}");
         Indent();
 
         foreach (var method in node.Methods)
@@ -4296,7 +4296,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EEXT{{{node.Id}}}");
+        EmitBlockEnd($"§/EEXT{{{node.SourceId}}}");
         return "";
     }
 
@@ -4371,7 +4371,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(DelegateDefinitionNode node)
     {
         EmitDocComment(node);
-        AppendLine($"§DEL{{{node.Id}:{node.Name}}}");
+        AppendLine($"§DEL{{{node.SourceId}:{node.Name}}}");
         Indent();
 
         foreach (var param in node.Parameters)
@@ -4391,7 +4391,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/DEL{{{node.Id}}}");
+        EmitBlockEnd($"§/DEL{{{node.SourceId}}}");
         return "";
     }
 
@@ -4403,7 +4403,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.HasAccessors)
         {
-            AppendLine($"§EVT{{{node.Id}:{node.Name}:{visibility}:{delegateType}}}");
+            AppendLine($"§EVT{{{node.SourceId}:{node.Name}:{visibility}:{delegateType}}}");
             Indent();
 
             if (node.AddBody != null)
@@ -4431,11 +4431,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
 
             Dedent();
-            EmitBlockEnd($"§/EVT{{{node.Id}}}");
+            EmitBlockEnd($"§/EVT{{{node.SourceId}}}");
         }
         else
         {
-            AppendLine($"§EVT{{{node.Id}:{node.Name}:{visibility}:{delegateType}}}");
+            AppendLine($"§EVT{{{node.SourceId}:{node.Name}:{visibility}:{delegateType}}}");
         }
 
         return "";
@@ -5497,7 +5497,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RefinementTypeNode node)
     {
         var predicate = node.Predicate.Accept(this);
-        AppendLine($"§RTYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}}} {predicate}");
+        AppendLine($"§RTYPE{{{node.SourceId}:{node.Name}:{node.BaseTypeName}}} {predicate}");
         return "";
     }
 
@@ -5510,14 +5510,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var condition = node.Condition.Accept(this);
         var desc = node.Description != null ? $":{node.Description}" : "";
-        AppendLine($"§PROOF{{{node.Id}{desc}}} {condition}");
+        AppendLine($"§PROOF{{{node.SourceId}{desc}}} {condition}");
         return "";
     }
 
     public string Visit(IndexedTypeNode node)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append($"§ITYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}:{node.SizeParam}}}");
+        sb.Append($"§ITYPE{{{node.SourceId}:{node.Name}:{node.BaseTypeName}:{node.SizeParam}}}");
         if (node.Constraint != null)
         {
             var constraint = node.Constraint.Accept(this);

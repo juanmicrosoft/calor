@@ -178,14 +178,15 @@ public sealed class CheckTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp-input.calr", compileOptions);
+            var filePath = GetString(arguments, "filePath") ?? "mcp-input.calr";
+            var result = Program.Compile(source, filePath, compileOptions);
             var (diagnostics, hints) = BuildDiagnoseDiagnostics(result, source);
 
             string? fixedSource = null;
             var fixesApplied = 0;
             if (applyFixes)
             {
-                fixedSource = DiagnosticFixes.Repair(source, "mcp-input.calr", compileOptions,
+                fixedSource = DiagnosticFixes.Repair(source, filePath, compileOptions,
                     out result, out fixesApplied, initialResult: result);
                 (diagnostics, hints) = BuildDiagnoseDiagnostics(result, fixedSource);
             }

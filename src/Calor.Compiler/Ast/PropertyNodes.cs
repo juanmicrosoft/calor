@@ -12,7 +12,8 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public sealed class PropertyNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
@@ -102,7 +103,7 @@ public sealed class PropertyNode : AstNode
         EffectsNode? row = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -146,7 +147,8 @@ public sealed class PropertyNode : AstNode
 /// </summary>
 public sealed class IndexerNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string TypeName { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
@@ -180,7 +182,7 @@ public sealed class IndexerNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Visibility = visibility;
         Modifiers = modifiers;
@@ -268,7 +270,8 @@ public sealed class PropertyAccessorNode : AstNode
 /// </summary>
 public sealed class ConstructorNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public Visibility Visibility { get; }
     public bool IsStatic { get; }
     public IReadOnlyList<ParameterNode> Parameters { get; }
@@ -322,7 +325,7 @@ public sealed class ConstructorNode : AstNode
         bool isStatic)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Visibility = visibility;
         IsStatic = isStatic;
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));

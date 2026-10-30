@@ -231,6 +231,18 @@ public sealed class MigrateTool : McpToolBase
 
         var perFile = new List<MigrateFileResult>();
 
+        try { Ids.DeclarationIdentityStore.SyncActiveInputs(calrFiles, directory); }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            perFile.Add(new MigrateFileResult
+            {
+                Path = Path.GetRelativePath(directory, ex.FilePath),
+                Status = "failed",
+                Errors = DiagnosticEnvelope.Build(ex.Diagnostics).Where(d => d.Severity == "error").ToList()
+            });
+            return BuildOutput("compile", perFile);
+        }
+
         foreach (var path in calrFiles)
         {
             ct.ThrowIfCancellationRequested();

@@ -755,6 +755,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string Calor0805 = "Calor0805";
 
+    /// <summary>
+    /// Error: Declaration sidecar identity is unavailable or ambiguous.
+    /// </summary>
+    public const string DeclarationIdentityUnavailable = "Calor0806";
+
     // Contract inheritance (Calor0810-0814)
 
     /// <summary>

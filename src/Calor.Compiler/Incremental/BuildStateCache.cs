@@ -417,6 +417,10 @@ internal static class BuildStateCache
         {
             if (!Directory.Exists(root.Directory))
                 continue;
+            var identityStore = Ids.DeclarationIdentityStore.Find(Path.Combine(root.Directory, "__identity__.calr"));
+            if (identityStore != null && File.Exists(identityStore.SidecarPath)
+                && seen.Add(identityStore.SidecarPath))
+                manifestFiles.Add((root.Scope, identityStore.SidecarPath));
             foreach (var file in Directory.GetFiles(
                          root.Directory, "*.calor-effects.json", SearchOption.TopDirectoryOnly))
             {

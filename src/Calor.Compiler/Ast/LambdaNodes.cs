@@ -120,7 +120,8 @@ public sealed class DelegateDefinitionNode : TypeDefinitionNode
 /// </summary>
 public sealed class EventDefinitionNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string Name { get; }
     public Visibility Visibility { get; }
     public string DelegateType { get; }
@@ -169,7 +170,7 @@ public sealed class EventDefinitionNode : AstNode
         TextSpan? delegateTypeSpan = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Visibility = visibility;
         DelegateType = delegateType ?? throw new ArgumentNullException(nameof(delegateType));

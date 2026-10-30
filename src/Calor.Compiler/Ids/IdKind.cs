@@ -45,5 +45,11 @@ public enum IdKind
     IndexedType,
 
     /// <summary>Indexer declaration (§IXER).</summary>
-    Indexer
+    Indexer,
+    Delegate,
+    Event,
+    Record,
+    Union,
+    Field,
+    Variant
 }

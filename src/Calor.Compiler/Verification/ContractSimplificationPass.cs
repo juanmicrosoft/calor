@@ -106,7 +106,7 @@ public sealed class ContractSimplificationPass
 
         return function.CopyMetadataTo(new FunctionNode(
             function.Span,
-            function.Id,
+            function.SourceId,
             function.Name,
             function.Visibility,
             function.TypeParameters,
@@ -156,7 +156,7 @@ public sealed class ContractSimplificationPass
 
         return cls.CopyMetadataTo(new ClassDefinitionNode(
             cls.Span,
-            cls.Id,
+            cls.SourceId,
             cls.Name,
             cls.IsAbstract,
             cls.IsSealed,
@@ -218,7 +218,7 @@ public sealed class ContractSimplificationPass
         // contracts silently deleted its property and indexer members.
         return iface.CopyMetadataTo(new InterfaceDefinitionNode(
             iface.Span,
-            iface.Id,
+            iface.SourceId,
             iface.Name,
             iface.BaseInterfaces,
             iface.TypeParameters,
@@ -273,7 +273,7 @@ public sealed class ContractSimplificationPass
 
         return method.CopyMetadataTo(new MethodNode(
             method.Span,
-            method.Id,
+            method.SourceId,
             method.Name,
             method.Visibility,
             method.Modifiers,
@@ -310,7 +310,7 @@ public sealed class ContractSimplificationPass
 
         return method.CopyMetadataTo(new MethodSignatureNode(
             method.Span,
-            method.Id,
+            method.SourceId,
             method.Name,
             method.TypeParameters,
             method.Parameters,

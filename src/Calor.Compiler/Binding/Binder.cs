@@ -114,6 +114,7 @@ public sealed class Binder
     private List<(string Key, int Previous)>? _declarationOccurrenceJournal;
     private IReadOnlySet<string> _declaredReferenceTypes = new HashSet<string>(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
+    private HashSet<string> _toolingIds = new(StringComparer.Ordinal);
     private SymbolId _declarationContext;
     private string? _currentClassName;
     private ClassDefinitionNode? _currentClass;
@@ -760,7 +761,10 @@ public sealed class Binder
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
-        _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
+        _toolingIds = Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal);
+        _moduleSymbolId = module.ToolingId != null
+            ? SymbolId.Create("declaration", module.ToolingId)
+            : SymbolId.Create("source", _sourceIdentity, "module", module.Id);
         _declarationContext = _moduleSymbolId;
 
         var functions = new List<BoundFunction>();
@@ -986,7 +990,7 @@ public sealed class Binder
             var (field, conditionalAlternative) = fields[fieldIndex];
             var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
             var symbol = CreateVariable(
-                CreateDeclarationId(classIdentity, "field", stableAstId: null, field.Name),
+                CreateDeclarationId(classIdentity, "field", field.ToolingId, field.Name),
                 field.Name,
                 field.TypeName,
                 isMutable,
@@ -1433,7 +1437,9 @@ public sealed class Binder
         string? stableAstId,
         string fallbackName)
     {
-        var baseId = !string.IsNullOrWhiteSpace(stableAstId)
+        var baseId = stableAstId != null && _toolingIds.Contains(stableAstId)
+            ? SymbolId.Create("declaration", stableAstId)
+            : !string.IsNullOrWhiteSpace(stableAstId)
             ? parent.Append(kind, $"ast:{stableAstId}")
             : parent.Append(kind, $"name:{fallbackName}");
         var key = baseId.Value;

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Text.Json;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
@@ -18,9 +19,35 @@ public static class IdsCommand
         {
             CreateCheckCommand(),
             CreateAssignCommand(),
-            CreateIndexCommand()
+            CreateIndexCommand(),
+            CreateSyncCommand()
         };
 
+        return command;
+    }
+
+    private static Command CreateSyncCommand()
+    {
+        var root = new Argument<string>("project", "Project root containing .calor/ids.json");
+        var files = new Option<string[]>("--register", "Explicit active .calr files to register (never discovers historical fixtures)")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+        var command = new Command("sync", "Synchronize tooling-owned declaration identities without rewriting source") { root, files };
+        command.SetHandler((InvocationContext context) =>
+        {
+            try
+            {
+                var store = new DeclarationIdentityStore(context.ParseResult.GetValueForArgument(root));
+                var state = store.Sync(context.ParseResult.GetValueForOption(files));
+                Console.WriteLine($"Synchronized {state.Declarations.Count} declarations in {state.Files.Count} registered files.");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Identity sync failed: {ex.Message}");
+                context.ExitCode = 1;
+            }
+        });
         return command;
     }
 
@@ -429,10 +456,15 @@ public static class IdsCommand
                 return null;
             }
 
+            DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(filePath), content, module);
             declarationIds?.AddFile(filePath, content, module);
 
             var scanner = new IdScanner();
             return scanner.Scan(module, filePath);
+        }
+        catch (DeclarationIdentityException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

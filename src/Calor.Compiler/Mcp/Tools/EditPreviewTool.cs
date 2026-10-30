@@ -33,6 +33,10 @@ public sealed class EditPreviewTool : McpToolBase
                     "type": "string",
                     "description": "The original Calor source code before the edit"
                 },
+                "filePath": {
+                    "type": "string",
+                    "description": "Original file path, required to preserve project sidecar identity across the preview"
+                },
                 "modifiedSource": {
                     "type": "string",
                     "description": "The modified Calor source code after the edit"
@@ -95,8 +99,9 @@ public sealed class EditPreviewTool : McpToolBase
         }
 
         // Parse both versions
-        var originalParse = CalorSourceHelper.Parse(originalSource);
-        var modifiedParse = CalorSourceHelper.Parse(modifiedSource);
+        var filePath = GetString(arguments, "filePath");
+        var originalParse = CalorSourceHelper.Parse(originalSource, filePath);
+        var modifiedParse = CalorSourceHelper.Parse(modifiedSource, filePath);
 
         // Edit summary
         var editSummary = ComputeEditSummary(originalSource, modifiedSource, originalParse, modifiedParse);

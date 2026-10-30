@@ -146,6 +146,7 @@ public static class TestCommand
 
             workspace = ExecutionWorkspace.CreateWorkspace("calor-check");
             var root = Directory.Exists(path) ? Path.GetFullPath(path) : Path.GetDirectoryName(Path.GetFullPath(path))!;
+            DeclarationIdentityStore.SyncActiveInputs(sources.Select(source => source.FullName), root);
             var originals = new Dictionary<string, string>(StringComparer.Ordinal);
             var snapshots = new List<FileInfo>();
             foreach (var source in sources)
@@ -156,6 +157,7 @@ public static class TestCommand
                 originals.Add(snapshot, source.FullName);
                 snapshots.Add(new FileInfo(snapshot));
             }
+            DeclarationIdentityStore.CopyToSnapshot(originals.ToDictionary(pair => pair.Value, pair => pair.Key, StringComparer.Ordinal));
             // Capture tests before compilation: an edit during build cannot change this run.
             var testFiles = FindTestFiles(path);
             var testProject = testFiles.Count > 0
@@ -302,6 +304,16 @@ public static class TestCommand
                     }
                 };
             }
+        }
+        catch (DeclarationIdentityParseException ex)
+        {
+            output.ExitCode = 1;
+            foreach (var diagnostic in DiagnosticEnvelope.Build(ex.Diagnostics))
+                output.Failures.Add(new("compile", diagnostic.Message, diagnostic));
+            output.Stages.Add(new("compile", "failed", 1));
+            output.Failures.Add(new("verify", "Contract verification did not complete for all source files."));
+            output.Stages.Add(new("verify", "incomplete"));
+            return Finish();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Xml.XmlException)
         {

@@ -13,6 +13,105 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class RenameHandlerTests
 {
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    public async Task RegisteredLegacyRenameRemainsAvailableWhileUnsavedSidecarRenameFailsExplicitlyAsync(
+        bool legacy, bool unsaved, bool transactional)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string idless = "§M{Demo}\n  §F{Compute:pub} () -> i32\n    §R 42\n";
+            var source = legacy ? idless.Replace("§M{", "§M{m001:").Replace("§F{", "§F{f001:") : idless;
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            store.Sync([file]);
+            var sidecar = File.ReadAllText(store.SidecarPath);
+            var buffer = unsaved ? source.Replace("42", "43") : source;
+            var uri = DocumentUri.FromFileSystemPath(file);
+            var workspace = new WorkspaceState();
+            workspace.GetOrCreate(uri, buffer, version: 2);
+            if (legacy)
+            {
+                var edit = await RenameAtAsync(workspace, uri, buffer, "Compute", "Calculate",
+                    supportsTransactionalEdits: transactional);
+                var documentEdit = Assert.Single(edit!.DocumentChanges!).TextDocumentEdit!;
+                Assert.Equal(2, documentEdit.TextDocument.Version);
+                Assert.Equal(uri, documentEdit.TextDocument.Uri);
+            }
+            else
+            {
+                var error = await Assert.ThrowsAsync<OmniSharp.Extensions.JsonRpc.Server.RequestFailedException>(
+                    () => RenameAtAsync(workspace, uri, buffer, "Compute", "Calculate",
+                        supportsTransactionalEdits: transactional));
+                Assert.Contains(transactional ? "Save sidecar-backed" : "transactional", error.Message);
+            }
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.Equal(sidecar, File.ReadAllText(store.SidecarPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SidecarIdentitySurvivesLspRenameAndSaveWithoutSourceIdsAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string source = """
+                §M{Demo}
+                  §F{Compute:pub} () -> i32
+                    §R 42
+                  §F{Use:pub} () -> i32
+                    §R §C{Compute} §/C
+                """;
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            var before = store.Sync([file]);
+            var expected = before.Declarations.Single(d => d.Name == "Compute").Id;
+            var uri = DocumentUri.FromFileSystemPath(file);
+            var workspace = new WorkspaceState();
+            var document = workspace.GetOrCreate(uri, source, version: 1);
+            var symbol = document.BoundModule!.SymbolsById.Values.Single(s => s.Name == "Compute").Id;
+            var refusal = await Assert.ThrowsAsync<OmniSharp.Extensions.JsonRpc.Server.RequestFailedException>(
+                () => RenameAtAsync(workspace, uri, source, "Compute", "Calculate"));
+            Assert.Contains("transactional", refusal.Message);
+            var edit = await RenameAtAsync(workspace, uri, source, "Compute", "Calculate",
+                supportsTransactionalEdits: true);
+            Assert.NotNull(edit);
+            var changes = edit!.DocumentChanges!.ToArray();
+            Assert.Equal(2, changes.Length);
+            var sidecarEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit?.TextDocument.Uri.GetFileSystemPath() == store.SidecarPath)).TextDocumentEdit!;
+            var sourceEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit is { } documentEdit && documentEdit.TextDocument.Uri == uri));
+            Assert.Equal(expected, store.Preview([]).Declarations.Single(d => d.Name == "Compute").Id);
+            var updated = ApplySingleDocumentEdit(source, new WorkspaceEdit
+            {
+                DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceEdit)
+            });
+            File.WriteAllText(store.SidecarPath, Assert.Single(sidecarEdit.Edits).NewText);
+            File.WriteAllText(file, updated);
+            var reloaded = LspTestHarness.CreateDocument(updated, new Uri(file).AbsoluteUri);
+            Assert.Equal(expected, store.Sync().Declarations.Single(d => d.Name == "Calculate").Id);
+            Assert.Equal(symbol, reloaded.BoundModule!.SymbolsById.Values.Single(s => s.Name == "Calculate").Id);
+            Assert.DoesNotContain(expected, updated);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task RenameUsesVersionedDocumentChangesAndExactTokenRangesAsync()
     {
@@ -1436,11 +1535,12 @@ public class RenameHandlerTests
         string source,
         string cursorText,
         string newName,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool supportsTransactionalEdits = false)
     {
         var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
         var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        return await new RenameHandler(workspace).Handle(
+        return await new RenameHandler(workspace) { SupportsTransactionalWorkspaceEdits = supportsTransactionalEdits }.Handle(
             new RenameParams
             {
                 TextDocument = new TextDocumentIdentifier(uri),

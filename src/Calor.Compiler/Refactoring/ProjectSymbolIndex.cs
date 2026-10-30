@@ -116,12 +116,15 @@ public sealed class ProjectSymbolIndex
     /// </summary>
     public static ProjectSymbolIndex Build(
         IEnumerable<string> filePaths,
-        out IReadOnlyList<string> skipped)
+        out IReadOnlyList<string> skipped,
+        bool synchronizeIdentities = true,
+        string? initializeIdentityRoot = null)
     {
         ArgumentNullException.ThrowIfNull(filePaths);
 
         var documents = new List<IndexedDocument>();
         var failed = new List<string>();
+        var parsed = new List<(string Path, string Source, ModuleNode Ast)>();
 
         foreach (var path in filePaths.OrderBy(path => path, StringComparer.Ordinal))
         {
@@ -145,6 +148,15 @@ public sealed class ProjectSymbolIndex
                 continue;
             }
 
+            parsed.Add((path, source, ast));
+        }
+        if (initializeIdentityRoot != null)
+            Ids.DeclarationIdentityStore.SyncActiveInputs(parsed.Select(document => document.Path), initializeIdentityRoot);
+        foreach (var (path, source, ast) in parsed)
+        {
+            if (synchronizeIdentities)
+                Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(path));
+            Ids.DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), source, ast);
             var bindDiagnostics = new DiagnosticBag();
             BoundModule bound;
             try
@@ -356,7 +368,9 @@ public sealed class ProjectSymbolIndex
 
             // Module names are indexed so a rename can be refused explicitly
             // rather than silently doing nothing.
-            var moduleId = SymbolId.Create(
+            var moduleId = document.Ast.ToolingId != null
+                ? SymbolId.Create("declaration", document.Ast.ToolingId)
+                : SymbolId.Create(
                 "source",
                 SymbolSourceIdentity.Canonicalize(document.FilePath),
                 "module",

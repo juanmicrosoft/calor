@@ -19,6 +19,7 @@ public sealed class DeclarationIdResolver
     /// <summary>Registers a parsed file. Entries with empty IDs are dropped (IDs are optional per language policy).</summary>
     public void AddFile(string filePath, string source, ModuleNode module)
     {
+        DeclarationIdentityStore.AttachIfRegistered(filePath, source, module);
         var entries = new IdScanner()
             .Scan(module, filePath)
             .Where(e => !string.IsNullOrEmpty(e.Id))

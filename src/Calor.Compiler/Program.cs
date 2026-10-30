@@ -480,6 +480,7 @@ public class Program
                 }
             }
 
+            Ids.DeclarationIdentityStore.SyncActiveInputs(input.Select(file => file.FullName));
             var driverResult = CompilationDriver.CompileAll(
                 input,
                 file =>
@@ -603,6 +604,19 @@ public class Program
                         : $"Compilation successful: {driverResult.Compiled.Count} compiled, {driverResult.Skipped.Count} cached");
             }
             return Finish(driverResult.AnyErrors ? 1 : 0);
+        }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            diagnosticSink?.AddRange(ex.Diagnostics);
+            if (!structuredOutput)
+                foreach (var diagnostic in ex.Diagnostics.Errors)
+                    Console.Error.WriteLine(diagnostic);
+            if (input != null && input.Any(file => file.FullName == ex.FilePath))
+            {
+                var failedOutput = output?.FullName ?? Path.ChangeExtension(ex.FilePath, ".g.cs");
+                if (File.Exists(failedOutput)) File.Delete(failedOutput);
+            }
+            return Finish(1);
         }
         catch (Exception ex)
         {
@@ -764,6 +778,24 @@ public class Program
         phaseSw.Restart();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
+        if (!diagnostics.HasErrors)
+        {
+            try
+            {
+                if (filePath != null && File.Exists(filePath) && File.ReadAllText(filePath) == source)
+                    Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(filePath));
+                Ids.DeclarationIdentityStore.AttachIfRegistered(
+                    filePath == null ? null : Path.GetFullPath(filePath), source, ast);
+            }
+            catch (Ids.DeclarationIdentityParseException ex)
+            {
+                diagnostics.AddRange(ex.Diagnostics);
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException)
+            {
+                diagnostics.Report(ast.Span, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
+            }
+        }
         phaseSw.Stop();
         telemetry?.TrackPhase("Parser", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 

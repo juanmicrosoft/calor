@@ -224,11 +224,7 @@ public sealed class LosslessConversionContractTests
 
         finally
         {
-            foreach (var file in Directory.GetFiles(directory))
-            {
-                File.Delete(file);
-            }
-            Directory.Delete(directory);
+            Directory.Delete(directory, recursive: true);
         }
 
         static MigrationPlanEntry Entry(string sourcePath) => new()
@@ -325,11 +321,7 @@ public sealed class LosslessConversionContractTests
         }
         finally
         {
-            foreach (var file in Directory.GetFiles(directory))
-            {
-                File.Delete(file);
-            }
-            Directory.Delete(directory);
+            Directory.Delete(directory, recursive: true);
         }
 
         static MigrationPlanEntry Entry(string sourcePath) => new()

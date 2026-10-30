@@ -46,6 +46,17 @@ internal static class CalorSourceHelper
             return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics);
         }
 
+        try { Ids.DeclarationIdentityStore.AttachIfRegistered(filePath, source, ast); }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            diagnostics.AddRange(ex.Diagnostics);
+            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics);
+        }
+        catch (Ids.DeclarationIdentityException ex)
+        {
+            diagnostics.Report(ast.Span, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
+            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics);
+        }
         return ParseResult.Success(ast, source);
     }
 
@@ -77,7 +88,10 @@ internal static class CalorSourceHelper
             var ast = parser.Parse();
 
             if (!diagnostics.HasErrors)
+            {
+                Ids.DeclarationIdentityStore.AttachIfRegistered(filePath, source, ast);
                 return ParseResult.Success(ast, source);
+            }
 
             return ParseResult.Partial(ast, source,
                 diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics, effectivePath);

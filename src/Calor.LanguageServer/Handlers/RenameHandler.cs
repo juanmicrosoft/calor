@@ -1,4 +1,5 @@
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Ids;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
 using Microsoft.CodeAnalysis.CSharp;
@@ -17,6 +18,7 @@ namespace Calor.LanguageServer.Handlers;
 public sealed class RenameHandler : RenameHandlerBase
 {
     private readonly WorkspaceState _workspace;
+    internal bool SupportsTransactionalWorkspaceEdits { get; set; }
 
     public RenameHandler(WorkspaceState workspace)
     {
@@ -112,7 +114,59 @@ public sealed class RenameHandler : RenameHandlerBase
                     Edits = new TextEditContainer(edits),
                 });
             })
-            .ToArray();
+            .ToList();
+
+        // Preparing a rename must not persist identity before client acceptance.
+        var sourceChanges = new List<DeclarationIdentityStore.SourceChange>();
+        foreach (var group in occurrences.GroupBy(item => item.Doc.Uri))
+        {
+            if (!group.Key.IsFile) continue;
+            var before = group.First().Snapshot.Source;
+            var after = before;
+            foreach (var item in group.OrderByDescending(item => item.Span.Start))
+                after = after[..item.Span.Start] + request.NewName + after[item.Span.End..];
+            sourceChanges.Add(new(group.Key.LocalPath, before, after));
+        }
+        try
+        {
+            foreach (var group in sourceChanges.GroupBy(change => DeclarationIdentityStore.Find(change.File)?.Root)
+                         .Where(group => group.Key != null))
+            {
+                var store = new DeclarationIdentityStore(group.Key!);
+                var registered = group.Where(change => store.IsRegistered(change.File)).ToArray();
+                if (registered.Length == 0) continue;
+                var unsaved = registered.Any(change => !File.Exists(change.File)
+                    || File.ReadAllText(change.File) != change.Before);
+                var legacySourceIdentity = registered.All(change =>
+                    DeclarationIdentityStore.Describe(change.File, change.Before!)
+                    .Where(declaration => declaration.Kind is not (IdKind.Field or IdKind.Variant)).All(declaration =>
+                        IdValidator.IsCanonicalId(declaration.Id) || IdValidator.IsTestId(declaration.Id)));
+                if ((!SupportsTransactionalWorkspaceEdits || unsaved) && legacySourceIdentity)
+                    continue;
+                if (!SupportsTransactionalWorkspaceEdits)
+                    throw new InvalidOperationException("Sidecar-backed rename requires a client with transactional text WorkspaceEdit support; no edits were applied.");
+                if (unsaved)
+                    throw new InvalidOperationException("Save sidecar-backed source buffers before rename; atomic unsaved-buffer rename is not yet supported. No edits were applied.");
+                var sidecar = store.PreviewSidecar(registered);
+                documentChanges.Add(new WorkspaceEditDocumentChange(new TextDocumentEdit
+                {
+                    TextDocument = new OptionalVersionedTextDocumentIdentifier
+                    {
+                        Uri = DocumentUri.FromFileSystemPath(sidecar.File)
+                    },
+                    Edits = new TextEditContainer(new TextEdit
+                    {
+                        Range = PositionConverter.ToLspRange(new TextSpan(0, sidecar.Before.Length, 1, 1), sidecar.Before),
+                        NewText = sidecar.After
+                    })
+                }));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            throw new OmniSharp.Extensions.JsonRpc.Server.RequestFailedException(-32803,
+                $"Declaration identity rename refused: {ex.Message}", string.Empty, ex);
+        }
 
         return new WorkspaceEdit
         {
@@ -161,6 +215,10 @@ public sealed class RenameHandler : RenameHandlerBase
         RenameCapability capability,
         ClientCapabilities clientCapabilities)
     {
+        var failureHandling = clientCapabilities.Workspace?.WorkspaceEdit.Value?.FailureHandling?.ToString();
+        SupportsTransactionalWorkspaceEdits = clientCapabilities.Workspace?.WorkspaceEdit.Value?.DocumentChanges == true
+            && (string.Equals(failureHandling, "transactional", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(failureHandling, "textOnlyTransactional", StringComparison.OrdinalIgnoreCase));
         return new RenameRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("calor"),

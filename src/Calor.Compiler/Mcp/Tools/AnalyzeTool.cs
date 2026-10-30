@@ -152,7 +152,7 @@ public sealed class AnalyzeTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp-analyze.calr", compileOptions);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp-analyze.calr", compileOptions);
 
             var analysisResult = compileOptions.VerificationAnalysisResult;
 

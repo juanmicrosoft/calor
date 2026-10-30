@@ -327,6 +327,7 @@ internal sealed class WatchSession
         DriverResultSummary summary;
         try
         {
+            Ids.DeclarationIdentityStore.SyncActiveInputs(sources.Select(file => file.FullName), _stateDirectory);
             var result = CompilationDriver.CompileAll(
                 sources,
                 file => new CompilationOptions
@@ -383,6 +384,18 @@ internal sealed class WatchSession
                 });
 
             summary = new DriverResultSummary(result.Compiled.Count, result.Skipped.Count, result.AnyErrors);
+        }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            diagnosticSink?.AddRange(ex.Diagnostics);
+            foreach (var diagnostic in ex.Diagnostics.Errors)
+                _status.WriteLine(diagnostic);
+            if (sources.Any(file => file.FullName == ex.FilePath))
+            {
+                var failedOutput = Path.ChangeExtension(ex.FilePath, ".g.cs");
+                if (File.Exists(failedOutput)) File.Delete(failedOutput);
+            }
+            summary = new DriverResultSummary(0, 0, AnyErrors: true);
         }
         catch (Exception ex)
         {

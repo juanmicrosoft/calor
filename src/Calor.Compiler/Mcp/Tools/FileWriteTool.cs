@@ -66,6 +66,111 @@ public sealed class FileWriteTool : McpToolBase
         _rejectDir = rejectDir ?? Environment.GetEnvironmentVariable("CALOR_MCP_REJECT_DIR");
     }
 
+    /// <summary>Position-addressed refactoring; agents supply names and source edits, never IDs.</summary>
+    private sealed class DeclarationRefactorAction
+    {
+        private readonly string _root;
+        internal DeclarationRefactorAction(string? root = null) =>
+            _root = CanonicalPath.Resolve(root ?? Environment.CurrentDirectory);
+
+        public Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var project = CanonicalPath.Resolve(GetString(arguments, "projectDirectory")
+                    ?? throw new InvalidOperationException("projectDirectory is required."));
+                if (!CanonicalPath.IsUnder(project, _root))
+                    throw new InvalidOperationException("Project is outside the server write root.");
+                string Confine(string path)
+                {
+                    var canonical = CanonicalPath.Resolve(Path.GetFullPath(path, project));
+                    if (!CanonicalPath.IsUnder(canonical, project) || !canonical.EndsWith(".calr", StringComparison.Ordinal))
+                        throw new InvalidOperationException("Refactoring paths must be .calr files inside the project.");
+                    return canonical;
+                }
+                var file = Confine(GetString(arguments, "filePath") ?? throw new InvalidOperationException("filePath is required."));
+                var store = new Ids.DeclarationIdentityStore(project);
+                if (!File.Exists(store.SidecarPath))
+                    throw new InvalidOperationException("Build the active project or run ids sync before refactoring.");
+                var preview = GetBool(arguments, "preview");
+                // Preview must not persist a sync, recover a pending transaction or
+                // change any source. The projection below validates the current set.
+                var expectedSidecar = File.ReadAllText(store.SidecarPath);
+                var state = store.Preview([], expectedSidecar: expectedSidecar);
+                var line = GetInt(arguments, "line", 0);
+                var column = GetInt(arguments, "column", 0);
+                var source = File.ReadAllText(file);
+                IReadOnlyList<Ids.DeclarationIdentityStore.SourceChange> changes;
+                IReadOnlyList<Ids.DeclarationRelocation> relocations = [];
+                var action = GetString(arguments, "action");
+                if (action == "rename")
+                {
+                    var index = Refactoring.ProjectSymbolIndex.Build(state.Files.Select(path => Path.Combine(project, path)), out var skipped,
+                        synchronizeIdentities: false);
+                    if (skipped.Count != 0) throw new InvalidOperationException("Refactoring refused: project has unindexed files.");
+                    var offset = CalorSourceHelper.GetOffset(source, line, column);
+                    var occurrence = index.Resolve(file, offset) ?? throw new InvalidOperationException("No indexed identifier at the requested position.");
+                    var rename = Refactoring.RenameEngine.Rename(index, occurrence.SymbolId,
+                        GetString(arguments, "newName") ?? throw new InvalidOperationException("newName is required."));
+                    if (!rename.Succeeded) throw new InvalidOperationException($"Rename refused: {rename.Refusal}");
+                    var originals = index.Documents.ToDictionary(d => d.FilePath, d => d.Source, StringComparer.Ordinal);
+                    var updated = Refactoring.RenameEngine.Apply(originals, rename.Edits);
+                    changes = rename.Edits.Select(edit => edit.FilePath).Distinct(StringComparer.Ordinal)
+                        .Select(path => new Ids.DeclarationIdentityStore.SourceChange(path, originals[path], updated[path])).ToArray();
+                    var declaration = state.Declarations.SingleOrDefault(d =>
+                        Binding.SymbolId.Create("declaration", d.Id) == occurrence.SymbolId);
+                    if (declaration != null)
+                        relocations = [new(declaration.Id, (declaration with { Name = GetString(arguments, "newName")! }).Key)];
+                }
+                else if (action == "move")
+                {
+                    var sourceKey = Ids.DeclarationIdentityStore.Locate(
+                        Path.GetRelativePath(project, file).Replace('\\', '/'), source, line, column).Key;
+                    var selected = state.Declarations.SingleOrDefault(d => d.Key == sourceKey)
+                        ?? throw new InvalidOperationException("Declaration is not registered; sync active inputs first.");
+                    if (arguments == null || !arguments.Value.TryGetProperty("changes", out var edits) || edits.ValueKind != JsonValueKind.Array)
+                        throw new InvalidOperationException("Move requires source changes.");
+                    changes = edits.EnumerateArray().Select(edit => new Ids.DeclarationIdentityStore.SourceChange(
+                        Confine(edit.GetProperty("path").GetString() ?? throw new InvalidOperationException("Change path is required.")),
+                        edit.GetProperty("originalSource").GetString(), edit.GetProperty("modifiedSource").GetString())).ToArray();
+                    var destination = Confine(GetString(arguments, "destinationFile") ?? throw new InvalidOperationException("destinationFile is required."));
+                    var destinationChange = changes.SingleOrDefault(c => c.File == destination && c.After != null)
+                        ?? throw new InvalidOperationException("Destination must be included in the proposed source changes.");
+                    var sourceChange = changes.SingleOrDefault(c => c.File == file)
+                        ?? throw new InvalidOperationException("Source must be included in the proposed changes.");
+                    if (sourceChange.After != null && Ids.DeclarationIdentityStore.Describe(selected.File, sourceChange.After).Any(d => d.Key == sourceKey))
+                        throw new InvalidOperationException("The original declaration still exists; this is a copy, not a move.");
+                    var target = Ids.DeclarationIdentityStore.Locate(
+                        Path.GetRelativePath(project, destination).Replace('\\', '/'), destinationChange.After!,
+                        GetInt(arguments, "destinationLine", 0), GetInt(arguments, "destinationColumn", 0));
+                    relocations = [new(selected.Id, target.Key)];
+                }
+                else
+                    throw new InvalidOperationException("action must be rename or move.");
+                foreach (var change in changes)
+                {
+                    if (change.Before != null && ValidateSourceSize(change.Before, "originalSource") is { } beforeError)
+                        return Task.FromResult(beforeError);
+                    if (change.After != null && ValidateSourceSize(change.After, "modifiedSource") is { } afterError)
+                        return Task.FromResult(afterError);
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (preview) store.Preview(changes, relocations, expectedSidecar);
+                else store.Apply(changes, relocations, expectedSidecar);
+                return Task.FromResult(McpToolResult.Json(new
+                {
+                    success = true, applied = !preview, validation = "parse-and-identity",
+                    changedFiles = changes.Select(c => c.File).ToArray()
+                }));
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException or KeyNotFoundException)
+            {
+                return Task.FromResult(McpToolResult.Error($"calor_file_write refactoring failed: {ex.Message}"));
+            }
+        }
+    }
+
     public override string Name => "calor_file_write";
 
     public override string Description =>
@@ -75,7 +180,8 @@ public sealed class FileWriteTool : McpToolBase
         "when the edit is breaking. Creates the file if it does not exist. Writes are " +
         "confined to the session root (or the server's working directory without a " +
         "session). Pass a sessionId from calor_session_open to check references across " +
-        "the whole project.";
+        "the whole project. Optional rename/move actions preserve declaration identity " +
+        "with recoverable multi-file updates; preview validates without applying.";
 
     public override McpToolAnnotations? Annotations => new() { DestructiveHint = true, IdempotentHint = true };
 
@@ -83,6 +189,29 @@ public sealed class FileWriteTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "action": { "type": "string", "enum": ["write", "rename", "move"], "default": "write" },
+                "projectDirectory": { "type": "string" },
+                "filePath": { "type": "string" },
+                "line": { "type": "integer", "minimum": 1 },
+                "column": { "type": "integer", "minimum": 1 },
+                "newName": { "type": "string" },
+                "destinationFile": { "type": "string" },
+                "destinationLine": { "type": "integer", "minimum": 1 },
+                "destinationColumn": { "type": "integer", "minimum": 1 },
+                "preview": { "type": "boolean", "default": false },
+                "changes": {
+                    "type": "array", "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string" },
+                            "originalSource": { "type": ["string", "null"] },
+                            "modifiedSource": { "type": ["string", "null"] }
+                        },
+                        "required": ["path", "originalSource", "modifiedSource"],
+                        "additionalProperties": false
+                    }
+                },
                 "path": {
                     "type": "string",
                     "description": "Path of the .calr file to write (created if missing)"
@@ -105,7 +234,21 @@ public sealed class FileWriteTool : McpToolBase
                     "description": "Auto-heal indentation/closer slips before checking (default: true)"
                 }
             },
-            "required": ["path", "content"],
+            "allOf": [
+                {
+                    "if": { "properties": { "action": { "enum": ["rename", "move"] } }, "required": ["action"] },
+                    "then": { "required": ["action", "projectDirectory", "filePath", "line", "column"] },
+                    "else": { "required": ["path", "content"] }
+                },
+                {
+                    "if": { "properties": { "action": { "const": "rename" } }, "required": ["action"] },
+                    "then": { "required": ["newName"] }
+                },
+                {
+                    "if": { "properties": { "action": { "const": "move" } }, "required": ["action"] },
+                    "then": { "required": ["changes", "destinationFile", "destinationLine", "destinationColumn"] }
+                }
+            ],
             "additionalProperties": false
         }
         """;
@@ -114,6 +257,26 @@ public sealed class FileWriteTool : McpToolBase
     {
         try
         {
+            var action = GetString(arguments, "action");
+            string[] incompatible = action switch
+            {
+                "rename" => ["path", "content", "checks", "heal", "changes", "destinationFile", "destinationLine", "destinationColumn"],
+                "move" => ["path", "content", "checks", "heal", "newName"],
+                _ => ["projectDirectory", "filePath", "line", "column", "newName", "destinationFile", "destinationLine", "destinationColumn", "changes"]
+            };
+            if (arguments is { ValueKind: JsonValueKind.Object } args
+                && incompatible.FirstOrDefault(name => args.TryGetProperty(name, out _)) is { } invalid)
+                return McpToolResult.Error($"Parameter '{invalid}' does not apply to action '{action ?? "write"}'.");
+            if (action is "rename" or "move")
+            {
+                if (GetString(arguments, "sessionId") != null)
+                    return McpToolResult.Error("rename/move require projectDirectory, not sessionId.");
+                return await new DeclarationRefactorAction(_defaultWriteRoot).ExecuteAsync(arguments, cancellationToken);
+            }
+            if (action != null && action != "write")
+                return McpToolResult.Error("action must be write, rename or move.");
+            if (GetBool(arguments, "preview"))
+                return McpToolResult.Error("Use calor_edit_preview for ordinary write previews.");
             return await ExecuteCoreAsync(arguments, cancellationToken);
         }
         catch (OperationCanceledException)
@@ -286,7 +449,12 @@ public sealed class FileWriteTool : McpToolBase
                     "File was created on disk while the edit was being checked — re-read it and retry");
             }
 
-            await WriteAtomicAsync(canonicalPath, finalContent, cancellationToken);
+            var identityStore = Ids.DeclarationIdentityStore.Find(canonicalPath);
+            if (identityStore != null && (CanonicalPath.IsUnder(identityStore.Root, session?.RootDirectory ?? _defaultWriteRoot)
+                || identityStore.IsRegistered(canonicalPath)))
+                identityStore.Apply([new(canonicalPath, fileExistedAtRead ? originalSource : null, finalContent)]);
+            else
+                await WriteAtomicAsync(canonicalPath, finalContent, cancellationToken);
             session?.UpdateFile(canonicalPath, finalContent, modifiedParse);
         }
 

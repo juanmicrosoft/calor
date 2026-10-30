@@ -7,7 +7,8 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public abstract class TypeDefinitionNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public AttributeCollection Attributes { get; }
@@ -20,7 +21,7 @@ public abstract class TypeDefinitionNode : AstNode
         TextSpan? identifierSpan = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

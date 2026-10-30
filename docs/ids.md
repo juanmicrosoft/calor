@@ -6,6 +6,68 @@ This document defines the normative contract for Calor IDs. IDs are the foundati
 
 ---
 
+## 0.30 sidecar transition
+
+Declaration identity is moving out of active source and into `.calor/ids.json`.
+Build, check, watch, migration and project indexing synchronize their actual
+active input files automatically; no manual registration step is required.
+Their existing project/compilation inputs define the boundary:
+they do not discover or rewrite historical inputs. Add the sidecar to version
+control. Agents should edit names and signatures, not identity records.
+
+For tooling integration and recovery, use:
+
+```bash
+calor ids sync /path/to/project --register /path/to/project/active.calr
+calor ids sync /path/to/project
+```
+
+Synchronization preserves identity for an exact declaration key (file, container,
+kind, name, and signature). A vanished declaration can match a new declaration
+with the same kind and signature in the same container or file, but only when
+both ends have exactly one candidate. Ambiguous changes fail without changing
+the sidecar. Refactoring integrations can provide explicit identity relocations,
+including moves across both files and containers.
+
+Source edits made through the identity transaction API and MCP file-write path
+are journaled with their sidecar update. An interrupted transaction rolls forward
+on the next synchronization. Recovery refuses to overwrite an external edit and
+keeps its journal for investigation. Independent branch additions can be recovered
+from ordinary or diff3 Git conflict markers by `ids sync`; conflicting edits to
+one identity are rejected rather than guessed.
+
+This is a **transition**, not the completed source-syntax cutover. Source-ID parsing,
+legacy assign/migration commands, and the rules below remain until all consumers
+and active-source migration are ready together. `SourceId` preserves source spelling;
+the AST's effective `Id` comes from the sidecar for registered declarations.
+The Calor emitter does not serialize tooling IDs into source.
+
+MCP `calor_file_write` retains its ordinary `path`/`content` call shape. Its
+optional `action` also accepts `rename` and `move`, addressed by `projectDirectory`,
+`filePath`, `line` and `column`. Rename requires `newName`; move requires exact
+`changes` snapshots plus `destinationFile`, `destinationLine` and
+`destinationColumn`. Set `preview: true` to validate without applying. Moves
+validate parsing and identity, not behavioral equivalence. There is no new
+top-level MCP tool. LSP rename returns source and sidecar text changes together
+in one client-applied `WorkspaceEdit`; server-side preparation writes neither.
+Sidecar-backed LSP rename requires transactional text-edit support from the
+client and currently refuses unsaved source buffers that differ from disk.
+Legacy source-ID projects retain their existing source-only rename behavior
+without transactional support, including unsaved buffers. Transactional clients
+apply saved sidecar-backed source and sidecar edits together; this does not add
+a filesystem compare-and-swap guarantee against noncooperating external writers.
+
+The shared declaration inventory includes delegates, events, records, unions,
+fields, variants, local functions and proof obligations, including declarations
+inside accessor bodies and conditional branches. Unsupported declaration kinds
+and indistinguishable unnamed proofs fail explicitly rather than disappearing.
+MCP refactor actions reject stale source or sidecar snapshots and parameters
+belonging to a different action.
+
+`Calor0806` reports unavailable or ambiguous sidecar identity. Invalid active
+source retains its original lexer/parser diagnostics; synchronization writes
+neither a partial sidecar nor generated output for that source.
+
 ## 1. What IDs Represent
 
 ### 1.1 Semantic Identity

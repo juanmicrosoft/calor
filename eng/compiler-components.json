@@ -43,7 +43,7 @@
     {
       "name": "Ids",
       "path": "Ids",
-      "allowedDependencies": ["Ast", "Parsing"]
+      "allowedDependencies": ["Analysis", "Ast", "Parsing"]
     }
   ]
 }

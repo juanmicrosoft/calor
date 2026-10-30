@@ -718,7 +718,9 @@ public class IncrementalCliEndToEndTests : IDisposable
 
         var gamma = state.Files.Values.Single(entry => entry.EffectSummary!.ModuleName == "Gamma").EffectSummary!;
         var caller = Assert.Single(gamma.Callers);
-        Assert.Equal("f001", caller.CallerId);
+        var identity = new Calor.Compiler.Ids.DeclarationIdentityStore(_tempDir).Preview([])
+            .Declarations.Single(declaration => declaration.File == "c.calr" && declaration.Name == "Call").Id;
+        Assert.Equal(identity, caller.CallerId);
         Assert.Equal("Call", caller.DisplayName);
         Assert.Contains(caller.Calls, call => call.Target == "Greet");
         Assert.Contains(gamma.PublicFunctions, function => function.Name == "Call" && function.HasEffectDeclaration);

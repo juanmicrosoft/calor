@@ -105,6 +105,8 @@ public static class ProjectIndexBuilder
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        var symbols = ProjectSymbolIndex.Build(options.Files, out var skipped,
+            initializeIdentityRoot: options.ProjectDirectory);
         var inputs = CurrentInputs(options);
         var index = new ProjectIndex
         {
@@ -114,7 +116,6 @@ public static class ProjectIndexBuilder
             Files = inputs.Files,
         };
 
-        var symbols = ProjectSymbolIndex.Build(options.Files, out var skipped);
         foreach (var unreadable in skipped)
             index.Residual.UnreadableFiles.Add(Relative(options.ProjectDirectory, unreadable));
 
@@ -138,6 +139,24 @@ public static class ProjectIndexBuilder
                     Line = line,
                     Column = column,
                     SemanticHash = HashDefinition(document.Source, symbol),
+                });
+            }
+
+            foreach (var declaration in new Ids.IdScanner().Scan(document.Ast, document.FilePath))
+            {
+                var id = SymbolId.Create("declaration", declaration.Id).Value;
+                if (!declarationIds.Add(id))
+                    continue;
+                var (line, column) = LineColumn(document.Source, declaration.Span.Start);
+                index.Declarations.Add(new IndexedDeclaration
+                {
+                    SymbolId = id,
+                    Name = declaration.Name,
+                    Kind = declaration.Kind.ToString().ToLowerInvariant(),
+                    File = relative,
+                    Line = line,
+                    Column = column,
+                    SemanticHash = HashDefinition(document.Source, declaration.Span),
                 });
             }
         }
@@ -685,6 +704,11 @@ public static class ProjectIndexBuilder
         var span = symbol.DefinitionSpan;
         if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
             span = symbol.DeclarationSpan;
+        return HashDefinition(source, span);
+    }
+
+    private static string HashDefinition(string source, Calor.Compiler.Parsing.TextSpan span)
+    {
         if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
             return "";
 

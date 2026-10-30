@@ -694,6 +694,7 @@ public static class HookCommand
             }
 
             // Scan IDs in the new content
+            DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), content, module);
             var scanner = new IdScanner();
             var newEntries = scanner.Scan(module, path);
 
@@ -727,6 +728,7 @@ public static class HookCommand
 
                     if (!existingDiagnostics.HasErrors)
                     {
+                        DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), existingContent, existingModule);
                         var existingScanner = new IdScanner();
                         var existingEntries = existingScanner.Scan(existingModule, path);
 
@@ -747,6 +749,10 @@ public static class HookCommand
 
             // All checks passed
             return (0, null);
+        }
+        catch (DeclarationIdentityException ex)
+        {
+            return (1, $"BLOCKED: {ex.Message}");
         }
         catch (JsonException)
         {

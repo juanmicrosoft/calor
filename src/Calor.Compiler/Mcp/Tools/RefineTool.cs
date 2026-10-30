@@ -34,6 +34,10 @@ public sealed class RefineTool : McpToolBase
                     "type": "string",
                     "description": "Calor source code to analyze"
                 },
+                "filePath": {
+                    "type": "string",
+                    "description": "File path for resolving project sidecar declaration identity"
+                },
                 "timeout": {
                     "type": "integer",
                     "default": 5000,
@@ -101,7 +105,7 @@ public sealed class RefineTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp_obligations.calr", options);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_obligations.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -185,7 +189,7 @@ public sealed class RefineTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            Program.Compile(source, "mcp_bounds.calr", options);
+            Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_bounds.calr", options);
 
             var tracker = options.ObligationResults;
 
@@ -249,7 +253,7 @@ public sealed class RefineTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp_diagnose.calr", options);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_diagnose.calr", options);
 
             var tracker = options.ObligationResults;
 
@@ -357,7 +361,7 @@ public sealed class RefineTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp_guards.calr", options);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_guards.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -426,7 +430,7 @@ public sealed class RefineTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
-            Program.Compile(source, "mcp_suggest.calr", options);
+            Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_suggest.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -490,6 +494,7 @@ public sealed class RefineTool : McpToolBase
                 }, isError: true));
             }
 
+            Ids.DeclarationIdentityStore.AttachIfRegistered(GetString(arguments, "filePath"), source, module);
             var suggester = new TypeSuggester();
             var suggestions = suggester.Suggest(module);
 

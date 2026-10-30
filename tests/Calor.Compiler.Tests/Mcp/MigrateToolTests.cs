@@ -447,7 +447,9 @@ public class MigrateToolTests
             var entry = file.GetProperty("errors").EnumerateArray()
                 .Single(e => e.GetProperty("code").GetString() == "Calor0250");
 
-            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+            var identities = new Calor.Compiler.Ids.DeclarationIdentityStore(tempDir).Sync();
+            Assert.Equal(identities.Declarations.Single(d => d.Name == "Foo").Id,
+                entry.GetProperty("declarationId").GetString());
         }
         finally
         {

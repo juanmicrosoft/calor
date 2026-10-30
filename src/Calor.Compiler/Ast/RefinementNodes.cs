@@ -8,7 +8,8 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public sealed class RefinementTypeNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string Name { get; }
     public string BaseTypeName { get; }
     public TextSpan BaseTypeNameSpan { get; }
@@ -25,7 +26,7 @@ public sealed class RefinementTypeNode : AstNode
         TextSpan? baseTypeNameSpan = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         BaseTypeName = baseTypeName ?? throw new ArgumentNullException(nameof(baseTypeName));
         BaseTypeNameSpan = baseTypeNameSpan ?? TextSpan.Empty;
@@ -53,7 +54,8 @@ public sealed class SelfRefNode : ExpressionNode
 /// </summary>
 public sealed class ProofObligationNode : StatementNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string? Description { get; }
     public ExpressionNode Condition { get; }
     public AttributeCollection Attributes { get; }
@@ -66,7 +68,7 @@ public sealed class ProofObligationNode : StatementNode
         AttributeCollection attributes)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         Description = description;
@@ -82,7 +84,8 @@ public sealed class ProofObligationNode : StatementNode
 /// </summary>
 public sealed class IndexedTypeNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? SourceId;
+    public string SourceId { get; }
     public string Name { get; }
     public string BaseTypeName { get; }
     public TextSpan BaseTypeNameSpan { get; }
@@ -101,7 +104,7 @@ public sealed class IndexedTypeNode : AstNode
         TextSpan? baseTypeNameSpan = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        SourceId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         BaseTypeName = baseTypeName ?? throw new ArgumentNullException(nameof(baseTypeName));
         BaseTypeNameSpan = baseTypeNameSpan ?? TextSpan.Empty;
