@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "floor": 200,
+  "floorRule": "Pre-registered with the ledger (v0.15 E1 slice 2c): keysFromBound + keysFromString across all subjects must be at least 200. The floor detects a collapsed denominator \u2014 a refactor that stops asking the resolver at all \u2014 which exact-equality alone cannot catch, because a regenerated ledger of zeroes is self-consistent. It is not a quality bar and is not re-tuned when the measurement moves.",
+  "scope": "Every committed .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap v0.16 \u00a74.1) excluded; nothing else filtered), partitioned into subjects by top-level directory. Each file is lexed with TokenizeAllForParser and parsed, then run through EffectEnforcementPass with UnknownCallPolicy.Strict and a hermetic EffectResolver (built-in manifests only; ProjectDirectory and SolutionDirectory null). keysFromBound counts EffectResolverKey instances built by EffectResolverKey.FromBoundReceiver \u2014 the receiver's type came from the bound tree; keysFromString counts EffectResolverKey.FromStrings \u2014 the caller held only text. Both are counted per CALL SITE, before the resolver's cache, so the ledger measures how the compiler ASKS rather than how often an answer had to be computed. A key's parameter component is the inferred types of the ARGUMENTS, not the callee's resolved signature (design doc \u00a78.4), so this ledger measures declaring-type provenance only. Files that fail to lex/parse, or whose pass throws, contribute no keys and are listed by repo-relative path in notMeasured.",
+  "aggregateKeysFromBound": 280,
+  "aggregateKeysFromString": 870,
+  "perSubject": [
+    {
+      "subject": "bench",
+      "keysFromBound": 233,
+      "keysFromString": 626,
+      "filesMeasured": 390,
+      "notMeasured": [
+        "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
+        "bench/mcp/tasks/01-fix-closing-tag/input.calr",
+        "bench/mcp/tasks/02-fix-missing-effect/expected.calr",
+        "bench/mcp/tasks/02-fix-missing-effect/input.calr",
+        "bench/mcp/tasks/03-fix-wrong-id-prefix/expected.calr",
+        "bench/mcp/tasks/03-fix-wrong-id-prefix/input.calr",
+        "bench/mcp/tasks/04-fix-duplicate-id/expected.calr",
+        "bench/mcp/tasks/04-fix-duplicate-id/input.calr",
+        "bench/mcp/tasks/05-fix-multiple-errors/expected.calr",
+        "bench/mcp/tasks/05-fix-multiple-errors/input.calr",
+        "bench/mcp/tasks/06-add-effect-to-function/expected.calr",
+        "bench/mcp/tasks/06-add-effect-to-function/input.calr",
+        "bench/mcp/tasks/07-greenfield-simple-function/expected.calr",
+        "bench/mcp/tasks/08-greenfield-module-with-class/expected.calr",
+        "bench/mcp/tasks/09-convert-csharp-simple/expected.calr",
+        "bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr",
+        "bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr",
+        "bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr",
+        "bench/mcp/tasks/12-fix-mismatched-closing-tag/expected.calr",
+        "bench/mcp/tasks/12-fix-mismatched-closing-tag/input.calr",
+        "bench/mcp/tasks/13-greenfield-crud-module/expected.calr",
+        "bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr",
+        "bench/mcp/tasks/14-fix-test-ids-in-production/input.calr",
+        "bench/mcp/tasks/15-nontarget-read-module/input.calr",
+        "bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr",
+        "bench/mcp/tasks/16-nontarget-refactor-rename/input.calr",
+        "bench/mcp/tasks/17-fix-missing-return/expected.calr",
+        "bench/mcp/tasks/17-fix-missing-return/input.calr",
+        "bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr",
+        "bench/mcp/tasks/18-fix-wrong-effect-code/input.calr",
+        "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
+        "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
+        "bench/mcp/tasks/20-fix-unclosed-call/input.calr"
+      ]
+    },
+    {
+      "subject": "benchmarks",
+      "keysFromBound": 16,
+      "keysFromString": 52,
+      "filesMeasured": 7,
+      "notMeasured": []
+    },
+    {
+      "subject": "samples",
+      "keysFromBound": 1,
+      "keysFromString": 29,
+      "filesMeasured": 11,
+      "notMeasured": []
+    },
+    {
+      "subject": "scripts",
+      "keysFromBound": 0,
+      "keysFromString": 0,
+      "filesMeasured": 2,
+      "notMeasured": []
+    },
+    {
+      "subject": "src",
+      "keysFromBound": 3,
+      "keysFromString": 23,
+      "filesMeasured": 10,
+      "notMeasured": []
+    },
+    {
+      "subject": "tests",
+      "keysFromBound": 27,
+      "keysFromString": 137,
+      "filesMeasured": 495,
+      "notMeasured": [
+        "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
+        "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
+        "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
+      ]
+    },
+    {
+      "subject": "tools",
+      "keysFromBound": 0,
+      "keysFromString": 3,
+      "filesMeasured": 1,
+      "notMeasured": []
+    }
+  ]
+}

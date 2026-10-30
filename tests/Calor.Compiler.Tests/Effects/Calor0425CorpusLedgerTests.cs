@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -66,15 +67,14 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para><b>Exact equality, both directions.</b> A rise means the row-less
 /// surface grew or the resolution ceiling fell; a fall means a site went silent.
-/// Both are decisions and both are made in a PR that regenerates this file and
-/// says what moved. Regenerate with
-/// <c>CALOR_REGENERATE_CALOR0425_LEDGER=1 dotnet test --filter Calor0425CorpusLedger</c>.
-/// A MISSING ledger is a failure, never a silent regeneration.</para>
+/// Both require an explanation. The historical ledger now replays its recorded
+/// compiler and original inputs without regeneration. Today's compiler compares
+/// separate ordinary expectations in <c>tests/TestData/Effects/</c>, including a
+/// live CLI cross-check on every run. A missing input is never regenerated.</para>
 ///
-/// <para>Skipped when the corpus submodules are not initialized; the
-/// <c>compiler</c> shard checks them out, and the skip is registered in
-/// <c>eng/test-manifest.json</c>'s <c>expectedSkipped</c> so a silent skip trips
-/// the count.</para>
+/// <para>The current test skips when the corpus submodules are not initialized;
+/// the <c>compiler</c> shard checks them out. Historical replay requires original
+/// history and submodule objects and fails, rather than skips, if unavailable.</para>
 ///
 /// <para><b>v0.16 K1 — schema 3: the ledger now mirrors the SHIPPING rule.</b>
 /// Schema 2 gated the effect pass on the <i>raw</i> binder bag
@@ -126,6 +126,11 @@ public class Calor0425CorpusLedgerTests
     // list (roadmap-v0.17 §3.1 R1, gate 13) + the Calor0411 count over the
     // enforced set, which the IL-rows trigger was being read without.
     private const int SchemaVersion = 4;
+    private const string CurrentScopeText =
+        "Current compiler conversion/effect regression expectations over the pinned MediatR, "
+        + "serilog and FluentValidation source corpora; Lossy/SelectActiveBranchLossy, empty "
+        + "defined symbols, propagated binding errors and built-in manifests only. CLI cross-check "
+        + "executes every converted module in an independent scratch directory.";
 
     /// <summary>
     /// v0.16 K1 — the rule the denominator is measured under, written into the
@@ -283,21 +288,13 @@ public class Calor0425CorpusLedgerTests
     /// now re-derived on every regeneration from the SAME conversion the
     /// in-process leg uses — so the two legs cannot drift by neglect, only by a
     /// real disagreement, which is what the gate is for.</para>
-    /// <para>Outside a regeneration the committed block is returned unchanged,
-    /// so an ordinary test run stays fast and still checks the committed bytes.
-    /// </para>
+    /// <para>The current-compiler regression always executes this leg. Historical
+    /// gate tests continue to read the immutable recorded block.</para>
     /// </summary>
     private static CliCrossCheck MeasureCliCrossCheck(
         string root,
         List<SubjectVolume> inProcess)
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER"),
-                "1", StringComparison.Ordinal))
-        {
-            return CommittedLedger().CliCrossCheck;
-        }
-
         var rows = new List<CliCrossCheckSubject>();
         foreach (var subject in inProcess)
         {
@@ -315,8 +312,7 @@ public class Calor0425CorpusLedgerTests
             + "defined symbols), each module written to a scratch directory holding no "
             + ".calor-effects.json, then `dotnet calor.dll -i <module>.calr -o <scratch>/out.g.cs` "
             + "— no flags, one process per module",
-            "v0.17 R2: re-derived automatically on every ledger regeneration rather than "
-            + "hand-registered, so the two legs cannot drift by neglect",
+            "Current compiler: executed live on every current-expectation comparison",
             rows);
     }
 
@@ -330,7 +326,7 @@ public class Calor0425CorpusLedgerTests
     private static CliCrossCheckSubject MeasureCliSubject(string root, string subject)
     {
         var srcRoot = Path.Combine(root, "bench", "corpus", subject, "src");
-        var cli = Path.Combine(root, "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+        var cli = typeof(Program).Assembly.Location;
         var files = Directory
             .EnumerateFiles(srcRoot, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
@@ -496,7 +492,7 @@ public class Calor0425CorpusLedgerTests
             var store = new Compiler.Ids.DeclarationIdentityStore(scratch);
             store.Sync([]);
             var modulePath = Path.Combine(scratch, "m.calr");
-            var cli = Path.Combine(RepoRoot(), "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+            var cli = typeof(Program).Assembly.Location;
             File.WriteAllText(modulePath, FirstCliModule);
             Assert.Equal("clean", CliDisposition(RunCli(cli, scratch)));
             var sidecar = File.ReadAllBytes(store.SidecarPath);
@@ -522,7 +518,7 @@ public class Calor0425CorpusLedgerTests
         Directory.CreateDirectory(scratch);
         try
         {
-            var cli = Path.Combine(RepoRoot(), "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+            var cli = typeof(Program).Assembly.Location;
             var sources = new[] { FirstCliModule, NextCliModule, FirstCliModule.Replace("\n", "\r\n") + "\r\n" };
             foreach (var source in sources)
                 Assert.Equal("clean", CliDisposition(RunCliModule(cli, scratch, source)));
@@ -612,9 +608,25 @@ public class Calor0425CorpusLedgerTests
     private static string LedgerPath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "calor0425-corpus-ledger.json");
 
-    [SkippableFact]
-    public void Calor0425CorpusLedgerMatchesRecomputation()
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task Calor0425CorpusLedgerMatchesRecomputation()
     {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "corpus"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical corpus replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    private static string CurrentExpectationsPath() => Path.Combine(
+        RepoRoot(), "tests", "TestData", "Effects", "calor0425-corpus-current-expectations.json");
+
+    [SkippableFact]
+    public void CurrentCompiler_CorpusMatchesExpectationsAndLiveCliExactly()
+    {
+        Assert.False(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER") == "1",
+            "The historical corpus ledger is immutable; current expectations are a separate test fixture.");
         var root = RepoRoot();
         var subjectDirs = Subjects
             .Select(subject => (Name: subject, Path: Path.Combine(root, "bench", "corpus", subject, "src")))
@@ -642,13 +654,12 @@ public class Calor0425CorpusLedgerTests
                 + "at bind)");
         }
 
-        var measured = new Ledger(
+        var measured = new CurrentExpectations(
             SchemaVersion,
-            ScopeText,
+            CurrentScopeText,
             BindRuleText,
             RegisteredFloorRule(),
             MeasureCliCrossCheck(root, perSubject),
-            MeasuredCommit(root),
             perSubject.Sum(s => s.Diagnostics),
             perSubject.Sum(s => s.ModulesWithDiagnostics),
             perSubject.Sum(s => s.ModulesEnforced),
@@ -665,23 +676,12 @@ public class Calor0425CorpusLedgerTests
             + "InvocationUndetermined "
             + $"{perSubject.Sum(s => s.UnknownSource + s.InvocationUndetermined)})");
 
-        var ledgerPath = LedgerPath();
-        if (string.Equals(
-                Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER"),
-                "1", StringComparison.Ordinal))
-        {
-            File.WriteAllText(ledgerPath, JsonSerializer.Serialize(
-                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            Console.WriteLine($"Calor0425 corpus ledger regenerated: {ledgerPath}");
-            return;
-        }
+        var committed = JsonSerializer.Deserialize<CurrentExpectations>(File.ReadAllText(CurrentExpectationsPath()))!;
+        AssertCurrentExpectations(committed, measured);
+    }
 
-        Assert.True(File.Exists(ledgerPath),
-            $"Calor0425 corpus ledger missing at {ledgerPath} — run once with "
-            + "CALOR_REGENERATE_CALOR0425_LEDGER=1. A missing ledger is a FAILURE, not a cue to "
-            + "write one silently: the number is the instrument §13.4 registers.");
-        var committed = JsonSerializer.Deserialize<Ledger>(File.ReadAllText(ledgerPath))!;
-
+    private static void AssertCurrentExpectations(CurrentExpectations committed, CurrentExpectations measured)
+    {
         // Anti-vacuity, now tied to gate 9's own floor rather than a hand-picked
         // number: a ledger that enforced nothing would satisfy every equality
         // below, including a per-subject zero. v0.16 K1 raised this from 90
@@ -695,6 +695,11 @@ public class Calor0425CorpusLedgerTests
             + "measurement stopped mirroring the shipping compiler — the raw-bag guard schema 2 "
             + $"used would report {measured.PerSubject.Sum(s => s.ModulesEnforcedRawBagRule)} "
             + "here (roadmap-v0.16.md §3.1 K1's discriminating pin).");
+        Assert.Equal(Subjects, measured.PerSubject.Select(s => s.Subject));
+        foreach (var subjectFloor in floor.PerSubjectModulesEnforcedMin)
+            Assert.True(measured.PerSubject.Single(s => s.Subject == subjectFloor.Subject).ModulesEnforced
+                >= subjectFloor.ModulesEnforcedMin, $"Current denominator fell below the floor for {subjectFloor.Subject}.");
+        Assert.Equal(0, measured.PerSubject.Sum(s => s.ExcludedParseFailed));
 
         // THE EXCLUSION RATE IS PART OF THE MEASUREMENT, not a footnote to it.
         // 265 of 364 modules (73%) never reach the effect pass, almost all of
@@ -724,7 +729,7 @@ public class Calor0425CorpusLedgerTests
             + "so the Calor0425 counts would mean nothing.");
 
         Assert.Equal(SchemaVersion, committed.SchemaVersion);
-        Assert.Equal(ScopeText, committed.Scope);
+        Assert.Equal(CurrentScopeText, committed.Scope);
 
         // v0.16 K1 — the bind rule and gate 9's floor rule travel WITH the
         // numbers, so a reader of the JSON alone knows what denominator they are
@@ -732,19 +737,9 @@ public class Calor0425CorpusLedgerTests
         // exactly the failure K1 exists to correct.
         Assert.Equal(BindRuleText, committed.BindRule);
         AssertFloorRuleEqual(RegisteredFloorRule(), committed.FloorRule);
-        // v0.17 R2 — the CLI leg is MEASURED on every regeneration, not compared
-        // to a hand-registered constant. That constant was the thing that went
-        // stale the moment R2 moved the in-process denominator, and keeping it
-        // would mean maintaining the same numbers in two places. What guards the
-        // block now is `Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement`,
-        // which holds it against the in-process cells it must agree with —
-        // a real cross-check rather than a copy of itself.
-
-        // measuredCommit is SHAPE-checked, never compared to HEAD — the
-        // convention the two existing ledgers use
-        // (HigherOrderDemandLedgerTests.cs:480-498), because a ledger regenerated
-        // in a PR is stamped with a commit that does not exist until it merges.
-        Assert.Matches("^[0-9a-f]{40}$", committed.MeasuredCommit);
+        AssertCliCrossCheckEqual(committed.CliCrossCheck, measured.CliCrossCheck);
+        AssertCliAgreement(measured.AggregateModulesEnforced, measured.FloorRule,
+            measured.PerSubject, measured.CliCrossCheck);
 
         Assert.Equal(committed.PerSubject.Count, measured.PerSubject.Count);
         foreach (var (expected, actual) in committed.PerSubject.Zip(measured.PerSubject))
@@ -765,14 +760,43 @@ public class Calor0425CorpusLedgerTests
                 + $"  causes   : {Describe(expected.BindFailureCauses)}"
                 + $"  ->  {Describe(actual.BindFailureCauses)}\n"
                 + $"  modules  : {DescribeDelta(expected.BindFailureModules, actual.BindFailureModules)}\n"
-                + "A RISE means the row-less surface grew or the resolution ceiling fell; a FALL "
-                + "means a site went silent. Both are decisions. Regenerate the ledger IN THIS PR "
-                + "with CALOR_REGENERATE_CALOR0425_LEDGER=1 and name the cause — never absorb it.");
+                + "Explain the current compiler delta before updating its ordinary expectations; "
+                + "never regenerate the historical ledger.");
         }
 
         Assert.Equal(committed.AggregateDiagnostics, measured.AggregateDiagnostics);
         Assert.Equal(committed.AggregateModulesWithDiagnostics, measured.AggregateModulesWithDiagnostics);
         Assert.Equal(committed.AggregateModulesEnforced, measured.AggregateModulesEnforced);
+    }
+
+    [Theory]
+    [InlineData("Calor0411Sites")]
+    [InlineData("Diagnostics")]
+    [InlineData("ModulesNotMeasured")]
+    [InlineData("ModulesEnforced")]
+    [InlineData("BindFailureCauses")]
+    [InlineData("BindFailureModules")]
+    [InlineData("BindFailureMultiCause")]
+    [InlineData("CliCrossCheck")]
+    public void CurrentExpectations_RejectCountCauseOrCliTampering(string field)
+    {
+        var text = File.ReadAllText(CurrentExpectationsPath());
+        var measured = JsonSerializer.Deserialize<CurrentExpectations>(text)!;
+        var expected = JsonSerializer.Deserialize<CurrentExpectations>(text)!;
+        AssertCurrentExpectations(expected, measured);
+        var changed = System.Text.Json.Nodes.JsonNode.Parse(text)!;
+        var subject = changed["PerSubject"]![0]!;
+        if (field == "BindFailureCauses")
+            subject[field]!["Calor0208"] = subject[field]!["Calor0208"]!.GetValue<int>() + 1;
+        else if (field == "BindFailureModules")
+            subject[field]![0] = "Calor0261 deliberately-wrong-input.cs";
+        else if (field == "CliCrossCheck")
+            changed[field]!["PerSubject"]![0]!["Calor0425Sites"] =
+                changed[field]!["PerSubject"]![0]!["Calor0425Sites"]!.GetValue<int>() + 1;
+        else
+            subject[field] = subject[field]!.GetValue<int>() + 1;
+        var tampered = JsonSerializer.Deserialize<CurrentExpectations>(changed.ToJsonString())!;
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertCurrentExpectations(tampered, measured));
     }
 
     // ---------------------------------------------------------------------
@@ -935,13 +959,18 @@ public class Calor0425CorpusLedgerTests
     public void Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement()
     {
         var committed = CommittedLedger();
-        var cli = committed.CliCrossCheck;
+        AssertCliAgreement(committed.AggregateModulesEnforced, committed.FloorRule,
+            committed.PerSubject, committed.CliCrossCheck);
+    }
 
+    private static void AssertCliAgreement(int aggregateModulesEnforced, Gate9FloorRule floorRule,
+        List<SubjectVolume> perSubject, CliCrossCheck cli)
+    {
         Assert.Equal(
-            committed.PerSubject.Select(s => s.Subject),
+            perSubject.Select(s => s.Subject),
             cli.PerSubject.Select(s => s.Subject));
 
-        foreach (var (inProcess, cliRow) in committed.PerSubject.Zip(cli.PerSubject))
+        foreach (var (inProcess, cliRow) in perSubject.Zip(cli.PerSubject))
         {
             var why = $"S2 cross-check disagreement for {inProcess.Subject} — the in-process "
                 + "measurement moved and the CLI leg was not re-run. Re-run the pinned CLI pass "
@@ -987,14 +1016,14 @@ public class Calor0425CorpusLedgerTests
         // review round 3 caught in PP-R1's effect size, in the opposite
         // direction.
         Assert.Equal(
-            committed.AggregateModulesEnforced,
+            aggregateModulesEnforced,
             cli.PerSubject.Sum(s => s.ReachEffectPass));
         Assert.True(
             cli.PerSubject.Sum(s => s.ReachEffectPass)
-                >= committed.FloorRule.ModulesEnforcedMin,
+                >= floorRule.ModulesEnforcedMin,
             "gate 9's regression floor: the CLI leg reached "
             + $"{cli.PerSubject.Sum(s => s.ReachEffectPass)} modules, below the "
-            + $"{committed.FloorRule.ModulesEnforcedMin} floor. #1385 legitimately moved "
+            + $"{floorRule.ModulesEnforcedMin} floor. #1385 legitimately moved "
             + "active scalar failures before the effect pass; it did not remove this floor.");
         Assert.Equal(0, cli.PerSubject.Sum(s => s.ParseFailed));
     }
@@ -1197,8 +1226,7 @@ public class Calor0425CorpusLedgerTests
     {
         var path = LedgerPath();
         Assert.True(File.Exists(path),
-            $"Calor0425 corpus ledger missing at {path} — run once with "
-            + "CALOR_REGENERATE_CALOR0425_LEDGER=1.");
+            $"Immutable historical Calor0425 corpus ledger missing at {path}; restore its original bytes.");
         return JsonSerializer.Deserialize<Ledger>(File.ReadAllText(path))!;
     }
 
@@ -1225,30 +1253,6 @@ public class Calor0425CorpusLedgerTests
         Assert.Equal(expected.Invocation, actual.Invocation);
         Assert.Equal(expected.MeasuredAt, actual.MeasuredAt);
         Assert.Equal(expected.PerSubject, actual.PerSubject);
-    }
-
-    private static string MeasuredCommit(string root)
-    {
-        // A shallow CI checkout still has HEAD; a worktree's .git is a FILE, so
-        // read the ref rather than assuming a directory layout. Falls back to
-        // forty zeroes, which the shape check accepts and a reader can spot.
-        try
-        {
-            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "git",
-                Arguments = "rev-parse HEAD",
-                WorkingDirectory = root,
-                RedirectStandardOutput = true,
-            })!;
-            var sha = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit();
-            return sha.Length == 40 ? sha : new string('0', 40);
-        }
-        catch
-        {
-            return new string('0', 40);
-        }
     }
 
     private static SubjectVolume MeasureSubject(string name, string srcRoot)
@@ -1994,6 +1998,18 @@ public class Calor0425CorpusLedgerTests
         /// production denominator must NOT land on.</summary>
         int RawBagDenominatorAtRegistration,
         string Note);
+
+    private sealed record CurrentExpectations(
+        int SchemaVersion,
+        string Scope,
+        string BindRule,
+        Gate9FloorRule FloorRule,
+        CliCrossCheck CliCrossCheck,
+        int AggregateDiagnostics,
+        int AggregateModulesWithDiagnostics,
+        int AggregateModulesEnforced,
+        int AggregateModulesExcluded,
+        List<SubjectVolume> PerSubject);
 
     private sealed record Ledger(
         int SchemaVersion,

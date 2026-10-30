@@ -78,6 +78,33 @@ this historical category, so it is **not** a full compiler-suite result.
 Current-compiler semantic replay uses separate active-syntax fixtures and cannot
 replace this historical check. Neither command reruns paid epochs or token collection.
 
+**Historical registered key/corpus ledgers and current regressions:**
+
+```bash
+python3 scripts/test_registered_ledger_historical_replay.py
+python3 scripts/registered_ledger_historical_replay.py key
+python3 scripts/registered_ledger_historical_replay.py corpus
+dotnet test tests/Calor.Compiler.Tests/ --filter "FullyQualifiedName~EffectResolverKeyLedgerTests|FullyQualifiedName~Calor0425CorpusLedgerTests"
+```
+
+The two historical checks have the same prerequisites and process deadline as
+PP-E1, plus initialized corpus submodule object stores containing their recorded
+commits. They never fetch missing history. Each runner archives its recorded
+compiler and each recorded submodule commit from Git objects, not from current
+worktree files or active mirrors. It compares the final immutable ledger bytes
+against the original landing commit, then requires exactly one executed passing
+original test. Missing history, submodule objects, native assets or result files,
+attempted regeneration and skipped/empty results fail.
+
+The original test names remain `Category=HistoricalReplay` obligations.
+`CurrentCompiler_*` tests compare today's compiler against ordinary fixtures in
+`tests/TestData/Effects/*-current-expectations.json`; these have no historical
+`measuredCommit` or provenance seals. Per-subject counts, denominators, named
+exclusions and binding causes are exact, and the original floors still apply.
+The current corpus test executes all 364 CLI module cross-checks on every run
+and compares every CLI field; it does not reuse recorded CLI results.
+Historical shape and gate tests continue to read the original ledgers.
+
 **Full-corpus lane** (adds ~500 MB and a few minutes; needed to unskip
 `BinderIncompleteRatchetTests`):
 
