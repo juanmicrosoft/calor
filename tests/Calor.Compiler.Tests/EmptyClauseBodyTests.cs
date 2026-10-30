@@ -282,7 +282,7 @@ public class EmptyClauseBodyTests
         new object[] { "if-then", "§IF{i1} b" },
         new object[] { "elseif", "§IF{i1} b\n      §B{a:i32} 1\n    §EI (== n 2)" },
         new object[] { "else", "§IF{i1} b\n      §B{a:i32} 1\n    §EL" },
-        new object[] { "arrow-if-else", "§IF{i1} b → §B{a:i32} 1\n    §EL" },
+        new object[] { "block-if-else", "§IF{i1} b\n      §B{a:i32} 1\n    §EL" },
         new object[] { "for", "§L{l1:i:0:3:1}" },
         new object[] { "while", "§WH{w1} b" },
         new object[] { "foreach", "§EACH{e1:x:i32} xs" },

@@ -8,6 +8,41 @@ namespace Calor.Compiler.Tests;
 
 public class ControlFlowTests
 {
+    [Theory]
+    [InlineData("§IF{i1} true → §R 1")]
+    [InlineData("§IF{i1} true\n      §R 1\n    §EI false → §R 2")]
+    [InlineData("§IF{i1} true\n      §R 1\n    §EL → §R 2")]
+    public void Parse_ArrowConditionalStatements_AreRejected(string statement)
+    {
+        var source = "§M{m1:Test}\n  §F{f1:Probe:pub} () -> i32\n    " + statement;
+        Parse(source, out var diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Message.Contains("Arrow conditional statements are removed", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("§W{w1} value\n      §K _ → 1", true)]
+    [InlineData("§W{w1} value\n      §K _\n        §R 1", false)]
+    [InlineData("§R §W{w1} value\n      §K _ → 1", false)]
+    public void Parse_StatementMatchArmsRequireBlocks(string statement, bool hasErrors)
+    {
+        var source = "§M{m1:Test}\n  §F{f1:Probe:pub} (i32:value) -> i32\n    " + statement;
+        var module = Parse(source, out var diagnostics);
+        Assert.Equal(hasErrors, diagnostics.HasErrors);
+        if (hasErrors)
+            Assert.Contains(diagnostics, diagnostic =>
+                diagnostic.Message.Contains("Statement match arms require", StringComparison.Ordinal));
+        else
+        {
+            var emitted = new Calor.Compiler.Migration.CalorEmitter().Emit(module);
+            Parse(emitted, out var emittedDiagnostics);
+            Assert.False(emittedDiagnostics.HasErrors,
+                string.Join("; ", emittedDiagnostics.Select(diagnostic => diagnostic.Message)));
+        }
+    }
+
     [Fact]
     public void Parse_ReturnMatchShortcut_IsRejectedWithExplicitReturnReplacement()
     {
@@ -15,7 +50,8 @@ public class ControlFlowTests
             §M{m1:Test}
               §F{f1:Probe:pub} (i32:value) -> i32
                 §W{w1:expr} value
-                  §K _ → 1
+                  §K _
+                    §R 1
             """;
 
         var module = Parse(source, out var diagnostics);

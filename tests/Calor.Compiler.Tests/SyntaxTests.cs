@@ -1103,7 +1103,8 @@ public class SyntaxTests
   §F{f001:Main:pub}
       §I{BOOL:flag}
       §O{void}
-        §IF{i1} flag → §P ""Yes""";
+        §IF{i1} flag
+          §P ""Yes""";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);

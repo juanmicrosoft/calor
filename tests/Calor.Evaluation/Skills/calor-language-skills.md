@@ -478,21 +478,23 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 
 ### Control Flow
 
-**IMPORTANT: Arrow Syntax vs Block Syntax**
+**Conditional statements use indented blocks**
 
-Calor has two styles for if statements. Choosing the wrong one causes compilation errors.
+Every statement branch uses an indented body. Arrow statement bodies are removed.
 
-**Arrow syntax (`→`) - SINGLE STATEMENT ONLY:**
+**Single-statement branches:**
 ```calor
-§IF{id} (condition) → §R value1
-§EI (condition2) → §R value2
-§EL → §R value3
+§IF{id} (condition)
+  §R value1
+§EI (condition2)
+  §R value2
+§EL
+  §R value3
 ```
-- Use ONLY when each branch has exactly ONE statement
-- The statement must immediately follow the arrow
+- Put the statement on the next line, indented under its branch
 - End the if by dedenting; do not write a structural close tag
 
-**Block syntax - MULTIPLE STATEMENTS:**
+**Multiple-statement branches:**
 ```calor
 §IF{id} (condition)
   §R value1
@@ -501,7 +503,6 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
   §B{x} 5
   §R x
 ```
-- Use when ANY branch needs more than one statement
 - No arrow after the condition
 - Statements go on following lines
 
@@ -521,19 +522,18 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 
 **IMPORTANT:** Both `→ thenValue` and `§EL → elseValue` are required for IF expressions.
 
-**COMMON MISTAKE - Arrow syntax with statements after:**
-```calor
-// WRONG - arrow syntax cannot have statements after it on separate lines
-§IF{if1} (== x 0) → §R false
-§ASSIGN y (+ y 1)    // ERROR: arrow syntax accepts only the branch statement here
-```
-
-**CORRECT - use block syntax when you need multiple statements:**
+**Dedenting ends the branch:**
 ```calor
 §IF{if1} (== x 0)
   §R false
+§ASSIGN y (+ y 1)    // Outside the if
+```
 
-§ASSIGN y (+ y 1)    // Now this is outside the if, which is correct
+**Indent additional statements to keep them in the branch:**
+```calor
+§IF{if1} (== x 0)
+  §ASSIGN y (+ y 1)
+  §R false
 ```
 
 **For Loop:**
@@ -621,8 +621,10 @@ When you have a loop with conditional logic inside, use block-style for inner if
 ```calor
 §F{f001:Abs:pub} (i32:n) -> i32
   §S (>= result 0)
-  §IF{if1} (< n 0) → §R (- 0 n)
-  §EL → §R n
+  §IF{if1} (< n 0)
+    §R (- 0 n)
+  §EL
+    §R n
 ```
 
 ### Function with Both Pre and Postconditions
@@ -631,9 +633,12 @@ When you have a loop with conditional logic inside, use block-style for inner if
   §Q (<= min max)
   §S (>= result min)
   §S (<= result max)
-  §IF{if1} (< value min) → §R min
-  §EI (> value max) → §R max
-  §EL → §R value
+  §IF{if1} (< value min)
+    §R min
+  §EI (> value max)
+    §R max
+  §EL
+    §R value
 ```
 
 ### Recursive Function
@@ -641,8 +646,10 @@ When you have a loop with conditional logic inside, use block-style for inner if
 §F{f001:Factorial:pub} (i32:n) -> i32
   §Q (>= n 0)
   §S (>= result 1)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+  §IF{if1} (<= n 1)
+    §R 1
+  §EL
+    §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ### Loop-based Function
@@ -661,9 +668,12 @@ When a loop contains an if statement, always use block-style for the inner if:
 ```calor
 §F{f001:IsPrime:pub} (i32:n) -> bool
   §Q (> n 0)
-  §IF{if1} (<= n 1) → §R false
-  §EI (== n 2) → §R true
-  §EI (== (% n 2) 0) → §R false
+  §IF{if1} (<= n 1)
+    §R false
+  §EI (== n 2)
+    §R true
+  §EI (== (% n 2) 0)
+    §R false
 
   §B{~i} 3
   §WH{wh1} (<= (* i i) n)
@@ -692,12 +702,16 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
       §ASSIGN §THIS._y y
 
     §MT{mt01:Equals:pub} (Point:other) -> bool
-      §IF{if1} (== other null) → §R false
-      §EL → §R true
+      §IF{if1} (== other null)
+        §R false
+      §EL
+        §R true
 
     §OP{op01:==:pub} (Point:left, Point:right) -> bool
-      §IF{if1} (== left null) → §R (== right null)
-      §EL → §R §C{left.Equals} §A right §/C
+      §IF{if1} (== left null)
+        §R (== right null)
+      §EL
+        §R §C{left.Equals} §A right §/C
 
     §OP{op02:!=:pub} (Point:left, Point:right) -> bool
       §R (not (== left right))
@@ -1062,10 +1076,14 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 ```calor
 §W{sw1} x
-  §K §VAR{n} §WHEN (> n 100) → "large"
-  §K §VAR{n} §WHEN (< n 0) → "negative"
-  §K 0 → "zero"
-  §K _ → "normal"
+  §K §VAR{n} §WHEN (> n 100)
+    §R "large"
+  §K §VAR{n} §WHEN (< n 0)
+    §R "negative"
+  §K 0
+    §R "zero"
+  §K _
+    §R "normal"
 ```
 
 ## Enums
@@ -1099,11 +1117,10 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 5. **Keep functions focused**: One function per task, with clear inputs, outputs, and contracts.
 
-6. **Arrow vs Block syntax for if statements**:
-   - Use arrow syntax (`→`) ONLY for single-statement branches
-   - Use block syntax (no arrow) when you need multiple statements
-   - Inside loops, prefer block-style for inner if statements
-   - When in doubt, use block syntax - it always works
+6. **Use indented bodies for every conditional statement**:
+   - Do not put an arrow after a statement condition
+   - Align `§EI` and `§EL` with their `§IF`
+   - Indent every branch body, including single statements
 
 7. **Use indentation to delimit structures**: Blocks end at the next dedent. Do not write structural close tags; they are compile-time errors.
 
@@ -1298,13 +1315,16 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **WRONG - Using < or > on strings:**
 ```calor
 // WRONG: Relational operators don't work on strings
-§IF{if1} (< a b) → §R (- 0 1)       // ❌ ERROR - can't compare strings with <
-§IF{if2} (> a b) → §R 1             // ❌ ERROR - can't compare strings with >
+§IF{if1} (< a b)
+  §R (- 0 1)       // ❌ ERROR - can't compare strings with <
+§IF{if2} (> a b)
+  §R 1             // ❌ ERROR - can't compare strings with >
 ```
 
 **CORRECT - Use string operations or character codes:**
 ```calor
-§IF{if1} (equals a b) → §R 0
+§IF{if1} (equals a b)
+  §R 0
 ```
 
 For lexicographic comparison, compare character by character using `(char-at)` and `(char-code)`.

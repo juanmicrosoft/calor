@@ -78,8 +78,8 @@
       "matchPatterns": ["can't compare strings", "string comparison", "< string", "> string"],
       "matchCodes": ["Calor0202", "Calor0111"],
       "description": "Relational operators (< >) don't work on strings. Use (equals) for equality.",
-      "wrongExample": "§IF{if1} (< a b) → §R (- 0 1)   // ERROR - can't compare strings with <",
-      "correctExample": "§IF{if1} (equals a b) → §R 0\n// For lexicographic comparison, compare character by character using (char-at) and (char-code).",
+      "wrongExample": "§IF{if1} (< a b)\n  §R (- 0 1)   // ERROR - can't compare strings with <",
+      "correctExample": "§IF{if1} (equals a b)\n  §R 0\n// For lexicographic comparison, compare character by character using (char-at) and (char-code).",
       "explanation": "String types cannot use < or > operators. Use (equals a b) for equality. For ordering, compare character codes."
     },
     {
@@ -89,18 +89,18 @@
       "matchCodes": ["Calor0200"],
       "description": "abs, max, min, sqrt, pow are not built-in. Use IF branches instead.",
       "wrongExample": "§R (abs x)     // ERROR - abs doesn't exist\n§R (max a b)   // ERROR - max doesn't exist",
-      "correctExample": "§IF{if1} (< x 0) → §R (- 0 x)\n§R x\n\n§IF{if2} (> a b) → §R a\n§R b",
+      "correctExample": "§IF{if1} (< x 0)\n  §R (- 0 x)\n§R x\n\n§IF{if2} (> a b)\n  §R a\n§R b",
       "explanation": "Calor doesn't have abs, max, min, sqrt, pow as built-in functions. Use §IF with a single return or an indented block to implement branch logic."
     },
     {
       "id": "control-flow-arrow",
-      "title": "Arrow Syntax Limitations",
+      "title": "Removed Arrow Conditional Statements",
       "matchPatterns": ["arrow syntax", "→ multiple", "single statement"],
       "matchCodes": ["Calor0100", "Calor0104"],
-      "description": "Arrow syntax (→) is for single statements only. Use block syntax for multiple statements.",
+      "description": "Arrow conditional statements are removed. Every statement branch uses an indented body.",
       "wrongExample": "§IF{if1} (condition) → §B{x} 1 → §R x   // ERROR",
       "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x",
-      "explanation": "The arrow (→) can only be followed by a single statement. For multiple statements, put an indented block under the §IF opener; the block ends at dedent."
+      "explanation": "Put every statement body on indented lines under §IF, §EI, or §EL. The block ends at dedent."
     },
     {
       "id": "new-object-placeholder",
@@ -231,16 +231,6 @@
       "wrongExample": "§F{f1:Make:pub} () -> List<i32>\n  §R §NEW{object}()",
       "correctExample": "§F{f1:Make:pub} () -> List<i32>\n  §R §NEW{List<i32>}()",
       "explanation": "The calor_fix tool infers the correct type from surrounding context: binding values, field/property types, throw statements (→ Exception), or function/method return types."
-    },
-    {
-      "id": "arrow-multi-statement-autofix",
-      "title": "Auto-Fixable: Arrow Body with Multiple Statements",
-      "matchPatterns": ["arrow", "→", "multiple statements", "single statement only"],
-      "matchCodes": ["Calor0106"],
-      "description": "Arrow syntax (→) only supports a single statement. Use calor_fix with error code 'arrow_multi_statement' to convert to block form automatically.",
-      "wrongExample": "§IF{if1} (condition) → §B{x} 1 §R x",
-      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x",
-      "explanation": "The calor_fix tool detects arrow bodies with multiple §-tagged statements and rewrites them as indented block bodies."
     },
     {
       "id": "id-conflicts-autofix",

@@ -177,7 +177,7 @@ The Calor skills teach Claude:
 
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
-- Arrow syntax conditionals: `§IF{id} condition → action`
+- Conditional statements: `§IF{id} condition` with an indented body
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
 
 ### Best Practices
@@ -214,7 +214,7 @@ Key syntax:
 - §Q condition - Requires (precondition)
 - §S condition - Ensures (postcondition)
 - §L{id:var:from:to:step} - Loop; body indents below
-- §IF{id} cond → action; §EI/§EL branches align with §IF
+- §IF{id} cond with an indented body; §EI/§EL branches align with §IF
 - §P expr - Print
 - §R expr - Return
 - (+ a b), (* a b), (== a b) - Lisp-style expressions
@@ -225,10 +225,14 @@ Example:
     §O{void}
     §E{cw}
     §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+      §IF{if1} (== (% i 15) 0)
+        §P "FizzBuzz"
+      §EI (== (% i 3) 0)
+        §P "Fizz"
+      §EI (== (% i 5) 0)
+        §P "Buzz"
+      §EL
+        §P i
 
 Please write Calor code for: [your request]
 ```
@@ -332,8 +336,10 @@ that n >= 0 and postcondition that result >= 1
     §O{i32}
     §Q (>= n 0)
     §S (>= result 1)
-    §IF{if1} (<= n 1) → §R 1
-    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+    §IF{if1} (<= n 1)
+      §R 1
+    §EL
+      §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ### Find Bugs

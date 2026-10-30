@@ -101,7 +101,7 @@ public sealed class GuardDiscovery
         {
             ObligationId = obligation.Id,
             Description = $"Add runtime guard at function entry for '{paramName}'",
-            CalorExpression = $"§IF{{g1}} (! ({condStr})) → §R (err \"Refinement violated: {paramName}\")",
+            CalorExpression = $"§IF{{g1}} (! ({condStr}))\n  §R (err \"Refinement violated: {paramName}\")",
             InsertionKind = "if_guard",
             Confidence = "medium"
         });
@@ -129,7 +129,7 @@ public sealed class GuardDiscovery
         {
             ObligationId = obligation.Id,
             Description = "Add guard before the proof obligation site",
-            CalorExpression = $"§IF{{g1}} (! ({condStr})) → §R (err \"Proof obligation violated\")",
+            CalorExpression = $"§IF{{g1}} (! ({condStr}))\n  §R (err \"Proof obligation violated\")",
             InsertionKind = "if_guard",
             Confidence = "medium"
         });
@@ -163,7 +163,7 @@ public sealed class GuardDiscovery
         {
             ObligationId = obligation.Id,
             Description = "Add bounds check before array access",
-            CalorExpression = $"§IF{{g1}} (! ({condStr})) → §R (err \"Index out of bounds\")",
+            CalorExpression = $"§IF{{g1}} (! ({condStr}))\n  §R (err \"Index out of bounds\")",
             InsertionKind = "if_guard",
             Confidence = "high"
         });

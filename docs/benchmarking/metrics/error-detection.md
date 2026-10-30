@@ -183,8 +183,10 @@ Given this buggy call:
   §O{i32!str}
   §Q (!= b 0)
   §S (|| (== result.IsOk true) (!= result.Error ""))
-  §IF{if1} (== b 0) → §R §ERR "Division by zero"
-  §EL → §R §OK (/ a b)
+  §IF{if1} (== b 0)
+    §R §ERR "Division by zero"
+  §EL
+    §R §OK (/ a b)
 ```
 
 **Score:**

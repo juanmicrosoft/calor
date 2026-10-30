@@ -151,8 +151,10 @@ dotnet run --project tests/Calor.Evaluation -- --output report.json
     §Q (>= n 0)
     §Q (<= n 12)
     §S (>= result 1)
-    §IF{if1} (<= n 1) → §R 1
-    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+    §IF{if1} (<= n 1)
+      §R 1
+    §EL
+      §R (* n §C{Factorial} §A (- n 1) §/C)
 
   §F{f002:Main:pub}
     §O{void}

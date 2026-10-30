@@ -186,10 +186,10 @@ public class ParserIndentAcceptanceTests
                   "    §O{void}\n" +
                   "    §E{cw}\n" +
                   "    §L{for1:i:1:100:1}\n" +
-                  "      §IF{if1} (== (% i 15) 0) → §P \"FizzBuzz\"\n" +
-                  "      §EI (== (% i 3) 0) → §P \"Fizz\"\n" +
-                  "      §EI (== (% i 5) 0) → §P \"Buzz\"\n" +
-                  "      §EL → §P i\n";
+                  "      §IF{if1} (== (% i 15) 0)\n        §P \"FizzBuzz\"\n" +
+                  "      §EI (== (% i 3) 0)\n        §P \"Fizz\"\n" +
+                  "      §EI (== (% i 5) 0)\n        §P \"Buzz\"\n" +
+                  "      §EL\n        §P i\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(src, diagnostics);

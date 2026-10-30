@@ -25,5 +25,7 @@
   §F{f006:RestockAmount:pub} (i32:shelf, i32:backroom, i32:target) -> i32
     §E{}
     §B{total:i32} §C{CountTotal} §A shelf §A backroom §/C
-    §IF{if1} (>= total target) → §R 0
-    §EL → §R (- target total)
+    §IF{if1} (>= total target)
+      §R 0
+    §EL
+      §R (- target total)

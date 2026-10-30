@@ -136,10 +136,14 @@ to reference the element from external tooling (e.g. `calor navigate`).
     §O{void}
     §E{cw}
     §L{i:1:100:1}
-      §IF (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+      §IF (== (% i 15) 0)
+        §P "FizzBuzz"
+      §EI (== (% i 3) 0)
+        §P "Fizz"
+      §EI (== (% i 5) 0)
+        §P "Buzz"
+      §EL
+        §P i
 ```
 
 Blocks are delimited by **indentation** (default 2 spaces per nesting <!-- drift:ignore -->

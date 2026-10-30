@@ -30,15 +30,19 @@ public class ComplexExampleValidationTests
                   §MT{mt01:Equals:pub}
                       §I{Point:other}
                       §O{bool}
-                      §IF{if1} (== other null) → §R false
-                      §EL → §R true
+                      §IF{if1} (== other null)
+                        §R false
+                      §EL
+                        §R true
 
                   §OP{op01:==:pub}
                     §I{Point:left}
                     §I{Point:right}
                     §O{bool}
-                    §IF{if1} (== left null) → §R (== right null)
-                    §EL → §R §C{left.Equals} §A right §/C
+                    §IF{if1} (== left null)
+                      §R (== right null)
+                    §EL
+                      §R §C{left.Equals} §A right §/C
                   §/OP{op01}
 
                   §OP{op02:!=:pub}

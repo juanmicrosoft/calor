@@ -13,7 +13,7 @@ public sealed class FixTool : McpToolBase
     public override string Name => "calor_fix";
 
     public override string Description =>
-        "Auto-fix common Calor compilation errors. Fixes NEW{object} placeholders, arrow-body multi-statement issues, and ID conflicts. Non-destructive — unfixable code is left as-is.";
+        "Auto-fix common Calor compilation errors. Fixes NEW{object} placeholders and ID conflicts. Non-destructive — unfixable code is left as-is.";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
 
@@ -32,7 +32,7 @@ public sealed class FixTool : McpToolBase
                 "errors": {
                     "type": "array",
                     "items": { "type": "string" },
-                    "description": "Specific error codes to fix. Values: 'new_object', 'arrow_multi_statement', 'id_conflicts'. Default: fix all known errors."
+                    "description": "Specific error codes to fix. Values: 'new_object', 'id_conflicts'. Default: fix all known errors."
                 }
             },
             "additionalProperties": false
@@ -72,13 +72,6 @@ public sealed class FixTool : McpToolBase
             if (fixAll || errorCodes.Contains("new_object", StringComparer.OrdinalIgnoreCase))
             {
                 var (result, applied) = FixNewObject(current);
-                current = result;
-                fixes.AddRange(applied);
-            }
-
-            if (fixAll || errorCodes.Contains("arrow_multi_statement", StringComparer.OrdinalIgnoreCase))
-            {
-                var (result, applied) = FixArrowMultiStatement(current);
                 current = result;
                 fixes.AddRange(applied);
             }
@@ -189,56 +182,6 @@ public sealed class FixTool : McpToolBase
     }
 
     /// <summary>
-    /// Detects arrow-body (→) functions with multiple statements (semicolons or multiple §-tags)
-    /// and converts them to block bodies.
-    /// </summary>
-    internal static (string Result, List<FixEntry> Fixes) FixArrowMultiStatement(string source)
-    {
-        var fixes = new List<FixEntry>();
-        var lines = source.Split('\n');
-        var result = new List<string>(lines.Length + 10);
-
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i];
-
-            // Match: §IF{id} (condition) → stmt1 → stmt2  (multiple → on one line after condition)
-            // or: §F/§FN body with → that contains multiple §-tagged statements
-            var arrowMatch = Regex.Match(line, @"^(\s*)(§(?:IF|EI)\{([^}]+)\}\s*\([^)]*\))\s*→\s*(.+)$");
-            if (arrowMatch.Success)
-            {
-                var indent = arrowMatch.Groups[1].Value;
-                var header = arrowMatch.Groups[2].Value;
-                var id = arrowMatch.Groups[3].Value;
-                var body = arrowMatch.Groups[4].Value;
-
-                // Check if body has multiple statements (multiple §-tagged items separated by spaces)
-                var stmtCount = CountStatements(body);
-                if (stmtCount > 1)
-                {
-                    var statements = SplitStatements(body);
-                    result.Add($"{indent}{header}");
-                    foreach (var stmt in statements)
-                        result.Add($"{indent}  {stmt.Trim()}");
-                    result.Add($"{indent}§/I{{{id}}}");
-
-                    fixes.Add(new FixEntry
-                    {
-                        Rule = "arrow_multi_statement",
-                        Line = i + 1,
-                        Description = $"Converted arrow body with {stmtCount} statements to block"
-                    });
-                    continue;
-                }
-            }
-
-            result.Add(line);
-        }
-
-        return (string.Join("\n", result), fixes);
-    }
-
-    /// <summary>
     /// Detects and renumbers conflicting/duplicate IDs within a module.
     /// Scans for declarations (§F, §M, §C, §IF, etc.) and renumbers duplicates.
     /// </summary>
@@ -316,28 +259,6 @@ public sealed class FixTool : McpToolBase
         "bool" => "bool",
         _ => calorType
     };
-
-    /// <summary>Counts statement-level §-tags in a body string.</summary>
-    private static int CountStatements(string body)
-    {
-        return Regex.Matches(body, @"§(?:B|R|C|IF|TH|ASSIGN)\b").Count;
-    }
-
-    /// <summary>Splits a body string at statement boundaries (§-tagged items).</summary>
-    private static List<string> SplitStatements(string body)
-    {
-        var parts = new List<string>();
-        var stmtStarts = Regex.Matches(body, @"§(?:B|R|C|IF|TH|ASSIGN)");
-
-        for (var i = 0; i < stmtStarts.Count; i++)
-        {
-            var start = stmtStarts[i].Index;
-            var end = i + 1 < stmtStarts.Count ? stmtStarts[i + 1].Index : body.Length;
-            parts.Add(body[start..end]);
-        }
-
-        return parts.Count > 0 ? parts : [body];
-    }
 
     private static string GetIdPrefix(string kind) => kind switch
     {

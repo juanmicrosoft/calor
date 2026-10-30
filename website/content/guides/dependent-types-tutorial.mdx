@@ -281,7 +281,7 @@ Response:
     {
       "obligation_id": "obl_0",
       "description": "Add runtime guard at function entry for 'b'",
-      "calor_expression": "§IF{g1} (! (!= b INT:0)) → §R (err \"Refinement violated: b\")",
+      "calor_expression": "§IF{g1} (! (!= b INT:0))\n  §R (err \"Refinement violated: b\")",
       "insertion_kind": "if_guard",
       "confidence": "medium"
     }
@@ -332,7 +332,7 @@ Response:
       "obligation_status": "Boundary",
       "policy_action": "AlwaysGuard",
       "patch_kind": "if_guard",
-      "calor_code": "§IF{g1} (! (!= b INT:0)) → §R (err \"Refinement violated: b\")",
+      "calor_code": "§IF{g1} (! (!= b INT:0))\n  §R (err \"Refinement violated: b\")",
       "description": "Add runtime guard at function entry for 'b'",
       "confidence": "medium",
       "discharges_obligations": ["obl_0"]

@@ -152,7 +152,7 @@ The Calor skills teach Gemini:
 
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
-- Arrow syntax conditionals: `§IF{id} condition → action`
+- Conditional statements: `§IF{id} condition` with an indented body
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
 
 ### Best Practices
@@ -206,8 +206,10 @@ that n >= 0 and postcondition that result >= 1
     §O{i32}
     §Q (>= n 0)
     §S (>= result 1)
-    §IF{if1} (<= n 1) → §R 1
-    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+    §IF{if1} (<= n 1)
+      §R 1
+    §EL
+      §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ### Create a Service Class

@@ -138,10 +138,14 @@ class Program
     §O{void}
     §E{cw}
     §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+      §IF{if1} (== (% i 15) 0)
+        §P "FizzBuzz"
+      §EI (== (% i 3) 0)
+        §P "Fizz"
+      §EI (== (% i 5) 0)
+        §P "Buzz"
+      §EL
+        §P i
 ```
 - Tokens: ~80
 - Lines: 13

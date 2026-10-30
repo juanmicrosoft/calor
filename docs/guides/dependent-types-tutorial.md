@@ -289,7 +289,7 @@ Response:
     {
       "obligation_id": "obl_0",
       "description": "Add if-guard returning error",
-      "calor_expression": "§IF{g1} (== b INT:0) → §R (err \"division by zero\")",
+      "calor_expression": "§IF{g1} (== b INT:0)\n  §R (err \"division by zero\")",
       "insertion_kind": "if_guard",
       "confidence": "medium"
     }

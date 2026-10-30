@@ -5399,7 +5399,7 @@ public sealed class Parser
 
         var target = ParseExpression();
         var matchOwner = BeginBlockBody(startToken, TokenKind.EndMatch, id);
-        var cases = ParseMatchCases();
+        var cases = ParseMatchCases(expressionContext: true);
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndMatch, matchOwner);
         var endAttrs = ParseAttributes();
@@ -5439,7 +5439,7 @@ public sealed class Parser
 
         var target = ParseExpression();
         var matchOwner = BeginBlockBody(startToken, TokenKind.EndMatch, id);
-        var cases = ParseMatchCases();
+        var cases = ParseMatchCases(expressionContext: false);
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndMatch, matchOwner);
         var endAttrs = ParseAttributes();
@@ -5455,7 +5455,7 @@ public sealed class Parser
         return new MatchStatementNode(span, id, target, cases, attrs);
     }
 
-    private List<MatchCaseNode> ParseMatchCases()
+    private List<MatchCaseNode> ParseMatchCases(bool expressionContext)
     {
         var cases = new List<MatchCaseNode>();
         var firstCaseColumn = -1;
@@ -5483,7 +5483,10 @@ public sealed class Parser
             // Check for arrow syntax: → expression (single expression case)
             if (Check(TokenKind.Arrow))
             {
-                Expect(TokenKind.Arrow);
+                var arrow = Expect(TokenKind.Arrow);
+                if (!expressionContext)
+                    _diagnostics.ReportError(arrow.Span, DiagnosticCode.UnexpectedToken,
+                        "Statement match arms require an indented body. Use §K pattern followed by indented statements, or §R §W for a returned match expression.");
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
             }
@@ -6188,6 +6191,8 @@ public sealed class Parser
                 if (Check(TokenKind.Arrow))
                 {
                     var arrowToken = Advance();
+                    _diagnostics.ReportError(arrowToken.Span, DiagnosticCode.UnexpectedToken,
+                        "Arrow conditional statements are removed. Put the statement on an indented line under §IF, §EI, or §EL.");
                     // An inline statement creates no indentation level. Its next
                     // dedent belongs to the enclosing loop, branch, or function.
                     ownsDedent = Current.IndentationDepth > arrowToken.IndentationDepth;
@@ -6277,6 +6282,9 @@ public sealed class Parser
             var elseIfToken = Expect(TokenKind.ElseIf);
             var elseIfCondition = ParseExpression();
             var elseIfBody = new List<StatementNode>();
+            if (Check(TokenKind.Arrow))
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "Arrow conditional statements are removed. Put the statement on an indented line under §EI.");
 
             clauseOwner = BeginBlockBody(elseIfToken, TokenKind.EndIf, id);
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf)
@@ -6300,6 +6308,9 @@ public sealed class Parser
         {
             var elseToken = Expect(TokenKind.Else);
             elseBody = new List<StatementNode>();
+            if (Check(TokenKind.Arrow))
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "Arrow conditional statements are removed. Put the statement on an indented line under §EL.");
 
             clauseOwner = BeginBlockBody(elseToken, TokenKind.EndIf, id);
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && IsInBlockBody(clauseOwner))

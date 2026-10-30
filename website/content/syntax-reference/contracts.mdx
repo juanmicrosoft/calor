@@ -89,8 +89,10 @@ In postconditions, `result` refers to the return value:
   §I{i32:x}
   §O{i32}
   §S (>= result 0)                       // absolute value is non-negative
-  §IF{if1} (>= x 0) → §R x
-  §EL → §R (- 0 x)
+  §IF{if1} (>= x 0)
+    §R x
+  §EL
+    §R (- 0 x)
 ```
 
 ---

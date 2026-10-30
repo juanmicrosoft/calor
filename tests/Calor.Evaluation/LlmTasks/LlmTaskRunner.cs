@@ -679,7 +679,7 @@ Calor syntax uses section markers with IDs:
 - §Q (condition) is a precondition (REQUIRES) using S-expression syntax
 - §S (condition) is a postcondition (ENSURES) using S-expression syntax
 - §R expression returns a value
-- §IF{id} (cond) → body with §EI, §EL, and §/I{id} for conditionals
+- §IF{id} (cond) with indented bodies and same-column §EI / §EL clauses for conditionals
 - §L{id:var:start:end:step} for loops, §/L{id} to end
 
 Math uses S-expressions: (+ a b), (* a b), (- a b), (/ a b), (% a b)
@@ -693,8 +693,10 @@ Example:
       §O{i32}
       §Q (>= n 0)
       §S (>= result 1)
-      §IF{if1} (<= n 1) → §R 1
-      §EL → §R (* n (Factorial (- n 1)))
+      §IF{if1} (<= n 1)
+        §R 1
+      §EL
+        §R (* n (Factorial (- n 1)))
 
 Output only the code, no markdown or explanation.";
     }

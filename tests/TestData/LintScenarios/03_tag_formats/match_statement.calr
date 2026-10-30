@@ -1,7 +1,10 @@
 §M{m1:MatchTest}
   §F{f1:Describe:pub} (i32:n) -> str
     §W{m1} n
-      §K 0 → "zero"
-      §K 1 → "one"
-      §K _ → "other"
+      §K 0
+        §R "zero"
+      §K 1
+        §R "one"
+      §K _
+        §R "other"
 

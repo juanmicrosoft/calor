@@ -910,12 +910,17 @@ namespace MathOps {
       §I{i32:n}
       §O{bool}
       §Q (> n 0)
-      §IF{if1} (<= n 1) → §R false
-      §IF{if2} (<= n 3) → §R true
-      §IF{if3} (== (% n 2) 0) → §R false
+      §IF{if1} (<= n 1)
+        §R false
+      §IF{if2} (<= n 3)
+        §R true
+      §IF{if3} (== (% n 2) 0)
+        §R false
       §L{while1:i:3:1000:2}
-          §IF{if4} (> (* i i) n) → §R true
-          §IF{if5} (== (% n i) 0) → §R false
+          §IF{if4} (> (* i i) n)
+            §R true
+          §IF{if5} (== (% n i) 0)
+            §R false
       §R true
 ";
         var ctx = new EvaluationContext
@@ -1011,9 +1016,12 @@ namespace MathOps {
   §F{f001:IsPrime:pub}
       §I{i32:n}
       §O{bool}
-      §IF{if1} (<= n 1) → §R false
-      §IF{if2} (<= n 3) → §R true
-      §IF{if3} (== (% n 2) 0) → §R false
+      §IF{if1} (<= n 1)
+        §R false
+      §IF{if2} (<= n 3)
+        §R true
+      §IF{if3} (== (% n 2) 0)
+        §R false
       §R true
 ";
         var module = Parse(source, out var diag);
@@ -1034,8 +1042,10 @@ namespace MathOps {
   §F{f001:Clamp:pub}
       §I{i32:n}
       §O{i32}
-      §IF{if1} (< n 0) → §R INT:0
-      §IF{if2} (== n 1) → §R INT:1
+      §IF{if1} (< n 0)
+        §R INT:0
+      §IF{if2} (== n 1)
+        §R INT:1
       §R n
 ";
         var module = Parse(source, out var diag);
@@ -1176,7 +1186,8 @@ namespace MathOps {
       §I{i32:n}
       §O{i32}
       §Q (>= n 0)
-      §IF{if1} (<= n 1) → §R INT:1
+      §IF{if1} (<= n 1)
+        §R INT:1
       §R (* n §C{Factorial} §A (- n 1) §/C)
 ";
         var ctx = new EvaluationContext
@@ -1206,7 +1217,8 @@ namespace MathOps {
       §I{i32:b}
       §O{i32}
       §Q (!= b 0)
-      §IF{if1} (<= b 1) → §R INT:0
+      §IF{if1} (<= b 1)
+        §R INT:0
       §R (/ a b)
 ";
         var minimalSource = @"
@@ -1264,7 +1276,8 @@ class C {
       §O{i32}
       §Q (!= b 0)
       §S (>= result 0)
-      §IF{if1} (<= b 1) → §R INT:0
+      §IF{if1} (<= b 1)
+        §R INT:0
       §IF{if2} (> a 0)
           §R (/ a b)
       §EL

@@ -172,10 +172,10 @@ public class PostConversionFixerTests
 
     #endregion
 
-    #region Rule F: IF Expression Arrow
+    #region Removed conditional forms
 
     [Fact]
-    public void Fix_IfExpressionMissingArrow_InsertsAndParses()
+    public void Fix_InlineConditionalStatement_DoesNotIntroduceRemovedArrow()
     {
         var source = """
             §M{m001:Test}
@@ -183,16 +183,14 @@ public class PostConversionFixerTests
                   §I{i32:n}
                   §O{i32}
                   §IF{if1} (< n 0) §R (- 0 n)
-                  §EL → §R n
+                  §EL
+                    §R n
             """;
 
         var result = _fixer.Fix(source);
 
-        Assert.True(result.WasModified);
-        Assert.Contains("IfExpressionArrow", result.AppliedFixes.Select(f => f.Rule));
-        var ifLine = result.FixedSource.Split('\n').First(l => l.Contains("§IF{if1}"));
-        Assert.Contains("→", ifLine);
-        AssertParses(result.FixedSource, "IfExpressionArrow");
+        Assert.False(result.WasModified);
+        Assert.DoesNotContain("→", result.FixedSource);
     }
 
     #endregion

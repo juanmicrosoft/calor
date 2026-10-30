@@ -297,8 +297,10 @@ and postcondition that result >= 1
     §O{i32}
     §Q (>= n 0)
     §S (>= result 1)
-    §IF{if1} (<= n 1) → §R 1
-    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+    §IF{if1} (<= n 1)
+      §R 1
+    §EL
+      §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ### Find Bugs

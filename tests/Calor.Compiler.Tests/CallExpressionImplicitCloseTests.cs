@@ -498,7 +498,10 @@ public class CallExpressionImplicitCloseTests
         var source = @"§M{Demo}
   §F{run:bool:pub}
     §B{x} §C{items.Any}
-    §IF{cond} x → §R x §EL → §R false
+    §IF{cond} x
+      §R x
+    §EL
+      §R false
 ";
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,

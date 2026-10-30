@@ -29,14 +29,15 @@ public class ArrowConditionalRuntimeTests
     }
 
     [Fact]
-    public void ArrowReturn_DoesNotStealLoopDedent()
+    public void BlockReturn_DoesNotStealLoopDedent()
     {
         const string source = """
             §M{m1:Arrow}
               §F{f1:HasNegative:pub} ([i32]:arr) -> bool
                 §E{}
                 §L{for1:i:0:(- (len arr) 1):1}
-                  §IF{if1} (< arr{i} 0) → §R true
+                  §IF{if1} (< arr{i} 0)
+                    §R true
                 §R false
             """;
         var module = Parse(source);
@@ -50,13 +51,11 @@ public class ArrowConditionalRuntimeTests
     }
 
     [Theory]
-    [InlineData("§IF{if1} (< i 0) → §R\n")]
-    [InlineData("§IF{if1} (&&\n        (< i 0)\n        (> i -10)) → §R\n")]
-    [InlineData("§IF{if1} (< i 0) → §R\n      §EI (&&\n        (> i 9)\n        (< i 20)) → §R\n")]
-    [InlineData("§IF{if1} (< i 0) → §R\n      §EI (> i 9) → §R\n")]
-    [InlineData("§IF{if1} (< i 0) → §R\n      §EL → §C{trace.Add} §A i §/C\n")]
-    [InlineData("§IF{if1} (< i 0) → §R\n      §EL\n        §C{trace.Add} §A i §/C\n")]
-    [InlineData("§IF{if1} (< i 0) →\n        §R\n      §EI (> i 9)\n        §R\n      §EL → §C{trace.Add} §A i §/C\n")]
+    [InlineData("§IF{if1} (< i 0)\n        §R\n")]
+    [InlineData("§IF{if1} (&&\n        (< i 0)\n        (> i -10))\n        §R\n")]
+    [InlineData("§IF{if1} (< i 0)\n        §R\n      §EI (&&\n        (> i 9)\n        (< i 20))\n        §R\n")]
+    [InlineData("§IF{if1} (< i 0)\n        §R\n      §EI (> i 9)\n        §R\n")]
+    [InlineData("§IF{if1} (< i 0)\n        §R\n      §EL\n        §C{trace.Add} §A i §/C\n")]
     public void FollowingNonReturnStatement_ExecutesOnceAfterLoop(string branch)
     {
         var source = """
@@ -89,13 +88,15 @@ public class ArrowConditionalRuntimeTests
               §F{f1:Probe:pub} (i32:x) -> i32
                 §E{}
                 §IF{if1} (> x 0)
-                  §IF{if2} (> x 1) → §R 2
+                  §IF{if2} (> x 1)
+                    §R 2
                 §EL
                   §R -1
                 §R 1
               §F{f2:Other:pub} () -> i32
                 §E{}
-                §IF{if3} true → §R 3
+                §IF{if3} true
+                  §R 3
                 §R 4
             """);
         Assert.Equal(-1, Invoke(type, "Probe", 0));
@@ -107,7 +108,7 @@ public class ArrowConditionalRuntimeTests
     [Theory]
     [InlineData("§IF{if1} true → §IF{if2} true →\n        §C{trace.Add} §A i §/C")]
     [InlineData("§IF{if1} false → §R §EL →\n        §C{trace.Add} §A i §/C")]
-    public void MidLineClauses_OwnTheirIndentedBodies(string branch)
+    public void MidLineStatementClauses_AreRejected(string branch)
     {
         var source = """
             §M{m1:Arrow}
@@ -115,15 +116,11 @@ public class ArrowConditionalRuntimeTests
                 §E{mut}
                 §L{for1:i:0:2:1}
             """ + "\n      " + branch + "\n      §C{trace.Add} §A 99 §/C\n";
-        var module = Parse(source);
-        var loop = Assert.IsType<ForStatementNode>(Assert.Single(module.Functions[0].Body));
-        Assert.Equal(2, loop.Body.Count);
-        foreach (var text in new[] { source, new CalorEmitter().Emit(module) })
-        {
-            var trace = new List<int>();
-            Invoke(Compile(text), "Probe", trace);
-            Assert.Equal([0, 99, 1, 99, 2, 99], trace);
-        }
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Message.Contains("Arrow conditional statements are removed", StringComparison.Ordinal));
     }
 
     private static ModuleNode Parse(string source)

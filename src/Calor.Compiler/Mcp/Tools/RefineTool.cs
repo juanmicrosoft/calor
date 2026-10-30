@@ -544,8 +544,8 @@ public sealed class RefineTool : McpToolBase
                     Description = "Add a runtime guard at the start of the function body",
                     Confidence = "medium",
                     Template = paramName != null
-                        ? $"§IF{{g1}} (< {paramName} INT:0) → §R (err \"Invalid {paramName}\")"
-                        : "§IF{g1} (not condition) → §R (err \"constraint violated\")"
+                        ? $"§IF{{g1}} (< {paramName} INT:0)\n  §R (err \"Invalid {paramName}\")"
+                        : "§IF{g1} (not condition)\n  §R (err \"constraint violated\")"
                 });
                 break;
 
@@ -564,7 +564,7 @@ public sealed class RefineTool : McpToolBase
                     Strategy = "add_guard",
                     Description = "Wrap the code path with a guard that ensures the condition",
                     Confidence = "medium",
-                    Template = "§IF{g1} (not condition) → §R (err \"condition not met\")"
+                    Template = "§IF{g1} (not condition)\n  §R (err \"condition not met\")"
                 });
                 break;
 

@@ -798,7 +798,7 @@ public sealed class McpMessageHandler
         - Function: §F{id:name:vis} (type:name, ...) -> retType (body indented)
         - Binding: §B{name} expr (immutable), §B{~name} expr (mutable)
         - Loop: §L{id:var:from:to:step} (body indented)
-        - Conditional: §IF{id} (cond) with §EI (cond) / §EL; inline §IF{id} (cond) → §R expr
+        - Conditional: §IF{id} (cond) with §EI (cond) / §EL; put each branch body on indented lines
         - NO structural closing tags — never write §/M, §/F, §/L, §/I; a block ends at the next dedent
         - Typed literals: INT:42, STR:"hello", BOOL:true, FLOAT:3.14
         - Expressions use prefix notation: (+ a b), (== x 0), (% i 15)

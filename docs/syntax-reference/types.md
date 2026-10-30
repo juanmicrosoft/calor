@@ -372,7 +372,8 @@ collection initializer does.
 
 **Example:**
 ```
-§IF §HAS{numbers} 5 → §P "Found 5"
+§IF §HAS{numbers} 5
+  §P "Found 5"
 
 §B{count} §CNT{ages}
 ```

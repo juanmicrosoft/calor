@@ -218,17 +218,20 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 
 ## Conditionals
 
-### Single Line (Arrow Syntax)
+### Indented Branches
 
 For simple single-action branches:
 
 ```
-§IF{id} condition → action
-§EI condition → action
-§EL → action
+§IF{id} condition
+  action
+§EI condition
+  action
+§EL
+  action
 ```
 
-### Multi-Line (Block Syntax)
+### Multiple Statements
 
 For complex branches:
 
@@ -247,7 +250,6 @@ For complex branches:
 |:-----|:------------|
 | `§IF cond` | If statement (block body indents below) |
 | `condition` | Boolean expression |
-| `→` | Arrow separator (single-line inline form) |
 | `§EI` | Else-if (optional, can repeat) at same column as `§IF` |
 | `§EL` | Else (optional, at most one) at same column as `§IF` |
 | `§IF{id} cond` | Explicit ID form (optional, for tooling references) |
@@ -259,7 +261,8 @@ For complex branches:
 ### Simple If
 
 ```
-§IF{if1} (> x 0) → §P "positive"
+§IF{if1} (> x 0)
+  §P "positive"
 ```
 
 ### If-Else
@@ -285,10 +288,14 @@ For complex branches:
 ### Single Line with Multiple Branches
 
 ```
-§IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-§EI (== (% i 3) 0) → §P "Fizz"
-§EI (== (% i 5) 0) → §P "Buzz"
-§EL → §P i
+§IF{if1} (== (% i 15) 0)
+  §P "FizzBuzz"
+§EI (== (% i 3) 0)
+  §P "Fizz"
+§EI (== (% i 5) 0)
+  §P "Buzz"
+§EL
+  §P i
 ```
 
 ### Nested Conditionals
@@ -311,10 +318,14 @@ For complex branches:
     §O{void}
     §E{cw}
     §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+      §IF{if1} (== (% i 15) 0)
+        §P "FizzBuzz"
+      §EI (== (% i 3) 0)
+        §P "Fizz"
+      §EI (== (% i 5) 0)
+        §P "Buzz"
+      §EL
+        §P i
 ```
 
 ---
@@ -344,8 +355,10 @@ Use conditionals with return for early exit:
   §I{i32:n}
   §O{i32}
   §Q (>= n 0)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+  §IF{if1} (<= n 1)
+    §R 1
+  §EL
+    §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ---
@@ -391,9 +404,12 @@ Pattern matching provides concise multi-way branching with C# switch expression 
 
 ```
 §W{id} expression
-  §K pattern1 → result1
-  §K pattern2 → result2
-  §K _ → default
+  §K pattern1
+    §R result1
+  §K pattern2
+    §R result2
+  §K _
+    §R default
 ```
 
 | Part | Description |
@@ -526,13 +542,11 @@ and when optional type checking is disabled.
 
 ---
 
-## Why Arrow Syntax?
+## Conditional Bodies
 
-The arrow `→` provides:
-
-1. **Single-line clarity** - `§IF cond → action` is compact
-2. **Readable flow** - Condition "leads to" action
-3. **Consistent pattern** - Same syntax for if, elseif, else
+Every `§IF`, `§EI`, and `§EL` statement uses an indented body, even for one
+statement. Arrow statement bodies are rejected. Arrows still separate a match
+expression's pattern from its result.
 
 ---
 

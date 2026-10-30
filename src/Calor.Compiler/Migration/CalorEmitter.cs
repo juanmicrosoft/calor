@@ -3025,7 +3025,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         foreach (var matchCase in node.Cases)
         {
-            Visit(matchCase);
+            EmitMatchCase(matchCase, expressionContext: false);
         }
 
         Dedent();
@@ -3034,7 +3034,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
     private int _switchCounter = 0;
 
-    public string Visit(MatchCaseNode node)
+    public string Visit(MatchCaseNode node) => EmitMatchCase(node, expressionContext: true);
+
+    private string EmitMatchCase(MatchCaseNode node, bool expressionContext)
     {
         var pattern = EmitPattern(node.Pattern);
         var guard = node.Guard != null ? $" §WHEN {node.Guard.Accept(this)}" : "";
@@ -3057,14 +3059,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
             foreach (var stmt in node.Body)
                 stmt.Accept(this);
             Dedent();
-            AppendLine("§/K");
+            if (expressionContext)
+                AppendLine("§/K");
+            else
+                EmitBlockEnd("§/K");
             return "";
         }
 
         // Check if this is a single-return case suitable for arrow syntax.
         // Block-level collection nodes (List, Dict, Set) emit via AppendLine and return "",
         // so they must use block syntax to avoid empty arrow expressions.
-        if (node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null
+        if (expressionContext && node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null
             && returnStmt.Expression is not ListCreationNode
             && returnStmt.Expression is not DictionaryCreationNode
             && returnStmt.Expression is not SetCreationNode)
@@ -3096,7 +3101,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            // Use block syntax with §/K closing tag
+            // Statement arms end at dedent; expression payloads may still need a closer.
             AppendLine($"§K {pattern}{guard}");
             Indent();
 
@@ -3106,7 +3111,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
 
             Dedent();
-            AppendLine("§/K");
+            if (expressionContext)
+                AppendLine("§/K");
+            else
+                EmitBlockEnd("§/K");
         }
 
         return "";

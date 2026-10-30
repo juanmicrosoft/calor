@@ -89,33 +89,6 @@ public class FixToolTests
         Assert.Empty(fixes);
     }
 
-    // ── FixArrowMultiStatement ──────────────────────────────────────
-
-    [Fact]
-    public void FixArrowMultiStatement_ConvertsToBlock()
-    {
-        var source = "  §IF{if1} (x) → §B{a} 1 §R a";
-        var (result, fixes) = FixTool.FixArrowMultiStatement(source);
-
-        Assert.DoesNotContain("→", result);
-        Assert.Contains("§IF{if1} (x)", result);
-        Assert.Contains("§B{a} 1", result);
-        Assert.Contains("§R a", result);
-        Assert.Contains("§/I{if1}", result);
-        Assert.Single(fixes);
-        Assert.Equal("arrow_multi_statement", fixes[0].Rule);
-    }
-
-    [Fact]
-    public void FixArrowMultiStatement_LeavesSingleStatement()
-    {
-        var source = "  §IF{if1} (x) → §R 1";
-        var (result, fixes) = FixTool.FixArrowMultiStatement(source);
-
-        Assert.Contains("→", result);
-        Assert.Empty(fixes);
-    }
-
     // ── FixIdConflicts ──────────────────────────────────────────────
 
     [Fact]

@@ -4,12 +4,14 @@
     §I{i32:score}
     §I{i32:max}
     §O{i32}
-    §IF{i1} (> score max) → §R max
+    §IF{i1} (> score max)
+      §R max
     §R score
 
   §F{f002:ClampLowerBound:pub}
     §I{i32:val}
     §O{i32}
-    §IF{i2} (< val 0) → §R 0
+    §IF{i2} (< val 0)
+      §R 0
     §R val
 

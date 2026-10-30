@@ -253,9 +253,12 @@ without blaming the following valid return statement.
 ### In Conditions
 
 ```
-§IF{if1} (> x 0) → §P "positive"
-§EI (< x 0) → §P "negative"
-§EL → §P "zero"
+§IF{if1} (> x 0)
+  §P "positive"
+§EI (< x 0)
+  §P "negative"
+§EL
+  §P "zero"
 ```
 
 ### In Contracts

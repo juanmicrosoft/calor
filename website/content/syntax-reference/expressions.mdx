@@ -142,9 +142,12 @@ conditional `(? c a b)` takes exactly three operands and `(?? a b)` exactly two.
 ### In Conditions
 
 ```calor
-§IF{if1} (> x 0) → §P "positive"
-§EI (< x 0) → §P "negative"
-§EL → §P "zero"
+§IF{if1} (> x 0)
+  §P "positive"
+§EI (< x 0)
+  §P "negative"
+§EL
+  §P "zero"
 ```
 
 ### In Contracts

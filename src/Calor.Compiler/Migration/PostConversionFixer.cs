@@ -47,8 +47,6 @@ public sealed class PostConversionFixer
         ("InlineErrLam", "Extract §ERR/§LAM from inside Lisp call arguments to preceding binding",
             FixInlineErrLam),
 
-        ("IfExpressionArrow", "Insert missing → after IF condition in expression context",
-            FixIfExpressionArrow),
     };
 
     /// <summary>
@@ -268,17 +266,4 @@ public sealed class PostConversionFixer
         return line[..i];
     }
 
-    /// <summary>
-    /// Rule F: Insert missing → after IF condition when used in expression context.
-    /// Targets: §IF{id} (condition) expression → should be §IF{id} (condition) → expression
-    /// </summary>
-    private static (string Result, bool Changed) FixIfExpressionArrow(string source)
-    {
-        // Match §IF or §EI followed by a parenthesized condition, then NOT followed by →
-        // but followed by §R (return), which indicates expression context
-        var pattern = @"(§(?:IF|EI)\{[^}]*\}\s*\([^)]*\))\s+(?!→)(§R\s)";
-        var result = Regex.Replace(source, pattern, "$1 → $2");
-
-        return (result, result != source);
-    }
 }

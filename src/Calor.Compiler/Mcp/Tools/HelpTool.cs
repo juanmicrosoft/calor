@@ -453,7 +453,6 @@ public sealed class HelpTool : McpToolBase
                 ### Control Flow
                 ```
                 §IF{id} (cond)  /  §EI (cond2)  /  §EL      If/ElseIf/Else (bodies indented)
-                §IF{id} (cond) → §R expr                    Inline if (single statement)
                 §L{id:var:from:to:step}                     For loop (body indented)
                 §EACH{var:collection}                       Foreach loop (body indented)
                 §WH{id} (cond)                              While loop (body indented)
