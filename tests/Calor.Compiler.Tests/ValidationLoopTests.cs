@@ -342,13 +342,8 @@ public sealed class ValidationLoopTests : IDisposable
         Assert.Equal(0, result.ExitCode);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ExitedRootWithDescendantHoldingPipes_IsBounded(bool cancel)
+    private async Task<string> BuildProcessTreeHelperAsync()
     {
-        var pidPath = Path.Combine(_directory, "child.pid");
-        var rootExitPath = Path.Combine(_directory, "root-exiting");
         var project = ExecutionWorkspace.WriteProject(Path.Combine(_directory, "helper"), "PipeHolder", true,
         [
             new ExecutionWorkspace.CompiledUnit("Program.cs", """
@@ -365,16 +360,67 @@ public sealed class ValidationLoopTests : IDisposable
                 using var child = Process.Start(start)!;
                 File.WriteAllText(args[1], child.Id.ToString());
                 File.WriteAllText(args[2], Environment.ProcessId.ToString());
+                if (args[0] == "live")
+                    Thread.Sleep(30000);
                 """)
         ]);
         var dotnet = ExecutionWorkspace.FindDotnet()!;
         var build = await ExecutionWorkspace.CaptureProcessAsync(dotnet,
             ["build", project, "--nologo", "-v", "quiet"], _directory, TimeSpan.FromSeconds(30), CancellationToken.None);
         Assert.Equal(0, build.ExitCode);
+        return Path.Combine(_directory, "helper", "bin", "Debug", "net10.0", "PipeHolder.dll");
+    }
+
+    private static bool HasTrackedProcessExited(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
+    private static async Task StopTrackedProcessAsync(int pid)
+    {
+        Process process;
+        try
+        {
+            process = Process.GetProcessById(pid);
+        }
+        catch (ArgumentException)
+        {
+            return;
+        }
+        using (process)
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill();
+            }
+            catch (InvalidOperationException) when (process.HasExited)
+            {
+                // The tracked process exited between inspection and termination.
+            }
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExitedRootWithDescendantHoldingPipes_IsBounded(bool cancel)
+    {
+        var pidPath = Path.Combine(_directory, "child.pid");
+        var rootExitPath = Path.Combine(_directory, "root-exiting");
+        var helper = await BuildProcessTreeHelperAsync();
         using var cts = new CancellationTokenSource();
         var stopwatch = Stopwatch.StartNew();
-        var running = ExecutionWorkspace.CaptureProcessAsync(dotnet,
-            [Path.Combine(_directory, "helper", "bin", "Debug", "net10.0", "PipeHolder.dll"), "root", pidPath, rootExitPath],
+        var running = ExecutionWorkspace.CaptureProcessAsync(ExecutionWorkspace.FindDotnet()!,
+            [helper, "root", pidPath, rootExitPath],
             _directory, TimeSpan.FromSeconds(2), cts.Token);
         int? descendantId = null;
         try
@@ -386,15 +432,7 @@ public sealed class ValidationLoopTests : IDisposable
             // Let the root actually exit, while its descendant still owns both pipes.
             await Task.Delay(150);
             var rootId = int.Parse(File.ReadAllText(rootExitPath));
-            try
-            {
-                using var root = Process.GetProcessById(rootId);
-                Assert.True(root.HasExited, "The helper root is still running.");
-            }
-            catch (ArgumentException)
-            {
-                // The exact root PID was already reaped.
-            }
+            Assert.True(HasTrackedProcessExited(rootId), "The helper root is still running.");
             Assert.False(running.IsCompleted, "The descendant did not retain the inherited pipes.");
             if (cancel)
             {
@@ -415,11 +453,58 @@ public sealed class ValidationLoopTests : IDisposable
             if (descendantId == null && File.Exists(pidPath))
                 descendantId = int.Parse(File.ReadAllText(pidPath));
             if (descendantId is { } pid)
+                await StopTrackedProcessAsync(pid);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LiveRootAndDescendant_AreTerminatedOnTimeoutOrCancellation(bool cancel)
+    {
+        var childPidPath = Path.Combine(_directory, "live-child.pid");
+        var rootPidPath = Path.Combine(_directory, "live-root.pid");
+        var helper = await BuildProcessTreeHelperAsync();
+        using var cts = new CancellationTokenSource();
+        var running = ExecutionWorkspace.CaptureProcessAsync(ExecutionWorkspace.FindDotnet()!,
+            [helper, "live", childPidPath, rootPidPath], _directory, TimeSpan.FromSeconds(3), cts.Token);
+        int? rootId = null;
+        int? childId = null;
+        try
+        {
+            for (var i = 0; i < 100 && !File.Exists(rootPidPath) && !running.IsCompleted; i++)
+                await Task.Delay(10);
+            Assert.True(File.Exists(rootPidPath), "The live helper did not start its descendant.");
+            rootId = int.Parse(File.ReadAllText(rootPidPath));
+            childId = int.Parse(File.ReadAllText(childPidPath));
+            Assert.False(HasTrackedProcessExited(rootId.Value), "The helper root must be live before interruption.");
+            Assert.False(HasTrackedProcessExited(childId.Value), "The helper descendant must be live before interruption.");
+            if (cancel)
             {
-                using var descendant = Process.GetProcessById(pid);
-                if (!descendant.HasExited) descendant.Kill();
-                await descendant.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                cts.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running.WaitAsync(TimeSpan.FromSeconds(5)));
             }
+            else
+            {
+                var result = await running.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.True(result.TimedOut);
+                Assert.Equal(2, result.ExitCode);
+            }
+            for (var i = 0; i < 200
+                 && (!HasTrackedProcessExited(rootId.Value) || !HasTrackedProcessExited(childId.Value)); i++)
+                await Task.Delay(10);
+            Assert.True(HasTrackedProcessExited(rootId.Value), "The interrupted helper root was not terminated.");
+            Assert.True(HasTrackedProcessExited(childId.Value), "The interrupted helper descendant was not terminated.");
+        }
+        finally
+        {
+            cts.Cancel();
+            if (childId == null && File.Exists(childPidPath))
+                childId = int.Parse(File.ReadAllText(childPidPath));
+            if (rootId == null && File.Exists(rootPidPath))
+                rootId = int.Parse(File.ReadAllText(rootPidPath));
+            if (childId is { } child) await StopTrackedProcessAsync(child);
+            if (rootId is { } root) await StopTrackedProcessAsync(root);
         }
     }
 
