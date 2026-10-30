@@ -4996,7 +4996,11 @@ public sealed class TypeChecker
 
         // Handle generic types with bracket syntax.
         var bracketIndex = typeName.IndexOf('[');
+        var rankStart = typeName.LastIndexOf('[');
+        var hasArrayRankSuffix = rankStart > 0 && typeName.EndsWith(']')
+            && typeName.AsSpan(rankStart + 1, typeName.Length - rankStart - 2).IndexOfAnyExcept(',') < 0;
         if (bracketIndex > 0 && typeName.EndsWith(']')
+            && !hasArrayRankSuffix
             && !typeName.AsSpan(bracketIndex + 1).Contains('='))
         {
             var baseName = typeName[..bracketIndex];

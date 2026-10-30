@@ -372,6 +372,72 @@ public class NullableReferenceTypingTests
     }
 
     [Theory]
+    [InlineData("i32[,]", "int[,]")]
+    [InlineData("i32[,,]", "int[,,]")]
+    [InlineData("i32[,,,]", "int[,,,]")]
+    [InlineData("i32[][,]", "int[][,]")]
+    [InlineData("i32[,][,,]", "int[,][,,]")]
+    [InlineData("?i32[,][]", "int[,][]?")]
+    [InlineData("str[,]", "string[,]")]
+    [InlineData("List<i32>[,]", "List<int>[,]")]
+    public void ArrayRankSuffixes_AcceptNullWithDefaultChecking(string type, string emittedType)
+    {
+        var result = Program.Compile($$"""
+            §M{m1:NullableTyping}
+              §U{System.Collections.Generic}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{grid:{{type}}} null
+            """, "array-rank-typing.calr");
+
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Contains($"{emittedType} grid = null;", result.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
+    }
+
+    [Theory]
+    [InlineData("i32[]")]
+    [InlineData("[i32]")]
+    [InlineData("i32[,][]")]
+    [InlineData("Option<i32>")]
+    [InlineData("Result<i32, str>")]
+    [InlineData("Option<i32[,]>")]
+    [InlineData("Result<i32[,], str>")]
+    [InlineData("Option[i32]")]
+    [InlineData("Result[i32, str]")]
+    public void ArraysAndOrdinaryGenerics_KeepExistingNullRejection(string type)
+    {
+        var result = Program.Compile($$"""
+            §M{m1:NullableTyping}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{value:{{type}}} null
+            """, "array-generic-typing.calr");
+
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.TypeMismatch &&
+            diagnostic.Message.Contains("Cannot assign null", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("List<i32[]>", "List<int[]>")]
+    [InlineData("Dictionary<i32, str[]>", "Dictionary<int, string[]>")]
+    public void GenericsWithArrayArguments_KeepTheirGenericIdentity(string type, string emittedType)
+    {
+        var result = Program.Compile($$"""
+            §M{m1:NullableTyping}
+              §U{System.Collections.Generic}
+              §F{f1:Probe:pub} ({{type}}:input) -> void
+                §E{}
+                §B{grid:{{type}}} input
+            """, "array-generic-typing.calr");
+
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Contains($"{emittedType} grid = input;", result.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
+    }
+
+    [Theory]
     [InlineData("i32[]", "str[]")]
     [InlineData("[i32]", "[str]")]
     [InlineData("Option<i32>", "Option<str>")]
