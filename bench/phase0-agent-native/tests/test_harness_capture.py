@@ -807,6 +807,22 @@ class EpochGuards(unittest.TestCase):
 
 
 class TemplateCarriesPermissiveEffects(unittest.TestCase):
+    def _assert_canary_diagnostics(self, result, severity):
+        diagnostics = json.loads(result.stdout)["diagnostics"]
+        for diagnostic in diagnostics:
+            self.assertIn(diagnostic["severity"], ("error", "warning", "info"))
+        self.assertEqual(result.returncode != 0,
+                         any(d["severity"] == "error" for d in diagnostics),
+                         result.stdout + result.stderr)
+        canaries = [d for d in diagnostics if d["code"] == "Calor0410"]
+        self.assertTrue(canaries, result.stdout + result.stderr)
+        self.assertTrue(all(d["severity"] == severity for d in canaries),
+                        result.stdout + result.stderr)
+        if severity == "error":
+            self.assertNotEqual(result.returncode, 0)
+        else:
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_template_placeholder_follows_the_arm_config(self):
         tpl = _read(TEMPLATE)
         self.assertIn("<CalorEnforceEffects>true</CalorEnforceEffects>", tpl)
@@ -819,15 +835,41 @@ class TemplateCarriesPermissiveEffects(unittest.TestCase):
         self.assertIn('TEMPLATE_SOURCE="harness"', src)   # pre-rows arm uses the harness template
 
     @unittest.skipUnless(HAVE_PRODUCT, "Release calor.dll not built")
-    def test_canary_is_an_error_strict_and_a_warning_permissive(self):
+    def test_known_effect_canary_is_an_error_in_strict_and_permissive_modes(self):
         with tempfile.TemporaryDirectory() as tmp:
-            base = ["dotnet", RELEASE_CLI, "-i", CANARY, "--enforce-effects", "--no-telemetry"]
+            base = ["dotnet", RELEASE_CLI, "-i", CANARY, "--enforce-effects", "--no-telemetry",
+                    "--format", "json"]
             strict = run(base + ["-o", os.path.join(tmp, "s.g.cs")])
-            self.assertNotEqual(strict.returncode, 0)
-            self.assertIn("error Calor0410", strict.stdout + strict.stderr)
+            self._assert_canary_diagnostics(strict, "error")
             perm = run(base + ["--permissive-effects", "-o", os.path.join(tmp, "p.g.cs")])
-            self.assertEqual(perm.returncode, 0, perm.stdout + perm.stderr)
-            self.assertIn("warning Calor0410", perm.stdout + perm.stderr)
+            # Permissive mode may waive unknown effects, not a known cw violation.
+            self._assert_canary_diagnostics(perm, "error")
+
+    def test_live_canary_rejects_text_matches_wrong_severity_and_exit_disagreement(self):
+        def result(diagnostics, exit_code):
+            return subprocess.CompletedProcess(
+                [], exit_code, json.dumps({"diagnostics": diagnostics}),
+                "non-diagnostic stderr: error Calor0410; warning Calor0410")
+
+        def diagnostic(code, severity):
+            return {"code": code, "severity": severity,
+                    "message": "error Calor0410; warning Calor0410"}
+
+        for expected, diagnostics, exit_code in [
+                ("error", [], 1),
+                ("error", [diagnostic("Calor0411", "error")], 1),
+                ("error", [diagnostic("Calor0410", "warning")], 0),
+                ("error", [diagnostic("Calor0410", "info")], 0),
+                ("error", [diagnostic("Calor0410", "error")], 0),
+                ("warning", [diagnostic("Calor0410", "warning")], 1),
+                ("warning", [diagnostic("Calor0410", "error")], 1),
+                ("warning", [diagnostic("Calor0410", "warning"),
+                             diagnostic("Calor0999", "error")], 0)]:
+            with self.subTest(expected=expected, diagnostics=diagnostics, exit_code=exit_code):
+                with self.assertRaises(AssertionError):
+                    self._assert_canary_diagnostics(result(diagnostics, exit_code), expected)
+        self._assert_canary_diagnostics(result([diagnostic("Calor0410", "error")], 1), "error")
+        self._assert_canary_diagnostics(result([diagnostic("Calor0410", "warning")], 0), "warning")
 
 
 # ---------------------------------------------------------------------------
