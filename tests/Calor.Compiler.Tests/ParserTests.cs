@@ -8,6 +8,93 @@ namespace Calor.Compiler.Tests;
 public class ParserTests
 {
     [Theory]
+    [InlineData("false", false)]
+    [InlineData("true", false)]
+    [InlineData("False", true)]
+    [InlineData("TRUE", true)]
+    public void ConfigureAwait_RequiresExactBooleanSpelling(string value, bool hasError)
+    {
+        var source = $"§M{{m1:Modifiers}}\n  §AF{{f1:Run:pub}} () -> i32\n    §R §AWAIT{{{value}}} §C{{GetAsync}} §/C";
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Equal(hasError, diagnostics.HasErrors);
+        if (hasError)
+            Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Message.Contains("exact-case 'true' or 'false'"));
+    }
+
+    [Theory]
+    [InlineData("class", TypeConstraintKind.Class)]
+    [InlineData("CLASS", TypeConstraintKind.TypeName)]
+    public void ConstraintKeywords_AreNotCaseFolded(string constraint, TypeConstraintKind expected)
+    {
+        var source = $"§M{{m1:Modifiers}}\n  §F{{f1:Run:pub}}<T> () -> void\n    §WHERE T : {constraint}";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal(expected, module.Functions.Single().TypeParameters.Single().Constraints.Single().Kind);
+    }
+
+    [Theory]
+    [InlineData("(i32:x:REF)", "")]
+    [InlineData("", "    §I{i32:x:REF}")]
+    public void ParameterModifierCaseVariants_ReportAnError(string signature, string taggedParameter)
+    {
+        var source = $"§M{{m1:Modifiers}}\n  §F{{f1:Run:pub}} {signature}\n{taggedParameter}\n    §R";
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier
+            && diagnostic.Message.Contains("'ref'"));
+    }
+
+    [Theory]
+    [InlineData("MT")]
+    [InlineData("AMT")]
+    public void CompactMethodWithoutModifiers_DoesNotTreatDefaultVisibilityAsAModifier(string marker)
+    {
+        var source = $"§M{{m1:Modifiers}}\n  §CL{{c1:Widget:pub}}\n    §{marker}{{Run:pub}} () -> void";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.Equal(MethodModifiers.None, module.Classes.Single().Methods.Single().Modifiers);
+    }
+
+    [Theory]
+    [InlineData("STATIC", "static")]
+    [InlineData("STAT", "stat")]
+    [InlineData("VIRTUAL", "virtual")]
+    [InlineData("OV", "ov")]
+    [InlineData("Readonly", "readonly")]
+    [InlineData("Required", "required")]
+    [InlineData("Unsafe", "unsafe")]
+    [InlineData("VOL", "vol")]
+    public void MemberModifierCaseVariants_ReportCanonicalSpelling(string modifier, string canonical)
+    {
+        var source = $$"""
+            §M{m1:Modifiers}
+              §CL{c1:Widget:pub}
+                §MT{mt1:Run:pub:{{modifier}}} () -> void
+            """;
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier
+            && diagnostic.Message.Contains($"'{canonical}'"));
+    }
+
+    [Theory]
+    [InlineData("STATIC", "static")]
+    [InlineData("ABS", "abs")]
+    [InlineData("Struct", "struct")]
+    [InlineData("Readonly", "readonly")]
+    public void ClassModifierCaseVariants_ReportCanonicalSpelling(string modifier, string canonical)
+    {
+        var source = $"§M{{m1:Modifiers}}\n  §CL{{c1:Widget:pub:{modifier}}}";
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier
+            && diagnostic.Message.Contains($"'{canonical}'"));
+    }
+
+    [Theory]
     [InlineData("add", "+")]
     [InlineData("SUBTRACT", "-")]
     [InlineData("mul", "*")]

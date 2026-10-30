@@ -9,6 +9,8 @@ permalink: /syntax-reference/
 # Syntax Reference
 
 Complete reference for Calor syntax. Calor uses Lisp-style expressions for all operations.
+Keywords, operators, literal prefixes, and declaration modifiers are case-sensitive.
+Use the spelling shown in the reference; capitalization is not an alias.
 
 ---
 

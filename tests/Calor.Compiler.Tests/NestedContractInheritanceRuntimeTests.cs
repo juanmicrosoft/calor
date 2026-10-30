@@ -844,7 +844,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                       §MT{mt4:Tag:pub} () -> i32
                         §E{}
                         §R INT:1
-                {{(inheritedShadow == "private-type" ? $"      §CL{{c8:{nestedName}:pri}}\n        §FLD{{i32:Min:pub:stat}} INT:-20" : "")}}
+                {{(inheritedShadow == "private-type" ? $"      §CL{{c8:{nestedName}:priv}}\n        §FLD{{i32:Min:pub:stat}} INT:-20" : "")}}
                     §CL{c4:Base:pub}
                       §EXT{Storage<i32>}
                       §CL{c5:{{nestedName}}:pub}<T>
@@ -889,7 +889,7 @@ public sealed class NestedContractInheritanceRuntimeTests
                   §CL{c1:Limits:pub}
                     §FLD{i32:Min:pub:stat} INT:0
                   §CL{c2:Storage:pub}
-                    §CL{c3:{{privateName}}:pri}
+                    §CL{c3:{{privateName}}:priv}
                       §FLD{i32:Min:pub:stat} INT:-10
                   §CL{c4:Outer:pub}
                     §CL{c5:Base:pub}

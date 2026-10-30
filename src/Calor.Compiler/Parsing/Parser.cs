@@ -1691,12 +1691,12 @@ public sealed class Parser
         bool isStatic = false;
         bool isGlobal = false;
 
-        if (pos0.Equals("global", StringComparison.OrdinalIgnoreCase))
+        if (pos0.Equals("global", StringComparison.Ordinal))
         {
             isGlobal = true;
             if (pos2 != null)
             {
-                if (pos1!.Equals("static", StringComparison.OrdinalIgnoreCase))
+                if (pos1!.Equals("static", StringComparison.Ordinal))
                 {
                     isStatic = true;
                 }
@@ -1714,7 +1714,7 @@ public sealed class Parser
         else if (pos1 != null)
         {
             // Two-part format: [prefix:namespace]
-            if (pos0.Equals("static", StringComparison.OrdinalIgnoreCase))
+            if (pos0.Equals("static", StringComparison.Ordinal))
             {
                 isStatic = true;
                 @namespace = pos1;
@@ -2082,11 +2082,7 @@ public sealed class Parser
         var modifier = ParameterModifier.None;
         if (!string.IsNullOrEmpty(semantic))
         {
-            if (semantic.Contains("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.This;
-            if (semantic.Contains("ref", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Ref;
-            if (semantic.Contains("out", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Out;
-            if (semantic.Contains("in", StringComparison.OrdinalIgnoreCase) && !semantic.Contains("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.In;
-            if (semantic.Contains("params", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Params;
+            modifier = ParseParameterModifiers(semantic, startToken.Span, allowSemantic: true);
         }
 
         var csharpAttrs = ParseCSharpAttributes();
@@ -8602,7 +8598,7 @@ public sealed class Parser
 
         foreach (var constraintText in constraints)
         {
-            var (kind, typeName) = constraintText.ToLowerInvariant() switch
+            var (kind, typeName) = constraintText switch
             {
                 "class" => (TypeConstraintKind.Class, (string?)null),
                 "class?" => (TypeConstraintKind.ClassNullable, (string?)null),
@@ -8657,7 +8653,7 @@ public sealed class Parser
         // Handle special keywords
         if (Check(TokenKind.Identifier))
         {
-            var text = Current.Text.ToLowerInvariant();
+            var text = Current.Text;
             if (text == "class")
             {
                 Advance();
@@ -8674,9 +8670,9 @@ public sealed class Parser
             }
             if (text == "allows"
                 && Peek(1).Kind == TokenKind.Identifier
-                && Peek(1).Text.Equals("ref", StringComparison.OrdinalIgnoreCase)
+                && Peek(1).Text.Equals("ref", StringComparison.Ordinal)
                 && Peek(2).Kind == TokenKind.Identifier
-                && Peek(2).Text.Equals("struct", StringComparison.OrdinalIgnoreCase))
+                && Peek(2).Text.Equals("struct", StringComparison.Ordinal))
             {
                 Advance();
                 Advance();
@@ -9270,16 +9266,28 @@ public sealed class Parser
 
         // Token-based matching: split modifiers and check each token against known abbreviations
         var modifierTokens = modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        var isAbstract = modifierTokens.Any(t => t.Equals("abs", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("abstract", StringComparison.OrdinalIgnoreCase));
-        var isSealed = modifierTokens.Any(t => t.Equals("seal", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("sealed", StringComparison.OrdinalIgnoreCase));
-        var isStatic = modifierTokens.Any(t => t.Equals("st", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("stat", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("static", StringComparison.OrdinalIgnoreCase));
-        var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.OrdinalIgnoreCase));
-        var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.OrdinalIgnoreCase));
-        var isReadOnly = modifierTokens.Any(t => t.Equals("readonly", StringComparison.OrdinalIgnoreCase));
+        foreach (var token in modifierTokens)
+        {
+            if (!ClassModifierKeywords.Contains(token))
+            {
+                var lower = token.ToLowerInvariant();
+                var hint = ClassModifierKeywords.Contains(lower)
+                    ? $"Use '{lower}' instead."
+                    : "Use a supported class modifier such as 'abs', 'stat', or 'struct'.";
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    $"Unknown class modifier '{token}'. Modifiers are case-sensitive. {hint}");
+            }
+        }
+        var isAbstract = modifierTokens.Any(t => t.Equals("abs", StringComparison.Ordinal)
+            || t.Equals("abstract", StringComparison.Ordinal));
+        var isSealed = modifierTokens.Any(t => t.Equals("seal", StringComparison.Ordinal)
+            || t.Equals("sealed", StringComparison.Ordinal));
+        var isStatic = modifierTokens.Any(t => t.Equals("st", StringComparison.Ordinal)
+            || t.Equals("stat", StringComparison.Ordinal)
+            || t.Equals("static", StringComparison.Ordinal));
+        var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.Ordinal));
+        var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.Ordinal));
+        var isReadOnly = modifierTokens.Any(t => t.Equals("readonly", StringComparison.Ordinal));
 
         // Structs cannot be abstract
         if (isStruct && isAbstract)
@@ -9587,7 +9595,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
-        var fieldModifiers = ParseMethodModifiers(modStr);
+        var fieldModifiers = ParseMethodModifiers(modStr, startToken.Span);
 
         // Position 8 (§3.3): §FLD{Action<i32>:onChange:priv} §E{cw}. Read BEFORE the
         // default-value branch. X9b is the executed proof this did not already parse:
@@ -9656,7 +9664,7 @@ public sealed class Parser
             && (posCount == 2 || posCount == 3 && !IsVisibilityKeyword(attrs["_pos2"] ?? "")))
         {
             // Shift: §MT{name:vis:mod}
-            modStr = visStr;
+            modStr = attrs["_pos2"] ?? "";
             visStr = name;
             name = id;
             id = GenerateParserAutoId("m");
@@ -9669,7 +9677,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
-        var modifiers = ParseMethodModifiers(modStr);
+        var modifiers = ParseMethodModifiers(modStr, startToken.Span);
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -9811,7 +9819,7 @@ public sealed class Parser
             // otherwise it is the compact {name:vis:modifiers} (#1607 review round 2).
             && (posCount == 2 || posCount == 3 && !IsVisibilityKeyword(attrs["_pos2"] ?? "")))
         {
-            modStr = visStr;
+            modStr = attrs["_pos2"] ?? "";
             visStr = name;
             name = id;
             id = GenerateParserAutoId("m");
@@ -9824,7 +9832,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
-        var modifiers = ParseMethodModifiers(modStr);
+        var modifiers = ParseMethodModifiers(modStr, startToken.Span);
 
         // Parse optional type parameters §AMT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -9935,49 +9943,83 @@ public sealed class Parser
         }, startToken);
     }
 
-    private static MethodModifiers ParseMethodModifiers(string modStr)
+    private ParameterModifier ParseParameterModifiers(string value, TextSpan span, bool allowSemantic = false)
+    {
+        var result = ParameterModifier.None;
+        foreach (var token in value.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var modifier = token switch
+            {
+                "this" => ParameterModifier.This,
+                "ref" => ParameterModifier.Ref,
+                "out" => ParameterModifier.Out,
+                "in" => ParameterModifier.In,
+                "params" => ParameterModifier.Params,
+                _ => ParameterModifier.None
+            };
+            if (modifier == ParameterModifier.None
+                && (!allowSemantic || token.ToLowerInvariant() is "this" or "ref" or "out" or "in" or "params"))
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.InvalidModifier,
+                    $"Unknown parameter modifier '{token}'. Use exact-case 'this', 'ref', 'out', 'in', or 'params'.");
+            }
+            result |= modifier;
+        }
+        return result;
+    }
+
+    private MethodModifiers ParseMethodModifiers(string modStr, TextSpan? span = null)
     {
         var mods = MethodModifiers.None;
         // Token-based matching: split on commas/spaces and check each token
         var tokens = modStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var token in tokens)
         {
-            if (token.Equals("vr", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("virt", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("virtual", StringComparison.OrdinalIgnoreCase))
+            if (token.Equals("vr", StringComparison.Ordinal)
+                || token.Equals("virt", StringComparison.Ordinal)
+                || token.Equals("virtual", StringComparison.Ordinal))
                 mods |= MethodModifiers.Virtual;
-            else if (token.Equals("ov", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("over", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("override", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("ov", StringComparison.Ordinal)
+                || token.Equals("over", StringComparison.Ordinal)
+                || token.Equals("override", StringComparison.Ordinal))
                 mods |= MethodModifiers.Override;
-            else if (token.Equals("abs", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("abstract", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("abs", StringComparison.Ordinal)
+                || token.Equals("abstract", StringComparison.Ordinal))
                 mods |= MethodModifiers.Abstract;
-            else if (token.Equals("seal", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("sealed", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("seal", StringComparison.Ordinal)
+                || token.Equals("sealed", StringComparison.Ordinal))
                 mods |= MethodModifiers.Sealed;
-            else if (token.Equals("st", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("stat", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("static", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("st", StringComparison.Ordinal)
+                || token.Equals("stat", StringComparison.Ordinal)
+                || token.Equals("static", StringComparison.Ordinal))
                 mods |= MethodModifiers.Static;
-            else if (token.Equals("const", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("const", StringComparison.Ordinal))
                 mods |= MethodModifiers.Const;
-            else if (token.Equals("readonly", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("readonly", StringComparison.Ordinal))
                 mods |= MethodModifiers.Readonly;
-            else if (token.Equals("req", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("required", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("req", StringComparison.Ordinal)
+                || token.Equals("required", StringComparison.Ordinal))
                 mods |= MethodModifiers.Required;
-            else if (token.Equals("part", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("partial", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("part", StringComparison.Ordinal)
+                || token.Equals("partial", StringComparison.Ordinal))
                 mods |= MethodModifiers.Partial;
-            else if (token.Equals("ext", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("extern", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("ext", StringComparison.Ordinal)
+                || token.Equals("extern", StringComparison.Ordinal))
                 mods |= MethodModifiers.Extern;
-            else if (token.Equals("unsafe", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("unsafe", StringComparison.Ordinal))
                 mods |= MethodModifiers.Unsafe;
-            else if (token.Equals("volatile", StringComparison.OrdinalIgnoreCase)
-                || token.Equals("vol", StringComparison.OrdinalIgnoreCase))
+            else if (token.Equals("volatile", StringComparison.Ordinal)
+                || token.Equals("vol", StringComparison.Ordinal))
                 mods |= MethodModifiers.Volatile;
+            else if (span is { } location)
+            {
+                var lower = token.ToLowerInvariant();
+                var hint = token != lower && ParseMethodModifiers(lower) != MethodModifiers.None
+                    ? $"Use '{lower}' instead."
+                    : "Use a supported member modifier such as 'stat', 'vr', or 'ov'.";
+                _diagnostics.ReportError(location, DiagnosticCode.InvalidModifier,
+                    $"Unknown member modifier '{token}'. Modifiers are case-sensitive. {hint}");
+            }
         }
         return mods;
     }
@@ -10867,7 +10909,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
-        var modifiers = ParseMethodModifiers(modStr);
+        var modifiers = ParseMethodModifiers(modStr, startToken.Span);
 
         // --- Compact accessor shorthand ---
         // Detect accessor shorthand in accessorStr position
@@ -11027,7 +11069,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
-        var modifiers = ParseMethodModifiers(modStr);
+        var modifiers = ParseMethodModifiers(modStr, startToken.Span);
 
         // --- Compact accessor shorthand with inline params ---
         if (IsAccessorShorthand(accessorStr))
@@ -11276,7 +11318,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CTOR", "id");
         }
 
-        var isStatic = visStr.Equals("stat", StringComparison.OrdinalIgnoreCase);
+        var isStatic = visStr.Equals("stat", StringComparison.Ordinal);
         var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr, startToken.Span);
 
         // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
@@ -12380,12 +12422,12 @@ public sealed class Parser
             while (i < count)
             {
                 var pos = attrs[$"_pos{i}"];
-                if (pos?.Equals("static", StringComparison.OrdinalIgnoreCase) == true)
+                if (pos?.Equals("static", StringComparison.Ordinal) == true)
                 {
                     isStatic = true;
                     i++;
                 }
-                else if (pos?.Equals("async", StringComparison.OrdinalIgnoreCase) == true)
+                else if (pos?.Equals("async", StringComparison.Ordinal) == true)
                 {
                     isAsync = true;
                     i++;
@@ -12805,13 +12847,18 @@ public sealed class Parser
         var configValue = attrs["_pos0"];
         if (!string.IsNullOrEmpty(configValue))
         {
-            if (configValue.Equals("false", StringComparison.OrdinalIgnoreCase))
+            if (configValue.Equals("false", StringComparison.Ordinal))
             {
                 configureAwait = false;
             }
-            else if (configValue.Equals("true", StringComparison.OrdinalIgnoreCase))
+            else if (configValue.Equals("true", StringComparison.Ordinal))
             {
                 configureAwait = true;
+            }
+            else
+            {
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidTypedLiteral,
+                    "ConfigureAwait requires exact-case 'true' or 'false'.");
             }
         }
 
@@ -14111,15 +14158,8 @@ public sealed class Parser
                         Advance(); // consume :
                         if (Check(TokenKind.Identifier))
                         {
-                            var modStr = Advance().Text;
-                            foreach (var mod in modStr.Split(','))
-                            {
-                                if (mod.Equals("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.This;
-                                else if (mod.Equals("ref", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Ref;
-                                else if (mod.Equals("out", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Out;
-                                else if (mod.Equals("in", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.In;
-                                else if (mod.Equals("params", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Params;
-                            }
+                            var modToken = Advance();
+                            modifier |= ParseParameterModifiers(modToken.Text, modToken.Span);
                         }
                     }
                 }
