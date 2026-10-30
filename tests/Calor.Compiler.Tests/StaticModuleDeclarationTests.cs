@@ -175,7 +175,23 @@ public class StaticModuleDeclarationTests
             }
             """;
         var original = Compile(source);
-        var (_, _, generated) = RoundTrip(source);
+        var (conversion, module, generated) = RoundTrip(source);
+        var outer = Assert.Single(module.Classes);
+        Assert.Equal("Outer", outer.Name);
+        Assert.Equal(staticModifier.Length > 0, outer.IsModule);
+        Assert.Equal(new[] { "Seed", "Value" }, outer.Fields.Select(field => field.Name));
+        Assert.Equal("Stored", Assert.Single(outer.Properties).Name);
+        Assert.Equal("Twice", Assert.Single(outer.Methods).Name);
+        var innerDeclaration = Assert.Single(outer.NestedClasses);
+        Assert.Equal("Inner", innerDeclaration.Name);
+        Assert.Equal("Run", Assert.Single(innerDeclaration.Methods).Name);
+        var deepDeclaration = Assert.Single(innerDeclaration.NestedClasses);
+        Assert.Equal("Deep", deepDeclaration.Name);
+        Assert.Equal("Read", Assert.Single(deepDeclaration.Methods).Name);
+        Assert.Empty(outer.InteropBlocks);
+        Assert.Empty(innerDeclaration.InteropBlocks);
+        Assert.Empty(deepDeclaration.InteropBlocks);
+        Assert.DoesNotContain("§CSHARP", conversion.CalorSource);
         var converted = Compile(generated);
         foreach (var assembly in new[] { original, converted })
         {
