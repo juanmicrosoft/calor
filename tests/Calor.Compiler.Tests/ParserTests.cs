@@ -8,6 +8,24 @@ namespace Calor.Compiler.Tests;
 public class ParserTests
 {
     [Theory]
+    [InlineData("public", "pub")]
+    [InlineData("internal", "int")]
+    [InlineData("protected", "prot")]
+    [InlineData("pro", "prot")]
+    [InlineData("private", "priv")]
+    [InlineData("pri", "priv")]
+    [InlineData("protected-internal", "prot-int")]
+    [InlineData("private-protected", "priv-prot")]
+    public void RemovedClassVisibility_IsNotReinterpretedAsABaseType(string alias, string canonical)
+    {
+        var source = $"§M{{m1:Modifiers}}\n  §CL{{c1:Widget:{alias}}}";
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnknownVisibility
+            && diagnostic.Message.Contains($"'{canonical}'"));
+    }
+
+    [Theory]
     [InlineData("false", false)]
     [InlineData("true", false)]
     [InlineData("False", true)]

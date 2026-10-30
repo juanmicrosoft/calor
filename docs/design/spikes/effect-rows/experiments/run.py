@@ -160,7 +160,7 @@ case("X9a-I-with-sameline-E", """
 case("X9b-FLD-with-sameline-E", """
     §M{m001:X9}
       §CL{c001:Counter:pub}
-        §FLD{Action<i32>:onChange:pri} §E{cw}
+        §FLD{Action<i32>:onChange:priv} §E{cw}
         §MT{mt001:Bump:pub} (i32:n) -> void
           §E{cw}
           §C{onChange} §A n §/C
@@ -214,7 +214,7 @@ case("X12b-calor0410-two-effects", """
 case("X13-field-delegate-invocation", """
     §M{m001:X13}
       §CL{c001:Counter:pub}
-        §FLD{Action<i32>:onChange:pri}
+        §FLD{Action<i32>:onChange:priv}
         §MT{mt001:Bump:pub} (i32:n) -> void
           §E{}
           §C{onChange} §A n §/C

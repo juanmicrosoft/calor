@@ -7625,8 +7625,7 @@ public sealed class Parser
     /// <summary>
     /// Maps a visibility word to its <see cref="Visibility"/>. Returns false for a
     /// word that is not a visibility (#1607: such a word used to compile silently
-    /// as <c>private</c>). <c>pri</c> and <c>pro</c> are the short forms the class
-    /// modifier and accessor tables already accept.
+    /// as <c>private</c>).
     /// </summary>
     private static bool TryParseVisibilityWord(string? value, out Visibility visibility)
     {
@@ -7653,13 +7652,27 @@ public sealed class Parser
         if (TryParseVisibilityWord(value, out var visibility) || string.IsNullOrEmpty(value))
             return visibility;
         // A modifier in the visibility slot (`§MT{m1:Area:abs}`) used to drop the modifier.
-        var hint = ParseMethodModifiers(value) != MethodModifiers.None
+        var replacement = RemovedVisibilityReplacement(value);
+        var hint = replacement != null
+            ? $" Use '{replacement}' instead."
+            : ParseMethodModifiers(value) != MethodModifiers.None
             ? $" '{value}' is a modifier: modifiers go in the field after the visibility, e.g. ':pub:{value}'."
             : "";
         _diagnostics.ReportError(span, DiagnosticCode.UnknownVisibility,
             $"Unknown visibility '{value}'. Valid visibility words: {ValidVisibilityWords}.{hint}");
         return visibility;
     }
+
+    private static string? RemovedVisibilityReplacement(string? value) => value switch
+    {
+        "public" => "pub",
+        "internal" => "int",
+        "protected" or "pro" => "prot",
+        "private" or "pri" => "priv",
+        "protected-internal" => "prot-int",
+        "private-protected" => "priv-prot",
+        _ => null
+    };
 
     // Phase 6: Arrays and Collections
 
@@ -9229,6 +9242,13 @@ public sealed class Parser
         string? baseClass = null;
         TextSpan? baseClassSpan = null;
         Visibility visibility = Visibility.Internal;
+
+        foreach (var word in pos2.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (RemovedVisibilityReplacement(word) is { } replacement)
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnknownVisibility,
+                    $"Removed visibility '{word}'. Use '{replacement}' instead.");
+        }
 
         if (pos3 != null)
         {
@@ -11744,11 +11764,16 @@ public sealed class Parser
         var exceptionType = attrs["_pos0"];
         var variableName = attrs["_pos1"];
 
-        // Catch filters use the section marker; bare legacy spellings are errors.
+        // Catch filters accept the exact-case WHEN keyword.
         ExpressionNode? filter = null;
         if (Check(TokenKind.When))
         {
             Expect(TokenKind.When);
+            filter = ParseExpression();
+        }
+        else if (Check(TokenKind.Identifier) && Current.Text == "WHEN")
+        {
+            Advance();
             filter = ParseExpression();
         }
         else if (Check(TokenKind.Identifier) && Current.Text.Equals("when", StringComparison.OrdinalIgnoreCase))

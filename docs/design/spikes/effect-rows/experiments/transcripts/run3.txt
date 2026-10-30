@@ -3,7 +3,7 @@ CASE Z1-FLD-nextline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Z1}
   §CL{c001:C:pub}
-    §FLD{i32:x:pri}
+    §FLD{i32:x:priv}
     §E{cw}
     §MT{mt001:M:pub} () -> void
       §E{}
@@ -79,7 +79,7 @@ CASE Z7-class-typeparam-reaches-member  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:Z7}
   §CL{c001:Box:pub}<T>
-    §FLD{T:value:pri}
+    §FLD{T:value:priv}
     §MT{mt001:Get:pub} () -> T
       §E{}
       §R value
@@ -223,4 +223,3 @@ CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 0
     §R §OK s
 ------------------------------------------------------------------------------
 Compilation successful: Z11-fallible-brace-form-full-output.g.cs
-

@@ -43,7 +43,7 @@ def case(name, src, args=None):
 case("Z1-FLD-nextline-E", """
     §M{m001:Z1}
       §CL{c001:C:pub}
-        §FLD{i32:x:pri}
+        §FLD{i32:x:priv}
         §E{cw}
         §MT{mt001:M:pub} () -> void
           §E{}
@@ -94,7 +94,7 @@ case("Z5-wrapped-inline-parameter-list", """
 case("Z7-class-typeparam-reaches-member", """
     §M{m001:Z7}
       §CL{c001:Box:pub}<T>
-        §FLD{T:value:pri}
+        §FLD{T:value:priv}
         §MT{mt001:Get:pub} () -> T
           §E{}
           §R value

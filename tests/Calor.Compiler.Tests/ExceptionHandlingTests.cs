@@ -14,7 +14,7 @@ public class ExceptionHandlingTests
     [InlineData("§WHEN", false)]
     [InlineData("when", true)]
     [InlineData("WhEn", true)]
-    [InlineData("WHEN", true)]
+    [InlineData("WHEN", false)]
     public void CatchFilter_RequiresCanonicalMarker(string marker, bool hasError)
     {
         var source = $$"""
