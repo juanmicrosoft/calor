@@ -34,7 +34,6 @@ public class ExpressionRegistrationTests
             [TokenKind.Ok] = ("§OK 1", nameof(OkExpressionNode)),
             [TokenKind.Err] = ("§ERR \"error\"", nameof(ErrExpressionNode)),
             [TokenKind.Match] = ("§W{w} value §K _ → 1 §/W{w}", nameof(MatchExpressionNode)),
-            [TokenKind.Record] = ("§D{Person} §FL{Name} \"Ada\"", nameof(RecordCreationNode)),
             [TokenKind.Array] = ("§ARR{a:i32} §/ARR{a}", nameof(ArrayCreationNode)),
             [TokenKind.Index] = ("§IDX values 0", nameof(ArrayAccessNode)),
             [TokenKind.Length] = ("§LEN values", nameof(ArrayLengthNode)),

@@ -108,30 +108,6 @@ public class EmptyInterfaceSiblingParsingTests
     }
 
     /// <summary>
-    /// Review m6: <c>§D</c> (record) is in the sibling set too. A record type
-    /// declaration has no module-level parse yet — <c>§D</c> at type position is
-    /// reported by the MODULE parser — so what this pins is that the interface
-    /// body ENDS at the same-column <c>§D</c>: the interface parses empty and the
-    /// "Expected EXT, METHOD, PROP, IXER, or END_IFACE" error is gone.
-    /// </summary>
-    [Fact]
-    public void EmptyInterface_FollowedBySameColumnRecord_EndsTheInterfaceBody()
-    {
-        const string source = """
-            §M{m001:Markers}
-              §IFACE{i001:IMarker}
-              §D{d002:Point}
-            """;
-
-        var (module, diagnostics) = Parse(source);
-
-        var marker = Assert.Single(module.Interfaces);
-        Assert.Empty(marker.Methods);
-        Assert.DoesNotContain(diagnostics.Errors,
-            d => d.Message.Contains("EXT, METHOD, PROP, IXER", StringComparison.Ordinal));
-    }
-
-    /// <summary>
     /// Review M2: the sibling rule is a SAME-COLUMN rule. An indented type opener
     /// inside an interface body is not a sibling — accepting it would silently
     /// reparent it to the enclosing scope, a nesting the language does not have.

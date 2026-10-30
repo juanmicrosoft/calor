@@ -4291,17 +4291,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RecordCreationNode node)
     {
-        var fields = string.Join(
-            " ",
-            node.Fields.Select(f =>
-                $"§FL{{{f.FieldName}}} {f.Value.Accept(this)}"));
-        return fields.Length == 0
-            ? $"§D{{{node.TypeName}}}"
-            : $"§D{{{node.TypeName}}} {fields}";
+        return Visit(new NewExpressionNode(
+            node.Span, node.TypeName, [],
+            node.Fields.Select(field => field.Value).ToArray(), [],
+            typeNameSpan: node.TypeNameSpan,
+            argumentNames: node.Fields.Select(field => (string?)field.FieldName).ToArray()));
     }
 
     public string Visit(FieldAssignmentNode node)
-        => $"§FL{{{node.FieldName}}} {node.Value.Accept(this)}";
+        => $"§A[{node.FieldName}] {node.Value.Accept(this)}";
 
     // Generic type nodes
     public string Visit(TypeParameterNode node)

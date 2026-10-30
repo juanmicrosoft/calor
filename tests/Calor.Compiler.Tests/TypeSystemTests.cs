@@ -103,25 +103,20 @@ public class TypeSystemTests
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
     }
 
-    [Fact]
-    public void Lexer_RecognizesRecordKeyword()
+    [Theory]
+    [InlineData("D")]
+    [InlineData("/D")]
+    [InlineData("FL")]
+    public void Lexer_RejectsRetiredRecordCreationMarkers(string marker)
     {
-        var tokens = Tokenize("§D", out var diagnostics);
+        var tokens = Tokenize($"§{marker}", out var diagnostics);
 
-        Assert.False(diagnostics.HasErrors);
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Message.Contains("§NEW", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("§A[name]", StringComparison.Ordinal));
         Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Record, tokens[0].Kind);
-        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesFieldKeyword()
-    {
-        var tokens = Tokenize("§FL", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Field, tokens[0].Kind);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
     }
 

@@ -37,7 +37,6 @@ public sealed class Parser
             [TokenKind.Ok] = static parser => parser.ParseOkExpression(),
             [TokenKind.Err] = static parser => parser.ParseErrExpression(),
             [TokenKind.Match] = static parser => parser.ParseMatchExpression(),
-            [TokenKind.Record] = static parser => parser.ParseRecordCreation(),
             [TokenKind.Array] = static parser => parser.ParseArrayCreation(),
             [TokenKind.Index] = static parser => parser.ParseArrayAccess(),
             [TokenKind.Length] = static parser => parser.ParseArrayLength(),
@@ -553,7 +552,7 @@ public sealed class Parser
     private bool IsSiblingDeclarationOpener(bool interopIsSibling)
         => Check(TokenKind.Func) || Check(TokenKind.AsyncFunc)
            || Check(TokenKind.Class) || Check(TokenKind.Interface)
-           || Check(TokenKind.Enum) || Check(TokenKind.Record)
+           || Check(TokenKind.Enum)
            || Check(TokenKind.Delegate) || Check(TokenKind.Namespace)
            || interopIsSibling && Check(TokenKind.CSharpInterop);
 
@@ -700,7 +699,6 @@ public sealed class Parser
            && (Check(TokenKind.Class)
                || Check(TokenKind.Interface)
                || Check(TokenKind.Enum)
-               || Check(TokenKind.Record)
                || Check(TokenKind.Delegate)
                // Review m1: a §CSHARP block at the interface's OWN column is a
                // sibling too - #717's rewrap emits exactly that when a sibling
@@ -5232,30 +5230,6 @@ public sealed class Parser
         var error = ParseExpression();
         var span = startToken.Span.Union(error.Span);
         return new ErrExpressionNode(span, error);
-    }
-
-    private RecordCreationNode ParseRecordCreation()
-    {
-        var startToken = Expect(TokenKind.Record);
-        var attrs = ParseAttributes();
-        var typeName = GetRequiredAttribute(attrs, "type", "RECORD", startToken.Span);
-
-        var fields = new List<FieldAssignmentNode>();
-        while (Check(TokenKind.Field))
-        {
-            var fieldToken = Expect(TokenKind.Field);
-            var fieldAttrs = ParseAttributes();
-            var fieldName = GetRequiredAttribute(fieldAttrs, "name", "FIELD", fieldToken.Span);
-            var value = ParseExpression();
-            fields.Add(new FieldAssignmentNode(fieldToken.Span.Union(value.Span), fieldName, value));
-        }
-
-        var lastSpan = fields.Count > 0 ? fields[^1].Span : startToken.Span;
-        return new RecordCreationNode(
-            startToken.Span.Union(lastSpan),
-            typeName,
-            fields,
-            attrs.GetSpan("type"));
     }
 
     private MatchExpressionNode ParseMatchExpression()

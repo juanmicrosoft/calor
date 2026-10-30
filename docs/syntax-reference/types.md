@@ -58,6 +58,7 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 `§NEW{Type}` calls a constructor. Use `§A[name] value` for a named argument;
 names select constructor parameters, not object-initializer properties.
 Arguments are evaluated in source order, even when names reorder the parameters.
+Records use this same constructor syntax; `§D` and `§FL` are not accepted.
 
 ```
 §B{pair:Pair} §NEW{Pair} §A[Right] "right" §A[Left] "left"

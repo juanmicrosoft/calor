@@ -160,7 +160,7 @@ public sealed class TypeReferenceNode : AstNode
 
 /// <summary>
 /// Represents a record instantiation expression.
-/// §RECORD[type=Person] §FIELD[name=Name] STR:"Alice" §FIELD[name=Age] INT:30
+/// Emits named constructor arguments: §NEW{Person} §A[Name] "Alice" §A[Age] 30.
 /// </summary>
 public sealed class RecordCreationNode : ExpressionNode
 {

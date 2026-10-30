@@ -758,8 +758,10 @@ public class Issue766DeclarationModuleSemanticsTests
             absent: ["FirstSelected", "ISecondBefore", "DeepSelected", "SecondAfter"]);
     }
 
-    [Fact]
-    public void ReorderedSameTypeRecordFields_PreserveRuntimeValues()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReorderedSameTypeRecordFields_PreserveRuntimeValues(bool throughCanonicalSyntax)
     {
         var creation = new RecordCreationNode(
             Span,
@@ -776,6 +778,14 @@ public class Issue766DeclarationModuleSemanticsTests
             ]);
 
         var expression = creation.Accept(new CSharpEmitter());
+        if (throughCanonicalSyntax)
+        {
+            var canonical = creation.Accept(new CalorEmitter());
+            var module = Parse(
+                $"§M{{m1:RecordMigration}}\n  §F{{f1:Create:pub}} () -> Pair\n    §R {canonical}");
+            var replay = Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression!;
+            expression = replay.Accept(new CSharpEmitter());
+        }
         Assert.Equal(
             "new Pair(Right: \"right\", Left: \"left\")",
             expression);
@@ -809,7 +819,7 @@ public class Issue766DeclarationModuleSemanticsTests
             ]);
 
         Assert.Equal(
-            "§D{Pair} §FL{Right} \"r\" §FL{Left} \"l\"",
+            "§NEW{Pair} §A[Right] \"r\" §A[Left] \"l\" §/NEW",
             creation.Accept(new CalorEmitter()));
     }
 

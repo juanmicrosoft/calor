@@ -36,7 +36,6 @@ public sealed class Lexer
         ["K"] = TokenKind.Case,             // §K = Case
         ["Q"] = TokenKind.Requires,         // §Q = Requires (preCondition)
         ["S"] = TokenKind.Ensures,          // §S = Ensures (poStcondition)
-        ["D"] = TokenKind.Record,           // §D = Record (Data)
         ["U"] = TokenKind.Using,            // §U = Using
         ["NS"] = TokenKind.Namespace,        // §NS = Namespace scope
 
@@ -48,7 +47,6 @@ public sealed class Lexer
         ["/L"] = TokenKind.EndFor,          // §/L
         ["/W"] = TokenKind.EndMatch,        // §/W
         ["/K"] = TokenKind.EndCase,         // §/K - closing case tag
-        ["/D"] = TokenKind.EndRecord,       // §/D
         ["/NS"] = TokenKind.EndNamespace,   // §/NS
 
         // Control flow keywords
@@ -70,7 +68,6 @@ public sealed class Lexer
         ["NN"] = TokenKind.None,            // §NN = None
         ["OK"] = TokenKind.Ok,              // §OK = Ok (already short)
         ["ERR"] = TokenKind.Err,            // §ERR = Err (already short)
-        ["FL"] = TokenKind.Field,           // §FL = Field
         ["IV"] = TokenKind.Invariant,       // §IV = Invariant
 
         // Using statement (block form)
@@ -2145,6 +2142,7 @@ public sealed class Lexer
             "BODY" or "END_BODY" => "Use indentation to delimit the function body instead.",
             "TP" => "Use an inline <T> type-parameter list instead.",
             "G" => "Use an inline generic type such as List<i32> instead.",
+            "D" or "/D" or "FL" => "Use §NEW with §A[name] named constructor arguments instead.",
             _ => null
         };
         if (replacement != null)

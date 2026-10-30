@@ -86,9 +86,6 @@ public enum TokenKind
     Bind,
 
     // Phase 3: Type System
-    Record,
-    EndRecord,
-    Field,
     Match,
     EndMatch,
     Case,
