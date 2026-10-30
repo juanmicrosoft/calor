@@ -4,1274 +4,2024 @@
     {
       "id": "object_instantiation",
       "csharpConstruct": "object instantiation",
-      "keywords": ["new", "object", "instantiation", "create", "constructor", "instance", "instantiate"],
+      "keywords": [
+        "new",
+        "object",
+        "instantiation",
+        "create",
+        "constructor",
+        "instance",
+        "instantiate",
+        "object instantiation"
+      ],
       "calorSyntax": "§NEW{ClassName} §A arg1 §A arg2 §/NEW",
       "description": "Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.",
+      "programs": [
+        "complete_objects"
+      ],
+      "csharpEquivalent": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);",
       "examples": [
         {
-          "csharp": "var user = new User(\"John\", 25);",
-          "calor": "§B{user} §NEW{User} §A \"John\" §A 25 §/NEW"
-        },
-        {
-          "csharp": "var list = new List<int>();",
-          "calor": "§B{list} §NEW{List<i32>} §/NEW"
-        },
-        {
-          "csharp": "return new Widget(value);",
-          "calor": "§R §NEW{Widget} §A value §/NEW"
+          "csharp": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);",
+          "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:str:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> ?str\n    §R (?. person Name)"
         }
       ]
     },
     {
       "id": "variable_declaration",
       "csharpConstruct": "variable declaration",
-      "keywords": ["var", "variable", "declare", "declaration", "let", "binding", "assign"],
+      "keywords": [
+        "var",
+        "variable",
+        "declare",
+        "declaration",
+        "let",
+        "binding",
+        "assign",
+        "variable declaration"
+      ],
       "calorSyntax": "§B{name} value or §B{~name} value (mutable)",
       "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.",
+      "programs": [
+        "primer_bindings",
+        "nested_arrays"
+      ],
+      "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;",
       "examples": [
         {
-          "csharp": "var count = 0;",
-          "calor": "§B{count} 0"
+          "csharp": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;",
+          "calor": "§M{Bindings}\n  §F{Demo:pub} () -> void\n    §E{cw}\n    §B{greeting:str} \"Ada\"\n    §B{~count:i32} 0\n    §C{Console.WriteLine} §A greeting §/C\n    §C{Console.WriteLine} §A count §/C"
         },
         {
-          "csharp": "int mutableCount = 0; // needs to be modified later",
-          "calor": "§B{~mutableCount} 0"
-        },
-        {
-          "csharp": "string name = \"John\";",
-          "calor": "§B{name} \"John\""
-        },
-        {
-          "csharp": "string? name = null;",
-          "calor": "§B{name:?str} null"
+          "csharp": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;",
+          "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} ([i32]:data) -> i32\n    §E{}\n    §S (== result (+ §IDX data 0 §IDX data 1))\n    §B{~sum} 0\n    §ASSIGN sum (+ sum §IDX data 0)\n    §R (+ sum §IDX data 1)\n\n  §F{MixFirst:pub} ([i32]:data, i32:hash) -> i32\n    §E{}\n    §R (^ hash §IDX data 0)"
         }
       ]
     },
     {
       "id": "method_definition",
       "csharpConstruct": "method definition",
-      "keywords": ["method", "function", "def", "define", "void", "return type", "class method", "member method"],
-      "calorSyntax": "§MT{id:name:vis[:modifiers]} (type:param, ...) -> returnType",
+      "keywords": [
+        "method",
+        "function",
+        "def",
+        "define",
+        "void",
+        "return type",
+        "class method",
+        "member method",
+        "method definition"
+      ],
+      "calorSyntax": "§MT{name:vis[:modifiers]} (type:param, ...) -> returnType",
       "description": "Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.",
+      "programs": [
+        "task_28"
+      ],
+      "csharpEquivalent": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }",
       "examples": [
         {
-          "csharp": "public void Process(int value) { ... }",
-          "calor": "§MT{m001:Process:pub} (i32:value) -> void\n  ..."
-        },
-        {
-          "csharp": "public virtual string GetName() { return _name; }",
-          "calor": "§MT{m002:GetName:pub:virt} () -> str\n  §R _name"
-        },
-        {
-          "csharp": "public override int Calculate(int x) { ... }",
-          "calor": "§MT{m003:Calculate:pub:over} (i32:x) -> i32\n  ..."
+          "csharp": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }",
+          "calor": "§M{AgentReference28}\n  §CL{Calculator:pub}\n    §MT{Add:pub} (i32:a, i32:b) -> i32\n      §R (+ a b)"
         }
       ]
     },
     {
       "id": "function_definition",
       "csharpConstruct": "function definition",
-      "keywords": ["function", "func", "method", "standalone", "static method", "top-level"],
-      "calorSyntax": "§F{id:name:vis} (type:param, ...) -> returnType",
+      "keywords": [
+        "function",
+        "func",
+        "method",
+        "standalone",
+        "static method",
+        "top-level",
+        "function definition"
+      ],
+      "calorSyntax": "§F{name:vis} (type:param, ...) -> returnType",
       "description": "Defines a standalone function (not a class member). Use for top-level functions or static utility methods.",
+      "programs": [
+        "primer_contracts"
+      ],
+      "csharpEquivalent": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }",
       "examples": [
         {
-          "csharp": "public static int Add(int a, int b) { return a + b; }",
-          "calor": "§F{f001:Add:pub} (i32:a, i32:b) -> i32\n  §R (+ a b)"
-        },
-        {
-          "csharp": "private void Log(string message) { Console.WriteLine(message); }",
-          "calor": "§F{f002:Log:priv} (str:message) -> void\n  §E{cw}\n  §C{Console.WriteLine} message"
+          "csharp": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }",
+          "calor": "§M{Contracts}\n  §F{Square:pub} (i32:x) -> i32\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)\n\n  §F{Divide:pub} (i32:a, i32:b) -> i32\n    §Q{\"divisor must not be zero\"} (!= b 0)\n    §R (/ a b)"
         }
       ]
     },
     {
       "id": "lambda_expression",
       "csharpConstruct": "lambda expression",
-      "keywords": ["lambda", "arrow", "=>", "anonymous", "closure", "delegate", "action", "func"],
-      "calorSyntax": "§LAM{id:param:type...} expression §/LAM{id}",
-      "description": "Creates an anonymous function/lambda expression. The id is required. Lambda parameters are name:type pairs after the id. Can capture variables from enclosing scope.",
+      "keywords": [
+        "lambda",
+        "arrow",
+        "=>",
+        "anonymous",
+        "closure",
+        "delegate",
+        "action",
+        "func",
+        "lambda expression"
+      ],
+      "calorSyntax": "§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}",
+      "description": "Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion only lowers noncapturing, non-generic direct same-point calls with ordinary parameters; unsupported cases remain explicit converter preservation.",
+      "programs": [
+        "task_25"
+      ],
+      "csharpEquivalent": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)",
       "examples": [
         {
-          "csharp": "x => x * 2",
-          "calor": "§LAM{lam1:x:i32} (* x 2) §/LAM{lam1}"
-        },
-        {
-          "csharp": "(a, b) => a + b",
-          "calor": "§LAM{lam1:a:i32:b:i32} (+ a b) §/LAM{lam1}"
-        },
-        {
-          "csharp": "items.Where(x => x > 5)",
-          "calor": "§C{items.Where} §A §LAM{lam1:x:i32} (> x 5) §/LAM{lam1} §/C"
+          "csharp": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)",
+          "calor": "§M{AgentReference25}\n  §F{ApplyComplex:pub} (i32:x) -> i32\n    §B{process:Func<i32,i32>} §LAM{n:i32}\n    (? (> n 0) (* n 2) 0)\n    §/LAM\n    §R §C{process} §A x §/C"
         }
       ]
     },
     {
       "id": "property_definition",
       "csharpConstruct": "property definition",
-      "keywords": ["property", "get", "set", "getter", "setter", "accessor", "prop"],
-      "calorSyntax": "§PROP{id:name:type:vis[:modifiers...:accessors]} [= default]",
+      "keywords": [
+        "property",
+        "get",
+        "set",
+        "getter",
+        "setter",
+        "accessor",
+        "prop",
+        "property definition"
+      ],
+      "calorSyntax": "§PROP{name:type:vis[:modifiers...:accessors]} [= default]",
       "description": "Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.",
+      "programs": [
+        "task_31",
+        "task_32"
+      ],
+      "csharpEquivalent": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }",
       "examples": [
         {
-          "csharp": "public string Name { get; set; }",
-          "calor": "§PROP{p001:Name:str:pub:get,set}"
+          "csharp": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }",
+          "calor": "§M{AgentReference31}\n  §CL{Product:pub}\n    §FLD{f64:_price:priv}\n    §PROP{Price:f64:pub}\n      §GET\n        §R _price\n      §SET\n        §ASSIGN _price value"
         },
         {
-          "csharp": "public int Count { get; private set; }",
-          "calor": "§PROP{p002:Count:i32:pub:get,priset}"
-        },
-        {
-          "csharp": "public int Value { get { return _value; } set { _value = value; } }",
-          "calor": "§PROP{p003:Value:i32:pub}\n  §GET\n    §R _value\n  §SET\n    §ASSIGN _value value"
+          "csharp": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }",
+          "calor": "§M{AgentReference32}\n  §CL{Person:pub}\n    §PROP{Name:str:pub}\n      §GET\n        §SET"
         }
       ]
     },
     {
       "id": "indexer_definition",
       "csharpConstruct": "indexer definition",
-      "keywords": ["indexer", "this[]", "this[int", "this[string", "bracket", "index", "§IXER"],
-      "calorSyntax": "§IXER{id:returnType:vis[:modifiers[:accessors]]} (type:param, ...)",
-      "description": "Defines an indexer (this[]) on a class or interface. Compact auto-property form puts accessors and parameters inline. Full form uses indented §GET/§SET/§INIT accessor blocks.",
+      "keywords": [
+        "indexer",
+        "this[]",
+        "this[int",
+        "this[string",
+        "bracket",
+        "index",
+        "§IXER",
+        "indexer definition"
+      ],
+      "calorSyntax": "§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies",
+      "description": "Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.",
+      "programs": [
+        "complete_indexer"
+      ],
+      "csharpEquivalent": "public int this[int index] { get; set; }\npublic string this[string key] { get; set; }\npublic int this[int row, int col] { get; set; }\npublic int this[int i] { get { return _data[i]; } set { _data[i] = value; } }",
       "examples": [
         {
-          "csharp": "public int this[int index] { get; set; }",
-          "calor": "§IXER{ix1:i32:pub:get,set} (i32:index)"
-        },
-        {
-          "csharp": "public string this[string key] { get; set; }",
-          "calor": "§IXER{ix1:str:pub:get,set} (str:key)"
-        },
-        {
-          "csharp": "public int this[int row, int col] { get; set; }",
-          "calor": "§IXER{ix1:i32:pub:get,set} (i32:row, i32:col)"
-        },
-        {
-          "csharp": "public int this[int i] { get { return _data[i]; } set { _data[i] = value; } }",
-          "calor": "§IXER{ix1:i32:pub} (i32:i)\n  §GET\n    §R §IDX _data i\n  §SET\n    §SETIDX _data i value"
+          "csharp": "public int this[int index] { get; set; }\npublic string this[string key] { get; set; }\npublic int this[int row, int col] { get; set; }\npublic int this[int i] { get { return _data[i]; } set { _data[i] = value; } }",
+          "calor": "§M{Indexers}\n  §CL{Numbers:pub}\n    §IXER{i32:pub}\n      §I{i32:index}\n      §GET\n        §R (+ index 1)"
         }
       ]
     },
     {
       "id": "property_access_vs_method_call",
       "csharpConstruct": "property access vs method call",
-      "keywords": ["property access", "member access", "method call", "call", "parentheses", "getter"],
+      "keywords": [
+        "property access",
+        "member access",
+        "method call",
+        "call",
+        "parentheses",
+        "getter",
+        "property access vs method call"
+      ],
       "calorSyntax": "Property: use bare member expression (e.g., obj.Property). Method: use §C{obj.Method} args.",
       "description": "§C{...} emits parentheses, making it a method call. For property or field access (no parentheses), use a bare dotted expression in a binding (§B{var} obj.Property) or directly as an expression. Do NOT use §C for property access — it will emit obj.Property() with unwanted parens.",
+      "programs": [
+        "task_31",
+        "complete_objects"
+      ],
+      "csharpEquivalent": "var items = Data.Products;\nvar items = Data.GetProducts();",
       "examples": [
         {
-          "csharp": "var items = Data.Products;",
-          "calor": "§B{~items} Data.Products"
+          "csharp": "var items = Data.Products;\nvar items = Data.GetProducts();",
+          "calor": "§M{AgentReference31}\n  §CL{Product:pub}\n    §FLD{f64:_price:priv}\n    §PROP{Price:f64:pub}\n      §GET\n        §R _price\n      §SET\n        §ASSIGN _price value"
         },
         {
-          "csharp": "var items = Data.GetProducts();",
-          "calor": "§B{~items} §C{Data.GetProducts}"
+          "csharp": "var items = Data.Products;\nvar items = Data.GetProducts();",
+          "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:str:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> ?str\n    §R (?. person Name)"
         }
       ]
     },
     {
       "id": "for_loop",
       "csharpConstruct": "for loop",
-      "keywords": ["for", "loop", "iterate", "iteration", "counter", "index", "range"],
-      "calorSyntax": "§L{id:var:from:to:step}",
+      "keywords": [
+        "for",
+        "loop",
+        "iterate",
+        "iteration",
+        "counter",
+        "index",
+        "range",
+        "for loop"
+      ],
+      "calorSyntax": "§L{var:from:to:step}",
       "description": "For loop with an inclusive integer range. The body is indented under the loop header.",
+      "programs": [
+        "primer_loops"
+      ],
+      "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }",
       "examples": [
         {
-          "csharp": "for (int i = 0; i < 10; i++) { ... }",
-          "calor": "§L{l1:i:0:9:1}\n  ..."
-        },
-        {
-          "csharp": "for (int i = 0; i <= 10; i++) { ... }",
-          "calor": "§L{l2:i:0:10:1}\n  ..."
-        },
-        {
-          "csharp": "for (int i = 0; i < 100; i += 2) { ... }",
-          "calor": "§L{l3:i:0:98:2}\n  ..."
+          "csharp": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }",
+          "calor": "§M{Loops}\n  §F{PrintOneToFive:pub} () -> void\n    §E{cw}\n    §L{i:1:5:1}\n      §C{Console.WriteLine} §A i §/C"
         }
       ]
     },
     {
       "id": "foreach_loop",
       "csharpConstruct": "foreach loop",
-      "keywords": ["foreach", "for each", "iterate", "collection", "enumerable", "items", "elements"],
-      "calorSyntax": "§EACH{var:collection}",
-      "description": "Iterates over each element in a collection.",
+      "keywords": [
+        "foreach",
+        "for each",
+        "iterate",
+        "collection",
+        "enumerable",
+        "items",
+        "elements",
+        "foreach loop"
+      ],
+      "calorSyntax": "§EACH{item:type} collection",
+      "description": "Iterates a collection with an indented body.",
+      "programs": [
+        "task_14",
+        "task_16"
+      ],
+      "csharpEquivalent": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }",
       "examples": [
         {
-          "csharp": "foreach (var item in items) { ... }",
-          "calor": "§EACH{item:items}\n  ..."
+          "csharp": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }",
+          "calor": "§M{AgentReference14}\n  §F{SumList:pub} () -> i32\n    §E{alloc,mut}\n    §B{nums:List<i32>} §NEW{List<i32>}\n    §PUSH{nums} 10\n    §PUSH{nums} 20\n    §PUSH{nums} 30\n    §B{~sum:i32} 0\n    §EACH{n} nums\n      §ASSIGN sum (+ sum n)\n    §R sum"
         },
         {
-          "csharp": "foreach (var (key, value) in dictionary) { ... }",
-          "calor": "§EACHKV{key:value:dictionary}\n  ..."
+          "csharp": "foreach (var item in items) { ... }\nforeach (var (key, value) in dictionary) { ... }",
+          "calor": "§M{AgentReference16}\n  §F{PrintDictionary:pub} (Dictionary<str,i32>:scores) -> void\n    §E{cw}\n    §EACHKV{k:v} scores\n      §P k\n      §P v"
         }
       ]
     },
     {
       "id": "while_loop",
       "csharpConstruct": "while loop",
-      "keywords": ["while", "loop", "condition", "repeat", "until"],
-      "calorSyntax": "§WH{id} (condition)",
+      "keywords": [
+        "while",
+        "loop",
+        "condition",
+        "repeat",
+        "until",
+        "while loop"
+      ],
+      "calorSyntax": "§WH (condition)",
       "description": "Executes body while condition is true.",
+      "programs": [
+        "task_12"
+      ],
+      "csharpEquivalent": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }",
       "examples": [
         {
-          "csharp": "while (count > 0) { count--; }",
-          "calor": "§WH{w1} (> count 0)\n  §ASSIGN count (- count 1)"
-        },
-        {
-          "csharp": "while (true) { if (done) break; }",
-          "calor": "§WH{w2} true\n  §IF{i1} done\n    §BK"
+          "csharp": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }",
+          "calor": "§M{AgentReference12}\n  §F{Countdown:pub} () -> void\n    §E{cw}\n    §B{~count:i32} 5\n    §WH (> count 0)\n      §C{Console.WriteLine}\n      §A count\n      §/C\n      §ASSIGN count (- count 1)"
         }
       ]
     },
     {
       "id": "if_statement",
       "csharpConstruct": "if statement",
-      "keywords": ["if", "else", "conditional", "branch", "condition", "then", "elseif", "else if"],
-      "calorSyntax": "§IF{id} (condition) body §EI (condition) body §EL body",
+      "keywords": [
+        "if",
+        "else",
+        "conditional",
+        "branch",
+        "condition",
+        "then",
+        "elseif",
+        "else if",
+        "if statement"
+      ],
+      "calorSyntax": "§IF (condition) body §EI (condition) body §EL body",
       "description": "Conditional branching. §EI for else-if, §EL for else. Both are optional.",
+      "programs": [
+        "primer_branching"
+      ],
+      "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }",
       "examples": [
         {
-          "csharp": "if (x > 0) { return true; }",
-          "calor": "§IF{i1} (> x 0)\n  §R true"
-        },
-        {
-          "csharp": "if (x > 0) { a(); } else { b(); }",
-          "calor": "§IF{i1} (> x 0)\n  §C{a}\n§EL\n  §C{b}"
-        },
-        {
-          "csharp": "if (x > 0) { } else if (x < 0) { } else { }",
-          "calor": "§IF{i1} (> x 0)\n  ...\n§EI (< x 0)\n  ...\n§EL\n  ..."
+          "csharp": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }",
+          "calor": "§M{Branching}\n  §F{Sign:pub} (i32:x) -> i32\n    §IF (> x 0)\n      §R 1\n    §EI (< x 0)\n      §R (- 0 1)\n    §EL\n      §R 0"
         }
       ]
     },
     {
       "id": "ternary_expression",
       "csharpConstruct": "ternary / conditional expression",
-      "keywords": ["ternary", "conditional", "?:", "question mark", "inline if"],
+      "keywords": [
+        "ternary",
+        "conditional",
+        "?:",
+        "question mark",
+        "inline if",
+        "ternary expression"
+      ],
       "calorSyntax": "(? condition trueValue falseValue)",
       "description": "Conditional expression (ternary operator). Uses prefix notation with (? ...) syntax. Both branches are expressions, not statements.",
+      "programs": [
+        "task_4"
+      ],
+      "csharpEquivalent": "var x = condition ? a : b;\nreturn count > 0 ? \"items\" : \"none\";\nvar label = isActive ? GetLabel() : \"default\";",
       "examples": [
         {
-          "csharp": "var x = condition ? a : b;",
-          "calor": "§B{x} (? condition a b)"
-        },
-        {
-          "csharp": "return count > 0 ? \"items\" : \"none\";",
-          "calor": "§R (? (> count 0) \"items\" \"none\")"
-        },
-        {
-          "csharp": "var label = isActive ? GetLabel() : \"default\";",
-          "calor": "§B{label} (? isActive §C{GetLabel} §/C \"default\")"
+          "csharp": "var x = condition ? a : b;\nreturn count > 0 ? \"items\" : \"none\";\nvar label = isActive ? GetLabel() : \"default\";",
+          "calor": "§M{AgentReference4}\n  §F{Abs:pub} (i32:x) -> i32\n    §S (>= result 0)\n    §R (? (< x 0) (- 0 x) x)"
         }
       ]
     },
     {
       "id": "return_statement",
       "csharpConstruct": "return statement",
-      "keywords": ["return", "result", "output", "yield", "value"],
+      "keywords": [
+        "return",
+        "result",
+        "output",
+        "yield",
+        "value",
+        "return statement"
+      ],
       "calorSyntax": "§R expression or §R (void)",
       "description": "Returns a value from a function or method. Use bare §R for void returns.",
+      "programs": [
+        "task_4"
+      ],
+      "csharpEquivalent": "return 42;\nreturn user.Name;\nreturn;",
       "examples": [
         {
-          "csharp": "return 42;",
-          "calor": "§R 42"
-        },
-        {
-          "csharp": "return user.Name;",
-          "calor": "§R user.Name"
-        },
-        {
-          "csharp": "return;",
-          "calor": "§R"
+          "csharp": "return 42;\nreturn user.Name;\nreturn;",
+          "calor": "§M{AgentReference4}\n  §F{Abs:pub} (i32:x) -> i32\n    §S (>= result 0)\n    §R (? (< x 0) (- 0 x) x)"
         }
       ]
     },
     {
       "id": "class_definition",
       "csharpConstruct": "class definition",
-      "keywords": ["class", "type", "object", "inheritance", "extends", "implements", "abstract", "sealed"],
-      "calorSyntax": "§CL{id:Name:vis[:modifiers]}",
+      "keywords": [
+        "class",
+        "type",
+        "object",
+        "inheritance",
+        "extends",
+        "implements",
+        "abstract",
+        "sealed",
+        "class definition"
+      ],
+      "calorSyntax": "§CL{Name:vis[:modifiers]}",
       "description": "Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.",
+      "programs": [
+        "primer_classes",
+        "complex_class"
+      ],
+      "csharpEquivalent": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
       "examples": [
         {
-          "csharp": "public class User { }",
-          "calor": "§CL{c001:User:pub}"
+          "csharp": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
+          "calor": "§M{Classes}\n  §CL{Greeter:pub}\n    §MT{Greet:pub} () -> str\n      §R \"hello\""
         },
         {
-          "csharp": "public class Admin : User, IAdmin { }",
-          "calor": "§CL{c001:Admin:pub}\n  §EXT{User}\n  §IMPL{IAdmin}"
-        },
-        {
-          "csharp": "public abstract class BaseEntity { }",
-          "calor": "§CL{c001:BaseEntity:pub:abs}"
+          "csharp": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }",
+          "calor": "§M{PointModule}\n  §CL{Point:pub}\n    §FLD{i32:_x:priv}\n    §FLD{i32:_y:priv}\n\n    §CTOR{pub} (i32:x, i32:y)\n      §ASSIGN §THIS._x x\n      §ASSIGN §THIS._y y\n\n    §MT{Equals:pub} (Point:other) -> bool\n      §IF (== other null)\n        §R false\n      §EL\n        §R true\n\n    §OP{==:pub} (Point:left, Point:right) -> bool\n      §IF (== left null)\n        §R (== right null)\n      §EL\n        §R §C{left.Equals} §A right §/C\n\n    §OP{!=:pub} (Point:left, Point:right) -> bool\n      §R (! (== left right))"
         }
       ]
     },
     {
       "id": "async_method",
       "csharpConstruct": "async method",
-      "keywords": ["async", "await", "task", "asynchronous", "async/await", "promise", "future"],
-      "calorSyntax": "§AF{id:name:vis} (type:param, ...) -> returnType or §AMT{id:name:vis} (type:param, ...) -> returnType",
+      "keywords": [
+        "async",
+        "await",
+        "task",
+        "asynchronous",
+        "async/await",
+        "promise",
+        "future",
+        "async method"
+      ],
+      "calorSyntax": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
       "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.",
+      "programs": [
+        "complex_async"
+      ],
+      "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }",
       "examples": [
         {
-          "csharp": "public async Task<string> FetchDataAsync() { ... }",
-          "calor": "§AF{f001:FetchDataAsync:pub} () -> str\n  ..."
-        },
-        {
-          "csharp": "public async Task ProcessAsync() { await DoWork(); }",
-          "calor": "§AMT{m001:ProcessAsync:pub} () -> void\n  §AWAIT §C{DoWork}"
+          "csharp": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }",
+          "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (str:url) -> str\n      §TR\n        §B{_} §AWAIT §C{Task.Delay} §A 100 §/C\n        §R (+ \"data from \" url)\n      §CA{Exception:ex}\n        §R (+ \"error: \" ex.Message)"
         }
       ]
     },
     {
       "id": "await_expression",
       "csharpConstruct": "await expression",
-      "keywords": ["await", "async", "wait", "asynchronous", "task"],
+      "keywords": [
+        "await",
+        "async",
+        "wait",
+        "asynchronous",
+        "task",
+        "await expression"
+      ],
       "calorSyntax": "§AWAIT expression",
       "description": "Awaits an asynchronous operation.",
+      "programs": [
+        "complex_async"
+      ],
+      "csharpEquivalent": "var result = await FetchAsync();\nawait Task.Delay(1000);",
       "examples": [
         {
-          "csharp": "var result = await FetchAsync();",
-          "calor": "§B{result} §AWAIT §C{FetchAsync}"
-        },
-        {
-          "csharp": "await Task.Delay(1000);",
-          "calor": "§B{_} §AWAIT §C{Task.Delay} 1000"
+          "csharp": "var result = await FetchAsync();\nawait Task.Delay(1000);",
+          "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (str:url) -> str\n      §TR\n        §B{_} §AWAIT §C{Task.Delay} §A 100 §/C\n        §R (+ \"data from \" url)\n      §CA{Exception:ex}\n        §R (+ \"error: \" ex.Message)"
         }
       ]
     },
     {
       "id": "try_catch",
       "csharpConstruct": "try catch",
-      "keywords": ["try", "catch", "finally", "exception", "error", "throw", "handle"],
-      "calorSyntax": "§TR{id} body §CA{ExceptionType:varName} handler §FI cleanup",
+      "keywords": [
+        "try",
+        "catch",
+        "finally",
+        "exception",
+        "error",
+        "throw",
+        "handle",
+        "try catch"
+      ],
+      "calorSyntax": "§TR body §CA{ExceptionType:varName} handler §FI cleanup",
       "description": "Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.",
+      "programs": [
+        "complex_async"
+      ],
+      "csharpEquivalent": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }",
       "examples": [
         {
-          "csharp": "try { x(); } catch { y(); }",
-          "calor": "§TR{t1}\n  §C{x}\n§CA{Exception}\n  §C{y}"
-        },
-        {
-          "csharp": "try { } catch (Exception ex) { Log(ex); }",
-          "calor": "§TR{t1}\n  ...\n§CA{Exception:ex}\n  §C{Log} ex"
-        },
-        {
-          "csharp": "try { } finally { Cleanup(); }",
-          "calor": "§TR{t1}\n  ...\n§FI\n  §C{Cleanup}"
+          "csharp": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }",
+          "calor": "§M{ConvertedModule}\n  §U{System}\n  §U{System.Threading.Tasks}\n\n  §CL{DataService:pub}\n    §AMT{FetchAsync:pub} (str:url) -> str\n      §TR\n        §B{_} §AWAIT §C{Task.Delay} §A 100 §/C\n        §R (+ \"data from \" url)\n      §CA{Exception:ex}\n        §R (+ \"error: \" ex.Message)"
         }
       ]
     },
     {
       "id": "throw_statement",
       "csharpConstruct": "throw statement",
-      "keywords": ["throw", "exception", "error", "raise"],
+      "keywords": [
+        "throw",
+        "exception",
+        "error",
+        "raise",
+        "throw statement"
+      ],
       "calorSyntax": "§TH expression or §RT (rethrow)",
       "description": "Throws an exception. Use §RT to rethrow in a catch block.",
+      "programs": [
+        "task_8"
+      ],
+      "csharpEquivalent": "throw new ArgumentException(\"Invalid\");\nthrow;",
       "examples": [
         {
-          "csharp": "throw new ArgumentException(\"Invalid\");",
-          "calor": "§TH §NEW{ArgumentException} §A \"Invalid\" §/NEW"
-        },
-        {
-          "csharp": "throw;",
-          "calor": "§RT"
+          "csharp": "throw new ArgumentException(\"Invalid\");\nthrow;",
+          "calor": "§M{AgentReference8}\n  §F{SafeDivide:pub} (i32:a, i32:b) -> i32\n    §E{alloc,throw}\n    §IF (!= b 0)\n      §R (/ a b)\n    §EL\n      §TH §NEW{ArgumentException} §A \"Division by zero\" §/NEW"
         }
       ]
     },
     {
       "id": "effects_annotation",
       "csharpConstruct": "side effects",
-      "keywords": ["effects", "side effect", "pure", "impure", "io", "console", "file", "network", "database"],
+      "keywords": [
+        "effects",
+        "side effect",
+        "pure",
+        "impure",
+        "io",
+        "console",
+        "file",
+        "network",
+        "database",
+        "effects annotation"
+      ],
       "calorSyntax": "§E{effect1,effect2,...}",
-      "description": "Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs (file system), rnd (random), time, and env.",
+      "description": "Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.",
+      "programs": [
+        "primer_effects"
+      ],
+      "csharpEquivalent": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)",
       "examples": [
         {
-          "csharp": "// Method that writes to console",
-          "calor": "§F{f001:Print:pub} () -> void\n  §E{cw}\n  ..."
-        },
-        {
-          "csharp": "// Method that reads file and writes console",
-          "calor": "§F{f002:ProcessFile:pub} () -> void\n  §E{fs,cw}\n  ..."
-        },
-        {
-          "csharp": "// Pure function (no effects)",
-          "calor": "§F{f003:Calculate:pub} (i32:a, i32:b) -> i32\n  §R (+ a b)"
+          "csharp": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)",
+          "calor": "§M{Effects}\n  §F{Greet:pub} (str:name) -> void\n    §E{cw}\n    §C{Console.WriteLine} §A \"Hello\" §/C\n    §C{Console.WriteLine} §A name §/C"
         }
       ]
     },
     {
       "id": "precondition",
       "csharpConstruct": "precondition",
-      "keywords": ["precondition", "requires", "require", "contract", "guard", "validate", "check", "assert"],
+      "keywords": [
+        "precondition",
+        "requires",
+        "require",
+        "contract",
+        "guard",
+        "validate",
+        "check",
+        "assert",
+        "precondition"
+      ],
       "calorSyntax": "§Q (condition) or §Q{\"message\"} (condition)",
       "description": "Declares a precondition that must be true when the function is called. Part of Design by Contract.",
+      "programs": [
+        "primer_contracts"
+      ],
+      "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)",
       "examples": [
         {
-          "csharp": "// Contract.Requires(value >= 0)",
-          "calor": "§F{f001:Process:pub} (i32:value) -> void\n  §Q (>= value 0)\n  ..."
-        },
-        {
-          "csharp": "// Guard.Against.Null(input)",
-          "calor": "§F{f001:Process:pub} (str:input) -> void\n  §Q{\"input cannot be null\"} (!= input null)\n  ..."
+          "csharp": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)",
+          "calor": "§M{Contracts}\n  §F{Square:pub} (i32:x) -> i32\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)\n\n  §F{Divide:pub} (i32:a, i32:b) -> i32\n    §Q{\"divisor must not be zero\"} (!= b 0)\n    §R (/ a b)"
         }
       ]
     },
     {
       "id": "postcondition",
       "csharpConstruct": "postcondition",
-      "keywords": ["postcondition", "ensures", "ensure", "contract", "result", "guarantee"],
+      "keywords": [
+        "postcondition",
+        "ensures",
+        "ensure",
+        "contract",
+        "result",
+        "guarantee",
+        "postcondition"
+      ],
       "calorSyntax": "§S (condition) or §S{\"message\"} (condition)",
       "description": "Declares a postcondition that will be true when the function returns. Use result to refer to the return value.",
+      "programs": [
+        "primer_contracts"
+      ],
+      "csharpEquivalent": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result",
       "examples": [
         {
-          "csharp": "// Contract.Ensures(result >= 0)",
-          "calor": "§F{f001:Abs:pub} (i32:x) -> i32\n  §S (>= result 0)\n  ..."
-        },
-        {
-          "csharp": "// Ensures non-empty result",
-          "calor": "§F{f002:GetItems:pub} () -> List<Item>\n  §S{\"must return at least one item\"} (> result.Count 0)\n  ..."
+          "csharp": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result",
+          "calor": "§M{Contracts}\n  §F{Square:pub} (i32:x) -> i32\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)\n\n  §F{Divide:pub} (i32:a, i32:b) -> i32\n    §Q{\"divisor must not be zero\"} (!= b 0)\n    §R (/ a b)"
         }
       ]
     },
     {
       "id": "invariant",
-      "csharpConstruct": "class invariant",
-      "keywords": ["invariant", "always", "constraint", "rule", "class constraint"],
-      "calorSyntax": "§INV (condition)",
-      "description": "Declares a class invariant that must always be true for valid instances.",
+      "csharpConstruct": "module invariant",
+      "keywords": [
+        "invariant",
+        "always",
+        "constraint",
+        "rule",
+        "class constraint",
+        "invariant"
+      ],
+      "calorSyntax": "§IV (condition)",
+      "description": "Declares an invariant at module scope.",
+      "programs": [
+        "complete_invariant"
+      ],
+      "csharpEquivalent": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }",
       "examples": [
         {
           "csharp": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }",
-          "calor": "§CL{c001:Counter:pub}\n  §INV (>= _count 0)\n  §FLD{i32:_count:priv}"
+          "calor": "§M{Invariants}\n  §IV (> 1 0)\n  §F{Read:pub} () -> i32\n    §R 1"
         }
       ]
     },
     {
       "id": "method_call",
       "csharpConstruct": "method call",
-      "keywords": ["call", "invoke", "method", "function call", "execute"],
-      "calorSyntax": "§C{method} arg1 arg2",
-      "description": "Calls a method or function. Use §C{target} followed by arguments; §A and §/C may be used to close inline nested calls where needed.",
+      "keywords": [
+        "call",
+        "invoke",
+        "method",
+        "function call",
+        "execute",
+        "method call"
+      ],
+      "calorSyntax": "§C{method} §A arg1 §A arg2 §/C",
+      "description": "Calls a method or function. Each argument uses §A; §/C delimits nested argument lists.",
+      "programs": [
+        "primer_files"
+      ],
+      "csharpEquivalent": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call",
       "examples": [
         {
-          "csharp": "Console.WriteLine(\"Hello\");",
-          "calor": "§C{Console.WriteLine} \"Hello\""
-        },
-        {
-          "csharp": "user.Save();",
-          "calor": "§C{user.Save}"
-        },
-        {
-          "csharp": "Calculate(x, y) // internal pure call",
-          "calor": "§C{Calculate} x y"
+          "csharp": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call",
+          "calor": "§M{Files}\n  §F{Append:pub} (str:path, str:key, str:value) -> void\n    §E{fs:w}\n    §C{File.AppendAllText} §A path §A (+ key (+ \"=\" (+ value \"\\n\"))) §/C\n\n  §F{CountLines:pub} (str:path) -> i32\n    §E{fs:r}\n    §B{ok:bool} §C{File.Exists} §A path §/C\n    §IF (! ok)\n      §R 0\n    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n    §R (len lines)"
         }
       ]
     },
     {
       "id": "field_definition",
       "csharpConstruct": "field definition",
-      "keywords": ["field", "member", "private field", "backing field", "_"],
+      "keywords": [
+        "field",
+        "member",
+        "private field",
+        "backing field",
+        "_",
+        "field definition"
+      ],
       "calorSyntax": "§FLD{type:name:visibility}",
       "description": "Defines a field in a class. Usually private, prefixed with underscore by convention.",
+      "programs": [
+        "task_33"
+      ],
+      "csharpEquivalent": "private string _name;\nprivate readonly int _id;",
       "examples": [
         {
-          "csharp": "private string _name;",
-          "calor": "§FLD{str:_name:priv}"
-        },
-        {
-          "csharp": "private readonly int _id;",
-          "calor": "§FLD{i32:_id:priv:readonly}"
+          "csharp": "private string _name;\nprivate readonly int _id;",
+          "calor": "§M{AgentReference33}\n  §CL{Person:pub}\n    §FLD{str:_name:priv}\n    §FLD{i32:_age:priv}\n    §CTOR{pub} (str:name, i32:age)\n      §ASSIGN _name name\n      §ASSIGN _age age\n    §MT{GetName:pub} () -> str\n      §R _name"
         }
       ]
     },
     {
       "id": "interface_definition",
       "csharpConstruct": "interface definition",
-      "keywords": ["interface", "contract", "abstraction", "implement"],
-      "calorSyntax": "§IFACE{id:Name:vis}",
+      "keywords": [
+        "interface",
+        "contract",
+        "abstraction",
+        "implement",
+        "interface definition"
+      ],
+      "calorSyntax": "§IFACE{Name:vis}",
       "description": "Defines an interface with method signatures.",
+      "programs": [
+        "complete_interface"
+      ],
+      "csharpEquivalent": "public interface IRepository { void Save(Entity e); }",
       "examples": [
         {
           "csharp": "public interface IRepository { void Save(Entity e); }",
-          "calor": "§IFACE{i001:IRepository:pub}\n  §MT{m001:Save} (Entity:e) -> void"
+          "calor": "§M{Interfaces}\n  §IFACE{ICounter}\n    §MT{Count:pub} () -> i32\n  §CL{Counter:pub}\n    §IMPL{ICounter}\n    §MT{Count:pub} () -> i32\n      §R 1"
         }
       ]
     },
     {
       "id": "enum_definition",
       "csharpConstruct": "enum definition",
-      "keywords": ["enum", "enumeration", "values", "constants"],
-      "calorSyntax": "§EN{id:Name:vis[:underlyingType]} values...",
+      "keywords": [
+        "enum",
+        "enumeration",
+        "values",
+        "constants",
+        "enum definition"
+      ],
+      "calorSyntax": "§EN{Name:vis[:underlyingType]} values...",
       "description": "Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.",
+      "programs": [
+        "complex_enum"
+      ],
+      "csharpEquivalent": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }",
       "examples": [
         {
-          "csharp": "public enum Status { Active, Inactive, Pending }",
-          "calor": "§EN{e001:Status:pub}\n  Active\n  Inactive\n  Pending"
-        },
-        {
-          "csharp": "public enum Priority : byte { Low = 0, High = 1 }",
-          "calor": "§EN{e001:Priority:pub:byte}\n  Low = 0\n  High = 1"
+          "csharp": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }",
+          "calor": "§M{ConvertedModule}\n  §EN{Status}\n    Pending\n    Active\n    Suspended\n    Closed\n\n  §CL{StatusHelper:pub}\n    §MT{GetLabel:pub:stat} (Status:s) -> str\n      §R §W s\n        §K Status.Pending → \"Pending Review\"\n        §K Status.Active → \"Active\"\n        §K Status.Suspended → \"Temporarily Suspended\"\n        §K Status.Closed → \"Closed\"\n        §K _ → \"Unknown\""
         }
       ]
     },
     {
       "id": "constructor",
       "csharpConstruct": "constructor",
-      "keywords": ["constructor", "ctor", "initialize", "new", "construct"],
-      "calorSyntax": "§CTOR{id:vis} (type:param, ...)",
+      "keywords": [
+        "constructor",
+        "ctor",
+        "initialize",
+        "new",
+        "construct",
+        "constructor"
+      ],
+      "calorSyntax": "§CTOR{vis} (type:param, ...)",
       "description": "Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.",
+      "programs": [
+        "task_33"
+      ],
+      "csharpEquivalent": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }",
       "examples": [
         {
-          "csharp": "public User(string name) { _name = name; }",
-          "calor": "§CTOR{ctor001:pub} (str:name)\n  §ASSIGN _name name"
-        },
-        {
-          "csharp": "public Admin(string name) : base(name) { }",
-          "calor": "§CTOR{ctor001:pub} (str:name)\n  §BASE §A name"
+          "csharp": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }",
+          "calor": "§M{AgentReference33}\n  §CL{Person:pub}\n    §FLD{str:_name:priv}\n    §FLD{i32:_age:priv}\n    §CTOR{pub} (str:name, i32:age)\n      §ASSIGN _name name\n      §ASSIGN _age age\n    §MT{GetName:pub} () -> str\n      §R _name"
         }
       ]
     },
     {
       "id": "switch_expression",
       "csharpConstruct": "switch expression",
-      "keywords": ["switch", "match", "pattern", "case", "when"],
-      "calorSyntax": "§W{id} expression with indented §K pattern → result cases; use in an expression context, such as §R §W{id}",
+      "keywords": [
+        "switch",
+        "match",
+        "pattern",
+        "case",
+        "when",
+        "switch expression"
+      ],
+      "calorSyntax": "§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W",
       "description": "Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.",
+      "programs": [
+        "complex_enum"
+      ],
+      "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
       "examples": [
         {
-          "csharp": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }",
-          "calor": "§R §W{sw1} x\n  §K 1 → \"one\"\n  §K 2 → \"two\"\n  §K _ → \"other\""
-        },
-        {
-          "csharp": "shape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
-          "calor": "§R §W{sw1} shape\n  §K Circle c → §C{c.Area}\n  §K Rectangle r → (* r.Width r.Height)"
+          "csharp": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
+          "calor": "§M{ConvertedModule}\n  §EN{Status}\n    Pending\n    Active\n    Suspended\n    Closed\n\n  §CL{StatusHelper:pub}\n    §MT{GetLabel:pub:stat} (Status:s) -> str\n      §R §W s\n        §K Status.Pending → \"Pending Review\"\n        §K Status.Active → \"Active\"\n        §K Status.Suspended → \"Temporarily Suspended\"\n        §K Status.Closed → \"Closed\"\n        §K _ → \"Unknown\""
         }
       ]
     },
     {
       "id": "null_check",
       "csharpConstruct": "null check",
-      "keywords": ["null", "nullable", "?.", "??", "null check", "optional", "null coalescing", "null conditional"],
+      "keywords": [
+        "null",
+        "nullable",
+        "?.",
+        "??",
+        "null check",
+        "optional",
+        "null coalescing",
+        "null conditional",
+        "null check"
+      ],
       "calorSyntax": "(?? left right) for null-coalescing, (?. target Member) for null-conditional",
       "description": "Handles nullable values. (?? left right) returns left if non-null, else right. (?. target Member) accesses Member on target only if non-null. Both use Lisp-style prefix notation inside parentheses.",
+      "programs": [
+        "task_6"
+      ],
+      "csharpEquivalent": "name ?? \"default\"\nuser?.Name\nGetValue() ?? fallback",
       "examples": [
         {
-          "csharp": "name ?? \"default\"",
-          "calor": "(?? name \"default\")"
-        },
-        {
-          "csharp": "user?.Name",
-          "calor": "(?. user Name)"
-        },
-        {
-          "csharp": "GetValue() ?? fallback",
-          "calor": "(?? §C{GetValue} fallback)"
+          "csharp": "name ?? \"default\"\nuser?.Name\nGetValue() ?? fallback",
+          "calor": "§M{AgentReference6}\n  §F{TryDouble:pub} (i32:x) -> ?i32\n    §E{}\n    §IF (> x 0)\n      §R (* x 2)\n    §EL\n      §R null"
         }
       ]
     },
     {
       "id": "using_statement",
       "csharpConstruct": "using statement",
-      "keywords": ["using", "dispose", "resource", "cleanup", "idisposable"],
-      "calorSyntax": "§USE{id:var:type} resourceExpression",
+      "keywords": [
+        "using",
+        "dispose",
+        "resource",
+        "cleanup",
+        "idisposable",
+        "using statement"
+      ],
+      "calorSyntax": "§USE{var:type} resourceExpression",
       "description": "Resource management with automatic disposal.",
+      "programs": [
+        "complete_using"
+      ],
+      "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
       "examples": [
         {
-          "csharp": "using (var stream = File.OpenRead(path)) { ... }",
-          "calor": "§USE{u1:stream:Stream} §C{File.OpenRead} path\n  ..."
-        },
-        {
-          "csharp": "using var connection = new SqlConnection(connStr);",
-          "calor": "§USE{u1:connection:SqlConnection} §NEW{SqlConnection} §A connStr §/NEW\n  ..."
+          "csharp": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);",
+          "calor": "§M{Resources}\n  §F{Read:pub} (str:value) -> str\n    §E{alloc}\n    §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW\n      §R §C{reader.ReadToEnd} §/C"
         }
       ]
     },
     {
       "id": "generic_type",
       "csharpConstruct": "generic type",
-      "keywords": ["generic", "template", "<T>", "type parameter", "constraint", "where"],
-      "calorSyntax": "Use type parameters in names, e.g. §CL{c001:Repository<T>:pub}; constraints use §WHERE T : class",
+      "keywords": [
+        "generic",
+        "template",
+        "<T>",
+        "type parameter",
+        "constraint",
+        "where",
+        "generic type"
+      ],
+      "calorSyntax": "§CL{Repository:pub}<T> with indented §WHERE T : class",
       "description": "Generic type parameters and constraints.",
+      "programs": [
+        "task_29"
+      ],
+      "csharpEquivalent": "public class Repository<T> where T : class { }\npublic T Get<T>(int id) where T : new() { }",
       "examples": [
         {
-          "csharp": "public class Repository<T> where T : class { }",
-          "calor": "§CL{c001:Repository<T>:pub}\n  §WHERE T : class"
-        },
-        {
-          "csharp": "public T Get<T>(int id) where T : new() { }",
-          "calor": "§F{f001:Get<T>:pub} (i32:id) -> T\n  §WHERE T : new()\n  ..."
+          "csharp": "public class Repository<T> where T : class { }\npublic T Get<T>(int id) where T : new() { }",
+          "calor": "§M{AgentReference29}\n  §CL{Container:pub}<T>\n    §FLD{T:_value:priv}\n    §MT{Get:pub} () -> T\n      §R _value\n    §MT{Set:pub} (T:value) -> void\n      §E{mut}\n      §ASSIGN _value value"
         }
       ]
     },
     {
       "id": "linq_query",
       "csharpConstruct": "LINQ query",
-      "keywords": ["linq", "query", "where", "select", "orderby", "from"],
-      "calorSyntax": "Use method syntax with lambdas: §C{collection.Where} lambdaValue",
+      "keywords": [
+        "linq",
+        "query",
+        "where",
+        "select",
+        "orderby",
+        "from",
+        "linq query"
+      ],
+      "calorSyntax": "§C{System.Linq.Enumerable.Where} §A collection §A predicate §/C",
       "description": "LINQ queries use method-chain syntax with §C (call) and §LAM (lambda) in Calor. Complex chains are commonly hoisted into bindings before the final call.",
+      "programs": [
+        "complete_linq"
+      ],
+      "csharpEquivalent": "items.Where(x => x > 5).Select(x => x * 2)\nfrom item in items where item.Active select item.Name",
       "examples": [
         {
-          "csharp": "items.Where(x => x > 5).Select(x => x * 2)",
-          "calor": "§B{_lamWhere} §LAM{lam1:x:i32} (> x 5) §/LAM{lam1}\n§B{_chainWhere} §C{items.Where} _lamWhere\n§B{_lamSelect} §LAM{lam2:x:i32} (* x 2) §/LAM{lam2}\n§C{_chainWhere.Select} _lamSelect"
-        },
-        {
-          "csharp": "from item in items where item.Active select item.Name",
-          "calor": "§B{_lamWhere} §LAM{lam1:item:Item} item.Active §/LAM{lam1}\n§B{_chainWhere} §C{items.Where} _lamWhere\n§B{_lamSelect} §LAM{lam2:item:Item} item.Name §/LAM{lam2}\n§C{_chainWhere.Select} _lamSelect"
+          "csharp": "items.Where(x => x > 5).Select(x => x * 2)\nfrom item in items where item.Active select item.Name",
+          "calor": "§M{Queries}\n  §U{System.Linq}\n  §F{Positive:pub} ([i32]:values) -> [i32]\n    §E{alloc}\n    §B{predicate:Func<i32,bool>} §LAM{x:i32} (> x 0) §/LAM\n    §B{filtered:IEnumerable<i32>} §C{System.Linq.Enumerable.Where} §A values §A predicate §/C\n    §R §C{System.Linq.Enumerable.ToArray} §A filtered §/C"
         }
       ]
     },
     {
       "id": "string_interpolation",
       "csharpConstruct": "string interpolation",
-      "keywords": ["interpolation", "format", "$\"", "string format", "template string"],
+      "keywords": [
+        "interpolation",
+        "format",
+        "$\"",
+        "string format",
+        "template string",
+        "string interpolation"
+      ],
       "calorSyntax": "Inline: \"text ${expression} text\"",
       "description": "String interpolation uses ${} inside ordinary string literals. Note: ${0}, ${1} etc. are treated as format placeholders, not interpolation.",
+      "programs": [
+        "complete_interpolation"
+      ],
+      "csharpEquivalent": "$\"Hello, {name}!\"\n$\"Total: {price:C2}\"\n$\"{firstName} {lastName}\"\n$\"Result: {Calculate(x, y)} units\"",
       "examples": [
         {
-          "csharp": "$\"Hello, {name}!\"",
-          "calor": "\"Hello ${name}!\""
-        },
-        {
-          "csharp": "$\"Total: {price:C2}\"",
-          "calor": "\"Total: ${(fmt \"{0:C2}\" price)}\""
-        },
-        {
-          "csharp": "$\"{firstName} {lastName}\"",
-          "calor": "\"${firstName} ${lastName}\""
-        },
-        {
-          "csharp": "$\"Result: {Calculate(x, y)} units\"",
-          "calor": "\"Result: ${Calculate(x, y)} units\""
+          "csharp": "$\"Hello, {name}!\"\n$\"Total: {price:C2}\"\n$\"{firstName} {lastName}\"\n$\"Result: {Calculate(x, y)} units\"",
+          "calor": "§M{Interpolation}\n  §F{Greet:pub} (str:name) -> str\n    §R \"Hello ${name}\""
         }
       ]
     },
     {
       "id": "break_continue",
       "csharpConstruct": "break and continue",
-      "keywords": ["break", "continue", "exit", "skip", "next"],
+      "keywords": [
+        "break",
+        "continue",
+        "exit",
+        "skip",
+        "next",
+        "break continue"
+      ],
       "calorSyntax": "§BK for break, §CN for continue",
       "description": "Loop control statements.",
+      "programs": [
+        "complete_break_continue"
+      ],
+      "csharpEquivalent": "if (done) break;\nif (skip) continue;",
       "examples": [
         {
-          "csharp": "if (done) break;",
-          "calor": "§IF{i1} done\n  §BK"
-        },
-        {
-          "csharp": "if (skip) continue;",
-          "calor": "§IF{i1} skip\n  §CN"
+          "csharp": "if (done) break;\nif (skip) continue;",
+          "calor": "§M{LoopControl}\n  §F{FirstPositive:pub} ([i32]:values) -> i32\n    §E{}\n    §B{~answer:i32} 0\n    §EACH{value:i32} values\n      §IF (<= value 0)\n        §CN\n      §ASSIGN answer value\n      §BK\n    §R answer"
         }
       ]
     },
     {
       "id": "record_type",
       "csharpConstruct": "record type",
-      "keywords": ["record", "data", "immutable", "value object"],
-      "calorSyntax": "§D{Name} (type:field, ...)",
-      "description": "Defines an immutable data record.",
-      "examples": [
-        {
-          "csharp": "public record Person(string Name, int Age);",
-          "calor": "§D{Person} (str:Name, i32:Age)"
-        }
-      ]
+      "keywords": [
+        "record",
+        "data",
+        "immutable",
+        "value object",
+        "record type"
+      ],
+      "calorSyntax": "No authored native record declaration",
+      "description": "Query calor_help action=features for record conversion support. Do not handwrite passthrough.",
+      "programs": [],
+      "lookupOnly": true,
+      "csharpEquivalent": "",
+      "examples": []
     },
     {
       "id": "array_creation",
       "csharpConstruct": "Array Creation/Initialization",
-      "keywords": ["array", "initializer", "initialization", "collection", "new array", "int[]", "string[]"],
-      "calorSyntax": "§ARR{id:type} elements §/ARR{id}",
+      "keywords": [
+        "array",
+        "initializer",
+        "initialization",
+        "collection",
+        "new array",
+        "int[]",
+        "string[]",
+        "array creation"
+      ],
+      "calorSyntax": "§B{items} §ARR{type} elements §/ARR",
       "description": "Creates and initializes a fixed-size array. The element type is specified in the header. Elements are space-separated between the opening and closing tags. Supports both explicit (new int[] { ... }) and bare ({ ... }) initializer syntax.",
+      "programs": [
+        "complete_arrays"
+      ],
+      "csharpEquivalent": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };",
       "examples": [
         {
-          "csharp": "int[] numbers = { 5, 4, 1, 3 };",
-          "calor": "§B{[i32]:numbers} §ARR{a001:i32} 5 4 1 3 §/ARR{a001}"
-        },
-        {
-          "csharp": "var items = new int[] { 1, 2, 3 };",
-          "calor": "§B{items} §ARR{a001:i32} 1 2 3 §/ARR{a001}"
-        },
-        {
-          "csharp": "string[] names = new[] { \"Alice\", \"Bob\" };",
-          "calor": "§B{names} §ARR{a001:str} \"Alice\" \"Bob\" §/ARR{a001}"
+          "csharp": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };",
+          "calor": "§M{ArrayValues}\n  §F{First:pub} () -> i32\n    §E{alloc}\n    §B{items} §ARR{i32} 10 20 30 §/ARR\n    §R §IDX items 0"
         }
       ]
     },
     {
       "id": "static_class",
       "csharpConstruct": "static class",
-      "keywords": ["static", "static class", "utility", "helper"],
-      "calorSyntax": "§M{id:Name:pub}",
+      "keywords": [
+        "static",
+        "static class",
+        "utility",
+        "helper",
+        "static class"
+      ],
+      "calorSyntax": "§M{Name}",
       "description": "Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.",
+      "programs": [
+        "primer_contracts"
+      ],
+      "csharpEquivalent": "public static class StringHelper { }",
       "examples": [
         {
           "csharp": "public static class StringHelper { }",
-          "calor": "§M{c001:StringHelper:pub}"
+          "calor": "§M{Contracts}\n  §F{Square:pub} (i32:x) -> i32\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)\n\n  §F{Divide:pub} (i32:a, i32:b) -> i32\n    §Q{\"divisor must not be zero\"} (!= b 0)\n    §R (/ a b)"
         }
       ]
     },
     {
       "id": "virtual_method",
       "csharpConstruct": "virtual method",
-      "keywords": ["virtual", "override", "polymorphism", "inheritance", "overridable"],
-      "calorSyntax": "§MT{id:name:vis:virt} (type:param, ...) -> returnType",
+      "keywords": [
+        "virtual",
+        "override",
+        "polymorphism",
+        "inheritance",
+        "overridable",
+        "virtual method"
+      ],
+      "calorSyntax": "§MT{name:vis:virt} (type:param, ...) -> returnType",
       "description": "Defines a virtual method that can be overridden in derived classes. Use the 'virt' modifier (the compiler also accepts 'vr').",
+      "programs": [
+        "complete_inheritance"
+      ],
+      "csharpEquivalent": "public virtual string GetName() { return _name; }\nprotected virtual void OnChanged() { }",
       "examples": [
         {
-          "csharp": "public virtual string GetName() { return _name; }",
-          "calor": "§MT{m001:GetName:pub:virt} () -> str\n  §R _name"
-        },
-        {
-          "csharp": "protected virtual void OnChanged() { }",
-          "calor": "§MT{m002:OnChanged:prot:virt} () -> void"
+          "csharp": "public virtual string GetName() { return _name; }\nprotected virtual void OnChanged() { }",
+          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> i32\n    §MT{Label:pub:virt} () -> str\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> i32\n      §R 7\n    §MT{Label:pub:over} () -> str\n      §R \"derived\""
         }
       ]
     },
     {
       "id": "override_method",
       "csharpConstruct": "override method",
-      "keywords": ["override", "overriding", "polymorphism", "derived", "subclass"],
-      "calorSyntax": "§MT{id:name:vis:over} (type:param, ...) -> returnType",
+      "keywords": [
+        "override",
+        "overriding",
+        "polymorphism",
+        "derived",
+        "subclass",
+        "override method"
+      ],
+      "calorSyntax": "§MT{name:vis:over} (type:param, ...) -> returnType",
       "description": "Overrides a virtual method from a base class. Use the 'over' modifier (the compiler also accepts 'ov').",
+      "programs": [
+        "complete_inheritance"
+      ],
+      "csharpEquivalent": "public override string ToString() { return _name; }\npublic override int GetHashCode() { return _id; }",
       "examples": [
         {
-          "csharp": "public override string ToString() { return _name; }",
-          "calor": "§MT{m001:ToString:pub:over} () -> str\n  §R _name"
-        },
-        {
-          "csharp": "public override int GetHashCode() { return _id; }",
-          "calor": "§MT{m002:GetHashCode:pub:over} () -> i32\n  §R _id"
+          "csharp": "public override string ToString() { return _name; }\npublic override int GetHashCode() { return _id; }",
+          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> i32\n    §MT{Label:pub:virt} () -> str\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> i32\n      §R 7\n    §MT{Label:pub:over} () -> str\n      §R \"derived\""
         }
       ]
     },
     {
       "id": "abstract_class",
       "csharpConstruct": "abstract class",
-      "keywords": ["abstract", "base class", "inheritance", "cannot instantiate"],
-      "calorSyntax": "§CL{id:Name:vis:abs}",
+      "keywords": [
+        "abstract",
+        "base class",
+        "inheritance",
+        "cannot instantiate",
+        "abstract class"
+      ],
+      "calorSyntax": "§CL{Name:vis:abs}",
       "description": "Defines an abstract class that cannot be instantiated directly. Use 'abs' modifier.",
+      "programs": [
+        "complete_inheritance"
+      ],
+      "csharpEquivalent": "public abstract class Shape { }",
       "examples": [
         {
           "csharp": "public abstract class Shape { }",
-          "calor": "§CL{c001:Shape:pub:abs}\n  ..."
+          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> i32\n    §MT{Label:pub:virt} () -> str\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> i32\n      §R 7\n    §MT{Label:pub:over} () -> str\n      §R \"derived\""
         }
       ]
     },
     {
       "id": "abstract_method",
       "csharpConstruct": "abstract method",
-      "keywords": ["abstract", "no body", "must override", "pure virtual"],
-      "calorSyntax": "§MT{id:name:vis:abs} (type:param, ...) -> returnType",
+      "keywords": [
+        "abstract",
+        "no body",
+        "must override",
+        "pure virtual",
+        "abstract method"
+      ],
+      "calorSyntax": "§MT{name:vis:abs} (type:param, ...) -> returnType",
       "description": "Defines an abstract method with no body that must be overridden. Use 'abs' modifier.",
+      "programs": [
+        "complete_inheritance"
+      ],
+      "csharpEquivalent": "public abstract double GetArea();",
       "examples": [
         {
           "csharp": "public abstract double GetArea();",
-          "calor": "§MT{m001:GetArea:pub:abs} () -> f64"
+          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> i32\n    §MT{Label:pub:virt} () -> str\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> i32\n      §R 7\n    §MT{Label:pub:over} () -> str\n      §R \"derived\""
         }
       ]
     },
     {
       "id": "sealed_class",
       "csharpConstruct": "sealed class",
-      "keywords": ["sealed", "final", "no inheritance", "cannot derive"],
-      "calorSyntax": "§CL{id:Name:vis:seal}",
+      "keywords": [
+        "sealed",
+        "final",
+        "no inheritance",
+        "cannot derive",
+        "sealed class"
+      ],
+      "calorSyntax": "§CL{Name:vis:seal}",
       "description": "Defines a sealed class that cannot be inherited from. Use 'seal' modifier.",
+      "programs": [
+        "complete_inheritance"
+      ],
+      "csharpEquivalent": "public sealed class FinalClass { }",
       "examples": [
         {
           "csharp": "public sealed class FinalClass { }",
-          "calor": "§CL{c001:FinalClass:pub:seal}\n  ..."
+          "calor": "§M{Inheritance}\n  §CL{Base:pub:abs}\n    §MT{Read:pub:abs} () -> i32\n    §MT{Label:pub:virt} () -> str\n      §R \"base\"\n  §CL{Derived:pub:seal}\n    §EXT{Base}\n    §MT{Read:pub:over} () -> i32\n      §R 7\n    §MT{Label:pub:over} () -> str\n      §R \"derived\""
         }
       ]
     },
     {
       "id": "lock_statement",
       "csharpConstruct": "lock statement",
-      "keywords": ["lock", "thread", "synchronization", "mutex", "critical section", "thread-safe"],
-      "calorSyntax": "§LK{object}",
-      "description": "Acquires an exclusive lock on an object for thread-safe access.",
+      "keywords": [
+        "lock",
+        "thread",
+        "synchronization",
+        "mutex",
+        "critical section",
+        "thread-safe",
+        "lock statement"
+      ],
+      "calorSyntax": "§SYNC (gate)",
+      "description": "Locks an object while executing the indented body.",
+      "programs": [
+        "complete_sync"
+      ],
+      "csharpEquivalent": "lock (_sync) { _count++; }",
       "examples": [
         {
           "csharp": "lock (_sync) { _count++; }",
-          "calor": "§LK{_sync}\n  §ASSIGN _count (+ _count 1)"
+          "calor": "§M{Synchronization}\n  §F{Read:pub} (object:gate) -> i32\n    §SYNC (gate)\n      §R 7"
         }
       ]
     },
     {
       "id": "todo_comment",
       "csharpConstruct": "todo comment",
-      "keywords": ["todo", "fixme", "hack", "comment", "annotation"],
-      "calorSyntax": "§TD{description} or §FX{description} or §HK{description}",
-      "description": "Marks todo items, fixmes, or hacks in the code.",
+      "keywords": [
+        "todo",
+        "fixme",
+        "hack",
+        "comment",
+        "annotation",
+        "todo comment"
+      ],
+      "calorSyntax": "// TODO: description",
+      "description": "Use ordinary comments for todo items, fixmes and hacks.",
+      "programs": [
+        "complete_documentation"
+      ],
+      "csharpEquivalent": "// TODO: Implement caching\n// FIXME: This breaks with null input\n// HACK: Temporary workaround for API bug",
       "examples": [
         {
-          "csharp": "// TODO: Implement caching",
-          "calor": "§TD{Implement caching}"
-        },
-        {
-          "csharp": "// FIXME: This breaks with null input",
-          "calor": "§FX{This breaks with null input}"
-        },
-        {
-          "csharp": "// HACK: Temporary workaround for API bug",
-          "calor": "§HK{Temporary workaround for API bug}"
+          "csharp": "// TODO: Implement caching\n// FIXME: This breaks with null input\n// HACK: Temporary workaround for API bug",
+          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> i32\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> i32\n    §R 8"
         }
       ]
     },
     {
       "id": "deprecated_annotation",
       "csharpConstruct": "obsolete attribute",
-      "keywords": ["deprecated", "obsolete", "old", "legacy", "do not use"],
+      "keywords": [
+        "deprecated",
+        "obsolete",
+        "old",
+        "legacy",
+        "do not use",
+        "deprecated annotation"
+      ],
       "calorSyntax": "§DP{reason}",
       "description": "Marks code as deprecated with a reason.",
+      "programs": [
+        "complete_documentation"
+      ],
+      "csharpEquivalent": "[Obsolete(\"Use NewMethod instead\")]",
       "examples": [
         {
           "csharp": "[Obsolete(\"Use NewMethod instead\")]",
-          "calor": "§DP{Use NewMethod instead}"
+          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> i32\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> i32\n    §R 8"
         }
       ]
     },
     {
       "id": "complexity_annotation",
       "csharpConstruct": "complexity documentation",
-      "keywords": ["complexity", "big o", "performance", "algorithm", "time complexity", "space complexity"],
-      "calorSyntax": "§CX{O(n)} or §CX{O(log n)}",
-      "description": "Documents the algorithmic complexity of a function.",
+      "keywords": [
+        "complexity",
+        "big o",
+        "performance",
+        "algorithm",
+        "time complexity",
+        "space complexity",
+        "complexity annotation"
+      ],
+      "calorSyntax": "// Complexity: O(n)",
+      "description": "Document algorithmic complexity in an ordinary comment.",
+      "programs": [
+        "complete_documentation"
+      ],
+      "csharpEquivalent": "// Complexity: O(n log n)\n// Complexity: O(1) - constant time",
       "examples": [
         {
-          "csharp": "// Complexity: O(n log n)",
-          "calor": "§CX{O(n log n)}"
-        },
-        {
-          "csharp": "// Complexity: O(1) - constant time",
-          "calor": "§CX{O(1)}"
+          "csharp": "// Complexity: O(n log n)\n// Complexity: O(1) - constant time",
+          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> i32\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> i32\n    §R 8"
         }
       ]
     },
     {
       "id": "visibility_modifiers",
       "csharpConstruct": "access modifiers",
-      "keywords": ["public", "private", "protected", "internal", "visibility", "access", "modifier"],
+      "keywords": [
+        "public",
+        "private",
+        "protected",
+        "internal",
+        "visibility",
+        "access",
+        "modifier",
+        "visibility modifiers"
+      ],
       "calorSyntax": "pub (public), priv (private), prot (protected)",
       "description": "Visibility modifiers are specified in the tag header. Use 'pub' for public, 'priv' for private, 'prot' for protected.",
+      "programs": [
+        "complete_documentation"
+      ],
+      "csharpEquivalent": "public void Method() { }\nprivate int _field;\nprotected virtual void OnChange() { }",
       "examples": [
         {
-          "csharp": "public void Method() { }",
-          "calor": "§MT{m001:Method:pub} () -> void"
-        },
-        {
-          "csharp": "private int _field;",
-          "calor": "§FLD{i32:_field:priv}"
-        },
-        {
-          "csharp": "protected virtual void OnChange() { }",
-          "calor": "§MT{m002:OnChange:prot:virt} () -> void"
+          "csharp": "public void Method() { }\nprivate int _field;\nprotected virtual void OnChange() { }",
+          "calor": "§M{Documentation}\n  // TODO: add another algorithm.\n  // Complexity: O(1).\n  §F{Read:pub} () -> i32\n    §DP{Use ReadCurrent instead}\n    §R 7\n  §F{ReadCurrent:priv} () -> i32\n    §R 8"
         }
       ]
     },
     {
       "id": "event_definition",
       "csharpConstruct": "event definition",
-      "keywords": ["event", "delegate", "handler", "subscribe", "publish", "raise", "eventhandler", "add", "remove", "accessor", "§EADD", "§EREM"],
-      "calorSyntax": "§EVT{id:name:vis:delegateType}",
+      "keywords": [
+        "event",
+        "delegate",
+        "handler",
+        "subscribe",
+        "publish",
+        "raise",
+        "eventhandler",
+        "add",
+        "remove",
+        "accessor",
+        "§EADD",
+        "§EREM",
+        "event definition"
+      ],
+      "calorSyntax": "§EVT{name:vis:delegateType}",
       "description": "Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.",
+      "programs": [
+        "task_23"
+      ],
+      "csharpEquivalent": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }",
       "examples": [
         {
-          "csharp": "public event EventHandler OnChanged;",
-          "calor": "§EVT{e1:OnChanged:pub:EventHandler}"
-        },
-        {
-          "csharp": "public event Action<int> ValueUpdated;",
-          "calor": "§EVT{e1:ValueUpdated:pub:Action<i32>}"
-        },
-        {
-          "csharp": "public event EventHandler Click { add { _click += value; } remove { _click -= value; } }",
-          "calor": "§EVT{e1:Click:pub:EventHandler}\n  §EADD\n    §ASSIGN _click (+ _click value)\n  §EREM\n    §ASSIGN _click (- _click value)"
+          "csharp": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }",
+          "calor": "§M{AgentReference23}\n  §CL{EventPublisher:pub}\n    §EVT{OnDataReceived:pub:EventHandler}\n    §MT{Subscribe:pub} (EventHandler:handler) -> void\n      §E{mut}\n      §SUB OnDataReceived handler"
         }
       ]
     },
     {
       "id": "operator_overload",
       "csharpConstruct": "operator overload",
-      "keywords": ["operator", "overload", "+", "-", "==", "!=", "implicit", "explicit", "conversion"],
-      "calorSyntax": "§OP{id:operator:vis} (type:param, ...) -> returnType",
+      "keywords": [
+        "operator",
+        "overload",
+        "+",
+        "-",
+        "==",
+        "!=",
+        "implicit",
+        "explicit",
+        "conversion",
+        "operator overload"
+      ],
+      "calorSyntax": "§OP{operator:vis} (type:param, ...) -> returnType",
       "description": "Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).",
+      "programs": [
+        "complex_class"
+      ],
+      "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }",
       "examples": [
         {
-          "csharp": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }",
-          "calor": "§OP{op001:+:pub} (MyType:left, MyType:right) -> MyType\n  §R §NEW{MyType} §A (+ left.Value right.Value) §/NEW"
-        },
-        {
-          "csharp": "public static MyType operator-(MyType value) { return new MyType(-value.Value); }",
-          "calor": "§OP{op001:-:pub} (MyType:value) -> MyType\n  §R §NEW{MyType} §A (- value.Value) §/NEW"
-        },
-        {
-          "csharp": "public static implicit operator int(MyType value) { return value.Value; }",
-          "calor": "§OP{op001:implicit:pub} (MyType:value) -> i32\n  §R value.Value"
-        },
-        {
-          "csharp": "public static explicit operator MyType(int value) { return new MyType(value); }",
-          "calor": "§OP{op001:explicit:pub} (i32:value) -> MyType\n  §R §NEW{MyType} §A value §/NEW"
+          "csharp": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }",
+          "calor": "§M{PointModule}\n  §CL{Point:pub}\n    §FLD{i32:_x:priv}\n    §FLD{i32:_y:priv}\n\n    §CTOR{pub} (i32:x, i32:y)\n      §ASSIGN §THIS._x x\n      §ASSIGN §THIS._y y\n\n    §MT{Equals:pub} (Point:other) -> bool\n      §IF (== other null)\n        §R false\n      §EL\n        §R true\n\n    §OP{==:pub} (Point:left, Point:right) -> bool\n      §IF (== left null)\n        §R (== right null)\n      §EL\n        §R §C{left.Equals} §A right §/C\n\n    §OP{!=:pub} (Point:left, Point:right) -> bool\n      §R (! (== left right))"
         }
       ]
     },
     {
       "id": "decimal_literal",
       "csharpConstruct": "decimal literal",
-      "keywords": ["decimal", "money", "precise", "DEC", "DECIMAL", "m suffix"],
+      "keywords": [
+        "decimal",
+        "money",
+        "precise",
+        "DEC",
+        "DECIMAL",
+        "m suffix",
+        "decimal literal"
+      ],
       "calorSyntax": "DECIMAL:value or DEC:value or value with m/M suffix",
       "description": "Decimal literals for precise numeric values. Use DECIMAL: or DEC: prefix, or append m/M suffix.",
+      "programs": [
+        "complete_decimal"
+      ],
+      "csharpEquivalent": "decimal price = 18.0000m;\ndecimal total = 100m;",
       "examples": [
         {
-          "csharp": "decimal price = 18.0000m;",
-          "calor": "§B{~price:decimal} DECIMAL:18.0000"
-        },
-        {
-          "csharp": "decimal total = 100m;",
-          "calor": "§B{~total:decimal} 100m"
+          "csharp": "decimal price = 18.0000m;\ndecimal total = 100m;",
+          "calor": "§M{Decimals}\n  §F{Price:pub} () -> dec\n    §R DECIMAL:18.00"
         }
       ]
     },
     {
       "id": "char_type",
       "csharpConstruct": "char type",
-      "keywords": ["char", "character", "single character"],
+      "keywords": [
+        "char",
+        "character",
+        "single character",
+        "char type"
+      ],
       "calorSyntax": "char",
       "description": "Single Unicode character. Uses 'char' type name directly (no abbreviation).",
+      "programs": [
+        "task_41"
+      ],
+      "csharpEquivalent": "char c = 'A';",
       "examples": [
         {
           "csharp": "char c = 'A';",
-          "calor": "§B{~c:char} 'A'"
+          "calor": "§M{AgentReference41}\n  §F{DigitValue:pub} (char:c) -> i32\n    §E{}\n    §Q (is-digit c)\n    §R (- c '0')"
         }
       ]
     },
     {
       "id": "yield_return",
       "csharpConstruct": "yield return",
-      "keywords": ["yield", "yield return", "yield break", "iterator", "IEnumerable", "generator", "lazy"],
+      "keywords": [
+        "yield",
+        "yield return",
+        "yield break",
+        "iterator",
+        "IEnumerable",
+        "generator",
+        "lazy",
+        "yield return"
+      ],
       "calorSyntax": "§YIELD expression or §YBRK (yield break)",
       "description": "Produces values lazily from an iterator method. §YIELD returns a value, §YBRK stops iteration.",
+      "programs": [
+        "complex_yield"
+      ],
+      "csharpEquivalent": "yield return item;\nyield break;\npublic IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }",
       "examples": [
         {
-          "csharp": "yield return item;",
-          "calor": "§YIELD item"
-        },
-        {
-          "csharp": "yield break;",
-          "calor": "§YBRK"
-        },
-        {
-          "csharp": "public IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }",
-          "calor": "§MT{m001:GetNumbers:pub} () -> IEnumerable<i32>\n  §L{l1:i:0:9:1}\n    §YIELD i"
+          "csharp": "yield return item;\nyield break;\npublic IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }",
+          "calor": "§M{ConvertedModule}\n  §U{System.Collections.Generic}\n\n  §CL{NumberGen:pub}\n    §MT{GetEvens:pub} (i32:max) -> Seq<i32>\n      §L{i:0:max:2}\n        §YIELD i"
         }
       ]
     },
     {
       "id": "delegate_definition",
       "csharpConstruct": "delegate definition",
-      "keywords": ["delegate", "callback", "function pointer", "multicast", "action", "func", "predicate", "nested delegate"],
-      "calorSyntax": "§DEL{id:name} with indented §I parameters and optional §O return type",
+      "keywords": [
+        "delegate",
+        "callback",
+        "function pointer",
+        "multicast",
+        "action",
+        "func",
+        "predicate",
+        "nested delegate",
+        "delegate definition"
+      ],
+      "calorSyntax": "§DEL{name} with indented §I parameters and optional §O return type",
       "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.",
+      "programs": [
+        "task_26"
+      ],
+      "csharpEquivalent": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }",
       "examples": [
         {
-          "csharp": "public delegate void EventCallback(string message);",
-          "calor": "§DEL{del001:EventCallback}\n  §I{str:message}"
-        },
-        {
-          "csharp": "public delegate int Transformer(int value);",
-          "calor": "§DEL{del001:Transformer}\n  §I{i32:value}\n  §O{i32}"
-        },
-        {
-          "csharp": "public class MyClass { public delegate void Handler(int x); }",
-          "calor": "§CL{c001:MyClass:pub}\n  §DEL{del001:Handler}\n    §I{i32:x}"
+          "csharp": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }",
+          "calor": "§M{AgentReference26}\n  §DEL{MathOperation}\n    §I{i32:x}\n    §I{i32:y}\n    §O{i32}"
         }
       ]
     },
     {
       "id": "preprocessor_directive",
       "csharpConstruct": "preprocessor directive",
-      "keywords": ["preprocessor", "#if", "#else", "#endif", "#elif", "conditional compilation", "DEBUG", "RELEASE"],
-      "calorSyntax": "§PP{CONDITION} body §PPE body §/PP{CONDITION}",
-      "description": "Conditional compilation blocks. §PP for #if, §PPE for #else/#elif, §/PP to close. Code inside is conditionally included based on defined symbols.",
+      "keywords": [
+        "preprocessor",
+        "#if",
+        "#else",
+        "#endif",
+        "#elif",
+        "conditional compilation",
+        "DEBUG",
+        "RELEASE",
+        "preprocessor directive"
+      ],
+      "calorSyntax": "§PP{CONDITION} indented body; §PPE indented alternative",
+      "description": "Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.",
+      "programs": [
+        "complete_preprocessor"
+      ],
+      "csharpEquivalent": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif",
       "examples": [
         {
-          "csharp": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif",
-          "calor": "§PP{DEBUG}\n  §C{Console.WriteLine} \"Debug mode\"\n§/PP{DEBUG}"
-        },
-        {
-          "csharp": "#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif",
-          "calor": "§PP{NET8_0_OR_GREATER}\n  §C{UseNewApi}\n§PPE\n  §C{UseLegacyApi}\n§/PP{NET8_0_OR_GREATER}"
+          "csharp": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif",
+          "calor": "§M{Preprocessor}\n  §F{Mode:pub} () -> str\n    §PP{DEBUG}\n      §R \"debug\"\n    §PPE\n      §R \"release\""
         }
       ]
     },
     {
       "id": "struct_definition",
       "csharpConstruct": "struct definition",
-      "keywords": ["struct", "value type", "stack allocated", "readonly struct"],
-      "calorSyntax": "§CL{id:Name:vis:struct}",
+      "keywords": [
+        "struct",
+        "value type",
+        "stack allocated",
+        "readonly struct",
+        "struct definition"
+      ],
+      "calorSyntax": "§CL{Name:vis:struct}",
       "description": "Defines a value type (struct). Uses the 'struct' modifier on §CL. Supports readonly structs with the 'readonly' modifier.",
+      "programs": [
+        "complete_struct"
+      ],
+      "csharpEquivalent": "public struct Point { public int X; public int Y; }\npublic readonly struct Vector2D { public readonly double X; public readonly double Y; }",
       "examples": [
         {
-          "csharp": "public struct Point { public int X; public int Y; }",
-          "calor": "§CL{s001:Point:pub:struct}\n  §FLD{i32:X:pub}\n  §FLD{i32:Y:pub}"
-        },
-        {
-          "csharp": "public readonly struct Vector2D { public readonly double X; public readonly double Y; }",
-          "calor": "§CL{s001:Vector2D:pub:readonly,struct}\n  §FLD{f64:X:pub:readonly}\n  §FLD{f64:Y:pub:readonly}"
+          "csharp": "public struct Point { public int X; public int Y; }\npublic readonly struct Vector2D { public readonly double X; public readonly double Y; }",
+          "calor": "§M{Values}\n  §CL{Point:pub:struct}[@Serializable]\n    §PROP{X:i32:pub:get,set}"
         }
       ]
     },
     {
       "id": "generic_constraint",
       "csharpConstruct": "generic type constraint",
-      "keywords": ["where", "constraint", "generic constraint", "type constraint", "class constraint", "new()", "struct constraint"],
+      "keywords": [
+        "where",
+        "constraint",
+        "generic constraint",
+        "type constraint",
+        "class constraint",
+        "new()",
+        "struct constraint",
+        "generic constraint"
+      ],
       "calorSyntax": "§WHERE T : constraint for generic constraints",
       "description": "Constrains generic type parameters. Supports class, struct, new(), interface, and base class constraints.",
+      "programs": [
+        "task_30"
+      ],
+      "csharpEquivalent": "public class Repository<T> where T : class, IEntity { }\npublic T Create<T>() where T : new() { return new T(); }\npublic void Process<T>(T item) where T : struct { }",
       "examples": [
         {
-          "csharp": "public class Repository<T> where T : class, IEntity { }",
-          "calor": "§CL{c001:Repository<T>:pub}\n  §WHERE T : class, IEntity"
-        },
-        {
-          "csharp": "public T Create<T>() where T : new() { return new T(); }",
-          "calor": "§MT{m001:Create<T>:pub} () -> T\n  §WHERE T : new()\n  §R §NEW{T} §/NEW"
-        },
-        {
-          "csharp": "public void Process<T>(T item) where T : struct { }",
-          "calor": "§MT{m002:Process<T>:pub} (T:item) -> void\n  §WHERE T : struct"
+          "csharp": "public class Repository<T> where T : class, IEntity { }\npublic T Create<T>() where T : new() { return new T(); }\npublic void Process<T>(T item) where T : struct { }",
+          "calor": "§M{AgentReference30}\n  §CL{Repository:pub}<T>\n    §WHERE T : class\n    §FLD{List<T>:_items:priv}\n    §MT{Add:pub} (T:item) -> void\n      §E{mut}\n      §C{_items.Add} §A item §/C"
         }
       ]
     },
     {
       "id": "do_while_loop",
       "csharpConstruct": "do-while loop",
-      "keywords": ["do", "do while", "do-while", "loop", "repeat until", "at least once"],
-      "calorSyntax": "§DO{id} (condition)",
-      "description": "Executes the body at least once, then continues while condition is true. The body is indented under the §DO header.",
+      "keywords": [
+        "do",
+        "do while",
+        "do-while",
+        "loop",
+        "repeat until",
+        "at least once",
+        "do while loop"
+      ],
+      "calorSyntax": "§DO body §/DO (condition)",
+      "description": "Runs the indented body at least once; the matching closer carries the condition.",
+      "programs": [
+        "task_13"
+      ],
+      "csharpEquivalent": "do { Process(); } while (HasMore());",
       "examples": [
         {
           "csharp": "do { Process(); } while (HasMore());",
-          "calor": "§DO{d1} (§C{HasMore})\n  §C{Process}"
+          "calor": "§M{AgentReference13}\n  §F{DoWhileDemo:pub} () -> void\n    §E{cw}\n    §B{~x:i32} 0\n    §DO\n      §C{Console.WriteLine}\n        §A x\n      §/C\n      §ASSIGN x (+ x 1)\n    §/DO (< x INT:3)"
         }
       ]
     },
     {
       "id": "partial_class",
       "csharpConstruct": "partial class",
-      "keywords": ["partial", "partial class", "split", "multiple files"],
-      "calorSyntax": "§CL{id:Name:vis:partial}",
+      "keywords": [
+        "partial",
+        "partial class",
+        "split",
+        "multiple files",
+        "partial class"
+      ],
+      "calorSyntax": "§CL{Name:vis:partial}",
       "description": "Defines part of a class that can be split across multiple files. Uses the 'partial' modifier.",
+      "programs": [
+        "complete_partial"
+      ],
+      "csharpEquivalent": "public partial class UserService { public void Save() { } }",
       "examples": [
         {
           "csharp": "public partial class UserService { public void Save() { } }",
-          "calor": "§CL{c001:UserService:pub:partial}\n  §MT{m001:Save:pub} () -> void"
+          "calor": "§M{PartialTypes}\n  §CL{Counter:pub:partial}\n    §MT{Read:pub} () -> i32\n      §R 1"
         }
       ]
     },
     {
       "id": "unsafe_block",
       "csharpConstruct": "unsafe block",
-      "keywords": ["unsafe", "pointer", "fixed", "stackalloc", "unmanaged"],
-      "calorSyntax": "§UNSAFE{id}",
+      "keywords": [
+        "unsafe",
+        "pointer",
+        "fixed",
+        "stackalloc",
+        "unmanaged",
+        "unsafe block"
+      ],
+      "calorSyntax": "§UNSAFE",
       "description": "Marks a block for unsafe pointer operations. Required for pointer arithmetic, fixed statements, and stackalloc.",
+      "programs": [
+        "complete_unsafe"
+      ],
+      "csharpEquivalent": "unsafe { int* ptr = &value; *ptr = 42; }",
       "examples": [
         {
           "csharp": "unsafe { int* ptr = &value; *ptr = 42; }",
-          "calor": "§UNSAFE{u1}\n  §B{~ptr:i32*} §ADDR value\n  §ASSIGN (§DEREF ptr) 42"
+          "calor": "§M{UnsafeCode}\n  §F{Size:pub} () -> i32\n    §E{unsafe}\n    §UNSAFE\n      §R 4"
         }
       ]
     },
     {
       "id": "null_coalescing_assignment",
       "csharpConstruct": "null-coalescing assignment",
-      "keywords": ["??=", "null coalescing assignment", "null-coalescing assignment", "null assign"],
-      "calorSyntax": "§IF{id} (== x null) with indented §ASSIGN x default",
+      "keywords": [
+        "??=",
+        "null coalescing assignment",
+        "null-coalescing assignment",
+        "null assign",
+        "null coalescing assignment"
+      ],
+      "calorSyntax": "§IF (== x null) with indented §ASSIGN x default",
       "description": "C#'s ??= operator has no direct Calor equivalent. Use an §IF null check with §ASSIGN as a workaround.",
+      "programs": [
+        "complete_nullable"
+      ],
+      "csharpEquivalent": "x ??= GetDefault();\n_cache ??= new Dictionary<string, int>();",
       "examples": [
         {
-          "csharp": "x ??= GetDefault();",
-          "calor": "§IF{i1} (== x null)\n  §ASSIGN x §C{GetDefault}"
-        },
-        {
-          "csharp": "_cache ??= new Dictionary<string, int>();",
-          "calor": "§IF{i1} (== _cache null)\n  §ASSIGN _cache §NEW{Dictionary<str, i32>} §/NEW"
+          "csharp": "x ??= GetDefault();\n_cache ??= new Dictionary<string, int>();",
+          "calor": "§M{NullableValues}\n  §F{DefaultName:pub} (?str:name) -> str\n    §B{~value:?str} name\n    §IF (== value null)\n      §ASSIGN value \"unknown\"\n    §R (?? value \"unknown\")"
         }
       ]
     },
     {
       "id": "attribute_annotation",
       "csharpConstruct": "attribute",
-      "keywords": ["attribute", "annotation", "metadata", "decorator", "Serializable", "Obsolete", "DllImport"],
-      "calorSyntax": "[@AttributeName] or [@Attr(arg1, arg2)]",
+      "keywords": [
+        "attribute",
+        "annotation",
+        "metadata",
+        "decorator",
+        "Serializable",
+        "Obsolete",
+        "DllImport",
+        "attribute annotation"
+      ],
+      "calorSyntax": "Attach [@AttributeName] or [@Attr(arg1, arg2)] after a declaration header",
       "description": "Attaches metadata to declarations. Placed before the declaration they annotate.",
+      "programs": [
+        "complete_struct"
+      ],
+      "csharpEquivalent": "[Serializable]\npublic class Data { }\n[Obsolete(\"Use NewMethod\")]\npublic void OldMethod() { }",
       "examples": [
         {
-          "csharp": "[Serializable]\npublic class Data { }",
-          "calor": "[@Serializable]\n§CL{c001:Data:pub}"
-        },
-        {
-          "csharp": "[Obsolete(\"Use NewMethod\")]\npublic void OldMethod() { }",
-          "calor": "[@Obsolete(\"Use NewMethod\")]\n§MT{m001:OldMethod:pub} () -> void"
+          "csharp": "[Serializable]\npublic class Data { }\n[Obsolete(\"Use NewMethod\")]\npublic void OldMethod() { }",
+          "calor": "§M{Values}\n  §CL{Point:pub:struct}[@Serializable]\n    §PROP{X:i32:pub:get,set}"
         }
       ]
     },
     {
       "id": "is_pattern_combinators",
       "csharpConstruct": "is pattern with combinators",
-      "keywords": ["is pattern", "and pattern", "or pattern", "not pattern", "compound pattern", "combinator", "relational pattern", "pattern combinator"],
+      "keywords": [
+        "is pattern",
+        "and pattern",
+        "or pattern",
+        "not pattern",
+        "compound pattern",
+        "combinator",
+        "relational pattern",
+        "pattern combinator",
+        "is pattern combinators"
+      ],
       "calorSyntax": "(&& (> x 0) (< x 100)) or (|| (< x 0) (> x 100))",
       "description": "C# 'is' patterns with and/or/not combinators are decomposed into standard boolean expressions using prefix notation. No special tag needed — fully supported natively.",
+      "programs": [
+        "complete_patterns"
+      ],
+      "csharpEquivalent": "if (x is > 0 and < 100)\nreturn x is < 0 or > 100;\nif (x is not < 0)",
       "examples": [
         {
-          "csharp": "if (x is > 0 and < 100)",
-          "calor": "§IF{id} (&& (> x 0) (< x 100))"
-        },
-        {
-          "csharp": "return x is < 0 or > 100;",
-          "calor": "§R (|| (< x 0) (> x 100))"
-        },
-        {
-          "csharp": "if (x is not < 0)",
-          "calor": "§IF{id} (! (< x 0))"
+          "csharp": "if (x is > 0 and < 100)\nreturn x is < 0 or > 100;\nif (x is not < 0)",
+          "calor": "§M{Patterns}\n  §F{InRange:pub} (i32:value) -> bool\n    §R (&& (> value 0) (< value 100))"
         }
       ]
     },
     {
       "id": "range_expression",
       "csharpConstruct": "range expression",
-      "keywords": ["range", "slice", "..", "^", "index from end", "hat", "caret", "span", "array slice"],
+      "keywords": [
+        "range",
+        "slice",
+        "..",
+        "^",
+        "index from end",
+        "hat",
+        "caret",
+        "span",
+        "array slice",
+        "range expression"
+      ],
       "calorSyntax": "§IDX{array} §RANGE start end / §IDX{array} §^ n",
       "description": "C# range expressions (start..end) and index-from-end (^n) are fully supported. Use §RANGE for slicing and §^ for indexing from the end.",
+      "programs": [
+        "complete_ranges"
+      ],
+      "csharpEquivalent": "var slice = array[0..5];\nvar last = items[^1];\nvar tail = data[2..];",
       "examples": [
         {
-          "csharp": "var slice = array[0..5];",
-          "calor": "§B{slice} §IDX{array} §RANGE 0 5"
-        },
-        {
-          "csharp": "var last = items[^1];",
-          "calor": "§B{last} §IDX{items} §^ 1"
-        },
-        {
-          "csharp": "var tail = data[2..];",
-          "calor": "§B{tail} §IDX{data} §RANGE 2"
+          "csharp": "var slice = array[0..5];\nvar last = items[^1];\nvar tail = data[2..];",
+          "calor": "§M{ArrayRanges}\n  §F{FirstTwo:pub} ([i32]:values) -> [i32]\n    §R §IDX{values} §RANGE 0 2\n"
         }
       ]
     },
     {
       "id": "positional_property_pattern",
       "csharpConstruct": "positional and property patterns",
-      "keywords": ["tuple pattern", "positional pattern", "property pattern", "deconstruct", "recursive pattern", "positional", "property"],
+      "keywords": [
+        "tuple pattern",
+        "positional pattern",
+        "property pattern",
+        "deconstruct",
+        "recursive pattern",
+        "positional",
+        "property",
+        "positional property pattern"
+      ],
       "calorSyntax": "Supported in C# → Calor migration. Decompose to §IF chains for hand-written Calor.",
       "description": "Positional patterns (tuple deconstruction) and property patterns are fully supported during C# → Calor migration — the converter preserves them inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.",
+      "programs": [
+        "complete_patterns"
+      ],
+      "csharpEquivalent": "(hour, minute) switch { (0, 0) => \"midnight\" }\nobj switch { { Length: > 0 } => true }",
       "examples": [
         {
-          "csharp": "(hour, minute) switch { (0, 0) => \"midnight\" }",
-          "calor": "§IF{i1} (&& (== hour 0) (== minute 0))\n  §R \"midnight\""
-        },
-        {
-          "csharp": "obj switch { { Length: > 0 } => true }",
-          "calor": "§IF{i1} (> obj.Length 0)\n  §R true"
+          "csharp": "(hour, minute) switch { (0, 0) => \"midnight\" }\nobj switch { { Length: > 0 } => true }",
+          "calor": "§M{Patterns}\n  §F{InRange:pub} (i32:value) -> bool\n    §R (&& (> value 0) (< value 100))"
         }
       ]
     },
     {
       "id": "pragma_warning",
       "csharpConstruct": "#pragma warning directive",
-      "keywords": ["pragma", "#pragma", "warning disable", "warning restore", "suppress warning"],
-      "calorSyntax": "NOT SUPPORTED — use §CSHARP if essential",
-      "description": "#pragma warning directives are NOT supported in Calor. They are silently dropped during C# → Calor conversion. If you need to suppress specific warnings, use §CSHARP{#pragma warning disable XXXX}§/CSHARP as a raw passthrough.",
-      "examples": [
-        {
-          "csharp": "#pragma warning disable 1591",
-          "calor": "§CSHARP{#pragma warning disable 1591}§/CSHARP"
-        },
-        {
-          "csharp": "#pragma warning restore 1591",
-          "calor": "§CSHARP{#pragma warning restore 1591}§/CSHARP"
-        }
-      ]
+      "keywords": [
+        "pragma",
+        "#pragma",
+        "warning disable",
+        "warning restore",
+        "suppress warning",
+        "pragma warning"
+      ],
+      "calorSyntax": "No authored Calor form",
+      "description": "Pragma directives use explicit source-ordered conversion nodes. Query calor_help action=features for current support; do not handwrite passthrough.",
+      "programs": [],
+      "lookupOnly": true,
+      "csharpEquivalent": "",
+      "examples": []
     },
     {
       "id": "tuple_type",
       "csharpConstruct": "tuple type and tuple literal",
-      "keywords": ["tuple", "value tuple", "pair", "triple", "deconstruct", "(,)", "tuple literal", "tuple type"],
+      "keywords": [
+        "tuple",
+        "value tuple",
+        "pair",
+        "triple",
+        "deconstruct",
+        "(,)",
+        "tuple literal",
+        "tuple type",
+        "tuple type"
+      ],
       "calorSyntax": "(Type1, Type2) for types; (expr1, expr2) for literals",
       "description": "Tuple types use parenthesized comma-separated types: (i32, str). Tuple literals use parenthesized comma-separated expressions: (1, \"hello\"). Named tuple elements are supported: (i32 X, i32 Y). Tuples are distinguished from Lisp expressions by the presence of commas.",
+      "programs": [
+        "complete_tuples"
+      ],
+      "csharpEquivalent": "(int, string) pair = (1, \"hello\");\n(int X, int Y) point = (10, 20);\nreturn (a + b, a - b);",
       "examples": [
         {
-          "csharp": "(int, string) pair = (1, \"hello\");",
-          "calor": "§B{pair:(i32, str)} (1, \"hello\")"
-        },
-        {
-          "csharp": "(int X, int Y) point = (10, 20);",
-          "calor": "§B{point:(i32 X, i32 Y)} (10, 20)"
-        },
-        {
-          "csharp": "return (a + b, a - b);",
-          "calor": "§R ((+ a b), (- a b))"
+          "csharp": "(int, string) pair = (1, \"hello\");\n(int X, int Y) point = (10, 20);\nreturn (a + b, a - b);",
+          "calor": "§M{Tuples}\n  §F{Pair:pub} (i32:value) -> (i32, str)\n    §R (value, \"value\")"
         }
       ]
     },
     {
       "id": "null_coalescing_operator",
       "csharpConstruct": "null coalescing operator",
-      "keywords": ["??", "null coalescing", "null-coalescing", "default value", "fallback", "coalesce"],
+      "keywords": [
+        "??",
+        "null coalescing",
+        "null-coalescing",
+        "default value",
+        "fallback",
+        "coalesce",
+        "null coalescing operator"
+      ],
       "calorSyntax": "(?? left right)",
       "description": "Null-coalescing operator in Lisp-style prefix notation. Returns left if non-null, otherwise returns right. Use inside parentheses: (?? expr default).",
+      "programs": [
+        "complete_nullable"
+      ],
+      "csharpEquivalent": "var result = value ?? \"default\";\nreturn name ?? \"Anonymous\";",
       "examples": [
         {
-          "csharp": "var result = value ?? \"default\";",
-          "calor": "§B{result} (?? value \"default\")"
-        },
-        {
-          "csharp": "return name ?? \"Anonymous\";",
-          "calor": "§R (?? name \"Anonymous\")"
+          "csharp": "var result = value ?? \"default\";\nreturn name ?? \"Anonymous\";",
+          "calor": "§M{NullableValues}\n  §F{DefaultName:pub} (?str:name) -> str\n    §B{~value:?str} name\n    §IF (== value null)\n      §ASSIGN value \"unknown\"\n    §R (?? value \"unknown\")"
         }
       ]
     },
     {
       "id": "null_conditional_operator",
       "csharpConstruct": "null conditional operator",
-      "keywords": ["?.", "null conditional", "null-conditional", "safe navigation", "optional chaining", "null propagation"],
+      "keywords": [
+        "?.",
+        "null conditional",
+        "null-conditional",
+        "safe navigation",
+        "optional chaining",
+        "null propagation",
+        "null conditional operator"
+      ],
       "calorSyntax": "(?. target MemberName)",
       "description": "Null-conditional member access in Lisp-style prefix notation. Accesses MemberName on target only if target is non-null, otherwise returns null. The member name is an unquoted identifier.",
+      "programs": [
+        "complete_objects"
+      ],
+      "csharpEquivalent": "var name = user?.Name;\nvar len = text?.Length;",
       "examples": [
         {
-          "csharp": "var name = user?.Name;",
-          "calor": "§B{name} (?. user Name)"
-        },
-        {
-          "csharp": "var len = text?.Length;",
-          "calor": "§B{len} (?. text Length)"
+          "csharp": "var name = user?.Name;\nvar len = text?.Length;",
+          "calor": "§M{Objects}\n  §CL{Person:pub}\n    §PROP{Name:str:pub:get,set}\n  §F{Create:pub} () -> Person\n    §E{alloc}\n    §R §NEW{Person} §/NEW\n  §F{ReadName:pub} (Person:person) -> ?str\n    §R (?. person Name)"
         }
       ]
     },
     {
       "id": "goto_case",
       "csharpConstruct": "goto case / goto default",
-      "keywords": ["goto", "goto case", "goto default", "jump", "switch fallthrough"],
+      "keywords": [
+        "goto",
+        "goto case",
+        "goto default",
+        "jump",
+        "switch fallthrough",
+        "goto case"
+      ],
       "calorSyntax": "§GOTO{CASE:expr} or §GOTO{DEFAULT}",
       "description": "Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.",
+      "programs": [
+        "complete_goto"
+      ],
+      "csharpEquivalent": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;",
       "examples": [
         {
-          "description": "goto case with integer constant",
-          "csharp": "goto case 1;",
-          "calor": "§GOTO{CASE:1}"
+          "csharp": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;",
+          "calor": "§M{Jumps}\n  §F{Normalize:pub} (i32:value) -> i32\n    §W value\n      §K 0\n        §GOTO{CASE:1}\n      §K 1\n        §R 1\n      §K _\n        §R 0"
+        }
+      ]
+    },
+    {
+      "id": "string_operations",
+      "csharpConstruct": "string operations",
+      "keywords": [
+        "string",
+        "strings",
+        "concat",
+        "substr",
+        "len",
+        "trim",
+        "indexof"
+      ],
+      "calorSyntax": "(concat a b), (substr text start count), (indexof text value :ordinal)",
+      "description": "Prefix operations include (str value), (concat a b), (fmt \"{0}\" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.",
+      "programs": [
+        "primer_strings",
+        "task_37",
+        "task_38"
+      ],
+      "csharpEquivalent": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
+      "examples": [
+        {
+          "csharp": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
+          "calor": "§M{Strings}\n  §F{FirstField:pub} (str:line) -> str\n    §E{}\n    §B{i:i32} (indexof line \",\" :ordinal)\n    §IF (< i 0)\n      §R line\n    §R (substr line 0 i)"
         },
         {
-          "description": "goto case with string constant",
-          "csharp": "goto case \"hello\";",
-          "calor": "§GOTO{CASE:hello}"
+          "csharp": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
+          "calor": "§M{AgentReference37}\n  §F{StringContains:pub} (str:s, str:sub) -> bool\n    §E{}\n    §R (contains s sub)"
         },
         {
-          "description": "goto default",
-          "csharp": "goto default;",
-          "calor": "§GOTO{DEFAULT}"
+          "csharp": "string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);",
+          "calor": "§M{AgentReference38}\n  §F{BuildGreeting:pub} (str:name) -> str\n    §E{alloc,mut}\n    §B{sb:StringBuilder} (sb-new)\n    (sb-append sb \"Hello, \")\n    (sb-append sb name)\n    (sb-append sb \"!\")\n    §R (sb-tostring sb)"
+        }
+      ]
+    },
+    {
+      "id": "character_operations",
+      "csharpConstruct": "character operations",
+      "keywords": [
+        "char",
+        "character",
+        "digit",
+        "letter",
+        "character literal"
+      ],
+      "calorSyntax": "(char-at text index), (char-code value), '0'",
+      "description": "Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to i32.",
+      "programs": [
+        "task_36",
+        "task_41",
+        "task_42"
+      ],
+      "csharpEquivalent": "text[index]; (int)value; char.IsDigit(value);",
+      "examples": [
+        {
+          "csharp": "text[index]; (int)value; char.IsDigit(value);",
+          "calor": "§M{AgentReference36}\n  §F{GetFirstChar:pub} (str:s) -> char\n    §E{}\n    §Q (> (len s) 0)\n    §R (char-at s 0)"
         },
         {
-          "description": "goto label",
-          "csharp": "goto myLabel;",
-          "calor": "§GOTO{myLabel}"
+          "csharp": "text[index]; (int)value; char.IsDigit(value);",
+          "calor": "§M{AgentReference41}\n  §F{DigitValue:pub} (char:c) -> i32\n    §E{}\n    §Q (is-digit c)\n    §R (- c '0')"
+        },
+        {
+          "csharp": "text[index]; (int)value; char.IsDigit(value);",
+          "calor": "§M{AgentReference42}\n  §F{Offset:pub} (char:c) -> i32\n    §E{}\n    §R (- c '0')"
+        }
+      ]
+    },
+    {
+      "id": "array_access",
+      "csharpConstruct": "array element access",
+      "keywords": [
+        "array",
+        "arrays",
+        "index",
+        "§IDX",
+        "nested",
+        "length"
+      ],
+      "calorSyntax": "§IDX array index",
+      "description": "Use [T] for array types and [[T]] for jagged arrays. Section expressions can nest inside prefix expressions. File.ReadAllLines returns [str], not List<str>.",
+      "programs": [
+        "nested_arrays",
+        "primer_files"
+      ],
+      "csharpEquivalent": "array[index]",
+      "examples": [
+        {
+          "csharp": "array[index]",
+          "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} ([i32]:data) -> i32\n    §E{}\n    §S (== result (+ §IDX data 0 §IDX data 1))\n    §B{~sum} 0\n    §ASSIGN sum (+ sum §IDX data 0)\n    §R (+ sum §IDX data 1)\n\n  §F{MixFirst:pub} ([i32]:data, i32:hash) -> i32\n    §E{}\n    §R (^ hash §IDX data 0)"
+        },
+        {
+          "csharp": "array[index]",
+          "calor": "§M{Files}\n  §F{Append:pub} (str:path, str:key, str:value) -> void\n    §E{fs:w}\n    §C{File.AppendAllText} §A path §A (+ key (+ \"=\" (+ value \"\\n\"))) §/C\n\n  §F{CountLines:pub} (str:path) -> i32\n    §E{fs:r}\n    §B{ok:bool} §C{File.Exists} §A path §/C\n    §IF (! ok)\n      §R 0\n    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n    §R (len lines)"
+        }
+      ]
+    },
+    {
+      "id": "assignment",
+      "csharpConstruct": "variable assignment",
+      "keywords": [
+        "assignment",
+        "update",
+        "mutable",
+        "§ASSIGN",
+        "increment",
+        "compound"
+      ],
+      "calorSyntax": "§ASSIGN name expression",
+      "description": "Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.",
+      "programs": [
+        "task_27"
+      ],
+      "csharpEquivalent": "name = expression;",
+      "examples": [
+        {
+          "csharp": "name = expression;",
+          "calor": "§M{AgentReference27}\n  §F{Accumulate:pub} (i32:n) -> i32\n    §B{~acc:i32} 0          // Bind mutable variable acc = 0\n    §ASSIGN acc (+ acc n)   // Assign acc = acc + n\n    §ASSIGN acc (+ acc n)   // Assign again\n    §ASSIGN acc (+ acc n)   // And again\n    §R acc"
+        }
+      ]
+    },
+    {
+      "id": "primitive_types",
+      "csharpConstruct": "primitive types",
+      "keywords": [
+        "types",
+        "type",
+        "i32",
+        "str",
+        "bool",
+        "nullable",
+        "literal"
+      ],
+      "calorSyntax": "i32, i64, i16, u8, u16, u32, u64, f32, f64, dec, str, bool, char, object, void, ?T, [T]",
+      "description": "Use the C# type mappings for aliases, ordinary .NET generic types for collections, ?T and null for nullable values. Typed numeric bounds such as INT:-2147483648 avoid an out-of-range positive intermediate. Use double quotes for strings.",
+      "programs": [
+        "primer_bindings",
+        "task_6"
+      ],
+      "csharpEquivalent": "int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]",
+      "examples": [
+        {
+          "csharp": "int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]",
+          "calor": "§M{Bindings}\n  §F{Demo:pub} () -> void\n    §E{cw}\n    §B{greeting:str} \"Ada\"\n    §B{~count:i32} 0\n    §C{Console.WriteLine} §A greeting §/C\n    §C{Console.WriteLine} §A count §/C"
+        },
+        {
+          "csharp": "int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]",
+          "calor": "§M{AgentReference6}\n  §F{TryDouble:pub} (i32:x) -> ?i32\n    §E{}\n    §IF (> x 0)\n      §R (* x 2)\n    §EL\n      §R null"
+        }
+      ]
+    },
+    {
+      "id": "prefix_expressions",
+      "csharpConstruct": "prefix expressions",
+      "keywords": [
+        "expressions",
+        "operator",
+        "arithmetic",
+        "boolean",
+        "math"
+      ],
+      "calorSyntax": "(+ a b), (== a b), (&& a b), (? condition thenValue elseValue)",
+      "description": "Arithmetic and comparisons use prefix notation. Boolean operators && and || short circuit; ! negates. Use (- 0 value) for negation and (? condition thenValue elseValue) for a conditional value. Call Math methods for operations not provided as built-ins; method names are not prefix operators.",
+      "programs": [
+        "task_4",
+        "task_10",
+        "nested_arrays"
+      ],
+      "csharpEquivalent": "a + b; a == b; a && b; condition ? thenValue : elseValue;",
+      "examples": [
+        {
+          "csharp": "a + b; a == b; a && b; condition ? thenValue : elseValue;",
+          "calor": "§M{AgentReference4}\n  §F{Abs:pub} (i32:x) -> i32\n    §S (>= result 0)\n    §R (? (< x 0) (- 0 x) x)"
+        },
+        {
+          "csharp": "a + b; a == b; a && b; condition ? thenValue : elseValue;",
+          "calor": "§M{AgentReference10}\n  §F{Max:pub} (i32:a, i32:b) -> i32\n    §IF (>= a b)\n      §R a\n    §EL\n      §R b"
+        },
+        {
+          "csharp": "a + b; a == b; a && b; condition ? thenValue : elseValue;",
+          "calor": "§M{NestedArrayExpressions}\n  §F{SumPair:pub} ([i32]:data) -> i32\n    §E{}\n    §S (== result (+ §IDX data 0 §IDX data 1))\n    §B{~sum} 0\n    §ASSIGN sum (+ sum §IDX data 0)\n    §R (+ sum §IDX data 1)\n\n  §F{MixFirst:pub} ([i32]:data, i32:hash) -> i32\n    §E{}\n    §R (^ hash §IDX data 0)"
+        }
+      ]
+    },
+    {
+      "id": "quantified_contracts",
+      "csharpConstruct": "quantified contracts",
+      "keywords": [
+        "quantifier",
+        "forall",
+        "exists",
+        "contracts",
+        "implication"
+      ],
+      "calorSyntax": "(forall ((i i32)) body), (exists ((i i32)) body), (-> condition consequence)",
+      "description": "Quantifiers declare typed bound variables. Bound runtime quantifiers with finite array ranges; check array lengths against external bounds. Use -> for implication. Contracts are obligations, not a guarantee that every proof succeeds.",
+      "programs": [
+        "task_39",
+        "task_40"
+      ],
+      "csharpEquivalent": "// Universal/existential contracts with bounded ranges.",
+      "examples": [
+        {
+          "csharp": "// Universal/existential contracts with bounded ranges.",
+          "calor": "§M{AgentReference39}\n  §F{AllPositive:pub} ([i32]:arr, i32:n) -> bool\n    §Q (== n (len arr))\n    §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))\n    §B{~allPos:bool} true\n    §L{i:0:(- (len arr) 1):1}\n      §IF (<= arr{i} 0)\n        §ASSIGN allPos false\n    §R allPos"
+        },
+        {
+          "csharp": "// Universal/existential contracts with bounded ranges.",
+          "calor": "§M{AgentReference40}\n  §F{HasNegative:pub} ([i32]:arr, i32:n) -> bool\n    §Q (== n (len arr))\n    §S (== result (exists ((i i32)) (&& (&& (>= i 0) (< i n)) (< arr{i} 0))))\n    §L{i:0:(- (len arr) 1):1}\n      §IF (< arr{i} 0)\n        §R true\n    §R false"
+        }
+      ]
+    },
+    {
+      "id": "collection_operations",
+      "csharpConstruct": "collection operations",
+      "keywords": [
+        "collections",
+        "list",
+        "dictionary",
+        "hashset",
+        "§PUSH",
+        "§PUT"
+      ],
+      "calorSyntax": "§PUSH{list} value; §PUT{dictionary} key value",
+      "description": "Ordinary List<T>, Dictionary<K,V> and HashSet<T> are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. §CNT reads count; §HAS tests membership. Use the complete examples for empty construction and iteration.",
+      "programs": [
+        "task_14",
+        "task_15",
+        "task_16",
+        "primer_collections",
+        "copilot_smoke"
+      ],
+      "csharpEquivalent": "list.Add(value); dictionary[key] = value;",
+      "examples": [
+        {
+          "csharp": "list.Add(value); dictionary[key] = value;",
+          "calor": "§M{AgentReference14}\n  §F{SumList:pub} () -> i32\n    §E{alloc,mut}\n    §B{nums:List<i32>} §NEW{List<i32>}\n    §PUSH{nums} 10\n    §PUSH{nums} 20\n    §PUSH{nums} 30\n    §B{~sum:i32} 0\n    §EACH{n} nums\n      §ASSIGN sum (+ sum n)\n    §R sum"
+        },
+        {
+          "csharp": "list.Add(value); dictionary[key] = value;",
+          "calor": "§M{AgentReference15}\n  §F{GetListLength:pub} (i32:n) -> i32\n    §E{alloc,mut}\n    §Q (>= n 0)\n    §B{nums:List<i32>} §NEW{List<i32>}\n    §L{i:1:n:1}\n      §PUSH{nums} i\n    §R §CNT{nums}"
+        },
+        {
+          "csharp": "list.Add(value); dictionary[key] = value;",
+          "calor": "§M{AgentReference16}\n  §F{PrintDictionary:pub} (Dictionary<str,i32>:scores) -> void\n    §E{cw}\n    §EACHKV{k:v} scores\n      §P k\n      §P v"
+        },
+        {
+          "csharp": "list.Add(value); dictionary[key] = value;",
+          "calor": "§M{Collections}\n  §F{Tally:pub} (str:key) -> i32\n    §E{mut,alloc}\n    §DICT{counts:str:i32}\n    §/DICT\n    §PUT{counts} key 1\n    §R §IDX counts key"
+        },
+        {
+          "csharp": "list.Add(value); dictionary[key] = value;",
+          "calor": "§M{CopilotSmoke}\n  §F{Collect:pub} (i32:n) -> i32\n    §E{mut,alloc}\n    §LIST{items:i32}\n    §/LIST\n    §L{i:1:n:1}\n      §PUSH{items} i\n    §B{count:i32} §CNT{items}\n    §R count"
         }
       ]
     }
@@ -1279,55 +2029,50 @@
   "tags": {
     "§NEW": {
       "name": "New Instance",
+      "close": "§/NEW",
       "syntax": "§NEW{ClassName} §A arg1 §A arg2 §/NEW",
-      "description": "Creates a new instance of a class using its constructor.",
-      "csharpEquivalent": "new ClassName(args)"
+      "description": "Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.",
+      "csharpEquivalent": "var user = new User(\"John\", 25);\nvar list = new List<int>();\nreturn new Widget(value);"
     },
     "§B": {
       "name": "Binding",
-      "syntax": "§B{name} value or §B{~name} value",
-      "description": "Variable binding. Immutable by default, use ~ prefix for mutable variables.",
-      "csharpEquivalent": "var name = value; or int name = value; (mutable)"
-    },
-    "§V": {
-      "name": "Binding (Alias)",
-      "syntax": "§V{name} value",
-      "description": "Alternative syntax for variable binding. Identical to §B{name} value.",
-      "csharpEquivalent": "var name = value;"
+      "syntax": "§B{name} value or §B{~name} value (mutable)",
+      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.",
+      "csharpEquivalent": "var count = 0;\nint mutableCount = 0; // needs to be modified later\nstring name = \"John\";\nstring? name = null;"
     },
     "§F": {
       "name": "Function",
-      "syntax": "§F{id:name:vis} (type:param, ...) -> returnType",
-      "description": "Defines a standalone function. Not a class member.",
-      "csharpEquivalent": "public static ReturnType Name(params) { body }"
+      "syntax": "§F{name:vis} (type:param, ...) -> returnType",
+      "description": "Defines a standalone function (not a class member). Use for top-level functions or static utility methods.",
+      "csharpEquivalent": "public static int Add(int a, int b) { return a + b; }\nprivate void Log(string message) { Console.WriteLine(message); }"
     },
     "§AF": {
       "name": "Async Function",
-      "syntax": "§AF{id:name:vis} (type:param, ...) -> returnType",
-      "description": "Defines an async standalone function.",
-      "csharpEquivalent": "public static async Task<T> Name(params) { body }"
+      "syntax": "§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType",
+      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.",
+      "csharpEquivalent": "public async Task<string> FetchDataAsync() { ... }\npublic async Task ProcessAsync() { await DoWork(); }"
     },
     "§M": {
-      "name": "Function (Alias)",
-      "syntax": "§F{id:name:vis} (type:param, ...) -> returnType",
-      "description": "Alternative syntax for function definition. Identical to §F.",
-      "csharpEquivalent": "public static ReturnType Name(params) { body }"
+      "name": "Module",
+      "syntax": "§M{Name}",
+      "description": "Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.",
+      "csharpEquivalent": "public static class StringHelper { }"
     },
     "§MT": {
       "name": "Method",
-      "syntax": "§MT{id:name:vis[:modifiers]} (type:param, ...) -> returnType",
-      "description": "Defines a class method. Modifiers include virt/vr, over/ov, abs, stat/st, and seal.",
-      "csharpEquivalent": "public ReturnType Name(params) { body }"
+      "syntax": "§MT{name:vis[:modifiers]} (type:param, ...) -> returnType",
+      "description": "Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.",
+      "csharpEquivalent": "public void Process(int value) { ... }\npublic virtual string GetName() { return _name; }\npublic override int Calculate(int x) { ... }"
     },
     "§AMT": {
       "name": "Async Method",
-      "syntax": "§AMT{id:name:vis[:modifiers]} (type:param, ...) -> returnType",
+      "syntax": "§AMT{name:vis[:modifiers]} (type:param, ...) -> returnType",
       "description": "Defines an async class method.",
       "csharpEquivalent": "public async Task<T> Name(params) { body }"
     },
     "§I": {
       "name": "Input Parameter",
-      "syntax": "(type:name) or (type:name:modifier) or (type:name = defaultExpr) in a header signature",
+      "syntax": "Inline (type:name) parameters in function headers; indented §I{type:name} for delegates and full indexers",
       "description": "Header parameter syntax. Modifiers: 'this' (extension method), 'ref', 'out', 'in', 'params'. Default values use =expr in the signature.",
       "csharpEquivalent": "Type name, this Type name, ref Type name, params Type[] name, Type name = default",
       "examples": [
@@ -1360,21 +2105,21 @@
     },
     "§O": {
       "name": "Output Type",
-      "syntax": "-> type in a header signature",
+      "syntax": "Inline -> type in function headers; indented §O{type} for delegates",
       "description": "Declares the return type of a function or method via the header arrow.",
       "csharpEquivalent": "Return type declaration"
     },
     "§R": {
       "name": "Return",
-      "syntax": "§R expression or §R",
-      "description": "Returns a value from a function. Empty for void returns.",
-      "csharpEquivalent": "return expression; or return;"
+      "syntax": "§R expression or §R (void)",
+      "description": "Returns a value from a function or method. Use bare §R for void returns.",
+      "csharpEquivalent": "return 42;\nreturn user.Name;\nreturn;"
     },
     "§CL": {
       "name": "Class",
-      "syntax": "§CL{id:Name:vis[:modifiers]}",
-      "description": "Defines a class. Modifiers include abs, seal, partial, stat, struct, and readonly.",
-      "csharpEquivalent": "public class Name { body }"
+      "syntax": "§CL{Name:vis[:modifiers]}",
+      "description": "Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.",
+      "csharpEquivalent": "public class User { }\npublic class Admin : User, IAdmin { }\npublic abstract class BaseEntity { }"
     },
     "§EXT": {
       "name": "Extends",
@@ -1390,33 +2135,34 @@
     },
     "§IFACE": {
       "name": "Interface",
-      "syntax": "§IFACE{id:Name:vis}",
-      "description": "Defines an interface.",
-      "csharpEquivalent": "public interface IName { body }"
+      "syntax": "§IFACE{Name:vis}",
+      "description": "Defines an interface with method signatures.",
+      "csharpEquivalent": "public interface IRepository { void Save(Entity e); }"
     },
     "§L": {
       "name": "Loop",
-      "syntax": "§L{id:var:from:to:step}",
-      "description": "For loop over an inclusive integer range. Use §EACH for foreach loops.",
-      "csharpEquivalent": "for (var i = start; i < end; i++) or foreach (var item in collection)"
+      "syntax": "§L{var:from:to:step}",
+      "description": "For loop with an inclusive integer range. The body is indented under the loop header.",
+      "csharpEquivalent": "for (int i = 0; i < 10; i++) { ... }\nfor (int i = 0; i <= 10; i++) { ... }\nfor (int i = 0; i < 100; i += 2) { ... }"
     },
     "§WH": {
       "name": "While Loop",
-      "syntax": "§WH{id} (condition)",
-      "description": "While loop that continues while condition is true.",
-      "csharpEquivalent": "while (condition) { body }"
+      "syntax": "§WH (condition)",
+      "description": "Executes body while condition is true.",
+      "csharpEquivalent": "while (count > 0) { count--; }\nwhile (true) { if (done) break; }"
     },
     "§DO": {
       "name": "Do-While Loop",
-      "syntax": "§DO{id} (condition)",
-      "description": "Do-while loop that executes at least once.",
-      "csharpEquivalent": "do { body } while (condition);"
+      "close": "§/DO (condition)",
+      "syntax": "§DO body §/DO (condition)",
+      "description": "Runs the indented body at least once; the matching closer carries the condition.",
+      "csharpEquivalent": "do { Process(); } while (HasMore());"
     },
     "§IF": {
       "name": "If Statement",
-      "syntax": "§IF{id} (condition)",
-      "description": "Conditional execution. Can include §EI (else-if) and §EL (else).",
-      "csharpEquivalent": "if (condition) { body }"
+      "syntax": "§IF (condition) body §EI (condition) body §EL body",
+      "description": "Conditional branching. §EI for else-if, §EL for else. Both are optional.",
+      "csharpEquivalent": "if (x > 0) { return true; }\nif (x > 0) { a(); } else { b(); }\nif (x > 0) { } else if (x < 0) { } else { }"
     },
     "§EI": {
       "name": "Else If",
@@ -1430,23 +2176,17 @@
       "description": "Else branch in a conditional.",
       "csharpEquivalent": "else { body }"
     },
-    "§ASYNC": {
-      "name": "Async Block",
-      "syntax": "Use §AF or §AMT async headers",
-      "description": "Marks a block as async.",
-      "csharpEquivalent": "async context"
-    },
     "§AWAIT": {
       "name": "Await",
       "syntax": "§AWAIT expression",
       "description": "Awaits an asynchronous operation.",
-      "csharpEquivalent": "await expression"
+      "csharpEquivalent": "var result = await FetchAsync();\nawait Task.Delay(1000);"
     },
     "§TR": {
       "name": "Try Block",
-      "syntax": "§TR{id} body §CA{Type:var} handler §FI cleanup",
-      "description": "Exception handling with try, catch, and optional finally.",
-      "csharpEquivalent": "try { body } catch (Type var) { handler } finally { cleanup }"
+      "syntax": "§TR body §CA{ExceptionType:varName} handler §FI cleanup",
+      "description": "Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.",
+      "csharpEquivalent": "try { x(); } catch { y(); }\ntry { } catch (Exception ex) { Log(ex); }\ntry { } finally { Cleanup(); }"
     },
     "§CA": {
       "name": "Catch Block",
@@ -1462,57 +2202,39 @@
     },
     "§TH": {
       "name": "Throw",
-      "syntax": "§TH expression or §RT",
-      "description": "Throws an exception. Use §RT to rethrow the current exception.",
-      "csharpEquivalent": "throw expression; or throw;"
+      "syntax": "§TH expression or §RT (rethrow)",
+      "description": "Throws an exception. Use §RT to rethrow in a catch block.",
+      "csharpEquivalent": "throw new ArgumentException(\"Invalid\");\nthrow;"
     },
     "§GOTO": {
       "name": "Goto",
-      "syntax": "§GOTO{label} or §GOTO{CASE:expr} or §GOTO{DEFAULT}",
-      "description": "Jump to a label, a switch case label, or the default case. Use CASE: prefix for goto case and DEFAULT for goto default.",
-      "csharpEquivalent": "goto label; or goto case expr; or goto default;"
+      "syntax": "§GOTO{CASE:expr} or §GOTO{DEFAULT}",
+      "description": "Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.",
+      "csharpEquivalent": "goto case 1;\ngoto case \"hello\";\ngoto default;\ngoto myLabel;"
     },
     "§E": {
       "name": "Effects",
       "syntax": "§E{effect1,effect2,...}",
-      "description": "Declares side effects. Common: cw (console write), cr (console read), fs:r/fs:w (file), net (network), db (database).",
-      "csharpEquivalent": "No direct equivalent - annotations or documentation"
+      "description": "Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.",
+      "csharpEquivalent": "// Method that writes to console\n// Method that reads file and writes console\n// Pure function (no effects)"
     },
     "§Q": {
       "name": "Precondition",
-      "syntax": "§Q (condition) or §Q (condition, \"message\")",
-      "description": "Declares a precondition that must be true when function is called.",
-      "csharpEquivalent": "Contract.Requires(condition) or Guard clauses"
+      "syntax": "§Q (condition) or §Q{\"message\"} (condition)",
+      "description": "Declares a precondition that must be true when the function is called. Part of Design by Contract.",
+      "csharpEquivalent": "// Contract.Requires(value >= 0)\n// Guard.Against.Null(input)"
     },
     "§S": {
       "name": "Postcondition",
-      "syntax": "§S (condition) or §S (condition, \"message\")",
-      "description": "Declares a postcondition that will be true when function returns. Use result for return value.",
-      "csharpEquivalent": "Contract.Ensures(condition)"
-    },
-    "§PRE": {
-      "name": "Precondition (Alias)",
-      "syntax": "§PRE (condition)",
-      "description": "Alternative syntax for precondition. Identical to §Q.",
-      "csharpEquivalent": "Contract.Requires(condition)"
-    },
-    "§POST": {
-      "name": "Postcondition (Alias)",
-      "syntax": "§POST (condition)",
-      "description": "Alternative syntax for postcondition. Identical to §S.",
-      "csharpEquivalent": "Contract.Ensures(condition)"
-    },
-    "§INV": {
-      "name": "Invariant",
-      "syntax": "§INV (condition)",
-      "description": "Class invariant that must always be true.",
-      "csharpEquivalent": "Contract.Invariant(condition)"
+      "syntax": "§S (condition) or §S{\"message\"} (condition)",
+      "description": "Declares a postcondition that will be true when the function returns. Use result to refer to the return value.",
+      "csharpEquivalent": "// Contract.Ensures(result >= 0)\n// Ensures non-empty result"
     },
     "§PROP": {
       "name": "Property",
-      "syntax": "§PROP{id:name:type:vis[:modifiers...:accessors]} [= default]",
-      "description": "Defines a property. Positional args: id, name, type, visibility, optional modifiers/accessors. Example: §PROP{p001:Count:i32:pub:stat:get,set} for a public static int property.",
-      "csharpEquivalent": "public Type Name { get; set; }"
+      "syntax": "§PROP{name:type:vis[:modifiers...:accessors]} [= default]",
+      "description": "Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.",
+      "csharpEquivalent": "public string Name { get; set; }\npublic int Count { get; private set; }\npublic int Value { get { return _value; } set { _value = value; } }"
     },
     "§GET": {
       "name": "Getter",
@@ -1528,15 +2250,15 @@
     },
     "§FLD": {
       "name": "Field",
-      "syntax": "§FLD{type:name:visibility:modifiers}",
-      "description": "Defines a class field. Modifiers: ro (readonly), st (static).",
-      "csharpEquivalent": "private Type _name;"
+      "syntax": "§FLD{type:name:visibility}",
+      "description": "Defines a field in a class. Usually private, prefixed with underscore by convention.",
+      "csharpEquivalent": "private string _name;\nprivate readonly int _id;"
     },
     "§CTOR": {
       "name": "Constructor",
-      "syntax": "§CTOR{id:vis} (type:param, ...)",
-      "description": "Defines a class constructor.",
-      "csharpEquivalent": "public ClassName(params) { body }"
+      "syntax": "§CTOR{vis} (type:param, ...)",
+      "description": "Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.",
+      "csharpEquivalent": "public User(string name) { _name = name; }\npublic Admin(string name) : base(name) { }"
     },
     "§BASE": {
       "name": "Base Constructor",
@@ -1552,21 +2274,15 @@
     },
     "§EN": {
       "name": "Enum",
-      "syntax": "§EN{id:Name:vis[:underlyingType]}",
-      "description": "Defines an enumeration.",
-      "csharpEquivalent": "public enum Name { ... }"
-    },
-    "§EV": {
-      "name": "Enum Value",
-      "syntax": "§EV{name} or §EV{name:value}",
-      "description": "Defines an enum member.",
-      "csharpEquivalent": "Name or Name = value"
+      "syntax": "§EN{Name:vis[:underlyingType]} values...",
+      "description": "Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.",
+      "csharpEquivalent": "public enum Status { Active, Inactive, Pending }\npublic enum Priority : byte { Low = 0, High = 1 }"
     },
     "§EVT": {
       "name": "Event",
-      "syntax": "§EVT{id:name:vis:delegateType}",
-      "description": "Defines an event. Positional attributes: id, name, visibility, delegateType. Simple form for field-like events; use indented §EADD/§EREM blocks for custom add/remove logic.",
-      "csharpEquivalent": "public event DelegateType Name; or event with add/remove accessors"
+      "syntax": "§EVT{name:vis:delegateType}",
+      "description": "Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.",
+      "csharpEquivalent": "public event EventHandler OnChanged;\npublic event Action<int> ValueUpdated;\npublic event EventHandler Click { add { _click += value; } remove { _click -= value; } }"
     },
     "§EADD": {
       "name": "Event Add Accessor",
@@ -1582,27 +2298,28 @@
     },
     "§LAM": {
       "name": "Lambda",
-      "syntax": "§LAM{id:param:type...} expression §/LAM{id}",
-      "description": "Anonymous function/lambda expression. Inline arrow form preferred for simple expressions.",
-      "csharpEquivalent": "(params) => expression or (params) => { body }"
+      "close": "§/LAM",
+      "syntax": "§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}",
+      "description": "Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion only lowers noncapturing, non-generic direct same-point calls with ordinary parameters; unsupported cases remain explicit converter preservation.",
+      "csharpEquivalent": "x => x * 2\n(a, b) => a + b\nitems.Where(x => x > 5)"
     },
     "§W": {
       "name": "Switch/Match",
-      "syntax": "§W{id} expression with indented §K pattern → result cases; return with §R §W{id}",
-      "description": "Pattern matching switch expression.",
-      "csharpEquivalent": "expression switch { pattern => result, ... }"
+      "syntax": "§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W",
+      "description": "Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.",
+      "csharpEquivalent": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }\nshape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }"
     },
     "§K": {
       "name": "Case",
-      "syntax": "§K{pattern} result",
+      "syntax": "§K pattern → result",
       "description": "A case in a switch expression. Use _ for default.",
       "csharpEquivalent": "pattern => result"
     },
     "§BK": {
       "name": "Break",
-      "syntax": "§BK",
-      "description": "Breaks out of a loop.",
-      "csharpEquivalent": "break;"
+      "syntax": "§BK for break, §CN for continue",
+      "description": "Loop control statements.",
+      "csharpEquivalent": "if (done) break;\nif (skip) continue;"
     },
     "§CN": {
       "name": "Continue",
@@ -1610,39 +2327,21 @@
       "description": "Continues to next loop iteration.",
       "csharpEquivalent": "continue;"
     },
-    "§!": {
-      "name": "External Call",
-      "syntax": "§C{method} arg1 arg2",
-      "description": "Calls a method or function.",
-      "csharpEquivalent": "method(args)"
-    },
     "§USE": {
       "name": "Using/Resource",
-      "syntax": "§USE{id:var:type} resourceExpression",
+      "syntax": "§USE{var:type} resourceExpression",
       "description": "Resource management with automatic disposal.",
-      "csharpEquivalent": "using (var name = expression) { body }"
-    },
-    "§G": {
-      "name": "Generic Type Parameter",
-      "syntax": "§G{T}",
-      "description": "Declares a generic type parameter.",
-      "csharpEquivalent": "<T>"
+      "csharpEquivalent": "using (var stream = File.OpenRead(path)) { ... }\nusing var connection = new SqlConnection(connStr);"
     },
     "§WHERE": {
       "name": "Generic Constraint",
-      "syntax": "§WHERE{T:constraint}",
+      "syntax": "§WHERE T : constraint",
       "description": "Constraint on a generic type parameter.",
       "csharpEquivalent": "where T : constraint"
     },
-    "§?": {
-      "name": "Null-Conditional (Legacy)",
-      "syntax": "(?. target Member)",
-      "description": "Legacy null-conditional syntax. Prefer Lisp-style (?. target Member) for null-conditional access.",
-      "csharpEquivalent": "expression?."
-    },
     "§??": {
       "name": "Null-Coalescing (Legacy)",
-      "syntax": "expression §??{default}",
+      "syntax": "(?? left right)",
       "description": "Legacy null-coalescing syntax. Prefer Lisp-style (?? left right) for null-coalescing.",
       "csharpEquivalent": "expression ?? default"
     },
@@ -1652,65 +2351,45 @@
       "description": "Null-conditional member access in Lisp prefix notation. Returns null if target is null, otherwise accesses Member.",
       "csharpEquivalent": "target?.Member"
     },
-    "§D": {
-      "name": "Data/Record",
-      "syntax": "§D{Name} (type:field, ...)",
-      "description": "Defines an immutable data record.",
-      "csharpEquivalent": "public record Name { ... }"
-    },
-    "§STR": {
-      "name": "String Interpolation (NOT IMPLEMENTED)",
-      "syntax": "NOT VALID — use inline ${} or §INTERP instead",
-      "description": "§STR is not a valid section marker. For string interpolation, use inline ${} within ordinary string literals, e.g., \"Hello ${name}\".",
-      "csharpEquivalent": "$\"text {expression} text\""
-    },
     "§INTERP": {
       "name": "String Interpolation",
       "syntax": "Prefer inline string interpolation: \"literal ${expr} literal\"",
       "description": "Builds an interpolated string from literal parts and §EXP expression parts. Strings are opaque — expressions cannot be embedded inside quotes. Use separate \"literal\" and §EXP expr parts.",
       "csharpEquivalent": "$\"literal{expr}literal\""
     },
-    "§RAW": {
-      "name": "Raw C# Passthrough",
-      "syntax": "§RAW\n  C# code here\n§/RAW",
-      "description": "Embeds raw C# code that is emitted verbatim without any transformation. Use this escape hatch for C# constructs that Calor does not yet support (e.g., LINQ query syntax, complex expression trees). Content between §RAW and §/RAW is not tokenized or parsed as Calor.",
-      "csharpEquivalent": "(content emitted as-is)"
-    },
-    "§M": {
-      "name": "Module",
-      "syntax": "§M{id:Name}",
-      "description": "Defines a module (namespace/compilation unit). All code must be inside a module.",
-      "csharpEquivalent": "namespace Name { ... }"
-    },
     "§C": {
       "name": "Call",
-      "syntax": "§C{target} §A arg1 §A arg2 §/C",
-      "description": "Calls a function or method. Target can be a function name, a method chain (e.g., obj.Method), or a nested expression. Arguments are marked with §A. Always emits parentheses — for property access, use bare member expressions instead.",
-      "csharpEquivalent": "target(arg1, arg2)"
+      "close": "§/C",
+      "syntax": "§C{method} §A arg1 §A arg2 §/C",
+      "description": "Calls a method or function. Each argument uses §A; §/C delimits nested argument lists.",
+      "csharpEquivalent": "Console.WriteLine(\"Hello\");\nuser.Save();\nCalculate(x, y) // internal pure call"
     },
     "§U": {
       "name": "Using Import",
       "syntax": "§U{namespace} or §U{alias:namespace}",
-      "description": "Imports a namespace or creates an alias. Must appear inside a module (§M{id:Name}) block.",
+      "description": "Imports a namespace or creates an alias. Must appear inside a module (§M{Name}) block.",
       "csharpEquivalent": "using Namespace; or using Alias = Namespace;"
     },
     "§ARR": {
       "name": "Array",
-      "syntax": "§ARR{id:type} elements §/ARR{id} or §ARR{type:name:size}",
-      "description": "Creates a fixed-size array.",
-      "csharpEquivalent": "new Type[size] or new[] { elements }"
+      "close": "§/ARR",
+      "syntax": "§B{items} §ARR{type} elements §/ARR",
+      "description": "Creates and initializes a fixed-size array. The element type is specified in the header. Elements are space-separated between the opening and closing tags. Supports both explicit (new int[] { ... }) and bare ({ ... }) initializer syntax.",
+      "csharpEquivalent": "int[] numbers = { 5, 4, 1, 3 };\nvar items = new int[] { 1, 2, 3 };\nstring[] names = new[] { \"Alice\", \"Bob\" };"
     },
     "§LIST": {
       "name": "List",
       "syntax": "§LIST{name:type} with indented values",
       "description": "Creates a dynamic list.",
-      "csharpEquivalent": "new List<Type>() or new List<Type> { elements }"
+      "csharpEquivalent": "new List<Type>() or new List<Type> { elements }",
+      "close": "§/LIST (empty literal)"
     },
     "§DICT": {
       "name": "Dictionary",
       "syntax": "§DICT{name:keyType:valueType} with indented §KV key value entries",
       "description": "Creates a dictionary/map.",
-      "csharpEquivalent": "new Dictionary<TKey, TValue>()"
+      "csharpEquivalent": "new Dictionary<TKey, TValue>()",
+      "close": "§/DICT (empty literal)"
     },
     "§P": {
       "name": "Print",
@@ -1720,21 +2399,45 @@
     },
     "§EACH": {
       "name": "Foreach",
-      "syntax": "§EACH{var:collection}",
-      "description": "Iterates over each element in a collection. Type is inferred automatically. Use three-field form §EACH{id:var:type} for explicit typing.",
+      "syntax": "§EACH{item} collection",
+      "description": "Iterates over each element in a collection. Type is inferred in §EACH{variable}; §EACH{variable:type} specifies it explicitly. An optional third field names the index.",
       "csharpEquivalent": "foreach (var item in collection) { body }"
     },
     "§IV": {
       "name": "Invariant",
       "syntax": "§IV (condition)",
-      "description": "Class invariant that must always be true. Alias for §INV.",
-      "csharpEquivalent": "Contract.Invariant(condition)"
+      "description": "Declares an invariant at module scope.",
+      "csharpEquivalent": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }"
     },
-    "§SIG": {
-      "name": "Signature",
-      "syntax": "§MT{id:name} (type:param, ...) -> returnType",
-      "description": "Declares a method signature in an interface.",
-      "csharpEquivalent": "ReturnType Name(params);"
+    "§PP": {
+      "name": "preprocessor directive",
+      "syntax": "§PP{CONDITION} indented body; §PPE indented alternative",
+      "description": "Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.",
+      "csharpEquivalent": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif\n#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif"
+    },
+    "§ASSIGN": {
+      "name": "variable assignment",
+      "syntax": "§ASSIGN name expression",
+      "description": "Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.",
+      "csharpEquivalent": "name = expression;"
+    },
+    "§IXER": {
+      "name": "indexer definition",
+      "syntax": "§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies",
+      "description": "Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.",
+      "csharpEquivalent": "public int this[int index] { get; set; }\npublic string this[string key] { get; set; }\npublic int this[int row, int col] { get; set; }\npublic int this[int i] { get { return _data[i]; } set { _data[i] = value; } }"
+    },
+    "§DEL": {
+      "name": "delegate definition",
+      "syntax": "§DEL{name} with indented §I parameters and optional §O return type",
+      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.",
+      "csharpEquivalent": "public delegate void EventCallback(string message);\npublic delegate int Transformer(int value);\npublic class MyClass { public delegate void Handler(int x); }"
+    },
+    "§OP": {
+      "name": "operator overload",
+      "syntax": "§OP{operator:vis} (type:param, ...) -> returnType",
+      "description": "Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).",
+      "csharpEquivalent": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }\npublic static MyType operator-(MyType value) { return new MyType(-value.Value); }\npublic static implicit operator int(MyType value) { return value.Value; }\npublic static explicit operator MyType(int value) { return new MyType(value); }"
     },
     "§RT": {
       "name": "Rethrow",
@@ -1760,54 +2463,6 @@
       "description": "Marks an argument in inline calls or constructors.",
       "csharpEquivalent": "Type name"
     },
-    "§VR": {
-      "name": "Virtual Modifier",
-      "syntax": "§MT{id:name:pub:virt} () -> returnType",
-      "description": "Marks a method as virtual, allowing it to be overridden in derived classes.",
-      "csharpEquivalent": "public virtual ReturnType Name()"
-    },
-    "§OV": {
-      "name": "Override Modifier",
-      "syntax": "§MT{id:name:pub:over} () -> returnType",
-      "description": "Marks a method as overriding a virtual method from a base class.",
-      "csharpEquivalent": "public override ReturnType Name()"
-    },
-    "§AB": {
-      "name": "Abstract Modifier",
-      "syntax": "§MT{id:name:pub:abs} () -> returnType or §CL{id:Name:pub:abs}",
-      "description": "Marks a method or class as abstract. Abstract methods have no body.",
-      "csharpEquivalent": "public abstract ReturnType Name(); or public abstract class Name"
-    },
-    "§SD": {
-      "name": "Sealed Modifier",
-      "syntax": "§CL{id:Name:pub:seal}",
-      "description": "Marks a class as sealed, preventing inheritance.",
-      "csharpEquivalent": "public sealed class Name"
-    },
-    "§BODY": {
-      "name": "Body Start",
-      "syntax": "Indent the body under the header",
-      "description": "Explicitly marks the start of a function or method body. Optional in most cases.",
-      "csharpEquivalent": "{ body }"
-    },
-    "§TD": {
-      "name": "Todo",
-      "syntax": "§TD{description}",
-      "description": "Marks a todo item in the code.",
-      "csharpEquivalent": "// TODO: description"
-    },
-    "§FX": {
-      "name": "Fixme",
-      "syntax": "§FX{description}",
-      "description": "Marks a fixme item in the code indicating something that needs to be fixed.",
-      "csharpEquivalent": "// FIXME: description"
-    },
-    "§HK": {
-      "name": "Hack",
-      "syntax": "§HK{description}",
-      "description": "Marks a hack or workaround in the code.",
-      "csharpEquivalent": "// HACK: description"
-    },
     "§EX": {
       "name": "Example",
       "syntax": "§EX{description} code",
@@ -1823,8 +2478,8 @@
     "§DP": {
       "name": "Deprecated",
       "syntax": "§DP{reason}",
-      "description": "Marks a feature as deprecated with a reason.",
-      "csharpEquivalent": "[Obsolete(\"reason\")]"
+      "description": "Marks code as deprecated with a reason.",
+      "csharpEquivalent": "[Obsolete(\"Use NewMethod instead\")]"
     },
     "§BR": {
       "name": "Breaking Change",
@@ -1832,84 +2487,23 @@
       "description": "Documents a breaking change in the API.",
       "csharpEquivalent": "// BREAKING CHANGE: description"
     },
-    "§XP": {
-      "name": "Experimental",
-      "syntax": "§XP{description}",
-      "description": "Marks a feature as experimental and subject to change.",
-      "csharpEquivalent": "// EXPERIMENTAL: description"
-    },
-    "§SB": {
-      "name": "Stable",
-      "syntax": "§SB",
-      "description": "Marks a feature as stable and production-ready.",
-      "csharpEquivalent": "// STABLE"
-    },
-    "§DC": {
-      "name": "Decision",
-      "syntax": "§DC{id:title} alternatives",
-      "description": "Documents an architectural or design decision with alternatives considered.",
-      "csharpEquivalent": "// DECISION: title"
-    },
-    "§CHOSEN": {
-      "name": "Chosen Alternative",
-      "syntax": "§CHOSEN{description}",
-      "description": "Documents the chosen alternative in a decision.",
-      "csharpEquivalent": "// CHOSEN: description"
-    },
-    "§CT": {
-      "name": "Context",
-      "syntax": "§CT{description}",
-      "description": "Documents the context or background for a decision or feature.",
-      "csharpEquivalent": "// CONTEXT: description"
-    },
-    "§VS": {
-      "name": "Visible Section",
-      "syntax": "§VS content",
-      "description": "Marks a section as visible (not hidden).",
-      "csharpEquivalent": "#region Visible"
-    },
-    "§HD": {
-      "name": "Hidden Section",
-      "syntax": "§HD content",
-      "description": "Marks a section as hidden from normal view.",
-      "csharpEquivalent": "#region Hidden"
-    },
-    "§FC": {
-      "name": "Focus",
-      "syntax": "§FC content",
-      "description": "Marks a section as the current focus area for editing.",
-      "csharpEquivalent": "// FOCUS"
-    },
-    "§CX": {
-      "name": "Complexity",
-      "syntax": "§CX{O(n)} or §CX{O(n log n)}",
-      "description": "Documents the algorithmic complexity of a function or method.",
-      "csharpEquivalent": "// Complexity: O(n)"
-    },
     "§AS": {
       "name": "Assume",
       "syntax": "§AS condition",
       "description": "Documents an assumption that must be true at this point in the code.",
       "csharpEquivalent": "Debug.Assert(condition); // Assumption"
     },
-    "§UB": {
-      "name": "Used By",
-      "syntax": "§UB{function_or_class}",
-      "description": "Documents what uses this code (reverse dependency).",
-      "csharpEquivalent": "// Used by: function_or_class"
-    },
-    "§LK": {
-      "name": "Lock",
-      "syntax": "§LK{object}",
-      "description": "Acquires a lock on an object for thread-safe access.",
-      "csharpEquivalent": "lock (object) { body }"
-    },
     "§SYNC": {
       "name": "Synchronization Block",
-      "syntax": "§SYNC{id} lockExpr",
-      "description": "Lock/synchronization block. Preferred over §LK for converter output. Compiles to C# lock statement.",
-      "csharpEquivalent": "lock (lockExpr) { body }",
-      "tags": ["§SYNC", "lock", "synchronization", "thread-safety"]
+      "tags": [
+        "§SYNC",
+        "lock",
+        "synchronization",
+        "thread-safety"
+      ],
+      "syntax": "§SYNC (gate)",
+      "description": "Locks an object while executing the indented body.",
+      "csharpEquivalent": "lock (_sync) { _count++; }"
     },
     "§PT": {
       "name": "Property Test",
@@ -1917,59 +2511,11 @@
       "description": "Defines a property-based test.",
       "csharpEquivalent": "[Property] public bool TestName() { ... }"
     },
-    "§FILE": {
-      "name": "File Reference",
-      "syntax": "§FILE{path}",
-      "description": "References an external file.",
-      "csharpEquivalent": "// See: path"
-    },
-    "§TASK": {
-      "name": "Task Reference",
-      "syntax": "§TASK{id}",
-      "description": "References a task or issue ID.",
-      "csharpEquivalent": "// Task: #id"
-    },
-    "§DATE": {
-      "name": "Date Marker",
-      "syntax": "§DATE{YYYY-MM-DD}",
-      "description": "Marks a date associated with the code (e.g., when added or modified).",
-      "csharpEquivalent": "// Date: YYYY-MM-DD"
-    },
-    "§AU": {
-      "name": "Author",
-      "syntax": "§AU{name}",
-      "description": "Documents the author of the code.",
-      "csharpEquivalent": "// Author: name"
-    },
-    "§US": {
-      "name": "Uses",
-      "syntax": "§US dependencies",
-      "description": "Declares dependencies or imports used by the code.",
-      "csharpEquivalent": "using Namespace;"
-    },
-    "§FL": {
-      "name": "Field (Alias)",
-      "syntax": "§FL{type:name}",
-      "description": "Alias for §FLD. Defines a field in a class.",
-      "csharpEquivalent": "private Type name;"
-    },
     "§EEXT": {
       "name": "Enum Extension",
       "syntax": "§EEXT{EnumName} extensions",
       "description": "Defines extension methods for an enum type.",
       "csharpEquivalent": "public static class EnumExtensions { ... }"
-    },
-    "§T": {
-      "name": "Type",
-      "syntax": "§T{TypeName}",
-      "description": "References or declares a type.",
-      "csharpEquivalent": "TypeName"
-    },
-    "§END_BODY": {
-      "name": "End Body",
-      "syntax": "§END_BODY",
-      "description": "Explicitly marks the end of a function or method body. Pairs with §BODY. Optional in most cases.",
-      "csharpEquivalent": "}"
     },
     "§RANGE": {
       "name": "Range",

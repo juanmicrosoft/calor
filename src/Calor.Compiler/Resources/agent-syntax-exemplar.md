@@ -1,11 +1,13 @@
+<!-- Generated from src/Calor.Compiler/Resources/Teaching/reference.json by calor self-check docs --fix. Do not edit. -->
+
 # Calor syntax exemplar (reference sheet)
 
 Calor is an indentation-only DSL (2 spaces per level, Python-style) that compiles
 <!-- drift:ignore -->
 to C#. **Never write structural closer tags** (`§/M`, `§/F`, `§/IF`, `§/WH`,
-`§/EACH`, ... are hard errors); blocks end by dedent. The only closers ever
-written are `§/C` (call arg lists), `§/LAM` (block lambdas), `§/NEW`, and
-`§/LIST`/`§/DICT` (empty collection literals).
+`§/EACH`, ... are hard errors); blocks end by dedent. Value delimiters remain where documented: calls (`§/C`), block lambdas
+(`§/LAM`), constructors (`§/NEW`), empty collection literals, and the do-while
+condition carried by `§/DO`. Structural blocks end at dedent.
 
 Every complete `§M{...}` program in the "Complete programs" section below compiles
 (the compiler's own tests prove it); the reference blocks show the shape of each
@@ -14,8 +16,8 @@ construct, and every idiom in them is exercised by one of those programs.
 ## Core tags
 
 ```
-§M{id:Name}                     Module
-§F{id:Name:pub} (str:x) -> str  Function, inline signature (pri = private)
+§M{Name}                     Module
+§F{Name:pub} (str:x) -> str  Function, inline signature (priv = private)
 §E{}                            Effects: §E{} pure; fs:r, fs:w, fs:rw file I/O;
                                 mut collection/heap mutation; cw console; comma-join
 §B{name:str} expr               Immutable binding (type annotation optional: §B{name})
@@ -24,11 +26,11 @@ construct, and every idiom in them is exercised by one of those programs.
 §Q (pre)  §S (post)             Precondition / postcondition (post can use `result`)
 §R expr                         Return (bare §R for void)
 §P expr                         Print line
-§IF{id} (cond) / §EI (cond) / §EL   If / else-if / else (§EI/§EL at §IF's column)
-§WH{id} (cond)                  While loop
-§L{id:i:0:9:1}                  For loop, i from 0 to 9 step 1 (inclusive)
-§EACH{id:x} coll                Foreach over list/array
-§EACHKV{id:k:v} dict            Foreach over dictionary
+§IF (cond) / §EI (cond) / §EL   If / else-if / else (§EI/§EL at §IF's column)
+§WH (cond)                  While loop
+§L{i:0:9:1}                  For loop, i from 0 to 9 step 1 (inclusive)
+§EACH{x} coll                Foreach over list/array
+§EACHKV{k:v} dict            Foreach over dictionary
 ```
 
 Expressions are prefix s-expressions: `(+ a b)`, `(== a b)`, `(&& p q)`, `(! p)`,
@@ -59,13 +61,13 @@ Expressions are prefix s-expressions: `(+ a b)`, `(== a b)`, `(&& p q)`, `(! p)`
 
 ```
 §LIST{items:str}          empty list literal — close the empty form with §/LIST
-§/LIST{items}
+§/LIST
 §PUSH{items} x            items.Add(x)         [needs mut effect]
 §B{n:i32} §CNT{items}     items.Count
 §B{e:str} §IDX items i    items[i]
-§IF{if1} (! §HAS{items} k)   Contains check (dict key: §HAS{d} §KEY k)
+§IF (! §HAS{items} k)   Contains check (dict key: §HAS{d} §KEY k)
 §DICT{ages:str:i32}       empty dict literal
-§/DICT{ages}
+§/DICT
 §PUT{ages} k v            ages[k] = v          [needs mut effect]
 ```
 
@@ -80,21 +82,21 @@ the type the surrounding surface declares.
 ## Complete programs (the compiler's tests prove every one compiles)
 
 ```calor
-§M{m1:Contracts}
-  §F{f1:Square:pub} (i32:x) -> i32
+§M{Contracts}
+  §F{Square:pub} (i32:x) -> i32
     §Q (>= x 0)
     §S (>= result 0)
     §R (* x x)
 
-  §F{f2:Divide:pub} (i32:a, i32:b) -> i32
+  §F{Divide:pub} (i32:a, i32:b) -> i32
     §Q{"divisor must not be zero"} (!= b 0)
     §R (/ a b)
 ```
 
 ```calor
-§M{m2:Branching}
-  §F{f1:Sign:pub} (i32:x) -> i32
-    §IF{if1} (> x 0)
+§M{Branching}
+  §F{Sign:pub} (i32:x) -> i32
+    §IF (> x 0)
       §R 1
     §EI (< x 0)
       §R (- 0 1)
@@ -103,59 +105,59 @@ the type the surrounding surface declares.
 ```
 
 ```calor
-§M{m3:Files}
-  §F{f1:Append:pub} (str:path, str:key, str:value) -> void
+§M{Files}
+  §F{Append:pub} (str:path, str:key, str:value) -> void
     §E{fs:w}
     §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
 
-  §F{f2:CountLines:pub} (str:path) -> i32
+  §F{CountLines:pub} (str:path) -> i32
     §E{fs:r}
     §B{ok:bool} §C{File.Exists} §A path §/C
-    §IF{if1} (! ok)
+    §IF (! ok)
       §R 0
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §R (len lines)
 ```
 
 ```calor
-§M{m4:Strings}
-  §F{f1:FirstField:pub} (str:line) -> str
+§M{Strings}
+  §F{FirstField:pub} (str:line) -> str
     §E{}
     §B{i:i32} (indexof line "," :ordinal)
-    §IF{if1} (< i 0)
+    §IF (< i 0)
       §R line
     §R (substr line 0 i)
 ```
 
 ```calor
-§M{m5:Collections}
-  §F{f1:Tally:pub} (str:key) -> i32
+§M{Collections}
+  §F{Tally:pub} (str:key) -> i32
     §E{mut,alloc}
     §DICT{counts:str:i32}
-    §/DICT{counts}
+    §/DICT
     §PUT{counts} key 1
     §R §IDX counts key
 ```
 
 ```calor
-§M{m6:Effects}
-  §F{f1:Greet:pub} (str:name) -> void
+§M{Effects}
+  §F{Greet:pub} (str:name) -> void
     §E{cw}
     §C{Console.WriteLine} §A "Hello" §/C
     §C{Console.WriteLine} §A name §/C
 ```
 
 ```calor
-§M{m7:Loops}
-  §F{f1:PrintOneToFive:pub} () -> void
+§M{Loops}
+  §F{PrintOneToFive:pub} () -> void
     §E{cw}
-    §L{l1:i:1:5:1}
+    §L{i:1:5:1}
       §C{Console.WriteLine} §A i §/C
 ```
 
 ```calor
-§M{m8:Bindings}
-  §F{f1:Demo:pub} () -> void
+§M{Bindings}
+  §F{Demo:pub} () -> void
     §E{cw}
     §B{greeting:str} "Ada"
     §B{~count:i32} 0
@@ -164,9 +166,9 @@ the type the surrounding surface declares.
 ```
 
 ```calor
-§M{m9:Classes}
-  §CL{c1:Greeter:pub}
-    §MT{mt1:Greet:pub} () -> str
+§M{Classes}
+  §CL{Greeter:pub}
+    §MT{Greet:pub} () -> str
       §R "hello"
 ```
 
@@ -177,12 +179,12 @@ the type the surrounding surface declares.
 §/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)
 <!-- drift:ignore -->
 §S (>= §RESULT 0)     wrong; the return value is lowercase: §S (>= result 0)
-§IF (> x 0)           wrong; §IF needs an id: §IF{if1} (> x 0)
+§IF                  wrong; §IF needs a condition, such as §IF (> x 0)
 §IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces
 <!-- drift:ignore -->
 §K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)
 §F{f1:Add:i32:pub}    wrong; a 4-field header drops the return type. Use:
-                     §F{f1:Add:pub} (i32:a, i32:b) -> i32
+                     §F{Add:pub} (i32:a, i32:b) -> i32
 ```
 
 Effects: `§E{cw}` declares console write; declare effects on any function that

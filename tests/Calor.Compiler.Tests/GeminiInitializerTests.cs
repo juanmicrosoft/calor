@@ -274,14 +274,13 @@ This should be preserved.
     }
 
     [Fact]
-    public void GeminiMdTemplate_ContainsTypeMappings()
+    public void GeminiMdTemplate_PointsToSharedSyntaxReference()
     {
         var template = EmbeddedResourceHelper.ReadTemplate("GEMINI.md.template");
 
-        // Should contain type mapping table
-        Assert.Contains("| C# | Calor |", template);
-        Assert.Contains("i32", template);
-        Assert.Contains("str", template);
+        Assert.Contains("calor://primer", template);
+        Assert.Contains("calor_help", template);
+        Assert.DoesNotContain("| C# | Calor |", template);
     }
 
     [Fact]

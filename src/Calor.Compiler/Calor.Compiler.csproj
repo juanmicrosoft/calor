@@ -167,8 +167,8 @@
     <EmbeddedResource Include="..\..\bench\phase0-agent-native\metadata-references-manifest.json">
       <LogicalName>Calor.Compiler.Resources.metadata-references-manifest.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\tests\Calor.Evaluation\Skills\calor-language-skills.md">
-      <LogicalName>Calor.Compiler.Resources.calor-language-skills.md</LogicalName>
+    <EmbeddedResource Include="Resources\Teaching\Generated\*">
+      <LogicalName>Calor.Compiler.Resources.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

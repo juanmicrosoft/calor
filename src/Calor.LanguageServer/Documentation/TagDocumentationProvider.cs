@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -130,90 +129,23 @@ public sealed class TagDocumentationProvider
 
     private bool LoadDocumentation()
     {
-        try
+        var json = Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+            "Calor.Compiler.Resources.calor-syntax-documentation.json");
+        var doc = JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
+        if (doc?.Tags is not { Count: > 0 })
+            throw new InvalidDataException("Packaged syntax documentation has no hover tags.");
+        foreach (var (tag, info) in doc.Tags)
         {
-            string? json = null;
-
-            // Try embedded resource from Calor.Compiler
-            var compilerAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == "Calor.Compiler");
-
-            if (compilerAssembly != null)
+            _tagDocs[tag] = new TagDocumentation
             {
-                var resourceName = "Calor.Compiler.Resources.calor-syntax-documentation.json";
-                using var stream = compilerAssembly.GetManifestResourceStream(resourceName);
-                if (stream != null)
-                {
-                    using var reader = new StreamReader(stream);
-                    json = reader.ReadToEnd();
-                }
-            }
-
-            // Fall back to file system (for development)
-            if (json == null)
-            {
-                var projectRoot = FindProjectRoot();
-                if (projectRoot != null)
-                {
-                    var filePath = Path.Combine(projectRoot, "src", "Calor.Compiler", "Resources", "calor-syntax-documentation.json");
-                    if (File.Exists(filePath))
-                    {
-                        json = File.ReadAllText(filePath);
-                    }
-                }
-            }
-
-            if (json == null)
-                return false;
-
-            var doc = JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
-            if (doc?.Tags == null)
-                return false;
-
-            foreach (var (tag, info) in doc.Tags)
-            {
-                _tagDocs[tag] = new TagDocumentation
-                {
-                    Tag = tag,
-                    Name = info.Name,
-                    Syntax = info.Syntax,
-                    Description = info.Description,
-                    CSharpEquivalent = info.CSharpEquivalent
-                };
-            }
-
-            return _tagDocs.Count > 0;
+                Tag = tag,
+                Name = info.Name,
+                Syntax = info.Syntax,
+                Description = info.Description,
+                CSharpEquivalent = info.CSharpEquivalent
+            };
         }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static string? FindProjectRoot()
-    {
-        var startDirs = new[]
-        {
-            Directory.GetCurrentDirectory(),
-            AppDomain.CurrentDomain.BaseDirectory
-        };
-
-        foreach (var startDir in startDirs)
-        {
-            var dir = startDir;
-            for (var i = 0; i < 10 && dir != null; i++)
-            {
-                if (File.Exists(Path.Combine(dir, "Calor.sln")) ||
-                    Directory.Exists(Path.Combine(dir, ".git")))
-                {
-                    return dir;
-                }
-                var parent = Directory.GetParent(dir);
-                dir = parent?.FullName;
-            }
-        }
-
-        return null;
+        return true;
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()

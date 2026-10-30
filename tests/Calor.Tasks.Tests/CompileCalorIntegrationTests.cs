@@ -106,6 +106,22 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void GeneratedTeachingPrimer_CompilesThroughBuildTask()
+    {
+        var primer = Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+            "Calor.Compiler.Resources.agent-syntax-exemplar.md");
+        var programs = Calor.Compiler.SelfCheck.ExemplarCompileChecker.ExtractCompletePrograms(primer);
+        Assert.Equal(9, programs.Count);
+        foreach (var (program, index) in programs.Select((program, index) => (program, index)))
+        {
+            var source = CreateSourceFile($"Reference{index}.calr", program.Source);
+            var task = CreateTask(source);
+            Assert.True(task.Execute(), string.Join("\n", ((TestBuildEngine)task.BuildEngine).Errors));
+            Assert.Single(task.GeneratedFiles);
+        }
+    }
+
+    [Fact]
     public void CrossModuleVariance_WarmBuildRechecksChangedBaseContract()
     {
         const string baseSource = """

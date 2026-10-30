@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Text.Json;
+using Calor.Compiler.Mcp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -53,6 +55,49 @@ public class McpRegistryValidationTests
         var handler = new Calor.Compiler.Mcp.McpMessageHandler(verbose: false);
         var instructions = handler.GetServerInstructionsForTest();
         AssertNoPhantomTools(instructions, "GetServerInstructions()");
+    }
+
+    [Theory]
+    [InlineData("calor://reference", "current-language-reference.md")]
+    [InlineData("calor://syntax-reference", "calor-syntax-documentation.json")]
+    [InlineData("calor://type-mappings", "type-mappings.md")]
+    [InlineData("calor://effects", "effects.json")]
+    [InlineData("calor://tags", "tags.json")]
+    [InlineData("calor://id-prefixes", "id-prefixes.json")]
+    [InlineData("calor://workflows", "workflows.json")]
+    public async Task TeachingResources_ServePackagedGeneratedOutput(string uri, string resource)
+    {
+        var handler = new McpMessageHandler();
+        var response = await handler.HandleRequestAsync(new JsonRpcRequest
+        {
+            Id = JsonSerializer.SerializeToElement(1),
+            Method = "resources/read",
+            Params = JsonSerializer.SerializeToElement(new { uri })
+        });
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        var result = JsonSerializer.SerializeToElement(response.Result, McpJsonOptions.Default);
+        var content = Assert.Single(result.GetProperty("contents").EnumerateArray());
+        Assert.Equal(uri, content.GetProperty("uri").GetString());
+        Assert.Equal(Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources." + resource),
+            content.GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public void TeachingTagCatalog_RetainsDelimiterContractWithoutSourceIds()
+    {
+        using var catalog = JsonDocument.Parse(McpMessageHandler.GetTagCatalogJsonPublic());
+        foreach (var tag in catalog.RootElement.GetProperty("tags").EnumerateArray())
+        {
+            Assert.False(string.IsNullOrWhiteSpace(tag.GetProperty("open").GetString()));
+            Assert.False(string.IsNullOrWhiteSpace(tag.GetProperty("close").GetString()));
+            Assert.False(tag.TryGetProperty("idPrefix", out _));
+        }
+        var call = catalog.RootElement.GetProperty("tags").EnumerateArray()
+            .Single(tag => tag.GetProperty("tag").GetString() == "§C");
+        Assert.Equal("§/C", call.GetProperty("close").GetString());
+        using var identity = JsonDocument.Parse(McpMessageHandler.GetIdPrefixCatalogJsonPublic());
+        Assert.Empty(identity.RootElement.GetProperty("prefixes").EnumerateArray());
     }
 
     private static void AssertNoPhantomTools(string content, string source)

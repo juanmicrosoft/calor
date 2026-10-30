@@ -18,20 +18,20 @@ public sealed class HelpTool : McpToolBase
 {
     // ── Lazy-loaded resources ────────────────────────────────────────
     private static readonly Lazy<SyntaxDocumentation?> SyntaxDoc = new(LoadSyntaxDocumentation);
-    private static Lazy<string> SkillContent = new(LoadSkillContent);
+    private static Lazy<string> ReferenceContent = new(LoadReferenceContent);
     private static readonly Lazy<List<ErrorPattern>> ErrorPatterns = new(LoadErrorPatterns);
 
     /// <summary>
-    /// Environment variable to override the skill file path.
+    /// Environment variable to override the generated reference path.
     /// </summary>
-    public const string SkillFilePathEnvVar = "CALOR_SKILL_FILE";
+    public const string ReferenceFilePathEnvVar = "CALOR_REFERENCE_FILE";
 
     /// <summary>
-    /// Resets the cached skill content. Used for testing environment variable overrides.
+    /// Resets the cached reference content. Used for testing environment variable overrides.
     /// </summary>
     internal static void ResetCacheForTesting()
     {
-        SkillContent = new Lazy<string>(LoadSkillContent);
+        ReferenceContent = new Lazy<string>(LoadReferenceContent);
     }
 
     public override string Name => "calor_help";
@@ -300,7 +300,7 @@ public sealed class HelpTool : McpToolBase
     {
         try
         {
-            var content = SkillContent.Value;
+            var content = ReferenceContent.Value;
             if (string.IsNullOrEmpty(content))
             {
                 return Task.FromResult(McpToolResult.Error("Syntax documentation not available"));
@@ -333,9 +333,10 @@ public sealed class HelpTool : McpToolBase
                     $"No documentation found for '{feature}'. Available features: {availableFeatures}"));
             }
 
-            // Truncate if total content exceeds budget to prevent token overflow
+            // Bound serialized transport size, including escaped section signs.
+            // This is a character limit, not a measured model-token budget.
             const int maxContentChars = 15_000;
-            var totalChars = sections.Sum(s => s.Content.Length);
+            var totalChars = sections.Sum(s => JsonSerializer.Serialize(s, McpJsonOptions.Default).Length);
             List<string>? omittedTitles = null;
 
             if (totalChars > maxContentChars)
@@ -346,10 +347,11 @@ public sealed class HelpTool : McpToolBase
 
                 foreach (var section in sections)
                 {
-                    if (budget + section.Content.Length <= maxContentChars || kept.Count == 0)
+                    var sectionChars = JsonSerializer.Serialize(section, McpJsonOptions.Default).Length;
+                    if (budget + sectionChars <= maxContentChars || kept.Count == 0)
                     {
                         kept.Add(section);
-                        budget += section.Content.Length;
+                        budget += sectionChars;
                     }
                     else
                     {
@@ -363,9 +365,10 @@ public sealed class HelpTool : McpToolBase
                     kept.Add(new SyntaxSection
                     {
                         Title = "Truncated — additional sections available",
-                        Content = $"Response truncated ({totalChars} chars). " +
+                        Content = $"Response truncated ({totalChars} serialized chars). " +
                                   $"Query these sections individually for full content:\n" +
-                                  string.Join("\n", omittedTitles.Select(t => $"- {t}"))
+                                  string.Join("\n", omittedTitles.Select(t => $"- {t}")) +
+                                  "\nRead calor://reference for the complete reference."
                     });
                 }
 
@@ -389,205 +392,19 @@ public sealed class HelpTool : McpToolBase
 
     private static McpToolResult HandleOverview(string feature, string content)
     {
-        // Extract the "Supported C# Features — Quick Reference" table and
-        // "Syntax Quick Reference" section from the skills doc for a curated overview
-        var overviewSections = new List<SyntaxSection>();
-
-        // 1. Extract the quick reference table
-        var headerPattern = new Regex(@"^## (.+)$", RegexOptions.Multiline);
-        var matches = headerPattern.Matches(content);
-
-        for (var i = 0; i < matches.Count; i++)
-        {
-            var match = matches[i];
-            var title = match.Groups[1].Value.Trim();
-            var startIndex = match.Index;
-            var endIndex = (i + 1 < matches.Count) ? matches[i + 1].Index : content.Length;
-            var sectionContent = content[startIndex..endIndex].Trim();
-
-            if (title.Contains("Quick Reference", StringComparison.OrdinalIgnoreCase) ||
-                title.Contains("Core Syntax", StringComparison.OrdinalIgnoreCase) ||
-                title.Equals("Properties", StringComparison.OrdinalIgnoreCase) ||
-                title.Equals("Indexers", StringComparison.OrdinalIgnoreCase) ||
-                title.Contains("Structure Tags", StringComparison.OrdinalIgnoreCase))
-            {
-                overviewSections.Add(new SyntaxSection
-                {
-                    Title = title,
-                    Content = sectionContent
-                });
-            }
-        }
-
-        // 2. Add a compact syntax cheatsheet as the first section
-        overviewSections.Insert(0, new SyntaxSection
+        var overview = new SyntaxSection
         {
             Title = "Calor Language Overview",
-            Content = """
-                ## Calor Language Overview
-
-                Calor is a DSL that compiles to C# on .NET 10. All constructs use section markers (§).
-
-                Calor is **indent-only**: a block's body is indented (2 spaces per level) under its
-                opener and ends at the next dedent. There are **NO structural closing tags** — never
-                write §/M, §/F, §/L, §/I, §/CL, §/MT, §/TR, etc. (The inline call closer §/C is still
-                valid and optional; §RAW…§/RAW, §CSHARP{…}§/CSHARP and §PP…§/PP keep their delimiters.)
-
-                ### Core Tags
-                ```
-                §M{id:Name}              Module (body indented)
-                §F{id:name:vis} (type:name, ...) -> retType   Function (body indented)
-                §B{name}                 Immutable binding (§B{name} expr)
-                §B{~name}                Mutable binding (§B{~name} expr)
-                §I{type:name}             Parameter (explicit form; alt. to the (…) signature)
-                §I{type:name:this}        Extension method parameter (C# 'this' modifier)
-                §I{type:name:ref}         Ref parameter
-                §I{type:name:out}         Out parameter
-                §I{type:name:in}          In (readonly ref) parameter
-                §I{type:name:params}      Params array parameter
-                §I{type:name}=expr        Parameter with default value
-                §O{type}                  Return type (explicit form; alt. to -> retType)
-                §R expr                   Return statement
-                §C{obj.Method} §A arg §/C Method call with argument
-                ```
-
-                ### Control Flow
-                ```
-                §IF{id} (cond)  /  §EI (cond2)  /  §EL      If/ElseIf/Else (bodies indented)
-                §L{id:var:from:to:step}                     For loop (body indented)
-                §EACH{var:collection}                       Foreach loop (body indented)
-                §WH{id} (cond)                              While loop (body indented)
-                §W{expr}  then  §K{pattern} → result        Match/Switch (arms indented)
-                §GOTO{label}                                          Goto label
-                §GOTO{CASE:expr}                                      Goto case expr
-                §GOTO{DEFAULT}                                        Goto default
-                ```
-
-                ### Types and Classes
-                ```
-                §CL{id:Name:vis}          Class (body indented)
-                §M{id:Name:vis}          Named module (static container; functions use §F)
-                §CL{id:Name:vis:struct}   Struct
-                §IFACE{id:Name}           Interface (body indented)
-                §MT{id:name:vis} (type:name, ...) -> retType   Method (body indented)
-                §CTOR{id:vis}             Constructor (body indented)
-                §BASE arg1 arg2           Constructor chaining to base class
-                §THIS arg1 arg2           Constructor chaining to another constructor
-                §PROP{id:Name:type:vis}   Property (body indented)
-                §IXER{id:type:vis}        Indexer (body indented)
-                §FLD{type:name:vis}       Field
-                §FLD{type:name:vis:volatile} Volatile field
-                §EXT{BaseClass}           Extends
-                §IMPL{Interface}          Implements
-                §EN{id:Name}              Enum (body indented)
-                §SYNC{id}                 Lock/synchronization block (body indented)
-                ```
-
-                ### Properties and Indexers (compact forms)
-                ```
-                §PROP{id:Name:type:vis:get,set}                      Auto-property
-                §IXER{id:type:vis:get,set} (type:param)              Auto-indexer
-                §IXER{id:type:vis:get,set} (type:p1, type:p2)        Multi-param indexer
-                ```
-
-                ### Contracts and Effects
-                ```
-                §Q (expr)                 Precondition (requires)
-                §S (expr)                 Postcondition (ensures)
-                §INV (expr)               Invariant
-                §E{effect1,effect2}       Effect declarations
-                ```
-
-                ### Async, Exceptions, and Resources
-                ```
-                §AF{id:name:vis} (type:name, ...) -> retType   Async function (body indented)
-                §AMT{id:name:vis} (type:name, ...) -> retType  Async method (body indented)
-                §AWAIT expr               Await expression
-                §TR{id}  /  §CA{Type:var}  /  §FI    Try/Catch/Finally (bodies indented; §CA{Type:var} WHEN (cond) for filters)
-                §TH expr                  Throw
-                §USE{var} expr            Using statement (body indented)
-                §YIELD expr               Yield return
-                §YBRK                     Yield break
-                ```
-
-                ### Lambdas, Delegates, Events
-                ```
-                §LAM{id:param:type} body §/LAM{id}   Lambda expression
-                §DEL{id:Name:vis}                     Delegate type (also inside §CL)
-                §EVT{id:Name:vis:type}                Event
-                §EADD body §/EADD                     Event add accessor
-                §EREM body §/EREM                     Event remove accessor
-                §OP{id:operator:vis}                  Operator overload
-                ```
-
-                ### Tuples and Null Operators
-                ```
-                (Type1, Type2)            Tuple type
-                (expr1, expr2)            Tuple literal
-                (?? left right)           Null-coalescing (left ?? right)
-                (?. target Member)        Null-conditional (target?.Member)
-                ```
-
-                ### Collections
-                ```
-                §LIST{id:type}            List<T>
-                §DICT{id:ktype:vtype}     Dictionary<K,V>
-                §HSET{id:type}            HashSet<T>
-                §IDX coll index           Element access
-                §PUSH coll item           Add to list/set
-                §PUT dict key value       Add/update dict entry
-                §RANGE start end          Range: start..end (for slicing)
-                §^ n                      Index from end: ^n
-                ```
-
-                ### Preprocessor and Interop
-                ```
-                §PP{CONDITION} ... §PPE ... §/PP{CONDITION}   #if/#else/#endif
-                §CSHARP{code}§/CSHARP                         Raw C# passthrough (member-level)
-                §RAW ... §/RAW                                Raw C# block
-                §UNSAFE{id}                                   Unsafe block (body indented)
-                ```
-
-                ### Typed Literals
-                ```
-                INT:42    STR:"hello"    BOOL:true    FLOAT:3.14    DECIMAL:18.00
-                ```
-
-                ### Visibility: pub, priv, prot, int, protint
-                ### Modifiers: stat, abs, virt, over, seal, req, partial, volatile
-
-                ### Parameter Modifiers
-                ```
-                :this     Extension method (first param)
-                :ref      Ref parameter
-                :out      Out parameter
-                :in       In (readonly ref) parameter
-                :params   Params array
-                =expr     Default value (e.g., §I{i32:count}=INT:0)
-                ```
-
-                **Key rule**: If a C# construct has a Calor tag, use it natively. Only use §CSHARP for constructs without native support.
-
-                Query a specific feature for detailed syntax and examples (e.g., 'async', 'indexers', 'contracts').
-                """
-        });
-
-        // Track telemetry
+            Content = EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.overview.md")
+        };
         if (CalorTelemetry.IsInitialized)
-        {
-            var matchedNames = string.Join(";", overviewSections.Select(s => s.Title).Take(5));
-            CalorTelemetry.Instance.TrackSyntaxHelpQuery(
-                feature, "overview", overviewSections.Count, matchedNames);
-        }
-
-        var output = new SyntaxHelpOutput
+            CalorTelemetry.Instance.TrackSyntaxHelpQuery(feature, "overview", 1, overview.Title);
+        return McpToolResult.Json(new SyntaxHelpOutput
         {
             Feature = feature,
-            Sections = overviewSections,
+            Sections = [overview],
             AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k).ToList()
-        };
-
-        return McpToolResult.Json(output);
+        });
     }
 
     private static List<SyntaxSection> ExtractRelevantSections(string content, string feature)
@@ -642,7 +459,9 @@ public sealed class HelpTool : McpToolBase
             }
         }
 
-        return sections;
+        // Prefer a named topic over incidental mentions inside large examples.
+        return sections.OrderByDescending(section =>
+            searchTerms.Any(term => IsContentMatch(section.Title, term))).ToList();
     }
 
     private static string[] GetSearchTerms(string feature)
@@ -1020,101 +839,17 @@ public sealed class HelpTool : McpToolBase
         PropertyNameCaseInsensitive = true
     };
 
-    private static SyntaxDocumentation? LoadSyntaxDocumentation()
+    private static SyntaxDocumentation LoadSyntaxDocumentation() =>
+        JsonSerializer.Deserialize<SyntaxDocumentation>(
+            EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.calor-syntax-documentation.json"), JsonOptions)
+        ?? throw new InvalidDataException("Packaged syntax documentation is empty.");
+
+    private static string LoadReferenceContent()
     {
-        try
-        {
-            // Try embedded resource first
-            var assembly = Assembly.GetExecutingAssembly();
-            var resourceName = "Calor.Compiler.Resources.calor-syntax-documentation.json";
-
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream != null)
-            {
-                using var reader = new StreamReader(stream);
-                var json = reader.ReadToEnd();
-                return JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
-            }
-
-            // Fall back to file system (for development)
-            var projectRoot = FindProjectRoot();
-            if (projectRoot != null)
-            {
-                var filePath = Path.Combine(projectRoot, "src", "Calor.Compiler", "Resources", "calor-syntax-documentation.json");
-                if (File.Exists(filePath))
-                {
-                    var json = File.ReadAllText(filePath);
-                    return JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
-                }
-            }
-
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string LoadSkillContent()
-    {
-        // 1. Check environment variable first (highest priority)
-        var envPath = Environment.GetEnvironmentVariable(SkillFilePathEnvVar);
-        if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath))
-        {
-            try
-            {
-                return File.ReadAllText(envPath);
-            }
-            catch
-            {
-                // Fall through to other methods
-            }
-        }
-
-        // 2. Look for project root by walking up directories
-        var projectRoot = FindProjectRoot();
-        if (projectRoot != null)
-        {
-            var skillPath = Path.Combine(projectRoot, "tests", "Calor.Evaluation", "Skills", "calor-language-skills.md");
-            if (File.Exists(skillPath))
-            {
-                try
-                {
-                    return File.ReadAllText(skillPath);
-                }
-                catch
-                {
-                    // Fall through
-                }
-            }
-        }
-
-        // 3. Try NuGet tool installation path
-        var nugetSkillPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Skills", "calor-language-skills.md");
-        if (File.Exists(nugetSkillPath))
-        {
-            try
-            {
-                return File.ReadAllText(nugetSkillPath);
-            }
-            catch
-            {
-                // Fall through
-            }
-        }
-
-        // 4. Fall back to embedded resource (always available in NuGet tool installations)
-        try
-        {
-            return EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.calor-language-skills.md");
-        }
-        catch
-        {
-            // Resource not found
-        }
-
-        return "";
+        var path = Environment.GetEnvironmentVariable(ReferenceFilePathEnvVar);
+        if (!string.IsNullOrEmpty(path))
+            return File.ReadAllText(path);
+        return EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.current-language-reference.md");
     }
 
     private static List<ErrorPattern> LoadErrorPatterns()
@@ -1220,6 +955,7 @@ public sealed class HelpTool : McpToolBase
 
         [JsonPropertyName("examples")]
         public List<SyntaxExample> Examples { get; set; } = new();
+
     }
 
     private sealed class SyntaxExample
@@ -1269,6 +1005,7 @@ public sealed class HelpTool : McpToolBase
         [JsonPropertyName("examples")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<SyntaxExampleOutput>? Examples { get; init; }
+
 
         [JsonPropertyName("message")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

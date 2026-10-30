@@ -482,7 +482,8 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("NOT SUPPORTED", json);
+        Assert.Contains("action=features", json);
+        Assert.DoesNotContain("§CSHARP", json);
     }
 
     #region Fuzzy Matching Edge Cases
@@ -612,7 +613,7 @@ public class SyntaxLookupToolTests
         Assert.False(result.IsError);
         var json = result.Content[0].Text ?? "";
         Assert.Contains("\"found\":true", json);
-        Assert.Contains("LK", json);
+        Assert.Contains("SYNC", json);
     }
 
     [Fact]

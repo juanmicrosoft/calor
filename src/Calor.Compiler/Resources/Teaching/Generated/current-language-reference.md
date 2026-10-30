@@ -1,0 +1,2359 @@
+<!-- Generated from src/Calor.Compiler/Resources/Teaching/reference.json by calor self-check docs --fix. Do not edit. -->
+
+# Current Calor language reference
+
+This reference describes the current compiler, not a final 0.30 grammar or a measured token budget.
+Write `.calr` files. Bodies are indented two spaces and structural blocks end at dedent.
+Source declarations carry no IDs; tooling keeps declaration identity in `.calor/ids.json`. Use tooling for renames.
+Use inline signatures, name-first bindings, and indented conditional branches.
+Use `§C{target} §A arg §/C` for calls, including nested calls inside prefix expressions.
+Use nullable .NET types (`?str`, `?i32`, `null`) and exceptions for absence and failure.
+Do not handwrite raw C# passthrough. Conversion fallback capabilities belong in `calor_help action=features`.
+Arrays and collections are different: `File.ReadAllLines` returns `[str]`, not `List<str>`.
+Contracts evaluate in order: check for null before reading length or members.
+Use only supported arguments for built-ins; `(indexof text value :ordinal)` selects ordinal comparison.
+Single quotes produce characters; double quotes produce strings.
+
+Query a specific feature with `calor_help` for detailed syntax and examples.
+
+## Calor Language Overview
+
+Module and function bodies use indentation. Control Flow uses indented branches and loops.
+Contracts and Effects describe obligations and side effects. Async functions use `§AF` and `§AWAIT`.
+Collections use ordinary .NET types; Typed Literals include `INT:42`, `STR:"hello"`, and `BOOL:true`.
+Property and Indexer declarations use `§PROP` and `§IXER`.
+Query a specific feature for complete examples; use `action=features` for conversion support.
+
+## object instantiation
+
+Creates a new instance of a class. The class name goes in braces; constructor arguments use §A. Use §NEW{ClassName} §/NEW for zero-argument constructors.
+
+Syntax: `§NEW{ClassName} §A arg1 §A arg2 §/NEW`
+
+C# equivalents (fragments):
+
+```csharp
+var user = new User("John", 25);
+var list = new List<int>();
+return new Widget(value);
+```
+
+Complete example: [objects](#example-complete_objects).
+
+## variable declaration
+
+Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.
+
+Syntax: `§B{name} value or §B{~name} value (mutable)`
+
+C# equivalents (fragments):
+
+```csharp
+var count = 0;
+int mutableCount = 0; // needs to be modified later
+string name = "John";
+string? name = null;
+```
+
+Complete example: [Bindings](#example-primer_bindings).
+
+Complete example: [Nested array expressions](#example-nested_arrays).
+
+## method definition
+
+Defines a method within a class. Supports visibility (pub/priv/prot) and modifiers such as virt/vr, over/ov, abs, stat/st, and seal.
+
+Syntax: `§MT{name:vis[:modifiers]} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public void Process(int value) { ... }
+public virtual string GetName() { return _name; }
+public override int Calculate(int x) { ... }
+```
+
+Complete example: [Calculator](#example-task_28).
+
+## function definition
+
+Defines a standalone function (not a class member). Use for top-level functions or static utility methods.
+
+Syntax: `§F{name:vis} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public static int Add(int a, int b) { return a + b; }
+private void Log(string message) { Console.WriteLine(message); }
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## lambda expression
+
+Creates an anonymous function using name:type parameter pairs. It can capture variables from its enclosing scope. The closing delimiter carries no source ID. Bind local helpers as lambdas, not nested §F declarations. Automatic local-function conversion only lowers noncapturing, non-generic direct same-point calls with ordinary parameters; unsupported cases remain explicit converter preservation.
+
+Syntax: `§LAM{[static:][async:]name:type[:name:type...]} body §/LAM; zero parameters: §LAM{}`
+
+C# equivalents (fragments):
+
+```csharp
+x => x * 2
+(a, b) => a + b
+items.Where(x => x > 5)
+```
+
+Complete example: [ApplyComplex](#example-task_25).
+
+## property definition
+
+Defines a property with optional getter and setter. Auto-properties use accessor shorthand such as get,set, get,priset, or get,init. Full properties use indented §GET and §SET bodies.
+
+Syntax: `§PROP{name:type:vis[:modifiers...:accessors]} [= default]`
+
+C# equivalents (fragments):
+
+```csharp
+public string Name { get; set; }
+public int Count { get; private set; }
+public int Value { get { return _value; } set { _value = value; } }
+```
+
+Complete example: [Product](#example-task_31).
+
+Complete example: [Person](#example-task_32).
+
+## indexer definition
+
+Defines an indexer on a class or interface. Full indexers use indented §I parameters and §GET/§SET/§INIT bodies. Compact auto-indexers use accessor shorthand and inline parameters.
+
+Syntax: `§IXER{returnType:vis} with indented §I parameters and §GET/§SET bodies`
+
+C# equivalents (fragments):
+
+```csharp
+public int this[int index] { get; set; }
+public string this[string key] { get; set; }
+public int this[int row, int col] { get; set; }
+public int this[int i] { get { return _data[i]; } set { _data[i] = value; } }
+```
+
+Complete example: [indexer](#example-complete_indexer).
+
+## property access vs method call
+
+§C{...} emits parentheses, making it a method call. For property or field access (no parentheses), use a bare dotted expression in a binding (§B{var} obj.Property) or directly as an expression. Do NOT use §C for property access — it will emit obj.Property() with unwanted parens.
+
+Syntax: `Property: use bare member expression (e.g., obj.Property). Method: use §C{obj.Method} args.`
+
+C# equivalents (fragments):
+
+```csharp
+var items = Data.Products;
+var items = Data.GetProducts();
+```
+
+Complete example: [Product](#example-task_31).
+
+Complete example: [objects](#example-complete_objects).
+
+## for loop
+
+For loop with an inclusive integer range. The body is indented under the loop header.
+
+Syntax: `§L{var:from:to:step}`
+
+C# equivalents (fragments):
+
+```csharp
+for (int i = 0; i < 10; i++) { ... }
+for (int i = 0; i <= 10; i++) { ... }
+for (int i = 0; i < 100; i += 2) { ... }
+```
+
+Complete example: [Loops](#example-primer_loops).
+
+## foreach loop
+
+Iterates a collection with an indented body.
+
+Syntax: `§EACH{item:type} collection`
+
+C# equivalents (fragments):
+
+```csharp
+foreach (var item in items) { ... }
+foreach (var (key, value) in dictionary) { ... }
+```
+
+Complete example: [SumList](#example-task_14).
+
+Complete example: [PrintDictionary](#example-task_16).
+
+## while loop
+
+Executes body while condition is true.
+
+Syntax: `§WH (condition)`
+
+C# equivalents (fragments):
+
+```csharp
+while (count > 0) { count--; }
+while (true) { if (done) break; }
+```
+
+Complete example: [Countdown](#example-task_12).
+
+## if statement
+
+Conditional branching. §EI for else-if, §EL for else. Both are optional.
+
+Syntax: `§IF (condition) body §EI (condition) body §EL body`
+
+C# equivalents (fragments):
+
+```csharp
+if (x > 0) { return true; }
+if (x > 0) { a(); } else { b(); }
+if (x > 0) { } else if (x < 0) { } else { }
+```
+
+Complete example: [Branching](#example-primer_branching).
+
+## ternary / conditional expression
+
+Conditional expression (ternary operator). Uses prefix notation with (? ...) syntax. Both branches are expressions, not statements.
+
+Syntax: `(? condition trueValue falseValue)`
+
+C# equivalents (fragments):
+
+```csharp
+var x = condition ? a : b;
+return count > 0 ? "items" : "none";
+var label = isActive ? GetLabel() : "default";
+```
+
+Complete example: [Abs](#example-task_4).
+
+## return statement
+
+Returns a value from a function or method. Use bare §R for void returns.
+
+Syntax: `§R expression or §R (void)`
+
+C# equivalents (fragments):
+
+```csharp
+return 42;
+return user.Name;
+return;
+```
+
+Complete example: [Abs](#example-task_4).
+
+## class definition
+
+Defines a class. Supports modifiers such as abs, seal, partial, stat, struct, and readonly. Use §EXT for base class and §IMPL for interfaces.
+
+Syntax: `§CL{Name:vis[:modifiers]}`
+
+C# equivalents (fragments):
+
+```csharp
+public class User { }
+public class Admin : User, IAdmin { }
+public abstract class BaseEntity { }
+```
+
+Complete example: [Classes](#example-primer_classes).
+
+Complete example: [Class with Fields, Constructor + Operators](#example-complex_class).
+
+## async method
+
+Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.
+
+Syntax: `§AF{name:vis} (type:param, ...) -> returnType or §AMT{name:vis} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public async Task<string> FetchDataAsync() { ... }
+public async Task ProcessAsync() { await DoWork(); }
+```
+
+Complete example: [Async Method with Try/Catch](#example-complex_async).
+
+## await expression
+
+Awaits an asynchronous operation.
+
+Syntax: `§AWAIT expression`
+
+C# equivalents (fragments):
+
+```csharp
+var result = await FetchAsync();
+await Task.Delay(1000);
+```
+
+Complete example: [Async Method with Try/Catch](#example-complex_async).
+
+## try catch
+
+Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.
+
+Syntax: `§TR body §CA{ExceptionType:varName} handler §FI cleanup`
+
+C# equivalents (fragments):
+
+```csharp
+try { x(); } catch { y(); }
+try { } catch (Exception ex) { Log(ex); }
+try { } finally { Cleanup(); }
+```
+
+Complete example: [Async Method with Try/Catch](#example-complex_async).
+
+## throw statement
+
+Throws an exception. Use §RT to rethrow in a catch block.
+
+Syntax: `§TH expression or §RT (rethrow)`
+
+C# equivalents (fragments):
+
+```csharp
+throw new ArgumentException("Invalid");
+throw;
+```
+
+Complete example: [SafeDivide](#example-task_8).
+
+## side effects
+
+Declares side effects a function may have. Common effects: cw (console write), db (database), net (network), fs:r/fs:w (file system), rand (random), time, and env. Unresolved external effects are not purity proofs; supply authoritative effect metadata rather than inventing an effect code.
+
+Syntax: `§E{effect1,effect2,...}`
+
+C# equivalents (fragments):
+
+```csharp
+// Method that writes to console
+// Method that reads file and writes console
+// Pure function (no effects)
+```
+
+Complete example: [Effects](#example-primer_effects).
+
+## precondition
+
+Declares a precondition that must be true when the function is called. Part of Design by Contract.
+
+Syntax: `§Q (condition) or §Q{"message"} (condition)`
+
+C# equivalents (fragments):
+
+```csharp
+// Contract.Requires(value >= 0)
+// Guard.Against.Null(input)
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## postcondition
+
+Declares a postcondition that will be true when the function returns. Use result to refer to the return value.
+
+Syntax: `§S (condition) or §S{"message"} (condition)`
+
+C# equivalents (fragments):
+
+```csharp
+// Contract.Ensures(result >= 0)
+// Ensures non-empty result
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## module invariant
+
+Declares an invariant at module scope.
+
+Syntax: `§IV (condition)`
+
+C# equivalents (fragments):
+
+```csharp
+// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }
+```
+
+Complete example: [invariant](#example-complete_invariant).
+
+## method call
+
+Calls a method or function. Each argument uses §A; §/C delimits nested argument lists.
+
+Syntax: `§C{method} §A arg1 §A arg2 §/C`
+
+C# equivalents (fragments):
+
+```csharp
+Console.WriteLine("Hello");
+user.Save();
+Calculate(x, y) // internal pure call
+```
+
+Complete example: [Files](#example-primer_files).
+
+## field definition
+
+Defines a field in a class. Usually private, prefixed with underscore by convention.
+
+Syntax: `§FLD{type:name:visibility}`
+
+C# equivalents (fragments):
+
+```csharp
+private string _name;
+private readonly int _id;
+```
+
+Complete example: [Person](#example-task_33).
+
+## interface definition
+
+Defines an interface with method signatures.
+
+Syntax: `§IFACE{Name:vis}`
+
+C# equivalents (fragments):
+
+```csharp
+public interface IRepository { void Save(Entity e); }
+```
+
+Complete example: [interface](#example-complete_interface).
+
+## enum definition
+
+Defines an enumeration. Enum values are indented under §EN and may use = for explicit values.
+
+Syntax: `§EN{Name:vis[:underlyingType]} values...`
+
+C# equivalents (fragments):
+
+```csharp
+public enum Status { Active, Inactive, Pending }
+public enum Priority : byte { Low = 0, High = 1 }
+```
+
+Complete example: [Enum with Switch/Match](#example-complex_enum).
+
+## constructor
+
+Defines a class constructor. Use §BASE with §A arguments to call a base constructor, or §THIS to chain constructors.
+
+Syntax: `§CTOR{vis} (type:param, ...)`
+
+C# equivalents (fragments):
+
+```csharp
+public User(string name) { _name = name; }
+public Admin(string name) : base(name) { }
+```
+
+Complete example: [Person](#example-task_33).
+
+## switch expression
+
+Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.
+
+Syntax: `§W expression with indented §K pattern → result cases; use in an expression context, such as §R §W`
+
+C# equivalents (fragments):
+
+```csharp
+x switch { 1 => "one", 2 => "two", _ => "other" }
+shape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }
+```
+
+Complete example: [Enum with Switch/Match](#example-complex_enum).
+
+## null check
+
+Handles nullable values. (?? left right) returns left if non-null, else right. (?. target Member) accesses Member on target only if non-null. Both use Lisp-style prefix notation inside parentheses.
+
+Syntax: `(?? left right) for null-coalescing, (?. target Member) for null-conditional`
+
+C# equivalents (fragments):
+
+```csharp
+name ?? "default"
+user?.Name
+GetValue() ?? fallback
+```
+
+Complete example: [TryDouble](#example-task_6).
+
+## using statement
+
+Resource management with automatic disposal.
+
+Syntax: `§USE{var:type} resourceExpression`
+
+C# equivalents (fragments):
+
+```csharp
+using (var stream = File.OpenRead(path)) { ... }
+using var connection = new SqlConnection(connStr);
+```
+
+Complete example: [using](#example-complete_using).
+
+## generic type
+
+Generic type parameters and constraints.
+
+Syntax: `§CL{Repository:pub}<T> with indented §WHERE T : class`
+
+C# equivalents (fragments):
+
+```csharp
+public class Repository<T> where T : class { }
+public T Get<T>(int id) where T : new() { }
+```
+
+Complete example: [Container](#example-task_29).
+
+## LINQ query
+
+LINQ queries use method-chain syntax with §C (call) and §LAM (lambda) in Calor. Complex chains are commonly hoisted into bindings before the final call.
+
+Syntax: `§C{System.Linq.Enumerable.Where} §A collection §A predicate §/C`
+
+C# equivalents (fragments):
+
+```csharp
+items.Where(x => x > 5).Select(x => x * 2)
+from item in items where item.Active select item.Name
+```
+
+Complete example: [linq](#example-complete_linq).
+
+## string interpolation
+
+String interpolation uses ${} inside ordinary string literals. Note: ${0}, ${1} etc. are treated as format placeholders, not interpolation.
+
+Syntax: `Inline: "text ${expression} text"`
+
+C# equivalents (fragments):
+
+```csharp
+$"Hello, {name}!"
+$"Total: {price:C2}"
+$"{firstName} {lastName}"
+$"Result: {Calculate(x, y)} units"
+```
+
+Complete example: [interpolation](#example-complete_interpolation).
+
+## break and continue
+
+Loop control statements.
+
+Syntax: `§BK for break, §CN for continue`
+
+C# equivalents (fragments):
+
+```csharp
+if (done) break;
+if (skip) continue;
+```
+
+Complete example: [break continue](#example-complete_break_continue).
+
+## record type
+
+Query calor_help action=features for record conversion support. Do not handwrite passthrough.
+
+Syntax: `No authored native record declaration`
+
+## Array Creation/Initialization
+
+Creates and initializes a fixed-size array. The element type is specified in the header. Elements are space-separated between the opening and closing tags. Supports both explicit (new int[] { ... }) and bare ({ ... }) initializer syntax.
+
+Syntax: `§B{items} §ARR{type} elements §/ARR`
+
+C# equivalents (fragments):
+
+```csharp
+int[] numbers = { 5, 4, 1, 3 };
+var items = new int[] { 1, 2, 3 };
+string[] names = new[] { "Alice", "Bob" };
+```
+
+Complete example: [Array values and indexed access](#example-complete_arrays).
+
+## static class
+
+Defines a named module for static members. Its functions use §F; C# callers keep the original static class name. Static class declarations with §CL are rejected.
+
+Syntax: `§M{Name}`
+
+C# equivalents (fragments):
+
+```csharp
+public static class StringHelper { }
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## virtual method
+
+Defines a virtual method that can be overridden in derived classes. Use the 'virt' modifier (the compiler also accepts 'vr').
+
+Syntax: `§MT{name:vis:virt} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public virtual string GetName() { return _name; }
+protected virtual void OnChanged() { }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## override method
+
+Overrides a virtual method from a base class. Use the 'over' modifier (the compiler also accepts 'ov').
+
+Syntax: `§MT{name:vis:over} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public override string ToString() { return _name; }
+public override int GetHashCode() { return _id; }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## abstract class
+
+Defines an abstract class that cannot be instantiated directly. Use 'abs' modifier.
+
+Syntax: `§CL{Name:vis:abs}`
+
+C# equivalents (fragments):
+
+```csharp
+public abstract class Shape { }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## abstract method
+
+Defines an abstract method with no body that must be overridden. Use 'abs' modifier.
+
+Syntax: `§MT{name:vis:abs} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public abstract double GetArea();
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## sealed class
+
+Defines a sealed class that cannot be inherited from. Use 'seal' modifier.
+
+Syntax: `§CL{Name:vis:seal}`
+
+C# equivalents (fragments):
+
+```csharp
+public sealed class FinalClass { }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## lock statement
+
+Locks an object while executing the indented body.
+
+Syntax: `§SYNC (gate)`
+
+C# equivalents (fragments):
+
+```csharp
+lock (_sync) { _count++; }
+```
+
+Complete example: [sync](#example-complete_sync).
+
+## todo comment
+
+Use ordinary comments for todo items, fixmes and hacks.
+
+Syntax: `// TODO: description`
+
+C# equivalents (fragments):
+
+```csharp
+// TODO: Implement caching
+// FIXME: This breaks with null input
+// HACK: Temporary workaround for API bug
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## obsolete attribute
+
+Marks code as deprecated with a reason.
+
+Syntax: `§DP{reason}`
+
+C# equivalents (fragments):
+
+```csharp
+[Obsolete("Use NewMethod instead")]
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## complexity documentation
+
+Document algorithmic complexity in an ordinary comment.
+
+Syntax: `// Complexity: O(n)`
+
+C# equivalents (fragments):
+
+```csharp
+// Complexity: O(n log n)
+// Complexity: O(1) - constant time
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## access modifiers
+
+Visibility modifiers are specified in the tag header. Use 'pub' for public, 'priv' for private, 'prot' for protected.
+
+Syntax: `pub (public), priv (private), prot (protected)`
+
+C# equivalents (fragments):
+
+```csharp
+public void Method() { }
+private int _field;
+protected virtual void OnChange() { }
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## event definition
+
+Defines an event. Simple form has no body. For custom add/remove accessors, use indented §EADD and §EREM blocks inside the event body.
+
+Syntax: `§EVT{name:vis:delegateType}`
+
+C# equivalents (fragments):
+
+```csharp
+public event EventHandler OnChanged;
+public event Action<int> ValueUpdated;
+public event EventHandler Click { add { _click += value; } remove { _click -= value; } }
+```
+
+Complete example: [EventPublisher](#example-task_23).
+
+## operator overload
+
+Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).
+
+Syntax: `§OP{operator:vis} (type:param, ...) -> returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }
+public static MyType operator-(MyType value) { return new MyType(-value.Value); }
+public static implicit operator int(MyType value) { return value.Value; }
+public static explicit operator MyType(int value) { return new MyType(value); }
+```
+
+Complete example: [Class with Fields, Constructor + Operators](#example-complex_class).
+
+## decimal literal
+
+Decimal literals for precise numeric values. Use DECIMAL: or DEC: prefix, or append m/M suffix.
+
+Syntax: `DECIMAL:value or DEC:value or value with m/M suffix`
+
+C# equivalents (fragments):
+
+```csharp
+decimal price = 18.0000m;
+decimal total = 100m;
+```
+
+Complete example: [decimal](#example-complete_decimal).
+
+## char type
+
+Single Unicode character. Uses 'char' type name directly (no abbreviation).
+
+Syntax: `char`
+
+C# equivalents (fragments):
+
+```csharp
+char c = 'A';
+```
+
+Complete example: [DigitValue](#example-task_41).
+
+## yield return
+
+Produces values lazily from an iterator method. §YIELD returns a value, §YBRK stops iteration.
+
+Syntax: `§YIELD expression or §YBRK (yield break)`
+
+C# equivalents (fragments):
+
+```csharp
+yield return item;
+yield break;
+public IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }
+```
+
+Complete example: [Yield Iterator](#example-complex_yield).
+
+## delegate definition
+
+Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.
+
+Syntax: `§DEL{name} with indented §I parameters and optional §O return type`
+
+C# equivalents (fragments):
+
+```csharp
+public delegate void EventCallback(string message);
+public delegate int Transformer(int value);
+public class MyClass { public delegate void Handler(int x); }
+```
+
+Complete example: [MathOperation](#example-task_26).
+
+## preprocessor directive
+
+Conditional compilation blocks use §PP for #if and §PPE for #else. Indented statement bodies end at dedent. Nested §PP blocks express #elif. Code inside is conditionally included based on defined symbols.
+
+Syntax: `§PP{CONDITION} indented body; §PPE indented alternative`
+
+C# equivalents (fragments):
+
+```csharp
+#if DEBUG
+    Console.WriteLine("Debug mode");
+#endif
+#if NET8_0_OR_GREATER
+    UseNewApi();
+#else
+    UseLegacyApi();
+#endif
+```
+
+Complete example: [preprocessor](#example-complete_preprocessor).
+
+## struct definition
+
+Defines a value type (struct). Uses the 'struct' modifier on §CL. Supports readonly structs with the 'readonly' modifier.
+
+Syntax: `§CL{Name:vis:struct}`
+
+C# equivalents (fragments):
+
+```csharp
+public struct Point { public int X; public int Y; }
+public readonly struct Vector2D { public readonly double X; public readonly double Y; }
+```
+
+Complete example: [struct](#example-complete_struct).
+
+## generic type constraint
+
+Constrains generic type parameters. Supports class, struct, new(), interface, and base class constraints.
+
+Syntax: `§WHERE T : constraint for generic constraints`
+
+C# equivalents (fragments):
+
+```csharp
+public class Repository<T> where T : class, IEntity { }
+public T Create<T>() where T : new() { return new T(); }
+public void Process<T>(T item) where T : struct { }
+```
+
+Complete example: [Repository](#example-task_30).
+
+## do-while loop
+
+Runs the indented body at least once; the matching closer carries the condition.
+
+Syntax: `§DO body §/DO (condition)`
+
+C# equivalents (fragments):
+
+```csharp
+do { Process(); } while (HasMore());
+```
+
+Complete example: [DoWhileDemo](#example-task_13).
+
+## partial class
+
+Defines part of a class that can be split across multiple files. Uses the 'partial' modifier.
+
+Syntax: `§CL{Name:vis:partial}`
+
+C# equivalents (fragments):
+
+```csharp
+public partial class UserService { public void Save() { } }
+```
+
+Complete example: [partial](#example-complete_partial).
+
+## unsafe block
+
+Marks a block for unsafe pointer operations. Required for pointer arithmetic, fixed statements, and stackalloc.
+
+Syntax: `§UNSAFE`
+
+C# equivalents (fragments):
+
+```csharp
+unsafe { int* ptr = &value; *ptr = 42; }
+```
+
+Complete example: [unsafe](#example-complete_unsafe).
+
+## null-coalescing assignment
+
+C#'s ??= operator has no direct Calor equivalent. Use an §IF null check with §ASSIGN as a workaround.
+
+Syntax: `§IF (== x null) with indented §ASSIGN x default`
+
+C# equivalents (fragments):
+
+```csharp
+x ??= GetDefault();
+_cache ??= new Dictionary<string, int>();
+```
+
+Complete example: [nullable](#example-complete_nullable).
+
+## attribute
+
+Attaches metadata to declarations. Placed before the declaration they annotate.
+
+Syntax: `Attach [@AttributeName] or [@Attr(arg1, arg2)] after a declaration header`
+
+C# equivalents (fragments):
+
+```csharp
+[Serializable]
+public class Data { }
+[Obsolete("Use NewMethod")]
+public void OldMethod() { }
+```
+
+Complete example: [struct](#example-complete_struct).
+
+## is pattern with combinators
+
+C# 'is' patterns with and/or/not combinators are decomposed into standard boolean expressions using prefix notation. No special tag needed — fully supported natively.
+
+Syntax: `(&& (> x 0) (< x 100)) or (|| (< x 0) (> x 100))`
+
+C# equivalents (fragments):
+
+```csharp
+if (x is > 0 and < 100)
+return x is < 0 or > 100;
+if (x is not < 0)
+```
+
+Complete example: [patterns](#example-complete_patterns).
+
+## range expression
+
+C# range expressions (start..end) and index-from-end (^n) are fully supported. Use §RANGE for slicing and §^ for indexing from the end.
+
+Syntax: `§IDX{array} §RANGE start end / §IDX{array} §^ n`
+
+C# equivalents (fragments):
+
+```csharp
+var slice = array[0..5];
+var last = items[^1];
+var tail = data[2..];
+```
+
+Complete example: [array ranges](#example-complete_ranges).
+
+## positional and property patterns
+
+Positional patterns (tuple deconstruction) and property patterns are fully supported during C# → Calor migration — the converter preserves them inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.
+
+Syntax: `Supported in C# → Calor migration. Decompose to §IF chains for hand-written Calor.`
+
+C# equivalents (fragments):
+
+```csharp
+(hour, minute) switch { (0, 0) => "midnight" }
+obj switch { { Length: > 0 } => true }
+```
+
+Complete example: [patterns](#example-complete_patterns).
+
+## #pragma warning directive
+
+Pragma directives use explicit source-ordered conversion nodes. Query calor_help action=features for current support; do not handwrite passthrough.
+
+Syntax: `No authored Calor form`
+
+## tuple type and tuple literal
+
+Tuple types use parenthesized comma-separated types: (i32, str). Tuple literals use parenthesized comma-separated expressions: (1, "hello"). Named tuple elements are supported: (i32 X, i32 Y). Tuples are distinguished from Lisp expressions by the presence of commas.
+
+Syntax: `(Type1, Type2) for types; (expr1, expr2) for literals`
+
+C# equivalents (fragments):
+
+```csharp
+(int, string) pair = (1, "hello");
+(int X, int Y) point = (10, 20);
+return (a + b, a - b);
+```
+
+Complete example: [tuples](#example-complete_tuples).
+
+## null coalescing operator
+
+Null-coalescing operator in Lisp-style prefix notation. Returns left if non-null, otherwise returns right. Use inside parentheses: (?? expr default).
+
+Syntax: `(?? left right)`
+
+C# equivalents (fragments):
+
+```csharp
+var result = value ?? "default";
+return name ?? "Anonymous";
+```
+
+Complete example: [nullable](#example-complete_nullable).
+
+## null conditional operator
+
+Null-conditional member access in Lisp-style prefix notation. Accesses MemberName on target only if target is non-null, otherwise returns null. The member name is an unquoted identifier.
+
+Syntax: `(?. target MemberName)`
+
+C# equivalents (fragments):
+
+```csharp
+var name = user?.Name;
+var len = text?.Length;
+```
+
+Complete example: [objects](#example-complete_objects).
+
+## goto case / goto default
+
+Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.
+
+Syntax: `§GOTO{CASE:expr} or §GOTO{DEFAULT}`
+
+C# equivalents (fragments):
+
+```csharp
+goto case 1;
+goto case "hello";
+goto default;
+goto myLabel;
+```
+
+Complete example: [goto](#example-complete_goto).
+
+## string operations
+
+Prefix operations include (str value), (concat a b), (fmt "{0}" value), (len text), (contains text value), (starts text prefix), (ends text suffix), (equals left right), (isempty text), (upper text), (lower text), (trim text), (replace text old new) and (substr text start count). indexof accepts an optional start and count; use :ordinal for ordinal comparison. Do not invent extra arguments.
+
+Syntax: `(concat a b), (substr text start count), (indexof text value :ordinal)`
+
+C# equivalents (fragments):
+
+```csharp
+string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);
+```
+
+Complete example: [Strings](#example-primer_strings).
+
+Complete example: [StringContains](#example-task_37).
+
+Complete example: [BuildGreeting](#example-task_38).
+
+## character operations
+
+Single quotes produce char literals with C# escapes. Built-ins include char-at, char-code, char-from-code, char-upper, char-lower, is-letter, is-digit, is-whitespace, is-upper and is-lower. Character subtraction promotes to i32.
+
+Syntax: `(char-at text index), (char-code value), '0'`
+
+C# equivalents (fragments):
+
+```csharp
+text[index]; (int)value; char.IsDigit(value);
+```
+
+Complete example: [GetFirstChar](#example-task_36).
+
+Complete example: [DigitValue](#example-task_41).
+
+Complete example: [Offset](#example-task_42).
+
+## array element access
+
+Use [T] for array types and [[T]] for jagged arrays. Section expressions can nest inside prefix expressions. File.ReadAllLines returns [str], not List<str>.
+
+Syntax: `§IDX array index`
+
+C# equivalents (fragments):
+
+```csharp
+array[index]
+```
+
+Complete example: [Nested array expressions](#example-nested_arrays).
+
+Complete example: [Files](#example-primer_files).
+
+## variable assignment
+
+Declare a mutable binding with a ~-prefixed name; use §ASSIGN for all updates, including increments and compound arithmetic.
+
+Syntax: `§ASSIGN name expression`
+
+C# equivalents (fragments):
+
+```csharp
+name = expression;
+```
+
+Complete example: [Accumulate](#example-task_27).
+
+## primitive types
+
+Use the C# type mappings for aliases, ordinary .NET generic types for collections, ?T and null for nullable values. Typed numeric bounds such as INT:-2147483648 avoid an out-of-range positive intermediate. Use double quotes for strings.
+
+Syntax: `i32, i64, i16, u8, u16, u32, u64, f32, f64, dec, str, bool, char, object, void, ?T, [T]`
+
+C# equivalents (fragments):
+
+```csharp
+int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]
+```
+
+Complete example: [Bindings](#example-primer_bindings).
+
+Complete example: [TryDouble](#example-task_6).
+
+## prefix expressions
+
+Arithmetic and comparisons use prefix notation. Boolean operators && and || short circuit; ! negates. Use (- 0 value) for negation and (? condition thenValue elseValue) for a conditional value. Call Math methods for operations not provided as built-ins; method names are not prefix operators.
+
+Syntax: `(+ a b), (== a b), (&& a b), (? condition thenValue elseValue)`
+
+C# equivalents (fragments):
+
+```csharp
+a + b; a == b; a && b; condition ? thenValue : elseValue;
+```
+
+Complete example: [Abs](#example-task_4).
+
+Complete example: [Max](#example-task_10).
+
+Complete example: [Nested array expressions](#example-nested_arrays).
+
+## quantified contracts
+
+Quantifiers declare typed bound variables. Bound runtime quantifiers with finite array ranges; check array lengths against external bounds. Use -> for implication. Contracts are obligations, not a guarantee that every proof succeeds.
+
+Syntax: `(forall ((i i32)) body), (exists ((i i32)) body), (-> condition consequence)`
+
+C# equivalents (fragments):
+
+```csharp
+// Universal/existential contracts with bounded ranges.
+```
+
+Complete example: [AllPositive](#example-task_39).
+
+Complete example: [HasNegative](#example-task_40).
+
+## collection operations
+
+Ordinary List<T>, Dictionary<K,V> and HashSet<T> are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. §CNT reads count; §HAS tests membership. Use the complete examples for empty construction and iteration.
+
+Syntax: `§PUSH{list} value; §PUT{dictionary} key value`
+
+C# equivalents (fragments):
+
+```csharp
+list.Add(value); dictionary[key] = value;
+```
+
+Complete example: [SumList](#example-task_14).
+
+Complete example: [GetListLength](#example-task_15).
+
+Complete example: [PrintDictionary](#example-task_16).
+
+Complete example: [Collections](#example-primer_collections).
+
+Complete example: [Collection allocation, loop mutation and count](#example-copilot_smoke).
+
+## Example copilot_smoke
+
+Collection allocation, loop mutation and count
+
+```calor
+§M{CopilotSmoke}
+  §F{Collect:pub} (i32:n) -> i32
+    §E{mut,alloc}
+    §LIST{items:i32}
+    §/LIST
+    §L{i:1:n:1}
+      §PUSH{items} i
+    §B{count:i32} §CNT{items}
+    §R count
+```
+
+## Example complete_arrays
+
+Array values and indexed access
+
+```calor
+§M{ArrayValues}
+  §F{First:pub} () -> i32
+    §E{alloc}
+    §B{items} §ARR{i32} 10 20 30 §/ARR
+    §R §IDX items 0
+```
+
+## Example task_0
+
+ReadInput
+
+```calor
+§M{AgentReference0}
+  §F{ReadInput:pub} () -> str
+    §E{cr}
+    §B{line} §C{Console.ReadLine} §/C
+    §R line
+```
+
+## Example task_1
+
+PrintValue
+
+```calor
+§M{AgentReference1}
+  §F{PrintValue:pub} (i32:x) -> void
+    §E{cw}
+    §C{Console.WriteLine}
+    §A x
+    §/C
+```
+
+## Example task_2
+
+ClampScore
+
+```calor
+§M{AgentReference2}
+  §F{ClampScore:pub} (i32:score) -> i32
+    §E{}
+    §B{value:i32} §C{Math.Clamp}
+      §A[value] score
+      §A[min] 0
+      §A[max] 100
+    §/C
+    §R value
+```
+
+## Example task_3
+
+SquareRoot
+
+```calor
+§M{AgentReference3}
+  §F{SquareRoot:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §R x
+```
+
+## Example task_4
+
+Abs
+
+```calor
+§M{AgentReference4}
+  §F{Abs:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §R (? (< x 0) (- 0 x) x)
+```
+
+## Example task_5
+
+PrintNumber
+
+```calor
+§M{AgentReference5}
+  §F{PrintNumber:pub} (i32:x) -> void
+    §E{cw}
+    §C{Console.WriteLine}
+    §A x
+    §/C
+```
+
+## Example task_6
+
+TryDouble
+
+```calor
+§M{AgentReference6}
+  §F{TryDouble:pub} (i32:x) -> ?i32
+    §E{}
+    §IF (> x 0)
+      §R (* x 2)
+    §EL
+      §R null
+```
+
+## Example task_7
+
+TryParseDigit
+
+```calor
+§M{AgentReference7}
+  §F{TryParseDigit:pub} (char:c) -> ?i32
+    §E{}
+    §IF (&& (>= c '0') (<= c '9'))
+      §R (- c '0')
+    §EL
+      §R null
+```
+
+## Example task_8
+
+SafeDivide
+
+```calor
+§M{AgentReference8}
+  §F{SafeDivide:pub} (i32:a, i32:b) -> i32
+    §E{alloc,throw}
+    §IF (!= b 0)
+      §R (/ a b)
+    §EL
+      §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
+```
+
+## Example task_9
+
+Classify
+
+```calor
+§M{AgentReference9}
+  §F{Classify:pub} (i32:n) -> str
+    §IF (< n 0)
+      §R "negative"
+    §EI (== n 0)
+      §R "zero"
+    §EL
+      §R "positive"
+```
+
+## Example task_10
+
+Max
+
+```calor
+§M{AgentReference10}
+  §F{Max:pub} (i32:a, i32:b) -> i32
+    §IF (>= a b)
+      §R a
+    §EL
+      §R b
+```
+
+## Example task_11
+
+GetGrade
+
+```calor
+§M{AgentReference11}
+  §F{GetGrade:pub} (i32:score) -> str
+    §B{~grade:str} "F"
+    §IF (>= score 90)
+      §ASSIGN grade "A"
+    §EI (>= score 80)
+      §ASSIGN grade "B"
+    §EI (>= score 70)
+      §ASSIGN grade "C"
+    §EL
+      §ASSIGN grade "F"
+    §R grade
+```
+
+## Example task_12
+
+Countdown
+
+```calor
+§M{AgentReference12}
+  §F{Countdown:pub} () -> void
+    §E{cw}
+    §B{~count:i32} 5
+    §WH (> count 0)
+      §C{Console.WriteLine}
+      §A count
+      §/C
+      §ASSIGN count (- count 1)
+```
+
+## Example task_13
+
+DoWhileDemo
+
+```calor
+§M{AgentReference13}
+  §F{DoWhileDemo:pub} () -> void
+    §E{cw}
+    §B{~x:i32} 0
+    §DO
+      §C{Console.WriteLine}
+        §A x
+      §/C
+      §ASSIGN x (+ x 1)
+    §/DO (< x INT:3)
+```
+
+## Example task_14
+
+SumList
+
+```calor
+§M{AgentReference14}
+  §F{SumList:pub} () -> i32
+    §E{alloc,mut}
+    §B{nums:List<i32>} §NEW{List<i32>}
+    §PUSH{nums} 10
+    §PUSH{nums} 20
+    §PUSH{nums} 30
+    §B{~sum:i32} 0
+    §EACH{n} nums
+      §ASSIGN sum (+ sum n)
+    §R sum
+```
+
+## Example task_15
+
+GetListLength
+
+```calor
+§M{AgentReference15}
+  §F{GetListLength:pub} (i32:n) -> i32
+    §E{alloc,mut}
+    §Q (>= n 0)
+    §B{nums:List<i32>} §NEW{List<i32>}
+    §L{i:1:n:1}
+      §PUSH{nums} i
+    §R §CNT{nums}
+```
+
+## Example task_16
+
+PrintDictionary
+
+```calor
+§M{AgentReference16}
+  §F{PrintDictionary:pub} (Dictionary<str,i32>:scores) -> void
+    §E{cw}
+    §EACHKV{k:v} scores
+      §P k
+      §P v
+```
+
+## Example task_17
+
+GetDataAsync
+
+```calor
+§M{AgentReference17}
+  §AF{GetDataAsync:pub} () -> Task<i32>
+    §R 42
+```
+
+## Example task_18
+
+GetStatus
+
+```calor
+§M{AgentReference18}
+  §F{GetStatus:pub} (i32:code) -> str
+    §R §W code
+      §K 200 → "OK"
+      §K 404 → "Not Found"
+      §K 500 → "Server Error"
+      §K _ → "Unknown"
+```
+
+## Example task_19
+
+DayName
+
+```calor
+§M{AgentReference19}
+  §F{DayName:pub} (i32:day) -> i32
+    §R §W day
+      §K 1 → 100
+      §K 2 → 100
+      §K 3 → 100
+      §K 4 → 100
+      §K 5 → 100
+      §K 6 → 200
+      §K 7 → 200
+      §K _ → 0
+```
+
+## Example task_20
+
+GetGrade
+
+```calor
+§M{AgentReference20}
+  §F{GetGrade:pub} (i32:score) -> str
+    §R §W score
+      §K §PREL{gte} 90 → "A"
+      §K §PREL{gte} 80 → "B"
+      §K §PREL{gte} 70 → "C"
+      §K _ → "F"
+```
+
+## Example task_21
+
+Describe
+
+```calor
+§M{AgentReference21}
+  §F{Describe:pub} (i32:x) -> str
+    §R §W x
+      §K §VAR{n} §WHEN (> n 100) → "large"
+      §K §VAR{n} §WHEN (< n 0) → "negative"
+      §K 0 → "zero"
+      §K _ → "normal"
+```
+
+## Example task_22
+
+IsSingleDigit
+
+```calor
+§M{AgentReference22}
+  §F{IsSingleDigit:pub} (i32:n) -> bool
+    §R §W n
+      §K 0 → true
+      §K 1 → true
+      §K 2 → true
+      §K 3 → true
+      §K 4 → true
+      §K 5 → true
+      §K 6 → true
+      §K 7 → true
+      §K 8 → true
+      §K 9 → true
+      §K _ → false
+```
+
+## Example task_23
+
+EventPublisher
+
+```calor
+§M{AgentReference23}
+  §CL{EventPublisher:pub}
+    §EVT{OnDataReceived:pub:EventHandler}
+    §MT{Subscribe:pub} (EventHandler:handler) -> void
+      §E{mut}
+      §SUB OnDataReceived handler
+```
+
+## Example task_24
+
+ApplyDouble
+
+```calor
+§M{AgentReference24}
+  §F{ApplyDouble:pub} (i32:x) -> i32
+    §B{doubler:Func<i32,i32>} (n) → (* n 2)
+    §R §C{doubler} §A x §/C
+```
+
+## Example task_25
+
+ApplyComplex
+
+```calor
+§M{AgentReference25}
+  §F{ApplyComplex:pub} (i32:x) -> i32
+    §B{process:Func<i32,i32>} §LAM{n:i32}
+    (? (> n 0) (* n 2) 0)
+    §/LAM
+    §R §C{process} §A x §/C
+```
+
+## Example task_26
+
+MathOperation
+
+```calor
+§M{AgentReference26}
+  §DEL{MathOperation}
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+```
+
+## Example task_27
+
+Accumulate
+
+```calor
+§M{AgentReference27}
+  §F{Accumulate:pub} (i32:n) -> i32
+    §B{~acc:i32} 0          // Bind mutable variable acc = 0
+    §ASSIGN acc (+ acc n)   // Assign acc = acc + n
+    §ASSIGN acc (+ acc n)   // Assign again
+    §ASSIGN acc (+ acc n)   // And again
+    §R acc
+```
+
+## Example task_28
+
+Calculator
+
+```calor
+§M{AgentReference28}
+  §CL{Calculator:pub}
+    §MT{Add:pub} (i32:a, i32:b) -> i32
+      §R (+ a b)
+```
+
+## Example task_29
+
+Container
+
+```calor
+§M{AgentReference29}
+  §CL{Container:pub}<T>
+    §FLD{T:_value:priv}
+    §MT{Get:pub} () -> T
+      §R _value
+    §MT{Set:pub} (T:value) -> void
+      §E{mut}
+      §ASSIGN _value value
+```
+
+## Example task_30
+
+Repository
+
+```calor
+§M{AgentReference30}
+  §CL{Repository:pub}<T>
+    §WHERE T : class
+    §FLD{List<T>:_items:priv}
+    §MT{Add:pub} (T:item) -> void
+      §E{mut}
+      §C{_items.Add} §A item §/C
+```
+
+## Example task_31
+
+Product
+
+```calor
+§M{AgentReference31}
+  §CL{Product:pub}
+    §FLD{f64:_price:priv}
+    §PROP{Price:f64:pub}
+      §GET
+        §R _price
+      §SET
+        §ASSIGN _price value
+```
+
+## Example task_32
+
+Person
+
+```calor
+§M{AgentReference32}
+  §CL{Person:pub}
+    §PROP{Name:str:pub}
+      §GET
+        §SET
+```
+
+## Example task_33
+
+Person
+
+```calor
+§M{AgentReference33}
+  §CL{Person:pub}
+    §FLD{str:_name:priv}
+    §FLD{i32:_age:priv}
+    §CTOR{pub} (str:name, i32:age)
+      §ASSIGN _name name
+      §ASSIGN _age age
+    §MT{GetName:pub} () -> str
+      §R _name
+```
+
+## Example task_34
+
+AbsoluteValue
+
+```calor
+§M{AgentReference34}
+  §F{AbsoluteValue:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §S (-> (>= x 0) (== result x))
+    §S (-> (< x 0) (== result (- 0 x)))
+    §R (? (< x 0) (- 0 x) x)
+```
+
+## Example task_35
+
+LogToFileAndConsole
+
+```calor
+§M{AgentReference35}
+  §F{LogToFileAndConsole:pub} (str:path, str:message) -> void
+    §E{cw,fs:w}
+    §C{Console.WriteLine}
+    §A message
+    §/C
+    §C{File.AppendAllText}
+    §A path
+    §A message
+    §/C
+```
+
+## Example task_36
+
+GetFirstChar
+
+```calor
+§M{AgentReference36}
+  §F{GetFirstChar:pub} (str:s) -> char
+    §E{}
+    §Q (> (len s) 0)
+    §R (char-at s 0)
+```
+
+## Example task_37
+
+StringContains
+
+```calor
+§M{AgentReference37}
+  §F{StringContains:pub} (str:s, str:sub) -> bool
+    §E{}
+    §R (contains s sub)
+```
+
+## Example task_38
+
+BuildGreeting
+
+```calor
+§M{AgentReference38}
+  §F{BuildGreeting:pub} (str:name) -> str
+    §E{alloc,mut}
+    §B{sb:StringBuilder} (sb-new)
+    (sb-append sb "Hello, ")
+    (sb-append sb name)
+    (sb-append sb "!")
+    §R (sb-tostring sb)
+```
+
+## Example task_39
+
+AllPositive
+
+```calor
+§M{AgentReference39}
+  §F{AllPositive:pub} ([i32]:arr, i32:n) -> bool
+    §Q (== n (len arr))
+    §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))
+    §B{~allPos:bool} true
+    §L{i:0:(- (len arr) 1):1}
+      §IF (<= arr{i} 0)
+        §ASSIGN allPos false
+    §R allPos
+```
+
+## Example task_40
+
+HasNegative
+
+```calor
+§M{AgentReference40}
+  §F{HasNegative:pub} ([i32]:arr, i32:n) -> bool
+    §Q (== n (len arr))
+    §S (== result (exists ((i i32)) (&& (&& (>= i 0) (< i n)) (< arr{i} 0))))
+    §L{i:0:(- (len arr) 1):1}
+      §IF (< arr{i} 0)
+        §R true
+    §R false
+```
+
+## Example task_41
+
+DigitValue
+
+```calor
+§M{AgentReference41}
+  §F{DigitValue:pub} (char:c) -> i32
+    §E{}
+    §Q (is-digit c)
+    §R (- c '0')
+```
+
+## Example task_42
+
+Offset
+
+```calor
+§M{AgentReference42}
+  §F{Offset:pub} (char:c) -> i32
+    §E{}
+    §R (- c '0')
+```
+
+## Example primer_contracts
+
+Contracts
+
+```calor
+§M{Contracts}
+  §F{Square:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{Divide:pub} (i32:a, i32:b) -> i32
+    §Q{"divisor must not be zero"} (!= b 0)
+    §R (/ a b)
+```
+
+## Example primer_branching
+
+Branching
+
+```calor
+§M{Branching}
+  §F{Sign:pub} (i32:x) -> i32
+    §IF (> x 0)
+      §R 1
+    §EI (< x 0)
+      §R (- 0 1)
+    §EL
+      §R 0
+```
+
+## Example primer_files
+
+Files
+
+```calor
+§M{Files}
+  §F{Append:pub} (str:path, str:key, str:value) -> void
+    §E{fs:w}
+    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+
+  §F{CountLines:pub} (str:path) -> i32
+    §E{fs:r}
+    §B{ok:bool} §C{File.Exists} §A path §/C
+    §IF (! ok)
+      §R 0
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §R (len lines)
+```
+
+## Example primer_strings
+
+Strings
+
+```calor
+§M{Strings}
+  §F{FirstField:pub} (str:line) -> str
+    §E{}
+    §B{i:i32} (indexof line "," :ordinal)
+    §IF (< i 0)
+      §R line
+    §R (substr line 0 i)
+```
+
+## Example primer_collections
+
+Collections
+
+```calor
+§M{Collections}
+  §F{Tally:pub} (str:key) -> i32
+    §E{mut,alloc}
+    §DICT{counts:str:i32}
+    §/DICT
+    §PUT{counts} key 1
+    §R §IDX counts key
+```
+
+## Example primer_effects
+
+Effects
+
+```calor
+§M{Effects}
+  §F{Greet:pub} (str:name) -> void
+    §E{cw}
+    §C{Console.WriteLine} §A "Hello" §/C
+    §C{Console.WriteLine} §A name §/C
+```
+
+## Example primer_loops
+
+Loops
+
+```calor
+§M{Loops}
+  §F{PrintOneToFive:pub} () -> void
+    §E{cw}
+    §L{i:1:5:1}
+      §C{Console.WriteLine} §A i §/C
+```
+
+## Example primer_bindings
+
+Bindings
+
+```calor
+§M{Bindings}
+  §F{Demo:pub} () -> void
+    §E{cw}
+    §B{greeting:str} "Ada"
+    §B{~count:i32} 0
+    §C{Console.WriteLine} §A greeting §/C
+    §C{Console.WriteLine} §A count §/C
+```
+
+## Example primer_classes
+
+Classes
+
+```calor
+§M{Classes}
+  §CL{Greeter:pub}
+    §MT{Greet:pub} () -> str
+      §R "hello"
+```
+
+## Example nested_arrays
+
+Nested array expressions
+
+```calor
+§M{NestedArrayExpressions}
+  §F{SumPair:pub} ([i32]:data) -> i32
+    §E{}
+    §S (== result (+ §IDX data 0 §IDX data 1))
+    §B{~sum} 0
+    §ASSIGN sum (+ sum §IDX data 0)
+    §R (+ sum §IDX data 1)
+
+  §F{MixFirst:pub} ([i32]:data, i32:hash) -> i32
+    §E{}
+    §R (^ hash §IDX data 0)
+```
+
+## Example complex_class
+
+Class with Fields, Constructor + Operators
+
+```calor
+§M{PointModule}
+  §CL{Point:pub}
+    §FLD{i32:_x:priv}
+    §FLD{i32:_y:priv}
+
+    §CTOR{pub} (i32:x, i32:y)
+      §ASSIGN §THIS._x x
+      §ASSIGN §THIS._y y
+
+    §MT{Equals:pub} (Point:other) -> bool
+      §IF (== other null)
+        §R false
+      §EL
+        §R true
+
+    §OP{==:pub} (Point:left, Point:right) -> bool
+      §IF (== left null)
+        §R (== right null)
+      §EL
+        §R §C{left.Equals} §A right §/C
+
+    §OP{!=:pub} (Point:left, Point:right) -> bool
+      §R (! (== left right))
+```
+
+## Example complex_async
+
+Async Method with Try/Catch
+
+```calor
+§M{ConvertedModule}
+  §U{System}
+  §U{System.Threading.Tasks}
+
+  §CL{DataService:pub}
+    §AMT{FetchAsync:pub} (str:url) -> str
+      §TR
+        §B{_} §AWAIT §C{Task.Delay} §A 100 §/C
+        §R (+ "data from " url)
+      §CA{Exception:ex}
+        §R (+ "error: " ex.Message)
+```
+
+## Example complex_enum
+
+Enum with Switch/Match
+
+```calor
+§M{ConvertedModule}
+  §EN{Status}
+    Pending
+    Active
+    Suspended
+    Closed
+
+  §CL{StatusHelper:pub}
+    §MT{GetLabel:pub:stat} (Status:s) -> str
+      §R §W s
+        §K Status.Pending → "Pending Review"
+        §K Status.Active → "Active"
+        §K Status.Suspended → "Temporarily Suspended"
+        §K Status.Closed → "Closed"
+        §K _ → "Unknown"
+```
+
+## Example complex_yield
+
+Yield Iterator
+
+```calor
+§M{ConvertedModule}
+  §U{System.Collections.Generic}
+
+  §CL{NumberGen:pub}
+    §MT{GetEvens:pub} (i32:max) -> Seq<i32>
+      §L{i:0:max:2}
+        §YIELD i
+```
+
+## Example complete_objects
+
+objects
+
+```calor
+§M{Objects}
+  §CL{Person:pub}
+    §PROP{Name:str:pub:get,set}
+  §F{Create:pub} () -> Person
+    §E{alloc}
+    §R §NEW{Person} §/NEW
+  §F{ReadName:pub} (Person:person) -> ?str
+    §R (?. person Name)
+```
+
+## Example complete_indexer
+
+indexer
+
+```calor
+§M{Indexers}
+  §CL{Numbers:pub}
+    §IXER{i32:pub}
+      §I{i32:index}
+      §GET
+        §R (+ index 1)
+```
+
+## Example complete_invariant
+
+invariant
+
+```calor
+§M{Invariants}
+  §IV (> 1 0)
+  §F{Read:pub} () -> i32
+    §R 1
+```
+
+## Example complete_interface
+
+interface
+
+```calor
+§M{Interfaces}
+  §IFACE{ICounter}
+    §MT{Count:pub} () -> i32
+  §CL{Counter:pub}
+    §IMPL{ICounter}
+    §MT{Count:pub} () -> i32
+      §R 1
+```
+
+## Example complete_using
+
+using
+
+```calor
+§M{Resources}
+  §F{Read:pub} (str:value) -> str
+    §E{alloc}
+    §USE{reader:System.IO.StringReader} §NEW{System.IO.StringReader} §A value §/NEW
+      §R §C{reader.ReadToEnd} §/C
+```
+
+## Example complete_linq
+
+linq
+
+```calor
+§M{Queries}
+  §U{System.Linq}
+  §F{Positive:pub} ([i32]:values) -> [i32]
+    §E{alloc}
+    §B{predicate:Func<i32,bool>} §LAM{x:i32} (> x 0) §/LAM
+    §B{filtered:IEnumerable<i32>} §C{System.Linq.Enumerable.Where} §A values §A predicate §/C
+    §R §C{System.Linq.Enumerable.ToArray} §A filtered §/C
+```
+
+## Example complete_interpolation
+
+interpolation
+
+```calor
+§M{Interpolation}
+  §F{Greet:pub} (str:name) -> str
+    §R "Hello ${name}"
+```
+
+## Example complete_break_continue
+
+break continue
+
+```calor
+§M{LoopControl}
+  §F{FirstPositive:pub} ([i32]:values) -> i32
+    §E{}
+    §B{~answer:i32} 0
+    §EACH{value:i32} values
+      §IF (<= value 0)
+        §CN
+      §ASSIGN answer value
+      §BK
+    §R answer
+```
+
+## Example complete_inheritance
+
+inheritance
+
+```calor
+§M{Inheritance}
+  §CL{Base:pub:abs}
+    §MT{Read:pub:abs} () -> i32
+    §MT{Label:pub:virt} () -> str
+      §R "base"
+  §CL{Derived:pub:seal}
+    §EXT{Base}
+    §MT{Read:pub:over} () -> i32
+      §R 7
+    §MT{Label:pub:over} () -> str
+      §R "derived"
+```
+
+## Example complete_sync
+
+sync
+
+```calor
+§M{Synchronization}
+  §F{Read:pub} (object:gate) -> i32
+    §SYNC (gate)
+      §R 7
+```
+
+## Example complete_documentation
+
+documentation
+
+```calor
+§M{Documentation}
+  // TODO: add another algorithm.
+  // Complexity: O(1).
+  §F{Read:pub} () -> i32
+    §DP{Use ReadCurrent instead}
+    §R 7
+  §F{ReadCurrent:priv} () -> i32
+    §R 8
+```
+
+## Example complete_decimal
+
+decimal
+
+```calor
+§M{Decimals}
+  §F{Price:pub} () -> dec
+    §R DECIMAL:18.00
+```
+
+## Example complete_preprocessor
+
+preprocessor
+
+```calor
+§M{Preprocessor}
+  §F{Mode:pub} () -> str
+    §PP{DEBUG}
+      §R "debug"
+    §PPE
+      §R "release"
+```
+
+## Example complete_struct
+
+struct
+
+```calor
+§M{Values}
+  §CL{Point:pub:struct}[@Serializable]
+    §PROP{X:i32:pub:get,set}
+```
+
+## Example complete_partial
+
+partial
+
+```calor
+§M{PartialTypes}
+  §CL{Counter:pub:partial}
+    §MT{Read:pub} () -> i32
+      §R 1
+```
+
+## Example complete_unsafe
+
+unsafe
+
+```calor
+§M{UnsafeCode}
+  §F{Size:pub} () -> i32
+    §E{unsafe}
+    §UNSAFE
+      §R 4
+```
+
+## Example complete_nullable
+
+nullable
+
+```calor
+§M{NullableValues}
+  §F{DefaultName:pub} (?str:name) -> str
+    §B{~value:?str} name
+    §IF (== value null)
+      §ASSIGN value "unknown"
+    §R (?? value "unknown")
+```
+
+## Example complete_patterns
+
+patterns
+
+```calor
+§M{Patterns}
+  §F{InRange:pub} (i32:value) -> bool
+    §R (&& (> value 0) (< value 100))
+```
+
+## Example complete_tuples
+
+tuples
+
+```calor
+§M{Tuples}
+  §F{Pair:pub} (i32:value) -> (i32, str)
+    §R (value, "value")
+```
+
+## Example complete_goto
+
+goto
+
+```calor
+§M{Jumps}
+  §F{Normalize:pub} (i32:value) -> i32
+    §W value
+      §K 0
+        §GOTO{CASE:1}
+      §K 1
+        §R 1
+      §K _
+        §R 0
+```
+
+## Example complete_ranges
+
+array ranges
+
+```calor
+§M{ArrayRanges}
+  §F{FirstTwo:pub} ([i32]:values) -> [i32]
+    §R §IDX{values} §RANGE 0 2
+```

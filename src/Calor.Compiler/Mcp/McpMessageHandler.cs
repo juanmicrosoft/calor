@@ -116,6 +116,13 @@ public sealed class McpMessageHandler
         });
         RegisterResource(new McpResource
         {
+            Uri = "calor://reference",
+            Name = "Current Language Reference",
+            Description = "Generated current constructs and complete examples, shared by help and agent task consumers",
+            MimeType = "text/markdown"
+        });
+        RegisterResource(new McpResource
+        {
             Uri = "calor://primer",
             Name = "Calor Language Primer",
             Description = "Canonical examples for agents: module, function, effects, contracts, branching, loops, bindings, class. Indent-only; every example compiles. Read once at session start.",
@@ -132,14 +139,14 @@ public sealed class McpMessageHandler
         {
             Uri = "calor://tags",
             Name = "Section Tag Catalog",
-            Description = "All Calor section tags with opening/closing forms",
+            Description = "Current documented Calor tags, syntax and delimiter guidance",
             MimeType = "application/json"
         });
         RegisterResource(new McpResource
         {
             Uri = "calor://id-prefixes",
-            Name = "ID Prefix Catalog",
-            Description = "ULID ID prefixes for each declaration kind",
+            Name = "Tooling Identity Guidance",
+            Description = "Tooling-owned identity; source declarations have no ID prefixes (legacy resource URI retained)",
             MimeType = "application/json"
         });
         RegisterResource(new McpResource
@@ -445,6 +452,8 @@ public sealed class McpMessageHandler
         {
             "calor://syntax-reference" => LoadEmbeddedResource(assembly,
                 "Calor.Compiler.Resources.calor-syntax-documentation.json", uri, "application/json"),
+            "calor://reference" => LoadEmbeddedResource(assembly,
+                "Calor.Compiler.Resources.current-language-reference.md", uri, "text/markdown"),
             "calor://error-catalog" => LoadEmbeddedResource(assembly,
                 "Calor.Compiler.Resources.error-suggestions.json", uri, "application/json"),
             "calor://type-mappings" => new McpResourceContent
@@ -495,29 +504,8 @@ public sealed class McpMessageHandler
         return new McpResourceContent { Uri = uri, MimeType = mimeType, Text = reader.ReadToEnd() };
     }
 
-    private static string GetTypeMappingsMarkdown() => """
-        # C# → Calor Type Mappings
-
-        | C# Type | Calor Type | Notes |
-        |---------|------------|-------|
-        | `int` | `i32` | 32-bit signed integer |
-        | `long` | `i64` | 64-bit signed integer |
-        | `short` | `i16` | 16-bit signed integer |
-        | `byte` | `u8` | 8-bit unsigned integer |
-        | `float` | `f32` | 32-bit floating point |
-        | `double` | `f64` | 64-bit floating point |
-        | `decimal` | `dec` | 128-bit decimal |
-        | `string` | `str` | UTF-16 string |
-        | `bool` | `bool` | Boolean |
-        | `char` | `char` | Unicode character |
-        | `void` | `void` | No return value |
-        | `object` | `obj` | Base type |
-        | `int?` / `Nullable<int>` | `?i32` | Nullable value |
-        | `Task<T>` | use `§AF`/`§AMT` | Async function/method |
-        | `List<T>` | `§LIST{name:type}` | List collection |
-        | `Dictionary<K,V>` | `§DICT{name:key:val}` | Dictionary collection |
-        | `HashSet<T>` | `§HSET{name:type}` | HashSet collection |
-        """;
+    private static string GetTypeMappingsMarkdown() =>
+        Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.type-mappings.md");
 
     private static string? _primerCache;
 
@@ -547,111 +535,20 @@ public sealed class McpMessageHandler
     internal static string GetPrimerContentPublic() => GetPrimerContent();
 
     internal static string GetEffectCatalogJsonPublic() => GetEffectCatalogJson();
-    private static string GetEffectCatalogJson() => """
-        {"effects":[
-          {"code":"cw","kind":"IO","description":"Console write","examples":["Console.WriteLine","ILogger.Log"]},
-          {"code":"cr","kind":"IO","description":"Console read","examples":["Console.ReadLine"]},
-          {"code":"fs:r","kind":"IO","description":"Filesystem read","examples":["File.ReadAllText","StreamReader.ReadToEnd"]},
-          {"code":"fs:w","kind":"IO","description":"Filesystem write","examples":["File.WriteAllText","StreamWriter.Write"]},
-          {"code":"fs:rw","kind":"IO","description":"Filesystem read+write (encompasses fs:r and fs:w)","examples":["FileStream.Open"]},
-          {"code":"net:r","kind":"IO","description":"Network read","examples":["HttpClient.GetStringAsync"]},
-          {"code":"net:w","kind":"IO","description":"Network write","examples":["HttpResponse.WriteAsync"]},
-          {"code":"net:rw","kind":"IO","description":"Network read+write (encompasses net:r and net:w)","examples":["HttpClient.GetAsync","TcpClient.Connect"]},
-          {"code":"db:r","kind":"IO","description":"Database read","examples":["DbContext.Find","DbCommand.ExecuteReader","SqlMapper.Query"]},
-          {"code":"db:w","kind":"IO","description":"Database write","examples":["DbContext.SaveChanges","DbCommand.ExecuteNonQuery","SqlMapper.Execute"]},
-          {"code":"db:rw","kind":"IO","description":"Database read+write (encompasses db:r and db:w)","examples":["DbConnection.Open"]},
-          {"code":"env:r","kind":"IO","description":"Environment/config read","examples":["Environment.GetEnvironmentVariable","IConfiguration.GetSection"]},
-          {"code":"env:rw","kind":"IO","description":"Environment read+write","examples":["Environment.SetEnvironmentVariable"]},
-          {"code":"proc","kind":"IO","description":"Process execution","examples":["Process.Start"]},
-          {"code":"alloc","kind":"Memory","description":"Significant allocation","examples":["GC.Collect"]},
-          {"code":"unsafe","kind":"Memory","description":"Unsafe memory operation","examples":["Marshal.AllocHGlobal"]},
-          {"code":"time","kind":"Nondeterminism","description":"System time dependency","examples":["DateTime.Now","Stopwatch.StartNew"]},
-          {"code":"rand","kind":"Nondeterminism","description":"Random number generation","examples":["Random.Next","Guid.NewGuid"]},
-          {"code":"mut","kind":"Mutation","description":"Heap mutation","examples":["List.Add","Dictionary.TryAdd"]},
-          {"code":"throw","kind":"Exception","description":"Intentional exception throw","examples":["ArgumentException","InvalidOperationException"]}
-        ],"subtyping":[
-          {"broad":"fs:rw","encompasses":["fs:r","fs:w"]},
-          {"broad":"net:rw","encompasses":["net:r","net:w"]},
-          {"broad":"db:rw","encompasses":["db:r","db:w"]},
-          {"broad":"env:rw","encompasses":["env:r"]}
-        ]}
-        """;
+    private static string GetEffectCatalogJson() =>
+        Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.effects.json");
 
     internal static string GetTagCatalogJsonPublic() => GetTagCatalogJson();
-    private static string GetTagCatalogJson() => """
-        {"tags":[
-          {"open":"§M{id:Name}","close":"(none — indent-only)","description":"Module (body indented)","idPrefix":"m_"},
-          {"open":"§F{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Function (body indented)","idPrefix":"f_"},
-          {"open":"§AF{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Async function (body indented)","idPrefix":"f_"},
-          {"open":"§CL{id:Name:vis}","close":"(none — indent-only)","description":"Class (body indented)","idPrefix":"c_"},
-          {"open":"§IF{id} (cond)","close":"(none — indent-only)","description":"If block (bodies indented; §EI/§EL for elseif/else)"},
-          {"open":"§EI (cond)","close":"(none)","description":"Else-if branch"},
-          {"open":"§EL","close":"(none)","description":"Else branch"},
-          {"open":"§L{id:var:from:to:step}","close":"(none — indent-only)","description":"For loop (body indented)"},
-          {"open":"§C{target}","close":"§/C","description":"Method call (§/C optional, closes inline)"},
-          {"open":"§A","close":"(inline)","description":"Argument to call"},
-          {"open":"§R","close":"(inline)","description":"Return expression"},
-          {"open":"§B{name}","close":"(inline)","description":"Immutable binding (§B{name} expr)"},
-          {"open":"§B{~name}","close":"(inline)","description":"Mutable binding (~ prefix)"},
-          {"open":"§I{type:name}","close":"(inline)","description":"Function input parameter (explicit form)"},
-          {"open":"§O{type}","close":"(inline)","description":"Function output type (explicit form)"},
-          {"open":"§E{effects}","close":"(inline)","description":"Effect declaration (comma-separated codes)"},
-          {"open":"§Q (expr)","close":"(inline)","description":"Precondition contract"},
-          {"open":"§S (expr)","close":"(inline)","description":"Postcondition contract"},
-          {"open":"§MT{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Method (inside class, body indented)","idPrefix":"mt_"},
-          {"open":"§AMT{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Async method (body indented)","idPrefix":"mt_"},
-          {"open":"§CTOR{id:vis}","close":"(none — indent-only)","description":"Constructor (body indented)","idPrefix":"ctor_"},
-          {"open":"§PROP{id:Name:type:vis}","close":"(none — indent-only)","description":"Property (body indented)","idPrefix":"p_"},
-          {"open":"§IFACE{id:Name}","close":"(none — indent-only)","description":"Interface (body indented)","idPrefix":"i_"},
-          {"open":"§EN{id:Name:vis}","close":"(none — indent-only)","description":"Enum (body indented)","idPrefix":"e_"},
-          {"open":"§OP{id:operator:vis}","close":"(none — indent-only)","description":"Operator overload (body indented)","idPrefix":"op_"}
-        ],"closingTagRules":"Calor is INDENT-ONLY: a block's body is indented (2 spaces per level) under its opener and ends at the next dedent. There are NO structural closing tags — never write §/M, §/F, §/CL, §/I, §/L, §/MT, §/CTOR, §/PROP, §/IFACE, §/EN, §/OP. The only closers that remain are inline/optional: §/C closes a call, and §RAW…§/RAW, §CSHARP{…}§/CSHARP, §PP…§/PP keep their delimiters."}
-        """;
+    private static string GetTagCatalogJson() =>
+        Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.tags.json");
 
     internal static string GetIdPrefixCatalogJsonPublic() => GetIdPrefixCatalogJson();
-    private static string GetIdPrefixCatalogJson() => """
-        {"prefixes":[
-          {"prefix":"m_","kind":"module","example":"m_01JWDG3KABCDEFGHJKMNPQRST"},
-          {"prefix":"f_","kind":"function","example":"f_01JWDG3LABCDEFGHJKMNPQRST"},
-          {"prefix":"c_","kind":"class","example":"c_01JWDG3MABCDEFGHJKMNPQRST"},
-          {"prefix":"i_","kind":"interface","example":"i_01JWDG3NABCDEFGHJKMNPQRST"},
-          {"prefix":"p_","kind":"property","example":"p_01JWDG3PABCDEFGHJKMNPQRST"},
-          {"prefix":"mt_","kind":"method","example":"mt_01JWDG3QABCDEFGHJKMNPQRST"},
-          {"prefix":"ctor_","kind":"constructor","example":"ctor_01JWDG3RABCDEFGHJKMNPQRST"},
-          {"prefix":"e_","kind":"enum","example":"e_01JWDG3SABCDEFGHJKMNPQRST"},
-          {"prefix":"op_","kind":"operator","example":"op_01JWDG3TABCDEFGHJKMNPQRST"}
-        ],"format":"IDs are ULID-based (26-character Crockford Base32). Generate with calor_generate_ids. Sequential IDs like f001 are test-only and flagged by Calor0804 in production."}
-        """;
+    private static string GetIdPrefixCatalogJson() =>
+        Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.id-prefixes.json");
 
     internal static string GetWorkflowsJsonPublic() => GetWorkflowsJson();
-    private static string GetWorkflowsJson() => """
-        {"tasks":{
-          "write-new-function":{"description":"Write a new Calor function from scratch","steps":[
-            {"tool":"calor_generate_ids","args":{"needs":[{"kind":"function","count":1}]},"why":"Get a ULID with correct f_ prefix"},
-            {"tool":"calor_help","args":{"action":"effects_for","calls":["DbContext.SaveChanges"]},"why":"Look up effects for planned external calls"},
-            {"action":"write_code","why":"Write the function using the ID, effects, and correct closing tags from calor://tags"},
-            {"tool":"calor_compile","args":{"autoFix":true},"why":"Compile and auto-fix syntax/ID/effect errors"}
-          ]},
-          "fix-compilation-errors":{"description":"Fix errors in existing Calor code","steps":[
-            {"tool":"calor_compile","args":{"autoFix":true},"why":"Auto-fix all high-confidence errors (parser, ID, effects)"},
-            {"condition":"remaining medium/low diagnostics","action":"Read diagnostics and apply suggested fixes manually"},
-            {"condition":"Calor0411 unknown external calls","tool":"calor_help","args":{"action":"effects_for"},"why":"Look up effects for unresolved calls"}
-          ]},
-          "convert-csharp-to-calor":{"description":"Convert a C# file to Calor","steps":[
-            {"tool":"calor_convert","args":{"includeEffects":true},"why":"Convert with auto-inferred effect declarations"},
-            {"tool":"calor_compile","args":{"autoFix":true},"why":"Verify and fix any remaining issues"}
-          ]},
-          "add-effects-to-function":{"description":"Add correct effect declarations to a function","steps":[
-            {"tool":"calor_compile","args":{"includeEffectSummary":true},"why":"Get declared vs computed effects per function"},
-            {"action":"Add missing effects from the effectSummary.missing field to §E{...}"}
-          ]},
-          "write-new-module":{"description":"Write a new Calor module with multiple functions","steps":[
-            {"tool":"calor_generate_ids","args":{"needs":[{"kind":"module","count":1},{"kind":"function","count":3}]},"why":"Get ULIDs for all declarations"},
-            {"action":"Write module using IDs, consulting calor://primer for syntax patterns"},
-            {"tool":"calor_compile","args":{"autoFix":true,"includeEffectSummary":true},"why":"Compile, fix, and verify effects"}
-          ]}
-        }}
-        """;
+    private static string GetWorkflowsJson() =>
+        Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.workflows.json");
 
     // ── Prompts ────────────────────────────────────────────────────────
 
@@ -782,35 +679,8 @@ public sealed class McpMessageHandler
 
     // ── Server Instructions ────────────────────────────────────────────
 
-    private static string GetServerInstructions() => """
-        You are working with a Calor project. Calor is a DSL for AI agents that compiles to C# on .NET 10.
-
-        RULES:
-        1. All new code MUST be written in Calor (.calr files), never raw C# (.cs).
-        2. Before modifying a .cs file, convert it to .calr first using calor_convert.
-        3. After writing any .calr code, compile with calor_compile (autoFix is on by default).
-        4. Never edit .g.cs files — they are auto-generated from .calr sources.
-
-        SYNTAX ESSENTIALS (Calor is INDENT-ONLY: bodies are indented, no closing tags):
-        - Module: §M{id:Name} (body indented)
-        - Function: §F{id:name:vis} (type:name, ...) -> retType (body indented)
-        - Binding: §B{name} expr (immutable), §B{~name} expr (mutable)
-        - Loop: §L{id:var:from:to:step} (body indented)
-        - Conditional: §IF{id} (cond) with §EI (cond) / §EL; put each branch body on indented lines
-        - NO structural closing tags — never write §/M, §/F, §/L, §/I; a block ends at the next dedent
-        - Typed literals: INT:42, STR:"hello", BOOL:true, FLOAT:3.14
-        - Expressions use prefix notation: (+ a b), (== x 0), (% i 15)
-        - Types: i32, i64, str, bool, f64, void, ?i32 (option), i32!str (result)
-        - Contracts: §Q (precondition), §S (postcondition)
-        - Effects: §E{cw,db:w,net:rw}
-
-        WORKFLOW: Read calor://primer at session start. Use calor_help for unfamiliar syntax. Use calor_verify for contract checking.
-
-        EDITING .calr FILES: Prefer calor_file_write — it auto-heals indentation slips, checks the
-        edit (compile, contracts, effects, references), and applies atomically or rejects breaking
-        edits with diagnostics. For multi-file projects, calor_session_open first and pass the
-        sessionId so checks see the whole project; calor_session_close when done.
-        """;
+    private static string GetServerInstructions() =>
+        Init.EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.server-instructions.md");
 
     // ── Test helpers (for McpRegistryValidationTests) ──────────────
 

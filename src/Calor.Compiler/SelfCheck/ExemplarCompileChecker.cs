@@ -1,4 +1,8 @@
 using System.Text.RegularExpressions;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Calor.Compiler.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -27,10 +31,158 @@ namespace Calor.Compiler.SelfCheck;
 /// Together they make "reintroducing the List&lt;str&gt; ReadAllLines bug fails
 /// self-check" true wherever the idiom appears. Regression guard for #712.</para>
 /// <para><see cref="CheckAgentTaskReference"/> applies the same compilation check
-/// to the actual reference heredoc copied into agent-task workspaces.</para>
+/// to the generated reference copied into agent-task workspaces.</para>
 /// </summary>
 public static class ExemplarCompileChecker
 {
+    public const string TeachingSourcePath = "src/Calor.Compiler/Resources/Teaching/reference.json";
+    public const string TeachingReferencePath = "src/Calor.Compiler/Resources/Teaching/Generated/current-language-reference.md";
+
+    /// <summary>Renders checked-in teaching mirrors; runtime consumers read only packaged output.</summary>
+    public static IReadOnlyDictionary<string, string> GenerateTeachingResources(string source)
+    {
+        var root = JsonNode.Parse(source)?.AsObject()
+            ?? throw new InvalidDataException("Teaching source must be an object.");
+        if (root["schemaVersion"]?.GetValue<int>() != 1)
+            throw new InvalidDataException("Unsupported teaching schema version.");
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+        string Text(JsonNode node, string key) => node[key]?.GetValue<string>()
+            ?? throw new InvalidDataException($"Teaching field '{key}' is missing.");
+        string Json(JsonNode node) => node.ToJsonString(options) + "\n";
+        var constructs = root["constructs"]!.AsArray();
+        var programs = root["programs"]!.AsArray().Select(p => p!).ToDictionary(p => Text(p, "id"), StringComparer.Ordinal);
+        if (constructs.Count == 0 || programs.Count == 0)
+            throw new InvalidDataException("Teaching source must contain constructs and complete examples.");
+        var byId = constructs.Select(c => c!).ToDictionary(c => Text(c, "id"), StringComparer.Ordinal);
+        var effectCodes = root["catalogs"]!["effects.json"]!["effects"]!.AsArray()
+            .Select(effect => Text(effect!, "code")).ToArray();
+        if (effectCodes.Distinct(StringComparer.Ordinal).Count() != effectCodes.Length
+            || !effectCodes.ToHashSet(StringComparer.Ordinal).SetEquals(Effects.EffectCodes.DocumentedCompactCodes))
+            throw new InvalidDataException("Teaching effects must match the current non-legacy effect registry.");
+        foreach (var construct in byId.Values)
+        {
+            foreach (var key in new[] { "csharpConstruct", "calorSyntax", "description", "csharpEquivalent" })
+                _ = Text(construct, key);
+            if (construct["keywords"]!.AsArray().Count == 0)
+                throw new InvalidDataException($"Construct '{Text(construct, "id")}' has no keywords.");
+            if (construct["lookupOnly"]?.GetValue<bool>() != true && construct["programs"]!.AsArray().Count == 0)
+                throw new InvalidDataException($"Construct '{Text(construct, "id")}' has no complete example.");
+            foreach (var id in construct["programs"]!.AsArray())
+                if (!programs.ContainsKey(id!.GetValue<string>()))
+                    throw new InvalidDataException($"Unknown teaching program '{id}'.");
+        }
+        var lookupConstructs = constructs.DeepClone().AsArray();
+        foreach (var construct in lookupConstructs)
+        {
+            construct!["examples"] = new JsonArray(construct["programs"]!.AsArray()
+                .Select(id => (JsonNode)new JsonObject
+                {
+                    ["csharp"] = Text(construct, "csharpEquivalent"),
+                    ["calor"] = Text(programs[id!.GetValue<string>()], "calor")
+                }).ToArray());
+        }
+
+        var tags = root["tags"]!.DeepClone().AsObject();
+        foreach (var (_, tag) in tags)
+        {
+            if (tag!["construct"] is not { } target)
+                continue;
+            var construct = byId[target.GetValue<string>()];
+            tag["name"] ??= Text(construct, "csharpConstruct");
+            tag["syntax"] = Text(construct, "calorSyntax");
+            tag["description"] = Text(construct, "description");
+            tag["csharpEquivalent"] = Text(construct, "csharpEquivalent");
+            tag.AsObject().Remove("construct");
+        }
+
+        const string banner = "<!-- Generated from src/Calor.Compiler/Resources/Teaching/reference.json by calor self-check docs --fix. Do not edit. -->\n\n";
+        var reference = new StringBuilder(banner);
+        reference.Append(Text(root, "introduction")).Append('\n').Append(Text(root, "overview")).Append('\n');
+        foreach (var construct in byId.Values)
+        {
+            reference.Append("## ").Append(Text(construct, "csharpConstruct")).Append("\n\n")
+                .Append(Text(construct, "description")).Append("\n\n")
+                .Append("Syntax: `").Append(Text(construct, "calorSyntax")).Append("`\n\n");
+            if (Text(construct, "csharpEquivalent").Length > 0)
+                reference.Append("C# equivalents (fragments):\n\n```csharp\n")
+                    .Append(Text(construct, "csharpEquivalent")).Append("\n```\n\n");
+            foreach (var id in construct["programs"]!.AsArray())
+                reference.Append("Complete example: [").Append(Text(programs[id!.GetValue<string>()], "title"))
+                    .Append("](#example-").Append(id.GetValue<string>()).Append(").\n\n");
+        }
+        foreach (var (id, program) in programs)
+        {
+            reference.Append("## Example ").Append(id).Append("\n\n")
+                .Append(Text(program, "title")).Append("\n\n```calor\n")
+                .Append(Text(program, "calor").TrimEnd()).Append("\n```\n\n");
+        }
+
+        var referenceText = reference.ToString().TrimEnd() + "\n";
+        var primerSource = root["primer"]!;
+        var primer = new StringBuilder(banner).Append(Text(primerSource, "introduction"))
+            .Append("## Complete programs (the compiler's tests prove every one compiles)\n\n");
+        foreach (var id in primerSource["programs"]!.AsArray())
+            primer.Append("```calor\n").Append(Text(programs[id!.GetValue<string>()], "calor").TrimEnd()).Append("\n```\n\n");
+        primer.Append(Text(primerSource, "mistakes"));
+        var instructions = Text(root, "agentInstructions");
+        var outputs = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [TeachingReferencePath] = referenceText,
+            [RelativePath.Replace('\\', '/')] = primer.ToString(),
+            ["src/Calor.Compiler/Resources/calor-syntax-documentation.json"] = Json(new JsonObject
+            {
+                ["version"] = root["version"]!.DeepClone(),
+                ["constructs"] = lookupConstructs,
+                ["tags"] = tags
+            }),
+            ["src/Calor.Compiler/Resources/Teaching/Generated/server-instructions.md"] = instructions,
+            ["src/Calor.Compiler/Resources/Teaching/Generated/overview.md"] = Text(root, "overview"),
+            ["docs/syntax-reference/current-language.md"] =
+                "---\nlayout: default\ntitle: Current language reference\nparent: Syntax Reference\n"
+                + "nav_order: 0\npermalink: /syntax-reference/current-language/\n---\n\n" + referenceText,
+        };
+        foreach (var template in new[] { "CLAUDE", "AGENTS", "GEMINI", "copilot-instructions" })
+            outputs[$"src/Calor.Compiler/Resources/Templates/{template}.md.template"] =
+                "<!-- BEGIN CalorC SECTION - DO NOT EDIT -->\n<!-- calor-template-version: 1 -->\n"
+                + banner + "## Calor-First Project\n\n" + instructions
+                + "\n*Generated by calor v{{VERSION}}*\n<!-- END CalorC SECTION -->\n";
+        foreach (var (name, value) in root["catalogs"]!.AsObject())
+            outputs["src/Calor.Compiler/Resources/Teaching/Generated/" + name] =
+                name.EndsWith(".json", StringComparison.Ordinal) ? Json(value!) : value!.GetValue<string>();
+        outputs["src/Calor.Compiler/Resources/Teaching/Generated/tags.json"] = Json(new JsonObject
+        {
+            ["tags"] = JsonSerializer.SerializeToNode(tags.Select(pair => new
+            {
+                open = pair.Value!["syntax"]!.GetValue<string>(),
+                close = pair.Value["close"]?.GetValue<string>() ?? "(none)",
+                tag = pair.Key,
+                description = pair.Value["description"]!.GetValue<string>(),
+                csharpEquivalent = pair.Value["csharpEquivalent"]!.GetValue<string>()
+            }).ToArray(), options),
+            ["closingTagRules"] = "Structural blocks end at dedent. Calls, block lambdas, do-while conditions and value literals use their documented delimiters."
+        });
+        // MDX prose needs escaping; code fences remain byte-identical to the agent reference.
+        var mdx = new StringBuilder("---\ntitle: Current language reference\ndescription: Generated current Calor constructs and complete examples\n---\n\n");
+        var inFence = false;
+        foreach (var line in referenceText.Split('\n'))
+        {
+            if (line.StartsWith("```", StringComparison.Ordinal))
+                inFence = !inFence;
+            if (line.StartsWith("<!--", StringComparison.Ordinal))
+                mdx.Append("{/* Generated from Teaching/reference.json by calor self-check docs --fix. */}");
+            else
+                mdx.Append(inFence || line.StartsWith("```", StringComparison.Ordinal) ? line :
+                    line.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("{", "&#123;").Replace("}", "&#125;"));
+            mdx.Append('\n');
+        }
+        outputs["website/content/syntax-reference/current-language.mdx"] = mdx.ToString().TrimEnd() + "\n";
+        return outputs;
+    }
+
     // A binding whose initializer is a call to an array-returning BCL API, e.g.
     // "§B{lines:[str]} §C{File.ReadAllLines} §A path §/C". Captures the declared
     // binding type and the API so the type can be required to be the array form.
@@ -226,9 +378,8 @@ public static class ExemplarCompileChecker
     }
 
     public static readonly string AgentTaskReferencePath =
-        Path.Combine("tests", "E2E", "agent-tasks", "lib", "helpers.sh");
+        TeachingReferencePath;
 
-    private const string ReferenceStartMarker = "<< 'CALOR_REFERENCE'";
     private static readonly Regex ReferenceDeclaration = new(@"^§(?:M|F|AF|CL|IFACE|DEL)\{");
 
     public sealed record ReferenceProgram(string Source, int FirstContentLine, bool Wrapped);
@@ -236,17 +387,10 @@ public static class ExemplarCompileChecker
     public static IReadOnlyList<ReferenceProgram> ExtractAgentTaskPrograms(string helperSource)
     {
         var lines = helperSource.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        var start = Array.FindIndex(lines, line => line.TrimEnd().EndsWith(ReferenceStartMarker, StringComparison.Ordinal));
-        if (start < 0)
-            throw new InvalidDataException("Agent reference heredoc opening marker is missing.");
-        var end = Array.FindIndex(lines, start + 1, line => line == "CALOR_REFERENCE");
-        if (end < 0)
-            throw new InvalidDataException("Agent reference heredoc closing marker is missing.");
-
         var programs = new List<ReferenceProgram>();
         string? language = null;
         var contentStart = 0;
-        for (var index = start + 1; index < end; index++)
+        for (var index = 0; index < lines.Length; index++)
         {
             var line = lines[index].Trim();
             if (!line.StartsWith("```", StringComparison.Ordinal))
@@ -274,7 +418,7 @@ public static class ExemplarCompileChecker
             var body = string.Join("\n", lines[first..index]);
             var wrapped = !lines[first].TrimStart().StartsWith("§M{", StringComparison.Ordinal);
             if (wrapped)
-                body = $"§M{{m_ref_{programs.Count}:AgentReference{programs.Count}}}\n"
+                body = $"§M{{AgentReference{programs.Count}}}\n"
                     + string.Join("\n", body.Split('\n').Select(line => "  " + line));
             programs.Add(new(body, first + 1, wrapped));
             language = null;

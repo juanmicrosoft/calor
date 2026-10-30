@@ -915,8 +915,32 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 The server implements [MCP 2024-11-05](https://spec.modelcontextprotocol.io/) with:
 
 - **Transport**: stdio with Content-Length headers
-- **Methods**: `initialize`, `initialized`, `tools/list`, `tools/call`, `ping`
-- **Capabilities**: `tools` (listChanged: false)
+- **Methods**: `initialize`, `initialized`, `tools/list`, `tools/call`,
+  `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, `ping`
+- **Capabilities**: `tools`, `resources`, `prompts` (listChanged: false)
+
+### Generated teaching resources
+
+`src/Calor.Compiler/Resources/Teaching/reference.json` authors the current
+constructs, C# equivalents, prose and complete examples. Run
+`calor self-check docs --teaching-only --fix` to regenerate the teaching outputs.
+Run without `--fix` to reject stale or missing output.
+
+| Resource | Content |
+|:---------|:--------|
+| `calor://reference` | Complete generated current-language reference |
+| `calor://primer` | Fixed subset of complete examples and common mistakes |
+| `calor://syntax-reference` | Syntax lookup and LSP hover metadata |
+| `calor://tags` | Documented tags with syntax and delimiter guidance |
+| `calor://type-mappings` | C# and Calor type mappings |
+| `calor://effects` | Effect-code examples |
+| `calor://id-prefixes` | Tooling-owned identity guidance; the legacy URI remains, but source ID prefixes are retired |
+| `calor://workflows` | Agent editing workflows |
+
+`calor_help query=` serves generated construct metadata and complete examples.
+`feature=` searches the generated prose reference; `action=features` reports
+conversion capability rather than teaching agents to author converter fallback.
+Initialization templates and MCP server instructions share the same authored source.
 
 ---
 
@@ -924,7 +948,7 @@ The server implements [MCP 2024-11-05](https://spec.modelcontextprotocol.io/) wi
 
 | Variable | Description |
 |:---------|:------------|
-| `CALOR_SKILL_FILE` | Override the skill file path for `calor_syntax_help` |
+| `CALOR_REFERENCE_FILE` | Explicit Markdown override for `calor_help feature=` topic help; unreadable overrides return an error |
 
 ---
 

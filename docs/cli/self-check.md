@@ -10,16 +10,25 @@ permalink: /cli/self-check/
 
 Machine-checks agent-facing documentation against the compiler
 implementation and exits nonzero when they contradict each other
-("doc drift"). This is **drift detection, not single-sourcing**: docs are
-still written by hand, and prose or behavioral inaccuracies that don't
-take one of the checked forms below will not be caught.
+("doc drift"). Current agent teaching resources are generated from
+`src/Calor.Compiler/Resources/Teaching/reference.json`. Other documentation
+is still authored separately. Prose or behavioral inaccuracies outside the
+checked forms below will not be caught.
 
 ```bash
 calor self-check docs                 # check the enclosing repository
 calor self-check docs --root /path    # explicit repository root
 calor self-check docs --format json   # unified diagnostic schema on stdout
 calor self-check docs --format sarif  # SARIF 2.1.0 on stdout
+calor self-check docs --teaching-only # generated teaching resources only
+calor self-check docs --teaching-only --fix # regenerate, then check those resources
 ```
+
+`--teaching-only` verifies all generated teaching mirrors, current keyword
+references, and compilation of the primer and every complete reference program.
+E2E reference loading uses this scoped gate before copying the reference.
+It is not a repository-wide documentation result. Without this option,
+`--fix` also regenerates the agent manual and AST inventory, then runs the full check.
 
 Exit codes: `0` no drift, `1` drift findings, `2` no repository root found.
 Findings use the `Calor1320`–`Calor1334` band (see
@@ -33,8 +42,12 @@ Findings use the `Calor1320`–`Calor1334` band (see
 - every `docs/cli/*.md`
 - every undated, top-level `docs/semantics/*.md` page; dated planning records
   and nested planning directories are excluded from normative checks
-- the agent syntax exemplar and the `CALOR_REFERENCE` heredoc in
-  `tests/E2E/agent-tasks/lib/helpers.sh`, which agents receive during tasks
+- the generated agent syntax exemplar and current-language reference copied by
+  `tests/E2E/agent-tasks/lib/helpers.sh` into task workspaces
+- teaching mirrors generated from
+  `src/Calor.Compiler/Resources/Teaching/reference.json`: syntax-query/hover JSON,
+  the primer, templates, MCP instructions/catalogs, and the `current-language`
+  pages in `docs/` and the website
 - the **version scan only** additionally covers all of `docs/**/*.md`,
   excluding dated records under `docs/plans/`, `docs/experiments/`,
   `docs/design/`, and `docs/process/`
@@ -57,7 +70,7 @@ Findings use the `Calor1320`–`Calor1334` band (see
 | Required files/sections are present and readable | `Calor1326` |
 | Every implemented `Calor13xx` code is listed in `docs/cli/structured-output.md`'s table | `Calor1327` |
 | Every complete-program example still parses (see below) | `Calor1328` |
-| Generated mirrors (`AGENTS.md`, semantics AST inventory) match their sources (`CLAUDE.md`, `eng/ast-schema.json`) | `Calor1329` |
+| Generated mirrors (agent manual, AST inventory and teaching resources) match their authored sources | `Calor1329` |
 | Every complete `§M` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
 | Every complete declaration example in the agent-task reference compiles to valid C# | `Calor1330` |
 | The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
@@ -166,19 +179,27 @@ array-returning BCL calls must bind to the array form `[T]`.
 
 ## Agent-task reference
 
-The same full compilation check runs on the actual `CALOR_REFERENCE` heredoc
-in `tests/E2E/agent-tasks/lib/helpers.sh`, not a separate copy. Bare and `calor`
-fences starting with a module, function, class, interface, or delegate are
-compiled independently. Non-module declarations get a synthetic module wrapper.
-This checks typing and generated C#, not only parsing.
+The same full compilation check runs on
+`src/Calor.Compiler/Resources/Teaching/Generated/current-language-reference.md`,
+the actual reference copied into E2E workspaces and packaged for current help
+and evaluation prompts. The harness checks documentation drift before copying;
+it never launches with a stale reference. Complete `calor` modules compile
+independently, including generated C# validation.
 
 Use `calor-fragment` only for schemas with placeholders or examples that require
 external declarations. A complete Calor declaration with another language label,
-an unterminated fence, a missing heredoc, or an empty example inventory fails
+an unterminated fence or an empty example inventory fails
 with `Calor1330`. The tests also pin the complete-example count and the six
 regression examples: `TryDouble`, `SafeDivide`, `HasNegative`, `DigitValue`,
 `Offset`, and `ClampScore`. Update the count when deliberately adding or removing examples.
 The existing CI `self-check docs` step enforces this guard.
+
+Edit `Resources/Teaching/reference.json`, not its generated outputs. Run
+`dotnet run --project src/Calor.Compiler -- self-check docs --fix`, then rebuild
+to package the changed resources. The same command without `--fix` checks every
+mirror without writing. Generation is deterministic UTF-8 without a BOM.
+Final grammar spellings and token budgets are separate release gates: this
+generator makes no tokenizer substitution or measured-budget claim.
 
 ## Meta-notation policy
 

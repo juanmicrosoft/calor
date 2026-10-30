@@ -7,3 +7,9 @@
 /tests/Calor.Evaluation/Core/*.cs -text
 /tests/Calor.Evaluation/Metrics/*.cs -text
 /eng/benchmark-publication/b1-1276/results/* -text
+/src/Calor.Compiler/Resources/Teaching/** text eol=lf
+/src/Calor.Compiler/Resources/calor-syntax-documentation.json text eol=lf
+/src/Calor.Compiler/Resources/agent-syntax-exemplar.md text eol=lf
+/src/Calor.Compiler/Resources/Templates/*.md.template text eol=lf
+/docs/syntax-reference/current-language.md text eol=lf
+/website/content/syntax-reference/current-language.mdx text eol=lf

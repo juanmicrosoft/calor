@@ -432,7 +432,7 @@ public class SyntaxHelpToolTests
     {
         // Create a custom skill file with many large sections that will trigger truncation
         var tempFile = Path.GetTempFileName();
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
 
         try
         {
@@ -441,7 +441,7 @@ public class SyntaxHelpToolTests
                 $"## BigSection {i}\nThis bigtopic section has bigtopic content.\n{new string('x', 2000)}\n"));
             File.WriteAllText(tempFile, content);
 
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
             HelpTool.ResetCacheForTesting();
 
             var tool = new HelpTool();
@@ -457,7 +457,7 @@ public class SyntaxHelpToolTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
@@ -483,17 +483,17 @@ public class SyntaxHelpToolTests
     #region File Resolution Tests
 
     [Fact]
-    public void SkillFilePathEnvVar_IsDocumented()
+    public void ReferenceFilePathEnvVar_IsDocumented()
     {
         // Verify the environment variable name is accessible
-        Assert.Equal("CALOR_SKILL_FILE", HelpTool.SkillFilePathEnvVar);
+        Assert.Equal("CALOR_REFERENCE_FILE", HelpTool.ReferenceFilePathEnvVar);
     }
 
     [Fact]
     public async Task ExecuteAsync_ContractsFeature_IncludesContractFirstMethodology()
     {
         // This verifies the merged content is being loaded (Contract-First Methodology
-        // was in calor-language-skills.md, not the original calor.md)
+        // was in current-language-reference.md, not the original calor.md)
         var args = JsonDocument.Parse("""
             {
                 "feature": "contracts"
@@ -595,18 +595,18 @@ public class SyntaxHelpToolTests
         var tempFile = Path.GetTempFileName();
         var customContent = @"# Custom Skill File
 ## Test Feature
-This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environment variable.
+This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_REFERENCE_FILE environment variable.
 ### Custom Syntax
 - §TEST: Test token for verification
 ";
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
 
         try
         {
             File.WriteAllText(tempFile, customContent);
 
             // Set the environment variable
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
 
             // Reset the cache so the env var is picked up
             HelpTool.ResetCacheForTesting();
@@ -630,7 +630,7 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
         finally
         {
             // Restore original environment variable and reset cache
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
 
             // Clean up temp file
@@ -644,59 +644,36 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
     #region Embedded Resource Fallback Tests
 
     [Fact]
-    public void EmbeddedResource_CalorLanguageSkills_ExistsAndIsNonEmpty()
+    public void EmbeddedResource_CurrentLanguageReference_ExistsAndIsNonEmpty()
     {
         // Verify the embedded resource that serves as the last-resort fallback
         // for NuGet-installed users (where filesystem paths don't exist) is
         // actually bundled in the assembly and contains meaningful content.
         var content = Init.EmbeddedResourceHelper.ReadResource(
-            "Calor.Compiler.Resources.calor-language-skills.md");
+            "Calor.Compiler.Resources.current-language-reference.md");
 
         Assert.False(string.IsNullOrWhiteSpace(content),
-            "Embedded calor-language-skills.md should not be empty");
+            "Embedded current-language-reference.md should not be empty");
         // Verify it has markdown section headers (the format ExtractRelevantSections expects)
         Assert.Contains("## ", content);
     }
 
     [Fact]
-    public async Task ExecuteAsync_EmbeddedFallback_ReturnsContentWhenFilesystemFails()
+    public async Task ExecuteAsync_MissingExplicitOverride_FailsRatherThanServingOtherContent()
     {
-        // Simulate the NuGet-installed scenario: env var points to a nonexistent file,
-        // and no filesystem skill file is reachable. The embedded resource should kick in.
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
-        var originalDir = Directory.GetCurrentDirectory();
-
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
         try
         {
-            // Point env var to nonexistent file (disables path 1)
-            Environment.SetEnvironmentVariable(
-                HelpTool.SkillFilePathEnvVar, "/nonexistent/path/skill.md");
-
-            // Change working directory to temp (no Calor.sln or .git — disables path 2)
-            var tempDir = Path.Combine(Path.GetTempPath(), $"calor-test-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(tempDir);
-            Directory.SetCurrentDirectory(tempDir);
-
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar,
+                "/nonexistent/path/reference.md");
             HelpTool.ResetCacheForTesting();
-
-            var tool = new HelpTool();
-            var args = JsonDocument.Parse("""{"feature": "contracts"}""").RootElement;
-
-            var result = await tool.ExecuteAsync(args);
-
-            Assert.False(result.IsError, "Should not error — embedded fallback should provide content");
-            var text = result.Content[0].Text!;
-            Assert.Contains("feature", text);
-            Assert.Contains("contracts", text.ToLower());
-
-            // Cleanup temp dir (may fail on Windows due to file locks)
-            try { Directory.Delete(tempDir, true); } catch (IOException) when (OperatingSystem.IsWindows()) { }
+            var result = await _tool.ExecuteAsync(JsonDocument.Parse("""{"feature":"contracts"}""").RootElement);
+            Assert.True(result.IsError);
+            Assert.Contains("Failed to get syntax help", result.Content[0].Text);
         }
         finally
         {
-            // Restore environment
-            Directory.SetCurrentDirectory(originalDir);
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
         }
     }
@@ -817,7 +794,7 @@ public class SyntaxHelpTelemetryTests
     public async Task ExecuteAsync_ManyResults_CapsMatchedSectionsAtFive()
     {
         var tempFile = Path.GetTempFileName();
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
         var (telemetry, channel) = CreateTestTelemetry();
         using var _t = CalorTelemetry.SetInstanceForTesting(telemetry);
 
@@ -827,7 +804,7 @@ public class SyntaxHelpTelemetryTests
             var content = string.Join("\n", Enumerable.Range(1, 8).Select(i =>
                 $"## Section {i}\nThis testtopic section has testtopic content number {i}.\n"));
             File.WriteAllText(tempFile, content);
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
             HelpTool.ResetCacheForTesting();
 
             var tool = new HelpTool();
@@ -842,7 +819,7 @@ public class SyntaxHelpTelemetryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
             if (File.Exists(tempFile))
                 File.Delete(tempFile);

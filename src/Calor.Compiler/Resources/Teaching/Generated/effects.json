@@ -1,0 +1,243 @@
+{
+  "effects": [
+    {
+      "code": "net",
+      "kind": "IO",
+      "description": "Network I/O",
+      "examples": []
+    },
+    {
+      "code": "http",
+      "kind": "IO",
+      "description": "HTTP I/O",
+      "examples": []
+    },
+    {
+      "code": "db",
+      "kind": "IO",
+      "description": "Database I/O",
+      "examples": []
+    },
+    {
+      "code": "env",
+      "kind": "IO",
+      "description": "Environment access",
+      "examples": []
+    },
+    {
+      "code": "env:w",
+      "kind": "IO",
+      "description": "Environment/config write",
+      "examples": []
+    },
+    {
+      "code": "mut:col",
+      "kind": "Mutation",
+      "description": "Collection mutation",
+      "examples": []
+    },
+    {
+      "code": "cw",
+      "kind": "IO",
+      "description": "Console write",
+      "examples": [
+        "Console.WriteLine",
+        "ILogger.Log"
+      ]
+    },
+    {
+      "code": "cr",
+      "kind": "IO",
+      "description": "Console read",
+      "examples": [
+        "Console.ReadLine"
+      ]
+    },
+    {
+      "code": "fs:r",
+      "kind": "IO",
+      "description": "Filesystem read",
+      "examples": [
+        "File.ReadAllText",
+        "StreamReader.ReadToEnd"
+      ]
+    },
+    {
+      "code": "fs:w",
+      "kind": "IO",
+      "description": "Filesystem write",
+      "examples": [
+        "File.WriteAllText",
+        "StreamWriter.Write"
+      ]
+    },
+    {
+      "code": "fs:rw",
+      "kind": "IO",
+      "description": "Filesystem read+write (encompasses fs:r and fs:w)",
+      "examples": [
+        "FileStream.Open"
+      ]
+    },
+    {
+      "code": "net:r",
+      "kind": "IO",
+      "description": "Network read",
+      "examples": [
+        "HttpClient.GetStringAsync"
+      ]
+    },
+    {
+      "code": "net:w",
+      "kind": "IO",
+      "description": "Network write",
+      "examples": [
+        "HttpResponse.WriteAsync"
+      ]
+    },
+    {
+      "code": "net:rw",
+      "kind": "IO",
+      "description": "Network read+write (encompasses net:r and net:w)",
+      "examples": [
+        "HttpClient.GetAsync",
+        "TcpClient.Connect"
+      ]
+    },
+    {
+      "code": "db:r",
+      "kind": "IO",
+      "description": "Database read",
+      "examples": [
+        "DbContext.Find",
+        "DbCommand.ExecuteReader",
+        "SqlMapper.Query"
+      ]
+    },
+    {
+      "code": "db:w",
+      "kind": "IO",
+      "description": "Database write",
+      "examples": [
+        "DbContext.SaveChanges",
+        "DbCommand.ExecuteNonQuery",
+        "SqlMapper.Execute"
+      ]
+    },
+    {
+      "code": "db:rw",
+      "kind": "IO",
+      "description": "Database read+write (encompasses db:r and db:w)",
+      "examples": [
+        "DbConnection.Open"
+      ]
+    },
+    {
+      "code": "env:r",
+      "kind": "IO",
+      "description": "Environment/config read",
+      "examples": [
+        "Environment.GetEnvironmentVariable",
+        "IConfiguration.GetSection"
+      ]
+    },
+    {
+      "code": "env:rw",
+      "kind": "IO",
+      "description": "Environment read+write",
+      "examples": [
+        "Environment.SetEnvironmentVariable"
+      ]
+    },
+    {
+      "code": "proc",
+      "kind": "IO",
+      "description": "Process execution",
+      "examples": [
+        "Process.Start"
+      ]
+    },
+    {
+      "code": "alloc",
+      "kind": "Memory",
+      "description": "Significant allocation",
+      "examples": [
+        "new object()",
+        "new List<int>()"
+      ]
+    },
+    {
+      "code": "unsafe",
+      "kind": "Memory",
+      "description": "Unsafe memory operation",
+      "examples": [
+        "Marshal.AllocHGlobal"
+      ]
+    },
+    {
+      "code": "time",
+      "kind": "Nondeterminism",
+      "description": "System time dependency",
+      "examples": [
+        "DateTime.Now",
+        "Stopwatch.StartNew"
+      ]
+    },
+    {
+      "code": "rand",
+      "kind": "Nondeterminism",
+      "description": "Random number generation",
+      "examples": [
+        "Random.Next",
+        "Guid.NewGuid"
+      ]
+    },
+    {
+      "code": "mut",
+      "kind": "Mutation",
+      "description": "Heap mutation",
+      "examples": [
+        "List.Add",
+        "Dictionary.TryAdd"
+      ]
+    },
+    {
+      "code": "throw",
+      "kind": "Exception",
+      "description": "Intentional exception throw",
+      "examples": [
+        "ArgumentException",
+        "InvalidOperationException"
+      ]
+    }
+  ],
+  "subtyping": [
+    {
+      "broad": "fs:rw",
+      "encompasses": [
+        "fs:r",
+        "fs:w"
+      ]
+    },
+    {
+      "broad": "net:rw",
+      "encompasses": [
+        "net:r",
+        "net:w"
+      ]
+    },
+    {
+      "broad": "db:rw",
+      "encompasses": [
+        "db:r",
+        "db:w"
+      ]
+    },
+    {
+      "broad": "env:rw",
+      "encompasses": [
+        "env:r"
+      ]
+    }
+  ]
+}

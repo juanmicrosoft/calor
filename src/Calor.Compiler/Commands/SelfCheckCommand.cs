@@ -36,8 +36,11 @@ public static class SelfCheckCommand
 
         var fixOption = new Option<bool>(
             aliases: ["--fix"],
-            description: "Regenerate AGENTS.md and the schema-derived AST inventory, then run all drift checks");
+            description: "Regenerate teaching mirrors (also AGENTS.md and AST inventory unless --teaching-only), then check");
 
+        var teachingOnlyOption = new Option<bool>(
+            "--teaching-only",
+            "Check only generated teaching mirrors and their complete examples (not repository-wide documentation)");
         var docsCommand = new Command("docs",
             "Check agent-facing docs against the compiler implementation. " +
             "Covered files: CLAUDE.md, docs/syntax-reference/*.md, docs/cli/*.md, and undated docs/semantics/*.md " +
@@ -50,7 +53,7 @@ public static class SelfCheckCommand
             "line starts with §M) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it); " +
             "(8) every complete program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) and no copyable line binds an array-returning call to a generic collection (the E1a trap). " +
             "(9) normative semantics-version claims match the implemented language version; (10) the AST inventory matches eng/ast-schema.json. " +
-            "(11) all complete examples in the actual agent-task CALOR_REFERENCE heredoc compile to valid C#. " +
+            "(11) all complete examples in the generated current teaching reference compile to valid C#, and teaching mirrors are current. " +
             "(12) website/content/**/*.mdx (historical changelog excluded): checks 1, 2, 5 and forward-only effect tables apply; " +
             "complete ```calor programs compile as `calor --input` does, `expect=CalorNNNN` negatives report exactly those codes, " +
             "`group=` fences compile together, and `output` fences match the real diagnostics (Calor1332-1334). " +
@@ -61,7 +64,8 @@ public static class SelfCheckCommand
         {
             rootOption,
             formatOption,
-            fixOption
+            fixOption,
+            teachingOnlyOption
         };
 
         docsCommand.SetHandler((InvocationContext ctx) =>
@@ -69,12 +73,12 @@ public static class SelfCheckCommand
             var root = ctx.ParseResult.GetValueForOption(rootOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
             var fix = ctx.ParseResult.GetValueForOption(fixOption);
-            ctx.ExitCode = Execute(root, format, fix);
+            ctx.ExitCode = Execute(root, format, fix, ctx.ParseResult.GetValueForOption(teachingOnlyOption));
         });
         return docsCommand;
     }
 
-    private static int Execute(string? root, string format, bool fix = false)
+    private static int Execute(string? root, string format, bool fix = false, bool teachingOnly = false)
     {
         var resolvedRoot = root ?? FindRepositoryRoot(Directory.GetCurrentDirectory());
         if (resolvedRoot == null)
@@ -87,37 +91,40 @@ public static class SelfCheckCommand
         if (fix)
         {
             var inventoryErrors = new List<Diagnostic>();
-            if (!DocDriftChecker.RegenerateAstInventory(resolvedRoot, inventoryErrors))
+            if ((!teachingOnly && !DocDriftChecker.RegenerateAstInventory(resolvedRoot, inventoryErrors))
+                || !DocDriftChecker.RegenerateTeachingResources(resolvedRoot, inventoryErrors))
             {
                 foreach (var error in inventoryErrors)
                     Console.Error.WriteLine(error);
                 return 2;
             }
-            // Regenerate mirror docs, then fall through to the full check so --fix
-            // never silently skips the other drift checks (keywords, codes, effects,
-            // versions, examples) and reports success. A source-missing error is fatal;
-            // an anchor mismatch is surfaced as a finding by the check below.
-            switch (DocDriftChecker.RegenerateAgentsMd(resolvedRoot))
+            // Regeneration never bypasses validation in the selected check scope.
+            if (!teachingOnly)
             {
-                case DocDriftChecker.MirrorRegenResult.SourceMissing:
-                    Console.Error.WriteLine("error: CLAUDE.md not found; cannot regenerate AGENTS.md");
-                    return 2;
-                case DocDriftChecker.MirrorRegenResult.AnchorMismatch:
-                    Console.Error.WriteLine(
-                        $"warning: CLAUDE.md H1 does not match '{DocDriftChecker.ClaudeTitleAnchor}'; " +
-                        "AGENTS.md not regenerated (reported below)");
-                    break;
-                case DocDriftChecker.MirrorRegenResult.Written:
-                    Console.Error.WriteLine($"Regenerated {DocDriftChecker.MirrorAgentsRelativePath} from CLAUDE.md.");
-                    break;
-                case DocDriftChecker.MirrorRegenResult.AlreadyInSync:
-                    Console.Error.WriteLine($"{DocDriftChecker.MirrorAgentsRelativePath} already in sync with CLAUDE.md.");
-                    break;
+                switch (DocDriftChecker.RegenerateAgentsMd(resolvedRoot))
+                {
+                    case DocDriftChecker.MirrorRegenResult.SourceMissing:
+                        Console.Error.WriteLine("error: CLAUDE.md not found; cannot regenerate AGENTS.md");
+                        return 2;
+                    case DocDriftChecker.MirrorRegenResult.AnchorMismatch:
+                        Console.Error.WriteLine(
+                            $"warning: CLAUDE.md H1 does not match '{DocDriftChecker.ClaudeTitleAnchor}'; " +
+                            "AGENTS.md not regenerated (reported below)");
+                        break;
+                    case DocDriftChecker.MirrorRegenResult.Written:
+                        Console.Error.WriteLine($"Regenerated {DocDriftChecker.MirrorAgentsRelativePath} from CLAUDE.md.");
+                        break;
+                    case DocDriftChecker.MirrorRegenResult.AlreadyInSync:
+                        Console.Error.WriteLine($"{DocDriftChecker.MirrorAgentsRelativePath} already in sync with CLAUDE.md.");
+                        break;
+                }
             }
         }
 
         var diagnostics = new List<Diagnostic>();
-        var inputs = DocDriftChecker.LoadFromRepository(resolvedRoot, diagnostics);
+        var inputs = teachingOnly
+            ? DocDriftChecker.LoadTeachingFromRepository(resolvedRoot, diagnostics)
+            : DocDriftChecker.LoadFromRepository(resolvedRoot, diagnostics);
         diagnostics.AddRange(DocDriftChecker.Check(inputs));
 
         if (format.Equals("json", StringComparison.OrdinalIgnoreCase) ||
@@ -133,9 +140,10 @@ public static class SelfCheckCommand
                 Console.Error.WriteLine(diagnostic.ToString());
             }
 
+            var scope = teachingOnly ? " teaching-only" : "";
             Console.Error.WriteLine(diagnostics.Count == 0
-                ? $"calor self-check docs — no drift found (root: {resolvedRoot})"
-                : $"calor self-check docs — {diagnostics.Count} drift finding(s) (root: {resolvedRoot})");
+                ? $"calor self-check docs{scope} — no drift found (root: {resolvedRoot})"
+                : $"calor self-check docs{scope} — {diagnostics.Count} drift finding(s) (root: {resolvedRoot})");
         }
 
         return diagnostics.Count > 0 ? 1 : 0;

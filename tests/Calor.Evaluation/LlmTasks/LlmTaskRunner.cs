@@ -572,17 +572,19 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         };
     }
 
-    private static string? _calorSkillsContent;
     private static string? _csharpSkillsContent;
 
     private static string? GetSkillsContent(string language)
     {
-        var cacheRef = language == "calor" ? ref _calorSkillsContent : ref _csharpSkillsContent;
+        if (language == "calor")
+            return Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+                "Calor.Compiler.Resources.current-language-reference.md");
+        ref var cacheRef = ref _csharpSkillsContent;
 
         if (cacheRef != null)
             return cacheRef;
 
-        var fileName = language == "calor" ? "calor-language-skills.md" : "csharp-language-skills.md";
+        const string fileName = "csharp-language-skills.md";
 
         // Try to load from various locations
         var possiblePaths = new[]
@@ -591,9 +593,6 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Skills", fileName),
             Path.Combine(Directory.GetCurrentDirectory(), "tests", "Calor.Evaluation", "Skills", fileName),
             Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "tests", "Calor.Evaluation", "Skills", fileName)),
-            // Compiler skills directory (legacy location for Calor)
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"),
-            Path.Combine(Directory.GetCurrentDirectory(), "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"),
         };
 
         foreach (var path in possiblePaths)
@@ -649,57 +648,15 @@ IMPORTANT INSTRUCTIONS:
 Create a public static class with a public static method. Output only the code, no markdown.";
     }
 
-    private static string GetCalorSystemPrompt()
-    {
-        var skillsContent = GetCalorSkillsContent();
+    private static string GetCalorSystemPrompt() =>
+        $"""
+        You are an expert Calor programmer. Generate only valid Calor code without any explanation.
 
-        if (skillsContent != null)
-        {
-            // Use the comprehensive skills file with instructions
-            return $@"You are an expert Calor programmer. Generate only valid Calor code without any explanation.
+        {GetCalorSkillsContent()}
 
-{skillsContent}
-
-IMPORTANT INSTRUCTIONS:
-1. Output ONLY the Calor code, no markdown code blocks, no explanation
-2. Always include the module wrapper §M{{id:ModuleName}} ... §/M{{id}}
-3. Use test-style IDs like m001, f001, if1
-4. For boolean logic, use (&&) not (and), (||) not (or), (!) not (not)
-5. For negation of numbers, use (- 0 n) not (- n)";
-        }
-
-        // Fallback to basic prompt
-        return @"You are an expert Calor programmer. Generate only valid Calor code without any explanation.
-
-Calor syntax uses section markers with IDs:
-- §M{id:ModuleName} starts a module, §/M{id} ends it
-- §F{id:FunctionName:pub} starts a public function, §/F{id} ends it
-- §I{type:paramName} declares an input parameter (types: i32, bool, string, void)
-- §O{type} declares the output/return type
-- §Q (condition) is a precondition (REQUIRES) using S-expression syntax
-- §S (condition) is a postcondition (ENSURES) using S-expression syntax
-- §R expression returns a value
-- §IF{id} (cond) with indented bodies and same-column §EI / §EL clauses for conditionals
-- §L{id:var:start:end:step} for loops, §/L{id} to end
-
-Math uses S-expressions: (+ a b), (* a b), (- a b), (/ a b), (% a b)
-Comparisons: (> a b), (< a b), (>= a b), (<= a b), (== a b), (!= a b)
-Logic: (&& a b), (|| a b), (! a)
-
-Example:
-§M{m001:Math}
-  §F{f001:Factorial:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (>= n 0)
-      §S (>= result 1)
-      §IF{if1} (<= n 1)
-        §R 1
-      §EL
-        §R (* n (Factorial (- n 1)))
-
-Output only the code, no markdown or explanation.";
-    }
+        Output only Calor source, no markdown or explanation. Include a complete module with indented bodies.
+        For boolean logic use (&& a b), (|| a b), (! a). For numeric negation use (- 0 n).
+        """;
 
     private static List<LlmTaskDefinition> FilterTasks(
         List<LlmTaskDefinition> tasks,

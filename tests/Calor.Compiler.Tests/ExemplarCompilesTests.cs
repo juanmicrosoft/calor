@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Text;
+using System.Text.Json.Nodes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
 using Xunit;
@@ -15,6 +17,108 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ExemplarCompilesTests
 {
+    private static string TeachingRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, ExemplarCompileChecker.TeachingSourcePath)))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new InvalidOperationException("Teaching source not found.");
+    }
+
+    [Fact]
+    public void TeachingOutputs_AreByteStableCurrentAndPackaged()
+    {
+        var root = TeachingRoot();
+        var source = File.ReadAllText(Path.Combine(root, ExemplarCompileChecker.TeachingSourcePath));
+        var outputs = ExemplarCompileChecker.GenerateTeachingResources(source);
+        var again = ExemplarCompileChecker.GenerateTeachingResources(source);
+        Assert.Equal(16, outputs.Count);
+        foreach (var (path, expected) in outputs)
+        {
+            Assert.Equal(expected, again[path]);
+            Assert.Equal(Encoding.UTF8.GetBytes(expected), File.ReadAllBytes(Path.Combine(root, path)));
+            if (path.Contains("/Resources/Teaching/Generated/", StringComparison.Ordinal))
+                Assert.Equal(expected, Init.EmbeddedResourceHelper.ReadResource(
+                    "Calor.Compiler.Resources." + Path.GetFileName(path)));
+        }
+    }
+
+    [Fact]
+    public void TeachingGeneration_RejectsMissingExampleReferences()
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        source["constructs"]![0]!["programs"] = new JsonArray("missing-example");
+        Assert.Throws<InvalidDataException>(() => ExemplarCompileChecker.GenerateTeachingResources(source.ToJsonString()));
+    }
+
+    [Fact]
+    public void TeachingGeneration_RequiresExamplesForAuthoredConstructs()
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        source["constructs"]![0]!["programs"] = new JsonArray();
+        Assert.Throws<InvalidDataException>(() => ExemplarCompileChecker.GenerateTeachingResources(source.ToJsonString()));
+    }
+
+    [Fact]
+    public void TeachingGeneration_RejectsEffectCatalogDrift()
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        source["catalogs"]!["effects.json"]!["effects"]!.AsArray().RemoveAt(0);
+        Assert.Throws<InvalidDataException>(() => ExemplarCompileChecker.GenerateTeachingResources(source.ToJsonString()));
+    }
+
+    [Fact]
+    public void TeachingSource_HasOnlyCompleteCurrentExamplesAndDerivedHover()
+    {
+        var source = JsonNode.Parse(File.ReadAllText(Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)))!;
+        foreach (var program in source["programs"]!.AsArray())
+        {
+            var text = program!["calor"]!.GetValue<string>();
+            Assert.StartsWith("§M{", text);
+            Assert.DoesNotContain("§CSHARP", text);
+            Assert.DoesNotContain("§D{", text);
+            Assert.DoesNotContain("(inc ", text);
+            Assert.DoesNotContain("(dec ", text);
+        }
+        var outputs = ExemplarCompileChecker.GenerateTeachingResources(source.ToJsonString());
+        var lookup = JsonNode.Parse(outputs["src/Calor.Compiler/Resources/calor-syntax-documentation.json"])!;
+        foreach (var (name, tag) in source["tags"]!.AsObject())
+        {
+            if (tag!["construct"] is not { } target)
+                continue;
+            Assert.Null(tag["syntax"]);
+            Assert.Null(tag["description"]);
+            var construct = source["constructs"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == target.GetValue<string>())!;
+            Assert.Equal(construct["calorSyntax"]!.GetValue<string>(), lookup["tags"]![name]!["syntax"]!.GetValue<string>());
+            Assert.Equal(construct["description"]!.GetValue<string>(), lookup["tags"]![name]!["description"]!.GetValue<string>());
+        }
+        var diagnostics = new List<Diagnostic>();
+        var inputs = DocDriftChecker.LoadTeachingFromRepository(TeachingRoot(), diagnostics);
+        diagnostics.AddRange(DocDriftChecker.Check(inputs));
+        Assert.True(diagnostics.Count == 0, string.Join("\n", diagnostics));
+    }
+
+    [Fact]
+    public void TeachingMirrorCheck_RejectsStaleAndMissingOutput()
+    {
+        var outputs = ExemplarCompileChecker.GenerateTeachingResources(File.ReadAllText(
+            Path.Combine(TeachingRoot(), ExemplarCompileChecker.TeachingSourcePath)));
+        foreach (var (path, expected) in outputs)
+        {
+            foreach (var actual in new[] { expected + "stale", null })
+            {
+                var inputs = new DocDriftInputs
+                {
+                    Version = "", LexerKeywords = [], DiagnosticCodes = [],
+                    KnownEffectCodes = [], DocumentedEffectCodes = [],
+                    MirrorDocs = [new(path, ExemplarCompileChecker.TeachingSourcePath, actual, expected)]
+                };
+                Assert.Contains(DocDriftChecker.Check(inputs),
+                    diagnostic => diagnostic.Code is DiagnosticCode.DocDriftMirrorOutOfSync or DiagnosticCode.DocDriftMissingInput);
+            }
+        }
+    }
+
     private const string ResourceName = "Calor.Compiler.Resources.agent-syntax-exemplar.md";
 
     private static string ExemplarContent()
@@ -61,8 +165,8 @@ public class ExemplarCompilesTests
         // yet see. Asserting the disjunction keeps the test robust if either
         // layer's coverage shifts, but today the Calor layer catches this case.
         const string calor =
-            "§M{m:Files}\n" +
-            "  §F{f:CountLines:pub} (str:path) -> i32\n" +
+            "§M{Files}\n" +
+            "  §F{CountLines:pub} (str:path) -> i32\n" +
             "    §E{fs:r}\n" +
             "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
             "    §R (len lines)\n";
@@ -81,8 +185,8 @@ public class ExemplarCompilesTests
         // List<str>-returning function that returns File.ReadAllLines (an array)
         // fails calor -i with Calor0254 rather than emitting broken C#.
         const string calor =
-            "§M{m:Files}\n" +
-            "  §F{f:Get:pub} (str:path) -> List<str>\n" +
+            "§M{Files}\n" +
+            "  §F{Get:pub} (str:path) -> List<str>\n" +
             "    §E{fs:r}\n" +
             "    §R §C{File.ReadAllLines} §A path §/C\n";
 

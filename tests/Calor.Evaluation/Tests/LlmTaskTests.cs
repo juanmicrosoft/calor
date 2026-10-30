@@ -12,6 +12,18 @@ namespace Calor.Evaluation.Tests;
 /// </summary>
 public class LlmTaskTests
 {
+    [Fact]
+    public void CalorPrompt_UsesPackagedCurrentReferenceWithoutLegacyFallback()
+    {
+        var reference = Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+            "Calor.Compiler.Resources.current-language-reference.md");
+        var prompt = LlmTaskRunner.GetSystemPromptForLanguage("calor");
+        Assert.Contains(reference, prompt);
+        Assert.DoesNotContain("§/M", prompt);
+        Assert.DoesNotContain("§CSHARP", prompt);
+        Assert.Contains("Include a complete module with indented bodies", prompt);
+    }
+
     #region MockProvider Tests
 
     [Fact]

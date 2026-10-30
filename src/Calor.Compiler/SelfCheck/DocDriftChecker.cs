@@ -282,6 +282,7 @@ public static class DocDriftChecker
             .ToList();
 
         var mirrorDocs = new List<MirrorDoc>();
+        mirrorDocs.AddRange(LoadTeachingMirrors(root, loadErrors));
         var inventory = LoadAstInventoryMirror(root, loadErrors);
         if (inventory != null)
             mirrorDocs.Add(inventory);
@@ -400,6 +401,60 @@ public static class DocDriftChecker
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         if (mirror.Actual?.Replace("\r\n", "\n") != mirror.Expected)
             File.WriteAllText(path, mirror.Expected);
+        return true;
+    }
+
+    public static DocDriftInputs LoadTeachingFromRepository(string root, List<Diagnostic> diagnostics)
+    {
+        var mirrors = LoadTeachingMirrors(root, diagnostics);
+        var reference = LoadDoc(root, ExemplarCompileChecker.TeachingReferencePath, diagnostics);
+        var primer = LoadDoc(root, ExemplarCompileChecker.RelativePath, diagnostics);
+        return new DocDriftInputs
+        {
+            Version = "", LexerKeywords = Parsing.Lexer.KeywordNames, DiagnosticCodes = [],
+            KnownEffectCodes = [], DocumentedEffectCodes = [],
+            MirrorDocs = mirrors,
+            KeywordDocs = reference == null ? [] : [reference],
+            AgentTaskReferenceDoc = reference,
+            ExemplarDoc = primer
+        };
+    }
+
+    private static IReadOnlyList<MirrorDoc> LoadTeachingMirrors(string root, List<Diagnostic> diagnostics)
+    {
+        var source = LoadDoc(root, ExemplarCompileChecker.TeachingSourcePath, diagnostics);
+        if (source == null)
+            return [];
+        try
+        {
+            return ExemplarCompileChecker.GenerateTeachingResources(source.Content).Select(pair =>
+            {
+                var path = Path.Combine(root, pair.Key);
+                return new MirrorDoc(pair.Key, source.Path,
+                    File.Exists(path) ? File.ReadAllText(path) : null, pair.Value);
+            }).ToList();
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException
+            or InvalidOperationException or KeyNotFoundException or ArgumentException)
+        {
+            diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                $"Cannot generate teaching reference: {exception.Message}", source.Path, 1, 1));
+            return [];
+        }
+    }
+
+    public static bool RegenerateTeachingResources(string root, List<Diagnostic> diagnostics)
+    {
+        var mirrors = LoadTeachingMirrors(root, diagnostics);
+        if (mirrors.Count == 0)
+            return false;
+        foreach (var mirror in mirrors)
+        {
+            var path = Path.Combine(root, mirror.MirrorPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (mirror.Actual != mirror.Expected)
+                File.WriteAllText(path, mirror.Expected, new UTF8Encoding(false));
+        }
         return true;
     }
 

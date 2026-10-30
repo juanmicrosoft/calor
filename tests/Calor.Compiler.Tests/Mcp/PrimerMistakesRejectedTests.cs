@@ -43,7 +43,7 @@ public class PrimerMistakesRejectedTests
     {
         new("legacy-closers", "§/F §/M §/I §/L", TopLevel: false),
         new("uppercase-result", "§S (>= §RESULT 0)", TopLevel: false),
-        new("if-missing-id", "§IF (> x 0)", TopLevel: false),
+        new("if-missing-condition", "§IF", TopLevel: false),
         new("if-condition-in-braces", "§IF{i1}{x > 0}", TopLevel: false),
         new("nonexistent-keywords", "§K   §ELSE", TopLevel: false),
         new("four-field-header", "§F{f1:Add:i32:pub}", TopLevel: true),
@@ -57,8 +57,8 @@ public class PrimerMistakesRejectedTests
     public void Mistake_DoesNotCompile(string name, string fragment, bool topLevel)
     {
         var module = topLevel
-            ? $"§M{{m1:Probe}}\n{fragment}\n  §R INT:0\n"
-            : $"§M{{m1:Probe}}\n§F{{f1:Probe:pub}} (i32:x) -> i32\n  {fragment}\n  §R x\n";
+            ? $"§M{{Probe}}\n{fragment}\n  §R INT:0\n"
+            : $"§M{{Probe}}\n§F{{Probe:pub}} (i32:x) -> i32\n  {fragment}\n  §R x\n";
 
         var result = Compile(module, "primer-mistake.calr");
 
@@ -84,7 +84,7 @@ public class PrimerMistakesRejectedTests
         // Sanity for the two-layer check itself: a correct module must pass BOTH layers, so a
         // green above cannot be an artifact of RoslynErrors spuriously rejecting everything.
         const string correct =
-            "§M{m1:Probe}\n§F{f1:Add:pub} (i32:a, i32:b) -> i32\n  §R (+ a b)\n";
+            "§M{Probe}\n§F{Add:pub} (i32:a, i32:b) -> i32\n  §R (+ a b)\n";
 
         var result = Compile(correct, "primer-correct.calr");
 

@@ -582,11 +582,11 @@ public class DocDriftCheckerTests
     // --- Parse-the-examples (the rotted-snippet class) ---
 
     private const string FizzBuzzExample =
-        "§M{m001:FizzBuzz}\n" +
-        "  §F{f001:Main:pub} () -> void\n" +
+        "§M{FizzBuzz}\n" +
+        "  §F{Main:pub} () -> void\n" +
         "    §E{cw}\n" +
-        "    §L{for1:i:1:100:1}\n" +
-        "      §IF{if1} (== (% i 15) 0)\n" +
+        "    §L{i:1:100:1}\n" +
+        "      §IF (== (% i 15) 0)\n" +
         "        §P \"FizzBuzz\"\n" +
         "      §EI (== (% i 3) 0)\n" +
         "        §P \"Fizz\"\n" +

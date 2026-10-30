@@ -32,13 +32,12 @@ namespace Calor.Compiler.Tests.Mcp;
 public class AgentDocsSyntaxGuardTests
 {
     [Fact]
-    public void Skills_NestedArrayExample_CompilesAndRuns()
+    public void Reference_NestedArrayExample_CompilesAndRuns()
     {
         var root = FindRepoRoot() ?? throw new InvalidOperationException("Repository root not found.");
-        var skills = File.ReadAllText(Path.Combine(root, "tests", "Calor.Evaluation", "Skills",
-            "calor-language-skills.md"));
+        var skills = File.ReadAllText(Path.Combine(root, Calor.Compiler.SelfCheck.ExemplarCompileChecker.TeachingReferencePath));
         var example = Assert.Single(Regex.Matches(skills,
-            @"```calor\s*\n(?<source>§M\{m001:NestedArrayExpressions\}.*?)\n```",
+            @"```calor\s*\n(?<source>§M\{NestedArrayExpressions\}.*?)\n```",
             RegexOptions.Singleline).Cast<Match>());
         var module = CompileTeachingModule(example.Groups["source"].Value, "NestedArrayExpressions");
         Assert.Equal(5, module.GetMethod("SumPair")!.Invoke(null, [new[] { 2, 3 }]));
@@ -53,7 +52,7 @@ public class AgentDocsSyntaxGuardTests
             "Calor.Compiler", "Resources", "error-suggestions.json")));
         var pattern = Assert.Single(suggestions.RootElement.GetProperty("patterns").EnumerateArray()
             .Where(item => item.GetProperty("id").GetString() == "array-type-syntax"));
-        var source = "§M{m001:ArrayTypeExamples}\n"
+        var source = "§M{ArrayTypeExamples}\n"
             + string.Join("\n", pattern.GetProperty("correctExample").GetString()!.Split('\n')
                 .Select(line => "  " + line));
         var module = CompileTeachingModule(source, "ArrayTypeExamples");
@@ -89,7 +88,7 @@ public class AgentDocsSyntaxGuardTests
         new(@"§B\{[^}]*\}\s*=", RegexOptions.Compiled);
 
     // A real module header is the marker alone on its line. Cheat-sheet / reference
-    // blocks write "§M{id:Name}   <prose describing the tag>", which must NOT be
+    // blocks write "§M{Name}   <prose describing the tag>", which must NOT be
     // treated as compilable code.
     private static readonly Regex ModuleHeaderLine =
         new(@"^§M\{[^}]*\}\s*$", RegexOptions.Compiled);
@@ -125,7 +124,7 @@ public class AgentDocsSyntaxGuardTests
             @"src\Calor.Compiler\Resources\Templates\CLAUDE.md.template",
             @"src\Calor.Compiler\Resources\Templates\GEMINI.md.template",
             @"src\Calor.Compiler\README.nuget.md",
-            @"tests\Calor.Evaluation\Skills\calor-language-skills.md",
+            @"src\Calor.Compiler\Resources\Teaching\Generated\current-language-reference.md",
         })
         {
             var path = Path.Combine(root, ToPlatformRelative(rel));

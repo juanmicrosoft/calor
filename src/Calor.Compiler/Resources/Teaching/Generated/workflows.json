@@ -1,0 +1,101 @@
+{
+  "tasks": {
+    "write-new-function": {
+      "description": "Write a new Calor function from scratch",
+      "steps": [
+        {
+          "tool": "calor_compile",
+          "args": {
+            "includeEffectSummary": true
+          },
+          "why": "Look up effects for planned external calls"
+        },
+        {
+          "action": "write_code",
+          "why": "Write the function using effects, and indented bodies from calor://tags"
+        },
+        {
+          "tool": "calor_compile",
+          "args": {
+            "autoFix": true
+          },
+          "why": "Compile and auto-fix syntax/effect errors"
+        }
+      ]
+    },
+    "fix-compilation-errors": {
+      "description": "Fix errors in existing Calor code",
+      "steps": [
+        {
+          "tool": "calor_compile",
+          "args": {
+            "autoFix": true
+          },
+          "why": "Auto-fix all high-confidence errors (parser, effects)"
+        },
+        {
+          "condition": "remaining medium/low diagnostics",
+          "action": "Read diagnostics and apply suggested fixes manually"
+        },
+        {
+          "condition": "Calor0411 unknown external calls",
+          "tool": "calor_compile",
+          "args": {
+            "includeEffectSummary": true
+          },
+          "why": "Look up effects for unresolved calls"
+        }
+      ]
+    },
+    "convert-csharp-to-calor": {
+      "description": "Convert a C# file to Calor",
+      "steps": [
+        {
+          "tool": "calor_convert",
+          "args": {
+            "includeEffects": true
+          },
+          "why": "Convert with auto-inferred effect declarations"
+        },
+        {
+          "tool": "calor_compile",
+          "args": {
+            "autoFix": true
+          },
+          "why": "Verify and fix any remaining issues"
+        }
+      ]
+    },
+    "add-effects-to-function": {
+      "description": "Add correct effect declarations to a function",
+      "steps": [
+        {
+          "tool": "calor_compile",
+          "args": {
+            "includeEffectSummary": true
+          },
+          "why": "Get declared vs computed effects per function"
+        },
+        {
+          "action": "Add missing effects from the effectSummary.missing field to §E{...}"
+        }
+      ]
+    },
+    "write-new-module": {
+      "description": "Write a new Calor module with multiple functions",
+      "steps": [
+        {
+          "action": "Write module without source IDs, consulting calor://primer for syntax patterns"
+        },
+        {
+          "tool": "calor_compile",
+          "args": {
+            "autoFix": true,
+            "includeEffectSummary": true
+          },
+          "why": "Compile, fix, and verify effects"
+        }
+      ]
+    }
+  }
+}

@@ -10,6 +10,31 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class HoverHandlerTests
 {
+    [Fact]
+    public void PackagedTeachingMetadata_MatchesEveryHoverEntry()
+    {
+        var provider = TagDocumentationProvider.Instance;
+        Assert.True(provider.IsLoaded);
+        using var source = System.Text.Json.JsonDocument.Parse(
+            Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+                "Calor.Compiler.Resources.calor-syntax-documentation.json"));
+        var tags = source.RootElement.GetProperty("tags");
+        Assert.Equal(tags.EnumerateObject().Select(tag => tag.Name).Order(),
+            provider.GetAllTags().Order());
+        foreach (var tag in tags.EnumerateObject())
+        {
+            var hover = provider.GetTagDocumentation(tag.Name);
+            Assert.NotNull(hover);
+            Assert.Equal(tag.Value.GetProperty("syntax").GetString(), hover.Syntax);
+            Assert.Equal(tag.Value.GetProperty("description").GetString(), hover.Description);
+            Assert.Equal(tag.Value.GetProperty("csharpEquivalent").GetString(), hover.CSharpEquivalent);
+            Assert.False(string.IsNullOrWhiteSpace(hover.Name));
+        }
+        Assert.Contains("§ASSIGN", provider.GetTagDocumentation("§ASSIGN")!.Syntax);
+        Assert.Contains("§ARR{type}", provider.GetTagDocumentation("§ARR")!.Syntax);
+        Assert.Null(provider.GetTagDocumentation("§D"));
+    }
+
     private readonly WorkspaceState _workspace = new();
     private readonly HoverHandler _handler;
 
