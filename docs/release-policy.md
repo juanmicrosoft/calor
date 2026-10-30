@@ -33,6 +33,11 @@ approval. No workflow creates or configures this environment. A missing setting 
 read blocks promotion. Reviewers must be trusted release maintainers; the maintainer owns that
 reviewer selection and the nuget.org Trusted Publishing policy.
 
+Independent review and preventing self-review are this implementation's policy choice, stronger
+than requiring explicit human approval alone. They remain fail-closed pending maintainer
+selection of the approval policy; no live environment setting change is authorized by this
+implementation.
+
 The boundary uses the package job's immutable artifact **ID and SHA-256**, not its mutable
 display name alone. API metadata must bind that ID to the same run and candidate, be unexpired
 and report the expected digest. The downloaded ZIP must hash to that digest. Before extraction,
@@ -139,9 +144,9 @@ only while the issue #760 gates remain green:
 - failure injection proving the original remains byte-identical;
 - an applied LSP formatting edit that recompiles.
 
-No formatter may use a generic regex to infer or rewrite identifiers. Structural
-ID migrations belong to dedicated commands that explicitly classify structural
-marker kinds, such as `calor fix --compact-ids`.
+No formatter may use a generic regex to infer or rewrite identifiers. Lexical
+identifiers are source-level names and must be preserved verbatim; formatting
+must not migrate or compact them.
 
 If any gate regresses, CLI and LSP writes must fail closed. Parseable inputs that
 already have semantic or generated-C# errors may use the documented conservative
