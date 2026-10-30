@@ -5499,6 +5499,9 @@ public sealed class EffectEnforcementPass
         {
             var effects = InferFromExpression(target);
             var targetType = InferExpressionType(target);
+            if (memberName == "Length"
+                && InferMetadataArrayLength(target.Span, span) is { } arrayEffects)
+                return effects.Union(arrayEffects);
             var shortType = StripGenericArguments(targetType);
             if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
             {
@@ -5604,6 +5607,11 @@ public sealed class EffectEnforcementPass
                 ? _context.OwnerClass?.Name
                 : ResolveLocalValueType(receiver);
             receiverType ??= _context.ClassesByName.ContainsKey(receiver) ? receiver : null;
+            if (member == "Length"
+                && InferMetadataArrayLength(new TextSpan(
+                    reference.Span.Start, receiver.Length, reference.Span.Line, reference.Span.Column),
+                    reference.Span) is { } arrayEffects)
+                return arrayEffects;
             if (chargeMethodGroup && receiverType != null && TryResolveClass(receiverType, out var cls))
                 return InferGetterEffects(receiverType, member, reference.Span, receiver)
                     .Union(MethodGroupEffects(cls, member) ?? EffectSet.Empty);
@@ -5644,6 +5652,17 @@ public sealed class EffectEnforcementPass
             expression is ReferenceNode reference && !reference.Name.Contains('.')
                 ? InferFromReference(reference, chargeMethodGroup: false)
                 : InferFromExpression(expression);
+
+        private EffectSet? InferMetadataArrayLength(TextSpan receiver, TextSpan diagnostic)
+        {
+            if (_context.CallGraph.MetadataArrayReceiverType(_context.CurrentFunctionId, receiver) is not { } array)
+                return null;
+            var resolution = _context.Resolver.Resolve(EffectResolverKey.FromBoundReceiver(
+                array, "Length", null, EffectMemberKind.Getter));
+            return resolution.Status == EffectResolutionStatus.Unknown
+                ? UnknownResolvedOperation($"{array.DisplayString}.get_Length", diagnostic)
+                : resolution.Effects;
+        }
 
         private EffectSet InferGetterEffects(
             string receiverType,

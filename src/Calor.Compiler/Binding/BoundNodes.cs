@@ -41,6 +41,8 @@ public abstract class BoundExpression : BoundNode
 
     internal ArrayBoundType? MethodInputArrayType { get; init; }
     internal GenericInstantiationBoundType? GenericNullabilityType { get; init; }
+    // Effects-only producer identity, independent of nullability and verifier eligibility.
+    internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; init; }
 
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
@@ -213,6 +215,7 @@ public sealed class BoundVariableExpression : BoundExpression
         {
             MethodInputArrayType = variable.MethodInputArrayType;
             GenericNullabilityType = variable.GenericNullabilityType;
+            MetadataArrayResultType = variable.StorageIdentity.MetadataArrayResultType;
         }
         if (typeOverride != null)
         {
@@ -743,6 +746,7 @@ public sealed class BoundUnaryExpression : BoundExpression
 /// </summary>
 public class BoundCallExpression : BoundExpression
 {
+    internal Microsoft.CodeAnalysis.IMethodSymbol? ResolvedMetadataMethod { get; init; }
     internal VariableSymbol? CallableStorageIdentity { get; init; }
     internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Target { get; }

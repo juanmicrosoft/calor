@@ -146,6 +146,7 @@ public sealed class Binder
     /// that cost unless they need it. Null until first BCL-shaped resolve.
     /// </summary>
     private Metadata.MetadataBinder? _metadataBinder;
+    private IReadOnlyList<UsingDirectiveNode> _metadataUsings = [];
 
     /// <summary>
     /// v0.14 §S4 (nullability workstream / issue #875) — declared return
@@ -282,6 +283,71 @@ public sealed class Binder
             result = preserved with { LegacyReturnType = result.GetReturnBoundTypeEx() };
         }
         return result;
+    }
+
+    private Metadata.MetadataBinderResult? TryResolveInstanceArrayCall(
+        CallExpressionNode call, BoundExpression? receiver)
+    {
+        if (call.Arguments.Count != 0 || call.TypeArguments is { Count: > 0 }
+            || receiver is null
+            || ResolveMetadataArrayReceiver(receiver) is not { } receiverType)
+            return null;
+
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata is null)
+            return null;
+        var result = metadata.ResolveCall(receiverType, call.Target[(call.Target.LastIndexOf('.') + 1)..], []);
+        return result.Symbol is { IsStatic: false, IsGenericMethod: false, Parameters.Length: 0,
+            ReturnType: Microsoft.CodeAnalysis.IArrayTypeSymbol }
+            ? result
+            : null;
+    }
+
+    private Microsoft.CodeAnalysis.INamedTypeSymbol? ResolveMetadataArrayReceiver(BoundExpression receiver)
+    {
+        if (receiver.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } symbol })
+            return symbol;
+        if (receiver is not BoundVariableExpression { Variable: { IsTypeInferred: false } variable }
+            || receiver.Type is not BoundTypes.NominalBoundType { Declaration: null }
+            || _currentMemberTypeParameters?.Any(parameter => parameter.Name == variable.TypeName) == true
+            || _currentClass?.TypeParameters.Any(parameter => parameter.Name == variable.TypeName) == true
+            || _symbolsById.Values.OfType<TypeSymbol>().Any(type => type.Name == variable.TypeName)
+            || _metadataUsings.Any(import => import.NamespaceScopeId != null))
+            return null;
+
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata is null)
+            return null;
+        var aliases = _metadataUsings.Where(import => import.Alias == variable.TypeName).ToArray();
+        var names = aliases.Length == 0
+            ? new[] { variable.TypeName }.Concat(_metadataUsings
+                .Where(import => !import.IsStatic && import.Alias is null)
+                .Select(import => $"{import.Namespace}.{variable.TypeName}"))
+            : aliases.Select(import => import.Namespace);
+        var candidates = names.Select(metadata.Context.TryResolveType)
+            .OfType<Microsoft.CodeAnalysis.INamedTypeSymbol>()
+            .Distinct<Microsoft.CodeAnalysis.INamedTypeSymbol>(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default)
+            .ToArray();
+        return candidates is [{ IsReferenceType: true, IsGenericType: false } resolved] ? resolved : null;
+    }
+
+    private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataArrayProperty(
+        BoundExpression receiver, string memberName)
+    {
+        return ResolveMetadataArrayReceiver(receiver) is { } receiverType
+            && GetOrCreateMetadataBinder()?.ResolveMemberRead(
+                receiverType, memberName, receiver is BoundTypeReferenceExpression, out _)
+                is Microsoft.CodeAnalysis.IPropertySymbol { Type: Microsoft.CodeAnalysis.IArrayTypeSymbol } property
+                ? property : null;
+    }
+
+    private static bool IsArrayReceiver(BoundExpression receiver)
+    {
+        var typeName = receiver.Type.DisplayString;
+        return receiver.Type is BoundTypes.ArrayBoundType
+            || receiver.MethodInputArrayType is not null
+            || typeName.EndsWith("[]", StringComparison.Ordinal)
+            || typeName.StartsWith("ARRAY[element=", StringComparison.Ordinal) && typeName.EndsWith(']');
     }
 
     // Exact analysis identities use CLR names, not C# keywords or reference-nullability syntax.
@@ -674,6 +740,7 @@ public sealed class Binder
     {
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
+        _metadataUsings = module.Usings;
         _scope = new Scope();
         _functionSymbols.Clear();
         _functionNamespaces.Clear();
@@ -2200,6 +2267,7 @@ public sealed class Binder
             methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer),
             genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null);
         variable.IsImmutableBinding = !bind.IsMutable && !bind.IsCollectionStatementForm; // #1550
+        variable.MetadataArrayResultType = initializer?.MetadataArrayResultType;
 
         if (!_scope.TryDeclare(variable))
         {
@@ -3285,6 +3353,8 @@ public sealed class Binder
         var target = boundTarget
             ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
             ?? BindExpression(fieldAccess.Target);
+        if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
+            return new BoundArrayLength(fieldAccess.Span, target);
         var resolvedFields = fieldAccess.Target switch
         {
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
@@ -3309,6 +3379,18 @@ public sealed class Binder
             if (identity is not null || isString)
                 resolvedType = new BoundTypes.NominalBoundType(
                     field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
+        }
+
+        if (fields.Length == 0
+            && ResolveMetadataArrayProperty(target, fieldAccess.FieldName) is { } arrayProperty)
+        {
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan)
+            {
+                ResolvedMetadataMember = arrayProperty,
+                MetadataArrayResultType = arrayProperty.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol
+            };
         }
 
         // Native this/base resolution remains authoritative; N2 owns its annotation transfer.
@@ -3604,6 +3686,8 @@ public sealed class Binder
         VariableSymbol variable,
         bool requireRebindable = true)
     {
+        variable.StorageIdentity.MetadataArrayResultType = null;
+        variable.MetadataArrayResultType = null;
         var source = variable;
         var traversed = new List<VariableSymbol>();
         while (_flowNarrowingSources.TryGetValue(source, out var previous))
@@ -3733,7 +3817,15 @@ public sealed class Binder
     {
         var array = BindExpression(arrayAccess.Array);
         var index = BindExpression(arrayAccess.Index);
-        return new BoundArrayAccess(arrayAccess.Span, array, index);
+        var metadataArray = array is BoundVariableExpression { Variable.IsTypeInferred: false }
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveBclArgumentType(metadata.Context, array.Type.DisplayString)
+                is Microsoft.CodeAnalysis.IArrayTypeSymbol { ElementType: Microsoft.CodeAnalysis.IArrayTypeSymbol element }
+                ? element : null;
+        return new BoundArrayAccess(arrayAccess.Span, array, index)
+        {
+            MetadataArrayResultType = metadataArray
+        };
     }
 
     private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
@@ -4087,6 +4179,13 @@ public sealed class Binder
     private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
     {
         var outerBindings = _scope.CaptureVisibleVariableBindings();
+        var mutableArrayResults = outerBindings.Select(binding => binding.Symbol.StorageIdentity)
+            .Distinct()
+            .Where(variable => variable.IsMutable && variable.MetadataArrayResultType is not null)
+            .Select(variable => (Variable: variable, Type: variable.MetadataArrayResultType))
+            .ToArray();
+        foreach (var (variable, _) in mutableArrayResults)
+            variable.MetadataArrayResultType = null;
         var outerFlowNarrowings = _flowNarrowingSources.ToArray();
         var outerCallableState = CaptureCallableState();
         var outerCallableWrites = _deferredCallableWrites;
@@ -4177,6 +4276,8 @@ public sealed class Binder
         foreach (var (narrowed, source) in outerFlowNarrowings)
             _flowNarrowingSources[narrowed] = source;
         RestoreCallableState(outerCallableState);
+        foreach (var (variable, type) in mutableArrayResults)
+            variable.MetadataArrayResultType = type;
         _deferredCallableWrites = outerCallableWrites;
 
         return new BoundLambdaExpression(
@@ -4643,7 +4744,11 @@ public sealed class Binder
                 BoundExpression? receiver = TryBindMetadataTypeReceiver(receiverNode);
                 if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
                     receiver = BindReferenceExpression(receiverNode);
-                if (receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null })
+                if (receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null }
+                    || receiver is not null && ResolveMetadataArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
+                    || refNode.Name[(lastDot + 1)..] == "Length"
+                        && receiver is not null && (IsArrayReceiver(receiver)
+                            || receiver is BoundVariableExpression { Variable.MetadataArrayResultType: not null }))
                 {
                     var memberSpan = new Parsing.TextSpan(
                         refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
@@ -5162,6 +5267,9 @@ public sealed class Binder
         var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
             ? TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
             : null;
+        var instanceArrayResolution = resolution.Kind == OverloadResolutionKind.NotFound
+            ? TryResolveInstanceArrayCall(callExpr, receiver)
+            : null;
         var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
         var methodInputArrayReturn = annotatedReturn as BoundTypes.ArrayBoundType;
         var genericNullabilityReturn = annotatedReturn as BoundTypes.GenericInstantiationBoundType;
@@ -5257,6 +5365,8 @@ public sealed class Binder
             annotatedReturnType: annotatedReturn,
             receiver: receiver)
         {
+            ResolvedMetadataMethod = instanceArrayResolution?.Symbol,
+            MetadataArrayResultType = instanceArrayResolution?.Symbol?.ReturnType as Microsoft.CodeAnalysis.IArrayTypeSymbol,
             CallableStorageIdentity = callable,
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),

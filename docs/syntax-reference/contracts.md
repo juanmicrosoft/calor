@@ -140,6 +140,19 @@ for computed callees or indexed assignment.
 The converter still emits legacy string built-ins during this staged migration;
 recognizing ordinary calls in contracts does not remove that vocabulary.
 
+Ordinary array `Length` effect resolution also retains exact metadata result
+types through inferred locals and generated receiver temporaries. This bounded
+channel covers zero-argument, non-generic instance methods and array-valued
+properties. It does not mark the producing call or property pure, change
+verification eligibility, or infer a type from a member name. Rebinding a
+mutable local invalidates its inferred result identity.
+
+When single-file conversion leaves a receiver with a nameless inference-error
+type, the converter retains the previous length form. That is legacy
+preservation, not metadata proof. Complete removal of this fallback requires
+project semantic context, including cross-file declarations and inferred lambda
+parameter types. Declared custom `Length` members remain ordinary properties.
+
 ### Range Validation
 
 ```

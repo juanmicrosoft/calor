@@ -80,6 +80,8 @@ public sealed class CallGraphAnalysis
     /// </summary>
     public sealed class BoundValueIndex
     {
+        internal Dictionary<(string CallerId, int Start, int End), Microsoft.CodeAnalysis.IArrayTypeSymbol>
+            MetadataArrayTypes { get; } = new();
         /// <summary>(callerId, reference start, reference end) → the resolved
         /// variable's <c>DeclarationSpan</c>.</summary>
         public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
@@ -116,6 +118,13 @@ public sealed class CallGraphAnalysis
 
     public VariableSymbol? BoundVariable(string callerId, TextSpan reference) =>
         _boundValues.Variables.GetValueOrDefault((callerId, reference.Start, reference.End));
+
+    internal Binding.BoundTypes.ArrayBoundType? MetadataArrayReceiverType(string callerId, TextSpan expression)
+    {
+        var type = _boundValues.MetadataArrayTypes.GetValueOrDefault((callerId, expression.Start, expression.End));
+        return type is null ? null
+            : Binding.Metadata.MetadataBinderResult.ToBoundType(type) as Binding.BoundTypes.ArrayBoundType;
+    }
 
     /// <summary>The declared <c>FunctionBoundType</c> of the LOCAL named
     /// <paramref name="name"/> whose declaration lies inside
@@ -796,6 +805,10 @@ public sealed class CallGraphAnalysis
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
+                    if (node is BoundExpression expressionWithMetadata
+                        && expressionWithMetadata.MetadataArrayResultType is { } metadataArray)
+                        boundValues.MetadataArrayTypes.TryAdd(
+                            (callerId, node.Span.Start, node.Span.End), metadataArray);
                     string? target = null;
                     IReadOnlyList<FunctionSymbol>? callees = null;
                     VariableSymbol? receiver = null;

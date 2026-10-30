@@ -1188,6 +1188,7 @@ public sealed class VariableSymbol : Symbol
     // from its display spelling in the local's lexical namespace.
     internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
     internal bool IsTypeInferred { get; init; }
+    internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; set; }
     internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
     internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
     internal VariableSymbol StorageIdentity { get; set; }

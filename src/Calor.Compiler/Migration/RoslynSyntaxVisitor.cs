@@ -13664,8 +13664,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        var lengthReceiverType = memberName == "Length"
+            ? _semanticModel?.GetTypeInfo(memberAccess.Expression).Type : null;
+        // A missing project context cannot certify a new property lowering.
+        // Keep the previous executable form, not a claim about its receiver type.
         if (memberName == "Length"
-            && _semanticModel?.GetTypeInfo(memberAccess.Expression).Type?.SpecialType == SpecialType.System_String)
+            && (lengthReceiverType?.SpecialType == SpecialType.System_String
+                || lengthReceiverType is { } unresolvedLengthReceiver
+                    && ContainsUnnamedErrorType(unresolvedLengthReceiver)))
         {
             _context.RecordFeatureUsage("native-string-op");
             return new StringOperationNode(span, StringOp.Length, new[] { target });
