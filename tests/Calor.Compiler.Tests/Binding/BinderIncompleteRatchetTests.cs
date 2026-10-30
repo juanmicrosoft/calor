@@ -146,7 +146,16 @@ public class BinderIncompleteRatchetTests
         + "and 78 propagated diagnostic identity hashes include those changes and 140 "
         + "layout-only records; propagated error counts are unchanged. Preserve-all "
         + "boundaries move 918 -> 914 and expressions 17112 -> 17068, with zero opaque-unmapped "
-        + "boundaries or unconverted files. All source identities and mixed partitions are unchanged";
+        + "boundaries or unconverted files. All source identities and mixed partitions are unchanged. "
+        + "Current inventory refreshed on staged 1d253aab8, not final 0.30: named modules change "
+        + "20 raw and five propagated diagnostic identity hashes through declaration-header "
+        + "locations and class-to-module candidate identities. Correct static registration of "
+        + "two const fields removes two false Calor0261 errors in KeyValuePairSettings "
+        + "(raw 12 -> 10, propagated 3 -> 1); the existing Calor0208 remains blocking. "
+        + "Legal nested access to containing private static members removes one false raw "
+        + "Calor0200 each in LogContext (9 -> 8) and SelfLog (4 -> 3). All other diagnostic "
+        + "counts, source and representation identities, binder visits and preserve-all "
+        + "coverage are unchanged";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
