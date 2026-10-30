@@ -13,7 +13,7 @@ checks. Stage A established scalar string checks; Stage B adds
 the bounded shapes below. See [Stage A evidence (#1386)](https://github.com/juanmicrosoft/calor/issues/1386)
 and [Stage B activation (#1402)](https://github.com/juanmicrosoft/calor/issues/1402).
 
-## Types: nullable references are not runtime Options
+## Types: native .NET nullability
 
 `str` and `string` name the same .NET string type. `?str`, `?string`, `str?`,
 and `string?` mark a nullable string reference. `?System.String` is also
@@ -21,12 +21,10 @@ supported. For a resolved reference type such as `Widget`, `?Widget` permits
 null without wrapping the object. Nullable value types, such as `?i32`, map
 to .NET nullable values (`int?`).
 
-Explicit `Option<T>` is different: it is Calor's runtime option type.
-`§SM value` and `§NN` construct Some and None. A nullable reference uses
-`null` and ordinary reference values instead. Neither a call nor the `??`
-operator implicitly unwraps an `Option<T>`. Choose a runtime Option when
-your API deliberately models Some/None, not just to silence a nullable-reference
-diagnostic. See [the type distinction (#1397)](https://github.com/juanmicrosoft/calor/issues/1397).
+A nullable reference uses `null` and ordinary reference values. Use `(?? value
+fallback)` to choose a default, or preserve the nullable annotation through the
+API. Failure uses native exceptions (`§TH`, `§TR`, `§CA`), not a second
+success/error representation.
 
 ## Supported receiving boundaries
 
@@ -38,7 +36,7 @@ not general conversions between arbitrary types.
 |:------|:-----------------|:-----------------|
 | Scalar STRING (`str`, `string`) | Active since Stage A | Initialization, native return, resolved method input |
 | Arrays | Active in Stage B | `?[str]` is a nullable container; `[?str]` has possibly-null STRING elements. Neither satisfies `[str]` at these boundaries; jagged arrays retain separate container/element information |
-| One-level string payloads | Active in Stage B | Matching definitions of `Option`, `List`, `IList`, `IEnumerable`, `IReadOnlyList`, `ICollection`, `IReadOnlyCollection`; for example `List<?str>` cannot satisfy `List<str>` |
+| One-level string payloads | Active in Stage B | Matching definitions of `List`, `IList`, `IEnumerable`, `IReadOnlyList`, `ICollection`, `IReadOnlyCollection`; for example `List<?str>` cannot satisfy `List<str>` |
 | Nominal reference types | Active in Stage B when identity is established | `?Widget` cannot satisfy `Widget` when both share a resolved underlying reference identity; this is not a name-based guess that every unknown type is a reference |
 | Other generic payloads, nested generics, unknown nominal identities | Outside the active guarantee | Analysis may retain type information; no promise of Calor0272–0274 coverage |
 | Mutable assignment/rebinding and constructor inputs | Excluded | Initializing a mutable local is checked; later writes and `§NEW` arguments are not covered by this receiving-boundary guarantee |
@@ -143,7 +141,7 @@ parameter, not to their source position:
 For an otherwise applicable native overload, a nullable argument now yields
 `Calor0274` rather than being discarded as an overload candidate and producing
 `Calor0208` (“no matching overload”). Genuine overload failures still use
-`Calor0208`; runtime `Option<str>` is not an implicitly unwrapped string overload.
+`Calor0208`; an unrelated generic library type is not implicitly unwrapped into a string.
 This diagnostic change applies to the supported boundaries in Calor 0.22.
 
 ## Defaults, throwing, and typed patterns

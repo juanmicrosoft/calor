@@ -37,31 +37,10 @@ public class BinderCoreFamilyTests
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
 
     [Fact]
-    public void Some_BindsWithComposedOptionType()
+    public void Null_BindsWithNullType()
     {
-        var (expr, diags) = BindReturn(new SomeExpressionNode(S, new IntLiteralNode(S, 42)));
-        var some = Assert.IsType<BoundSomeExpression>(expr);
-        Assert.Equal("Option<INT>", some.Type.DisplayString);
-        Assert.IsType<BoundIntLiteral>(some.Value);
-        AssertComplete(diags);
-    }
-
-    [Fact]
-    public void Ok_BindsWithComposedResultType()
-    {
-        var (expr, diags) = BindReturn(new OkExpressionNode(S, new IntLiteralNode(S, 1)));
-        var ok = Assert.IsType<BoundOkExpression>(expr);
-        Assert.Equal("Result<INT, OBJECT>", ok.Type.DisplayString);
-        AssertComplete(diags);
-    }
-
-    [Fact]
-    public void Err_BindsWithComposedResultType()
-    {
-        var (expr, diags) = BindReturn(new ErrExpressionNode(S, new StringLiteralNode(S, "boom")));
-        var err = Assert.IsType<BoundErrExpression>(expr);
-        Assert.Equal("Result<OBJECT, STRING>", err.Type.DisplayString);
-        Assert.IsType<BoundStringLiteral>(err.Error);
+        var (expr, diags) = BindReturn(new ReferenceNode(S, "null"));
+        Assert.IsType<BoundNullLiteral>(expr);
         AssertComplete(diags);
     }
 
@@ -121,11 +100,12 @@ public class BinderCoreFamilyTests
     public void With_BindsTargetAndAssignments_KeepsTargetType()
     {
         var node = new WithExpressionNode(S,
-            new SomeExpressionNode(S, new IntLiteralNode(S, 5)),
+            new RecordCreationNode(S, "Counter", [
+                new FieldAssignmentNode(S, "Value", new IntLiteralNode(S, 5))]),
             new[] { new WithPropertyAssignmentNode(S, "Value", new IntLiteralNode(S, 9)) });
         var (expr, diags) = BindReturn(node);
         var with = Assert.IsType<BoundWithExpression>(expr);
-        Assert.Equal("Option<INT>", with.Type.DisplayString);
+        Assert.Equal("Counter", with.Type.DisplayString);
         Assert.Single(with.Assignments);
         AssertComplete(diags);
     }
@@ -146,13 +126,13 @@ public class BinderCoreFamilyTests
         // The review-of-B2 CRITICAL: "analyzable again" was false — checkers' closed
         // traversal switches skipped the new node types' children (a nested /0 produced
         // NO finding through the full pipeline). The BoundChildren default arms fix it;
-        // this pins the claim END TO END: a division by literal zero inside a Some
-        // payload must produce the actual Calor0920, not merely a bound subtree.
+        // this pins the claim END TO END: a division nested inside a call argument
+        // must produce the actual Calor0920, not merely a bound subtree.
         const string source = @"
 §M{m001:Test}
   §F{f001:Trap:pub} () -> void
     §E{cw}
-    §B{b} §SM (/ 10 0)
+    §B{b} §C{Math.Abs} §A (/ 10 0) §/C
     §P b";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
@@ -180,9 +160,6 @@ public class BinderCoreFamilyTests
         // B2 node yields exactly its expression children.
         var i = new BoundIntLiteral(S, 1);
         var j = new BoundIntLiteral(S, 2);
-        Assert.Equal([i], BoundChildren.Of(new BoundSomeExpression(S, i)));
-        Assert.Equal([i], BoundChildren.Of(new BoundOkExpression(S, i)));
-        Assert.Equal([i], BoundChildren.Of(new BoundErrExpression(S, i)));
         Assert.Equal([i, j], BoundChildren.Of(new BoundExpressionCall(S, i, [j])));
         Assert.Equal([i], BoundChildren.Of(
             new BoundAnonymousObjectCreation(S, [new BoundNamedValue("a", i, S)])));

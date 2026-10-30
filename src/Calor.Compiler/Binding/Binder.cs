@@ -31,7 +31,6 @@ public sealed class Binder
             [typeof(ConditionalExpressionNode)] = static (binder, expression) => binder.BindConditionalExpression((ConditionalExpressionNode)expression),
             [typeof(DecimalLiteralNode)] = static (_, expression) => new BoundDecimalLiteral(expression.Span, ((DecimalLiteralNode)expression).Value),
             [typeof(DictionaryCreationNode)] = static (binder, expression) => binder.BindDictionaryCreation((DictionaryCreationNode)expression),
-            [typeof(ErrExpressionNode)] = static (binder, expression) => binder.BindErrExpression((ErrExpressionNode)expression),
             [typeof(ExistsExpressionNode)] = static (binder, expression) => binder.BindExistsExpression((ExistsExpressionNode)expression),
             [typeof(ExpressionCallNode)] = static (binder, expression) => binder.BindExpressionCall((ExpressionCallNode)expression),
             [typeof(FallbackExpressionNode)] = static (binder, expression) => binder.BindFallbackInterop((FallbackExpressionNode)expression),
@@ -51,10 +50,8 @@ public sealed class Binder
             [typeof(MultiDimArrayCreationNode)] = static (binder, expression) => binder.BindMultiDimArrayCreation((MultiDimArrayCreationNode)expression),
             [typeof(NameOfExpressionNode)] = static (_, expression) => new BoundStringLiteral(expression.Span, ((NameOfExpressionNode)expression).Name),
             [typeof(NewExpressionNode)] = static (binder, expression) => binder.BindNewExpression((NewExpressionNode)expression),
-            [typeof(NoneExpressionNode)] = static (binder, expression) => binder.BindNoneExpression((NoneExpressionNode)expression),
             [typeof(NullCoalesceNode)] = static (binder, expression) => binder.BindNullCoalesce((NullCoalesceNode)expression),
             [typeof(NullConditionalNode)] = static (binder, expression) => binder.BindNullConditional((NullConditionalNode)expression),
-            [typeof(OkExpressionNode)] = static (binder, expression) => binder.BindOkExpression((OkExpressionNode)expression),
             [typeof(PointerDereferenceNode)] = static (binder, expression) => binder.BindPointerDereference((PointerDereferenceNode)expression),
             [typeof(RangeExpressionNode)] = static (binder, expression) => binder.BindRangeExpression((RangeExpressionNode)expression),
             [typeof(RawCSharpExpressionNode)] = static (binder, expression) => binder.BindRawCSharpInterop((RawCSharpExpressionNode)expression),
@@ -63,7 +60,6 @@ public sealed class Binder
             [typeof(SelfRefNode)] = static (binder, expression) => binder.BindSelfReference((SelfRefNode)expression),
             [typeof(SetCreationNode)] = static (binder, expression) => binder.BindSetCreation((SetCreationNode)expression),
             [typeof(SizeOfNode)] = static (binder, expression) => binder.BindSizeOf((SizeOfNode)expression),
-            [typeof(SomeExpressionNode)] = static (binder, expression) => binder.BindSomeExpression((SomeExpressionNode)expression),
             [typeof(StackAllocNode)] = static (binder, expression) => binder.BindStackAlloc((StackAllocNode)expression),
             [typeof(StringBuilderOperationNode)] = static (binder, expression) => binder.BindStringBuilderOperation((StringBuilderOperationNode)expression),
             [typeof(StringLiteralNode)] = static (binder, expression) => binder.BindStringLiteral((StringLiteralNode)expression),
@@ -247,7 +243,6 @@ public sealed class Binder
             var arrayType = NullabilityChecker.GetMethodInputArrayType(args[i]);
             var display = args[i].Type.DisplayString;
             // Strip only recognized nullable annotations for metadata lookup.
-            // Explicit runtime Option<T> retains its distinct representation.
             var trimmed = display;
             while (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
             {
@@ -1258,7 +1253,7 @@ public sealed class Binder
                 // (unblocks the pin test
                 // Calor0272_StillFires_For_ParameterReference_KnownLimitation).
                 // parameter.TypeName is already ExpandType'd by the
-                // parser (?string → OPTION[inner=STRING]); the helper
+                // parser (?string → NULLABLE[inner=STRING]); the helper
                 // handles both forms. Scoped to STRING per §D6.
                 nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName),
                 // v0.15 E2 slice b — position 4/5's row (§3.3). Null unless the
@@ -1845,8 +1840,6 @@ public sealed class Binder
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
     {
         var expr = ret.Expression != null ? BindExpression(ret.Expression) : null;
-        var incompatibleRepresentation = expr is not null && _currentFunctionReturnType is not null
-            && CheckReferenceOptionRepresentation(_currentFunctionReturnType, expr);
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
         // sibling of the §S3b BindBindStatement check. Fires when the current
@@ -1858,8 +1851,7 @@ public sealed class Binder
         // returns silently pass. Current semantics produces binder Errors;
         // BindingDiagnosticPolicy keeps these analysis-only. Unsupported
         // major versions are rejected before binding, not compiled in Info mode.
-        if (!incompatibleRepresentation
-            && expr != null
+        if (expr != null
             && _currentFunctionReturnType != null
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
@@ -2277,9 +2269,6 @@ public sealed class Binder
         if (initializer is not null)
             SetCallableState(variable, initializer);
 
-        var incompatibleRepresentation = initializer is not null && bind.TypeName is not null
-            && CheckReferenceOptionRepresentation(bind.TypeName, initializer);
-
         // v0.14 §S3 nullability check (issue #875, D2 predicate). Fires when
         // an explicit :string / :str target is initialized with a value whose
         // BoundType.NullableAnnotation is Annotated or Oblivious (per D3,
@@ -2289,8 +2278,7 @@ public sealed class Binder
         // now carry real annotations on their BoundCallExpression.Type.
         // Current semantics produces binder Errors, kept analysis-only by
         // BindingDiagnosticPolicy. Unsupported majors do not compile in Info mode.
-        if (!incompatibleRepresentation
-            && initializer != null
+        if (initializer != null
             && bind.TypeName != null
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
@@ -2307,20 +2295,6 @@ public sealed class Binder
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
-    }
-
-    private bool CheckReferenceOptionRepresentation(string targetType, BoundExpression source)
-    {
-        if (Parsing.AttributeHelper.IsReferenceOptionMismatch(
-            targetType, source.Type.DisplayString, _declaredReferenceTypes))
-        {
-            _diagnostics.ReportError(source.Span, DiagnosticCode.ReferenceOptionMismatch,
-                $"Cannot assign '{Parsing.AttributeHelper.ToSurfaceSpelling(source.Type.DisplayString)}' " +
-                $"to '{Parsing.AttributeHelper.ToSurfaceSpelling(targetType)}': reference values and " +
-                "runtime Option values are distinct. Use explicit Option construction or consumption.");
-            return true;
-        }
-        return false;
     }
 
     /// <summary>
@@ -2451,7 +2425,7 @@ public sealed class Binder
         var type = spelling.Trim();
         annotation = BoundTypes.NullableAnnotation.NotAnnotated;
         var wholeAnnotation = type.StartsWith('?') || type.EndsWith('?')
-            || type.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase)
+            || type.StartsWith("NULLABLE[inner=", StringComparison.OrdinalIgnoreCase)
                 && IsWholeBracketedType(type, type.IndexOf('['));
         if (wholeAnnotation && Parsing.AttributeHelper.TryUnwrapNullableAnnotation(type, out var referent))
         {
@@ -2678,7 +2652,7 @@ public sealed class Binder
         // v0.14 §S6 (task #7 Phase-C) — array-shape targets. Surface forms
         // accepted here mirror what ExpandType and IsLikelyType emit:
         //   :[str] / :[string]                 -> "ARRAY[element=STRING]"    (non-null elements)
-        //   :[?str] / :[?string]               -> "ARRAY[element=OPTION[inner=STRING]]" (nullable elements)
+        //   :[?str] / :[?string]               -> "ARRAY[element=NULLABLE[inner=STRING]]" (nullable elements)
         //   :str[] / :string[]                 -> "STRING[]"                 (postfix; non-null elements)
         //   :?str[] / :?string[]               -> "?STRING[]"                (nullable elements)
         // Recognize both post-expansion and raw surface forms because
@@ -2694,7 +2668,7 @@ public sealed class Binder
 
         // v0.14 §S7 (task #7 Phase-C) — whitelisted generic instantiations
         // whose relevant type argument is STRING. Recognizes:
-        //   Option<string> / ?string-in-Option    (T=payload)
+        //   List<string> / ?string-in-List    (T=payload)
         //   List<T>, IList<T>, IEnumerable<T>, IReadOnlyList<T>,
         //   ICollection<T>, IReadOnlyCollection<T>  (T=element)
         // For each, position 0 of TypeArguments is the meaningful slot; the
@@ -2801,11 +2775,11 @@ public sealed class Binder
         var elementAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
         var elementTrimmed = innerType.Trim();
 
-        if (elementTrimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+        if (elementTrimmed.StartsWith("NULLABLE[inner=", StringComparison.Ordinal)
             && elementTrimmed.EndsWith("]", StringComparison.Ordinal))
         {
             elementAnnotation = BoundTypes.NullableAnnotation.Annotated;
-            elementTrimmed = elementTrimmed["OPTION[inner=".Length..^1];
+            elementTrimmed = elementTrimmed["NULLABLE[inner=".Length..^1];
         }
         else if (elementTrimmed.StartsWith("?", StringComparison.Ordinal))
         {
@@ -2828,9 +2802,9 @@ public sealed class Binder
         return true;
     }
 
-    // v0.14 §S7 whitelist — the six generic containers that participate in
+    // v0.14 §S7 whitelist — the generic containers that participate in
     // the string-scope nullability gate. Keys cover both the Calor surface
-    // spelling (e.g. "Option", "List") and Roslyn's fully-qualified
+    // spelling (e.g. "List") and Roslyn's fully-qualified
     // display-name (e.g. "System.Collections.Generic.List") so the same
     // whitelist works for both bind-site (surface strings) and metadata-
     // resolved (BCL) call/return-site parameter types. Everything not in
@@ -2839,7 +2813,6 @@ public sealed class Binder
     private static readonly HashSet<string> GenericStringContainerWhitelist =
         new(StringComparer.Ordinal)
         {
-            "Option",           "OPTION",
             "List",             "System.Collections.Generic.List",
             "IList",            "System.Collections.Generic.IList",
             "IEnumerable",      "System.Collections.Generic.IEnumerable",
@@ -2851,10 +2824,10 @@ public sealed class Binder
     /// <summary>
     /// v0.14 §S7 helper — recognizes a whitelisted generic instantiation
     /// whose position-0 type argument is a scalar STRING. Accepts both
-    /// the Calor surface form (<c>Option&lt;string&gt;</c>,
+    /// the Calor surface form (<c>List&lt;string&gt;</c>,
     /// <c>List&lt;?string&gt;</c>) and the post-ExpandType form where the
     /// argument is normalized (<c>List&lt;STRING&gt;</c>,
-    /// <c>Option&lt;OPTION[inner=STRING]&gt;</c>). Returns a
+    /// <c>List&lt;NULLABLE[inner=STRING]&gt;</c>). Returns a
     /// <see cref="BoundTypes.GenericInstantiationBoundType"/> whose
     /// single argument is a STRING <see cref="BoundTypes.NominalBoundType"/>
     /// carrying the declared inner annotation, so
@@ -2883,7 +2856,7 @@ public sealed class Binder
         // out-of-scope per D6 and must not construct a target.
         if (!GenericStringContainerWhitelist.Contains(baseName)) return false;
 
-        // Position-0 argument only: none of the six whitelisted containers
+        // Position-0 argument only: none of the whitelisted containers
         // use multi-arg like Dictionary yet. If the argument list contains
         // a top-level comma, we conservatively reject rather than guess.
         if (ContainsTopLevelComma(argsSection)) return false;
@@ -2891,11 +2864,11 @@ public sealed class Binder
         var innerRaw = argsSection.Trim();
         var innerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
 
-        if (innerRaw.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+        if (innerRaw.StartsWith("NULLABLE[inner=", StringComparison.Ordinal)
             && innerRaw.EndsWith("]", StringComparison.Ordinal))
         {
             innerAnnotation = BoundTypes.NullableAnnotation.Annotated;
-            innerRaw = innerRaw["OPTION[inner=".Length..^1];
+            innerRaw = innerRaw["NULLABLE[inner=".Length..^1];
         }
         else if (innerRaw.StartsWith("?", StringComparison.Ordinal) && innerRaw.Length > 1)
         {
@@ -2927,7 +2900,7 @@ public sealed class Binder
     /// when the generic argument list contains a comma at the top level
     /// (i.e. a multi-argument generic). Nested angle brackets and square
     /// brackets are respected so <c>Dictionary&lt;string, List&lt;int&gt;&gt;</c>
-    /// is detected as multi-arg while <c>List&lt;OPTION[inner=STRING]&gt;</c>
+    /// is detected as multi-arg while <c>List&lt;NULLABLE[inner=STRING]&gt;</c>
     /// is not.
     /// </summary>
     private static bool ContainsTopLevelComma(string argsSection)
@@ -3079,7 +3052,7 @@ public sealed class Binder
     /// the three emit sites (S3 bind, S4 return, S4 call). Scalar STRING
     /// yields <c>'string'</c> / <c>'?string'</c>, array yields
     /// <c>'string[]'</c> / <c>'[?string]'</c>, generic yields
-    /// <c>'Option&lt;string&gt;'</c> / <c>'Option&lt;?string&gt;'</c>
+    /// <c>'List&lt;string&gt;'</c> / <c>'List&lt;?string&gt;'</c>
     /// (spelled with the definition's short name so it matches what the
     /// user wrote).
     /// </summary>
@@ -3116,7 +3089,7 @@ public sealed class Binder
     // the source-count of TypeName string-equality sites flat (F-3 ratchet
     // in BoundTypeArchitectureTests). Delegates to TryBuildStringTarget so
     // surface-form parsing (`:string`, `:?string`, `:str`,
-    // `OPTION[inner=STRING]`) stays in one place.
+    // `NULLABLE[inner=STRING]`) stays in one place.
     // v0.14 nullability workstream — fallback for §B{x} STR:"hi" (inferred
     // type). When bind.TypeName is null but the inferred typeName resolves
     // to a scalar STRING, copy the initializer's annotation onto the
@@ -3996,30 +3969,6 @@ public sealed class Binder
                 .ToArray());
     }
 
-    private BoundExpression BindSomeExpression(SomeExpressionNode some)
-    {
-        var value = BindExpression(some.Value);
-        return new BoundSomeExpression(some.Span, value);
-    }
-
-    private BoundExpression BindNoneExpression(NoneExpressionNode none)
-    {
-        var innerType = string.IsNullOrWhiteSpace(none.TypeName) ? "OBJECT" : none.TypeName!;
-        return new BoundNoneLiteral(none.Span, MakeOptionType(innerType));
-    }
-
-    private BoundExpression BindOkExpression(OkExpressionNode ok)
-    {
-        var value = BindExpression(ok.Value);
-        return new BoundOkExpression(ok.Span, value);
-    }
-
-    private BoundExpression BindErrExpression(ErrExpressionNode err)
-    {
-        var error = BindExpression(err.Error);
-        return new BoundErrExpression(err.Span, error);
-    }
-
     private BoundExpression BindAwaitExpression(AwaitExpressionNode awaitExpression)
     {
         var awaited = BindExpression(awaitExpression.Awaited);
@@ -4418,14 +4367,6 @@ public sealed class Binder
                     relational,
                     metadata: new Dictionary<string, object?> { ["Operator"] = relational.Operator },
                     expressions: [BindExpression(relational.Value)]);
-            case SomePatternNode some:
-                return Pattern(some, patterns: [BindPattern(some.InnerPattern, allowBindings)]);
-            case NonePatternNode:
-                return Pattern(pattern);
-            case OkPatternNode ok:
-                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern, allowBindings)]);
-            case ErrPatternNode err:
-                return Pattern(err, patterns: [BindPattern(err.InnerPattern, allowBindings)]);
             case PositionalPatternNode positional:
                 return Pattern(
                     positional,
@@ -4574,7 +4515,7 @@ public sealed class Binder
         //   * StringOp.ToString maps to object.ToString(), which the
         //     modern BCL annotates as string? because overrides may
         //     return null. Stamp Annotated so downstream flow requires
-        //     an explicit null-check / .unwrap before non-null uses.
+        //     an explicit null-check before non-null uses.
         var stringAnnotation = operation.Operation == StringOp.ToString
             && (arguments.Count == 0 || !IsDefinitelyNonNullToStringInput(arguments[0]))
                 ? BoundTypes.NullableAnnotation.Annotated
@@ -5286,7 +5227,7 @@ public sealed class Binder
         // shapes — the same set §S3/S7/S8 target-side gates handle) to
         // extract the annotation, then wraps the ALREADY-COMPUTED
         // `returnType` string so BoundCallExpression.Type.DisplayString
-        // stays byte-identical to today (e.g. "str", "OPTION[inner=STRING]",
+        // stays byte-identical to today (e.g. "str", "NULLABLE[inner=STRING]",
         // "Foo"). We deliberately do NOT swap in TryBuildStringTarget's
         // canonicalized target ("STRING") — that would break every
         // downstream consumer (BinderOverloadSetTests, etc.) that reads
@@ -5322,18 +5263,6 @@ public sealed class Binder
             methodInputArrayReturn ??= callableShape as BoundTypes.ArrayBoundType;
             genericNullabilityReturn ??= callableShape as BoundTypes.GenericInstantiationBoundType;
         }
-        if (annotatedReturn is null
-            && resolvedMethodName == "Unwrap"
-            && receiverSymbol is not null
-            && TryParseGenericStringTarget(receiverSymbol.TypeName, out var receiverGeneric)
-            && receiverGeneric!.Definition.QualifiedName is "Option" or "OPTION"
-            && receiverGeneric.TypeArguments[0] is BoundTypes.NominalBoundType optionPayload)
-        {
-            // Unwrap preserves T. Option<str> returns a non-null string or
-            // throws; Option<?str> may successfully return null.
-            annotatedReturn = optionPayload;
-        }
-
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, callExpr.ArgumentModifiers, resolution, bclResolution);
@@ -6147,13 +6076,13 @@ public sealed class Binder
     private bool IsNominalTypeInvisibleToThisModule(string type)
     {
         var canonical = TypeIdentity.Canonicalize(type);
-        // These spellings previously had the built-in OPTION head and therefore did not
-        // suppress a failed overload. Keep that rejection until #1382/#1383/#1385 hand it off.
+        // Nullable spellings must not suppress a failed overload.
+        // Keep that rejection until #1382/#1383/#1385 hand it off.
         // This compatibility condition is not a claim that the referent was resolved.
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(canonical, out _))
             return false;
 
-        // Head of a generic/array/option form: `Seq<Assembly>` -> `Seq`.
+        // Head of a generic/array form: `Seq<Assembly>` -> `Seq`.
         var head = canonical;
         var generic = head.IndexOf('<');
         if (generic > 0)
@@ -6841,7 +6770,7 @@ public sealed class Binder
             // Only these kinds run no code and read no shared storage of their own; every other
             // kind (calls of any form, construction, element/field/property reads) may.
             BoundIntLiteral or BoundStringLiteral or BoundBoolLiteral or BoundFloatLiteral or BoundDecimalLiteral
-                or BoundNoneLiteral or BoundNullLiteral or BoundLambdaExpression => false,
+                or BoundNullLiteral or BoundLambdaExpression => false,
             // An operator on a user type may be an overloaded operator method.
             BoundBinaryExpression binary => !IsBuiltInOperand(binary.Left) || !IsBuiltInOperand(binary.Right),
             // A built-in string or character operation (`len`, `upper`) over built-in operands runs no user code.
@@ -6915,12 +6844,6 @@ public sealed class Binder
 
     private static string MakeArrayType(string elementType, int rank) =>
         $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
-
-    private static string MakeOptionType(string innerType) =>
-        $"Option<{innerType}>";
-
-    private static string MakeResultType(string okType, string errorType) =>
-        $"RESULT[ok={okType}][err={errorType}]";
 
     private static string UnwrapAwaitedType(string typeName)
     {

@@ -443,8 +443,8 @@ Assess C# source code for Calor migration potential. Returns scores across 8 dim
 **Scoring Dimensions:**
 - **ContractPotential** (18%): Argument validation, assertions -> contracts
 - **EffectPotential** (13%): I/O, network, database calls -> effect declarations
-- **NullSafetyPotential** (18%): Nullable types, null checks -> Option&lt;T&gt;
-- **ErrorHandlingPotential** (18%): Try/catch, throw -> Result&lt;T,E&gt;
+- **NullSafetyPotential** (18%): Nullable types, null checks -> nullable-boundary checks
+- **ErrorHandlingPotential** (18%): Try/catch, throw -> native exceptions with declared effects
 - **PatternMatchPotential** (8%): Switch statements -> exhaustiveness checking
 - **ApiComplexityPotential** (13%): Undocumented public APIs
 - **AsyncPotential** (6%): async/await, Task&lt;T&gt; returns

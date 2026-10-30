@@ -118,7 +118,7 @@ internal static class NullabilityChecker
             // non-null-elements array target trips the same predicate.
             ArrayBoundType array => CheckArrayTarget(source, array),
             // S7 — whitelisted generic-instantiation STRING nullability
-            // (Option<T>, List<T>, IList<T>, IEnumerable<T>,
+            // (List<T>, IList<T>, IEnumerable<T>,
             // IReadOnlyList<T>, ICollection<T>, IReadOnlyCollection<T>).
             // Container's own annotation is orthogonal — only the
             // position-0 type argument (payload / element) mismatch
@@ -307,7 +307,7 @@ internal static class NullabilityChecker
         var canonical = TypeIdentity.Canonicalize(type.Name);
         return Binder.IsBuiltInValueTypeName(canonical)
             || TypeIdentity.IsKnownValueMetadataName(type.Name)
-            || TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("STRING" or "OBJECT" or "OPTION")
+            || TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("STRING" or "OBJECT")
                 ? NullableAnnotation.NotAnnotated
                 : null;
     }

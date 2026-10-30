@@ -52,12 +52,6 @@ public static class OperatorSuggestions
         "list", "cons", "car", "cdr", "nth", "map", "filter", "reduce", "reverse",
         "append", "length",
 
-        // Option operations
-        "some", "none", "is-some", "is-none", "unwrap", "unwrap-or", "map-opt",
-
-        // Result operations
-        "ok", "err", "is-ok", "is-err", "unwrap-result",
-
         // Async operations
         "await",
 
@@ -82,13 +76,13 @@ public static class OperatorSuggestions
         // C# keywords with Calor equivalents
         ["typeof"] = "Use (typeof Type) in Lisp expressions",
         ["sizeof"] = "Size operations are not supported in Calor. Use constants for known sizes.",
-        ["default"] = "Use explicit default values (0 for numbers, \"\" for strings, §NN for None).",
+        ["default"] = "Use (default Type), or an explicit value such as 0 or null.",
         ["new"] = "Use §NEW for object creation: §NEW[Type] §A arg1 §A arg2",
         ["await"] = "Use (await expr) for async operations",
         ["async"] = "Mark functions with §AWAIT effect, then use (await ...) in expressions",
-        ["throw"] = "Use (err message) to create error results, or §THROW for exceptions",
-        ["try"] = "Use Result types with (ok ...) and (err ...) instead of try-catch",
-        ["catch"] = "Use pattern matching on Result types: §MATCH[result] §ARM[Ok] ... §ARM[Err] ...",
+        ["throw"] = "Use §TH for exceptions",
+        ["try"] = "Use §TRY for exception handling",
+        ["catch"] = "Use §CA for catch clauses",
         ["finally"] = "Use §DEFER for cleanup code that must run",
         ["lock"] = "Concurrency primitives are not supported in Calor",
         ["using"] = "§U[namespace] for using directives, §USE[var] for resource management",
@@ -111,9 +105,9 @@ public static class OperatorSuggestions
         ["*="] = "Use (set x (* x value))",
         ["/="] = "Use (set x (/ x value))",
         ["??"] = "Use (?? x default) for null-coalescing in Lisp expressions",
-        ["?."] = "Use pattern matching or (map-opt option fn) for null-conditional",
-        ["?["] = "Use (if (is-some opt) (nth (unwrap opt) i) default)",
-        ["!."] = "Use (unwrap option) to assert non-null",
+        ["?."] = "Use (?. receiver member) for null-conditional access",
+        ["?["] = "Check the nullable array for null before indexing",
+        ["!."] = "Check for null or use (?? value fallback)",
         ["::"] = "Namespace resolution is automatic in Calor",
 
         // Common C# methods
@@ -141,9 +135,9 @@ public static class OperatorSuggestions
         ["Sum"] = "Use (reduce list + 0)",
 
         // Null-related
-        ["null"] = "Use Option types: §SM for Some, §NN for None",
-        ["NULL"] = "Use Option types: §SM for Some, §NN for None",
-        ["Null"] = "Use Option types: §SM for Some, §NN for None",
+        ["null"] = "Use null with a nullable type",
+        ["NULL"] = "Use null with a nullable type",
+        ["Null"] = "Use null with a nullable type",
 
         // Boolean operators
         ["true"] = "Use #true for boolean true",

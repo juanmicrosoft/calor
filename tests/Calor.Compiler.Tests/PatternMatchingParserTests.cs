@@ -222,30 +222,23 @@ public class PatternMatchingParserTests
     #region Parser Tests - Option/Result Patterns
 
     [Fact]
-    public void Parse_SomeNonePattern_ParsesCorrectly()
+    public void Parse_SomeNonePattern_IsRejected()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:Test:pub}
-      §I{?i32:opt}
+      §I{bool:opt}
       §O{i32}
       §R §W{sw1} opt
           §K §SM §VAR{v} → v
           §K §NN → 0";
 
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
-
-        var func = Assert.Single(module.Functions);
-        var ret = Assert.IsType<ReturnStatementNode>(func.Body[0]);
-        var match = Assert.IsType<MatchExpressionNode>(ret.Expression);
-
-        Assert.IsType<SomePatternNode>(match.Cases[0].Pattern);
-        Assert.IsType<NonePatternNode>(match.Cases[1].Pattern);
+        Parse(source, out var diagnostics);
+        Assert.True(diagnostics.HasErrors);
     }
 
     [Fact]
-    public void Parse_OkErrPattern_ParsesCorrectly()
+    public void Parse_OkErrPattern_IsRejected()
     {
         var source = @"
 §M{m001:Test}
@@ -256,15 +249,8 @@ public class PatternMatchingParserTests
           §K §OK §VAR{v} → ""ok""
           §K §ERR §VAR{e} → ""err""";
 
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
-
-        var func = Assert.Single(module.Functions);
-        var ret = Assert.IsType<ReturnStatementNode>(func.Body[0]);
-        var match = Assert.IsType<MatchExpressionNode>(ret.Expression);
-
-        Assert.IsType<OkPatternNode>(match.Cases[0].Pattern);
-        Assert.IsType<ErrPatternNode>(match.Cases[1].Pattern);
+        Parse(source, out var diagnostics);
+        Assert.True(diagnostics.HasErrors);
     }
 
     #endregion
@@ -391,7 +377,7 @@ public class PatternMatchingParserTests
       §I{?i32:opt}
       §O{i32}
         §W{m1} opt
-            §K §NN
+            §K true
               §R 0";
 
         var module = Parse(source, out var parseDiagnostics);
@@ -399,7 +385,7 @@ public class PatternMatchingParserTests
 
         var checkDiagnostics = new DiagnosticBag();
         var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("opt", new OptionType(PrimitiveType.Int));
+        typeEnv.DefineVariable("opt", PrimitiveType.Bool);
         var checker = new PatternChecker(checkDiagnostics, typeEnv);
         checker.Check(module);
 

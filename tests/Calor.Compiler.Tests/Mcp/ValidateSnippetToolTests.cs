@@ -76,14 +76,14 @@ public class ValidateSnippetToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithValidSomeExpression_ReturnsValid()
+    public async Task ExecuteAsync_WithValidNullableValue_ReturnsValid()
     {
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§R §SM 42",
+                "source": "§R 42",
                 "context": {
-                    "returnType": "Option<i32>"
+                    "returnType": "?i32"
                 }
             }
             """).RootElement;
@@ -96,14 +96,14 @@ public class ValidateSnippetToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithValidNoneExpression_ReturnsValid()
+    public async Task ExecuteAsync_WithValidNullExpression_ReturnsValid()
     {
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§R §NN",
+                "source": "§R null",
                 "context": {
-                    "returnType": "Option<i32>"
+                    "returnType": "?i32"
                 }
             }
             """).RootElement;
@@ -468,10 +468,10 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§W{_w1} value\n  §K §SM x\n    §R x\n  §K §NN\n    §R 0",
+                "source": "§W{_w1} value\n  §K null\n    §R 0\n  §K _\n    §R 1",
                 "context": {
                     "parameters": [
-                        { "name": "value", "type": "Option<i32>" }
+                        { "name": "value", "type": "?i32" }
                     ],
                     "returnType": "i32"
                 }

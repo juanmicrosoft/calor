@@ -507,15 +507,6 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 case AwaitExpressionNode awaitExpr:
                     VisitExpression(awaitExpr.Awaited);
                     break;
-                case SomeExpressionNode some:
-                    VisitExpression(some.Value);
-                    break;
-                case OkExpressionNode ok:
-                    VisitExpression(ok.Value);
-                    break;
-                case ErrExpressionNode err:
-                    VisitExpression(err.Error);
-                    break;
                 case ConditionalExpressionNode cond:
                     VisitExpression(cond.Condition);
                     VisitExpression(cond.WhenTrue);

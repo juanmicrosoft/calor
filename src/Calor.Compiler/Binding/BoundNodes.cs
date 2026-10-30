@@ -301,7 +301,7 @@ public sealed class BoundVariableExpression : BoundExpression
         "VOID" or "void" => false,
         "OBJECT" or "object" => false,  // OBJECT is the multi-resolve sentinel — not a real user type
         "" => false,
-        var n when n.Contains('[', StringComparison.Ordinal) => false, // ARRAY[…] / OPTION[…]
+        var n when n.Contains('[', StringComparison.Ordinal) => false, // ARRAY[…] / NULLABLE[…]
         _ => true,
     };
 
@@ -695,19 +695,6 @@ public sealed class BoundDecimalLiteral : BoundExpression
 }
 
 /// <summary>
-/// Bound None literal (Option.None / null).
-/// </summary>
-public sealed class BoundNoneLiteral : BoundExpression
-{
-    public override BoundType Type { get; }
-
-    public BoundNoneLiteral(TextSpan span, string? optionType = null) : base(span)
-    {
-        Type = new NominalBoundType(optionType ?? "NONE");
-    }
-}
-
-/// <summary>
 /// Bound C# null literal. Its nominal type is intentionally not STRING; receiving
 /// boundaries decide whether null is applicable to their declared reference type.
 /// </summary>
@@ -947,50 +934,6 @@ public static class BoundChildren
 
     public static IEnumerable<BoundExpression> DeferredOf(BoundExpression expression) =>
         expression.DeferredChildren;
-}
-
-/// <summary>#762 B2: Option construction. Type composes from the payload (string types, D3).</summary>
-public sealed class BoundSomeExpression : BoundExpression
-{
-    public BoundExpression Value { get; }
-    public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => [Value];
-
-    public BoundSomeExpression(TextSpan span, BoundExpression value) : base(span)
-    {
-        Value = value;
-        Type = new NominalBoundType($"Option<{value.Type.DisplayString}>");
-    }
-}
-
-/// <summary>#762 B2: Result success construction. The error type parameter is unknowable
-/// from the value alone under 0.13's string types — "OBJECT" is the explicit placeholder
-/// (never null, per D3); 0.14's typed representation replaces it.</summary>
-public sealed class BoundOkExpression : BoundExpression
-{
-    public BoundExpression Value { get; }
-    public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => [Value];
-
-    public BoundOkExpression(TextSpan span, BoundExpression value) : base(span)
-    {
-        Value = value;
-        Type = new NominalBoundType($"Result<{value.Type.DisplayString}, OBJECT>");
-    }
-}
-
-/// <summary>#762 B2: Result error construction (see BoundOkExpression on the placeholder).</summary>
-public sealed class BoundErrExpression : BoundExpression
-{
-    public BoundExpression Error { get; }
-    public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => [Error];
-
-    public BoundErrExpression(TextSpan span, BoundExpression error) : base(span)
-    {
-        Error = error;
-        Type = new NominalBoundType($"Result<OBJECT, {error.Type.DisplayString}>");
-    }
 }
 
 /// <summary>#762 B2: invocation of a function VALUE (computed target). Return type is

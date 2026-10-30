@@ -201,20 +201,12 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(RecordCreationNode node) { }
     public void Visit(FieldAssignmentNode node) { }
     public void Visit(FieldAccessNode node) { }
-    public void Visit(SomeExpressionNode node) { }
-    public void Visit(NoneExpressionNode node) { }
-    public void Visit(OkExpressionNode node) { }
-    public void Visit(ErrExpressionNode node) { }
     public void Visit(MatchExpressionNode node) { }
     public void Visit(MatchStatementNode node) { }
     public void Visit(MatchCaseNode node) { }
     public void Visit(WildcardPatternNode node) { }
     public void Visit(VariablePatternNode node) { }
     public void Visit(LiteralPatternNode node) { }
-    public void Visit(SomePatternNode node) { }
-    public void Visit(NonePatternNode node) { }
-    public void Visit(OkPatternNode node) { }
-    public void Visit(ErrPatternNode node) { }
     public void Visit(RequiresNode node) { }
     public void Visit(EnsuresNode node) { }
     public void Visit(InvariantNode node) { }

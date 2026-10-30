@@ -6,7 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
 
 namespace TypeSystem
 {
@@ -14,35 +13,10 @@ namespace TypeSystem
     {
         public static void Main()
         {
-            Console.WriteLine("Testing Option and Result types...");
-            TestSome();
-            TestNone();
-            TestOk();
-            TestErr();
-        }
-
-        private static void TestSome()
-        {
-            var opt = Calor.Runtime.Option.Some(42);
-            Console.WriteLine("  Created Some(42)");
-        }
-
-        private static void TestNone()
-        {
-            var opt = Calor.Runtime.Option<int>.None();
-            Console.WriteLine("  Created None");
-        }
-
-        private static void TestOk()
-        {
-            var result = Calor.Runtime.Result.Ok<int, string>(100);
-            Console.WriteLine("  Created Ok(100)");
-        }
-
-        private static void TestErr()
-        {
-            var result = Calor.Runtime.Result.Err<object, string>("Something went wrong");
-            Console.WriteLine("  Created Err");
+            int? present = 42;
+            int? absent = null;
+            Console.WriteLine(present ?? 0);
+            Console.WriteLine(absent ?? 0);
         }
 
     }

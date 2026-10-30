@@ -98,19 +98,20 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
-    public void CoalesceDoesNotUnwrapRuntimeOption()
+    public void UnknownGenericCoalesce_DoesNotIntroduceOptionSemantics()
     {
         var rejected = Check("""
             §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
+              §F{f1:Probe:pub} (Option<str>:opt) -> void
                 §E{alloc}
-                §B{opt:Option<str>} §SM "value"
                 §B{value:str} (?? opt "fallback")
             """);
 
-        var diagnostic = SingleErrorAt(rejected, 5);
-        Assert.Contains("Option<str>", diagnostic.Message);
-        Assert.Contains("does not unwrap", diagnostic.Message);
+        Assert.DoesNotContain(rejected.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ReferenceOptionMismatch);
+        Assert.DoesNotContain("Unwrap", rejected.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Option", rejected.GeneratedCode);
+        Assert.Contains("Option<string>", rejected.GeneratedCode);
     }
 
     [Fact]

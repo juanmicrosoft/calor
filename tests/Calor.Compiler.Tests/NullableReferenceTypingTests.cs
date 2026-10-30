@@ -105,16 +105,16 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void ExplicitOptionConstructionAndConsumption_KeepTheirRuntimeWrapper()
+    public void NullableConstructionAndConsumption_KeepTheirDeclaredType()
     {
         const string source = """
             §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (bool:present) -> Option<str>
+              §F{f1:Probe:pub} (bool:present) -> ?str
                 §E{alloc}
                 §IF{if1} present
-                  §R §SM "value"
+                  §R "value"
                 §EL
-                  §R §NN{str}
+                  §R null
             """;
         foreach (var text in RoundTrip(source))
         foreach (var checking in new[] { true, false })
@@ -122,9 +122,9 @@ public class NullableReferenceTypingTests
             var result = Compile(text, checking);
             AssertNoTypingNoise(result);
             var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
-            Assert.Equal(typeof(Option<string>), method.ReturnType);
-            Assert.Equal("value", Assert.IsType<Option<string>>(method.Invoke(null, [true])).Unwrap());
-            Assert.True(Assert.IsType<Option<string>>(method.Invoke(null, [false])).IsNone);
+            Assert.Equal(typeof(string), method.ReturnType);
+            Assert.Equal("value", method.Invoke(null, [true]));
+            Assert.Null(method.Invoke(null, [false]));
         }
     }
 
@@ -132,9 +132,7 @@ public class NullableReferenceTypingTests
     [InlineData("?str", "§SM \"value\"")]
     [InlineData("?string", "§NN{str}")]
     [InlineData("str", "§SM \"value\"")]
-    [InlineData("Option<str>", "\"value\"")]
-    [InlineData("Option<str>", "input")]
-    public void ReferenceOptionMismatches_AreNotImplicitConversions(string target, string expression)
+    public void RemovedOptionConstructors_AreRejectedInNullableBindings(string target, string expression)
     {
         var source = $$"""
             §M{m1:NullableTyping}
@@ -154,8 +152,6 @@ public class NullableReferenceTypingTests
             Assert.True(result.HasErrors, result.GeneratedCode);
             Assert.Contains(result.Diagnostics.Errors, d => d.Span.Line == 4);
         }
-        var (_, diagnostics) = Bind(source);
-        Assert.Contains(diagnostics.Errors, BindingDiagnosticPolicy.IsCompilationError);
     }
 
     [Fact]
@@ -314,19 +310,19 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void OptionNullableStringUnwrap_PreservesAnnotatedPayload()
+    public void NullableStringReturn_PreservesAnnotatedPayload()
     {
         const string source = """
             §M{m1:NullableTyping}
-              §F{f1:Probe:pub} (Option<?str>:value) -> str
+              §F{f1:Probe:pub} (?str:value) -> str
                 §E{throw}
-                §R §C{value.Unwrap} §/C
+                §R value
             """;
 
         var (bound, diagnostics) = Bind(source);
         var returned = Assert.IsType<BoundReturnStatement>(
             Assert.Single(bound.Functions).Body.Single());
-        var call = Assert.IsType<BoundCallExpression>(returned.Expression);
+        var call = Assert.IsType<BoundVariableExpression>(returned.Expression);
         Assert.Equal(NullableAnnotation.Annotated,
             Assert.IsType<NominalBoundType>(call.Type).NullableAnnotation);
         Assert.Equal(DiagnosticCode.NullableReturnFromNonNullable,
@@ -392,10 +388,10 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void NullableAndOptionTypeModels_HaveDistinctIdentitiesAndHashes()
+    public void NullableAndNominalGenericTypeModels_HaveDistinctIdentitiesAndHashes()
     {
         var nullable = new NullableReferenceType(PrimitiveType.String);
-        var option = new OptionType(PrimitiveType.String);
+        var option = new ExternalType("Option<str>");
         Assert.NotEqual<CalorType>(nullable, option);
         Assert.Equal("?str", nullable.SurfaceName);
         Assert.Equal("Option<str>", option.SurfaceName);
@@ -404,10 +400,10 @@ public class NullableReferenceTypingTests
         Assert.NotEqual(TypeIdentity.Canonicalize("str?[]"), TypeIdentity.Canonicalize("?str[]"));
         Assert.Equal("System.String", TypeIdentity.MapShortTypeNameToFullName("?str"));
         Assert.Equal("System.Nullable`1", TypeIdentity.MapShortTypeNameToFullName("?i32"));
-        Assert.Equal("System.Nullable`1", TypeIdentity.MapShortTypeNameToFullName("?Option<str>"));
-        Assert.Equal("Calor.Runtime.Option`1", TypeIdentity.MapShortTypeNameToFullName("Option<str>"));
+        Assert.Equal("Option<str>", TypeIdentity.MapShortTypeNameToFullName("?Option<str>"));
+        Assert.Equal("Option<str>", TypeIdentity.MapShortTypeNameToFullName("Option<str>"));
         Assert.Throws<ArgumentException>(() => new NullableReferenceType(PrimitiveType.Int));
-        Assert.Throws<ArgumentException>(() => new NullableReferenceType(option));
+        Assert.Equal("?Option<str>", new NullableReferenceType(option).SurfaceName);
     }
 
     [Fact]
@@ -431,8 +427,7 @@ public class NullableReferenceTypingTests
 
     [Theory]
     [InlineData("[?str]", "string?[]")]
-    [InlineData("Option<?str>", "Option<string?>")]
-    public void NullablePayloads_DoNotCollapseTheirArrayOrRuntimeOptionContainer(string type, string emittedType)
+    public void NullablePayloads_DoNotCollapseTheirArrayContainer(string type, string emittedType)
     {
         var source = $$"""
             §M{m1:NullableTyping}
@@ -448,15 +443,14 @@ public class NullableReferenceTypingTests
             Assert.Contains(emittedType, result.GeneratedCode);
             Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
             var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
-            Assert.Equal(type.StartsWith("Option", StringComparison.Ordinal)
-                ? typeof(Option<string>) : typeof(string[]), method.ReturnType);
+            Assert.Equal(typeof(string[]), method.ReturnType);
         }
     }
 
     [Theory]
     [InlineData("?str", "§SM \"value\"")]
-    [InlineData("Option<str>", "\"value\"")]
-    public void ReturnRepresentationErrors_AreActiveWithoutTypeChecking(string returnType, string expression)
+    [InlineData("?str", "§NN{str}")]
+    public void RemovedOptionReturns_AreRejectedWithoutTypeChecking(string returnType, string expression)
     {
         var source = $$"""
             §M{m1:NullableTyping}
@@ -472,10 +466,8 @@ public class NullableReferenceTypingTests
                 EnableTypeChecking = checking,
                 UnsafeTranspileOnly = transpile
             });
-            var diagnostic = Assert.Single(result.Diagnostics.Errors);
-            Assert.Equal(DiagnosticCode.ReferenceOptionMismatch, diagnostic.Code);
-            Assert.Equal(4, diagnostic.Span.Line);
-            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            Assert.True(result.HasErrors);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Span.Line == 4);
         }
     }
 
@@ -486,8 +478,8 @@ public class NullableReferenceTypingTests
             §M{m1:NullableTyping}
               §F{f1:Probe:pub} () -> str
                 §E{alloc}
-                §B{factory:Func<Option<str>>} §LAM{lam1}
-                  §R §SM "value"
+                §B{factory:Func<str?>} §LAM{lam1}
+                  §R null
                 §/LAM{lam1}
                 §R "outer"
             """;
@@ -540,13 +532,13 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void NullableObjectBoxing_PreservesTheWholeOptionValueWithoutUnwrapping()
+    public void NullableObjectBoxing_PreservesTheValue()
     {
         const string source = """
             §M{m1:NullableTyping}
               §F{f1:Probe:pub} () -> ?object
                 §E{alloc}
-                §B{boxed:?object} §SM "value"
+                §B{boxed:?object} "value"
                 §R boxed
             """;
         foreach (var checking in new[] { true, false })
@@ -555,7 +547,7 @@ public class NullableReferenceTypingTests
             AssertNoTypingNoise(result);
             var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
             Assert.Equal(typeof(object), method.ReturnType);
-            Assert.Equal("value", Assert.IsType<Option<string>>(method.Invoke(null, null)).Unwrap());
+            Assert.Equal("value", Assert.IsType<string>(method.Invoke(null, null)));
         }
     }
 

@@ -54,7 +54,7 @@ public class CliTypeCheckDefaultTests : IDisposable
     [InlineData(true, false, "0")]
     [InlineData(false, true, "0")]
     [InlineData(false, false, "1")]
-    public void NullableReferenceRepair_DoesNotAllowWarmOptionMismatch(
+    public void NullableReferenceRepair_RejectsRemovedSyntaxAfterWarmBuild(
         bool typeOff, bool transpile, string environmentOptOut)
     {
         var path = Path.Combine(_tempDir, "nullable-reference.calr");
@@ -75,7 +75,7 @@ public class CliTypeCheckDefaultTests : IDisposable
         File.WriteAllText(path, safe.Replace("§R \"safe\"", "§R §SM \"safe\"", StringComparison.Ordinal));
         var rejected = CliTestHarness.RunCli(_tempDir, environment, args.ToArray());
         Assert.NotEqual(0, rejected.ExitCode);
-        Assert.Contains(DiagnosticCode.ReferenceOptionMismatch, rejected.StdOut + rejected.StdErr);
+        Assert.Contains(DiagnosticCode.UnknownSectionMarker, rejected.StdOut + rejected.StdErr);
         Assert.DoesNotContain("Up-to-date (cached)", rejected.StdOut);
     }
 

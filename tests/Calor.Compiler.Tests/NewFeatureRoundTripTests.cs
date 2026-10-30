@@ -150,7 +150,7 @@ public class NewFeatureRoundTripTests
     }
 
     [Fact]
-    public void RoundTrip_MatchWithOptionPatterns_FormatsAndReparses()
+    public void RoundTrip_MatchWithNullablePatterns_FormatsAndReparses()
     {
         var source = @"
 §M{m001:Test}
@@ -158,14 +158,14 @@ public class NewFeatureRoundTripTests
     §I{i32:x}
     §O{i32}
     §W{m1} x
-    §K §SM _
+    §K null
       §R 1
-    §K §NN
+    §K _
       §R 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§SM", formatted);
-        Assert.Contains("§NN", formatted);
+        Assert.Contains("null", formatted);
+        Assert.Contains("§K _", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -293,41 +293,41 @@ public class NewFeatureRoundTripTests
 
     #endregion
 
-    #region Option and Result Types
+    #region Nullable Values and Exceptions
 
     [Fact]
-    public void RoundTrip_OptionExpressions_FormatsAndReparses()
+    public void RoundTrip_NullableExpressions_FormatsAndReparses()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:SomeTest:pub}
-    §O{i32}
-    §R §SM 42
+    §O{?i32}
+    §R 42
   §F{f002:NoneTest:pub}
-    §O{i32}
-    §R §NN{i32}
+    §O{?i32}
+    §R null
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§SM", formatted);
-        Assert.Contains("§NN", formatted);
+        Assert.Contains("42", formatted);
+        Assert.Contains("null", formatted);
         Assert.Equal(2, reparsed.Functions.Count);
     }
 
     [Fact]
-    public void RoundTrip_ResultExpressions_FormatsAndReparses()
+    public void RoundTrip_ReturnAndThrow_FormatsAndReparses()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:OkTest:pub}
     §O{i32}
-    §R §OK 42
+    §R 42
   §F{f002:ErrTest:pub}
     §O{str}
-    §R §ERR ""error""
+    §TH §NEW{Exception} §A ""error"" §/NEW
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("OK", formatted);
-        Assert.Contains("ERR", formatted);
+        Assert.Contains("42", formatted);
+        Assert.Contains("§TH", formatted);
         Assert.Equal(2, reparsed.Functions.Count);
     }
 

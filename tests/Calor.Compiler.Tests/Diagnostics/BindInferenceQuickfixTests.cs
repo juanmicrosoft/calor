@@ -15,7 +15,7 @@ namespace Calor.Compiler.Tests.Diagnostics;
 public class BindInferenceQuickfixTests
 {
     [Fact]
-    public void Calor0251_None_AttachesOptionFix()
+    public void RemovedNone_DoesNotSuggestRemovedType()
     {
         var source = """
             §M{m001:Test}
@@ -27,15 +27,9 @@ public class BindInferenceQuickfixTests
         var result = Program.Compile(source, "test.calr",
             new CompilationOptions { StrictBindInference = true });
 
-        var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
+        Assert.True(result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
-        var edit = Assert.Single(withFix.Fix.Edits);
-        Assert.Equal(":Option<object>", edit.NewText);
-        Assert.Contains("Option<object>", withFix.Fix.Description);
-
-        // Insertion must land at the column of the closing '}' of '§B{x}'.
-        var fixedSource = ApplyFix(source, withFix.Fix);
-        Assert.Contains("§B{x:Option<object>} §NN", fixedSource);
     }
 
     [Fact]
@@ -132,7 +126,7 @@ public class BindInferenceQuickfixTests
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{~items} §NN
+                  §B{~items} null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -141,7 +135,7 @@ public class BindInferenceQuickfixTests
         var withFix = Assert.Single(result.Diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
         var fixedSource = ApplyFix(source, withFix.Fix);
-        Assert.Contains("§B{~items:Option<object>} §NN", fixedSource);
+        Assert.Contains("§B{~items:object?} null", fixedSource);
     }
 
     [Fact]
@@ -151,7 +145,7 @@ public class BindInferenceQuickfixTests
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{a} §NN
+                  §B{a} null
                   §B{b} §C{Vec.empty}
                   §B{c} (+ INT:1 FLOAT:1.0)
             """;
@@ -176,7 +170,7 @@ public class BindInferenceQuickfixTests
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{x} §NN
+                  §B{x} null
             """;
 
         var result = Program.Compile(source, "test.calr",

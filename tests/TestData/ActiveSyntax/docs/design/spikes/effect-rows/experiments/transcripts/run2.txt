@@ -1,0 +1,172 @@
+==============================================================================
+CASE Y1a-I-sameline-cw-then-decl-pure  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y1}
+  §F{f001:Log:pub}
+    §I{str:m} §E{cw}
+    §O{void}
+    §E{}
+    §P m
+------------------------------------------------------------------------------
+Y1a-I-sameline-cw-then-decl-pure.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Y1b-I-sameline-cw-only  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y1}
+  §F{f001:Log:pub}
+    §I{str:m} §E{cw}
+    §O{void}
+    §P m
+------------------------------------------------------------------------------
+Y1b-I-sameline-cw-only.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y1}
+  §F{f001:Log:pub}
+    §I{str:m} §E{}
+    §O{void}
+    §E{cw}
+    §P m
+------------------------------------------------------------------------------
+Y1c-I-sameline-pure-then-decl-cw.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Y2a-fallible-brace-form  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y2}
+  §F{f001:Parse:pub}
+    §I{?str:s}
+    §O{str}
+    §E{alloc,throw}
+    §R (?? s §TH §NEW{ArgumentException} §A "Missing value" §/NEW)
+------------------------------------------------------------------------------
+Compilation successful: Y2a-fallible-brace-form.g.cs
+
+==============================================================================
+CASE Y2b-fallible-in-B  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y2}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{r:?i32} INT:1
+------------------------------------------------------------------------------
+Compilation successful: Y2b-fallible-in-B.g.cs
+
+==============================================================================
+CASE Y3a-B-with-sameline-E  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y3}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+------------------------------------------------------------------------------
+Compilation successful: Y3a-B-with-sameline-E.g.cs
+
+==============================================================================
+CASE Y3b-B-plain  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y3}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{f:Func<i32,i32>} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+------------------------------------------------------------------------------
+Compilation successful: Y3b-B-plain.g.cs
+
+==============================================================================
+CASE Y4a-O-sameline-E-decl-later  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y4}
+  §F{f001:Make:pub}
+    §O{Func<i32>} §E{cw}
+    §E{}
+    §R §LAM{lam1} §R INT:1 §/LAM{lam1}
+------------------------------------------------------------------------------
+Compilation successful: Y4a-O-sameline-E-decl-later.g.cs
+
+==============================================================================
+CASE Y5a-arrow-sameline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y5}
+  §F{f001:Log:pub} (str:m) -> void §E{cw}
+    §P m
+------------------------------------------------------------------------------
+Y5a-arrow-sameline-E.calr(2,36): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Y6a-MT-twoline  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y6}
+  §CL{c001:C:pub}
+    §MT{mt001:Log:pub}
+      §I{str:m}
+      §O{void}
+      §E{}
+      §P m
+------------------------------------------------------------------------------
+Y6a-MT-twoline.calr(6,7): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+
+==============================================================================
+CASE Y7a-IFACE-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y7}
+  §IFACE{i001:IRenderer}
+    §MT{m001:Render}
+      §O{void}
+      §E{}
+  §CL{c001:ConsoleRenderer:pub}
+    §IMPL{IRenderer}
+    §MT{mt001:Render:pub}
+      §O{void}
+      §E{cw}
+      §P "rendering"
+------------------------------------------------------------------------------
+Y7a-IFACE-E.calr(10,7): error Calor0421: Implementation 'ConsoleRenderer.Render' of interface method 'IRenderer.Render' on class 'ConsoleRenderer' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw does not fit the interface's row [pure]. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+
+==============================================================================
+CASE Y8a-override-broader-permissive  args: --permissive-effects  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y8}
+  §CL{c001:Base:pub}
+    §MT{mt001:Render:pub:virt}
+      §O{void}
+      §E{}
+  §CL{c002:Derived:pub}
+    §EXT{Base}
+    §MT{mt002:Render:pub:over}
+      §O{void}
+      §E{cw}
+      §P "laundered"
+------------------------------------------------------------------------------
+Y8a-override-broader-permissive.calr(10,7): error Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). Effect row cw does not fit the base method's row [pure]. An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
+
+==============================================================================
+CASE Y8b-override-broader-strict  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y8}
+  §CL{c001:Base:pub}
+    §MT{mt001:Render:pub:virt}
+      §O{void}
+      §E{}
+  §CL{c002:Derived:pub}
+    §EXT{Base}
+    §MT{mt002:Render:pub:over}
+      §O{void}
+      §E{cw}
+      §P "laundered"
+------------------------------------------------------------------------------
+Y8b-override-broader-strict.calr(10,7): error Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). Effect row cw does not fit the base method's row [pure]. An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
+
+==============================================================================
+CASE Y9a-B-untyped-lambda-then-invoke-permissive  args: --permissive-effects  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y9}
+  §F{f001:UseLambda:pub} () -> i32
+    §E{}
+    §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+    §R §C{f} §A INT:1 §/C
+------------------------------------------------------------------------------
+Compilation successful: Y9a-B-untyped-lambda-then-invoke-permissive.g.cs
+

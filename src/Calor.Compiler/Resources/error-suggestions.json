@@ -147,10 +147,10 @@
       "title": "Invalid Lisp Expression",
       "matchPatterns": ["Unexpected token in expression", "invalid expression argument", "invalid lisp"],
       "matchCodes": ["Calor0114"],
-      "description": "The parser encountered an unexpected token inside a Lisp-style expression (parenthesized prefix notation). Common causes: postfix nullable type syntax (T?), unsupported operator, or malformed nested expression.",
-      "wrongExample": "(cast T? value)          // Use prefix ?T for option/nullable types\n(+ a §IDX arr i)         // Can't nest § tags in Lisp expressions",
-      "correctExample": "(cast ?T value)          // Prefix option/nullable type\n§B{_tmp} §IDX arr i      // Extract to binding first\n(+ a _tmp)",
-      "explanation": "Lisp expressions use prefix notation: (operator arg1 arg2). Types must use Calor type forms such as ?T for option/nullable values. Section markers (§) cannot appear inside parenthesized expressions."
+      "description": "The parser encountered an unexpected token inside a Lisp-style expression (parenthesized prefix notation). Common causes include an unsupported operator or malformed nested expression.",
+      "wrongExample": "(unknown-op a b)         // Unsupported operator",
+      "correctExample": "(+ a b)                  // Supported addition operator",
+      "explanation": "Lisp expressions use prefix notation: (operator arg1 arg2). Use a documented operator and supply its required operands. Nullable types keep their existing type annotations; they do not require wrapper construction."
     },
     {
       "id": "mismatched-id",

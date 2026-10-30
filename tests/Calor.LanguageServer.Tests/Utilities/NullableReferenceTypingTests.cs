@@ -110,18 +110,17 @@ public class NullableReferenceTypingTests
     [Theory]
     [InlineData("§B{x:?str} §SM \"value\"", "void")]
     [InlineData("§R §SM \"value\"", "?str")]
-    [InlineData("§B{x:Option<str>} input", "void")]
-    public async Task RepresentationMismatch_IsActiveAndClearsOnSafeEditAsync(string body, string returnType)
+    [InlineData("§R §NN{str}", "?str")]
+    public async Task RemovedConstructors_AreRejectedAndClearOnSafeEditAsync(string body, string returnType)
     {
         var source = $"§M{{m1:NullableTyping}}\n  §F{{f1:Probe:pub}} (?str:input) -> {returnType}\n    §E{{alloc}}\n    {body}\n";
         var path = Path.Combine(Path.GetTempPath(), "typing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
-        var editor = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.ReferenceOptionMismatch));
+        var editor = document.Diagnostics.First(d => d.Severity == DiagnosticSeverity.Error);
         var lsp = DiagnosticConverter.ToLspDiagnostic(editor, source);
         Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(editor.Span, source), lsp.Range);
-        Assert.True(BindingDiagnosticPolicy.IsCompilationError(editor));
         foreach (var transpile in new[] { true, false })
         {
             var result = Compiler.Program.Compile(source, path, new CompilationOptions
@@ -129,14 +128,13 @@ public class NullableReferenceTypingTests
                 EnableTypeChecking = false,
                 UnsafeTranspileOnly = transpile
             });
-            var compiler = Assert.Single(result.Diagnostics.Errors);
-            Assert.Equal(editor.Code, compiler.Code);
-            Assert.Equal(editor.Span, compiler.Span);
-            Assert.Equal(editor.Severity, compiler.Severity);
+            Assert.Contains(result.Diagnostics.Errors, compiler =>
+                compiler.Code == editor.Code && compiler.Span == editor.Span
+                && compiler.Severity == editor.Severity);
         }
         var update = await document.UpdateAsync(
             "§M{m1:NullableTyping}\n  §F{f1:Probe:pub} (?str:input) -> ?str\n    §R input\n", 1);
         Assert.True(update.Accepted);
-        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == DiagnosticCode.ReferenceOptionMismatch);
+        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 }

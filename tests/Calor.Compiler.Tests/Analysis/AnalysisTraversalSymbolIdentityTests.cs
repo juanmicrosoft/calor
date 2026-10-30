@@ -21,7 +21,7 @@ public sealed class AnalysisTraversalSymbolIdentityTests
     [Fact]
     public void BoundAnalyses_FindNestedSeedsThroughStructuralWrappers()
     {
-        var parameter = Variable("opt", "Option<i32>", "parameter:opt", isParameter: true);
+        var parameter = Variable("items", "INT[]", "local:items");
         var tainted = Variable("user_input", "STRING", "parameter:user", isParameter: true);
         var callee = FunctionSymbol("Target", "INT", "function:target");
 
@@ -36,13 +36,8 @@ public sealed class AnalysisTraversalSymbolIdentityTests
             new BoundStructuralExpression(Span(21), "Array", "INT[]"),
             [new BoundIntLiteral(Span(22), -1)],
             "INT");
-        var unwrap = new BoundCallExpression(
-            Span(30),
-            "opt.unwrap",
-            [],
-            "INT",
-            resolvedMethodName: "unwrap",
-            receiverSymbol: parameter);
+        var dereference = new BoundArrayLength(
+            Span(30), new BoundVariableExpression(Span(31), parameter));
         var taintSink = new BoundCallExpression(
             Span(40),
             "db.execute",
@@ -65,14 +60,17 @@ public sealed class AnalysisTraversalSymbolIdentityTests
             Span(1),
             "DiverseWrapper",
             "OBJECT",
-            [division, index, unwrap, taintSink, internalCall]);
+            [division, index, dereference, taintSink, internalCall]);
         var caller = Function(
             FunctionSymbol(
                 "Caller",
                 "OBJECT",
                 "function:caller",
-                [parameter, tainted]),
-            [new BoundReturnStatement(Span(0), wrapper)]);
+                [tainted]),
+            [
+                new BoundBindStatement(Span(0), parameter, new BoundNullLiteral(Span(0))),
+                new BoundReturnStatement(Span(0), wrapper)
+            ]);
         var target = Function(callee, []);
         var module = Module([target, caller]);
 
@@ -92,7 +90,7 @@ public sealed class AnalysisTraversalSymbolIdentityTests
         new NullDereferenceChecker(FastBugOptions()).Check(caller, nullDiagnostics);
         Assert.Contains(
             nullDiagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
+            diagnostic => diagnostic.Code == DiagnosticCode.NullDereference);
 
         var taint = new TaintAnalysis(caller);
         Assert.Contains(

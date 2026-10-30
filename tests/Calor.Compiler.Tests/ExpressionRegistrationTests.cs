@@ -29,10 +29,6 @@ public class ExpressionRegistrationTests
             [TokenKind.OpenParen] = ("(+ 1 2)", nameof(BinaryOperationNode)),
             [TokenKind.OpenBrace] = ("{1, 2}", nameof(ArrayCreationNode)),
             [TokenKind.If] = ("§IF{i} true → 1 §EL → 2 §/I{i}", nameof(ConditionalExpressionNode)),
-            [TokenKind.Some] = ("§SM 1", nameof(SomeExpressionNode)),
-            [TokenKind.None] = ("§NN{i32}", nameof(NoneExpressionNode)),
-            [TokenKind.Ok] = ("§OK 1", nameof(OkExpressionNode)),
-            [TokenKind.Err] = ("§ERR \"error\"", nameof(ErrExpressionNode)),
             [TokenKind.Match] = ("§W{w} value §K _ → 1 §/W{w}", nameof(MatchExpressionNode)),
             [TokenKind.Array] = ("§ARR{a:i32} §/ARR{a}", nameof(ArrayCreationNode)),
             [TokenKind.Index] = ("§IDX values 0", nameof(ArrayAccessNode)),
@@ -167,7 +163,7 @@ public class ExpressionRegistrationTests
             ExpressionContext.Return => "§R __expression__",
             ExpressionContext.Binding => "§B{x} __expression__",
             ExpressionContext.CallArgument => "§C{Sink} §A __expression__ §/C",
-            ExpressionContext.Nested => "§R §SM __expression__",
+            ExpressionContext.Nested => "§R §?? __expression__ 0",
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
         var source = $$"""
@@ -197,8 +193,8 @@ public class ExpressionRegistrationTests
             ExpressionContext.Binding => Assert.IsType<BindStatementNode>(Assert.Single(function.Body)).Initializer!,
             ExpressionContext.CallArgument => Assert.Single(
                 Assert.IsType<CallStatementNode>(Assert.Single(function.Body)).Arguments),
-            ExpressionContext.Nested => Assert.IsType<SomeExpressionNode>(
-                Assert.IsType<ReturnStatementNode>(Assert.Single(function.Body)).Expression).Value,
+            ExpressionContext.Nested => Assert.IsType<NullCoalesceNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(function.Body)).Expression).Left,
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
     }

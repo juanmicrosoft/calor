@@ -255,9 +255,9 @@ Initial formal semantics specification including:
   - ENSURES evaluated after body with `result` binding
   - ContractViolationException with FunctionId
 
-- **Option<T> and Result<T,E>**
-  - Pattern matching semantics
-  - Exhaustiveness checking
+- **Nullable values and exceptions**
+  - Native nullable annotations and `null`
+  - Exception propagation and handling
 
 ---
 

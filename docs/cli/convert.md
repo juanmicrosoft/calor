@@ -203,8 +203,8 @@ missing `#r` or `#load` targets are errors rather than silently accepted.
 | `if/else if/else` | `§IF{id}` / `§EI` / `§EL` branches (end at dedent) |
 | `for` loop | `§L{id:var:from:to:step}` |
 | `while` loop | `§WH{id}` |
-| `try/catch` | Converted to `Result<T,E>` pattern |
-| `?.`, `??` | Converted to `Option<T>` pattern |
+| `try/catch` | Native exception handling with `§TR` / `§CA` |
+| `?.`, `??` | Nullable references and null-conditional / null-coalescing expressions |
 
 ### Conversion Warnings
 

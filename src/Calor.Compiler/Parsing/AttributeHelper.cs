@@ -603,23 +603,11 @@ public static class AttributeHelper
             return $"ARRAY[element={inner}]";
         }
 
-        // Historical nullable-annotation encoding, not the runtime Option<T> type.
+        // Keep nullable annotations distinct from ordinary generic type references.
         if (compactType.StartsWith('?'))
         {
             var inner = ExpandType(compactType[1..]);
-            return $"OPTION[inner={inner}]";
-        }
-
-        // Handle Result type: T!E -> RESULT[ok=T][err=E]
-        // But be careful not to match ! inside generic brackets
-        var exclamationIndex = FindTopLevelChar(compactType, '!');
-        if (exclamationIndex >= 0)
-        {
-            var ok = ExpandType(compactType[..exclamationIndex]);
-            var err = exclamationIndex < compactType.Length - 1
-                ? ExpandType(compactType[(exclamationIndex + 1)..])
-                : "STRING";
-            return $"RESULT[ok={ok}][err={err}]";
+            return $"NULLABLE[inner={inner}]";
         }
 
         // Handle generic types: List<T>, Dictionary<str, T>
@@ -693,21 +681,9 @@ public static class AttributeHelper
             return $"[{ToSurfaceSpelling(t["ARRAY[element=".Length..^1])}]";
         }
 
-        if (t.StartsWith("OPTION[inner=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
+        if (t.StartsWith("NULLABLE[inner=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
         {
-            return $"?{ToSurfaceSpelling(t["OPTION[inner=".Length..^1])}";
-        }
-
-        if (t.StartsWith("RESULT[ok=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
-        {
-            var body = t["RESULT[ok=".Length..^1];
-            var sep = body.IndexOf("][err=", StringComparison.Ordinal);
-            if (sep > 0)
-            {
-                var ok = ToSurfaceSpelling(body[..sep]);
-                var err = ToSurfaceSpelling(body[(sep + "][err=".Length)..]);
-                return $"{ok}!{err}";
-            }
+            return $"?{ToSurfaceSpelling(t["NULLABLE[inner=".Length..^1])}";
         }
 
         // Generic: Base<A, B> — surface-spell each argument.
@@ -755,29 +731,7 @@ public static class AttributeHelper
     }
 
     /// <summary>
-    /// Finds the index of a character at the top level (not inside angle brackets).
-    /// Returns -1 if not found.
-    /// </summary>
-    private static int FindTopLevelChar(string str, char target)
-    {
-        var depth = 0;
-        for (int i = 0; i < str.Length; i++)
-        {
-            var c = str[i];
-            if (c == '<') depth++;
-            else if (c == '>') depth--;
-            else if (c == target && depth == 0) return i;
-        }
-        return -1;
-    }
-
-    /// <summary>
-    /// Splits generic type arguments respecting nested angle brackets.
-    /// E.g., "str, List&lt;T&gt;" → ["str", "List&lt;T&gt;"]
-    /// </summary>
-    /// <summary>
-    /// Reads a nullable annotation, including the parser's historical expanded spelling.
-    /// Explicit Option&lt;T&gt; and Option[T] are runtime values, not nullable annotations.
+    /// Reads a nullable annotation, including the parser's expanded spelling.
     /// </summary>
     public static bool TryUnwrapNullableAnnotation(string typeName, out string innerType)
     {
@@ -787,7 +741,7 @@ public static class AttributeHelper
             return false;
         }
         var type = typeName.Trim();
-        const string expandedPrefix = "OPTION[inner=";
+        const string expandedPrefix = "NULLABLE[inner=";
         if (type.StartsWith(expandedPrefix, StringComparison.OrdinalIgnoreCase) && type.EndsWith(']'))
             innerType = type[expandedPrefix.Length..^1];
         else if (type.StartsWith('?') && type.Length > 1)
@@ -801,34 +755,6 @@ public static class AttributeHelper
         }
 
         return !string.IsNullOrWhiteSpace(innerType);
-    }
-
-    /// <summary>Reads explicit runtime Option types without accepting nullable annotations.</summary>
-    public static bool TryUnwrapRuntimeOption(string typeName, out string innerType)
-    {
-        if (string.IsNullOrWhiteSpace(typeName))
-        {
-            innerType = string.Empty;
-            return false;
-        }
-        var type = typeName.Trim();
-        var open = type.IndexOfAny(['<', '[']);
-        if (open > 0
-            && (type[..open].Equals("Option", StringComparison.OrdinalIgnoreCase)
-                || type[..open].Equals("Calor.Runtime.Option", StringComparison.Ordinal))
-            && type[^1] == (type[open] == '<' ? '>' : ']')
-            && !type[(open + 1)..].StartsWith("inner=", StringComparison.OrdinalIgnoreCase))
-        {
-            var arguments = SplitGenericArgs(type[(open + 1)..^1]);
-            if (arguments.Count == 1 && arguments[0].Length > 0)
-            {
-                innerType = arguments[0];
-                return true;
-            }
-        }
-
-        innerType = string.Empty;
-        return false;
     }
 
     /// <summary>
@@ -870,25 +796,6 @@ public static class AttributeHelper
             foreach (var declaration in delegates) references.Add(Qualify(declaration.Name));
             foreach (var declaration in enums) nonReferences.Add(Qualify(declaration.Name));
         }
-    }
-
-    /// <summary>
-    /// A known reference/Option representation mismatch, not a null-state predicate.
-    /// Object is deliberately excluded: the binder also uses it for unresolved expressions.
-    /// </summary>
-    public static bool IsReferenceOptionMismatch(
-        string targetType, string sourceType, IReadOnlySet<string> declaredReferences)
-    {
-        var targetOption = TryUnwrapRuntimeOption(targetType, out _);
-        var sourceOption = TryUnwrapRuntimeOption(sourceType, out _);
-        if (targetOption == sourceOption)
-            return false;
-
-        var reference = targetOption ? sourceType : targetType;
-        if (TryUnwrapNullableAnnotation(reference, out var referent))
-            reference = referent;
-        return reference is "str" or "string" or "STRING" or "System.String"
-            || declaredReferences.Contains(reference);
     }
 
     private static List<string> SplitGenericArgs(string argsStr)

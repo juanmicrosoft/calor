@@ -90,10 +90,6 @@ public enum TokenKind
     EndMatch,
     Case,
     EndCase,    // §/K - closing case tag for block syntax
-    Some,
-    None,
-    Ok,
-    Err,
 
     // Phase 4: Contracts and Effects
     Requires,

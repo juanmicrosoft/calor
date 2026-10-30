@@ -63,11 +63,6 @@ public sealed class Lexer
         ["LABEL"] = TokenKind.Label,        // §LABEL{label} = Label
         ["SEMVER"] = TokenKind.SemVer,      // §SEMVER{MAJOR.MINOR.PATCH} = semantics-version declaration (lexed by ScanSemVerDirective; listed here for the keyword registry / doc-drift check)
 
-        // Type system - Option/Result patterns
-        ["SM"] = TokenKind.Some,            // §SM = Some
-        ["NN"] = TokenKind.None,            // §NN = None
-        ["OK"] = TokenKind.Ok,              // §OK = Ok (already short)
-        ["ERR"] = TokenKind.Err,            // §ERR = Err (already short)
         ["IV"] = TokenKind.Invariant,       // §IV = Invariant
 
         // Using statement (block form)

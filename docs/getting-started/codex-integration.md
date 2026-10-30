@@ -94,13 +94,13 @@ The generated guidance covers:
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Conditional statements: `§IF{id} condition` with an indented body
-- Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
+- Type system: `i32`, `f64`, `str`, `bool`, nullable types (`?str`), arrays
 - Unique ID generation (`m001`, `f001`, `c001`, etc.)
 - Contract placement (`§Q` preconditions, `§S` postconditions)
 - Effect declarations (`§E{db:rw,net:rw,cw}`)
 - Proper indentation and block nesting
-- Error handling with `Result<T,E>`
-- Null safety with `Option<T>`
+- Error handling with native exceptions (`§TH`, `§TR`, `§CA`)
+- Absence with .NET nullable types and `null`
 - Iteration patterns (for, while, do-while)
 - Class definitions with fields, properties, methods
 

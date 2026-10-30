@@ -357,7 +357,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var producer = GetProducerCall(module, boundary);
         Assert.NotNull(producer.ResolvedSymbol);
         var type = Assert.IsType<NominalBoundType>(producer.Type);
-        Assert.Equal("OPTION[inner=Foo]", type.DisplayString);
+        Assert.Equal("NULLABLE[inner=Foo]", type.DisplayString);
         Assert.Equal(NullableAnnotation.Annotated, type.NullableAnnotation);
         Assert.NotNull(type.Declaration);
         Assert.Single(diagnostics.Where(d => d.Code == code));
@@ -372,7 +372,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         Assert.Null(call.ResolvedSymbol);
         var producer = Assert.IsType<BoundCallExpression>(Assert.Single(call.Arguments));
         Assert.NotNull(producer.ResolvedSymbol);
-        Assert.Equal("OPTION[inner=Foo]", producer.Type.DisplayString);
+        Assert.Equal("NULLABLE[inner=Foo]", producer.Type.DisplayString);
         Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NoMatchingOverload));
     }
 

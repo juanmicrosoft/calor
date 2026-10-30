@@ -1032,24 +1032,6 @@ public sealed class ContractInheritanceChecker : IDisposable
                 nameOf.Span,
                 RewriteValueReference(nameOf.Name, replacements, typeReplacements));
         }
-        if (expression is SomeExpressionNode some)
-        {
-            return new SomeExpressionNode(
-                some.Span,
-                RewriteReferences(some.Value, replacements, typeReplacements));
-        }
-        if (expression is OkExpressionNode ok)
-        {
-            return new OkExpressionNode(
-                ok.Span,
-                RewriteReferences(ok.Value, replacements, typeReplacements));
-        }
-        if (expression is ErrExpressionNode err)
-        {
-            return new ErrExpressionNode(
-                err.Span,
-                RewriteReferences(err.Error, replacements, typeReplacements));
-        }
         if (expression is AwaitExpressionNode awaitExpression)
         {
             return new AwaitExpressionNode(
@@ -1345,15 +1327,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             return typeName;
         if (Migration.TypeMapper.ExtractBracketValue(typeName, "ARRAY[element=") is { } element)
             return RewriteTypeName(element, replacements) + "[]";
-        if (Migration.TypeMapper.ExtractBracketValue(typeName, "OPTION[inner=") is { } inner)
-            return "OPTION[inner=" + RewriteTypeName(inner, replacements) + "]";
-        if (typeName.StartsWith("RESULT[ok=", StringComparison.Ordinal))
-        {
-            var (ok, error) = Migration.TypeMapper.ExtractResultTypes(typeName);
-            if (ok != null && error != null)
-                return "RESULT[ok=" + RewriteTypeName(ok, replacements)
-                    + "][err=" + RewriteTypeName(error, replacements) + "]";
-        }
+        if (Migration.TypeMapper.ExtractBracketValue(typeName, "NULLABLE[inner=") is { } inner)
+            return "NULLABLE[inner=" + RewriteTypeName(inner, replacements) + "]";
         if (typeName.StartsWith('[') && typeName.EndsWith(']'))
             return RewriteTypeName(typeName[1..^1], replacements) + "[]";
         if (typeName.StartsWith('?'))
@@ -2138,7 +2113,6 @@ public sealed class ContractInheritanceChecker : IDisposable
             (StringLiteralNode s1, StringLiteralNode s2) =>
                 s1.Value.Equals(s2.Value, StringComparison.Ordinal),
 
-            (NoneExpressionNode, NoneExpressionNode) => true,
 
             _ => false
         };

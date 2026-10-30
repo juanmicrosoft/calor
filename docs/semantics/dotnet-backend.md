@@ -278,41 +278,15 @@ if (!(condition))
 
 ---
 
-## 6. Option<T> and Result<T,E>
+## 6. Nullable Values and Exceptions
 
-### 6.1 Option<T>
+The backend emits .NET's native representations: `?str` becomes `string?`,
+`?i32` becomes `int?`, and `null` remains `null`. The expression
+`(?? value fallback)` becomes `value ?? fallback`.
 
-**C# Implementation using records:**
-```csharp
-namespace Calor.Runtime
-{
-    public abstract record Option<T>
-    {
-        public sealed record Some(T Value) : Option<T>;
-        public sealed record None : Option<T>;
-
-        public static Option<T> Some(T value) => new Some(value);
-        public static Option<T> None() => new None();
-    }
-}
-```
-
-### 6.2 Result<T,E>
-
-**C# Implementation:**
-```csharp
-namespace Calor.Runtime
-{
-    public abstract record Result<T, E>
-    {
-        public sealed record Ok(T Value) : Result<T, E>;
-        public sealed record Err(E Error) : Result<T, E>;
-
-        public static Result<T, E> Ok(T value) => new Ok(value);
-        public static Result<T, E> Err(E error) => new Err(error);
-    }
-}
-```
+`§TH`, `§TR`, `§CA`, `§FI`, and `§RT` emit C# `throw`, `try`, `catch`,
+`finally`, and rethrow statements. Success values use their ordinary return
+type; no Calor-specific absence/error runtime types are required.
 
 ---
 
@@ -578,8 +552,6 @@ The .NET backend depends on `Calor.Runtime.dll`:
 ```
 Calor.Runtime
 ├── ContractViolationException.cs
-├── Option.cs
-├── Result.cs
 └── Effects/
     └── EffectAttributes.cs
 ```
@@ -596,7 +568,7 @@ The backend must ensure:
 - [ ] Type conversions explicit where required
 - [ ] Contracts generate correct exception type
 - [ ] Contract exception includes function ID
-- [ ] Option/Result types from runtime library
+- [ ] Native nullable types and exception handling
 - [ ] Pattern matching exhaustive (compiler enforced)
 - [ ] Async/await preserves semantics
 

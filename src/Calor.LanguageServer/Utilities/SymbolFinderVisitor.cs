@@ -308,18 +308,6 @@ public sealed class SymbolFinderVisitor
                 symbols.Add(new VisibleSymbol(vPat.Name, "var pattern", null, vPat.Span, vPat));
                 break;
 
-            case SomePatternNode somePat:
-                CollectPatternVariables(somePat.InnerPattern, symbols);
-                break;
-
-            case OkPatternNode okPat:
-                CollectPatternVariables(okPat.InnerPattern, symbols);
-                break;
-
-            case ErrPatternNode errPat:
-                CollectPatternVariables(errPat.InnerPattern, symbols);
-                break;
-
             case PositionalPatternNode posPat:
                 foreach (var inner in posPat.Patterns)
                 {
@@ -349,7 +337,6 @@ public sealed class SymbolFinderVisitor
             case WildcardPatternNode:
             case LiteralPatternNode:
             case ConstantPatternNode:
-            case NonePatternNode:
             case RelationalPatternNode:
                 break;
         }
@@ -967,18 +954,6 @@ public sealed class SymbolFinderVisitor
                 AddToScope(vPat.Name, "var pattern", null, vPat.Span, vPat);
                 break;
 
-            case SomePatternNode somePat:
-                CollectPatternVariablesToScope(somePat.InnerPattern);
-                break;
-
-            case OkPatternNode okPat:
-                CollectPatternVariablesToScope(okPat.InnerPattern);
-                break;
-
-            case ErrPatternNode errPat:
-                CollectPatternVariablesToScope(errPat.InnerPattern);
-                break;
-
             case PositionalPatternNode posPat:
                 foreach (var inner in posPat.Patterns)
                 {
@@ -1008,7 +983,6 @@ public sealed class SymbolFinderVisitor
             case WildcardPatternNode:
             case LiteralPatternNode:
             case ConstantPatternNode:
-            case NonePatternNode:
             case RelationalPatternNode:
                 break;
         }
@@ -1222,18 +1196,6 @@ public sealed class SymbolFinderVisitor
                 }
                 break;
 
-            case SomeExpressionNode someExpr:
-                VisitExpression(someExpr.Value);
-                break;
-
-            case OkExpressionNode okExpr:
-                VisitExpression(okExpr.Value);
-                break;
-
-            case ErrExpressionNode errExpr:
-                VisitExpression(errExpr.Error);
-                break;
-
             case ArrayAccessNode arrayAccess:
                 if (SpanContainsOffset(arrayAccess.Array.Span))
                 {
@@ -1363,13 +1325,6 @@ public sealed class SymbolFinderVisitor
                         "Length", "array length", "i32",
                         arrayLen.Span, null, arrayLen);
                 }
-                break;
-
-            // None expression
-            case NoneExpressionNode noneExpr:
-                _result = new SymbolLookupResult(
-                    "None", "none literal", noneExpr.TypeName ?? "?T",
-                    noneExpr.Span, null, noneExpr);
                 break;
 
             // Range and index expressions

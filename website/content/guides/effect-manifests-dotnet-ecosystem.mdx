@@ -45,7 +45,6 @@ Core .NET types the compiler has always known about, plus recent additions:
 | `bcl-concurrent` | ConcurrentDictionary, Channel, BlockingCollection | `ConcurrentDictionary.TryAdd → mut` |
 | `bcl-crypto` | SHA256, RSA, Aes, RandomNumberGenerator | `SHA256.HashData → pure`, `RandomNumberGenerator.GetBytes → rand` |
 | `bcl-framework-interfaces` | ILogger, DbContext, IConfiguration, IHost, ControllerBase | See below |
-| `calor-runtime` | Option and Result combinators | Pure modulo callback arguments |
 
 ### Framework Interfaces (Tier B)
 
@@ -219,7 +218,7 @@ With IL analysis enabled, the compiler can trace `UserRepository.Save()` → `Db
 
 | Approach | Best for | Coverage |
 |----------|----------|----------|
-| **Built-in manifests** | .NET and Calor Runtime types (DbCommand, HttpClient, ILogger, Option/Result) | Curated embedded coverage |
+| **Built-in manifests** | .NET types (DbCommand, HttpClient, ILogger) | Curated embedded coverage |
 | **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Precise, reviewed |
 | **IL analysis** | Your own assemblies with concrete call chains | Automatic, best-effort |
 

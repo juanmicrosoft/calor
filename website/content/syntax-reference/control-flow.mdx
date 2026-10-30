@@ -411,25 +411,12 @@ Capture the matched value and add conditions:
 | `§VAR{name}` | Captures value into variable `name` |
 | `§WHEN condition` | Guard condition (pattern matches only if true) |
 
-### Option Patterns (`§SM`, `§NN`)
+### Nullable Values and Exceptions
 
-Match Option types:
-
-```calor
-§R §W{sw1} maybeValue
-  §K §SM §VAR{v} → v        // Some(v) - extract value
-  §K §NN → 0                 // None - default
-```
-
-### Result Patterns (`§OK`, `§ERR`)
-
-Match Result types:
-
-```calor
-§R §W{sw1} result
-  §K §OK §VAR{v} → (+ "Success: " v)
-  §K §ERR §VAR{e} → (+ "Error: " e)
-```
+Use the existing null-coalescing expression `(?? value fallback)` for a missing
+nullable value. Handle failures with `§TR` / `§CA`, not success/error patterns.
+See [Types](/docs/syntax-reference/types/#failure-uses-exceptions) for a complete
+throwing function.
 
 ### Block Syntax
 

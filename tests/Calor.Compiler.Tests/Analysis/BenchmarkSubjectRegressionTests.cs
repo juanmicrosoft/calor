@@ -33,7 +33,7 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
     [InlineData("arithmetic/div-by-zero.calr", 8, 4)]
     [InlineData("arithmetic/overflow.calr", 8, 4)]
     [InlineData("loops/bounds-violation.calr", 8, 4)]
-    [InlineData("null-safety/null-deref.calr", 8, 4)]
+    [InlineData("null-safety/null-deref.calr", 8, 3)]
     public void Subjects_ParseBindCompileAndVerifySeededFindings_WithNamedSafeCaseGaps(
         string relativePath, int functionCount, int seededFindingCount)
     {
@@ -72,7 +72,7 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
             "arithmetic/div-by-zero.calr" => new[] { DiagnosticCode.DivisionByZero },
             "arithmetic/overflow.calr" => [DiagnosticCode.IntegerOverflow],
             "loops/bounds-violation.calr" => [DiagnosticCode.IndexOutOfBounds],
-            "null-safety/null-deref.calr" => [DiagnosticCode.NullDereference, DiagnosticCode.UnsafeUnwrap],
+            "null-safety/null-deref.calr" => [DiagnosticCode.NullDereference],
             _ => [DiagnosticCode.SqlInjection, DiagnosticCode.CommandInjection, DiagnosticCode.PathTraversal],
         };
 
@@ -112,7 +112,8 @@ public sealed class BenchmarkSubjectRegressionTests(ITestOutputHelper output)
         while (!Directory.Exists(Path.Combine(root, "benchmarks")))
             root = Path.GetDirectoryName(root)
                 ?? throw new DirectoryNotFoundException("Repository benchmarks directory not found.");
-        return File.ReadAllText(Path.Combine(root, "benchmarks", relativePath));
+        return File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(
+            root, Path.Combine(root, "benchmarks", relativePath)));
     }
 
     private static TaintAnalysisOptions SqlContracts(BoundModule module)

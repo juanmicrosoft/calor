@@ -6,7 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
 
 namespace TypeSystem
 {
@@ -14,35 +13,70 @@ namespace TypeSystem
     {
         public static void Main()
         {
-            Console.WriteLine("Testing Option and Result types...");
-            TestSome();
-            TestNone();
-            TestOk();
-            TestErr();
+            #line 4 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            Console.WriteLine("Testing nullable values and exceptions...");
+            #line default
+            #line 5 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            TestPresent();
+            #line default
+            #line 6 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            TestMissing();
+            #line default
+            #line 7 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            TestSuccess();
+            #line default
+            #line 8 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            TestFailure();
+            #line default
         }
 
-        private static void TestSome()
+        private static void TestPresent()
         {
-            var opt = Calor.Runtime.Option.Some(42);
-            Console.WriteLine("  Created Some(42)");
+            #line 12 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            int? value = 42;
+            #line default
+            #line 13 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            Console.WriteLine(value ?? 0);
+            #line default
         }
 
-        private static void TestNone()
+        private static void TestMissing()
         {
-            var opt = Calor.Runtime.Option<int>.None();
-            Console.WriteLine("  Created None");
+            #line 17 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            int? value = null;
+            #line default
+            #line 18 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            Console.WriteLine(value ?? -1);
+            #line default
         }
 
-        private static void TestOk()
+        private static void TestSuccess()
         {
-            var result = Calor.Runtime.Result.Ok<int, string>(100);
-            Console.WriteLine("  Created Ok(100)");
+            #line 22 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            int value = 100;
+            #line default
+            #line 23 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            Console.WriteLine(value);
+            #line default
         }
 
-        private static void TestErr()
+        private static void TestFailure()
         {
-            var result = Calor.Runtime.Result.Err<object, string>("Something went wrong");
-            Console.WriteLine("  Created Err");
+            #line 27 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+            try
+            {
+                #line 28 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+                throw new InvalidOperationException("Something went wrong");
+                #line default
+            }
+            catch (InvalidOperationException error)
+            {
+                #line 30 "/Users/juanrivera/repos/juanatjcx/copilot-worktrees/calor/juanmicrosoft-cuddly-barnacle/tests/E2E/scenarios/04_option_result/input.calr"
+                Console.WriteLine(error.Message);
+                #line default
+            }
+
+            #line default
         }
 
     }

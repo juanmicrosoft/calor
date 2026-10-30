@@ -20,7 +20,7 @@ namespace Calor.Compiler.Analysis;
 /// <c>--no-strict-bind-inference</c>):</para>
 /// <list type="bullet">
 ///   <item><c>Calor0251 BindCannotInferNullLiteral</c> --
-///   <c>§B{x} none</c> / <c>§B{x} null</c> with no <c>:type</c> annotation.</item>
+///   <c>§B{x} null</c> with no <c>:type</c> annotation.</item>
 ///   <item><c>Calor0252 BindCannotInferGenericReturn</c> --
 ///   <c>§B{x} §C{Vec.empty}</c> and similar well-known generic
 ///   factory calls without a <c>:type</c> annotation.</item>
@@ -1484,23 +1484,11 @@ public sealed class BindValidationPass
 
     private void CheckStrictInitializer(BindStatementNode bind, ExpressionNode init)
     {
-        // Calor0251 -- bare none/null cannot infer a type.
-        if (init is NoneExpressionNode none && none.TypeName == null)
-        {
-            var msg = $"Binding '{bind.Name}' uses 'none' without a type. " +
-                "Inference cannot pick a concrete element type. " +
-                "Add ':Option<T>' (e.g. '§B{" + bind.Name + ":Option<i32>} none') " +
-                "or use a typed §NN{type=...} form.";
-            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferNullLiteral, msg,
-                "Annotate binding with ':Option<object>'", ":Option<object>");
-            return;
-        }
-
         if (init is ReferenceNode refNode && refNode.Name == "null")
         {
             var msg = $"Binding '{bind.Name}' is initialised to 'null' with no declared type. " +
                 "Inference cannot pick a concrete type. " +
-                "Add ':T?' or use an Option type (e.g. '§B{" + bind.Name + ":Option<T>} none').";
+                "Add a nullable type annotation such as ':object?'.";
             ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferNullLiteral, msg,
                 "Annotate binding with ':object?'", ":object?");
             return;

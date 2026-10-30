@@ -244,22 +244,19 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ---
 
-## 6. Option and Result Types
+## 6. Nullable Values and Exceptions
 
-### 6.1 Option\<T\>
+The absence model is .NET nullability. Existing `?str` / `str?` annotations
+permit a null string reference; `?i32` emits C# `int?`. Values are ordinary
+values or `null`, with no wrapper construction. Use `(?? value fallback)`
+to supply a default.
 
-Represents an optional value: either `Some(value)` or `None`.
+Failure uses .NET exceptions: `§TH` throws, `§TR` / `§CA` handle exceptions,
+`§FI` runs cleanup, and `§RT` rethrows. A function returns its ordinary success
+type and declares the `throw` effect when it can throw.
 
-**Semantics:**
-- `Some(v)` wraps a value
-- `None` represents absence of value
-- Must be pattern-matched or explicitly unwrapped
-
-**Test:** `S9: OptionNone_BehavesCorrectly`
-
-### 6.2 Result\<T,E\>
-
-Represents a computation that may fail: either `Ok(value)` or `Err(error)`.
+Third-party generic types use ordinary library APIs, with no special language
+encoding or implicit conversion.
 
 ---
 

@@ -74,8 +74,7 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | `str` | String | `string` |
 | `bool` | Boolean | `bool` |
 | `void` | No return value | `void` |
-| `?T` | Optional T | `T?` (nullable) |
-| `T!E` | Result (T or error E) | `Result\<T, E\>` |
+| `?T` | Nullable T | `T?` (nullable) |
 
 ---
 
@@ -152,7 +151,7 @@ Legacy structural closers raise `Calor0830`; migrate them with
 ## Detailed Reference
 
 - [Structure Tags](/docs/syntax-reference/structure-tags/) - Modules, functions, block structure
-- [Types](/docs/syntax-reference/types/) - Type system, Option, Result
+- [Types](/docs/syntax-reference/types/) - Primitives, nullable types, generics
 - [Bindings](/docs/syntax-reference/binding/) - `§B` local bindings and inference
 - [Calls](/docs/syntax-reference/calls/) - `§C` calls and implicit close
 - [Expressions](/docs/syntax-reference/expressions/) - Lisp-style operators

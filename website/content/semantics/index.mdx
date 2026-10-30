@@ -49,7 +49,7 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 | **Scoping** | Lexical with explicit shadowing | No surprises from dynamic lookup |
 | **Integer Overflow** | TRAP by default | Safety-first; silent bugs are unacceptable |
 | **Type Conversions** | Explicit for narrowing | Prevents accidental data loss |
-| **Nullability** | `Option\<T\>` for explicit optional values | Reduces implicit nulls; raw .NET references and unsafe unwraps still require analysis |
+| **Nullability** | .NET nullable types and `null` | Models absence; supported receiving boundaries are checked, not whole-program null safety |
 | **Exceptions** | Typed, with semantic meaning | `ContractViolationException` carries context |
 
 ### Why This Matters for Agents
@@ -126,7 +126,6 @@ Every semantic decision is backed by tests:
 | S6 | `ReturnFromNestedScope` | Return unwinds to function boundary |
 | S7 | `IntegerOverflow_Traps` | Overflow throws `OverflowException` |
 | S8 | `NumericConversion_IntToFloat` | Implicit widening works |
-| S9 | `OptionNone_BehavesCorrectly` | `Option\<T\>` semantics correct |
 | S10 | `RequiresFails_ThrowsContractViolation` | Contracts throw with function ID |
 | S11 | `SemanticsVersionMismatch_EmitsDiagnostic` | Version checking works |
 

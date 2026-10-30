@@ -319,12 +319,13 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void Binder_OptionExpression_RetainsItsValue()
+    public void Binder_ThrowExpression_RetainsItsException()
     {
-        var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
+        var thrown = new ThrowExpressionNode(DummySpan,
+            new NewExpressionNode(DummySpan, "Exception", [], []));
 
         var func = MakeFunction("Foo", "INT",
-            body: new List<StatementNode> { new ReturnStatementNode(DummySpan, someExpr) });
+            body: new List<StatementNode> { new ReturnStatementNode(DummySpan, thrown) });
         var module = MakeModule(func);
 
         var diagnostics = new DiagnosticBag();
@@ -333,9 +334,9 @@ public class CompilerBugFixTests
 
         Assert.NotNull(bound);
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
-        var option = Assert.IsType<BoundSomeExpression>(ret.Expression);
-        Assert.Equal("Option<INT>", option.Type.DisplayString);
-        Assert.IsType<BoundIntLiteral>(option.Value);
+        var expression = Assert.IsType<BoundThrowExpression>(ret.Expression);
+        Assert.Equal("NEVER", expression.Type.DisplayString);
+        Assert.IsType<BoundNewExpression>(expression.Exception);
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
         Assert.DoesNotContain(diagnostics,
@@ -719,14 +720,14 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void StrictBindInference_NoneInitializer_ReportsCalor0251()
+    public void StrictBindInference_NullInitializer_ReportsCalor0251()
     {
-        // §B{x} §NN with --strict-bind-inference must fail with Calor0251.
+        // A null initializer requires an explicit nullable type.
         var source = """
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{x} §NN
+                  §B{x} null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -738,32 +739,32 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void StrictBindInference_NoneInitializer_NoStrict_Compiles()
+    public void StrictBindInference_NullInitializer_NoStrict_DoesNotReportCalor0251()
     {
-        // With --no-strict-bind-inference (StrictBindInference = false), §B{x} §NN must compile.
         var source = """
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{x} §NN
+                  §B{x} null
             """;
 
         var result = Program.Compile(source, "test.calr",
             new CompilationOptions { StrictBindInference = false });
 
-        Assert.False(result.HasErrors,
-            "With StrictBindInference = false, §B{x} §NN must not fire Calor0251.");
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.BindCannotInferNullLiteral);
+        Assert.True(result.HasErrors,
+            "Disabling strict inference does not make an untyped null a valid C# var initializer.");
     }
 
     [Fact]
-    public void StrictBindInference_TypedNone_DoesNotReportCalor0251()
+    public void StrictBindInference_TypedNull_DoesNotReportCalor0251()
     {
-        // §B{x:Option<i32>} §NN bypasses the inference path entirely.
         var source = """
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{x:Option<i32>} §NN
+                  §B{x:?i32} null
             """;
 
         var result = Program.Compile(source, "test.calr",

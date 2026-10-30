@@ -65,7 +65,7 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
-    public void SomeNullCoalesce_DoesNotUnwrapPayload_OrResolvePayloadOverload()
+    public void NullCoalesce_UsesFallbackTypeToResolveOverload()
     {
         const string source = """
             §M{m1:Test}
@@ -74,7 +74,7 @@ public sealed class SymbolAndOverloadBindingTests
               §F{f2:Pick:priv} (str:value) -> str
                 §R value
               §F{f3:Use:pub} () -> i32
-                §R §C{Pick} §A (?? §SM INT:1 INT:0) §/C
+                §R §C{Pick} §A (?? null INT:0) §/C
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -82,9 +82,9 @@ public sealed class SymbolAndOverloadBindingTests
         var call = Assert.IsType<BoundCallExpression>(
             Assert.IsType<BoundReturnStatement>(Assert.Single(use.Body)).Expression);
 
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
-        Assert.Equal("OBJECT", Assert.Single(call.Arguments).Type.DisplayString);
-        Assert.Null(call.ResolvedSymbol);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.Equal("INT", Assert.Single(call.Arguments).Type.DisplayString);
+        Assert.Same(bound.Functions[0].Symbol, call.ResolvedSymbol);
     }
 
     [Fact]
@@ -395,15 +395,15 @@ public sealed class SymbolAndOverloadBindingTests
         {
             "?str",
             "string?",
-            "OPTION[inner=STRING]",
+            "NULLABLE[inner=STRING]",
         };
 
         Assert.All(spellings, spelling =>
             Assert.Equal("STRING?", TypeIdentity.Canonicalize(spelling)));
         Assert.Equal(
-            "OPTION<STRING>?",
-            TypeIdentity.Canonicalize("OPTION[inner=Option<str>]"));
-        Assert.Equal("OPTION<STRING?>", TypeIdentity.Canonicalize("Option<?str>"));
+            "Option<STRING>?",
+            TypeIdentity.Canonicalize("NULLABLE[inner=Option<str>]"));
+        Assert.Equal("Option<STRING?>", TypeIdentity.Canonicalize("Option<?str>"));
 
         var scope = new Scope();
         var expected = new FunctionSymbol(
@@ -418,9 +418,9 @@ public sealed class SymbolAndOverloadBindingTests
             Assert.Same(expected, resolution.Function);
         }
 
-        foreach (var spelling in new[] { "Option<str>", "Option[str]", "Calor.Runtime.Option<string>" })
+        foreach (var spelling in new[] { "Option<str>", "Option<string>" })
         {
-            Assert.Equal("OPTION<STRING>", TypeIdentity.Canonicalize(spelling));
+            Assert.Equal("Option<STRING>", TypeIdentity.Canonicalize(spelling));
             Assert.Null(scope.ResolveOverload("Pick", [spelling]).Function);
         }
     }

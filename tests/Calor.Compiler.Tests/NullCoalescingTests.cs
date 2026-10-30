@@ -146,7 +146,7 @@ public static class NullHandling
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         var func = module.Functions[0];
         Assert.Single(func.Parameters);
-        // ?i32 expands to OPTION[inner=INT] which becomes int?
-        Assert.Contains("OPTION", func.Parameters[0].TypeName);
+        // ?i32 expands to NULLABLE[inner=INT] which becomes int?
+        Assert.Equal("NULLABLE[inner=INT]", func.Parameters[0].TypeName);
     }
 }

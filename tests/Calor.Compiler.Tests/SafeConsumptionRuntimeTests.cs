@@ -528,25 +528,25 @@ public sealed class SafeConsumptionRuntimeTests
     }
 
     [Fact]
-    public void ExplicitOptionUnwrap_RetainsItsActualRuntimeContract()
+    public void ExplicitNullableFailure_ThrowsTheDeclaredException()
     {
         const string source = """
             §M{m1:Consumption}
               §F{f1:Probe:pub} (bool:present) -> str
                 §E{alloc,throw}
-                §B{opt:Option<str>} (? present §SM "value" §NN{str})
-                §R §C{opt.Unwrap} §/C
+                §B{value:?str} (? present "value" null)
+                §R (?? value §TH §NEW{InvalidOperationException} §A "missing" §/NEW)
             """;
         foreach (var text in RoundTrip(source))
         {
             var result = Program.Compile(text, "option-consumption.calr");
             Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
-            Assert.Contains("Option", result.GeneratedCode);
-            Assert.Contains("opt.Unwrap()", result.GeneratedCode);
+            Assert.Contains("??", result.GeneratedCode);
+            Assert.Contains("throw new InvalidOperationException", result.GeneratedCode);
             var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
             Assert.Equal("value", method.Invoke(null, [true]));
             var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [false]));
-            Assert.IsType<InvalidOperationException>(error.InnerException);
+            Assert.Equal("missing", Assert.IsType<InvalidOperationException>(error.InnerException).Message);
         }
         WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
     }

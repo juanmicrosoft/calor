@@ -214,7 +214,7 @@
         },
         {
           "name": "throw-expression",
-          "description": "Throw expressions are converted to \u00A7ERR nodes"
+          "description": "Throw expressions are preserved as \u00A7TH expressions"
         },
         {
           "name": "nameof",
@@ -448,7 +448,7 @@
         {
           "name": "out-parameter",
           "description": "out parameters and out arguments convert natively (\u00A7A{out}, out _ discards). Flow attributes such as [NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
-          "workaround": "Keep the preserved member as C# interop; no tuple or Result\u003CT, E\u003E form is equivalent"
+          "workaround": "Keep the preserved member as C# interop; no return-value-only form is equivalent"
         },
         {
           "name": "pattern-matching-advanced",
@@ -462,7 +462,7 @@
         },
         {
           "name": "generic-method-expression",
-          "description": "Generic method calls like Option\u003CT\u003E.Some() in expressions may have issues",
+          "description": "Generic method calls like Factory\u003CT\u003E.Create() in expressions may have issues",
           "workaround": "Assign generic method results to intermediate variables before use"
         },
         {

@@ -1120,9 +1120,6 @@ public static class TypeReferenceIndex
                 case TypePatternNode typePattern:
                     AddTypePosition(typePattern.TypeName, typePattern.TypeNameSpan);
                     break;
-                case NoneExpressionNode none:
-                    AddTypePosition(none.TypeName, none.TypeNameSpan);
-                    break;
                 case RecordCreationNode recordCreation:
                     AddTypePosition(
                         recordCreation.TypeName,

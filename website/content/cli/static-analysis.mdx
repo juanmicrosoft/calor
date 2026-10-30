@@ -18,7 +18,7 @@ calor --input <file.calr> --analyze [--all-findings]
 The `--analyze` flag enables advanced static analysis on Calor source files. It runs **after compilation** and uses the bound syntax tree to detect bugs that C# alone cannot catch:
 
 - **Division by zero** — proven via Z3 SMT solver or constant analysis
-- **Null dereference** — unsafe `.unwrap()` on Option/Result types without prior checks
+- **Null dereference** — potentially null values used without sufficient checks
 - **Integer overflow** — Z3-verified signed overflow in arithmetic operations
 - **Index out of bounds** — array access with provably negative indices
 - **Off-by-one errors** — loop bounds vs. array length mismatches
@@ -68,7 +68,6 @@ calor -i MyModule.calr --analyze --verify --permissive-effects
 | Calor0921 | Index out of bounds | Error / Warning | Negative literal + Z3 |
 | Calor0922 | Null dereference | Warning | Unwrap pattern analysis |
 | Calor0923 | Integer overflow | Warning | Z3 bitvector arithmetic |
-| Calor0925 | Unsafe unwrap | Warning | Option/Result flow tracking |
 | Calor0926 | Missing precondition | Warning | Divisor parameter analysis |
 | Calor0927 | Off-by-one | Warning | Loop bounds heuristic |
 

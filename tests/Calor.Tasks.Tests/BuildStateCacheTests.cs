@@ -601,7 +601,7 @@ public class BuildStateCacheTests : IDisposable
         var resolved = Calor.Tasks.CompileCalor.ResolveCompilerClosurePaths(
             typeof(Calor.Tasks.CompileCalor).Assembly.Location);
         Assert.Contains(typeof(Calor.Compiler.Program).Assembly.Location, resolved);
-        Assert.Contains(typeof(Calor.Runtime.Option<int>).Assembly.Location, resolved);
+        Assert.Contains(typeof(Calor.Runtime.ContractViolationException).Assembly.Location, resolved);
 
         Assert.Contains(resolved, path =>
             path.Contains(

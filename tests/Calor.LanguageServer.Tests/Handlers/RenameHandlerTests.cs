@@ -329,7 +329,6 @@ public class RenameHandlerTests
                 Calor.Compiler.Ast.PositionalPatternNode value => value.TypeName,
                 Calor.Compiler.Ast.PropertyPatternNode value => value.TypeName,
                 Calor.Compiler.Ast.TypePatternNode value => value.TypeName,
-                Calor.Compiler.Ast.NoneExpressionNode value => value.TypeName,
                 Calor.Compiler.Ast.RecordCreationNode value => value.TypeName,
                 Calor.Compiler.Ast.FieldDefinitionNode value => value.TypeName,
                 Calor.Compiler.Ast.TypeConstraintNode value => value.TypeName,

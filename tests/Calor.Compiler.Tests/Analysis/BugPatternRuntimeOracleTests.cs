@@ -251,49 +251,50 @@ public class BugPatternRuntimeOracleTests
             DiagnosticCode.IntegerOverflow,
             int.MinValue),
         OracleCase.Throws(
-            "OptionUnsafe",
+            "NullableArrayUnsafe",
             """
-            §M{m:OptionUnsafe}
+            §M{m:NullableArrayUnsafe}
               §F{f:Run:pub} () -> i32
-                §B{option:Option<i32>} §NN{i32}
-                §R §C{option.Unwrap} §/C
+                §B{items:i32[]} null
+                §R §LEN items
             """,
-            DiagnosticCode.UnsafeUnwrap,
-            typeof(InvalidOperationException)),
+            DiagnosticCode.NullDereference,
+            typeof(NullReferenceException)),
         OracleCase.Returns(
-            "OptionSafe",
+            "NullableArraySafe",
             """
-            §M{m:OptionSafe}
+            §M{m:NullableArraySafe}
               §F{f:Run:pub} () -> i32
-                §B{option:Option<i32>} §SM INT:1
-                §R §C{option.Unwrap} §/C
+                §B{items:i32[]} §ARR{i32:items} §A INT:1 §/ARR{items}
+                §R §LEN items
             """,
-            DiagnosticCode.UnsafeUnwrap,
+            DiagnosticCode.NullDereference,
             1),
         OracleCase.Returns(
-            "NoneFirstOptionGuardSafe",
+            "NullFirstArrayGuardSafe",
             """
-            §M{m:NoneFirstOptionGuardSafe}
+            §M{m:NullFirstArrayGuardSafe}
               §F{f:Run:pub} () -> i32
-                §B{option:Option<i32>} §SM INT:1
-                §IF{i1} (== §NN{i32} option)
+                §B{items:i32[]} §ARR{i32:items} §A INT:1 §/ARR{items}
+                §IF{i1} (== null items)
                   §R INT:0
-                §R §C{option.Unwrap} §/C
+                §R §LEN items
             """,
-            DiagnosticCode.UnsafeUnwrap,
+            DiagnosticCode.NullDereference,
             1),
         OracleCase.ThrowsWithArguments(
-            "UnknownOptionConditionalArm",
+            "UnknownNullableArrayConditionalArm",
             """
-            §M{m:UnknownOptionConditionalArm}
-              §F{make:Make:priv} () -> Option<i32>
-                §R §NN{i32}
+            §M{m:UnknownNullableArrayConditionalArm}
+              §F{make:Make:priv} () -> i32[]
+                §R null
               §F{run:Run:pub} (bool:condition) -> i32
-                §B{option:Option<i32>} (? condition §SM INT:1 §C{Make} §/C)
-                §R §C{option.Unwrap} §/C
+                §B{known:i32[]} §ARR{i32:known} §A INT:1 §/ARR{known}
+                §B{items:i32[]} (? condition known §C{Make} §/C)
+                §R §LEN items
             """,
-            DiagnosticCode.UnsafeUnwrap,
-            typeof(InvalidOperationException),
+            DiagnosticCode.NullDereference,
+            typeof(NullReferenceException),
             [false]),
         OracleCase.ThrowsWithArguments(
             "ExcludedZeroDivisionOverflow",

@@ -135,7 +135,7 @@ public sealed class VariantDefinitionNode : AstNode
 
 /// <summary>
 /// Represents a type reference with optional generic arguments.
-/// Example: Result[INT, STRING], Option[Person]
+/// Example: Dictionary&lt;str, i32&gt;, List&lt;Person&gt;
 /// </summary>
 public sealed class TypeReferenceNode : AstNode
 {
@@ -221,79 +221,6 @@ public sealed class FieldAccessNode : ExpressionNode
         Target = target ?? throw new ArgumentNullException(nameof(target));
         FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
         FieldNameSpan = fieldNameSpan ?? span;
-    }
-
-
-}
-
-/// <summary>
-/// Represents an Option.Some expression.
-/// §SOME expression
-/// </summary>
-public sealed class SomeExpressionNode : ExpressionNode
-{
-    public ExpressionNode Value { get; }
-
-    public SomeExpressionNode(TextSpan span, ExpressionNode value)
-        : base(span)
-    {
-        Value = value ?? throw new ArgumentNullException(nameof(value));
-    }
-
-
-}
-
-/// <summary>
-/// Represents an Option.None expression.
-/// §NONE[type=xxx]
-/// </summary>
-public sealed class NoneExpressionNode : ExpressionNode
-{
-    public string? TypeName { get; }
-    public TextSpan? TypeNameSpan { get; }
-
-    public NoneExpressionNode(
-        TextSpan span,
-        string? typeName,
-        TextSpan? typeNameSpan = null)
-        : base(span)
-    {
-        TypeName = typeName;
-        TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
-    }
-
-
-}
-
-/// <summary>
-/// Represents a Result.Ok expression.
-/// §OK expression
-/// </summary>
-public sealed class OkExpressionNode : ExpressionNode
-{
-    public ExpressionNode Value { get; }
-
-    public OkExpressionNode(TextSpan span, ExpressionNode value)
-        : base(span)
-    {
-        Value = value ?? throw new ArgumentNullException(nameof(value));
-    }
-
-
-}
-
-/// <summary>
-/// Represents a Result.Err expression.
-/// §ERR expression
-/// </summary>
-public sealed class ErrExpressionNode : ExpressionNode
-{
-    public ExpressionNode Error { get; }
-
-    public ErrExpressionNode(TextSpan span, ExpressionNode error)
-        : base(span)
-    {
-        Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
 

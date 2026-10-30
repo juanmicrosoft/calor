@@ -326,7 +326,7 @@ public static class FeatureSupport
             // #943 (D1 RO-REP-1, RO-NULL-3/4): native out parameters and §A{out} arguments.
             Description = "out parameters and out arguments convert natively (§A{out}, out _ discards). Flow attributes such as " +
                 "[NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
-            Workaround = "Keep the preserved member as C# interop; no tuple or Result<T, E> form is equivalent"
+            Workaround = "Keep the preserved member as C# interop; no return-value-only form is equivalent"
         },
         ["pattern-matching-advanced"] = new FeatureInfo
         {
@@ -454,7 +454,7 @@ public static class FeatureSupport
         {
             Name = "generic-method-expression",
             Support = SupportLevel.Partial,
-            Description = "Generic method calls like Option<T>.Some() in expressions may have issues",
+            Description = "Generic method calls like Factory<T>.Create() in expressions may have issues",
             Workaround = "Assign generic method results to intermediate variables before use"
         },
         ["equals-operator"] = new FeatureInfo
@@ -512,7 +512,7 @@ public static class FeatureSupport
         {
             Name = "throw-expression",
             Support = SupportLevel.Full,
-            Description = "Throw expressions are converted to §ERR nodes"
+            Description = "Throw expressions are preserved as §TH expressions"
         },
         ["nameof"] = new FeatureInfo
         {

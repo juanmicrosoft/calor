@@ -351,7 +351,7 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_TokenizesOptionType()
+    public void Lexer_TokenizesNullableType()
     {
         var tokens = Tokenize("[?i32]");
 
@@ -363,7 +363,7 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_TokenizesResultType()
+    public void Lexer_TokenizesExclamationBetweenIdentifiers()
     {
         var tokens = Tokenize("[i32!str]");
 
@@ -546,17 +546,17 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void AttributeHelper_ExpandsOptionType()
+    public void AttributeHelper_ExpandsNullableType()
     {
         var result = AttributeHelper.ExpandType("?i32");
-        Assert.Equal("OPTION[inner=INT]", result);
+        Assert.Equal("NULLABLE[inner=INT]", result);
     }
 
     [Fact]
-    public void AttributeHelper_ExpandsResultType()
+    public void AttributeHelper_DoesNotExpandRemovedResultShorthand()
     {
         var result = AttributeHelper.ExpandType("i32!str");
-        Assert.Equal("RESULT[ok=INT][err=STRING]", result);
+        Assert.Equal("i32!str", result);
     }
 
     [Fact]

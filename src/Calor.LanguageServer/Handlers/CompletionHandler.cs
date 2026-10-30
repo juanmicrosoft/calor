@@ -91,10 +91,6 @@ public sealed class CompletionHandler : CompletionHandlerBase
         ("D", "Record definition", CompletionItemKind.Struct),
         ("V", "Variant definition", CompletionItemKind.EnumMember),
         ("T", "Type definition", CompletionItemKind.TypeParameter),
-        ("SM", "Some (Option)", CompletionItemKind.Value),
-        ("NN", "None (Option)", CompletionItemKind.Value),
-        ("OK", "Ok (Result)", CompletionItemKind.Value),
-        ("ERR", "Err (Result)", CompletionItemKind.Value),
         ("U", "Using directive", CompletionItemKind.Reference),
     };
 
@@ -1967,18 +1963,6 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
             case VarPatternNode vPat:
                 variables.Add(new ScopeVariable(vPat.Name, null, false, "pattern"));
-                break;
-
-            case SomePatternNode somePat:
-                CollectPatternVariables(somePat.InnerPattern, variables);
-                break;
-
-            case OkPatternNode okPat:
-                CollectPatternVariables(okPat.InnerPattern, variables);
-                break;
-
-            case ErrPatternNode errPat:
-                CollectPatternVariables(errPat.InnerPattern, variables);
                 break;
 
             case PositionalPatternNode posPat:

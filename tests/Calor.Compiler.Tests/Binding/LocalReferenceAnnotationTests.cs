@@ -455,23 +455,22 @@ public class LocalReferenceAnnotationTests
     }
 
     [Fact]
-    public void RuntimeOption_InferredChainDoesNotBecomeNullableReferenceAnnotation()
+    public void NullableReference_InferredChainRetainsNullableAnnotation()
     {
         const string source = """
             §M{m1:OptionInference}
               §CL{c1:Holder:pub}
                 §MT{probe:Probe:pub:static} () -> void
-                  §B{first} §SM STR:"value"
+                  §B{first:?str} null
                   §B{second} first
                   §B{result:string} second
             """;
         var (module, diagnostics) = Bind(source);
         foreach (var binding in Probe(module).Body.Take(2).Cast<BoundBindStatement>())
         {
-            Assert.Equal(NullableAnnotation.Oblivious, binding.Variable.NullableAnnotation);
-            Assert.Null(binding.Variable.InferredReferenceType);
+            Assert.Equal(NullableAnnotation.Annotated, binding.Variable.NullableAnnotation);
         }
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ReferenceOptionMismatch);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
     }
 
     private static BoundExpression ConsumerValue(BoundStatement statement, string boundary)

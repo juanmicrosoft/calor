@@ -388,19 +388,6 @@
     ]
   },
   {
-    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckReferenceOptionRepresentation::DiagnosticBag.ReportError#01",
-    "member": "Calor.Compiler.Binding.Binder.CheckReferenceOptionRepresentation",
-    "sink": "DiagnosticBag.ReportError",
-    "helperPath": "DiagnosticBag.ReportError",
-    "possibleCodes": [
-      "Calor0275"
-    ],
-    "severity": "Error",
-    "disposition": "CompilationError",
-    "owningIssue": 1397,
-    "reason": "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation."
-  },
-  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.DeclareParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
     "member": "Calor.Compiler.Binding.Binder.DeclareParameters",
     "sink": "DiagnosticBag.ReportDuplicateDefinitionWithFix",

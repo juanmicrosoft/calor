@@ -512,9 +512,7 @@ public sealed class McpMessageHandler
         | `char` | `char` | Unicode character |
         | `void` | `void` | No return value |
         | `object` | `obj` | Base type |
-        | `int?` | `?i32` | Option type (compact) |
-        | `Nullable<int>` | `OPTION[inner=INT]` | Option type (expanded) |
-        | `Result<int,string>` | `i32!str` | Result type (compact) |
+        | `int?` / `Nullable<int>` | `?i32` | Nullable value |
         | `Task<T>` | use `§AF`/`§AMT` | Async function/method |
         | `List<T>` | `§LIST{name:type}` | List collection |
         | `Dictionary<K,V>` | `§DICT{name:key:val}` | Dictionary collection |

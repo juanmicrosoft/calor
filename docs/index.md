@@ -163,7 +163,7 @@ The tool scores files based on patterns like null handling, error handling, asyn
 
 - [x] Core compiler (lexer, parser, C# code generation)
 - [x] Control flow (for, if/else, while, do-while)
-- [x] Type system (Option, Result)
+- [x] Type system (primitives, nullable types, ordinary generics)
 - [x] Contracts (requires, ensures) with runtime enforcement
 - [x] Effects declarations with compile-time enforcement
 - [x] Interprocedural effect analysis (SCC-based)

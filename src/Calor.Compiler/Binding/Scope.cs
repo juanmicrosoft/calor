@@ -136,8 +136,6 @@ public static class BindingDiagnosticPolicy
                 "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2.", 943),
             new(DiagnosticCode.WriteToReadOnlyLocal, BindingDiagnosticDisposition.CompilationError,
                 "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1.", 1550),
-            new(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticDisposition.CompilationError,
-                "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation.", 1397),
             Analysis(DiagnosticCode.ExpectedTypeName, "Parser owns the user-facing missing-type error; binder recovery is not a new activation.", 1396),
             Analysis(DiagnosticCode.UndefinedReference, "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception.", 1396),
             Analysis(DiagnosticCode.TypeMismatch, "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit.", 1397),
@@ -408,13 +406,6 @@ public static class TypeIdentity
         return lookupName;
     }
 
-    public static bool TryUnwrapOptionOrNullable(string typeName, out string elementType)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
-        return AttributeHelper.TryUnwrapNullableAnnotation(typeName, out elementType)
-            || AttributeHelper.TryUnwrapRuntimeOption(typeName, out elementType);
-    }
-
     private static string StripLookupDecorators(string type)
     {
         while (type.StartsWith('?') && type.Length > 1)
@@ -452,17 +443,12 @@ public static class TypeIdentity
         if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var nullableReferent))
             return $"{Canonicalize(nullableReferent)}?";
 
-        if (AttributeHelper.TryUnwrapRuntimeOption(type, out var optionElement))
-            return $"OPTION<{Canonicalize(optionElement)}>";
-
         if (TryStripPostfix(type, out var elementType, out var postfix))
             return Canonicalize(elementType) + postfix;
 
         if (TrySplitGeneric(type, out var genericName, out var arguments))
         {
-            var canonicalName = genericName.Equals("Option", StringComparison.OrdinalIgnoreCase)
-                ? "OPTION"
-                : genericName.Trim();
+            var canonicalName = genericName.Trim();
             return $"{canonicalName}<{string.Join(",", arguments.Select(Canonicalize))}>";
         }
 
@@ -511,8 +497,7 @@ public static class TypeIdentity
     /// pointer and nullable decorators already stripped.
     /// </summary>
     public static bool IsBuiltinCanonicalName(string canonical) =>
-        ProvablyNonFunctionCanonicalNames.Contains(canonical)
-        || string.Equals(canonical, "OPTION", StringComparison.Ordinal);
+        ProvablyNonFunctionCanonicalNames.Contains(canonical);
 
     /// <summary>
     /// v0.15 E3 slice a, review round 1 (F2) — "is this type PROVABLY not a
@@ -533,7 +518,7 @@ public static class TypeIdentity
     ///
     /// <para>So the rule is inverted to fail OPEN. A row is misplaced only when
     /// the compiler can PROVE the position cannot carry one — a built-in scalar,
-    /// <c>void</c>, an array, a tuple, a pointer, or an <c>Option</c>. An unknown
+    /// <c>void</c>, an array, a tuple, or a pointer. An unknown
     /// NOMINAL is never Calor0405: the honest answer there is "I do not know what
     /// this is", and §4.3's whole discipline is that an unknown is not a
     /// verdict.</para>
@@ -567,8 +552,7 @@ public static class TypeIdentity
         }
 
         var canonical = Canonicalize(trimmed);
-        return ProvablyNonFunctionCanonicalNames.Contains(canonical)
-            || canonical.StartsWith("OPTION<", StringComparison.Ordinal);
+        return ProvablyNonFunctionCanonicalNames.Contains(canonical);
     }
 
     /// <summary>
@@ -835,26 +819,17 @@ public static class TypeIdentity
     {
         if (string.IsNullOrWhiteSpace(shortName))
             return shortName;
-        // Nullable annotations do not introduce a runtime Option receiver.
         if (AttributeHelper.TryUnwrapNullableAnnotation(shortName, out var referent))
         {
             var canonical = Canonicalize(referent);
             var mapped = MapShortTypeNameToFullName(referent);
             var knownValue = IsBuiltinCanonicalName(canonical)
-                && canonical is not ("STRING" or "OBJECT" or "VOID" or "NEVER" or "OPTION");
+                && canonical is not ("STRING" or "OBJECT" or "VOID" or "NEVER");
             return knownValue || canonical is "char" or "CHAR"
                 || NullableValueMetadataNames.Contains(mapped)
-                || mapped is "Calor.Runtime.Option`1" or "Calor.Runtime.Result`2"
                     ? "System.Nullable`1"
                     : mapped;
         }
-        if (AttributeHelper.TryUnwrapRuntimeOption(shortName, out _))
-            return "Calor.Runtime.Option`1";
-        if (shortName.StartsWith("Result<"))
-            return "Calor.Runtime.Result`2";
-        if (shortName.Contains('!') && !shortName.Contains('.') && !shortName.Contains('('))
-            return "Calor.Runtime.Result`2";
-
         // Normalize declared generic collection types ("List<i32>") to their
         // manifest identities so typed receivers resolve to the correct entries
         // (e.g. List`1.Add = mut) instead of hitting the unknown-call chain.
@@ -899,9 +874,6 @@ public static class TypeIdentity
 
     private static string MapKnownShortTypeName(string shortName) => shortName switch
     {
-        // Calor runtime static helper classes
-        "Option" => "Calor.Runtime.Option",
-        "Result" => "Calor.Runtime.Result",
         // BCL types
         "Console" => "System.Console",
         // Generic collections referenced by bare name (e.g. §NEW{List<i32>}
@@ -2137,7 +2109,7 @@ public sealed class Scope
 
     private static bool IsSupportedStringContainer(string name) =>
         name[(name.LastIndexOf('.') + 1)..] is
-            "OPTION" or "Option" or "List" or "IList" or "IEnumerable"
+            "List" or "IList" or "IEnumerable"
             or "IReadOnlyList" or "ICollection" or "IReadOnlyCollection";
 
     private sealed record ArgumentMapping(

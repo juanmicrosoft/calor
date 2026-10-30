@@ -135,8 +135,8 @@ Write a function that calculates compound interest with:
 /calor
 
 Create a UserService class with methods for:
-- GetUserById (returns Option<User>)
-- CreateUser (returns Result<User, ValidationError>)
+- GetUserById (returns a nullable User reference)
+- CreateUser (returns User; throws on validation failure)
 - DeleteUser (effects: database write)
 ```
 
@@ -178,7 +178,7 @@ The Calor skills teach Claude:
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Conditional statements: `§IF{id} condition` with an indented body
-- Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
+- Type system: `i32`, `f64`, `str`, `bool`, nullable types (`?str`), arrays
 
 ### Best Practices
 
@@ -189,8 +189,8 @@ The Calor skills teach Claude:
 
 ### Code Patterns
 
-- Error handling with `Result<T,E>`
-- Null safety with `Option<T>`
+- Error handling with native exceptions (`§TH`, `§TR`, `§CA`)
+- Absence with .NET nullable types and `null`
 - Iteration patterns (for, while, do-while)
 - Class definitions with fields, properties, methods
 
@@ -446,7 +446,7 @@ In PaymentService.calr:
 Review OrderService.calr and identify:
 1. Any missing preconditions that could cause runtime errors
 2. Functions that should be marked pure but have undeclared effects
-3. Opportunities to use Result<T,E> instead of exceptions
+3. Exception handling and the effects it requires
 ```
 
 ---

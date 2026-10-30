@@ -1114,7 +1114,7 @@ public sealed class ObligationTests
             Assert.IsType<ReferenceNode>(comparison.Left).Name);
 
         var unsupported = FactCollector.SubstituteSelfRefStatic(
-            new SomeExpressionNode(span, new SelfRefNode(span)),
+            new ThrowExpressionNode(span, new SelfRefNode(span)),
             "value");
         Assert.False(Assert.IsType<BoolLiteralNode>(unsupported).Value);
 

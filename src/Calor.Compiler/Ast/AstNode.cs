@@ -96,20 +96,12 @@ public interface IAstVisitor
     void Visit(RecordCreationNode node);
     void Visit(FieldAssignmentNode node);
     void Visit(FieldAccessNode node);
-    void Visit(SomeExpressionNode node);
-    void Visit(NoneExpressionNode node);
-    void Visit(OkExpressionNode node);
-    void Visit(ErrExpressionNode node);
     void Visit(MatchExpressionNode node);
     void Visit(MatchStatementNode node);
     void Visit(MatchCaseNode node);
     void Visit(WildcardPatternNode node);
     void Visit(VariablePatternNode node);
     void Visit(LiteralPatternNode node);
-    void Visit(SomePatternNode node);
-    void Visit(NonePatternNode node);
-    void Visit(OkPatternNode node);
-    void Visit(ErrPatternNode node);
     void Visit(RequiresNode node);
     void Visit(EnsuresNode node);
     void Visit(InvariantNode node);
@@ -285,20 +277,12 @@ public interface IAstVisitor<T>
     T Visit(RecordCreationNode node);
     T Visit(FieldAssignmentNode node);
     T Visit(FieldAccessNode node);
-    T Visit(SomeExpressionNode node);
-    T Visit(NoneExpressionNode node);
-    T Visit(OkExpressionNode node);
-    T Visit(ErrExpressionNode node);
     T Visit(MatchExpressionNode node);
     T Visit(MatchStatementNode node);
     T Visit(MatchCaseNode node);
     T Visit(WildcardPatternNode node);
     T Visit(VariablePatternNode node);
     T Visit(LiteralPatternNode node);
-    T Visit(SomePatternNode node);
-    T Visit(NonePatternNode node);
-    T Visit(OkPatternNode node);
-    T Visit(ErrPatternNode node);
     T Visit(RequiresNode node);
     T Visit(EnsuresNode node);
     T Visit(InvariantNode node);
@@ -481,20 +465,12 @@ public static class AstSchemaMetadata
         Create<RecordCreationNode>("TypeNodes.cs"),
         Create<FieldAssignmentNode>("TypeNodes.cs"),
         Create<FieldAccessNode>("TypeNodes.cs"),
-        Create<SomeExpressionNode>("TypeNodes.cs"),
-        Create<NoneExpressionNode>("TypeNodes.cs"),
-        Create<OkExpressionNode>("TypeNodes.cs"),
-        Create<ErrExpressionNode>("TypeNodes.cs"),
         Create<MatchExpressionNode>("PatternNodes.cs"),
         Create<MatchStatementNode>("PatternNodes.cs"),
         Create<MatchCaseNode>("PatternNodes.cs"),
         Create<WildcardPatternNode>("PatternNodes.cs"),
         Create<VariablePatternNode>("PatternNodes.cs"),
         Create<LiteralPatternNode>("PatternNodes.cs"),
-        Create<SomePatternNode>("PatternNodes.cs"),
-        Create<NonePatternNode>("PatternNodes.cs"),
-        Create<OkPatternNode>("PatternNodes.cs"),
-        Create<ErrPatternNode>("PatternNodes.cs"),
         Create<RequiresNode>("ContractNodes.cs"),
         Create<EnsuresNode>("ContractNodes.cs"),
         Create<InvariantNode>("ContractNodes.cs"),
@@ -711,20 +687,12 @@ internal static class AstVisitorDispatch
             case RecordCreationNode typed: visitor.Visit(typed); return;
             case FieldAssignmentNode typed: visitor.Visit(typed); return;
             case FieldAccessNode typed: visitor.Visit(typed); return;
-            case SomeExpressionNode typed: visitor.Visit(typed); return;
-            case NoneExpressionNode typed: visitor.Visit(typed); return;
-            case OkExpressionNode typed: visitor.Visit(typed); return;
-            case ErrExpressionNode typed: visitor.Visit(typed); return;
             case MatchExpressionNode typed: visitor.Visit(typed); return;
             case MatchStatementNode typed: visitor.Visit(typed); return;
             case MatchCaseNode typed: visitor.Visit(typed); return;
             case WildcardPatternNode typed: visitor.Visit(typed); return;
             case VariablePatternNode typed: visitor.Visit(typed); return;
             case LiteralPatternNode typed: visitor.Visit(typed); return;
-            case SomePatternNode typed: visitor.Visit(typed); return;
-            case NonePatternNode typed: visitor.Visit(typed); return;
-            case OkPatternNode typed: visitor.Visit(typed); return;
-            case ErrPatternNode typed: visitor.Visit(typed); return;
             case RequiresNode typed: visitor.Visit(typed); return;
             case EnsuresNode typed: visitor.Visit(typed); return;
             case InvariantNode typed: visitor.Visit(typed); return;
@@ -908,20 +876,12 @@ internal static class AstVisitorDispatch
             RecordCreationNode typed => visitor.Visit(typed),
             FieldAssignmentNode typed => visitor.Visit(typed),
             FieldAccessNode typed => visitor.Visit(typed),
-            SomeExpressionNode typed => visitor.Visit(typed),
-            NoneExpressionNode typed => visitor.Visit(typed),
-            OkExpressionNode typed => visitor.Visit(typed),
-            ErrExpressionNode typed => visitor.Visit(typed),
             MatchExpressionNode typed => visitor.Visit(typed),
             MatchStatementNode typed => visitor.Visit(typed),
             MatchCaseNode typed => visitor.Visit(typed),
             WildcardPatternNode typed => visitor.Visit(typed),
             VariablePatternNode typed => visitor.Visit(typed),
             LiteralPatternNode typed => visitor.Visit(typed),
-            SomePatternNode typed => visitor.Visit(typed),
-            NonePatternNode typed => visitor.Visit(typed),
-            OkPatternNode typed => visitor.Visit(typed),
-            ErrPatternNode typed => visitor.Visit(typed),
             RequiresNode typed => visitor.Visit(typed),
             EnsuresNode typed => visitor.Visit(typed),
             InvariantNode typed => visitor.Visit(typed),

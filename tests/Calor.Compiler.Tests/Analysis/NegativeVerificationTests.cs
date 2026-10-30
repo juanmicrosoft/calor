@@ -349,7 +349,7 @@ public class NegativeVerificationTests
   §F{f001:SafeNullCheck:pub}
       §I{string:maybeNull}
       §O{i32}
-      §IF{if1} (!= maybeNull §NN)
+      §IF{if1} (!= maybeNull null)
           §R (CALL string.length maybeNull)
       §EL
           §R INT:0";
@@ -537,29 +537,30 @@ public class NegativeVerificationTests
         Assert.NotNull(bound);
     }
 
-    [SkippableFact]
-    public void Binding_NoneExpression_ProducesBoundNoneLiteral()
+    [Fact]
+    public void Binding_NullExpression_ProducesBoundNullLiteral()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:TestNone:pub}
       §I{string:maybeNull}
       §O{i32}
-      §IF{if1} (!= maybeNull §NN)
+      §IF{if1} (!= maybeNull null)
           §R INT:1
       §EL
           §R INT:0";
 
         var bound = Bind(source, out var parseDiag);
-        Skip.If(parseDiag.HasErrors || bound == null, "Calor syntax not supported by parser");
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
+        Assert.NotNull(bound);
 
-        // Walk the bound tree looking for a BoundNoneLiteral
+        // Null must not be confused with integer zero by numeric analyses.
         var func = bound!.Functions.First();
-        BoundNoneLiteral? foundNone = null;
+        BoundNullLiteral? foundNone = null;
 
         void CheckExpr(BoundExpression? expr)
         {
-            if (expr is BoundNoneLiteral nl) foundNone = nl;
+            if (expr is BoundNullLiteral nl) foundNone = nl;
             if (expr is BoundBinaryExpression bin)
             {
                 CheckExpr(bin.Left);
@@ -577,11 +578,10 @@ public class NegativeVerificationTests
 
         Assert.NotNull(foundNone);
 
-        // BoundNoneLiteral must NOT be treated as a numeric constant or as literal zero
         Assert.False(BoundNodeHelpers.IsConstant(foundNone),
-            "BoundNoneLiteral should not be considered a numeric constant");
+            "Null should not be considered a numeric constant");
         Assert.False(BoundNodeHelpers.IsLiteralZero(foundNone),
-            "BoundNoneLiteral should not be confused with literal zero");
+            "Null should not be confused with literal zero");
     }
 
     [SkippableFact]

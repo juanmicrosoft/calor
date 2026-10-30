@@ -147,7 +147,7 @@ are documented and covered by a dedicated test suite
 | Contracts with `--contract-mode off` | Stripped entirely (the waiver you chose) |
 | `§E` effect declarations | No runtime footprint — effects were compile-time discipline; the enforcement disappears, the behavior does not change |
 | Refinement-type obligations | Comments / retained checks per obligation status (they were never runtime-enforced — #782) |
-| Option/Result types | Ordinary `Calor.Runtime` generic types; keep the (small, MIT-licensed) `Calor.Runtime` package or inline the types |
+| Nullable values and exceptions | Native .NET types and exception handling; no additional absence/error runtime types |
 | Unsupported constructs during C#→Calor migration | Were preserved verbatim as interop blocks — they eject as the original C# |
 
 What ejecting costs you: the proofs, the effect discipline, and the

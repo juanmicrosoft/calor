@@ -80,12 +80,6 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(FieldAssignmentNode node) => DefaultVisit(node)!;
     public virtual T Visit(FieldAccessNode node) => DefaultVisit(node)!;
 
-    // Option/Result
-    public virtual T Visit(SomeExpressionNode node) => DefaultVisit(node)!;
-    public virtual T Visit(NoneExpressionNode node) => DefaultVisit(node)!;
-    public virtual T Visit(OkExpressionNode node) => DefaultVisit(node)!;
-    public virtual T Visit(ErrExpressionNode node) => DefaultVisit(node)!;
-
     // Pattern matching
     public virtual T Visit(MatchExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(MatchStatementNode node) => DefaultVisit(node)!;
@@ -93,10 +87,6 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(WildcardPatternNode node) => DefaultVisit(node)!;
     public virtual T Visit(VariablePatternNode node) => DefaultVisit(node)!;
     public virtual T Visit(LiteralPatternNode node) => DefaultVisit(node)!;
-    public virtual T Visit(SomePatternNode node) => DefaultVisit(node)!;
-    public virtual T Visit(NonePatternNode node) => DefaultVisit(node)!;
-    public virtual T Visit(OkPatternNode node) => DefaultVisit(node)!;
-    public virtual T Visit(ErrPatternNode node) => DefaultVisit(node)!;
 
     // Contracts
     public virtual T Visit(RequiresNode node) => DefaultVisit(node)!;

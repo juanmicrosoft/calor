@@ -39,8 +39,7 @@ public class DiagnosticSurfaceSpellingTests
         ("UNIT",   new Regex(@"\bUNIT\b")),
         ("NEVER",  new Regex(@"\bNEVER\b")),
         ("ARRAY[element=", new Regex(@"ARRAY\[element=")),
-        ("OPTION[inner=",  new Regex(@"OPTION\[inner=")),
-        ("RESULT[ok=",     new Regex(@"RESULT\[ok=")),
+        ("NULLABLE[inner=", new Regex(@"NULLABLE\[inner=")),
         ("[bits=",         new Regex(@"\[bits=")),
     };
 
@@ -134,8 +133,7 @@ public class DiagnosticSurfaceSpellingTests
             ["UNIT"] = "is UNIT",
             ["NEVER"] = "is NEVER",
             ["ARRAY[element="] = "ARRAY[element=i32]",
-            ["OPTION[inner="] = "OPTION[inner=i32]",
-            ["RESULT[ok="] = "RESULT[ok=i32][err=str]",
+            ["NULLABLE[inner="] = "NULLABLE[inner=i32]",
             ["[bits="] = "INT[bits=64][signed=true]",
         };
         foreach (var (token, message) in isolated)

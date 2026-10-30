@@ -3,7 +3,6 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
-using Calor.Runtime;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -13,31 +12,72 @@ namespace Calor.Compiler.Tests;
 public class ResultContextRuntimeTests
 {
     [Theory]
-    [InlineData("§R §OK value", true)]
-    [InlineData("§R §ERR error", false)]
-    [InlineData("§IF{if1} (> value 0)\n      §R §OK value\n    §EL\n      §R §ERR error", true)]
-    [InlineData("§R §IF{if1} (> value 0) → §OK value §EL → §ERR error", true)]
-    public void ReturnContexts_PreserveBothGenericArguments(string body, bool isOk)
+    [InlineData("§R value")]
+    [InlineData("§IF{if1} (> value 0)\n      §R value\n    §EL\n      §TH §NEW{InvalidOperationException} §A error §/NEW")]
+    [InlineData("§L{for1:i:0:1:1}\n      §IF{if1} (> value 0)\n        §R value\n    §TH §NEW{InvalidOperationException} §A error §/NEW")]
+    public void ReturnContexts_PreserveValueAndThrowMessage(string body)
     {
         var source = """
             §M{m1:ResultContext}
-              §F{f1:Probe:pub} (i32:value, str:error) -> Result<i32,str>
-                §E{alloc}
+              §U{System}
+              §F{f1:Probe:pub} (i32:value, str:error) -> i64
+                §E{alloc,throw}
             """ + "\n    " + body;
         foreach (var text in RoundTrip(source))
         {
             var type = Compile(text);
-            var result = Assert.IsType<Result<int, string>>(type.GetMethod("Probe")!.Invoke(null, [7, "failed"]));
-            Assert.Equal(isOk, result.IsOk);
-            if (isOk)
-                Assert.Equal(7, result.Unwrap());
-            else
-                Assert.Equal("failed", result.UnwrapErr());
+            var method = type.GetMethod("Probe")!;
+            Assert.Equal(7L, Assert.IsType<long>(method.Invoke(null, [7, "failed"])));
+            if (body != "§R value")
+            {
+                var exception = Assert.Throws<TargetInvocationException>(
+                    () => method.Invoke(null, [0, "failed"]));
+                Assert.Equal("failed", Assert.IsType<InvalidOperationException>(exception.InnerException).Message);
+            }
         }
     }
 
     [Fact]
-    public void NonStringErrorAndNestedResult_PreserveExpectedPayloadTypes()
+    public void NestedFailure_PreservesEvaluationOrderAndStopsAfterThrow()
+    {
+        const string source = """
+            §M{m1:ResultContext}
+              §U{System}
+              §F{f1:Probe:pub} (Func<i32>:first §E{throw}, Func<i32>:second §E{throw}, bool:fail) -> i64
+                §E{alloc,throw}
+                §B{left:i32} §C{first} §/C
+                §IF{if1} fail
+                  §TH §NEW{InvalidOperationException} §A "failed" §/NEW
+                §R (+ left §C{second} §/C)
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var method = Compile(text).GetMethod("Probe")!;
+            var events = new List<string>();
+            Func<int> first = () => { events.Add("first"); return 7; };
+            Func<int> second = () => { events.Add("second"); return 5; };
+            Assert.Equal(12L, method.Invoke(null, [first, second, false]));
+            Assert.Equal(["first", "second"], events);
+            events.Clear();
+            var error = Assert.Throws<TargetInvocationException>(
+                () => method.Invoke(null, [first, second, true]));
+            Assert.Equal("failed", Assert.IsType<InvalidOperationException>(error.InnerException).Message);
+            Assert.Equal(["first"], events);
+            events.Clear();
+            Func<int> throwingFirst = () =>
+            {
+                events.Add("first");
+                throw new ApplicationException("producer failed");
+            };
+            var nested = Assert.Throws<TargetInvocationException>(
+                () => method.Invoke(null, [throwingFirst, second, false]));
+            Assert.Equal("producer failed", Assert.IsType<ApplicationException>(nested.InnerException).Message);
+            Assert.Equal(["first"], events);
+        }
+    }
+
+    [Fact]
+    public void NonStringErrorAndNestedResult_AreRejectedRatherThanFlattened()
     {
         const string source = """
             §M{m1:ResultContext}
@@ -48,15 +88,9 @@ public class ResultContextRuntimeTests
                 §EL
                   §R §OK §ERR error
             """;
-        foreach (var text in RoundTrip(source))
-        {
-            var type = Compile(text);
-            var method = type.GetMethod("Probe")!;
-            var success = Assert.IsType<Result<Result<long, int>, int>>(method.Invoke(null, [7, 42]));
-            Assert.Equal(7L, success.Unwrap().Unwrap());
-            var failure = Assert.IsType<Result<Result<long, int>, int>>(method.Invoke(null, [0, 42]));
-            Assert.Equal(42, failure.Unwrap().UnwrapErr());
-        }
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
     }
 
     private static IEnumerable<string> RoundTrip(string source)

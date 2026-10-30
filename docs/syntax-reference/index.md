@@ -114,8 +114,7 @@ replacement is not selected yet.
 | `str` | String | `string` |
 | `bool` | Boolean | `bool` |
 | `void` | No return value | `void` |
-| `?T` | Optional T | `T?` (nullable) |
-| `T!E` | Result (T or error E) | `Result<T, E>` |
+| `?T` | Nullable T | `T?` (nullable) |
 
 ---
 
@@ -202,7 +201,7 @@ issues at the source level):
 ## Detailed Reference
 
 - [Structure Tags](/calor/syntax-reference/structure-tags/) - Modules, functions, block structure
-- [Types](/calor/syntax-reference/types/) - Type system, Option, Result
+- [Types](/calor/syntax-reference/types/) - Primitives, nullable types, generics
 - [Bindings](/calor/syntax-reference/binding/) - `§B` declarations and type inference
 - [Calls](/calor/syntax-reference/calls/) - `§C` calls in statement and expression context
 - [Expressions](/calor/syntax-reference/expressions/) - Lisp-style operators

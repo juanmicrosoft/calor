@@ -98,7 +98,7 @@ public class NullabilityIntegrationTests
     [Theory]
     [InlineData("Foo")]
     [InlineData("[str]")]
-    [InlineData("Option<str>")]
+    [InlineData("List<str>")]
     public void LiteralNull_RemainsApplicableToNonScalarReferenceParameters(
         string parameterType)
     {

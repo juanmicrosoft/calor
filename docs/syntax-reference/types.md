@@ -7,7 +7,7 @@ nav_order: 2
 
 # Types
 
-Calor has a simple type system with primitives, optionals, results, and arrays.
+Calor has primitives, .NET nullable types, ordinary generics, and arrays.
 
 ---
 
@@ -139,7 +139,7 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 ## Nullable References (`?T`)
 
 For supported reference types, `?str` and `?string` mean C# `string?`, and `?Foo`
-means a nullable `Foo` reference. They do **not** create a runtime `Option<T>`.
+means a nullable `Foo` reference. These annotations do not wrap the value.
 Postfix spellings such as `str?` are also nullable annotations.
 
 ```calor
@@ -158,88 +158,48 @@ The staged `Calor0272`/`Calor0273`/`Calor0274` binder findings remain analysis-o
 some older unsafe assignments still fail the TypeChecker first. General mutation
 is outside those receiving-boundary checks.
 
-Existing nullable-value spellings such as `?i32` emit C# `int?`, not a reference or
-an Option. This reference-typing repair does not expand their TypeChecker support.
+Existing nullable-value spellings such as `?i32` emit C# `int?`, not a reference.
+This reference-typing repair does not expand their TypeChecker support.
 Unknown external types and arbitrary generic payloads also need separate analysis;
 absence of an error is not proof that they were resolved.
 
-## Runtime Option (`Option<T>`)
-
-An explicit `Option<T>` stores either a value or an absent case. `§SM value`
-constructs `Some(value)` and `§NN{T}` constructs a typed `None`. These are
-`Calor.Runtime.Option<T>` values, not nullable references.
+Use ordinary values or `null` for absence. A fallback uses the existing
+null-coalescing expression:
 
 ```calor
-§M{m1:OptionExample}
-  §F{f1:Greeting:pub} (bool:present) -> Option<str>
-    §E{alloc}
-    §IF{if1} present
-      §R §SM "hello"
-    §EL
-      §R §NN{str}
+§M{m1:NullableFallback}
+  §F{f1:Greeting:pub} (?str:name) -> str
+    §E{}
+    §R (?? name "anonymous")
 ```
-
-Do not initialize `?str` with `§SM "hello"` or `§NN{str}`. Supported
-reference/Option representation mismatches are rejected (`Calor0202` from early
-typing or `Calor0275` from binding). Use explicit Option construction/consumption;
-the compiler does not insert an unwrap, fallback, or throw.
 
 ---
 
-## Result Type (`T!E`)
+## Failure Uses Exceptions
 
-Results represent computations that may fail.
+Return the ordinary success type and throw an exception on failure. Declare
+the exception effect `throw` (and `alloc` when constructing the exception).
 
-### Syntax
-
-```
-T!E                 // Result: either T (success) or E (error)
-```
-
-### Examples
-
-```
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32!str}           // returns int on success, string error on failure
-  §IF{if1} (== b 0)
-    §R §ERR "Division by zero"
-  §EL
-    §R §OK (/ a b)
+```calor
+§M{m1:Division}
+  §F{f1:Divide:pub} (i32:a, i32:b) -> i32
+    §E{throw,alloc}
+    §IF{if1} (== b 0)
+      §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
+    §R (/ a b)
 ```
 
-### Creating Result Values
-
-```
-§OK value           // Ok(value) - success
-§ERR "message"      // Err(message) - failure
-```
-
-### Common Patterns
-
-**Parse integer:**
-```
-§F{f001:ParseInt:pub}
-  §I{str:text}
-  §O{i32!str}
-  // ...implementation
-```
-
-**File read:**
-```
-§F{f001:ReadFile:pub}
-  §I{str:path}
-  §O{str!str}
-  §E{fs:r}
-  // ...implementation
-```
+Handle exceptions with `§TR` / `§CA`; use `§FI` for cleanup and `§RT` to
+rethrow. No special success/error return-type encoding is required.
 
 ---
 
 ## Generic Types
 
 Generic types use angle bracket syntax inline.
+
+Third-party types named `Option<T>` or `Result<T,E>` are ordinary generic
+types, not Calor built-ins. Import their namespace and use their library API.
 
 ### Syntax
 

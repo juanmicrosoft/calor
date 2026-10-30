@@ -7,12 +7,41 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Tests for converting Option&lt;T&gt; and Result&lt;T,E&gt; structs from C# to Calor,
+/// Tests for converting user-defined Option&lt;T&gt; and Result&lt;T,E&gt; structs as ordinary generics,
 /// verifying per-member fallback, target-typed new inference, and round-trip fidelity.
 /// </summary>
 public class OptionResultConversionTests
 {
     private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
+
+    [Fact]
+    public void ThirdPartyOptionResult_AreOrdinaryGenericsAcrossConversionAndEmission()
+    {
+        const string source = """
+            public struct Option<T> { public T Value; }
+            public struct Result<T, E> { public T Value; public E Error; }
+            public static class Consumer
+            {
+                public static Option<int> EchoOption(Option<int> input) => input;
+                public static Result<int, string> EchoResult(Result<int, string> input) => input;
+                public static Option<Result<int, int>> EchoNested(Option<Result<int, int>> input) => input;
+            }
+            """;
+        var converted = _converter.Convert(source);
+        Assert.True(converted.Success, GetErrorMessage(converted));
+        Assert.DoesNotContain("§SM", converted.CalorSource);
+        Assert.DoesNotContain("§NN", converted.CalorSource);
+        Assert.DoesNotContain("§OK", converted.CalorSource);
+        Assert.DoesNotContain("§ERR", converted.CalorSource);
+        var compiled = Program.Compile(converted.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("Option<int>", compiled.GeneratedCode);
+        Assert.Contains("Result<int, string>", compiled.GeneratedCode);
+        Assert.Contains("Option<Result<int, int>>", compiled.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Option", compiled.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Result", compiled.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(compiled.GeneratedCode).CompilationSuccess);
+    }
 
     private const string OptionCSharp = """
         using System;

@@ -342,9 +342,9 @@ public class BenchmarkVerificationTests
         var source = @"
 §M{m001:Test}
   §F{f001:VulnerableNull:pub}
-      §I{Option<i32>:maybeNull}
       §O{i32}
-      §R §C{maybeNull.Unwrap} §/C";
+      §B{maybeNull:i32[]} null
+      §R §LEN maybeNull";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -352,8 +352,8 @@ public class BenchmarkVerificationTests
         var diagnostics = RunBugPatternAnalysis(module!);
 
         Assert.True(
-            HasDiagnosticCode(diagnostics, DiagnosticCode.UnsafeUnwrap),
-            "Unchecked Option unwrap should be reported");
+            HasDiagnosticCode(diagnostics, DiagnosticCode.NullDereference),
+            "Unchecked array dereference should be reported");
     }
 
     [Fact]
@@ -362,19 +362,19 @@ public class BenchmarkVerificationTests
         var source = @"
 §M{m001:Test}
   §F{f001:SafeNull:pub}
-      §I{Option<i32>:maybeNull}
+      §I{i32[]?:maybeNull}
       §O{i32}
-      §IF{i1} (== maybeNull §NN{i32})
+      §IF{i1} (== maybeNull null)
         §R INT:0
-      §R §C{maybeNull.Unwrap} §/C";
+      §R §LEN maybeNull";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 
-        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.UnsafeUnwrap),
-            "Option guard should prevent unsafe unwrap warning");
+        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.NullDereference),
+            "Null guard should prevent dereference warning");
     }
 
     #endregion

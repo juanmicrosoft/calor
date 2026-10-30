@@ -1718,49 +1718,6 @@ public sealed class TypeChecker
                 }
                 break;
 
-            case SomePatternNode somePat:
-                if (expectedType is OptionType optType)
-                {
-                    CheckPattern(somePat.InnerPattern, optType.InnerType, bindVariables);
-                }
-                else
-                {
-                    _diagnostics.ReportError(somePat.Span, DiagnosticCode.TypeMismatch,
-                        $"Some pattern can only match Option types, got {expectedType.SurfaceName}");
-                }
-                break;
-
-            case NonePatternNode nonePat:
-                if (expectedType is not OptionType)
-                {
-                    _diagnostics.ReportError(nonePat.Span, DiagnosticCode.TypeMismatch,
-                        $"None pattern can only match Option types, got {expectedType.SurfaceName}");
-                }
-                break;
-
-            case OkPatternNode okPat:
-                if (expectedType is ResultType resType)
-                {
-                    CheckPattern(okPat.InnerPattern, resType.OkType, bindVariables);
-                }
-                else
-                {
-                    _diagnostics.ReportError(okPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Ok pattern can only match Result types, got {expectedType.SurfaceName}");
-                }
-                break;
-
-            case ErrPatternNode errPat:
-                if (expectedType is ResultType errResType)
-                {
-                    CheckPattern(errPat.InnerPattern, errResType.ErrType, bindVariables);
-                }
-                else
-                {
-                    _diagnostics.ReportError(errPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Err pattern can only match Result types, got {expectedType.SurfaceName}");
-                }
-                break;
             // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
             // default arm below and hard-errored, so every switch arm using it was rejected.
             case VarPatternNode varPatNode:
@@ -1838,10 +1795,6 @@ public sealed class TypeChecker
             ReferenceNode refNode => InferReferenceType(refNode),
             UnaryOperationNode unary => InferUnaryOperationType(unary),
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
-            SomeExpressionNode some => InferSomeType(some),
-            NoneExpressionNode none => InferNoneType(none),
-            OkExpressionNode ok => InferOkType(ok),
-            ErrExpressionNode err => InferErrType(err),
             RecordCreationNode rec => InferRecordCreationType(rec),
             FieldAccessNode field => InferFieldAccessType(field),
             MatchExpressionNode match => InferMatchExpressionType(match, expectedType),
@@ -1880,13 +1833,7 @@ public sealed class TypeChecker
             return rightType is NeverType ? NeverType.Instance : rightType;
         }
 
-        if (leftType is OptionType)
-        {
-            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
-                $"Null-coalescing does not unwrap runtime {leftType.SurfaceName}; use Option.Unwrap explicitly");
-            return ErrorType.Instance;
-        }
-        if (IsPrimitiveValueType(leftType) || leftType is ResultType
+        if (IsPrimitiveValueType(leftType)
             || leftType.Equals(PrimitiveType.Void) || leftType.Equals(PrimitiveType.Unit))
         {
             _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
@@ -3664,9 +3611,6 @@ public sealed class TypeChecker
             || type switch
             {
                 GenericInstanceType generic => generic.TypeArguments.Any(ContainsInferencePlaceholder),
-                OptionType option => ContainsInferencePlaceholder(option.InnerType),
-                ResultType result => ContainsInferencePlaceholder(result.OkType)
-                    || ContainsInferencePlaceholder(result.ErrType),
                 NullableReferenceType nullable => ContainsInferencePlaceholder(nullable.ReferentType),
                 NullableValueType nullable => ContainsInferencePlaceholder(nullable.UnderlyingType),
                 ArrayType array => ContainsInferencePlaceholder(array.ElementType),
@@ -4213,18 +4157,6 @@ public sealed class TypeChecker
         {
             return new GenericInstanceType(trueGeneric.BaseName,
                 [CommonConditionalType(span, trueGeneric.TypeArguments[0], falseGeneric.TypeArguments[0])]);
-        }
-
-        if (trueType is OptionType trueOption && falseType is OptionType falseOption)
-        {
-            return new OptionType(CommonConditionalType(span, trueOption.InnerType, falseOption.InnerType));
-        }
-
-        if (trueType is ResultType trueResult && falseType is ResultType falseResult)
-        {
-            return new ResultType(
-                CommonConditionalType(span, trueResult.OkType, falseResult.OkType),
-                CommonConditionalType(span, trueResult.ErrType, falseResult.ErrType));
         }
 
         if (TryUnifyNullableReferences(trueType, falseType, out var nullableReference))
@@ -4814,35 +4746,6 @@ public sealed class TypeChecker
         return PrimitiveType.Int;
     }
 
-    private CalorType InferSomeType(SomeExpressionNode some)
-    {
-        var innerType = InferExpressionType(some.Value);
-        return new OptionType(innerType);
-    }
-
-    private CalorType InferNoneType(NoneExpressionNode none)
-    {
-        if (none.TypeName != null)
-        {
-            var innerType = ResolveTypeName(none.TypeName, none.Span);
-            return new OptionType(innerType);
-        }
-        // Type inference needed - return a type variable
-        return new OptionType(new TypeVariable());
-    }
-
-    private CalorType InferOkType(OkExpressionNode ok)
-    {
-        var okType = InferExpressionType(ok.Value);
-        return new ResultType(okType, new TypeVariable());
-    }
-
-    private CalorType InferErrType(ErrExpressionNode err)
-    {
-        var errType = InferExpressionType(err.Error);
-        return new ResultType(new TypeVariable(), errType);
-    }
-
     private CalorType InferRecordCreationType(RecordCreationNode rec)
     {
         var type = _env.LookupType(rec.TypeName);
@@ -5063,7 +4966,7 @@ public sealed class TypeChecker
             if (supportedReference is not null)
             {
                 return new NullableReferenceType(supportedReference,
-                    typeName.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase));
+                    typeName.StartsWith("NULLABLE[inner=", StringComparison.OrdinalIgnoreCase));
             }
 
             var valueReferent = ResolveNullableValueReferent(referentName);
@@ -5074,7 +4977,7 @@ public sealed class TypeChecker
 
             // Other annotations retain the existing unsupported/unresolved behavior. In
             // particular, this is not permission to model arbitrary nullable payloads as
-            // references or runtime Options.
+            // references.
         }
 
         // Arrays, in BOTH spellings the compiler produces. `T[]` is what the C# converter and
@@ -5091,29 +4994,16 @@ public sealed class TypeChecker
             return new ArrayType(ResolveTypeName(typeName[1..^1], span));
         }
 
-        // Handle generic types with bracket syntax: Option[INT] or Result[INT, STRING]
+        // Handle generic types with bracket syntax.
         var bracketIndex = typeName.IndexOf('[');
-        if (bracketIndex > 0 && typeName.EndsWith(']'))
+        if (bracketIndex > 0 && typeName.EndsWith(']')
+            && !typeName.AsSpan(bracketIndex + 1).Contains('='))
         {
             var baseName = typeName[..bracketIndex];
             var argsStr = typeName[(bracketIndex + 1)..^1];
             var args = SplitGenericArgs(argsStr);
 
-            if (Parsing.AttributeHelper.TryUnwrapRuntimeOption(typeName, out var optionReferent))
-            {
-                var innerType = ResolveTypeName(optionReferent, span);
-                return new OptionType(innerType);
-            }
-
-            if (baseName.Equals("Option", StringComparison.OrdinalIgnoreCase) && args.Count == 1)
-                return new OptionType(ResolveTypeName(args[0], span));
-
-            if (baseName.Equals("Result", StringComparison.OrdinalIgnoreCase) && args.Count == 2)
-            {
-                var okType = ResolveTypeName(args[0], span);
-                var errType = ResolveTypeName(args[1], span);
-                return new ResultType(okType, errType);
-            }
+            return new GenericInstanceType(baseName, args.Select(arg => ResolveTypeName(arg, span)).ToList());
         }
 
         // Handle generic types with angle bracket syntax: List<T>, Dictionary<K, V>
@@ -5124,22 +5014,7 @@ public sealed class TypeChecker
             var argsStr = typeName[(angleIndex + 1)..^1];
             var args = SplitGenericArgs(argsStr);
 
-            // Handle Option<T> with angle brackets
-            if (Parsing.AttributeHelper.TryUnwrapRuntimeOption(typeName, out var optionReferent))
-            {
-                var innerType = ResolveTypeName(optionReferent, span);
-                return new OptionType(innerType);
-            }
-
-            // Handle Result<T, E> with angle brackets
-            if (baseName.Equals("Result", StringComparison.OrdinalIgnoreCase) && args.Count == 2)
-            {
-                var okType = ResolveTypeName(args[0], span);
-                var errType = ResolveTypeName(args[1], span);
-                return new ResultType(okType, errType);
-            }
-
-            // For other generic types (List<T>, Dictionary<K, V>, etc.),
+            // For generic types (List<T>, Dictionary<K, V>, etc.),
             // resolve the type arguments and create a GenericInstanceType
             var resolvedArgs = new List<CalorType>();
             foreach (var arg in args)
@@ -5332,8 +5207,8 @@ public sealed class TypeChecker
             ? sourceNullable.ReferentType : source;
         if (targetReferent is ArrayType targetArray && sourceReferent is ArrayType sourceArray)
             return HaveSameArrayRuntimeType(targetArray, sourceArray);
-        return targetReferent is GenericInstanceType or OptionType
-            && sourceReferent is GenericInstanceType or OptionType
+        return targetReferent is GenericInstanceType
+            && sourceReferent is GenericInstanceType
             && Binding.Scope.HasNullableStringAnnotationDifference(target.SurfaceName, source.SurfaceName);
     }
 
@@ -5362,9 +5237,8 @@ public sealed class TypeChecker
             if (source is NullType)
                 return true;
             if (nullableTarget.ReferentType.Equals(PrimitiveType.Object))
-                return true; // Boxing to object preserves the value; this does not unwrap Option.
-            if (source is OptionType or ResultType
-                || nullableTarget.ReferentType is ExternalType && source is PrimitiveType)
+                return true;
+            if (nullableTarget.ReferentType is ExternalType && source is PrimitiveType)
                 return false;
             return IsAssignable(nullableTarget.ReferentType, source);
         }

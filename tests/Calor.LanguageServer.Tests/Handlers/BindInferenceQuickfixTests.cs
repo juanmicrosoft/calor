@@ -11,7 +11,7 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class BindInferenceQuickfixTests
 {
     [Fact]
-    public void Calor0251_NoneInitializer_SurfacesOptionFix()
+    public void RemovedNoneInitializer_DoesNotSuggestRemovedType()
     {
         var source = """
             §M{m001:Test}
@@ -22,10 +22,8 @@ public class BindInferenceQuickfixTests
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
 
-        var fix = Assert.Single(fixes, f => f.Code == "Calor0251");
-        Assert.Single(fix.Fix.Edits);
-        Assert.Equal(":Option<object>", fix.Fix.Edits[0].NewText);
-        Assert.Contains("Option<object>", fix.Fix.Description);
+        Assert.DoesNotContain(fixes, f => f.Code == "Calor0251");
+        Assert.DoesNotContain(fixes, f => f.Fix.Description.Contains("Option"));
     }
 
     [Fact]
@@ -69,7 +67,7 @@ public class BindInferenceQuickfixTests
             §M{m001:Test}
               §F{f001:Foo:pub}
                 §O{void}
-                §B{x:Option<i32>} §NN
+                §B{x:?i32} null
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);

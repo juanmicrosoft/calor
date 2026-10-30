@@ -174,19 +174,23 @@ Given this buggy call:
 
 ## Scoring Example
 
+This is an explanatory example, not a measured corpus input. The source below
+uses current nullable syntax; the historical score breakdown is unchanged.
+No benchmark measurement was rerun.
+
 ### Calor Code
 
 ```
 §F{f001:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
-  §O{i32!str}
+  §O{?i32}
   §Q (!= b 0)
-  §S (|| (== result.IsOk true) (!= result.Error ""))
+  §S (== result (/ a b))
   §IF{if1} (== b 0)
-    §R §ERR "Division by zero"
+    §R null
   §EL
-    §R §OK (/ a b)
+    §R (/ a b)
 ```
 
 **Score:**
@@ -201,11 +205,11 @@ Given this buggy call:
 ### C# Equivalent
 
 ```csharp
-public static Result<int, string> SafeDivide(int a, int b)
+public static int? SafeDivide(int a, int b)
 {
     if (b == 0)
-        return Result.Err("Division by zero");
-    return Result.Ok(a / b);
+        return null;
+    return a / b;
 }
 ```
 

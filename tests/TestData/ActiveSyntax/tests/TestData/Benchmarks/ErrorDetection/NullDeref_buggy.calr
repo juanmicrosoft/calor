@@ -1,0 +1,5 @@
+// Current nullable/exception semantics, not a replay of the frozen benchmark.
+§M{m001:RequiredNullable}
+  §F{f001:GetValue:pub} (?i32:maybeVal) -> i32
+    §E{alloc,throw}
+    §R (?? maybeVal §TH §NEW{InvalidOperationException} §A "Missing value" §/NEW)

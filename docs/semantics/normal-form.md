@@ -555,8 +555,6 @@ public enum CnfType
     String,
     Object,  // Reference types
     Array,   // Array types (with element type)
-    Option,  // Option<T>
-    Result,  // Result<T,E>
 }
 ```
 

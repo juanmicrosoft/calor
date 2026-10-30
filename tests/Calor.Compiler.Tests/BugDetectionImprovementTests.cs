@@ -607,13 +607,12 @@ public class BugDetectionImprovementTests
     [Fact]
     public void BugScenario_NullDeref_CalorDetects()
     {
-        // Uses §C{} call syntax to produce BoundCallExpression with target "maybeVal.unwrap"
         var buggySource = @"
-§M{m001:UnsafeOption}
+§M{m001:UnsafeNullable}
   §F{f001:GetValue:pub}
-      §I{Option<i32>:maybeVal}
       §O{i32}
-      §R §C{maybeVal.unwrap} §/C
+      §B{maybeVal:i32[]} null
+      §R §LEN maybeVal
 ";
         var module = Parse(buggySource, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -627,10 +626,8 @@ public class BugDetectionImprovementTests
         var pass = new VerificationAnalysisPass(diagnostics, options);
         var result = pass.Analyze(module);
 
-        // NullDereferenceChecker should detect unsafe unwrap without is_some check
         Assert.True(result.FunctionsAnalyzed > 0);
         Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.UnsafeUnwrap ||
             d.Code == DiagnosticCode.NullDereference);
     }
 

@@ -100,23 +100,12 @@ public sealed class PatternChecker
         return target switch
         {
             ReferenceNode refNode => _typeEnv.LookupVariable(refNode.Name) ?? ErrorType.Instance,
-            SomeExpressionNode some => new OptionType(InferTargetType(some.Value)),
-            NoneExpressionNode none => none.TypeName != null
-                ? new OptionType(ResolveTypeName(none.TypeName))
-                : new OptionType(new TypeVariable()),
-            OkExpressionNode ok => new ResultType(InferTargetType(ok.Value), new TypeVariable()),
-            ErrExpressionNode err => new ResultType(new TypeVariable(), InferTargetType(err.Error)),
             IntLiteralNode => PrimitiveType.Int,
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
             _ => ErrorType.Instance
         };
-    }
-
-    private CalorType ResolveTypeName(string typeName)
-    {
-        return PrimitiveType.FromName(typeName) ?? _typeEnv.LookupType(typeName) ?? ErrorType.Instance;
     }
 
     /// <summary>
@@ -202,10 +191,6 @@ public sealed class PatternChecker
             WildcardPatternNode => "_",
             VariablePatternNode => "var:_",
             VarPatternNode => "var:_",
-            SomePatternNode some => $"Some({GetPatternSignature(some.InnerPattern)})",
-            NonePatternNode => "None",
-            OkPatternNode ok => $"Ok({GetPatternSignature(ok.InnerPattern)})",
-            ErrPatternNode err => $"Err({GetPatternSignature(err.InnerPattern)})",
             LiteralPatternNode lit => $"lit:{GetLiteralValue(lit.Literal)}",
             ConstantPatternNode c => $"const:{GetLiteralValue(c.Value)}",
             PositionalPatternNode pos => $"pos:{pos.TypeName}",
@@ -242,7 +227,7 @@ public sealed class PatternChecker
 
         if (!coverage.IsExhaustive)
         {
-            // Exhaustive match on known sum types (Option/Result/Bool/Union) is
+            // Exhaustive match on known sum types (Bool/Union) is
             // mandatory per docs/design/calor-direction.md — non-exhaustive is an
             // error, regardless of whether the match is in statement or expression
             // position.
@@ -272,67 +257,10 @@ public sealed class PatternChecker
         // Type-specific exhaustiveness checking
         return targetType switch
         {
-            OptionType => CheckOptionCoverage(cases),
-            ResultType => CheckResultCoverage(cases),
             PrimitiveType pt when pt.Equals(PrimitiveType.Bool) => CheckBoolCoverage(cases),
             UnionType ut => CheckUnionCoverage(ut, cases),
             _ => new CoverageResult(true, Array.Empty<string>()) // Unknown types are considered exhaustive
         };
-    }
-
-    private CoverageResult CheckOptionCoverage(IReadOnlyList<MatchCaseNode> cases)
-    {
-        var hasSome = false;
-        var hasNone = false;
-
-        foreach (var matchCase in cases)
-        {
-            // Skip guarded patterns for exhaustiveness
-            if (matchCase.Guard != null) continue;
-
-            switch (matchCase.Pattern)
-            {
-                case SomePatternNode:
-                    hasSome = true;
-                    break;
-                case NonePatternNode:
-                    hasNone = true;
-                    break;
-            }
-        }
-
-        var missing = new List<string>();
-        if (!hasSome) missing.Add("Some(_)");
-        if (!hasNone) missing.Add("None");
-
-        return new CoverageResult(hasSome && hasNone, missing);
-    }
-
-    private CoverageResult CheckResultCoverage(IReadOnlyList<MatchCaseNode> cases)
-    {
-        var hasOk = false;
-        var hasErr = false;
-
-        foreach (var matchCase in cases)
-        {
-            if (matchCase.Guard != null) continue;
-
-            switch (matchCase.Pattern)
-            {
-                case OkPatternNode:
-                    hasOk = true;
-                    break;
-                case ErrPatternNode:
-                    hasErr = true;
-                    break;
-            }
-        }
-
-        var missing = new List<string>();
-        if (!hasOk) missing.Add("Ok(_)");
-        if (!hasErr) missing.Add("Err(_)");
-
-        return new CoverageResult(hasOk && hasErr, missing);
     }
 
     private CoverageResult CheckBoolCoverage(IReadOnlyList<MatchCaseNode> cases)

@@ -559,7 +559,7 @@ public class CodeGenBugFixTests
     [InlineData("i32", "count", "count", "INT")]                                  // Primitive type first
     [InlineData("str", "name", "name", "STRING")]                                 // str type first
     [InlineData("StringBuilder", "sb", "sb", "StringBuilder")]                    // PascalCase type
-    [InlineData("?i32", "result", "result", "OPTION[inner=INT]")]                 // Nullable type
+    [InlineData("?i32", "result", "result", "NULLABLE[inner=INT]")]                 // Nullable type
     // {name:type} format — fallback when pos0 isn't a type
     [InlineData("myVar", "i32", "myVar", "INT")]                                  // Original format
     [InlineData("count", "u64", "count", "INT[bits=64][signed=false]")]           // name:type

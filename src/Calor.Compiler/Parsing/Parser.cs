@@ -32,10 +32,6 @@ public sealed class Parser
             [TokenKind.OpenParen] = static parser => parser.ParseParenExpressionOrInlineLambda(),
             [TokenKind.OpenBrace] = static parser => parser.ParseCollectionInitializer(),
             [TokenKind.If] = static parser => parser.ParseIfExpression(),
-            [TokenKind.Some] = static parser => parser.ParseSomeExpression(),
-            [TokenKind.None] = static parser => parser.ParseNoneExpression(),
-            [TokenKind.Ok] = static parser => parser.ParseOkExpression(),
-            [TokenKind.Err] = static parser => parser.ParseErrExpression(),
             [TokenKind.Match] = static parser => parser.ParseMatchExpression(),
             [TokenKind.Array] = static parser => parser.ParseArrayCreation(),
             [TokenKind.Index] = static parser => parser.ParseArrayAccess(),
@@ -5192,47 +5188,6 @@ public sealed class Parser
 
     // Phase 3: Type System Expression Parsing
 
-    private SomeExpressionNode ParseSomeExpression()
-    {
-        var startToken = Expect(TokenKind.Some);
-        var value = ParseExpression();
-        var span = startToken.Span.Union(value.Span);
-        return new SomeExpressionNode(span, value);
-    }
-
-    private NoneExpressionNode ParseNoneExpression()
-    {
-        var startToken = Expect(TokenKind.None);
-        var attrs = ParseAttributes();
-        // v2 syntax: §NN{type} - type is positional
-        var typeName = attrs["_pos0"];
-        // Expand compact type name to internal form
-        if (!string.IsNullOrEmpty(typeName))
-        {
-            typeName = AttributeHelper.ExpandType(typeName);
-        }
-        return new NoneExpressionNode(
-            startToken.Span,
-            typeName,
-            typeName == null ? null : attrs.GetSpan("_pos0"));
-    }
-
-    private OkExpressionNode ParseOkExpression()
-    {
-        var startToken = Expect(TokenKind.Ok);
-        var value = ParseExpression();
-        var span = startToken.Span.Union(value.Span);
-        return new OkExpressionNode(span, value);
-    }
-
-    private ErrExpressionNode ParseErrExpression()
-    {
-        var startToken = Expect(TokenKind.Err);
-        var error = ParseExpression();
-        var span = startToken.Span.Union(error.Span);
-        return new ErrExpressionNode(span, error);
-    }
-
     private MatchExpressionNode ParseMatchExpression()
     {
         var startToken = Expect(TokenKind.Match);
@@ -5646,33 +5601,6 @@ public sealed class Parser
         {
             var literal = ParseExpression();
             return new LiteralPatternNode(literal.Span, literal);
-        }
-
-        if (Check(TokenKind.Some))
-        {
-            var startToken = Expect(TokenKind.Some);
-            var innerPattern = ParsePattern();
-            return new SomePatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
-        }
-
-        if (Check(TokenKind.None))
-        {
-            var token = Expect(TokenKind.None);
-            return new NonePatternNode(token.Span);
-        }
-
-        if (Check(TokenKind.Ok))
-        {
-            var startToken = Expect(TokenKind.Ok);
-            var innerPattern = ParsePattern();
-            return new OkPatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
-        }
-
-        if (Check(TokenKind.Err))
-        {
-            var startToken = Expect(TokenKind.Err);
-            var innerPattern = ParsePattern();
-            return new ErrPatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
         }
 
         // Handle parenthesized patterns: (nameof x), (§PREL{gte} 5, _, _), (cast Type x), etc.
@@ -6774,7 +6702,7 @@ public sealed class Parser
                     else if (Check(TokenKind.OpenBracket))
                     {
                         // Handle array/attribute types in generic arguments with depth tracking
-                        // Supports nested brackets: OPTION[inner=INT[bits=8][signed=false][]]
+                        // Supports nested brackets: NULLABLE[inner=INT[bits=8][signed=false][]]
                         sb.Append('[');
                         lastWasIdentifier = false;
                         Advance();
@@ -6854,7 +6782,7 @@ public sealed class Parser
                 }
             }
 
-            // Handle array suffix or attribute brackets: i32[], int[,], OPTION[inner=Type]
+            // Handle array suffix or attribute brackets: i32[], int[,], NULLABLE[inner=Type]
             if (Check(TokenKind.OpenBracket))
             {
                 if (Peek(1).Kind == TokenKind.CloseBracket)
@@ -6947,19 +6875,6 @@ public sealed class Parser
             sb.Append(Advance().Value?.ToString()?.ToLowerInvariant() ?? "");
         }
 
-        // Handle ! suffix for fallibility or Result types (T!E)
-        if (Check(TokenKind.Exclamation))
-        {
-            sb.Append('!');
-            Advance();
-
-            // Check for error type after ! (for Result types)
-            if (Check(TokenKind.Identifier))
-            {
-                sb.Append(Advance().Text);
-            }
-        }
-
         // Handle complex expressions that may contain escaped braces and other tokens
         // Continue parsing until we hit a colon (separator) or unescaped close brace (end of attributes)
         // Note: :: (double colon) for namespace aliases is NOT a separator
@@ -6985,7 +6900,8 @@ public sealed class Parser
             // Add space before identifiers if there's content before them (to separate from operators/other tokens)
             if (Check(TokenKind.Identifier))
             {
-                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
+                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) &&
+                    sb[sb.Length - 1] != '(' && sb[sb.Length - 1] != '!')
                     sb.Append(' ');
                 sb.Append(Advance().Text);
             }

@@ -86,7 +86,7 @@ no `:type` annotation is present is on the right.
 | `(+ a b)` etc. | result type of the binary op | `BoundBinaryExpression.TypeName` — type of the result, not the operands |
 | an identifier `x` | declared type of `x` | through `BoundVariableExpression` |
 | `§C{Foo.bar} … §/C` | declared return type of `Foo.bar` | the binder uses the call's bound return type |
-| `null` or untyped `§NN` | **inference fails** by default | `Calor0251`; provide an appropriate explicit nullable or Option type |
+| `null` | **inference fails** by default | `Calor0251`; provide an appropriate explicit nullable type |
 
 The literal-type names on the right (`INT`, `STRING`, …) are the
 binder's internal type identifiers. They appear in tool output and
@@ -201,7 +201,7 @@ or set `CompilationOptions.StrictBindInference = false`.
 
 | Code | Title | Fires on |
 |:-----|:------|:---------|
-| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} §NN` (untyped None) or `§B{x} null` |
+| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} null` |
 | `Calor0252` | `BindCannotInferGenericReturn` | `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets (`Vec.empty`, `List.empty`, `Array.empty`, `Set.empty`, `Map.empty`, …) |
 | `Calor0253` | `BindAmbiguousNumeric` | `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands |
 
@@ -209,7 +209,7 @@ Each fires only when the binding lacks an explicit `:type` annotation;
 adding the annotation always silences the diagnostic.
 
 ```calor
-§B{x:Option<i32>} §NN              // silences Calor0251
+§B{x:?str} null                  // silences Calor0251
 §B{x:Vec<i32>} §C{Vec.empty} §/C   // silences Calor0252
 §B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
 ```

@@ -227,6 +227,43 @@ public class ParserTests
     }
 
     [Fact]
+    public void Parse_UnknownPrefixBangEffect_PreservesDiagnosticText()
+    {
+        foreach (var effects in new[] { "!e", "alloc, !e" })
+        {
+            var source = $$"""
+                §M{m001:Test}
+                  §F{f001:Main:pub} () -> void
+                    §E{{{effects}}}
+                """;
+            var result = Program.Compile(source);
+            var diagnostic = Assert.Single(result.Diagnostics.Errors.Where(
+                diagnostic => diagnostic.Code == DiagnosticCode.UnknownEffectCode));
+            Assert.Contains("'!e'", diagnostic.Message);
+            Assert.DoesNotContain("'! e'", diagnostic.Message);
+            Assert.DoesNotContain(result.Diagnostics.Errors,
+                diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken);
+        }
+    }
+
+    [Fact]
+    public void Parse_FallibleCall_PreservesTerminalBang()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Main:pub} () -> void
+                §C{Risky!} §/C
+            """;
+
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = Assert.IsType<CallStatementNode>(Assert.Single(module.Functions[0].Body));
+        Assert.Equal("Risky", call.Target);
+        Assert.True(call.Fallible);
+    }
+
+    [Fact]
     public void Parse_FunctionWithCallStatement_ReturnsCallNode()
     {
         var source = """

@@ -333,7 +333,7 @@ public class EffectRowLatticeTests
     [InlineData("Func<i32,i32>", false)]
     [InlineData("Action", false)]
     [InlineData("SomeUnknownNominal", false)]
-    [InlineData("Option<i32>", true)]
+    [InlineData("Option<i32>", false)]
     public void IsProvablyNonFunctionType_IsConservative(string typeName, bool expected)
     {
         // The predicate F2 introduced, table-driven. A `true` here is a licence

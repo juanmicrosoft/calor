@@ -16,7 +16,7 @@ public abstract class CalorType : IEquatable<CalorType>
 
     /// <summary>
     /// The compact surface spelling agents actually write (<c>i32</c>, <c>str</c>,
-    /// <c>bool</c>, <c>Option&lt;str&gt;</c>) — the form every diagnostic that echoes a
+    /// <c>bool</c>, <c>List&lt;str&gt;</c>) — the form every diagnostic that echoes a
     /// type must use, so the message never teaches an un-writable internal spelling.
     /// Defaults to <see cref="Name"/> (correct for user/record/union/param types whose
     /// name is already what the user wrote); primitives and composites override to
@@ -206,7 +206,7 @@ public sealed class ArrayType : CalorType
 }
 
 /// <summary>
-/// A supported nullable reference. This has no runtime Option wrapper or implicit unwrap.
+/// A supported nullable reference.
 /// </summary>
 public sealed class NullableReferenceType : CalorType
 {
@@ -240,7 +240,7 @@ public sealed class NullableReferenceType : CalorType
 }
 
 /// <summary>
-/// A nullable value type such as <c>?i32</c>. This is not a runtime <see cref="OptionType"/>.
+/// A nullable value type such as <c>?i32</c>.
 /// </summary>
 public sealed class NullableValueType : CalorType
 {
@@ -257,48 +257,6 @@ public sealed class NullableValueType : CalorType
         => other is NullableValueType nullable && UnderlyingType.Equals(nullable.UnderlyingType);
 
     public override int GetHashCode() => HashCode.Combine("NullableValue", UnderlyingType);
-}
-
-/// <summary>
-/// Represents a runtime Option[T] type, distinct from a nullable reference.
-/// </summary>
-public sealed class OptionType : CalorType
-{
-    public CalorType InnerType { get; }
-    public override string Name => $"Option<{InnerType.Name}>";
-    public override string SurfaceName => $"Option<{InnerType.SurfaceName}>";
-
-    public OptionType(CalorType innerType)
-    {
-        InnerType = innerType ?? throw new ArgumentNullException(nameof(innerType));
-    }
-
-    public override bool Equals(CalorType? other)
-        => other is OptionType ot && InnerType.Equals(ot.InnerType);
-
-    public override int GetHashCode() => HashCode.Combine("Option", InnerType);
-}
-
-/// <summary>
-/// Represents a Result[T, E] type.
-/// </summary>
-public sealed class ResultType : CalorType
-{
-    public CalorType OkType { get; }
-    public CalorType ErrType { get; }
-    public override string Name => $"Result<{OkType.Name}, {ErrType.Name}>";
-    public override string SurfaceName => $"Result<{OkType.SurfaceName}, {ErrType.SurfaceName}>";
-
-    public ResultType(CalorType okType, CalorType errType)
-    {
-        OkType = okType ?? throw new ArgumentNullException(nameof(okType));
-        ErrType = errType ?? throw new ArgumentNullException(nameof(errType));
-    }
-
-    public override bool Equals(CalorType? other)
-        => other is ResultType rt && OkType.Equals(rt.OkType) && ErrType.Equals(rt.ErrType);
-
-    public override int GetHashCode() => HashCode.Combine("Result", OkType, ErrType);
 }
 
 /// <summary>

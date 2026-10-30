@@ -5890,9 +5890,6 @@ public sealed class EffectEnforcementPass
                 ConditionalExpressionNode cond => InferFromExpression(cond.Condition)
                     .Union(InferFromExpression(cond.WhenTrue))
                     .Union(InferFromExpression(cond.WhenFalse)),
-                SomeExpressionNode some => InferFromExpression(some.Value),
-                OkExpressionNode ok => InferFromExpression(ok.Value),
-                ErrExpressionNode err => InferFromExpression(err.Error),
                 NewExpressionNode newExpr => InferFromNewExpression(newExpr),
                 FieldAccessNode field => InferFromFieldAccess(field),
                 ArrayAccessNode array => InferFromExpression(array.Array).Union(InferFromExpression(array.Index)),
@@ -5958,7 +5955,7 @@ public sealed class EffectEnforcementPass
                 // No-effect leaves
                 ReferenceNode reference => InferFromReference(reference),
                 IntLiteralNode or StringLiteralNode or BoolLiteralNode or FloatLiteralNode
-                    or DecimalLiteralNode or NoneExpressionNode
+                    or DecimalLiteralNode
                     or ThisExpressionNode or BaseExpressionNode or SelfRefNode
                     or GenericTypeNode or TypeOfExpressionNode or NameOfExpressionNode
                     or SizeOfNode => EffectSet.Empty,

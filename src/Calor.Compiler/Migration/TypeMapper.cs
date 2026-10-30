@@ -289,10 +289,10 @@ public static class TypeMapper
         if (csharpType.Contains("INT[bits=", StringComparison.Ordinal))
             csharpType = CompactCanonicalIntAliases(csharpType);
 
-        // Compact OPTION[inner=T] → ?T only when it appears in the input
+        // Compact NULLABLE[inner=T] → ?T only when it appears in the input
         // (avoid running regex on every type for performance)
-        if (csharpType.Contains("OPTION["))
-            csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"OPTION\[inner=([^\]\)]+)\]", "?$1");
+        if (csharpType.Contains("NULLABLE["))
+            csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"NULLABLE\[inner=([^\]\)]+)\]", "?$1");
 
         // Strip C-style block comments /* ... */ from Roslyn trivia
         if (csharpType.Contains("/*"))
@@ -391,7 +391,7 @@ public static class TypeMapper
 
     /// <summary>
     /// Adds a nullable-reference annotation to an already mapped Calor type
-    /// without changing value-nullable or <c>Option&lt;T&gt;</c> semantics.
+    /// without changing value-nullable semantics.
     /// </summary>
     public static string AnnotateNullableReference(string calorType)
     {
@@ -416,23 +416,10 @@ public static class TypeMapper
         if (string.IsNullOrWhiteSpace(calorType))
             return calorType;
 
-        // Nullable annotations include the historical OPTION[inner=...] parser spelling.
-        // Explicit Option<T> is handled as a runtime generic below.
+        // Nullable annotations use a dedicated expanded parser spelling.
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(calorType, out var nullableReferent))
         {
             return $"{CalorToCSharp(nullableReferent)}?";
-        }
-
-        // Handle expanded RESULT format: RESULT[ok=T][err=E] -> Calor.Runtime.Result<T, E>
-        if (calorType.StartsWith("RESULT[ok=", StringComparison.Ordinal))
-        {
-            var (okType, errType) = ExtractResultTypes(calorType);
-            if (okType != null && errType != null)
-            {
-                var mappedOk = CalorToCSharp(okType);
-                var mappedErr = CalorToCSharp(errType);
-                return $"Calor.Runtime.Result<{mappedOk}, {mappedErr}>";
-            }
         }
 
         // Handle expanded INT format: INT[bits=N][signed=B] -> sbyte/short/int/long/byte/ushort/uint/ulong
@@ -645,7 +632,7 @@ public static class TypeMapper
             "bool" => "false",
             "str" => "\"\"",
             "char" => "'\\0'",
-            _ when calorType.StartsWith("?") => "none",
+            _ when calorType.StartsWith("?") => "null",
             _ => "default"
         };
     }
@@ -675,21 +662,6 @@ public static class TypeMapper
 
         // Value is between prefix end and closing bracket (exclusive)
         return type[valueStart..(i - 1)];
-    }
-
-    /// <summary>
-    /// Extracts ok and err types from expanded RESULT format: RESULT[ok=T][err=E]
-    /// </summary>
-    internal static (string? OkType, string? ErrType) ExtractResultTypes(string type)
-    {
-        var okType = ExtractBracketValue(type, "RESULT[ok=");
-        if (okType == null)
-            return (null, null);
-
-        // Find the [err=...] portion after the [ok=...] bracket
-        var errPrefix = $"RESULT[ok={okType}][err=";
-        var errType = ExtractBracketValue(type, errPrefix);
-        return (okType, errType);
     }
 
     /// <summary>

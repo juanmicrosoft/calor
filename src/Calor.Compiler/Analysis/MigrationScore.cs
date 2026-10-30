@@ -16,12 +16,12 @@ public enum ScoreDimension
     EffectPotential,
 
     /// <summary>
-    /// Nullable types, null checks, ??, ?. → Option&lt;T&gt;.
+    /// Nullable types, null checks, null-coalescing and conditional access.
     /// </summary>
     NullSafetyPotential,
 
     /// <summary>
-    /// Try/catch blocks, throw statements → Result&lt;T,E&gt;.
+    /// Try/catch blocks and throw statements.
     /// </summary>
     ErrorHandlingPotential,
 

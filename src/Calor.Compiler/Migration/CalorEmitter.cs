@@ -2039,10 +2039,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var mappedType = node.TypeName != null ? TypeMapper.CSharpToCalor(node.TypeName) : null;
         if (mappedType != null && mappedType.Contains("delegate*"))
             mappedType = "nint"; // function pointers are pointer-sized; use nint as safe placeholder
-        // Compact OPTION[inner=T] → ?T to avoid bracket issues in attribute blocks.
+        // Compact NULLABLE[inner=T] → ?T to avoid bracket issues in attribute blocks.
         // Stop capture at ) or > to avoid swallowing tuple/generic closers.
-        while (mappedType != null && mappedType.Contains("OPTION["))
-            mappedType = System.Text.RegularExpressions.Regex.Replace(mappedType, @"OPTION\[inner=([^\]\)>]+)\]", "?$1");
+        while (mappedType != null && mappedType.Contains("NULLABLE["))
+            mappedType = System.Text.RegularExpressions.Regex.Replace(mappedType, @"NULLABLE\[inner=([^\]\)>]+)\]", "?$1");
 
         // Build the §B{...} header (without trailing initializer) so we can emit it
         // either inline-with-initializer (default) or inline-with-§W{...:expr} target
@@ -3806,30 +3806,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return sb.ToString();
     }
 
-    public string Visit(SomeExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return $"§SM {value}";
-    }
-
-    public string Visit(NoneExpressionNode node)
-    {
-        var typePart = node.TypeName != null ? $"{{{TypeMapper.CSharpToCalor(node.TypeName)}}}" : "";
-        return $"§NN{typePart}";
-    }
-
-    public string Visit(OkExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return $"§OK {value}";
-    }
-
-    public string Visit(ErrExpressionNode node)
-    {
-        var error = node.Error.Accept(this);
-        return $"§ERR {error}";
-    }
-
     public string Visit(ArrayCreationNode node)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
@@ -4091,10 +4067,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             WildcardPatternNode => "_",
             VariablePatternNode vp => $"§VAR{{{vp.Name}}}",
             LiteralPatternNode lp => lp.Literal.Accept(this),
-            SomePatternNode sp => $"§SM {EmitPattern(sp.InnerPattern)}",
-            NonePatternNode => "§NN",
-            OkPatternNode op => $"§OK {EmitPattern(op.InnerPattern)}",
-            ErrPatternNode ep => $"§ERR {EmitPattern(ep.InnerPattern)}",
             VarPatternNode varp => $"§VAR{{{varp.Name}}}",
             TypePatternNode tp => Visit(tp),
             ConstantPatternNode cp => cp.Value.Accept(this),
@@ -4137,10 +4109,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         : $"§PTYPE{{{node.TypeName}}}";
     public string Visit(VariablePatternNode node) => $"§VAR{{{node.Name}}}";
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
-    public string Visit(SomePatternNode node) => $"§SM {EmitPattern(node.InnerPattern)}";
-    public string Visit(NonePatternNode node) => "§NN";
-    public string Visit(OkPatternNode node) => $"§OK {EmitPattern(node.InnerPattern)}";
-    public string Visit(ErrPatternNode node) => $"§ERR {EmitPattern(node.InnerPattern)}";
     public string Visit(VarPatternNode node) => $"§VAR{{{node.Name}}}";
     public string Visit(ConstantPatternNode node) => node.Value.Accept(this);
     public string Visit(NegatedPatternNode node) => $"(not {EmitPattern(node.Inner)})";
@@ -5095,22 +5063,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FallbackExpressionNode node)
     {
-        // Emit as §ERR "TODO: feature -- C#: code"
-        // Uses §ERR followed by a string literal so the parser handles it
-        // as ErrExpressionNode(StringLiteralNode) without cascading parse errors.
-        var escapedCode = node.OriginalCSharp
-            .Replace("\\", "\\\\")  // Escape backslashes first
-            .Replace("\"", "'")     // Replace double quotes
-            .Replace("\n", " ")     // Collapse newlines
-            .Replace("\r", "");     // Remove carriage returns
-
-        // Truncate very long code to avoid overly long error messages
-        if (escapedCode.Length > 100)
-        {
-            escapedCode = escapedCode.Substring(0, 97) + "...";
-        }
-
-        return $"§ERR \"TODO: {node.FeatureName} -- C#: {escapedCode}\"";
+        return $"§CS{{{node.OriginalCSharp}}}";
     }
 
     public string Visit(ExpressionStatementNode node)

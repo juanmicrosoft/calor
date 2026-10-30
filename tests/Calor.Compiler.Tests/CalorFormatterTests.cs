@@ -220,9 +220,9 @@ public class CalorFormatterTests
     §I{i32:x}
     §O{i32}
     §W{m1} x
-    §K §SM _
+    §K null
       §R 1
-    §K §NN
+    §K _
       §R 0
 ";
         var module = Parse(source, out var diagnostics);
@@ -283,16 +283,16 @@ public class CalorFormatterTests
     }
 
     [Fact]
-    public void Format_OptionExpressions_FormatsCorrectly()
+    public void Format_NullableExpressions_FormatsCorrectly()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:Test:pub}
-    §O{i32}
-    §R §SM 42
+    §O{?i32}
+    §R 42
   §F{f002:Test2:pub}
-    §O{i32}
-    §R §NN{i32}
+    §O{?i32}
+    §R null
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -300,21 +300,21 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§SM", result);
-        Assert.Contains("§NN", result);
+        Assert.Contains("42", result);
+        Assert.Contains("null", result);
     }
 
     [Fact]
-    public void Format_ResultExpressions_FormatsCorrectly()
+    public void Format_ReturnAndThrow_FormatsCorrectly()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:Test:pub}
     §O{i32}
-    §R §OK 42
+    §R 42
   §F{f002:Test2:pub}
     §O{str}
-    §R §ERR ""error""
+    §TH §NEW{Exception} §A ""error"" §/NEW
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -322,8 +322,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("OK", result);
-        Assert.Contains("ERR", result);
+        Assert.Contains("42", result);
+        Assert.Contains("§TH", result);
     }
 
     #endregion

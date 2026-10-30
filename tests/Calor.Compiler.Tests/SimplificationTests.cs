@@ -1500,57 +1500,55 @@ public class SimplificationTests
     }
 
     [Fact]
-    public void Visitor_SomeExpression_SimplifiesValue()
+    public void Visitor_NullCoalesce_SimplifiesFallback()
     {
-        // Some((+ 1 2)) → Some(3)
         var value = new BinaryOperationNode(Span, BinaryOperator.Add,
             new IntLiteralNode(Span, 1), new IntLiteralNode(Span, 2));
-        var expr = new SomeExpressionNode(Span, value);
+        var expr = new NullCoalesceNode(Span, new ReferenceNode(Span, "value"), value);
 
         var result = Simplify(expr);
 
-        var some = Assert.IsType<SomeExpressionNode>(result);
-        var lit = Assert.IsType<IntLiteralNode>(some.Value);
+        var coalesce = Assert.IsType<NullCoalesceNode>(result);
+        var lit = Assert.IsType<IntLiteralNode>(coalesce.Right);
         Assert.Equal(3, lit.Value);
     }
 
     [Fact]
-    public void Visitor_NoneExpression_Unchanged()
+    public void Visitor_NullLiteral_Unchanged()
     {
-        var expr = new NoneExpressionNode(Span, null);
+        var expr = new ReferenceNode(Span, "null");
 
         var result = Simplify(expr);
 
-        Assert.IsType<NoneExpressionNode>(result);
+        Assert.Equal("null", Assert.IsType<ReferenceNode>(result).Name);
     }
 
     [Fact]
-    public void Visitor_OkExpression_SimplifiesValue()
+    public void Visitor_Conditional_SimplifiesValue()
     {
-        // Ok((+ 1 2)) → Ok(3)
         var value = new BinaryOperationNode(Span, BinaryOperator.Add,
             new IntLiteralNode(Span, 1), new IntLiteralNode(Span, 2));
-        var expr = new OkExpressionNode(Span, value);
+        var expr = new ConditionalExpressionNode(Span, new ReferenceNode(Span, "condition"),
+            value, new ReferenceNode(Span, "null"));
 
         var result = Simplify(expr);
 
-        var ok = Assert.IsType<OkExpressionNode>(result);
-        var lit = Assert.IsType<IntLiteralNode>(ok.Value);
+        var conditional = Assert.IsType<ConditionalExpressionNode>(result);
+        var lit = Assert.IsType<IntLiteralNode>(conditional.WhenTrue);
         Assert.Equal(3, lit.Value);
     }
 
     [Fact]
-    public void Visitor_ErrExpression_SimplifiesError()
+    public void Visitor_ThrowExpression_SimplifiesExceptionArgument()
     {
-        // Err((+ 1 2)) → Err(3)
         var error = new BinaryOperationNode(Span, BinaryOperator.Add,
             new IntLiteralNode(Span, 1), new IntLiteralNode(Span, 2));
-        var expr = new ErrExpressionNode(Span, error);
+        var expr = new ThrowExpressionNode(Span, error);
 
         var result = Simplify(expr);
 
-        var err = Assert.IsType<ErrExpressionNode>(result);
-        var lit = Assert.IsType<IntLiteralNode>(err.Error);
+        var thrown = Assert.IsType<ThrowExpressionNode>(result);
+        var lit = Assert.IsType<IntLiteralNode>(thrown.Exception);
         Assert.Equal(3, lit.Value);
     }
 

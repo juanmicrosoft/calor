@@ -49,7 +49,7 @@ public class SuggestionTests
     [InlineData("typeof", "Use (typeof Type)")]
     [InlineData("new", "§NEW")]
     [InlineData("await", "await")]
-    [InlineData("null", "Option types")]
+    [InlineData("null", "nullable type")]
     [InlineData("ToString", "Use (str expr)")]
     [InlineData("Contains", "Use (contains s substring)")]
     [InlineData("++", "Use (inc x)")]

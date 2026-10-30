@@ -1,0 +1,76 @@
+// Current nullable/exception semantics, not a replay of the frozen benchmark.
+§M{m001:NullDerefBenchmark}
+
+  §F{f001:VulnerableNullDeref:pub}
+    // BUG: Potential null dereference without check
+    // EXPECTED: Calor0922 Null Dereference
+    §I{?string:maybeNull}
+    §O{i32}
+    §R maybeNull . Length
+
+  §F{f002:SafeNullCheck:pub}
+    // SAFE: Null check before use
+    // EXPECTED: No warnings
+    §I{?string:maybeNull}
+    §O{i32}
+    §IF{if1} (!= maybeNull null)
+      §R maybeNull . Length
+    §EL
+      §R INT:0
+
+  §F{f003:VulnerableChainedAccess:pub}
+    // BUG: Chained access without null checks
+    // EXPECTED: Calor0922 Null Dereference
+    §I{?BenchmarkNode:obj}
+    §O{?string}
+    §B{inner:?BenchmarkNode} obj . Inner
+    §B{value:?string} inner . Value
+    §R value
+
+  §F{f004:SafeCoalesce:pub}
+    // SAFE: Coalesce provides default
+    // EXPECTED: No warnings
+    §I{?string:maybeNull}
+    §O{string}
+    §B{safe:string} (?? maybeNull STR:"default")
+    §R safe
+
+  §F{f005:RequiredNullableValue:pub}
+    // SAFE: Absence deliberately throws; it is not an implicit unwrap.
+    // EXPECTED: No warnings
+    §I{?i32:maybeValue}
+    §O{i32}
+    §E{alloc,throw}
+    §R (?? maybeValue §TH §NEW{InvalidOperationException} §A "Missing value" §/NEW)
+
+  §F{f006:SafeNullableCheck:pub}
+    // SAFE: Guarded nullable value with a fallback
+    // EXPECTED: No warnings
+    §I{?i32:maybeValue}
+    §O{i32}
+    §IF{if2} (!= maybeValue null)
+      §R (?? maybeValue INT:0)
+    §EL
+      §R INT:0
+
+  §F{f007:VulnerableFunctionReturn:pub}
+    // BUG: Function return may be null
+    // EXPECTED: Calor0922 Null Dereference
+    §I{i32:key}
+    §I{System.Collections.Generic.Dictionary<i32,?string>:dict}
+    §O{i32}
+    §B{result:?string} §C{System.Collections.Generic.CollectionExtensions.GetValueOrDefault} §A dict §A key §/C
+    §R §C{result.GetHashCode} §/C
+
+  §F{f008:SafeOrDefault:pub}
+    // SAFE: Using get_or_default
+    // EXPECTED: No warnings
+    §I{i32:key}
+    §I{System.Collections.Generic.Dictionary<i32,?string>:dict}
+    §O{i32}
+    §B{result:string} (?? §C{System.Collections.Generic.CollectionExtensions.GetValueOrDefault} §A dict §A key §/C STR:"")
+    §R §C{result.GetHashCode} §/C
+
+  §CL{c1:BenchmarkNode:pub}
+    §FLD{?BenchmarkNode:Inner:pub}
+    §FLD{?string:Value:pub}

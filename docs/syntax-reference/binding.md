@@ -190,7 +190,7 @@ or set `CompilationOptions.StrictBindInference = false`.
 
 | Code | Title | Fires on |
 |:-----|:------|:---------|
-| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} §NN` (untyped None) or `§B{x} null` |
+| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} null` |
 | `Calor0252` | `BindCannotInferGenericReturn` | `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets (`Vec.empty`, `List.empty`, `Array.empty`, `Set.empty`, `Map.empty`, …) |
 | `Calor0253` | `BindAmbiguousNumeric` | `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands |
 
@@ -198,7 +198,7 @@ Each fires only when the binding lacks an explicit `:type` annotation;
 adding the annotation always silences the diagnostic.
 
 ```
-§B{x:Option<i32>} §NN              // silences Calor0251
+§B{x:?str} null                  // silences Calor0251
 §B{x:Vec<i32>} §C{Vec.empty} §/C   // silences Calor0252
 §B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
 ```
@@ -374,7 +374,6 @@ annotation right before the closing `}` of the bind's attribute block:
 
 | Code | Inserted annotation | Notes |
 |:-----|:--------------------|:------|
-| `Calor0251` (`§NN`)    | `:Option<object>` | replace `object` with the concrete element type |
 | `Calor0251` (`null`)   | `:object?`        | replace `object` with the concrete type |
 | `Calor0252` (`Vec.empty`, `Set.empty`, `List.empty`, `Queue.empty`, `Stack.empty`, `Array.empty`) | `:Vec<object>` etc. | one type parameter; replace `object` |
 | `Calor0252` (`Map.empty`, `Dict.empty`, `Dictionary.empty`)  | `:Map<object, object>` etc. | two type parameters |

@@ -318,32 +318,19 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ---
 
-## 6. Option<T> and Result<T,E>
+## 6. Nullable Values and Exceptions
 
-### 6.1 Option<T>
+The absence model is .NET nullability. Existing `?str` / `str?` annotations
+permit a null string reference; `?i32` emits C# `int?`. Values are ordinary
+values or `null`, with no wrapper construction. Use `(?? value fallback)`
+to supply a default.
 
-Represents an optional value: either `Some(value)` or `None`.
+Failure uses .NET exceptions: `§TH` throws, `§TR` / `§CA` handle exceptions,
+`§FI` runs cleanup, and `§RT` rethrows. A function returns its ordinary success
+type and declares the `throw` effect when it can throw.
 
-```calor
-§SM INT:42       // Option<i32> containing 42
-§NN              // None, with element type supplied by the surrounding context
-```
-
-**Semantics:**
-- `Some(v)` wraps a value
-- `None` represents absence of value
-- Must be pattern-matched or explicitly unwrapped
-
-**Test Reference:** `S9: OptionNone_BehavesCorrectly`
-
-### 6.2 Result<T,E>
-
-Represents a computation that may fail: either `Ok(value)` or `Err(error)`.
-
-```calor
-§OK INT:42                    // Result<INT,E> success
-§ERR STR:"not found"          // Result<T,STRING> failure
-```
+Third-party generic types use ordinary library APIs, with no special language
+encoding or implicit conversion.
 
 ---
 
@@ -362,7 +349,7 @@ Effects track side-effect capabilities of functions.
 | Network Read | `nr` | Network input |
 | Network Write | `nw` | Network output |
 | Mutation | `mut` | Mutates state |
-| Exception | `ex` | May throw |
+| Exception | `throw` | May throw |
 
 ### 7.2 Effect Declaration
 
@@ -370,7 +357,7 @@ Effects track side-effect capabilities of functions.
 §F{f001:readFile:pub}
   §I{string:path}
   §O{string}
-  §E{io=fs:r,ex=IOException}
+  §E{fs:r,throw}
   ...
 ```
 

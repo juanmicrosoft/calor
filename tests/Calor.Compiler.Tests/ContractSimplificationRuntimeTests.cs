@@ -404,14 +404,13 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ResultPayloads_UseExpressionTypesNotLiteralShapes(bool verify)
+    public void NullablePayloads_UseExpressionTypesNotLiteralShapes(bool verify)
     {
         string[] predicates =
         [
-            "(is (cast object §OK (== x x)) Result<bool,str>)",
-            "(is (cast object §OK (- x x)) Result<i32,str>)",
-            "(is (cast object §ERR (== x x)) Result<object,bool>)",
-            "(is (cast object §OK INT:2147483648) Result<i64,str>)"
+            "(is (cast object (== x x)) bool)",
+            "(is (cast object (- x x)) i32)",
+            "(is (cast object INT:2147483648) i64)"
         ];
         foreach (var predicate in predicates)
         {
@@ -421,44 +420,38 @@ public class ContractSimplificationRuntimeTests
 
         foreach (var body in new[]
         {
-            "§R §OK x",
-            """§R (? (> x INT:0) §OK x §ERR "negative")"""
+            "§R x",
+            "§R (? (> x INT:0) x null)"
         })
         {
             var source = $$"""
                 §M{m1:TypedContracts}
-                  §F{f1:Check:pub} (i32:x) -> Result<object,str>
+                  §F{f1:Check:pub} (i32:x) -> ?i64
                     §E{}
                     §S true
                     {{body}}
                 """;
             var assembly = Compile(source, verify);
-            Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<object, string>>(Invoke(assembly, 3)).Unwrap());
+            Assert.Equal(3L, Assert.IsType<long>(Invoke(assembly, 3)));
+            if (body != "§R x")
+                Assert.Null(Invoke(assembly, -1));
         }
 
-        var nested = Compile("""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Result<Result<object,str>,str>
-                §E{}
-                §R §OK §OK x
-            """, verify);
-        Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<Calor.Runtime.Result<object, string>, string>>(
-            Invoke(nested, 3)).Unwrap().Unwrap());
         var nullable = Compile("""
             §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Result<object,str>?
+              §F{f1:Check:pub} (i32:x) -> i64?
                 §E{}
-                §R §OK x
+                §R x
             """, verify);
-        Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<object, string>>(Invoke(nullable, 3)).Unwrap());
+        Assert.Equal(3L, Assert.IsType<long>(Invoke(nullable, 3)));
         var lambda = Compile("""
             §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Func<Result<object,str>>
+              §F{f1:Check:pub} (i32:x) -> Func<i64?>
                 §E{}
-                §R §LAM{l1} §R §OK x §/LAM{l1}
+                §R §LAM{l1} §R x §/LAM{l1}
             """, verify);
-        var factory = Assert.IsType<Func<Calor.Runtime.Result<object, string>>>(Invoke(lambda, 3));
-        Assert.Equal(3, factory().Unwrap());
+        var factory = Assert.IsType<Func<long?>>(Invoke(lambda, 3));
+        Assert.Equal(3L, factory());
     }
 
     [Theory]

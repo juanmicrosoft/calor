@@ -272,8 +272,8 @@ Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
 - **CSharpInteropBlockNode** — when `RoslynSyntaxVisitor` encounters unsupported C# features, it wraps the raw C# in this node (preserves code verbatim with metadata about the unsupported feature)
 - **MemberPreprocessorBlockNode** — wraps class members in conditional `#if` blocks; supports `§PP{CONDITION}` ... `§/PP{CONDITION}` syntax with chained else branches
 - **VariableSymbol.IsParameter** — distinguishes function parameters from locals; used by analysis passes
-- **BoundCallExpression.Target** is a `string` — `NullDereferenceChecker` checks for `.unwrap` suffix
-- **Option\<T\> and Result\<T,E\>** are valid generic types in Calor's type system
+- **BoundCallExpression.Target** is a `string` — call-target names alone are not nullability proof facts
+- **Absence and failure** use existing .NET nullable types (`?str`, `?i32`, `null`) and exceptions (`§TH`, `§TR`, `§CA`); third-party generic types use ordinary generic type references
 - **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version + contract verification results), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
 
 ## Project Layout

@@ -163,7 +163,7 @@ public class CompileCalorIntegrationTests : IDisposable
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public void NullableReferenceTyping_AgreesWithTaskAndRejectsWarmOptionMismatch(bool typeOff, bool transpile)
+    public void NullableReferenceTyping_AgreesWithTaskAndRejectsRemovedSyntaxAfterWarmBuild(bool typeOff, bool transpile)
     {
         const string safe = """
             §M{m1:NullableTyping}
@@ -183,7 +183,8 @@ public class CompileCalorIntegrationTests : IDisposable
         rejected.TypeCheck = !typeOff;
         rejected.TranspileOnly = transpile;
         Assert.False(rejected.Execute());
-        Assert.Contains("Calor0275", ((TestBuildEngine)rejected.BuildEngine).ErrorCodes);
+        Assert.NotEmpty(((TestBuildEngine)rejected.BuildEngine).ErrorCodes);
+        Assert.DoesNotContain("Calor0275", ((TestBuildEngine)rejected.BuildEngine).ErrorCodes);
         Assert.Empty(rejected.GeneratedFiles);
     }
 

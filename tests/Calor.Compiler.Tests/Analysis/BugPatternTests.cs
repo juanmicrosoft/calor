@@ -367,14 +367,14 @@ public class BugPatternTests
     #region Null Dereference Tests
 
     [Fact]
-    public void NullDeref_UnwrapWithoutCheck_ReportsWarning()
+    public void NullDeref_ArrayLengthWithoutCheck_ReportsWarning()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:Unwrap:pub}
-      §I{Option<i32>:opt}
       §O{i32}
-      §R (CALL opt.unwrap)";
+      §B{items:i32[]} null
+      §R §LEN items";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -383,21 +383,19 @@ public class BugPatternTests
         var checker = new NullDereferenceChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // Should warn about unwrap without is_some check
-        Assert.Contains(diagnostics.Warnings, d =>
-            d.Code == DiagnosticCode.UnsafeUnwrap ||
+        Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullDereference);
     }
 
     [Fact]
-    public void NullDeref_UnwrapOr_Safe()
+    public void NullDeref_Coalesce_Safe()
     {
         var source = @"
 §M{m001:Test}
   §F{f001:Safe:pub}
-      §I{Option<i32>:opt}
+      §I{?i32:value}
       §O{i32}
-      §R (CALL opt.unwrap_or INT:0)";
+      §R (?? value INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -406,9 +404,8 @@ public class BugPatternTests
         var checker = new NullDereferenceChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // unwrap_or is safe - no warning
         Assert.DoesNotContain(diagnostics.Warnings, d =>
-            d.Code == DiagnosticCode.UnsafeUnwrap);
+            d.Code == DiagnosticCode.NullDereference);
     }
 
     #endregion

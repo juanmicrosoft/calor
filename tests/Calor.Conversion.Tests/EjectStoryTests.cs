@@ -48,13 +48,13 @@ public class EjectStoryTests
     §P name
 ";
 
-    private const string OptionsModule = @"§M{m001:Ejected}
+    private const string NullableModule = @"§M{m001:Ejected}
   §F{f001:PickOrDefault:pub} (i32:x, bool:take) -> i32
     §IF{if1} take
-      §B{opt} §SM x
-      §R §C{opt.UnwrapOr} §A 0 §/C
-    §B{none} §NN{i32}
-    §R §C{none.UnwrapOr} §A -1 §/C
+      §B{value:?i32} x
+      §R (?? value 0)
+    §B{missing:?i32} null
+    §R (?? missing -1)
 ";
 
     // ------------------------------------------------------------------
@@ -124,7 +124,7 @@ public class EjectStoryTests
     [Theory]
     [InlineData(ContractsModule)]
     [InlineData(EffectsModule)]
-    [InlineData(OptionsModule)]
+    [InlineData(NullableModule)]
     public void EjectedModules_CompileCleanly(string calorSource)
     {
         var csharp = Emit(calorSource, EmitContractMode.Debug);
@@ -146,9 +146,9 @@ public class EjectStoryTests
     }
 
     [Fact]
-    public void Options_BehaviorPreserved()
+    public void NullableFallback_BehaviorPreserved()
     {
-        var assembly = CompileToAssembly(Emit(OptionsModule, EmitContractMode.Debug));
+        var assembly = CompileToAssembly(Emit(NullableModule, EmitContractMode.Debug));
         Assert.Equal(42, Invoke(assembly, "Ejected", "PickOrDefault", 42, true));
         Assert.Equal(-1, Invoke(assembly, "Ejected", "PickOrDefault", 42, false));
     }

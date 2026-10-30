@@ -30,8 +30,8 @@ public class DiagnosticSeedReachabilityTests
         yield return new object[] { "implication-consequent", "§R (-> (> x 0) (== (/ 10 0) 1))" };
         yield return new object[] { "forall-body", "§R (forall ((i i32)) (> (/ 10 0) i))" };
         yield return new object[] { "exists-body", "§R (exists ((i i32)) (> (/ 10 0) i))" };
-        yield return new object[] { "some-payload", "§R §SM (/ 10 0)" };
-        yield return new object[] { "ok-payload", "§R §OK (/ 10 0)" };
+        yield return new object[] { "conditional-value", "§R (? (> x 0) (/ 10 0) null)" };
+        yield return new object[] { "throw-argument", "§R §TH §NEW{Exception} §A (/ 10 0) §/NEW" };
         yield return new object[] { "conversion-operand", "§R (as (/ 10 0) i64)" };
         yield return new object[] { "await-operand", "§R §AWAIT (/ 10 0)" };
         yield return new object[] { "lambda-expression-body", "§R §LAM{l1:y:i32} (/ 10 0) §/LAM{l1}" };
@@ -73,6 +73,7 @@ public class DiagnosticSeedReachabilityTests
         var source = $$"""
             §M{m001:Test}
               §F{f001:Probe:pub} ({{inputType}}:x) -> OBJECT
+                §E{alloc,throw}
                 {{statement}}
             """;
 

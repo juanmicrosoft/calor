@@ -136,14 +136,11 @@ public sealed class NativeStringApplicabilityTests
     [Theory]
     [InlineData("§SM \"value\"")]
     [InlineData("§NN{str}")]
-    public void RuntimeSomeAndNone_AreNotUnwrapped(string argument)
+    public void RemovedConstructors_AreRejectedBeforeNativeApplicability(string argument)
     {
         foreach (var nullableTarget in new[] { false, true })
         {
             var source = Source(false, nullableTarget ? "?str" : "str", argument);
-            var (_, diagnostics) = Bind(source);
-            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload);
-            Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
             Assert.True(Program.Compile(source, "runtime-option.calr").HasErrors);
         }
     }

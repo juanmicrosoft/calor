@@ -9,388 +9,79 @@ namespace Calor.Compiler.Tests;
 
 public class PatternCheckerTests
 {
-    private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
+    private static DiagnosticBag Check(string cases)
     {
-        diagnostics = new DiagnosticBag();
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-        var parser = new Parser(tokens, diagnostics);
-        return parser.Parse();
-    }
-
-    #region Option Exhaustiveness
-
-    [Fact]
-    public void Check_OptionExhaustive_NoWarning()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §SM _
-              §R 1
-            §K §NN
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
+        var source = """
+            §M{m001:Test}
+              §F{f001:Test:pub} (bool:x) -> i32
+                §W{m1} x
+            """ + "\n" + cases;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.DoesNotContain(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
+        typeEnv.DefineVariable("x", PrimitiveType.Bool);
+        new PatternChecker(diagnostics, typeEnv).Check(module);
+        return diagnostics;
     }
-
-    [Fact]
-    public void Check_OptionMissingSome_ReportsNonExhaustive()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §NN
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.Contains(checkDiagnostics, d => d.Message.Contains("Some(_)"));
-    }
-
-    [Fact]
-    public void Check_OptionNonExhaustive_IsError_NotWarning()
-    {
-        // TIER1C: non-exhaustive match over Option is an error, regardless of
-        // whether the match is in statement or expression position. See
-        // docs/design/calor-direction.md — exhaustive match on known sum types
-        // is mandatory syntax.
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §NN
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        var diag = checkDiagnostics.FirstOrDefault(d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.NotNull(diag);
-        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
-    }
-
-    [Fact]
-    public void Check_OptionMissingNone_ReportsNonExhaustive()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §SM _
-              §R 1
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.Contains(checkDiagnostics, d => d.Message.Contains("None"));
-    }
-
-    #endregion
-
-    #region Result Exhaustiveness
-
-    [Fact]
-    public void Check_ResultExhaustive_NoWarning()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §OK _
-              §R 1
-            §K §ERR _
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new ResultType(PrimitiveType.Int, PrimitiveType.String));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.DoesNotContain(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-    }
-
-    [Fact]
-    public void Check_ResultMissingOk_ReportsNonExhaustive()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §ERR _
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new ResultType(PrimitiveType.Int, PrimitiveType.String));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.Contains(checkDiagnostics, d => d.Message.Contains("Ok(_)"));
-    }
-
-    [Fact]
-    public void Check_ResultMissingErr_ReportsNonExhaustive()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K §OK _
-              §R 1
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new ResultType(PrimitiveType.Int, PrimitiveType.String));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.Contains(checkDiagnostics, d => d.Message.Contains("Err(_)"));
-    }
-
-    #endregion
-
-    #region Bool Exhaustiveness
 
     [Fact]
     public void Check_BoolExhaustive_NoWarning()
     {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{bool:x}
-      §O{i32}
-        §W{m1} x
-            §K BOOL:true
-              §R 1
-            §K BOOL:false
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", PrimitiveType.Bool);
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.DoesNotContain(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
+        var diagnostics = Check("      §K true\n        §R 1\n      §K false\n        §R 0");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
     }
 
-    [Fact]
-    public void Check_BoolMissingTrue_ReportsNonExhaustive()
+    [Theory]
+    [InlineData("false", "true")]
+    [InlineData("true", "false")]
+    public void Check_BoolMissingBranch_ReportsNonExhaustiveError(string covered, string missing)
     {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{bool:x}
-      §O{i32}
-        §W{m1} x
-            §K BOOL:false
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", PrimitiveType.Bool);
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.Contains(checkDiagnostics, d => d.Message.Contains("true"));
+        var diagnostics = Check($"      §K {covered}\n        §R 0");
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NonExhaustiveMatch));
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains(missing, diagnostic.Message);
     }
 
-    [Fact]
-    public void Check_BoolMissingFalse_ReportsNonExhaustive()
+    [Theory]
+    [InlineData("_")]
+    [InlineData("y")]
+    public void Check_CatchAllMakesExhaustive(string pattern)
     {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{bool:x}
-      §O{i32}
-        §W{m1} x
-            §K BOOL:true
-              §R 1
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", PrimitiveType.Bool);
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-        Assert.Contains(checkDiagnostics, d => d.Message.Contains("false"));
+        var diagnostics = Check($"      §K {pattern}\n        §R 0");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
     }
-
-    #endregion
-
-    #region Catch-All Patterns
-
-    [Fact]
-    public void Check_WildcardMakesExhaustive()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K _
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.DoesNotContain(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-    }
-
-    [Fact]
-    public void Check_VariablePatternMakesExhaustive()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K y
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var typeEnv = new TypeEnvironment();
-        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
-        var checker = new PatternChecker(checkDiagnostics, typeEnv);
-        checker.Check(module);
-
-        Assert.DoesNotContain(checkDiagnostics, d => d.Code == DiagnosticCode.NonExhaustiveMatch);
-    }
-
-    #endregion
-
-    #region Unreachable Patterns
 
     [Fact]
     public void Check_PatternAfterWildcard_ReportsUnreachable()
     {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K _
-              §R 0
-            §K §SM _
-              §R 1
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var checker = new PatternChecker(checkDiagnostics);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.UnreachablePattern);
+        var diagnostics = Check("      §K _\n        §R 0\n      §K true\n        §R 1");
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnreachablePattern);
     }
 
     [Fact]
     public void Check_DuplicateLiteralPattern_ReportsDuplicate()
     {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §W{m1} x
-            §K INT:1
-              §R 1
-            §K INT:1
-              §R 2
-            §K _
-              §R 0
-";
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
-
-        var checkDiagnostics = new DiagnosticBag();
-        var checker = new PatternChecker(checkDiagnostics);
-        checker.Check(module);
-
-        Assert.Contains(checkDiagnostics, d => d.Code == DiagnosticCode.DuplicatePattern);
+        var diagnostics = Check("      §K true\n        §R 1\n      §K true\n        §R 2\n      §K _\n        §R 0");
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.DuplicatePattern);
     }
 
-    #endregion
+    [Theory]
+    [InlineData("§SM _")]
+    [InlineData("§NN")]
+    [InlineData("§OK _")]
+    [InlineData("§ERR _")]
+    public void RemovedPatterns_AreRejectedBeforeExhaustivenessAnalysis(string pattern)
+    {
+        var source = $$"""
+            §M{m1:RemovedPatterns}
+              §F{f1:Probe:pub} (object:value) -> i32
+                §R §W{w1} value
+                  §K {{pattern}} → 1
+                  §K _ → 0
+            """;
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.True(diagnostics.HasErrors);
+    }
 }

@@ -1154,14 +1154,14 @@ public class TypedBugPatternAnalysisTests
     }
 
     [Fact]
-    public void NullOption_AliasCheckFlowsUntilStrongUpdate()
+    public void ExternalOption_AliasCheckDoesNotAddLanguageVariantSemantics()
     {
         var function = BindFunction("""
             §M{m:Typed}
               §F{f:Read:pub} (Option<i32>:input) -> i32
                 §B{~original:Option<i32>} input
                 §B{alias:Option<i32>} original
-                §IF{i1} (== alias §NN{i32})
+                §IF{i1} (== alias null)
                   §R INT:0
                 §R §C{original.Unwrap} §/C
             """);
@@ -1174,27 +1174,27 @@ public class TypedBugPatternAnalysisTests
     }
 
     [Fact]
-    public void NullOption_ReassignmentInvalidatesAliasDerivedState()
+    public void ExternalOption_ReassignmentDoesNotProduceUnsafeUnwrap()
     {
         var function = BindFunction("""
             §M{m:Typed}
               §F{f:Read:pub} (Option<i32>:input) -> i32
                 §B{~original:Option<i32>} input
                 §B{alias:Option<i32>} original
-                §IF{i1} (!= alias §NN{i32})
-                  §ASSIGN original §NN{i32}
+                §IF{i1} (!= alias null)
+                  §ASSIGN original null
                   §R §C{original.Unwrap} §/C
                 §R INT:0
             """);
 
         var diagnostics = Run(function, nulls: true);
 
-        Assert.Contains(diagnostics.Errors, diagnostic =>
+        Assert.DoesNotContain(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
     }
 
     [Fact]
-    public void NullOption_NameSubstringIsNeverSemanticProof()
+    public void ExternalMethod_NameSubstringIsNeverSemanticProof()
     {
         var receiver = Variable("containsunwrap", "i32", parameter: true);
         var misleading = new BoundCallExpression(
@@ -1216,19 +1216,19 @@ public class TypedBugPatternAnalysisTests
     }
 
     [Fact]
-    public void NullOption_RefOutExpressionCallsInvalidateEveryEvaluationContext()
+    public void ExternalOption_RefOutCallsDoNotInventVariantWarnings()
     {
         foreach (var function in RefMutationFunctions())
         {
             var diagnostics = Run(function, nulls: true);
 
-            Assert.Contains(diagnostics.Warnings, diagnostic =>
+            Assert.DoesNotContain(diagnostics, diagnostic =>
                 diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
         }
     }
 
     [Fact]
-    public void NullOption_AndConditionAppliesRightMutationAfterLeftRefinement()
+    public void ExternalOption_AndConditionDoesNotInventVariantWarnings()
     {
         var option = Variable("option", "Option<i32>");
         var condition = new BoundBinaryExpression(
@@ -1248,7 +1248,7 @@ public class TypedBugPatternAnalysisTests
                 new BoundBindStatement(
                     S,
                     option,
-                    new BoundSomeExpression(S, Int(1))),
+                    new BoundCallExpression(S, "Option.Some", [Int(1)], "Option<i32>")),
                 new BoundIfStatement(
                     S,
                     condition,
@@ -1263,14 +1263,14 @@ public class TypedBugPatternAnalysisTests
 
         var diagnostics = Run(function, nulls: true);
 
-        Assert.Contains(diagnostics.Warnings, diagnostic =>
+        Assert.DoesNotContain(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void NullOption_UnknownConditionalArmJoinsToMaybe(bool unknownFirst)
+    public void ExternalOption_UnknownConditionalArmDoesNotInventVariantWarnings(bool unknownFirst)
     {
         var condition = Variable("condition", "bool", parameter: true);
         var option = Variable("option", "Option<i32>");
@@ -1279,7 +1279,7 @@ public class TypedBugPatternAnalysisTests
             "Make",
             [],
             "Option<i32>");
-        var some = new BoundSomeExpression(S, Int(1));
+        var some = new BoundCallExpression(S, "Option.Some", [Int(1)], "Option<i32>");
         var initializer = new BoundConditionalExpression(
             S,
             Ref(condition),
@@ -1297,7 +1297,7 @@ public class TypedBugPatternAnalysisTests
 
         var diagnostics = Run(function, nulls: true);
 
-        Assert.Contains(diagnostics.Warnings, diagnostic =>
+        Assert.DoesNotContain(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
     }
 
@@ -1344,7 +1344,7 @@ public class TypedBugPatternAnalysisTests
     [Theory]
     [InlineData(BinaryOperator.Equal, false)]
     [InlineData(BinaryOperator.NotEqual, true)]
-    public void NullOption_NoneFirstComparisonRefinesBothOrders(
+    public void ExternalOption_NullComparisonDoesNotInventVariantWarnings(
         BinaryOperator operation,
         bool unwrapInThen)
     {
@@ -1352,7 +1352,7 @@ public class TypedBugPatternAnalysisTests
         var comparison = new BoundBinaryExpression(
             S,
             operation,
-            new BoundNoneLiteral(S, "Option<i32>"),
+            new BoundNullLiteral(S),
             Ref(option),
             "BOOL");
         var unwrap = new BoundReturnStatement(
@@ -1377,7 +1377,7 @@ public class TypedBugPatternAnalysisTests
     }
 
     [Fact]
-    public void Result_UnwrapErrRequiresErrVariant()
+    public void ExternalResult_UnwrapErrHasNoBuiltInVariantSemantics()
     {
         var okDiagnostics = Run(
             ResultUnwrapFunction(ok: true, methodName: "UnwrapErr"),
@@ -1386,14 +1386,14 @@ public class TypedBugPatternAnalysisTests
             ResultUnwrapFunction(ok: false, methodName: "UnwrapErr"),
             nulls: true);
 
-        Assert.Contains(okDiagnostics.Errors, diagnostic =>
+        Assert.DoesNotContain(okDiagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
         Assert.DoesNotContain(errDiagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
     }
 
     [Fact]
-    public void Result_InverseBranchRefinementsProveBothUnwrapDirections()
+    public void ExternalResult_MethodNamesDoNotInventVariantWarnings()
     {
         var result = Variable("result", "Result<i32,str>", parameter: true);
         var condition = ResultCall(result, "IsErr", "BOOL");
@@ -1423,7 +1423,7 @@ public class TypedBugPatternAnalysisTests
     }
 
     [Fact]
-    public void Result_AliasCheckFlowsUntilReassignment()
+    public void ExternalResult_ReassignmentDoesNotInventVariantWarnings()
     {
         var original = Variable("original", "Result<i32,str>", parameter: true);
         var alias = Variable("alias", "Result<i32,str>");
@@ -1438,7 +1438,7 @@ public class TypedBugPatternAnalysisTests
                         new BoundAssignmentStatement(
                             S,
                             Ref(original),
-                            new BoundOkExpression(S, Int(1))),
+                            new BoundCallExpression(S, "Result.Ok", [Int(1)], "Result<i32,str>")),
                         new BoundReturnStatement(
                             S,
                             ResultCall(original, "UnwrapErr", "str")),
@@ -1449,12 +1449,12 @@ public class TypedBugPatternAnalysisTests
 
         var diagnostics = Run(function, nulls: true);
 
-        Assert.Contains(diagnostics.Errors, diagnostic =>
+        Assert.DoesNotContain(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnsafeUnwrap);
     }
 
     [Fact]
-    public void Result_AliasPredicateRefinesOriginal()
+    public void ExternalResult_AliasPredicateDoesNotInventVariantWarnings()
     {
         var original = Variable("original", "Result<i32,str>", parameter: true);
         var alias = Variable("alias", "Result<i32,str>");
@@ -2075,8 +2075,8 @@ public class TypedBugPatternAnalysisTests
             CorpusCase(ArrayFunction(Int(-1), length: 3), DiagnosticCode.IndexOutOfBounds, true),
             CorpusCase(ArrayFunction(Int(2), length: 3), DiagnosticCode.IndexOutOfBounds, false),
             CorpusCase(ArrayFunction(Int(3), length: 3), DiagnosticCode.IndexOutOfBounds, true),
-            CorpusCase(OptionFunction(empty: true), DiagnosticCode.UnsafeUnwrap, true),
-            CorpusCase(OptionFunction(empty: false), DiagnosticCode.UnsafeUnwrap, false),
+            CorpusCase(NullableArrayFunction(empty: true), DiagnosticCode.NullDereference, true),
+            CorpusCase(NullableArrayFunction(empty: false), DiagnosticCode.NullDereference, false),
             CorpusCase(OverflowFunction(int.MaxValue, 1), DiagnosticCode.IntegerOverflow, true),
             CorpusCase(OverflowFunction(10, 20), DiagnosticCode.IntegerOverflow, false),
             CorpusCase(OffByOneFunction(unsafeBound: true), DiagnosticCode.OffByOne, true),
@@ -2217,19 +2217,13 @@ public class TypedBugPatternAnalysisTests
             ]);
     }
 
-    private static BoundFunction OptionFunction(bool empty)
+    private static BoundFunction NullableArrayFunction(bool empty)
     {
-        var option = Variable("option", "Option<i32>");
+        var option = Variable("items", "i32[]");
         var initializer = empty
-            ? (BoundExpression)new BoundNoneLiteral(S, "Option<i32>")
-            : new BoundSomeExpression(S, Int(1));
-        var unwrap = new BoundCallExpression(
-            S,
-            "option.Unwrap",
-            [],
-            "i32",
-            resolvedMethodName: "Unwrap",
-            receiverSymbol: option);
+            ? (BoundExpression)new BoundNullLiteral(S)
+            : new BoundArrayCreation(S, "a", "items", "i32", Int(1), []);
+        var unwrap = new BoundArrayLength(S, Ref(option));
         return Function(
             [],
             [
@@ -2310,7 +2304,7 @@ public class TypedBugPatternAnalysisTests
                     new BoundBindStatement(
                         S,
                         option,
-                        new BoundSomeExpression(S, Int(1))),
+                        new BoundCallExpression(S, "Option.Some", [Int(1)], "Option<i32>")),
                     .. bodyFactory(option, dummy, mutation, unwrap),
                 ]);
         }
@@ -2334,8 +2328,8 @@ public class TypedBugPatternAnalysisTests
     {
         var result = Variable("result", "Result<i32,str>");
         var initializer = ok
-            ? (BoundExpression)new BoundOkExpression(S, Int(1))
-            : new BoundErrExpression(S, new BoundStringLiteral(S, "error"));
+            ? (BoundExpression)new BoundCallExpression(S, "Result.Ok", [Int(1)], "Result<i32,str>")
+            : new BoundCallExpression(S, "Result.Err", [new BoundStringLiteral(S, "error")], "Result<i32,str>");
         return Function(
             [],
             [

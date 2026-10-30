@@ -55,7 +55,8 @@ the next dedent. There are **no closing tags** — never write `§/`-prefixed cl
 | Loop | `§L{id:var:from:to:step}` (body indented) |
 | Conditional | `§IF{id} (cond)` + `§EI (cond)` / `§EL`; inline `§IF{id} (cond) → §R expr` |
 | Contracts | `§Q (precondition)`, `§S (postcondition)` |
-| Types | `i32`, `i64`, `str`, `bool`, `f64`, `void`, `?i32` (option), `i32!str` (result) |
+| Types | `i32`, `i64`, `str`, `bool`, `f64`, `void`, `?i32` (nullable int), `?str` (nullable string) |
+| Failure | `§TH` throws; `§TR` / `§CA` handle exceptions; declare `§E{throw}` |
 | Expressions | Prefix notation: `(+ a b)`, `(== x 0)`, `(% i 15)` |
 | Literals | `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14` |
 

@@ -17,8 +17,8 @@
           "calor": "§B{list} §NEW{List<i32>} §/NEW"
         },
         {
-          "csharp": "return new Result(value);",
-          "calor": "§R §NEW{Result} §A value §/NEW"
+          "csharp": "return new Widget(value);",
+          "calor": "§R §NEW{Widget} §A value §/NEW"
         }
       ]
     },
@@ -27,7 +27,7 @@
       "csharpConstruct": "variable declaration",
       "keywords": ["var", "variable", "declare", "declaration", "let", "binding", "assign"],
       "calorSyntax": "§B{name} value or §B{~name} value (mutable)",
-      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default.",
+      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default. Give null an explicit existing nullable type, such as ?str.",
       "examples": [
         {
           "csharp": "var count = 0;",
@@ -40,6 +40,10 @@
         {
           "csharp": "string name = \"John\";",
           "calor": "§B{name} \"John\""
+        },
+        {
+          "csharp": "string? name = null;",
+          "calor": "§B{name:?str} null"
         }
       ]
     },
@@ -1689,30 +1693,6 @@
       "syntax": "§U{namespace} or §U{alias:namespace}",
       "description": "Imports a namespace or creates an alias. Must appear inside a module (§M{id:Name}) block.",
       "csharpEquivalent": "using Namespace; or using Alias = Namespace;"
-    },
-    "§SM": {
-      "name": "Some (Option)",
-      "syntax": "§SM value",
-      "description": "Creates a Some value for Option types. Represents a present value.",
-      "csharpEquivalent": "Some(value) or value (with nullable)"
-    },
-    "§NN": {
-      "name": "None (Option)",
-      "syntax": "§NN or §NN{Type}",
-      "description": "Creates a None value for Option types. Represents absence of value.",
-      "csharpEquivalent": "None or null"
-    },
-    "§OK": {
-      "name": "Ok (Result)",
-      "syntax": "§OK value",
-      "description": "Creates an Ok result for Result types. Represents success.",
-      "csharpEquivalent": "Result.Ok(value)"
-    },
-    "§ERR": {
-      "name": "Err (Result)",
-      "syntax": "§ERR error",
-      "description": "Creates an Err result for Result types. Represents failure.",
-      "csharpEquivalent": "Result.Err(error)"
     },
     "§ARR": {
       "name": "Array",

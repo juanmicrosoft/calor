@@ -11,6 +11,7 @@
     "bench/phase0-agent-native/pairs/W3-003-kv-journal/reference/calor/KvJournal.calr",
     "bench/phase0-agent-native/pairs/W3-004-sync-folder/calor/FolderSync.calr",
     "bench/phase0-agent-native/pairs/W3-004-sync-folder/reference/calor/FolderSync.calr",
+    "benchmarks/null-safety/null-deref.calr",
     "docs/design/spikes/effect-rows/after/A1.calr",
     "docs/design/spikes/effect-rows/after/A2-broadening.calr",
     "docs/design/spikes/effect-rows/after/A2.calr",
@@ -25,6 +26,21 @@
     "docs/design/spikes/effect-rows/before/A3-callback.calr",
     "docs/design/spikes/effect-rows/before/A3-map.calr",
     "docs/design/spikes/effect-rows/before/A3-match.calr",
-    "docs/design/spikes/effect-rows/before/A3-middleware.calr"
+    "docs/design/spikes/effect-rows/before/A3-middleware.calr",
+    "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
+  ],
+  "executables": [
+    {
+      "originalPath": "docs/design/spikes/effect-rows/experiments/run.py",
+      "transcriptPath": "docs/design/spikes/effect-rows/experiments/transcripts/run.txt"
+    },
+    {
+      "originalPath": "docs/design/spikes/effect-rows/experiments/run2.py",
+      "transcriptPath": "docs/design/spikes/effect-rows/experiments/transcripts/run2.txt"
+    },
+    {
+      "originalPath": "docs/design/spikes/effect-rows/experiments/run3.py",
+      "transcriptPath": "docs/design/spikes/effect-rows/experiments/transcripts/run3.txt"
+    }
   ]
 }

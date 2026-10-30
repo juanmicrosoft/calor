@@ -347,8 +347,8 @@ Complete declaration examples below are compiled by `calor self-check docs` in C
 | `§EACH{id:var} coll` | Foreach | `foreach` |
 | `§EACHKV{id:k:v} dict` | Foreach key-value | `foreach (var (k,v))` |
 | `§CNT{name}` | Count | `.Count` |
-| `§SM value` / `§NN` | Some/None | `Some(v)` / `None` |
-| `§OK value` / `§ERR msg` | Ok/Error | `Ok(v)` / `Err(msg)` |
+| `?T` / `null` | Nullable value | A value or `null` |
+| `§TH exception` | Throw | `throw exception` |
 | `§EVT{id:Name:pub:Type}` | Event | `event Type Name` |
 | `§SUB event handler` | Subscribe | `event += handler` |
 | `§LAM{id:param:type} expr §/LAM{id}` | Lambda (use inside §B) | `(param) => expr` |
@@ -432,7 +432,7 @@ Use contracts to verify your implementation:
 | `string` | `str` |
 | `bool` | `bool` |
 | `void` | `void` |
-| `int?` or `Option<int>` | `Option<i32>` |
+| `int?` | `?i32` |
 
 ### Expression Syntax (Lisp-style, prefix notation)
 - Arithmetic: `(+ a b)`, `(- a b)`, `(* a b)`, `(/ a b)`, `(% a b)`
@@ -553,55 +553,47 @@ Calls in bindings and returns also accept multi-line arguments. Indent each
 ```
 This returns -1 if x<0, 0 if x==0, 1 otherwise.
 
-### Option Type (for nullable/optional values)
-Return type: `§O{Option<i32>}` for Option<int>
-
-Constructors:
-- `§SM value` = Some(value) - wrap value
-- `§NN` = None - no value
+### Nullable Type (for optional values)
+Return type: `§O{?i32}` for int?. Return the value directly or `null`.
 
 Example:
 ```
 §F{f001:TryDouble:pub}
   §I{i32:x}
-  §O{Option<i32>}
-  §E{alloc}
+  §O{?i32}
+  §E{}
   §IF{if1} (> x 0)
-    §R §SM (* x 2)
+    §R (* x 2)
   §EL
-    §R §NN
+    §R null
 ```
 
-**Option with char parsing (TryParseDigit pattern):**
+**Nullable char parsing (TryParseDigit pattern):**
 ```
 §F{f001:TryParseDigit:pub}
   §I{char:c}
-  §O{Option<i32>}
-  §E{alloc}
+  §O{?i32}
+  §E{}
   §IF{if1} (&& (>= c '0') (<= c '9'))
-    §R §SM (- c '0')
+    §R (- c '0')
   §EL
-    §R §NN
+    §R null
 ```
 
-### Result Type (for success/error returns)
-Return type: `§O{Result<i32,str>}` for Result<int, string>
-
-Constructors:
-- `§OK value` = Ok(value) - success with value
-- `§ERR "message"` = Err(message) - error with message
+### Exceptions (for failure)
+Return the success value directly. Use `§TH` with a .NET exception on failure.
 
 Example:
 ```
 §F{f001:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
-  §O{Result<i32,str>}
-  §E{alloc}
+  §O{i32}
+  §E{alloc,throw}
   §IF{if1} (!= b 0)
-    §R §OK (/ a b)
+    §R (/ a b)
   §EL
-    §R §ERR "Division by zero"
+    §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
 ```
 
 ### Control Flow
@@ -1016,7 +1008,7 @@ Key syntax:
 §IFACE{i001:IRepository}
   §MT{m001:GetById}
     §I{i32:id}
-    §O{Option<Entity>}
+    §O{?Entity}
   §MT{m002:Save}
     §I{Entity:entity}
     §O{void}

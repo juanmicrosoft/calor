@@ -181,7 +181,8 @@ public class BinderIncompleteRatchetTests
         {
             var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
             var diagnostics = new DiagnosticBag();
-            var lexer = new Lexer(File.ReadAllText(file).Replace("\r\n", "\n"), diagnostics);
+            var active = ActiveSyntaxInputs.ForCurrentCompiler(root, file);
+            var lexer = new Lexer(File.ReadAllText(active).Replace("\r\n", "\n"), diagnostics);
             var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
             var module = parser.Parse();
             if (diagnostics.HasErrors) { parseFailures.Add(rel); continue; }

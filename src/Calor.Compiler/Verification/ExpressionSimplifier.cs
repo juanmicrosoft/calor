@@ -466,31 +466,6 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             : new FieldAccessNode(node.Span, target, node.FieldName);
     }
 
-    public ExpressionNode Visit(SomeExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return value == node.Value
-            ? node
-            : new SomeExpressionNode(node.Span, value);
-    }
-
-    public ExpressionNode Visit(NoneExpressionNode node) => node;
-
-    public ExpressionNode Visit(OkExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return value == node.Value
-            ? node
-            : new OkExpressionNode(node.Span, value);
-    }
-
-    public ExpressionNode Visit(ErrExpressionNode node)
-    {
-        var error = node.Error.Accept(this);
-        return error == node.Error
-            ? node
-            : new ErrExpressionNode(node.Span, error);
-    }
 
     public ExpressionNode Visit(CallExpressionNode node)
     {
@@ -904,10 +879,6 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(WildcardPatternNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(VariablePatternNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(LiteralPatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(SomePatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(NonePatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(OkPatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(ErrPatternNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RequiresNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnsuresNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(InvariantNode node) => throw new InvalidOperationException();

@@ -11,6 +11,66 @@ public class ActiveSyntaxInputTests
             .Select(path => new object[] { path });
 
     [Fact]
+    public void ExecutableRegistry_IdentifiesEveryScriptAndTranscriptWithoutParsingThemAsCalor()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
+        var registrations = ActiveSyntaxInputs.ExecutableRegistrations.Values.ToArray();
+        Assert.NotEmpty(registrations);
+        foreach (var extension in new[] { ".py", ".txt" })
+        {
+            var mirrors = Directory.EnumerateFiles(activeRoot, "*" + extension, SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(activeRoot, path).Replace('\\', '/'))
+                .Order(StringComparer.Ordinal);
+            var registered = registrations.Select(entry => extension == ".py"
+                ? entry.OriginalPath : entry.TranscriptPath).Order(StringComparer.Ordinal);
+            Assert.Equal(registered, mirrors);
+        }
+
+        foreach (var registration in registrations)
+        {
+            Assert.Equal(".py", Path.GetExtension(registration.OriginalPath));
+            Assert.Equal(
+                Path.Combine(Path.GetDirectoryName(registration.OriginalPath)!, "transcripts",
+                    Path.ChangeExtension(Path.GetFileName(registration.OriginalPath), ".txt")).Replace('\\', '/'),
+                registration.TranscriptPath);
+            Assert.True(File.Exists(Path.Combine(root, registration.OriginalPath)));
+            Assert.True(File.Exists(Path.Combine(root, registration.TranscriptPath)));
+            Assert.DoesNotContain(registration.OriginalPath, ActiveSyntaxInputs.OriginalPaths);
+            var (script, transcript) = ActiveSyntaxInputs.ForCurrentExecutable(root, registration.OriginalPath);
+            Assert.Equal(Path.Combine(activeRoot, registration.OriginalPath), script);
+            Assert.Equal(Path.Combine(activeRoot, registration.TranscriptPath), transcript);
+            Assert.Throws<InvalidDataException>(() =>
+                ActiveSyntaxInputs.ForCurrentCompiler(root, registration.OriginalPath));
+        }
+    }
+
+    [Fact]
+    public void ExecutableResolver_RejectsUnregisteredAndAliasedPaths()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var original = ActiveSyntaxInputs.ExecutableRegistrations.Keys.Order(StringComparer.Ordinal).First();
+        foreach (var path in new[]
+        {
+            "./" + original, Path.Combine(root, original), ActiveSyntaxInputs.RelativeRoot + original,
+            "samples/FizzBuzz/fizzbuzz.calr", "docs/unregistered.py", "../outside.py"
+        })
+        {
+            Assert.Throws<ArgumentException>(() => ActiveSyntaxInputs.ForCurrentExecutable(root, path));
+        }
+    }
+
+    [Fact]
+    public void RequiredExecutableMirrorMissing_DoesNotRunTheHistoricalOriginal()
+    {
+        var root = Path.Combine(CliTestHarness.FindRepoRoot(), "artifacts", $"missing-active-{Guid.NewGuid():N}");
+        var original = ActiveSyntaxInputs.ExecutableRegistrations.Keys.Order(StringComparer.Ordinal).First();
+        var exception = Assert.Throws<FileNotFoundException>(() =>
+            ActiveSyntaxInputs.ForCurrentExecutable(root, original));
+        Assert.Equal(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, original), exception.FileName);
+    }
+
+    [Fact]
     public void Registry_IdentifiesEveryMirrorWithoutAddingCorpusSubjects()
     {
         var root = CliTestHarness.FindRepoRoot();

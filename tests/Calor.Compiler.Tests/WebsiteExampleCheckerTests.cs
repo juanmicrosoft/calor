@@ -520,7 +520,8 @@ public sealed class WebsiteExampleCheckerTests
     // transcript by W1GuideTranscriptTests) and one unchecked report excerpt.
     // #1529/#1530 (0.27): complete 62 -> 64 and negative 6 -> 7, the nominal-refinement example
     // and its Calor0202 refusal in syntax-reference/refinement-types.mdx.
-    private const string Pinned = "pages=97 complete=64 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
+    // #1617: NullableFallback and Division add two compile-checked complete programs.
+    private const string Pinned = "pages=97 complete=66 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

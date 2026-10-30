@@ -1,3 +1,5 @@
+using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
@@ -6,7 +8,7 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Tests for converter quality improvements: §ERR parseable emission,
+/// Tests for converter quality improvements: raw C# fallback emission,
 /// Unicode escape sequences, and named argument round-trip.
 /// </summary>
 public class ConverterQualityTests
@@ -24,7 +26,32 @@ public class ConverterQualityTests
         return string.Join("\n", result.Issues.Select(i => $"{i.Severity}: {i.Message}"));
     }
 
-    #region §ERR Fallback Emission Tests
+    #region Raw C# Fallback Emission Tests
+
+    [Fact]
+    public void FallbackExpression_RoundTripPreservesMultilineStringsAndBraces()
+    {
+        const string original = """
+            ((System.Func<string>)(() => {
+                var text = "quoted } { \"value\"";
+                return text + "{suffix}";
+            }))()
+            """;
+        var fallback = new FallbackExpressionNode(TextSpan.Empty, original, "test-unsupported-expression");
+        var expression = fallback.Accept(new CalorEmitter());
+        Assert.Equal($"§CS{{{original}}}", expression);
+        Assert.DoesNotContain("§ERR", expression);
+        var source = "§M{m1:FallbackRoundTrip}\n"
+            + "  §F{f1:Probe:pub} () -> str\n    §R " + expression;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body.Single());
+        Assert.Equal(original, Assert.IsType<RawCSharpExpressionNode>(returned.Expression).CSharpCode);
+        var generated = new CSharpEmitter().Emit(module);
+        Assert.Contains(original, generated);
+        Assert.True(GeneratedCSharpCompiler.Validate(generated).CompilationSuccess);
+    }
 
     [Fact]
     public void MakeRefExpression_ConvertsAsRawCSharp()
@@ -54,18 +81,15 @@ public class ConverterQualityTests
     [Fact]
     public void FallbackExpression_ParsesWithoutCascadingErrors()
     {
-        // A .calr file containing §ERR should parse with only warnings, not cascading errors
         var calorSource = """
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{x:i32} §ERR "TODO: unknown-expression -- C#: checked(1 + 2)"
+                  §B{x:i32} §CS{checked(1 + 2)}
             """;
 
         var compileResult = Program.Compile(calorSource);
 
-        // The §ERR should parse as an ErrExpressionNode wrapping a string literal
-        // It may produce a semantic error but should NOT produce cascading parse errors
         var parseErrors = compileResult.Diagnostics
             .Where(d => d.Code == DiagnosticCode.UnexpectedToken)
             .ToList();
@@ -79,7 +103,7 @@ public class ConverterQualityTests
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{str}
-                  §R §ERR "TODO: throw-expression -- C#: throw new Exception()"
+                  §R §CS{throw new Exception()}
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -93,14 +117,13 @@ public class ConverterQualityTests
     [Fact]
     public void FallbackExpression_MultipleInFile_NoParserCascade()
     {
-        // Multiple §ERR tokens in one file should each produce one error, not cascade
         var calorSource = """
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §B{x:i32} §ERR "TODO: feature-a -- C#: something"
-                  §B{y:str} §ERR "TODO: feature-b -- C#: something else"
-                  §B{z:bool} §ERR "TODO: feature-c -- C#: yet another"
+                  §B{x:i32} §CS{checked(1 + 2)}
+                  §B{y:str} §CS{string.Empty}
+                  §B{z:bool} §CS{true}
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -114,8 +137,8 @@ public class ConverterQualityTests
     [Fact]
     public void FallbackExpression_ConvertThenCompile_NoCascade()
     {
-        // A class with multiple unsupported constructs should produce individual §ERR tokens
-        // that parse cleanly instead of cascading parse failures
+        // Unsupported constructs retain their original C# instead of introducing
+        // a second error representation.
         var csharp = """
             public class Test
             {

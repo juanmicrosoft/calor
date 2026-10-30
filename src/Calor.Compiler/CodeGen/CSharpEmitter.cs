@@ -4919,34 +4919,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return $"{target}.{fieldName}";
     }
 
-    public string Visit(SomeExpressionNode node)
-    {
-        RequireNamespace("Calor.Runtime");
-        var value = node.Value.Accept(this);
-        return $"Calor.Runtime.Option.Some({value})";
-    }
-
-    public string Visit(NoneExpressionNode node)
-    {
-        RequireNamespace("Calor.Runtime");
-        if (node.TypeName != null)
-        {
-            var typeName = MapTypeName(node.TypeName);
-            return $"Calor.Runtime.Option<{typeName}>.None()";
-        }
-        return "Calor.Runtime.Option.None<object>()";
-    }
-
-    public string Visit(OkExpressionNode node)
-    {
-        RequireNamespace("Calor.Runtime");
-        var value = node.Value.Accept(this);
-        var literalType = GetLiteralTypeName(node.Value);
-        return literalType == null
-            ? $"Calor.Runtime.Result.Ok({value})"
-            : $"Calor.Runtime.Result.Ok<{literalType}, string>({value})";
-    }
-
     private string EmitTypedExpression(ExpressionNode expression, string? expectedType)
     {
         var typeSyntax = expectedType == null ? null : SyntaxFactory.ParseTypeName(expectedType);
@@ -4962,42 +4934,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             && generic is { Identifier.ValueText: "Func" }
             && generic.TypeArgumentList.Arguments.Count > 0)
             return EmitLambda(lambda, generic.TypeArgumentList.Arguments[^1].ToString());
-        if (generic is { Identifier.ValueText: "Option", TypeArgumentList.Arguments.Count: 1 })
-        {
-            RequireNamespace("Calor.Runtime");
-            var elementType = generic.TypeArgumentList.Arguments[0].ToString();
-            return expression switch
-            {
-                SomeExpressionNode some =>
-                    $"Calor.Runtime.Option.Some<{elementType}>({EmitTypedExpression(some.Value, elementType)})",
-                NoneExpressionNode { TypeName: null } =>
-                    $"Calor.Runtime.Option.None<{elementType}>()",
-                ConditionalExpressionNode conditional =>
-                    EmitConditionalExpression(conditional, expectedType),
-                _ => expression.Accept(this)
-            };
-        }
-        if (generic is not { Identifier.ValueText: "Result", TypeArgumentList.Arguments.Count: 2 })
-            return expression.Accept(this);
-
         return expression switch
         {
-            OkExpressionNode ok => $"Calor.Runtime.Result.Ok<{generic.TypeArgumentList.Arguments[0]}, {generic.TypeArgumentList.Arguments[1]}>({EmitTypedExpression(ok.Value, generic.TypeArgumentList.Arguments[0].ToString())})",
-            ErrExpressionNode err => $"Calor.Runtime.Result.Err<{generic.TypeArgumentList.Arguments[0]}, {generic.TypeArgumentList.Arguments[1]}>({EmitTypedExpression(err.Error, generic.TypeArgumentList.Arguments[1].ToString())})",
             ConditionalExpressionNode conditional =>
                 EmitConditionalExpression(conditional, expectedType),
             _ => expression.Accept(this)
         };
-    }
-
-    public string Visit(ErrExpressionNode node)
-    {
-        RequireNamespace("Calor.Runtime");
-        var error = node.Error.Accept(this);
-        var literalType = GetLiteralTypeName(node.Error);
-        return literalType == null
-            ? $"Calor.Runtime.Result.Err({error})"
-            : $"Calor.Runtime.Result.Err<object, {literalType}>({error})";
     }
 
     private static bool IsSupportedMatchExpressionArm(MatchCaseNode arm) =>
@@ -5136,10 +5078,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             PropertyPatternNode pp => Visit(pp),
             PositionalPatternNode pos => Visit(pos),
             ConstantPatternNode cp => cp.Value.Accept(this),
-            SomePatternNode sp => $"{{ IsSome: true, Value: {EmitPattern(sp.InnerPattern)} }}",
-            NonePatternNode => "{ IsNone: true }",
-            OkPatternNode op => $"{{ IsOk: true, Value: {EmitPattern(op.InnerPattern)} }}",
-            ErrPatternNode ep => $"{{ IsErr: true, Error: {EmitPattern(ep.InnerPattern)} }}",
             ListPatternNode lp => Visit(lp),
             NegatedPatternNode np => $"not {EmitPatternOperand(np.Inner, 3)}",
             OrPatternNode orp => $"{EmitPatternOperand(orp.Left, 1)} or {EmitPatternOperand(orp.Right, 1)}",
@@ -5179,23 +5117,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
 
-    public string Visit(SomePatternNode node)
-        => $"{{ IsSome: true, Value: {node.InnerPattern.Accept(this)} }}";
-
-    public string Visit(NonePatternNode node) => "{ IsNone: true }";
-
     public string Visit(TypePatternNode node)
         => node.BindingName is { } name
             ? $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(name)}"
             : MapTypeName(node.TypeName);
-
-    public string Visit(OkPatternNode node)
-        => $"{{ IsOk: true, Value: {node.InnerPattern.Accept(this)} }}";
-
-    public string Visit(ErrPatternNode node)
-        => $"{{ IsErr: true, Error: {node.InnerPattern.Accept(this)} }}";
-
-    // Phase 4: Contracts
 
     private string EmitContractExpression(ExpressionNode expression)
     {
@@ -8328,8 +8253,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 case "Enumerable":
                     RequireNamespace("System.Linq");
                     break;
-                case "Option":
-                case "Result":
                 case "ContractViolationException":
                     RequireNamespace("Calor.Runtime");
                     break;

@@ -257,14 +257,14 @@ public class NamedRefinementArithmeticTests
             §M{m:R}
               §U{Nat:System.Int32}
               §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f1:Bad:pub} (Dictionary<i32,Nat>:a) -> Option<Nat>
+              §F{f1:Bad:pub} (Dictionary<i32,Nat>:a) -> Nat
                 §B{x} (dec §IDX a INT:0)
-                §B{boxed:Option<Nat>} §SM x
+                §B{boxed:Nat} x
                 §R boxed
             """);
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
-            && d.Message.Contains("Option<Nat>"));
+            && d.Message.Contains("Nat"));
     }
 
     /// <summary>
@@ -345,7 +345,7 @@ public class NamedRefinementArithmeticTests
             §M{m:R}
               §RTYPE{r1:Money:decimal} (>= # INT:0)
               §F{f1:Sum:pub} (Money:a, Money:b) -> decimal
-                §B{boxed:Option<decimal>} §SM (+ a b)
+                §B{boxed:?decimal} (+ a b)
                 §B{total:decimal} (* (+ a b) INT:2)
                 §R total
             """);

@@ -288,7 +288,7 @@ public static class UnaryOperatorExtensions
 
 /// <summary>
 /// Represents a fallback expression for unsupported C# constructs.
-/// Emitted as §ERR{"TODO: feature"} /* C#: originalCode */ in Calor output.
+/// Preserved as a raw C# expression in Calor output.
 /// </summary>
 public sealed class FallbackExpressionNode : ExpressionNode
 {

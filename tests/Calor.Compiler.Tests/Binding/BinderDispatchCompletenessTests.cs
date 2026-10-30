@@ -11,9 +11,8 @@ namespace Calor.Compiler.Tests;
 /// binding surface, and it must cover the concrete ExpressionNode subclass set EXACTLY —
 /// in both directions. A new node class with no dispatch entry, or a stale entry for a
 /// removed class, fails here by construction (the code-side half of F-1's bidirectional
-/// completeness rule). The parser-totality work leaves 60 accepted expression classes;
+/// completeness rule). The current language has 56 accepted expression classes;
 /// KeywordArgNode is a parser helper rather than a value expression.
-/// than the number so an F-1 amendment and a code change must move together.
 /// </summary>
 public class BinderDispatchCompletenessTests
 {
@@ -48,6 +47,8 @@ public class BinderDispatchCompletenessTests
         // KeywordArgNode reclassified out of the AST entirely — it is a parser-internal
         // value object that can no longer TYPE as an expression, so it leaves the
         // denominator by becoming unrepresentable, not by being silently skipped.
-        Assert.Equal(60, ConcreteExpressionTypes().Count);
+        // #1617 removes Some/None/Ok/Err expression classes from the current language.
+        // The historical registration stays unchanged; exact surviving dispatch is checked above.
+        Assert.Equal(56, ConcreteExpressionTypes().Count);
     }
 }

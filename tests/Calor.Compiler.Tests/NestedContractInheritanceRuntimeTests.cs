@@ -484,10 +484,9 @@ public sealed class NestedContractInheritanceRuntimeTests
         foreach (var path in new[] { "interface", "base", "interface-base" })
         foreach (var mode in new[] { "pre", "post", "both" })
         foreach (var shape in new[] { "[T]", "T[]", "(T,i32)", "(T[,],i32)", "?T",
-                     "Result<T,str>", "Result<(T,i32),str>", "List<T[]>[,]", "List<T>[,]", "List<T[]>[]" })
+                     "List<T[]>[,]", "List<T>[,]", "List<T[]>[]" })
         {
-            var predicate = shape.StartsWith('(') ? "(!= x.Item1 null)"
-                : shape.StartsWith("Result", StringComparison.Ordinal) ? "x.IsOk" : "(!= x null)";
+            var predicate = shape.StartsWith('(') ? "(!= x.Item1 null)" : "(!= x null)";
             var contracts = string.Join("\n", new[]
             {
                 mode != "post" ? "§Q " + predicate : null,
@@ -528,8 +527,6 @@ public sealed class NestedContractInheritanceRuntimeTests
                 "(T,i32)" => ("valid", 1),
                 "(T[,],i32)" => (new string[1, 1], 1),
                 "?T" => "valid",
-                "Result<T,str>" => Calor.Runtime.Result<string, string>.Ok("valid"),
-                "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Ok(("valid", 1)),
                 "List<T[]>[,]" => new List<string[]>[1, 1],
                 "List<T>[,]" => new List<string>[1, 1],
                 "List<T[]>[]" => new List<string[]>[1],
@@ -539,8 +536,6 @@ public sealed class NestedContractInheritanceRuntimeTests
             {
                 "(T,i32)" => ((string?)null, 1),
                 "(T[,],i32)" => ((string[,]?)null, 1),
-                "Result<T,str>" => Calor.Runtime.Result<string, string>.Err("invalid"),
-                "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Err("invalid"),
                 _ => null
             };
             Assert.Equal(valid, method.Invoke(instance, [valid]));

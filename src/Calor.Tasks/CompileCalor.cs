@@ -1186,7 +1186,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         {
             tasksAssemblyPath,
             compilerPath,
-            typeof(Calor.Runtime.Option<int>).Assembly.Location,
+            typeof(Calor.Runtime.CalorModuleAttribute).Assembly.Location,
             Path.Combine(compilerDirectory, "Microsoft.Z3.dll"),
             Path.Combine(compilerDirectory, nativeZ3Name)
         }

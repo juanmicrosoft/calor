@@ -139,13 +139,11 @@ public class PostConversionFixerTests
 
     #endregion
 
-    #region Rule E: Inline §ERR/§LAM Extraction
+    #region Removed Error Constructors
 
     [Fact]
-    public void Fix_InlineErrInCallArg_ExtractsToBinding()
+    public void Fix_RemovedErrConstructor_IsNotRewrittenAsValidSyntax()
     {
-        // Complete module where §ERR{e1} is inlined as a call argument — causes parse error.
-        // Fixer should extract it to a §B{__autoErr1} binding on the preceding line.
         var source = """
             §M{m001:Test}
               §F{f001:Foo:pub}
@@ -156,18 +154,9 @@ public class PostConversionFixerTests
 
         var result = _fixer.Fix(source);
 
-        Assert.True(result.WasModified);
-        Assert.Contains("InlineErrLam", result.AppliedFixes.Select(f => f.Rule));
-        // Binding should be emitted
-        Assert.Contains("§B{__autoErr1}", result.FixedSource);
-        // The §ERR should be in the binding, not in the call
-        Assert.Contains("§ERR{e1}", result.FixedSource);
-        var callLine = result.FixedSource.Split('\n').First(l => l.Contains("§C{Bar}"));
-        Assert.Contains("__autoErr1", callLine);
-        Assert.DoesNotContain("§ERR", callLine);
-        // Note: The extracted §B{__autoErr1} §ERR{e1} "oops" may still not parse cleanly
-        // because §ERR syntax has specific requirements. The key value is separating it
-        // from the call argument position, which eliminates the original parse error.
+        Assert.False(result.WasModified);
+        Assert.Equal(source, result.FixedSource);
+        Assert.DoesNotContain(result.AppliedFixes, f => f.Rule == "InlineErrLam");
     }
 
     #endregion

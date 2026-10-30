@@ -148,7 +148,7 @@ public class BoundTypeArchitectureTests
             (new BoundStringLiteral(span, "hello", isMultiline: false, isUtf8: true),
                 "ReadOnlySpan<BYTE>"),
             (new BoundDecimalLiteral(span, 1.5m), "DECIMAL"),
-            (new BoundNoneLiteral(span), "NONE"),
+            (new BoundNullLiteral(span), "NULL"),
         };
 
         foreach (var (expression, expected) in sampler)
@@ -204,7 +204,7 @@ public class BoundTypeArchitectureTests
         {
             try
             {
-                var source = File.ReadAllText(file);
+                var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, file));
                 var lexDiagnostics = new DiagnosticBag();
                 var lexer = new Lexer(source, lexDiagnostics);
                 var tokens = lexer.TokenizeAllForParser();

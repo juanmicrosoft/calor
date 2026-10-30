@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -18,14 +19,16 @@ namespace Calor.Compiler.Tests;
 /// mode the doc criticises Draft v1 for.</para>
 ///
 /// <para>This test closes it. It re-runs the compiler-behavior scripts and compares the
-/// output byte-for-byte against the transcripts committed beside them. The scripts
+/// output byte-for-byte against explicitly registered active transcript mirrors. The scripts
 /// render structured diagnostics in the archived layout, preserving full messages
-/// without making the old layout a contract for today's default text output.</para>
+/// without making the old layout a contract for today's default text output.
+/// Original scripts and transcripts remain historical inputs; only the active copies
+/// replace retired Option/Result probes with nullable/throw probes.</para>
 ///
 /// <para><b>Regenerating.</b> After an intentional compiler change, review the diff,
 /// update the design doc's quoted output, and commit both in the same PR.
 /// Setting <c>CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1</c> makes this test
-/// rewrite the transcripts instead of asserting — the same discipline as
+/// rewrite only the active transcripts instead of asserting — the same discipline as
 /// <c>CALOR_REGENERATE_S5_LEDGER</c> for the metadata ledger.</para>
 ///
 /// <para>The source census and <c>o53/baseline.json</c> are historical measurements,
@@ -37,21 +40,22 @@ public sealed class EffectRowExperimentHarnessTests
         ["run.py", "run2.py", "run3.py"];
 
     /// <summary>
-    /// P29 — every quoted experiment still produces the output the design doc quotes.
+    /// P29 — every current probe still produces its explicitly registered output.
     /// </summary>
     [Fact]
     public void ExperimentTranscripts_MatchARerun()
     {
         var experiments = ExperimentsDirectory();
+        var root = RepositoryRoot();
         var regenerate =
             Environment.GetEnvironmentVariable("CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS") == "1";
 
         var drifted = new List<string>();
         foreach (var script in Scripts)
         {
-            var transcript = Path.Combine(experiments, "transcripts",
-                Path.ChangeExtension(script, ".txt"));
-            var actual = RunScript(experiments, script);
+            var original = Path.GetRelativePath(root, Path.Combine(experiments, script)).Replace('\\', '/');
+            var (activeScript, transcript) = ActiveSyntaxInputs.ForCurrentExecutable(root, original);
+            var actual = RunScript(experiments, activeScript);
 
             if (regenerate)
             {
@@ -71,31 +75,94 @@ public sealed class EffectRowExperimentHarnessTests
         }
 
         Assert.True(drifted.Count == 0,
-            "The effect-rows design doc quotes compiler output that no longer reproduces. "
-            + "Either the compiler changed (update the doc AND the transcripts in the same PR) "
+            "The registered current effect-row probes no longer reproduce. "
+            + "Either the compiler changed (review the active scripts and transcripts together) "
             + "or the harness broke.\n  "
             + string.Join("\n  ", drifted)
-            + "\n\nRegenerate this test's behavior transcripts with "
+            + "\n\nRegenerate only this test's active behavior transcripts with "
             + "CALOR_REGENERATE_EXPERIMENT_TRANSCRIPTS=1.");
+    }
+
+    [Fact]
+    public void ActiveTranscripts_ChangeOnlyRetiredProbesAndPrefixBangDiagnosticSpelling()
+    {
+        var replacements = new Dictionary<string, string[]>
+        {
+            ["run.py"] = ["X4-fallible-type-suffix"],
+            ["run2.py"] = ["Y2a-fallible-brace-form", "Y2b-fallible-in-B"],
+            ["run3.py"] = ["Z11-fallible-brace-form-full-output"]
+        };
+        var root = RepositoryRoot();
+        foreach (var script in Scripts)
+        {
+            var original = Path.Combine(ExperimentsDirectory(), script);
+            var relative = Path.GetRelativePath(root, original).Replace('\\', '/');
+            var (_, activeTranscript) = ActiveSyntaxInputs.ForCurrentExecutable(root, relative);
+            var historical = TranscriptCases(File.ReadAllText(Path.Combine(
+                ExperimentsDirectory(), "transcripts", Path.ChangeExtension(script, ".txt"))));
+            var active = TranscriptCases(File.ReadAllText(activeTranscript));
+            Assert.NotEmpty(historical);
+            Assert.Equal(historical.Keys.Order(StringComparer.Ordinal), active.Keys.Order(StringComparer.Ordinal));
+            foreach (var (name, expected) in historical)
+            {
+                if (replacements[script].Contains(name, StringComparer.Ordinal))
+                    Assert.NotEqual(expected, active[name]);
+                else if (script == "run.py" && name == "X3b-bang-sigil-mixed")
+                {
+                    const string historicalMessage = "Unknown effect code '! e'.";
+                    const string currentMessage = "Unknown effect code '!e'.";
+                    Assert.Contains(historicalMessage, expected);
+                    Assert.Equal(expected.Replace(historicalMessage, currentMessage, StringComparison.Ordinal),
+                        active[name]);
+                }
+                else
+                    Assert.Equal(expected, active[name]);
+            }
+        }
+    }
+
+    private static Dictionary<string, string> TranscriptCases(string text)
+    {
+        text = Normalize(text);
+        var matches = Regex.Matches(text, @"(?m)^CASE (\S+)");
+        return matches.Select((match, index) => (
+            Name: match.Groups[1].Value,
+            Body: text[match.Index..(index + 1 < matches.Count ? matches[index + 1].Index : text.Length)]))
+            .ToDictionary(entry => entry.Name, entry => entry.Body, StringComparer.Ordinal);
     }
 
     private static string RunScript(string experiments, string script)
     {
-        var start = new ProcessStartInfo("python3", script)
+        var work = Path.Combine(RepositoryRoot(), "src", "Calor.Compiler", "bin",
+            "effect-row-experiments", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        var start = new ProcessStartInfo("python3")
         {
             WorkingDirectory = experiments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        start.ArgumentList.Add(script);
         start.Environment["CALOR_DLL"] = CompilerDll();
+        start.Environment["CALOR_EXPERIMENT_ORIGINAL_DIRECTORY"] = experiments;
+        start.Environment["CALOR_EXPERIMENT_WORKDIR"] = work;
+        start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
 
-        using var process = Process.Start(start);
-        Assert.NotNull(process);
-        var stdout = process!.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        return stdout + stderr;
+        try
+        {
+            using var process = Process.Start(start);
+            Assert.NotNull(process);
+            var stdout = process!.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            Assert.True(process.ExitCode == 0, $"Experiment script failed: {script}\n{stderr}");
+            return stdout + stderr;
+        }
+        finally
+        {
+            Directory.Delete(work, recursive: true);
+        }
     }
 
     /// <summary>

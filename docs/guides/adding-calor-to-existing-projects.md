@@ -92,8 +92,8 @@ Files are scored based on patterns that map to Calor features:
 | Pattern | Calor Feature |
 |:--------|:-------------|
 | Argument validation, `ArgumentException` | `§Q` precondition contracts |
-| Null checks, `?.`, `??` | `Option<T>` types |
-| Try/catch blocks | `Result<T,E>` error handling |
+| Null checks, `?.`, `??` | .NET nullable types and explicit null handling |
+| Try/catch blocks | Native exception handling with `§TR` / `§CA` |
 | File I/O, network, database calls | `§E` effect declarations |
 
 ### Priority Bands
@@ -294,7 +294,7 @@ MyProject/
 
 1. **High-scoring files** from `calor assess`
 2. **Files with complex validation** - benefit from contracts
-3. **Files with error handling** - benefit from `Result<T,E>`
+3. **Files with error handling** - retain native exceptions and declare their effects
 4. **Files with side effects** - benefit from effect declarations
 
 ### What to Keep in C#

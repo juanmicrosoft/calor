@@ -5,7 +5,7 @@ order: 2
 ---
 
 
-Calor has a simple type system with primitives, optionals, and results.
+Calor has primitives, .NET nullable types, ordinary generics, and arrays.
 
 Code blocks on this reference page are declaration, expression, or body
 fragments, not complete files. The
@@ -41,9 +41,9 @@ Signature fragments (inside a module):
 
 ---
 
-## Nullable Types (`?T`) and Runtime Options
+## Nullable Types (`?T`)
 
-`?str` is a nullable .NET string reference, not an `Option<str>`.
+`?str` is a nullable .NET string reference.
 `str` and `string` are aliases; `?str`, `?string`, `str?`, and `string?`
 are supported nullable spellings. A resolved `?User` remains an ordinary
 nullable object reference. Nullable value types such as `?i32` map to
@@ -56,16 +56,14 @@ Signature fragments:
 §F{f002:Process:pub} (?i32:maybeValue) -> void
 ```
 
-Use ordinary values or `null` with nullable references. Explicit `Option<T>`
-instead represents Some/None using Calor's runtime option type. It is not
-implicitly unwrapped into a reference or by `??`.
+Use ordinary values or `null` with nullable references. The existing
+null-coalescing expression supplies a fallback:
 
-### Creating Option Values
-
-Expression fragments for an explicit `Option<T>`:
 ```calor
-§SM value           // Some(value) - has a value
-§NN                 // None - no value
+§M{m1:NullableFallback}
+  §F{f1:Greeting:pub} (?str:name) -> str
+    §E{}
+    §R (?? name "anonymous")
 ```
 
 See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
@@ -77,53 +75,31 @@ constructor inputs.
 
 ---
 
-## Result Type (`T!E`)
+## Failure Uses Exceptions
 
-Results represent computations that may fail.
-
-### Syntax
-
-```calor
-T!E                 // Result: either T (success) or E (error)
-```
-
-### Examples
+Return the ordinary success type and throw on failure. The `throw` effect
+declares exceptions; `alloc` covers construction of the exception object.
 
 ```calor
-§F{f001:Divide:pub} (i32:a, i32:b) -> i32!str
-  §IF{if1} (== b 0)
-    §R §ERR "Division by zero"
-  §EL
-    §R §OK (/ a b)
+§M{m1:Division}
+  §F{f1:Divide:pub} (i32:a, i32:b) -> i32
+    §E{throw,alloc}
+    §IF{if1} (== b 0)
+      §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
+    §R (/ a b)
 ```
 
-### Creating Result Values
-
-```calor
-§OK value           // Ok(value) - success
-§ERR "message"      // Err(message) - failure
-```
-
-### Common Patterns
-
-**Parse integer:**
-```calor
-§F{f001:ParseInt:pub} (str:text) -> i32!str
-  // ...implementation
-```
-
-**File read:**
-```calor
-§F{f001:ReadFile:pub} (str:path) -> str!str
-  §E{fs:r}
-  // ...implementation
-```
+Handle exceptions with `§TR` / `§CA`; use `§FI` for cleanup and `§RT` to
+rethrow. No special success/error return-type encoding is required.
 
 ---
 
 ## Generic Types
 
 Generic types use angle bracket syntax inline.
+
+Third-party types named `Option<T>` or `Result<T,E>` are ordinary generic
+types, not Calor built-ins. Import their namespace and use their library API.
 
 ### Syntax
 
