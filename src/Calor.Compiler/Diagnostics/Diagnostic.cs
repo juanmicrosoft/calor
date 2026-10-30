@@ -1536,19 +1536,8 @@ public sealed class Diagnostic
 
     public override string ToString()
     {
-        var location = FilePath != null
-            ? $"{FilePath}({Span.Line},{Span.Column})"
-            : $"({Span.Line},{Span.Column})";
-
-        var severityText = Severity switch
-        {
-            DiagnosticSeverity.Error => "error",
-            DiagnosticSeverity.Warning => "warning",
-            DiagnosticSeverity.Info => "info",
-            _ => "unknown"
-        };
-
-        return $"{location}: {severityText} {Code}: {Message}";
+        var severity = Severity == DiagnosticSeverity.Error ? "" : $"{Severity.ToString().ToLowerInvariant()}: ";
+        return $"{DiagnosticText.OneLine(FilePath ?? "<input>")}:{Span.Line}:{Span.Column} {Code} {severity}{DiagnosticText.ShortMessage(this)}";
     }
 }
 
@@ -1590,6 +1579,9 @@ public sealed class DiagnosticWithFix
 /// </summary>
 public sealed class SuggestedFix
 {
+    /// <summary>False for heuristic suggestions or changes requiring a policy decision.</summary>
+    public bool IsSafeToApply { get; }
+
     /// <summary>
     /// Description of what the fix does.
     /// </summary>
@@ -1600,15 +1592,123 @@ public sealed class SuggestedFix
     /// </summary>
     public IReadOnlyList<TextEdit> Edits { get; }
 
-    public SuggestedFix(string description, IReadOnlyList<TextEdit> edits)
+    public SuggestedFix(string description, IReadOnlyList<TextEdit> edits, bool isSafeToApply = false)
     {
         Description = description ?? throw new ArgumentNullException(nameof(description));
         Edits = edits ?? throw new ArgumentNullException(nameof(edits));
+        IsSafeToApply = isSafeToApply;
     }
 
-    public SuggestedFix(string description, TextEdit edit)
-        : this(description, new[] { edit })
+    public SuggestedFix(string description, TextEdit edit, bool isSafeToApply = false)
+        : this(description, new[] { edit }, isSafeToApply)
     {
+    }
+}
+
+/// <summary>Validates an entire patch against its compilation snapshot before applying any edit.</summary>
+internal static class DiagnosticFixes
+{
+    internal static string Apply(
+        string source, string expectedSource, string filePath,
+        IReadOnlyList<DiagnosticWithFix> diagnostics, out int fixesApplied)
+    {
+        if (!string.Equals(source, expectedSource, StringComparison.Ordinal))
+            throw new InvalidDataException("Source changed since diagnosis; refusing stale fixes.");
+
+        var fixes = diagnostics.Where(d => d.Fix.IsSafeToApply && d.Fix.Edits.Count > 0).ToList();
+        var lineStarts = new List<int> { 0 };
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (source[i] == '\r')
+            {
+                if (i + 1 < source.Length && source[i + 1] == '\n')
+                    i++;
+                lineStarts.Add(i + 1);
+            }
+            else if (source[i] == '\n')
+                lineStarts.Add(i + 1);
+        }
+
+        int Offset(int line, int column)
+        {
+            if (line < 1 || line > lineStarts.Count || column < 1)
+                throw new InvalidDataException("Fix span is outside the source.");
+            var start = lineStarts[line - 1];
+            var end = line < lineStarts.Count ? lineStarts[line] - 1 : source.Length;
+            if (end > start && source[end - 1] == '\r')
+                end--;
+            if (column - 1 > end - start)
+                throw new InvalidDataException("Fix column is outside the source line.");
+            var offset = start + column - 1;
+            if (offset > 0 && offset < source.Length
+                && char.IsHighSurrogate(source[offset - 1]) && char.IsLowSurrogate(source[offset]))
+                throw new InvalidDataException("Fix span splits a UTF-16 surrogate pair.");
+            return offset;
+        }
+
+        var edits = new List<(int Start, int End, string Text)>();
+        foreach (var edit in fixes.SelectMany(d => d.Fix.Edits))
+        {
+            if (edit.FilePath.Length > 0
+                && !Incremental.BuildStateCache.GetPathComparer().Equals(
+                    Path.GetFullPath(edit.FilePath), Path.GetFullPath(filePath)))
+                throw new InvalidDataException($"Fix targets another file: {edit.FilePath}");
+            var start = Offset(edit.StartLine, edit.StartColumn);
+            var end = Offset(edit.EndLine, edit.EndColumn);
+            if (end < start)
+                throw new InvalidDataException("Fix span ends before it starts.");
+            // Producers use LF in insertions. Preserve the document's line ending.
+            var newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n"
+                : source.Contains('\r') && !source.Contains('\n') ? "\r" : "\n";
+            var text = newline != "\n"
+                ? edit.NewText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", newline, StringComparison.Ordinal)
+                : edit.NewText;
+            if (!string.Equals(source[start..end], text, StringComparison.Ordinal))
+                edits.Add((start, end, text));
+        }
+
+        var sorted = edits.Distinct().OrderBy(e => e.Start).ThenBy(e => e.End).ToList();
+        for (var i = 1; i < sorted.Count; i++)
+        {
+            var previous = sorted[i - 1];
+            var current = sorted[i];
+            if (current.Start < previous.End || current.Start == previous.Start)
+                throw new InvalidDataException("Fix edits overlap; apply them separately after a fresh diagnosis.");
+        }
+
+        var result = source;
+        foreach (var edit in sorted.AsEnumerable().Reverse())
+            result = result[..edit.Start] + edit.Text + result[edit.End..];
+        fixesApplied = sorted.Count;
+        return result;
+    }
+
+    internal static string Repair(
+        string source, string filePath, CompilationOptions options,
+        out CompilationResult result, out int editsApplied, List<string>? descriptions = null,
+        CompilationResult? initialResult = null)
+    {
+        result = initialResult ?? Program.Compile(source, filePath, options);
+        editsApplied = 0;
+        // Re-diagnose after each patch: later phases may expose another safe fix.
+        for (var pass = 0; pass < 3; pass++)
+        {
+            options.CancellationToken.ThrowIfCancellationRequested();
+            var next = Apply(source, source, filePath, result.Diagnostics.DiagnosticsWithFixes, out var applied);
+            if (next == source)
+                break;
+            descriptions?.AddRange(result.Diagnostics.DiagnosticsWithFixes
+                .Where(d => d.Fix.IsSafeToApply)
+                .Select(d => $"{d.Code}: {d.Fix.Description}"));
+            editsApplied += applied;
+            var recheck = Program.Compile(next, filePath, options);
+            if (!result.HasErrors && (recheck.HasErrors
+                || !string.Equals(result.GeneratedCode, recheck.GeneratedCode, StringComparison.Ordinal)))
+                throw new InvalidDataException("A safe fix changed compilation semantics; refusing the patch.");
+            source = next;
+            result = recheck;
+        }
+        return source;
     }
 }
 

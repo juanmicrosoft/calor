@@ -4,6 +4,73 @@ using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Diagnostics;
 
+/// <summary>Authored text summaries; unknown message shapes remain lossless, not truncated.</summary>
+internal static class DiagnosticText
+{
+    internal static string OneLine(string text) => text
+        .Replace("\r", "\\r", StringComparison.Ordinal)
+        .Replace("\n", "\\n", StringComparison.Ordinal)
+        .Replace("\t", "\\t", StringComparison.Ordinal)
+        .Replace("\u0085", "\\u0085", StringComparison.Ordinal)
+        .Replace("\u2028", "\\u2028", StringComparison.Ordinal)
+        .Replace("\u2029", "\\u2029", StringComparison.Ordinal);
+
+    internal static string ShortMessage(Diagnostic diagnostic)
+    {
+        var message = diagnostic.Message;
+        if (Rules.TryGetValue(diagnostic.Code, out var rule))
+        {
+            message = System.Text.RegularExpressions.Regex.Replace(
+                message, rule.Pattern, rule.Summary,
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant
+                    | System.Text.RegularExpressions.RegexOptions.NonBacktracking,
+                TimeSpan.FromSeconds(1));
+        }
+        return OneLine(message);
+    }
+
+    internal static string? Explanation(string code) =>
+        Rules.TryGetValue(code, out var rule) ? rule.Explanation : null;
+
+    private sealed record Rule(string Pattern, string Summary, string Explanation);
+
+    private static readonly Dictionary<string, Rule> Rules = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [DiagnosticCode.LegacyCloserForm] = new(
+            "^Legacy structural closing tag '([^']+)' was removed in Phase 4d and is no longer accepted\\. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends\\.$",
+            "Remove legacy closer '$1'; blocks end at dedent",
+            "Structural closing tags are not accepted. Blocks end when their bodies dedent. Remove the closer, not its surrounding code or comments. The diagnostic carries a safe deletion patch; call and block-lambda closers remain valid."),
+        [DiagnosticCode.MalformedFunctionHeader] = new(
+            "^'([^']+)' header has four fields \\(([^)]+)\\), but §F/§AF headers take at most \\{id:name:visibility\\}\\. The third field '([^']+)' is a return type -- declare it in the signature as '\\(\\.\\.\\.\\) -> [^']+', not in the header\\. A four-field header silently drops the return type and emits a void method\\.$",
+            "'$1' header $2: move return type '$3' to the signature",
+            "Function headers have at most {id:name:visibility}. The return type belongs in the inline signature, for example §F{f1:Add:pub} () -> i32. A structured patch moves the return type out of a malformed four-field header."),
+        [DiagnosticCode.TabIndentation] = new(
+            "^Leading whitespace uses tabs on ([0-9]+) line\\(s\\)\\. Calor indentation is canonically 2 spaces per level\\.$",
+            "Tab indentation on $1 line(s); use 2 spaces per level",
+            "Canonical indentation is 2 spaces per nesting level. A tab counts as one column in the parser. Consistently tab-only indentation carries a safe expansion patch. Mixing tabs with space-indented lines can change block structure, so expansion remains a suggestion in that case."),
+        [DiagnosticCode.NonStandardIndentWidth] = new(
+            "^Indentation step is not 2 spaces on ([0-9]+) line\\(s\\)\\. Calor indentation is canonically 2 spaces per level\\.$",
+            "Noncanonical indentation on $1 line(s); use 2 spaces per level",
+            "The parser uses relative indentation levels, but canonical source uses 2 spaces per level. Space-only source with consistent nesting carries a safe patch that retains those nesting levels. Mixed or mismatched indentation requires an explicit decision."),
+        [DiagnosticCode.EffectRowUnknown] = new(
+            "^(.+) has effect row (.+) and (.+) declares row (.+), so it cannot be decided whether (?:the row fits|the callee's effects fit)\\. State a row on both sides, or compile with --permissive-effects\\.$",
+            "$1 row $2 vs $3 row $4: compatibility unknown",
+            "An effect row states what a function value may do. An unknown row cannot be checked against another row; an assumed row is not a proof. State rows on both sides or resolve the unavailable declaration. --permissive-effects explicitly waives unknown-row checking, not known effect violations; --strict-effects promotes the warning to an error. Choosing an effect policy is not a deterministic fix."),
+        [DiagnosticCode.UnknownExternalCall] = new(
+            "^Unknown (?:external call to|call target) '([^']+)'(?:\\. Add effect declaration in a \\.calor-effects\\.json manifest\\.| - assuming worst-case effects\\. Consider adding to manifest\\.|: not an internal function, parameter, binding, or field visible to the effect pass\\. If this is a delegate-typed member, declare it where this module can see it with an effect row \\(§E\\{…\\} on the same line as its type\\); otherwise add the callee to a \\.calor-effects\\.json manifest\\.)$",
+            "Unknown effects for call '$1'; declare its effect contract",
+            "The effect pass cannot resolve this call's effects. It charges worst-case effects rather than assuming purity. Supply a .calor-effects.json manifest for an external member, or make a function-valued declaration and its effect row visible to the module. Selecting effects is a policy decision, not a safe automatic fix."),
+        [DiagnosticCode.UndeclaredPublicFunction] = new(
+            "^Public function '([^']+)' in module '([^']+)' has no effect declaration\\. Cross-module callers cannot verify effect safety\\. Add §E\\{\\.\\.\\.\\} to declare effects\\.$",
+            "Public function '$2.$1' has no effect declaration",
+            "Public functions need an explicit §E effect declaration so cross-module callers can verify their effects. §E{} declares purity; nonempty declarations must include the effects the function can perform. The compiler does not choose this API contract automatically."),
+        [DiagnosticCode.AmbiguousCallContinuation] = new(
+            "^Closer-less call '([^']+)' already took one inline argument; a second positional argument is ambiguous\\. Use the explicit form '([^']+)' instead\\.$",
+            "Ambiguous second argument to '$1'; use '$2'",
+            "A closer-less call accepts at most one inline argument. Multiple arguments require explicit §A markers and §/C. The intended argument boundaries are ambiguous, so no automatic patch is applied.")
+    };
+}
+
 /// <summary>
 /// Formats diagnostics for output.
 /// </summary>
@@ -278,7 +345,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         // Build lookup from DiagnosticsWithFixes to populate fix info
         // Include message in key to differentiate between different constructs at same location
         var fixLookup = diagnostics.DiagnosticsWithFixes
-            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+            .GroupBy(dwf => (dwf.FilePath, dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
             .ToDictionary(g => g.Key, g => g.First());
 
         var results = new List<SarifResult>();
@@ -287,7 +354,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
             List<SarifFix>? fixes = null;
 
             // Check if this diagnostic has an associated fix
-            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
+            var key = (d.FilePath, d.Span.Line, d.Span.Column, d.Code, d.Message);
             if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
             {
                 fixes = new List<SarifFix>

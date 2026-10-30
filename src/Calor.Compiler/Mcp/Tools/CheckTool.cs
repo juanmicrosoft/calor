@@ -38,7 +38,7 @@ public sealed class CheckTool : McpToolBase
                 },
                 "apply": {
                     "type": "boolean",
-                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics; if errors remain, a source-level heal (indentation + structural-closer repair) is attempted (diagnose action, default: false)"
+                    "description": "Apply deterministic safe patches and return fixed source with freshly computed diagnostics. Heuristic suggestions are not applied (diagnose action, default: false)."
                 },
                 "strictApi": {
                     "type": "boolean",
@@ -152,36 +152,11 @@ public sealed class CheckTool : McpToolBase
 
             string? fixedSource = null;
             var fixesApplied = 0;
-            bool healed = false;
             if (applyFixes)
             {
-                fixedSource = ApplyFixes(source, result.Diagnostics.DiagnosticsWithFixes, out fixesApplied);
-
-                // Auto-heal: if errors remain after applying the targeted fix
-                // edits, run the source-level healer (same transform as
-                // `calor format --heal`) and keep the result when it strictly
-                // reduces the error count. This lets agent check→fix loops
-                // self-heal indentation/closer thrash without a round-trip.
-                if (result.HasErrors)
-                {
-                    var candidate = new SourceHealer().Heal(fixedSource);
-                    if (candidate != fixedSource)
-                    {
-                        var recheck = Program.Compile(candidate, "mcp-input.calr", compileOptions);
-                        if (recheck.Diagnostics.Errors.Count < result.Diagnostics.Errors.Count)
-                        {
-                            fixedSource = candidate;
-                            healed = true;
-
-                            // The response must describe the state of
-                            // fixedSource, not the pre-heal input: replace the
-                            // diagnostics (so coordinates match fixedSource)
-                            // and derive success/isError from the recheck.
-                            result = recheck;
-                            (diagnostics, hints) = BuildDiagnoseDiagnostics(recheck, candidate);
-                        }
-                    }
-                }
+                fixedSource = DiagnosticFixes.Repair(source, "mcp-input.calr", compileOptions,
+                    out result, out fixesApplied, initialResult: result);
+                (diagnostics, hints) = BuildDiagnoseDiagnostics(result, fixedSource);
             }
 
             var output = new DiagnoseOutput
@@ -193,7 +168,7 @@ public sealed class CheckTool : McpToolBase
                 Hints = hints.Count > 0 ? hints : null,
                 FixedSource = fixedSource,
                 FixesApplied = applyFixes ? fixesApplied : null,
-                Healed = healed ? true : null
+                Healed = null
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
@@ -242,50 +217,6 @@ public sealed class CheckTool : McpToolBase
         }
 
         return (entries, hints);
-    }
-
-    private static string ApplyFixes(string source, IReadOnlyList<DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
-    {
-        var allEdits = diagnosticsWithFixes
-            .SelectMany(d => d.Fix.Edits)
-            .OrderByDescending(e => e.StartLine)
-            .ThenByDescending(e => e.StartColumn)
-            .ToList();
-
-        fixesApplied = 0;
-        if (allEdits.Count == 0) return source;
-
-        var lines = source.Split('\n');
-
-        foreach (var edit in allEdits)
-        {
-            var startLine = edit.StartLine - 1;
-            var startCol = edit.StartColumn - 1;
-            var endLine = edit.EndLine - 1;
-            var endCol = edit.EndColumn - 1;
-
-            if (startLine < 0 || startLine >= lines.Length) continue;
-            if (endLine < 0 || endLine >= lines.Length) continue;
-
-            var beforeEdit = startCol >= 0 && startCol <= lines[startLine].Length
-                ? lines[startLine][..startCol]
-                : lines[startLine];
-            var afterEdit = endCol >= 0 && endCol <= lines[endLine].Length
-                ? lines[endLine][endCol..]
-                : "";
-
-            var newContent = beforeEdit + edit.NewText + afterEdit;
-            var newLines = newContent.Split('\n');
-
-            var lineList = lines.ToList();
-            lineList.RemoveRange(startLine, endLine - startLine + 1);
-            lineList.InsertRange(startLine, newLines);
-            lines = lineList.ToArray();
-
-            fixesApplied++;
-        }
-
-        return string.Join('\n', lines);
     }
 
     private static readonly Lazy<JsonDocument?> ErrorSuggestions = new(LoadErrorSuggestions);

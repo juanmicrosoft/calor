@@ -76,6 +76,7 @@ public sealed class EnvelopeBinding
 public sealed class EnvelopeFix
 {
     public required string Description { get; init; }
+    public bool IsSafeToApply { get; init; }
     public required List<EnvelopeEdit> Edits { get; init; }
 }
 
@@ -128,6 +129,7 @@ public static class DiagnosticEnvelope
             entry.Fix = new EnvelopeFix
             {
                 Description = fix.Description,
+                IsSafeToApply = fix.IsSafeToApply,
                 Edits = fix.Edits.Select(e => new EnvelopeEdit
                 {
                     FilePath = e.FilePath,
@@ -152,13 +154,13 @@ public static class DiagnosticEnvelope
         DeclarationIdResolver? declarationIds = null)
     {
         var fixLookup = bag.DiagnosticsWithFixes
-            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+            .GroupBy(dwf => (dwf.FilePath, dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
             .ToDictionary(g => g.Key, g => g.First());
 
         var entries = new List<EnvelopeDiagnostic>();
         foreach (var d in bag)
         {
-            fixLookup.TryGetValue((d.Span.Line, d.Span.Column, d.Code, d.Message), out var withFix);
+            fixLookup.TryGetValue((d.FilePath, d.Span.Line, d.Span.Column, d.Code, d.Message), out var withFix);
             entries.Add(Build(d, declarationIds, withFix?.Fix));
         }
         return entries;

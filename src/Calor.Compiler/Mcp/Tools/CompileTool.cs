@@ -80,7 +80,7 @@ public sealed class CompileTool : McpToolBase
                         "autoFix": {
                             "type": "boolean",
                             "default": true,
-                            "description": "Auto-fix high-confidence errors (parser, ID, effects). Set to false to skip auto-fix."
+                            "description": "Apply deterministic safe diagnostic patches and recompile. Heuristic and effect-policy suggestions are not applied. Set false to skip auto-fix."
                         },
                         "enforceEffects": {
                             "type": "boolean",
@@ -206,37 +206,10 @@ public sealed class CompileTool : McpToolBase
             // AutoFix: multi-pass compile→fix→recompile loop
             var fixesApplied = new List<string>();
             var fixedSource = source;
-            if (autoFix && result.HasErrors)
+            if (autoFix)
             {
-                const int maxPasses = 3;
-                for (var pass = 0; pass < maxPasses; pass++)
-                {
-                    var diagnosticsWithFixes = result.Diagnostics.DiagnosticsWithFixes;
-                    if (diagnosticsWithFixes.Count == 0)
-                        break; // No fixes available
-
-                    // Apply high-confidence fixes (parser Calor01xx + ID Calor08xx)
-                    // Medium-confidence (effects Calor04xx) also applied since we generate them
-                    var applicableFixes = diagnosticsWithFixes.ToList();
-                    if (applicableFixes.Count == 0)
-                        break;
-
-                    var previousSource = fixedSource;
-                    fixedSource = ApplyFixes(fixedSource, applicableFixes, out var applied);
-
-                    if (fixedSource == previousSource)
-                        break; // No changes — bail to prevent infinite loop
-
-                    foreach (var fix in applicableFixes.Take(applied))
-                        fixesApplied.Add($"{fix.Code}: {fix.Fix.Description}");
-
-                    // Recompile with fixed source
-                    cancellationToken.ThrowIfCancellationRequested();
-                    result = Program.Compile(fixedSource, filePath, compileOptions);
-
-                    if (!result.HasErrors)
-                        break; // Success!
-                }
+                fixedSource = DiagnosticFixes.Repair(source, filePath, compileOptions,
+                    out result, out _, fixesApplied, initialResult: result);
 
                 // Update source for the output if fixes were applied
                 if (fixesApplied.Count > 0)
@@ -605,54 +578,6 @@ public sealed class CompileTool : McpToolBase
     private static void IncrementCategory(Dictionary<string, int> categories, string key)
     {
         categories[key] = categories.GetValueOrDefault(key) + 1;
-    }
-
-    /// <summary>
-    /// Applies fix edits to source in reverse line order (same pattern as CheckTool.ApplyFixes).
-    /// </summary>
-    private static string ApplyFixes(string source,
-        IReadOnlyList<Diagnostics.DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
-    {
-        var allEdits = diagnosticsWithFixes
-            .SelectMany(d => d.Fix.Edits)
-            .OrderByDescending(e => e.StartLine)
-            .ThenByDescending(e => e.StartColumn)
-            .ToList();
-
-        fixesApplied = 0;
-        if (allEdits.Count == 0) return source;
-
-        var lines = source.Split('\n');
-
-        foreach (var edit in allEdits)
-        {
-            var startLine = edit.StartLine - 1;
-            var startCol = edit.StartColumn - 1;
-            var endLine = edit.EndLine - 1;
-            var endCol = edit.EndColumn - 1;
-
-            if (startLine < 0 || startLine >= lines.Length) continue;
-            if (endLine < 0 || endLine >= lines.Length) endLine = startLine;
-
-            var beforeEdit = startCol >= 0 && startCol <= lines[startLine].Length
-                ? lines[startLine][..startCol]
-                : lines[startLine];
-            var afterEdit = endCol >= 0 && endCol <= lines[endLine].Length
-                ? lines[endLine][endCol..]
-                : "";
-
-            var newContent = beforeEdit + edit.NewText + afterEdit;
-            var newLines = newContent.Split('\n');
-
-            var lineList = lines.ToList();
-            lineList.RemoveRange(startLine, endLine - startLine + 1);
-            lineList.InsertRange(startLine, newLines);
-            lines = lineList.ToArray();
-
-            fixesApplied++;
-        }
-
-        return string.Join('\n', lines);
     }
 
     private sealed class CompileToolOutput

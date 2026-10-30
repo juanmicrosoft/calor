@@ -1298,14 +1298,16 @@ internal static class PpE1Probe
             start.ArgumentList.Add(source);
             start.ArgumentList.Add("-o");
             start.ArgumentList.Add(output);
+            start.ArgumentList.Add("--format");
+            start.ArgumentList.Add("json");
 
             using var process = Process.Start(start);
             Assert.NotNull(process);
-            var stdout = process!.StandardOutput.ReadToEnd();
-            var stderr = process.StandardError.ReadToEnd();
+            var stdout = process!.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
             process.WaitForExit();
 
-            return (process.ExitCode, Parse(stdout + "\n" + stderr));
+            return (process.ExitCode, ParseStructured(stdout.Result, stderr.Result, process.ExitCode));
         }
         finally
         {
@@ -1314,38 +1316,22 @@ internal static class PpE1Probe
     }
 
     /// <summary>
-    /// `…/A2.calr(26,24): warning Calor0411: message` → one diagnostic; an
-    /// indented line that follows one is that diagnostic's continuation.
+    /// Reads the live compiler's structured transport without changing the
+    /// archived fixture, diagnostic message, multiset or registered location.
     /// </summary>
-    private static PpE1Diagnostic[] Parse(string text)
+    internal static PpE1Diagnostic[] ParseStructured(string json, string stderr, int exitCode)
     {
-        var result = new List<PpE1Diagnostic>();
-        PpE1Diagnostic? current = null;
-        foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
-        {
-            var match = DiagnosticLine.Match(raw);
-            if (match.Success)
-            {
-                current = new PpE1Diagnostic(
-                    int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
-                    int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture),
-                    match.Groups[4].Value,
-                    match.Groups[3].Value,
-                    match.Groups[5].Value.TrimEnd());
-                result.Add(current);
-            }
-            else if (current is not null && raw.Length > 0 && char.IsWhiteSpace(raw[0])
-                     && !string.IsNullOrWhiteSpace(raw))
-            {
-                var joined = current with { Message = current.Message + "\n" + raw.TrimEnd() };
-                result[result.Count - 1] = joined;
-                current = joined;
-            }
-            else
-            {
-                current = null;
-            }
-        }
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var result = document.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(d => new PpE1Diagnostic(
+                d.GetProperty("location").GetProperty("line").GetInt32(),
+                d.GetProperty("location").GetProperty("column").GetInt32(),
+                d.GetProperty("code").GetString()!, d.GetProperty("severity").GetString()!,
+                d.GetProperty("message").GetString()!))
+            .ToList();
+        if (result.Any(d => d.Severity is not ("error" or "warning" or "info"))
+            || (exitCode != 0) != result.Any(d => d.Severity == "error"))
+            throw new InvalidDataException($"CLI exit and structured diagnostics disagree (exit {exitCode}): {stderr}");
 
         return [.. result
             .OrderBy(d => d.Line)
@@ -1354,10 +1340,6 @@ internal static class PpE1Probe
             .ThenBy(d => d.Severity, StringComparer.Ordinal)
             .ThenBy(d => d.Message, StringComparer.Ordinal)];
     }
-
-    private static readonly System.Text.RegularExpressions.Regex DiagnosticLine = new(
-        @"\((\d+),(\d+)\): (error|warning|info) (Calor\d+): (.*)$",
-        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     public static int CountOccurrences(string haystack, string needle)
     {

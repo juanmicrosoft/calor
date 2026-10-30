@@ -18,8 +18,9 @@ namespace Calor.Compiler.Tests;
 /// mode the doc criticises Draft v1 for.</para>
 ///
 /// <para>This test closes it. It re-runs the compiler-behavior scripts and compares the
-/// output byte-for-byte against the transcripts committed beside them. A drift is
-/// a red test naming the script, not a stale document.</para>
+/// output byte-for-byte against the transcripts committed beside them. The scripts
+/// render structured diagnostics in the archived layout, preserving full messages
+/// without making the old layout a contract for today's default text output.</para>
 ///
 /// <para><b>Regenerating.</b> After an intentional compiler change, review the diff,
 /// update the design doc's quoted output, and commit both in the same PR.

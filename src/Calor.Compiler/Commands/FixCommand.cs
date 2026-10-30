@@ -2,12 +2,13 @@ using System.CommandLine;
 using System.Text;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Formatting;
 
 namespace Calor.Compiler.Commands;
 
 /// <summary>
-/// <c>calor fix</c> — bulk source rewrites that are mechanically safe
-/// and reversible (each operation records a <c>migration.log.json</c>).
+/// <c>calor fix</c> applies safe diagnostic patches, or explicit reversible
+/// source migrations (which can record a <c>migration.log.json</c>).
 ///
 /// Subcommands:
 /// <list type="bullet">
@@ -24,13 +25,15 @@ public static class FixCommand
 {
     public static Command Create()
     {
-        var rootArgument = new Argument<DirectoryInfo>(
+        var rootArgument = new Argument<string>(
             name: "root",
-            description: "Root directory to walk recursively for .calr files")
+            getDefaultValue: () => ".",
+            description: "Calor file or root directory (default: current directory)")
         {
-            Arity = ArgumentArity.ExactlyOne
+            Arity = ArgumentArity.ZeroOrOne
         };
 
+        var applyOption = new Option<bool>("--apply", "Apply deterministic safe diagnostic patches");
         var elideCallClosersOption = new Option<bool>(
             aliases: ["--elide-call-closers"],
             description: "Elide §/C on zero-arg + one-arg same-line calls (v0.6.x)");
@@ -56,9 +59,10 @@ public static class FixCommand
             getDefaultValue: () => "text",
             description: "Output format: text or json (envelope v1.1)");
 
-        var command = new Command("fix", "Apply mechanical, reversible source rewrites")
+        var command = new Command("fix", "Apply safe diagnostic patches or reversible source migrations")
         {
             rootArgument,
+            applyOption,
             elideCallClosersOption,
             healClosersOption,
             revertOption,
@@ -70,8 +74,25 @@ public static class FixCommand
         command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
         {
             var parse = context.ParseResult;
+            if (parse.GetValueForOption(applyOption))
+            {
+                var json = string.Equals(parse.GetValueForOption(formatOption), "json", StringComparison.OrdinalIgnoreCase);
+                if (parse.GetValueForOption(elideCallClosersOption) || parse.GetValueForOption(healClosersOption)
+                    || parse.GetValueForOption(revertOption) || parse.GetValueForOption(logOption) != null)
+                {
+                    const string message = "--apply cannot be combined with migration options (--elide-call-closers, --heal-closers, --revert, --log)";
+                    EmitErrorEnvelope(json, DiagnosticCode.CliUsageError, message, null);
+                    Console.Error.WriteLine(message);
+                    context.ExitCode = 2;
+                    return;
+                }
+                context.ExitCode = await ApplyDiagnosticsAsync(
+                    parse.GetValueForArgument(rootArgument),
+                    parse.GetValueForOption(dryRunOption), json);
+                return;
+            }
             context.ExitCode = await ExecuteAsync(
-                parse.GetValueForArgument(rootArgument),
+                new DirectoryInfo(parse.GetValueForArgument(rootArgument)),
                 parse.GetValueForOption(elideCallClosersOption),
                 parse.GetValueForOption(healClosersOption),
                 parse.GetValueForOption(revertOption),
@@ -118,8 +139,8 @@ public static class FixCommand
         if (selectedCount == 0)
         {
             EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
-                "specify --elide-call-closers or --heal-closers", filePath: null);
-            Console.Error.WriteLine("specify --elide-call-closers or --heal-closers");
+                "specify --apply, --elide-call-closers or --heal-closers", filePath: null);
+            Console.Error.WriteLine("specify --apply, --elide-call-closers or --heal-closers");
             return 2;
         }
         if (selectedCount > 1)
@@ -139,6 +160,69 @@ public static class FixCommand
         return revert
             ? await RevertHealClosersAsync(root, log, dryRun, json)
             : await HealClosersAsync(root, log, dryRun, json);
+    }
+
+    private static async Task<int> ApplyDiagnosticsAsync(string target, bool dryRun, bool json)
+    {
+        var diagnostics = new DiagnosticBag();
+        var changedFiles = 0;
+        var editsApplied = 0;
+        try
+        {
+            var fullPath = Path.GetFullPath(target);
+            if (!File.Exists(fullPath) && !Directory.Exists(fullPath))
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticCode.CliInputNotFound, DiagnosticSeverity.Error,
+                    "Input path not found", fullPath, 1, 1));
+            }
+            else
+            {
+                var paths = File.Exists(fullPath) ? [fullPath]
+                    : EnumerateCalrFiles(new DirectoryInfo(fullPath)).Order(StringComparer.Ordinal).ToArray();
+                if (paths.Length == 0 || paths.Any(path => !path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)))
+                    throw new ArgumentException("Expected a .calr file or a directory containing .calr files.");
+
+                foreach (var path in paths)
+                {
+                    var snapshot = await SourceFileSnapshot.ReadAsync(path);
+                    var fixedSource = DiagnosticFixes.Repair(snapshot.Text, snapshot.Path,
+                        new CompilationOptions(), out var result, out var applied);
+                    if (fixedSource != snapshot.Text)
+                    {
+                        if (!dryRun)
+                        {
+                            await SafeSourceFile.WriteParsedAsync(snapshot, fixedSource, persisted =>
+                            {
+                                if (!string.Equals(persisted, fixedSource, StringComparison.Ordinal))
+                                    throw new InvalidDataException("Persisted source does not match the validated patch.");
+                            });
+                        }
+                        changedFiles++;
+                        editsApplied += applied;
+                    }
+                    // A preview describes the unchanged disk, not a fictional successful repair.
+                    if (dryRun)
+                        result = Program.Compile(snapshot.Text, snapshot.Path);
+                    diagnostics.AddRange(result.Diagnostics);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            diagnostics.Add(new Diagnostic(DiagnosticCode.CliInternalError, DiagnosticSeverity.Error,
+                $"Fix failed: {ex.Message}", target, 1, 1));
+        }
+
+        if (json)
+            Console.WriteLine(EnvelopeWriter.Serialize("fix",
+                new { operation = "apply", dryRun, changedFiles, editsApplied }, diagnostics));
+        else
+        {
+            foreach (var diagnostic in diagnostics)
+                Console.Error.WriteLine(diagnostic);
+            Console.WriteLine($"fix: {(dryRun ? "[dry-run] " : "")}files_changed={changedFiles} edits={editsApplied} errors={diagnostics.Errors.Count} warnings={diagnostics.Warnings.Count}");
+        }
+        return diagnostics.HasErrors ? 1 : 0;
     }
 
     /// <summary>

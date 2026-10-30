@@ -223,7 +223,7 @@ Analyze Calor code for security vulnerabilities and bug patterns.
 
 **Output:** Security vulnerabilities, bug patterns, and dataflow issues.
 
-### calor_diagnose
+### calor_check (`action: "diagnose"`)
 
 Get machine-readable diagnostics from Calor source code. Includes suggestions and fix information for errors when available.
 
@@ -231,7 +231,8 @@ Get machine-readable diagnostics from Calor source code. Includes suggestions an
 ```json
 {
   "source": "string (required) - Calor source code to diagnose",
-  "apply": "boolean - Apply all available fix edits and return the fixed source; if errors remain, a source-level heal is attempted (default: false)",
+  "action": "diagnose",
+  "apply": "boolean - Apply deterministic safe patches and return freshly checked source (default: false)",
   "options": {
     "strictApi": "boolean - Enable strict API checking (default: false)",
     "requireDocs": "boolean - Require documentation on public functions (default: false)"
@@ -298,20 +299,23 @@ With `"apply": true` the response additionally contains:
 
 ```json
 {
-  "fixedSource": "string - the source after applying every machine-applicable fix edit",
-  "fixesApplied": 2,
-  "healed": true
+  "fixedSource": "string - the source after applying safe diagnostic patches",
+  "fixesApplied": 2
 }
 ```
 
-`healed` is present (and `true`) only when the targeted fix edits were not
-enough and the source-level healer (the same transform as
-`calor format --heal`) was applied on top and strictly reduced the error
-count. **When `healed` is `true`, `success`, `errorCount`, `warningCount`,
-and `diagnostics` describe the post-heal recheck of `fixedSource`** — all
-diagnostic coordinates match `fixedSource`, not the original input. Note
-that healing is not semantics-preserving (it guesses control flow when
-re-anchoring ambiguous statements) — review `fixedSource` before using it.
+`success`, counts, diagnostic coordinates and `isError` always describe
+`fixedSource`, including after targeted patches that need no source-level heal.
+`fixesApplied` counts individual edits. Up to three patch batches are applied,
+with a fresh diagnosis after each.
+
+Only patches marked `fix.isSafeToApply: true` are applied. Fuzzy name or operator
+matches, guessed types, effect-contract changes and ambiguous indentation remain
+suggestions with their original fix payloads. Invalid spans, overlapping edits
+and cross-file patches fail explicitly instead of being skipped. `apply` no
+longer invokes the heuristic source healer implicitly; use explicit
+`calor format --heal` when you intend to review control-flow guesses.
+MCP `calor_compile` uses the same safe-patch path for `options.autoFix`.
 
 **Fix-Supported Diagnostics:**
 - Typos in operators (e.g., "cotains" → "contains")

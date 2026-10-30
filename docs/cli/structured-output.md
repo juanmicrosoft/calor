@@ -27,6 +27,20 @@ calor lint file.calr --format json        # lint findings in the same schema
 On the root command `--format` has the short alias `-f`. On `calor lint` there
 is **no short alias** — `-f` means `--fix` there; spell out `--format`.
 
+## Default text
+
+Each diagnostic occupies one line: `file:line:col code short-message`.
+Warnings and informational diagnostics prefix the message with `warning:` or
+`info:`; errors have no extra prefix. A missing file is printed as `<input>`.
+Embedded line breaks are escaped, not dropped. Unknown codes and unrecognized
+message shapes retain their full message rather than being truncated.
+
+Common verbose diagnostics have authored short summaries. Use MCP
+`calor_help` with `{"action":"error","error":"Calor0425"}` for the explanation;
+JSON and SARIF retain the original full message and structured verification
+payload. A non-verbose clean compile prints one status line for the whole file
+set, including cached files.
+
 ## Output-stream contract
 
 In a structured format (`json` or `sarif`):
@@ -112,7 +126,10 @@ Field notes:
     and the structured counterexample model on `refuted`.
   - `suggestion` / `fix` — present only when the compiler attaches a suggested
     fix. `fix.edits[]` are machine-applicable text edits (1-based line/column,
-    end-exclusive replace of the region with `newText`).
+    end-exclusive replace of the region with `newText`). `fix.isSafeToApply`
+    identifies deterministic patches; `false` means a suggestion requiring
+    review. CLI `calor fix --apply` and MCP `calor_check` with `apply: true`
+    apply only safe patches, then report a fresh diagnosis.
 - `summary` — counts over `diagnostics[]`; `total` always equals the array length.
 
 Fields that are `null` are omitted from the serialized output.

@@ -2,14 +2,30 @@
 title: "fix"
 section: "cli"
 order: 18
-description: "Apply reversible mechanical source migrations"
+description: "Apply safe diagnostic patches or reversible source migrations"
 ---
 
 ```bash
-calor fix <root> <operation-option> [options]
+calor fix [file-or-root] --apply [options]
 ```
 
-Exactly one operation is required:
+`--apply` applies deterministic safe diagnostic patches, then rechecks the
+result. The path defaults to the current directory. It does not apply fuzzy
+name suggestions, choose effect contracts or guess ambiguous indentation.
+Those suggestions remain available in structured diagnostics.
+
+```bash
+calor fix src/Broken.calr --apply --dry-run --format json
+calor fix src/ --apply
+```
+
+The command makes at most three patch passes. Remaining errors produce a
+nonzero exit, even if some patches were applied. A dry run preserves the
+original diagnostics and source. Writes preserve encoding, BOM and permissions,
+reject stale source, and replace each file atomically. Invalid, overlapping or
+cross-file edits fail explicitly.
+
+Alternatively, select one reversible migration operation:
 
 | Operation | Rewrite |
 |:----------|:--------|
@@ -26,7 +42,8 @@ calor fix src/ --heal-closers --revert --log .calor/closers.json
 
 `--dry-run` (`-n`) reports changes without writing. `--log` records removed
 UTF-8 byte ranges, and `--revert` restores the original bytes. `--format json`
-(`-f`) emits a schema 2.0 envelope.
+(`-f`) emits a schema 2.0 envelope. Migration flags, `--log` and `--revert`
+cannot be combined with `--apply`.
 
 Use this command—not format or lint—to heal structural closer syntax, because
 those tools must parse the file and `Calor0830` rejects the closer first.

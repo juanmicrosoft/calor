@@ -19,6 +19,13 @@ calor watch src/ --format json
 Root compile supports `-f`; on lint, spell out `--format` because `-f` means
 `--fix`. Watch produces NDJSON: one compact envelope per line for every rebuild.
 
+Default text uses one line per diagnostic: `file:line:col code short-message`.
+Warnings and informational messages retain `warning:` and `info:` prefixes
+after the code. Embedded line breaks are escaped. Unknown messages are preserved,
+not truncated. A clean non-verbose compile prints one status line for all inputs.
+Long explanations for common diagnostics are available through MCP `calor_help`
+with `action: "error"` and the diagnostic code.
+
 ## Envelope Shape
 
 ```json illustrative
@@ -48,6 +55,10 @@ Root compile supports `-f`; on lint, spell out `--format` because `-f` means
 Fields that do not apply are omitted. `diagnostics[].fix.edits[]` carries
 machine-applicable, 1-based, end-exclusive source edits when a diagnostic has a
 fix. Command-specific results live under `data`.
+`fix.isSafeToApply` distinguishes deterministic patches from suggestions that
+need review. `calor fix --apply` and MCP `calor_check` with `apply: true` apply
+only safe patches and return fresh diagnostics. Structured messages and
+verification payloads are unchanged.
 
 ## Conversion Output
 

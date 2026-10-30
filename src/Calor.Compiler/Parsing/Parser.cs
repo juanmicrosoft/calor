@@ -792,8 +792,8 @@ public sealed class Parser
 
     /// <summary>
     /// Builds the <see cref="SuggestedFix"/> that auto-heals a legacy
-    /// structural closer by deleting its entire line. The edit spans from
-    /// column 1 of the closer line to just past the closer keyword and any
+    /// structural closer by deleting only its token and payload. The edit spans from
+    /// the closer's column to just past the closer keyword and any
     /// optional <c>{id}</c> payload (e.g. <c>§/F{f1}</c>), replacing it with
     /// an empty string. Indent-only Calor tolerates the resulting blank line,
     /// so the healed source compiles. Consumed by the LSP code-action handler
@@ -837,7 +837,8 @@ public sealed class Parser
         var filePath = _diagnostics.CurrentFilePath ?? string.Empty;
         return new SuggestedFix(
             $"Remove the legacy closer '{closerToken.Text}' (indentation already ends the block)",
-            TextEdit.Replace(filePath, span.Line, 1, endLine, endColumn, string.Empty));
+            TextEdit.Replace(filePath, span.Line, span.Column, endLine, endColumn, string.Empty),
+            isSafeToApply: true);
     }
 
     /// <summary>
@@ -907,7 +908,7 @@ public sealed class Parser
 
         var fix = new SuggestedFix(
             $"Move the return type '{type}' out of the header: use {{{id}:{name}:{visRaw}}} and declare the return type in the signature",
-            edits);
+            edits, isSafeToApply: true);
 
         _diagnostics.ReportErrorWithFix(
             startToken.Span.Union(headerClose.Span),

@@ -12,7 +12,7 @@ namespace Calor.Compiler.Tests;
 ///      misaligned §EI/§EL clauses).
 ///   2. <c>SourceHealer</c> (calor format --heal): closer stripping,
 ///      indentation re-derivation, chain-clause re-alignment, idempotence.
-///   3. The MCP calor_check auto-heal path.
+///   3. MCP calor_check refuses heuristic-only repairs.
 /// </summary>
 public class WritePathRobustnessTests
 {
@@ -477,15 +477,13 @@ public class WritePathRobustnessTests
         Assert.DoesNotContain("§/M", healed);
     }
 
-    // ===== 3. MCP calor_check auto-heal =====
+    // ===== 3. MCP calor_check safe patches =====
 
     [Fact]
-    public async Task CheckTool_DiagnoseApply_HealsSourceWhenFixEditsAreNotEnough()
+    public async Task CheckTool_DiagnoseApply_LeavesAmbiguousDedentsForExplicitHeal()
     {
-        // Two dedent mismatches: only the first is reported with a fix (the
-        // lexer gates indentation errors to one per file), so applying fix
-        // edits alone still leaves a broken file — only the source healer
-        // can finish the repair.
+        // Choosing either enclosing indent level changes control flow. Keep
+        // the suggestion, but reserve the heuristic repair for explicit heal.
         var source = string.Join('\n',
             "§M{m1:T}",
             "  §F{f1:A:pub} () -> void",
@@ -503,21 +501,21 @@ public class WritePathRobustnessTests
         var toolResult = await tool.ExecuteAsync(args);
 
         var doc = System.Text.Json.JsonDocument.Parse(toolResult.Content![0].Text!);
-        Assert.True(doc.RootElement.GetProperty("healed").GetBoolean());
+        Assert.False(doc.RootElement.TryGetProperty("healed", out _));
 
         var fixedSource = doc.RootElement.GetProperty("fixedSource").GetString();
-        Assert.NotNull(fixedSource);
-        Assert.False(ParseSource(fixedSource!).HasErrors,
-            $"healed fixedSource should parse:\n{fixedSource}");
+        Assert.Equal(source, fixedSource);
+        Assert.Equal(0, doc.RootElement.GetProperty("fixesApplied").GetInt32());
+        Assert.True(ParseSource(fixedSource!).HasErrors);
 
-        // When healed==true the response must describe fixedSource, not the
-        // pre-heal input: the heal fully repaired this file, so the recheck
-        // is clean and the tool result is not an error.
-        Assert.True(doc.RootElement.GetProperty("success").GetBoolean());
-        Assert.Equal(0, doc.RootElement.GetProperty("errorCount").GetInt32());
-        Assert.DoesNotContain(doc.RootElement.GetProperty("diagnostics").EnumerateArray(),
-            d => d.GetProperty("severity").GetString() == "error");
-        Assert.False(toolResult.IsError);
+        Assert.False(doc.RootElement.GetProperty("success").GetBoolean());
+        Assert.True(doc.RootElement.GetProperty("errorCount").GetInt32() > 0);
+        var diagnostic = doc.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .First(d => d.GetProperty("code").GetString() == DiagnosticCode.MixedIndentation);
+        Assert.True(diagnostic.TryGetProperty("suggestion", out _));
+        Assert.False(diagnostic.GetProperty("fix").GetProperty("isSafeToApply").GetBoolean());
+        Assert.True(toolResult.IsError);
+        Assert.False(ParseSource(new SourceHealer().Heal(source)).HasErrors);
     }
 
     [Fact]

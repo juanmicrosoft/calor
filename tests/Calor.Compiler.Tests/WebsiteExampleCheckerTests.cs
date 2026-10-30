@@ -167,6 +167,7 @@ public sealed class WebsiteExampleCheckerTests
         Assert.Empty(Check(Page("Calculator.calr(4,11): error Calor0200: Undefined variable 'x'"), coverage));
         Assert.Equal(1, coverage.CheckedOutputs);
         Assert.Empty(Check(Page("Calor0200: Undefined\nvariable 'x'"))); // wrapped, no location or severity
+        Assert.Empty(Check(Page("Calculator.calr:4:11 Calor0200 Undefined variable 'x'")));
 
         foreach (var wrong in new[]
         {
@@ -174,6 +175,8 @@ public sealed class WebsiteExampleCheckerTests
             "Calculator.calr(4,12): error Calor0200: Undefined variable 'x'",  // location
             "Calculator.calr(4,11): warning Calor0200: Undefined variable 'x'", // severity
             "Calor0200: Undefined variable 'x'\nCalor0201: Something else",     // extra
+            "Calculator.calr:4:12 Calor0200 Undefined variable 'x'",
+            "Calculator.calr:4:11 Calor0200 warning: Undefined variable 'x'",
             "Compilation failed with 1 error",                                   // not a diagnostic
         })
         {
@@ -189,6 +192,7 @@ public sealed class WebsiteExampleCheckerTests
 
     [Theory]
     [InlineData("```\nerror Calor0410: Function 'F' uses effect 'cw' but does not declare it\n```\n")]
+    [InlineData("```\n<input>:4:11 Calor0200 Undefined variable 'x'\n```\n")]
     [InlineData("```text\napp.calr:11:11 function Leaky\n```\n")]
     [InlineData("```\n=== Calor Migration Analysis ===\n```\n")]
     [InlineData("```\nBLOCKED: Cannot create C# file 'A.cs'\n```\n")]

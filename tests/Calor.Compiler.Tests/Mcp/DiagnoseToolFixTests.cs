@@ -118,19 +118,12 @@ public class DiagnoseToolFixTests
         var result = await _tool.ExecuteAsync(args);
         var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
 
-        // A Calor0116 diagnostic must be present with a fix attached.
-        var hasHeaderDiag = false;
-        foreach (var diag in json.GetProperty("diagnostics").EnumerateArray())
-        {
-            if (diag.GetProperty("code").GetString() == "Calor0116")
-            {
-                hasHeaderDiag = true;
-                Assert.True(diag.TryGetProperty("fix", out var fix));
-                Assert.True(fix.TryGetProperty("edits", out var edits));
-                Assert.True(edits.GetArrayLength() > 0);
-            }
-        }
-        Assert.True(hasHeaderDiag, "Expected a Calor0116 diagnostic");
+        // Returned diagnostics describe the repaired source, not stale coordinates.
+        Assert.True(json.GetProperty("success").GetBoolean());
+        Assert.Equal(0, json.GetProperty("errorCount").GetInt32());
+        Assert.False(result.IsError);
+        Assert.DoesNotContain(json.GetProperty("diagnostics").EnumerateArray(),
+            d => d.GetProperty("code").GetString() == "Calor0116");
 
         Assert.True(json.TryGetProperty("fixedSource", out var fixedSourceEl));
         var healed = fixedSourceEl.GetString()!;

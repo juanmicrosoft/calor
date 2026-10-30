@@ -130,9 +130,9 @@ public class ParserLegacyCloserRejectionTests
         Assert.All(fixes, dwf =>
         {
             var edit = Assert.Single(dwf.Fix.Edits);
-            // Deletion: empty replacement that starts at column 1 of the closer line.
+            // Delete only the closer, preserving inline code and comments.
             Assert.Equal(string.Empty, edit.NewText);
-            Assert.Equal(1, edit.StartColumn);
+            Assert.Equal(dwf.Span.Column, edit.StartColumn);
             // The removal range covers the closer keyword and its {id} payload.
             Assert.True(edit.EndColumn > edit.StartColumn);
         });

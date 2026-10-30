@@ -35,10 +35,7 @@ public class DiagnosticFormatterTests
         var formatter = new TextDiagnosticFormatter();
         var result = formatter.Format(new[] { diagnostic });
 
-        Assert.Contains("test.calr(10,5)", result);
-        Assert.Contains("error", result);
-        Assert.Contains("Calor0100", result);
-        Assert.Contains("Unexpected token", result);
+        Assert.Equal("test.calr:10:5 Calor0100 Unexpected token", result);
     }
 
     [Fact]
@@ -53,7 +50,7 @@ public class DiagnosticFormatterTests
         var formatter = new TextDiagnosticFormatter();
         var result = formatter.Format(new[] { diagnostic });
 
-        Assert.Contains("(5,10)", result);
+        Assert.Equal("<input>:5:10 Calor0100 Test", result);
     }
 
     [Fact]

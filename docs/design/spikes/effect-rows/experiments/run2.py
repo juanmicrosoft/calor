@@ -2,6 +2,7 @@
 """Round 2 experiments: discriminating cases for the same-line rule,
 the fallible-type brace form, and the §B suffix position."""
 import os, subprocess, sys, tempfile, textwrap
+from transcript_output import transcript_output
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
 def _find_dll():
@@ -182,14 +183,14 @@ def run(name, src, args):
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(src)
     out = os.path.join(WORK, name + ".g.cs")
-    proc = subprocess.run(["dotnet", DLL, "-i", path, "-o", out] + args,
+    proc = subprocess.run(["dotnet", DLL, "-i", path, "-o", out, "--format", "json"] + args,
                           capture_output=True, text=True, cwd=WORK)
     print("=" * 78)
     print("CASE", name, " args:", " ".join(args) or "(none)", " exit:", proc.returncode)
     print("-" * 78)
     print(src.rstrip())
     print("-" * 78)
-    body = (proc.stdout + proc.stderr).strip().replace(WORK + "/", "")
+    body = transcript_output(proc, out).strip().replace(WORK + "/", "")
     print(body if body else "(no output)")
     print()
 

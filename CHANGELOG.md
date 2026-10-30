@@ -10,6 +10,27 @@ All notable changes to this project will be documented in this file.
   and `§WHEN`. The aliases `§SW`, `§ENUM`, `§WR`, `§ADD` and lowercase `§when`
   now produce errors that name the canonical marker. `§/SW` and `§/ENUM` are
   also rejected; end these blocks by dedenting.
+- **Text diagnostics use `file:line:col code message`.** Each diagnostic stays
+  on one line. Warnings and informational messages keep their severity labels.
+  Common verbose messages have short summaries; MCP `calor_help` explains them
+  by code. JSON and SARIF retain full messages and verification details.
+- **Automatic fixes no longer guess intent.** MCP `calor_check` and
+  `calor_compile` apply only patches marked `isSafeToApply`. Fuzzy matches,
+  inferred contract changes and ambiguous indentation remain suggestions.
+  Explicit `calor format --heal` remains available for reviewed heuristic repair.
+
+### Added
+
+- **`calor fix --apply` applies safe diagnostic patches.** It accepts a file or
+  directory, supports read-only previews, preserves source encoding, and rejects
+  invalid, overlapping or stale edits. It rechecks patched source and reports
+  remaining errors rather than claiming success.
+- **Clean builds print one status line**, including multi-file and cached builds.
+  Verbose mode still reports per-file progress.
+
+Diagnostic token budgets and before/after iterations-to-green are not measured
+yet. They require the selected Anthropic Claude Opus 5.5 measurement setup;
+no substitute tokenizer or estimated result is reported here.
 
 ### Fixed
 

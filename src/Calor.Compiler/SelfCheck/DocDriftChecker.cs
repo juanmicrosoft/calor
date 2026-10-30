@@ -1010,15 +1010,15 @@ public static class WebsiteExampleChecker
     private static readonly Regex Heading = new(@"^#{1,6}\s", RegexOptions.Compiled);
     private static readonly Regex LocationClaim = new(@"\bline (?<line>\d+), column (?<column>\d+)\b", RegexOptions.Compiled);
 
-    // One quoted diagnostic in an output fence: an optional "path(l,c): " prefix, an optional
-    // severity word, the code, and the message (continuation lines are appended).
+    // Accept current one-line text and older quoted output without rewriting historical pages.
     private static readonly Regex QuotedDiagnostic = new(
-        @"^(?:\S+\((?<line>\d+),(?<column>\d+)\):\s*)?(?:(?<severity>error|warning)\s+)?(?<code>Calor\d{4}):\s*(?<message>.*)$",
+        @"^(?:(?<agent>.+:(?<line>\d+):(?<column>\d+))\s+(?<code>Calor\d{4})\s+(?:(?<severity>warning|info):\s*)?(?<message>.*)"
+            + @"|(?:\S+\((?<line>\d+),(?<column>\d+)\):\s*)?(?:(?<severity>error|warning)\s+)?(?<code>Calor\d{4}):\s*(?<message>.*))$",
         RegexOptions.Compiled);
 
     // Lines that make a fence read as real tool output.
     private static readonly Regex OutputShaped = new(
-        @"Calor\d{4}:|^\s*(?:error|warning)\b|\.calr[:(]\d+[:,]\d+|^\s*===.*===\s*$|^\s*BLOCKED:",
+        @"Calor\d{4}:|^.+:\d+:\d+\s+Calor\d{4}\s|^\s*(?:error|warning)\b|\.calr[:(]\d+[:,]\d+|^\s*===.*===\s*$|^\s*BLOCKED:",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     private static readonly HashSet<string> OutputLanguages = new(StringComparer.Ordinal) { "", "text", "console", "plaintext" };
@@ -1499,14 +1499,16 @@ public static class WebsiteExampleChecker
             return;
         }
 
-        var quoted = new List<(string? Severity, string Code, string Message, string? Location)>();
+        var quoted = new List<(string? Severity, string Code, string Message, string? Location, bool Agent)>();
         foreach (var line in output.Lines)
         {
             var match = QuotedDiagnostic.Match(line.Trim());
             if (match.Success)
-                quoted.Add((match.Groups["severity"].Success ? match.Groups["severity"].Value : null,
+                quoted.Add((match.Groups["severity"].Success ? match.Groups["severity"].Value
+                        : match.Groups["agent"].Success ? "error" : null,
                     match.Groups["code"].Value, match.Groups["message"].Value,
-                    match.Groups["line"].Success ? $"{match.Groups["line"].Value},{match.Groups["column"].Value}" : null));
+                    match.Groups["line"].Success ? $"{match.Groups["line"].Value},{match.Groups["column"].Value}" : null,
+                    match.Groups["agent"].Success));
             else if (quoted.Count > 0 && line.Trim().Length > 0)
                 quoted[^1] = quoted[^1] with { Message = quoted[^1].Message + " " + line.Trim() };
             else if (line.Trim().Length > 0)
@@ -1516,10 +1518,10 @@ public static class WebsiteExampleChecker
         }
 
         var remaining = unit.Members.SelectMany(m => unit.Actual.GetValueOrDefault(m) ?? []).ToList();
-        foreach (var (severity, code, message, location) in quoted)
+        foreach (var (severity, code, message, location, agent) in quoted)
         {
             var match = remaining.FirstOrDefault(d => d.Code == code
-                && Normalize(d.Message) == Normalize(message)
+                && Normalize(agent ? DiagnosticText.ShortMessage(d) : d.Message) == Normalize(message)
                 && (severity == null || string.Equals(severity, d.Severity.ToString(), StringComparison.OrdinalIgnoreCase))
                 && (location == null || location == $"{d.Span.Line},{d.Span.Column}"));
             if (match == null)

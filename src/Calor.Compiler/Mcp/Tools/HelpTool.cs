@@ -6,6 +6,7 @@ using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.SelfTest;
 using Calor.Compiler.Telemetry;
+using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -809,6 +810,25 @@ public sealed class HelpTool : McpToolBase
         {
             var patterns = ErrorPatterns.Value;
             var matchList = FindMatchingErrorPatterns(patterns, error);
+            var explanation = DiagnosticText.Explanation(error);
+
+            if (explanation != null)
+            {
+                return Task.FromResult(McpToolResult.Json(new
+                {
+                    query = error,
+                    explanation,
+                    matches = matchList.Select(p => new ErrorExplanation
+                    {
+                        Id = p.Id,
+                        Title = p.Title,
+                        Description = p.Description,
+                        WrongExample = p.WrongExample,
+                        CorrectExample = p.CorrectExample,
+                        Explanation = p.Explanation
+                    }).ToList()
+                }));
+            }
 
             if (matchList.Count == 0)
             {

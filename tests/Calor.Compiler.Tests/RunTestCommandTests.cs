@@ -234,7 +234,7 @@ public class RunTestCommandTests : IDisposable
         var (exitCode, _, stdErr) = RunCli("run", WritePureViolator());
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("error Calor04", stdErr);
+        Assert.Contains("Calor0410 Function", stdErr);
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class RunTestCommandTests : IDisposable
 
         Assert.True(exitCode != 0, $"expected a non-zero exit, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
         Assert.Contains("Calor0410", stdErr);
-        Assert.DoesNotContain("warning Calor0410", stdErr);
+        Assert.DoesNotContain("Calor0410 warning:", stdErr);
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public class RunTestCommandTests : IDisposable
             "--input", file, "--enforce-effects", "--permissive-effects");
 
         Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
-        Assert.Contains("warning Calor04", stdErr);
+        Assert.Matches(@"Calor04\d{2} warning:", stdErr);
         Assert.Contains("Compilation successful", stdOut);
     }
 

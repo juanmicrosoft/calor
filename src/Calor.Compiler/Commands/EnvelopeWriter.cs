@@ -40,7 +40,9 @@ internal static class EnvelopeWriter
         {
             Version = JsonDiagnosticFormatter.SchemaVersion,
             Command = command,
-            Diagnostics = list.Select(d => DiagnosticEnvelope.Build(d, resolver)).ToList(),
+            Diagnostics = diagnostics is DiagnosticBag bag
+                ? DiagnosticEnvelope.Build(bag, resolver)
+                : list.Select(d => DiagnosticEnvelope.Build(d, resolver)).ToList(),
             Summary = DiagnosticEnvelope.Summarize(list),
             Data = data
         };

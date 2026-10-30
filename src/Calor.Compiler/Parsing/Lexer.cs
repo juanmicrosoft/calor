@@ -399,6 +399,7 @@ public sealed class Lexer
         int currentIndent = 0;
         bool sawMixedIndent = false;
         bool currentIndentHasTab = false;
+        bool sawSpaceIndent = false;
 
         // Aggregated fixable indentation issues (reported once per file, at
         // EOF, with one machine-applicable edit per offending line so a
@@ -421,6 +422,7 @@ public sealed class Lexer
                 var text = tok.Text;
                 bool hasTab = text.Contains('\t');
                 bool hasSpace = text.Contains(' ');
+                sawSpaceIndent |= hasSpace;
                 if (hasTab && hasSpace && !sawMixedIndent)
                 {
                     sawMixedIndent = true;
@@ -567,7 +569,7 @@ public sealed class Lexer
                         "Calor indentation is canonically 2 spaces per level.",
                         new SuggestedFix(
                             "Replace tab indentation with spaces (each tab becomes 2 spaces)",
-                            tabIndentEdits));
+                            tabIndentEdits, isSafeToApply: !sawMixedIndent && !sawSpaceIndent));
                 }
                 if (firstWidthTok is { } widthTok)
                 {
@@ -576,7 +578,7 @@ public sealed class Lexer
                         "Calor indentation is canonically 2 spaces per level.",
                         new SuggestedFix(
                             "Re-indent to 2 spaces per level",
-                            widthEdits));
+                            widthEdits, isSafeToApply: !sawMixedIndent && tabIndentEdits.Count == 0));
                 }
 
                 // Drain remaining indent stack.
@@ -854,8 +856,12 @@ public sealed class Lexer
     private Token ScanRemovedQuantifier(string keywordText)
     {
         Advance();
-        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidLispExpression,
-            $"Removed quantifier '{CurrentText()}'. Use '{keywordText}' instead.");
+        var span = CurrentSpan();
+        _diagnostics.ReportErrorWithFix(span, DiagnosticCode.InvalidLispExpression,
+            $"Removed quantifier '{CurrentText()}'. Use '{keywordText}' instead.",
+            new SuggestedFix($"Replace the quantifier with '{keywordText}'",
+                TextEdit.Replace(_diagnostics.CurrentFilePath ?? "", span.Line, span.Column,
+                    span.Line, span.Column + span.Length, keywordText), isSafeToApply: true));
         return MakeToken(TokenKind.Error);
     }
 
@@ -2184,7 +2190,8 @@ public sealed class Lexer
                 $"Replace '§{keyword}' with '§{suggestion}'",
                 Diagnostics.TextEdit.Replace(filePath, span.Line, span.Column,
                     span.Line, span.Column + span.Length,
-                    $"§{suggestion}"));
+                    $"§{suggestion}"),
+                isSafeToApply: keyword is "SW" or "ENUM" or "WR" or "ADD" or "when");
             _diagnostics.ReportErrorWithFix(span, Diagnostics.DiagnosticCode.UnknownSectionMarker,
                 $"Unknown section marker '§{keyword}'. Did you mean '§{suggestion}'{description}?",
                 fix);

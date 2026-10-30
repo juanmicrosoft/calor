@@ -568,16 +568,18 @@ public class Program
                         statusOut.WriteLine($"Output written to: {outputPath}");
                     }
 
-                    statusOut.WriteLine(transpileOnly
-                        ? $"Unsafe transpilation output written: {outputPath}"
-                        : $"Compilation successful: {outputPath}");
+                    if (verbose)
+                        statusOut.WriteLine(transpileOnly
+                            ? $"Unsafe transpilation output written: {outputPath}"
+                            : $"Compilation successful: {outputPath}");
                 },
                 diagnosticSink: diagnosticSink,
                 cache: buildCache,
                 onSkipped: (file, outputPath) =>
                 {
                     var statusOut = structuredOutput ? Console.Error : Console.Out;
-                    statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
+                    if (verbose)
+                        statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
                 },
                 onAst: declarationIds != null
                     ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
@@ -590,6 +592,15 @@ public class Program
                         File.Delete(failedOutputPath);
                 });
 
+            if (!driverResult.AnyErrors && !verbose)
+            {
+                var statusOut = structuredOutput ? Console.Error : Console.Out;
+                statusOut.WriteLine(transpileOnly
+                    ? $"Unsafe transpilation output written: {input.Length} file(s)"
+                    : driverResult.Compiled.Count == 0
+                        ? $"Up-to-date (cached): {driverResult.Skipped.Count} file(s)"
+                        : $"Compilation successful: {driverResult.Compiled.Count} compiled, {driverResult.Skipped.Count} cached");
+            }
             return Finish(driverResult.AnyErrors ? 1 : 0);
         }
         catch (Exception ex)

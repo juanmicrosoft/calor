@@ -74,9 +74,9 @@ public class CliMultiFileTests : IDisposable
             "--input", aPath, "--input", bPath, "--permissive-effects");
 
         Assert.True(exit == 0, $"Expected exit 0 under --permissive-effects. Exit={exit}\nStdOut:\n{stdOut}\nStdErr:\n{stdErr}");
-        Assert.Contains("warning Calor0410", stdErr);
+        Assert.Contains("Calor0410 warning:", stdErr);
         Assert.Contains("HandleRequest", stdErr);
-        Assert.DoesNotContain("error Calor0410", stdOut + stdErr);
+        Assert.DoesNotContain("Calor0410 Function", stdOut + stdErr);
     }
 
     [Fact]

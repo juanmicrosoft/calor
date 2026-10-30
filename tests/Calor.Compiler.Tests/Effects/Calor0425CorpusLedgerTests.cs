@@ -355,42 +355,43 @@ public class Calor0425CorpusLedgerTests
                 var modulePath = Path.Combine(scratch, "m.calr");
                 File.WriteAllText(modulePath, calor);
                 var output = RunCli(cli, scratch);
+                var codes = output.Diagnostics.Select(d => d.Code).ToHashSet(StringComparer.Ordinal);
 
-                var sites = CountOccurrences(output, "Calor0425");
+                var sites = output.Diagnostics.Count(d => d.Code == "Calor0425");
                 if (sites > 0)
                 {
                     modules0425++;
                     sites0425 += sites;
                 }
 
-                if (output.Contains("Calor0099", StringComparison.Ordinal)
-                    || output.Contains("Calor0100", StringComparison.Ordinal)
-                    || output.Contains("Calor0117", StringComparison.Ordinal))
+                if (codes.Contains("Calor0099")
+                    || codes.Contains("Calor0100")
+                    || codes.Contains("Calor0117"))
                 {
                     parseFailed++;
                     continue;
                 }
 
-                if (output.Contains("Calor0208", StringComparison.Ordinal)
-                    || output.Contains("Calor0250", StringComparison.Ordinal)
-                    || output.Contains("Calor0201", StringComparison.Ordinal)
-                    || output.Contains("Calor0272", StringComparison.Ordinal)
-                    || output.Contains("Calor0273", StringComparison.Ordinal)
-                    || output.Contains("Calor0274", StringComparison.Ordinal))
+                if (codes.Contains("Calor0208")
+                    || codes.Contains("Calor0250")
+                    || codes.Contains("Calor0201")
+                    || codes.Contains("Calor0272")
+                    || codes.Contains("Calor0273")
+                    || codes.Contains("Calor0274"))
                 {
                     bindStopped++;
                     continue;
                 }
 
                 reach++;
-                if (output.Contains("error Calor0410", StringComparison.Ordinal))
+                var disposition = CliDisposition(output);
+                if (disposition == "0410")
                     stop0410++;
-                else if (output.Contains("error Calor0422", StringComparison.Ordinal)
-                    || output.Contains("error Calor0423", StringComparison.Ordinal))
+                else if (disposition == "042X")
                     stop042X++;
-                else if (output.Contains("error Calor1002", StringComparison.Ordinal))
+                else if (disposition == "1002")
                     stop1002++;
-                else if (output.Contains("error Calor", StringComparison.Ordinal))
+                else if (disposition == "other")
                     cliOnly++;
                 else
                     clean++;
@@ -431,7 +432,50 @@ public class Calor0425CorpusLedgerTests
         }
     }
 
-    private static string RunCli(string cliDll, string workingDirectory)
+    private sealed record CliProbe(List<(string Code, string Severity)> Diagnostics, int ExitCode);
+
+    private static string CliDisposition(CliProbe probe)
+    {
+        var errors = probe.Diagnostics.Where(d => d.Severity == "error").Select(d => d.Code).ToHashSet();
+        return errors.Contains("Calor0410") ? "0410"
+            : errors.Contains("Calor0422") || errors.Contains("Calor0423") ? "042X"
+            : errors.Contains("Calor1002") ? "1002"
+            : probe.ExitCode != 0 ? "other" : "clean";
+    }
+
+    private static CliProbe ParseCliProbe(string stdout, string stderr, int exitCode)
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        var diagnostics = document.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(d => (Code: d.GetProperty("code").GetString()!, Severity: d.GetProperty("severity").GetString()!))
+            .ToList();
+        if (diagnostics.Any(d => d.Severity is not ("error" or "warning" or "info"))
+            || (exitCode != 0) != diagnostics.Any(d => d.Severity == "error"))
+            throw new InvalidDataException($"CLI exit and structured diagnostics disagree (exit {exitCode}): {stderr}");
+        return new CliProbe(diagnostics, exitCode);
+    }
+
+    [Theory]
+    [InlineData("Calor0410", "0410")]
+    [InlineData("Calor0422", "042X")]
+    [InlineData("Calor0423", "042X")]
+    [InlineData("Calor1002", "1002")]
+    [InlineData("Calor0200", "other")]
+    public void CliClassifier_UsesSeverityCodeAndExitNotProse(string code, string disposition)
+    {
+        static string Output(string code, string severity) => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            diagnostics = new[] { new { code, severity, message = "error Calor0410 warning Calor1002" } }
+        });
+        const string noisyStderr = "status: error Calor0410; warning Calor1002; Calor0425";
+        Assert.Equal(disposition, CliDisposition(ParseCliProbe(Output(code, "error"), noisyStderr, 1)));
+        Assert.Equal("clean", CliDisposition(ParseCliProbe(Output(code, "warning"), noisyStderr, 0)));
+        Assert.Equal("clean", CliDisposition(ParseCliProbe(Output(code, "info"), noisyStderr, 0)));
+        Assert.Throws<InvalidDataException>(() => ParseCliProbe(Output(code, "warning"), noisyStderr, 1));
+        Assert.Throws<InvalidDataException>(() => ParseCliProbe(Output(code, "error"), noisyStderr, 0));
+    }
+
+    private static CliProbe RunCli(string cliDll, string workingDirectory)
     {
         var start = new System.Diagnostics.ProcessStartInfo("dotnet")
         {
@@ -445,13 +489,15 @@ public class Calor0425CorpusLedgerTests
         start.ArgumentList.Add("m.calr");
         start.ArgumentList.Add("-o");
         start.ArgumentList.Add("out.g.cs");
+        start.ArgumentList.Add("--format");
+        start.ArgumentList.Add("json");
         start.Environment["LC_ALL"] = "C";
         using var process = System.Diagnostics.Process.Start(start);
         Assert.NotNull(process);
         var stdout = process!.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
-        return stdout.Result + stderr.Result;
+        return ParseCliProbe(stdout.Result, stderr.Result, process.ExitCode);
     }
 
     private static int CountOccurrences(string haystack, string needle)

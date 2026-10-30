@@ -83,7 +83,11 @@ MCP tools embed the same objects in their result DTOs.
 - `verification` — present only on contract diagnostics (`Calor0710`–`Calor0721`
   band). `status` is the **closed seven-status vocabulary**; see below.
 - `suggestion` / `fix` — machine-applicable fix hint when one exists;
-  `fix.edits[]` are 1-based, end-exclusive text edits.
+  `fix.edits[]` are 1-based, end-exclusive UTF-16 text edits.
+  `fix.isSafeToApply` is additive metadata: `true` marks a deterministic safe
+  patch; `false` marks a suggestion requiring review. An absent flag from an
+  older producer must not be interpreted as permission to auto-apply a patch.
+  Full messages, severities, verification status and counterexamples are unchanged.
 
 ## Verification payload and the seven-status vocabulary
 
