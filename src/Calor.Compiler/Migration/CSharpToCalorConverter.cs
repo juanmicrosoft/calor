@@ -2024,7 +2024,8 @@ internal static class ConversionFileWriter
             ?? throw new InvalidOperationException($"Output path has no directory: {path}");
         Directory.CreateDirectory(directory);
 
-        if (fullPath.EndsWith(".calr", StringComparison.Ordinal))
+        if (fullPath.EndsWith(".calr", StringComparison.Ordinal)
+            && !Ids.DeclarationIdentityStore.IsAmbientRoot(directory))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (encoding != null && encoding.CodePage != System.Text.Encoding.UTF8.CodePage)

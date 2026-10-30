@@ -85,6 +85,7 @@ public sealed class DeclarationIdentityStore
         for (var directory = Path.GetDirectoryName(Path.GetFullPath(file)); directory != null;
              directory = Path.GetDirectoryName(directory))
         {
+            if (IsAmbientRoot(directory)) return null;
             var store = new DeclarationIdentityStore(directory);
             if (File.Exists(store.SidecarPath) || File.Exists(store.JournalPath))
                 return store;
@@ -101,8 +102,7 @@ public sealed class DeclarationIdentityStore
             return CanonicalPath.IsUnder(CanonicalPath.Resolve(store.Root), CanonicalPath.Resolve(projectRoot)) ? store : null;
 
         // An inferred input directory is not an ownership boundary. A nearer
-        // actual project is; ambient temp/home/root stores are not projects.
-        if (IsAmbientRoot(store.Root)) return null;
+        // actual project is. Find already excludes ambient ownership boundaries.
         for (var directory = Path.GetDirectoryName(Path.GetFullPath(file)); directory != null && directory != store.Root;
              directory = Path.GetDirectoryName(directory))
         {
@@ -174,7 +174,10 @@ public sealed class DeclarationIdentityStore
             return FindForActiveInput(file, projectRoot)?.Root ?? common;
         }
         foreach (var group in files.GroupBy(RootFor, StringComparer.Ordinal))
-            new DeclarationIdentityStore(group.Key).Sync(group);
+        {
+            if (!IsAmbientRoot(group.Key))
+                new DeclarationIdentityStore(group.Key).Sync(group);
+        }
     }
 
     public static void CopyToSnapshot(IReadOnlyDictionary<string, string> originalsToCopies)

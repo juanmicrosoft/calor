@@ -73,6 +73,71 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.False(DeclarationIdentityStore.IsAmbientRoot(_root));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void AutomaticCliIdentityNeverReadsOrCreatesAnAmbientStore(bool convert, bool existingStore, bool nested)
+    {
+        Store.Sync([]);
+        var guardian = File.ReadAllText(Store.SidecarPath);
+        using var guardianGate = new FileStream(PathFor(".calor/ids.lock"), FileMode.Open,
+            FileAccess.ReadWrite, FileShare.None);
+        var ambientRoot = PathFor("ambient");
+        var ambientStore = new DeclarationIdentityStore(ambientRoot);
+        var file = Write(nested ? "ambient/project/active.calr" : "ambient/active.calr", Original);
+        var unrelated = Write("ambient/unrelated.calr", Original);
+        var journalPath = PathFor("ambient/.calor/ids.transaction.json");
+        string? sidecar = null;
+        string? journal = null;
+        if (existingStore)
+        {
+            ambientStore.Sync([file, unrelated]);
+            sidecar = File.ReadAllText(ambientStore.SidecarPath);
+            journal = JsonSerializer.Serialize(new
+            {
+                BeforeSidecar = sidecar, AfterSidecar = sidecar,
+                Changes = new[] { new DeclarationIdentityStore.SourceChange("unrelated.calr", Original, Original + "\n") }
+            });
+            File.WriteAllText(journalPath, journal);
+        }
+        using var gate = existingStore
+            ? new FileStream(PathFor("ambient/.calor/ids.lock"), FileMode.Open, FileAccess.ReadWrite, FileShare.None)
+            : null;
+        var environment = new Dictionary<string, string>
+        {
+            ["TMPDIR"] = ambientRoot,
+            ["TMP"] = ambientRoot,
+            ["TEMP"] = ambientRoot
+        };
+        var arguments = convert
+            ? new[] { "convert", Write("input.cs", "public static class Converted { public static int Value() => 1; }"),
+                "--output", file }
+            : new[] { "--input", file };
+        var result = CliTestHarness.RunCli(ambientRoot, environment, arguments);
+        Assert.True(result.ExitCode == 0, result.StdOut + result.StdErr);
+        Assert.Equal(guardian, File.ReadAllText(Store.SidecarPath));
+        if (existingStore)
+        {
+            Assert.Equal(sidecar, File.ReadAllText(ambientStore.SidecarPath));
+            Assert.Equal(journal, File.ReadAllText(journalPath));
+            Assert.Equal(Original, File.ReadAllText(unrelated));
+        }
+        else
+        {
+            Assert.False(Directory.Exists(PathFor("ambient/.calor")));
+        }
+        if (nested)
+            Assert.True(File.Exists(PathFor("ambient/project/.calor/ids.json")));
+        if (!convert)
+            Assert.Equal(Original, File.ReadAllText(file));
+    }
+
     [SkippableFact]
     public void PhysicalBoundaryComparisonDoesNotAllowSymlinkedIdentitySources()
     {

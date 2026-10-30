@@ -16,8 +16,11 @@ they do not discover or rewrite historical inputs. Add the sidecar to version
 control. Agents should edit names and signatures, not identity records.
 Building one registered file or adding a migration output in a subdirectory
 reuses its owning project sidecar rather than creating a shadow store.
-Unregistered inputs do not adopt a store above a nearer project boundary or
-an ambient temporary, home or filesystem root.
+Unregistered inputs do not adopt a store above a nearer project boundary.
+Automatic discovery stops at temporary, home and filesystem roots before
+opening any sidecar or lock there. Single-file compilation and conversion
+directly in those ambient directories retain source identity without creating
+a project sidecar. A dedicated subdirectory still gets its own project store.
 Compile-time recovery requires a confirmed registration in the current or
 pending sidecar; merely finding an ancestor store never recovers its journal.
 Ownership comparisons resolve physical directory aliases. Source registration
