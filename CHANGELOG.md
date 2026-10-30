@@ -41,11 +41,14 @@ no substitute tokenizer or estimated result is reported here.
 
 - **C# conversion preserves indexer parameters and generic array element types.**
   Both cases now survive the full C# → Calor → C# pipeline. The 100-snippet
-  scorecard reaches 100 round-trip compilations, with 97 fully native conversions.
+  scorecard reaches 100 round-trip compilations, with 98 fully native conversions.
   Preserved C# does not count as native conversion.
 - **Built-in C# unary `+` converts natively.** Numeric promotion uses a cast,
   preserving nullable lifting and one evaluation of the operand. User-defined,
   dynamic and unresolved operators remain preserved as C#.
+- **Generic C# `ref T` methods convert natively.** Calls pass the caller's storage,
+  including aliased variables and array elements, rather than a copy. Generic
+  `out`/`in` and nullable-type-parameter `ref T?` declarations remain preserved.
 - **Whole-file namespace preservation keeps the original C# compilation unit.**
   It no longer adds a generated preamble, and passthrough payloads ending with a
   newline no longer acquire indentation before their terminator.

@@ -26,7 +26,8 @@ public class ConversionScorecardTests
     // initializer proved to run no user code. Round-trip stays 98.
     // 0.30: full indexer parameters and generic sized arrays survive reparse.
     // Built-in unary plus retains numeric promotion through a native cast.
-    private const int BASELINE_FULLY_CONVERTED = 97;
+    // Generic ref T uses native parameter/argument modifiers without copying storage.
+    private const int BASELINE_FULLY_CONVERTED = 98;
     private const int BASELINE_ROUNDTRIP = 100;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
@@ -128,6 +129,16 @@ public class ConversionScorecardTests
     public void BuiltInUnaryPlus_IsNativeWithoutPreservation()
     {
         var result = Assert.Single(Scorecard.Results.Where(result => result.Id == "017"));
+        Assert.Equal(SnippetStatus.FullyConverted, result.Status);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.SemanticLossCount);
+        Assert.True(result.RoundTripSuccess);
+    }
+
+    [Fact]
+    public void GenericRefMethod_IsNativeWithoutPreservation()
+    {
+        var result = Assert.Single(Scorecard.Results.Where(result => result.Id == "086"));
         Assert.Equal(SnippetStatus.FullyConverted, result.Status);
         Assert.Equal(0, result.InteropPreservationCount);
         Assert.Equal(0, result.SemanticLossCount);

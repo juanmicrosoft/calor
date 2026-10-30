@@ -316,7 +316,8 @@ public static class FeatureSupport
             // #943 (D1 RO-REP-1, RO-UNS-1): native ref parameters and §A{ref} arguments; no tuple form.
             Description = "ref parameters and ref arguments convert natively (§A{ref}) and pass the caller's storage, never a copy. " +
                 "Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, " +
-                "by-reference delegates, constructor and indexer arguments, and method-generic by-reference parameters are preserved as C#",
+                "by-reference delegates, constructor and indexer arguments, and method-generic out/in or nullable-type-parameter ref declarations are preserved as C#. " +
+                "Plain ref T method parameters use the same native storage-preserving form",
             Workaround = "Keep the preserved member as C# interop; no tuple or wrapper form is equivalent"
         },
         ["out-parameter"] = new FeatureInfo

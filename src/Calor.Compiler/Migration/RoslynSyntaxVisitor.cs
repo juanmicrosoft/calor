@@ -11230,7 +11230,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// declaration, return, or `if` condition (outside lambdas and queries), placed before the
     /// statement. Escalates the statement to C# when a declaration's type is not expressible or
     /// its name is visible or declared elsewhere in its scope, when a `_` operand binds to a
-    /// declared symbol, or when a by-reference argument targets a method type parameter.
+    /// declared symbol, or when an out/in argument targets a method type parameter.
     /// </summary>
     private List<StatementNode> LowerOutDeclarations(StatementSyntax statement)
     {
@@ -11247,8 +11247,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 throw EscalateExpression(statement, "out-var");
             if (argument.Parent?.Parent is ExpressionSyntax call
                 && _semanticModel.GetSymbolInfo(call).Symbol is IMethodSymbol method
-                && DetermineParameter(argument, method)?.OriginalDefinition.Type is ITypeParameterSymbol
-                    { TypeParameterKind: TypeParameterKind.Method })
+                && DetermineParameter(argument, method) is { } parameter
+                && parameter.OriginalDefinition.Type is ITypeParameterSymbol
+                    { TypeParameterKind: TypeParameterKind.Method }
+                && parameter.RefKind != RefKind.Ref)
                 throw EscalateExpression(statement, argument.RefKindKeyword.ValueText + "-parameter");
         }
         SyntaxNode? scanned = inLambda ? null : statement switch
@@ -11316,7 +11318,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var methodTypeParameters = (parameter.Parent?.Parent as MethodDeclarationSyntax)?.TypeParameterList?.Parameters;
         return parameter.Modifiers.Any(modifier => modifier.Kind() is SyntaxKind.ScopedKeyword or SyntaxKind.ReadOnlyKeyword or SyntaxKind.ThisKeyword)
             || parameter.Parent?.Parent is DelegateDeclarationSyntax
-            || methodTypeParameters?.Any(typeParameter => typeParameter.Identifier.ValueText == typeName?.TrimEnd('?')) == true;
+            || methodTypeParameters?.Any(typeParameter => typeParameter.Identifier.ValueText == typeName?.TrimEnd('?')) == true
+                && (!parameter.Modifiers.Any(SyntaxKind.RefKeyword) || parameter.Type is not IdentifierNameSyntax);
     }
 
     private static IParameterSymbol? DetermineParameter(ArgumentSyntax argument, IMethodSymbol method)
@@ -13090,7 +13093,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var arguments = invocation.ArgumentList.Arguments;
         // #943 (D1 RO-CALL-3, RO-LV-3, RO-NULL-4, RO-UNS-1): consult the callee. `ref` for an `in`
-        // parameter becomes `§A{in}`; an omitted `in`, a method-generic by-reference parameter, a
+        // parameter becomes `§A{in}`; an omitted `in`, a method-generic out/in parameter, a
         // by-reference delegate, or a `this ref`/`this in` receiver is preserved.
         var method = _semanticModel != null && invocation.SyntaxTree == _semanticModel.SyntaxTree
                 ? _semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol
@@ -13105,7 +13108,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var parameter = method == null ? null : DetermineParameter(a, method);
                 if (parameter?.RefKind is RefKind.In or RefKind.RefReadOnlyParameter && a.RefKindKeyword.IsKind(SyntaxKind.None)
                     || parameter?.OriginalDefinition.Type is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method }
-                        && parameter.RefKind != RefKind.None
+                        && parameter.RefKind is not (RefKind.None or RefKind.Ref)
                     // An element of a non-array (Span<T>, an indexer) is not a variable Calor can pass.
                     || !a.RefKindKeyword.IsKind(SyntaxKind.None) && a.Expression is ElementAccessExpressionSyntax element
                         && _semanticModel!.GetTypeInfo(element.Expression).Type is not IArrayTypeSymbol

@@ -23,6 +23,92 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// </summary>
 public class RefOutImplementationTests
 {
+    public static TheoryData<string, string, string, Surface> GenericRefRows()
+    {
+        var data = new TheoryData<string, string, string, Surface>();
+        var witnesses = new (string Members, string Body, string Expected)[]
+        {
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "int a = 1, b = 2; Swap<int>(ref a, ref b); return a + \":\" + b;", "2:1"),
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "int a = 3; Swap(ref a, ref a); return a.ToString();", "3"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int a = 1; int seen = Write(ref a, ref a, 9); return seen + \":\" + a;", "9:9"),
+            ("static T Clear<T>(ref T a, ref T b) { a = default(T); return b; }",
+                "string a = \"first\"; string seen = Clear<string>(ref a, ref a); return (seen == null) + \":\" + (a == null);", "True:True"),
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "string a = \"first\", b = \"second\"; Swap(ref a, ref b); return a + \":\" + b;", "second:first"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int[] a = new[] { 1, 2 }; int seen = Write(ref a[0], ref a[0], 9); return seen + \":\" + a[0];", "9:9"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int[] a = new[] { 1, 2 }; int seen = Write(ref a[0], ref a[1], 9); return seen + \":\" + a[0];", "2:9"),
+            ("public struct Cell { public int N; } static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "Cell a = new Cell { N = 1 }; Cell value = new Cell { N = 7 }; Cell seen = Write(ref a, ref a, value); return seen.N + \":\" + a.N;", "7:7"),
+            ("static void Set<T>(ref T a, T value) { a = value; } static void Forward<T>(ref T a, T value) { Set(ref a, value); }",
+                "int a = 1; Forward(ref a, 7); return a.ToString();", "7"),
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "int a = 1, b = 2; Swap<int>(b: ref a, a: ref b); return a + \":\" + b;", "2:1"),
+        };
+        foreach (var witness in witnesses)
+            foreach (var surface in Enum.GetValues<Surface>())
+                data.Add(witness.Members, witness.Body, witness.Expected, surface);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(GenericRefRows))]
+    public async Task GenericRefMethods_PreserveActualCallerStorage(
+        string members, string body, string expected, Surface surface)
+    {
+        var source = "public static class Probe { " + members
+            + " public static string Run() { " + body + " } }";
+        var (calor, losses) = await ConvertAsync(source, surface);
+        Assert.Empty(losses);
+        Assert.DoesNotContain("§CS", calor);
+        Assert.DoesNotContain("§RAW", calor);
+        Assert.Contains("T:a:ref", calor);
+        var parseDiagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(calor, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics).Parse();
+        Assert.False(parseDiagnostics.HasErrors, string.Join("; ", parseDiagnostics.Errors));
+        var generated = new CSharpEmitter().Emit(module);
+        Assert.Contains("ref T a", generated);
+        Assert.Equal(expected, Run(source));
+        Assert.Equal(expected, Run(generated));
+    }
+
+    [Theory]
+    [InlineData("§C{Keep<?str>} §A{ref} b §/C", false)]
+    [InlineData("§B{i32:n} 1", true)]
+    public void GenericRefCall_InvalidatesPotentiallyAliasedNarrowing(string step, bool keepsNarrowing)
+    {
+        var errors = Errors($$"""
+              §F{g1:Keep<T>:pub} (T:value:ref) -> void
+                §ASSIGN value value
+              §F{g2:Check:pub} (?str:a:ref, ?str:b:ref) -> i32
+                §IF{i1} (!= a null)
+                  {{step}}
+                  §B{str:z} a
+                  §R (len z)
+                §R 0
+            """);
+        Assert.Equal(keepsNarrowing ? [] : ["Calor0272"], errors);
+    }
+
+    [Theory]
+    [InlineData("ref T?", "where T : class", "ref-parameter", "method")]
+    [InlineData("scoped ref T", "", "scoped-parameter", "scoped-parameter")]
+    [InlineData("ref readonly T", "", "ref-parameter", "method")]
+    public void GenericRefShapesOutsideTheNativeSlice_KeepTheirDeclaration(
+        string parameterType, string constraint, string feature, string loss)
+    {
+        var source = $"public static class Probe {{ static void Use<T>({parameterType} value) {constraint} {{ }} }}";
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.Contains("§CSHARP", conversion.CalorSource);
+        Assert.Contains(conversion.Issues, issue => issue.Feature == feature);
+        Assert.Contains(conversion.Losses, item => item.Feature == loss);
+    }
+
     private const string Prelude = """
         §M{m1:P}
           §F{f0:Bump:pub} (i32:x:ref) -> void
@@ -480,9 +566,9 @@ public class RefOutImplementationTests
 
     [Theory]
     [InlineData("static void Use(ref int x) { x++; } static void M(int[] a) { Use(ref a[Next()]); }", "ref-parameter")]
+    [InlineData("static void Use<T>(ref T x) { } static void M(int[] a) { Use<int>(ref a[Next()]); }", "ref-parameter")]
     [InlineData("static void Use(out int x) { x = 1; } static void M(int[] a) { Use(out a[Next()]); }", "out-parameter")]
     [InlineData("static void Use(ref readonly int x) { } static void M(int[] a) { Use(in a[Next()]); }", "ref-parameter")]
-    [InlineData("static void Use<T>(ref T x) { } static void M() { int x = 0; Use<int>(ref x); }", "ref-parameter")]
     [InlineData("static void Use<T>(in T x) { } static void M() { int x = 0; Use<int>(in x); }", "in-parameter")]
     [InlineData("static void Use(in int x) { } static void M(int[] a) { Use(in a[Next()]); }", "in-parameter")] // control
     [InlineData("static void Use(in int x) { } static void M(int v) { Use(v); }", "in-parameter")]                  // control

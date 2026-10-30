@@ -157,8 +157,10 @@ with default options:
   of struct array elements (`Bump(ref pts[0].X)` passes the element's own field), when
   the operand runs no code of its own. A C# `ref` argument to an `in` parameter becomes
   `§A{in}`.
+- Plain method-generic `ref T` parameters and calls, including aliased arguments.
+  The callee writes the original storage; there is no tuple or wrapper copy.
 
-**What stays C# in 0.25:**
+**What stays C#:**
 
 - `out var` in other places: chained assignments (`x = y = F(out var n)`), code where a
   member named `default` is visible, `while`/`for`/`using`/`lock` headers, lambdas, LINQ queries,
@@ -167,7 +169,8 @@ with default options:
 - Ref locals (`ref int r = ref a[0];`), ref returns (block or `=>` bodied), conditional refs,
   `scoped` and `ref readonly` parameters, `this ref`/`this in` extension calls,
   by-reference delegates and lambdas, by-reference constructor and indexer arguments,
-  and method-generic `out T` or `ref T` parameters. The member stays `§CSHARP`; the
+  and method-generic `out T`/`in T` or nullable-type-parameter `ref T?` declarations.
+  The member stays `§CSHARP`; the
   report names feature `method` and warns with the shape, such as `ref-parameter`.
 - Call sites C# allows but Calor cannot write: an `in` argument passed without `in`
   (`Twice(x)`), or a by-reference operand that runs code (`Bump(ref a[Next()])`). In a
