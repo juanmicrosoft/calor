@@ -40,7 +40,8 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void EveryCatalogEntry_HasAnExplicitDispositionReasonAndOwner()
     {
-        Assert.Equal(21, BindingDiagnosticPolicy.Catalog.Count); // #943 adds InvalidByReferenceOperand; #1550 adds WriteToReadOnlyLocal
+        Assert.Equal(20, BindingDiagnosticPolicy.Catalog.Count); // #1617 retires the runtime Option mismatch rule.
+        Assert.DoesNotContain(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticPolicy.Catalog.Keys);
         foreach (var (code, rule) in BindingDiagnosticPolicy.Catalog)
         {
             Assert.Equal(code, rule.Code);

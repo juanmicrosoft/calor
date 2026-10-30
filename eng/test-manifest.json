@@ -152,8 +152,9 @@
       "count": 7
     },
     {
+      "_comment": "#1617 replaces the skippable builtin-None binding probe with an unconditional nullable binding regression.",
       "reason": "Calor syntax not supported by parser",
-      "count": 5
+      "count": 4
     },
     {
       "_comment": "#1601: 400 -> 412, exactly 12 availability-guard call sites in Calor.Verification.Tests/BclContractTests.cs (5 theory methods and 7 facts, expanding to 29 cases: 473 -> 502). BclLoweringPrerequisiteTests adds 6 compiler cases: 16075 -> 16081. The exact array-result follow-up adds 15 compiler cases: 16081 -> 16096 (5 metadata array forms; scoped/unknown identity; mutable rebind and capture; argument-bearing and instance-through-type refusal; custom getter; missing project context; jagged arrays; 2 lazy operand rows). No additional skip sites. These guards only skip when Z3 is absent; expectedSkipped remains unchanged, and CI still requires Z3.",

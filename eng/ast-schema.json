@@ -154,22 +154,6 @@
       "source": "TypeNodes.cs"
     },
     {
-      "name": "SomeExpressionNode",
-      "source": "TypeNodes.cs"
-    },
-    {
-      "name": "NoneExpressionNode",
-      "source": "TypeNodes.cs"
-    },
-    {
-      "name": "OkExpressionNode",
-      "source": "TypeNodes.cs"
-    },
-    {
-      "name": "ErrExpressionNode",
-      "source": "TypeNodes.cs"
-    },
-    {
       "name": "MatchExpressionNode",
       "source": "PatternNodes.cs"
     },
@@ -191,22 +175,6 @@
     },
     {
       "name": "LiteralPatternNode",
-      "source": "PatternNodes.cs"
-    },
-    {
-      "name": "SomePatternNode",
-      "source": "PatternNodes.cs"
-    },
-    {
-      "name": "NonePatternNode",
-      "source": "PatternNodes.cs"
-    },
-    {
-      "name": "OkPatternNode",
-      "source": "PatternNodes.cs"
-    },
-    {
-      "name": "ErrPatternNode",
       "source": "PatternNodes.cs"
     },
     {

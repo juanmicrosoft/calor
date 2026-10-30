@@ -2,7 +2,7 @@
 
 <!-- Generated from eng/ast-schema.json by calor self-check docs --fix. Do not edit by hand. -->
 
-The AST schema contains **185** node types. This is a structural inventory, not a claim that every node supports every compiler stage.
+The AST schema contains **177** node types. This is a structural inventory, not a claim that every node supports every compiler stage.
 
 Regenerate with `calor self-check docs --fix`. The drift gate compares this entire page with the schema-derived output.
 
@@ -63,8 +63,6 @@ Regenerate with `calor self-check docs --fix`. The drift gate compares this enti
 | `EnumDefinitionNode` | [`TypeNodes.cs`](../../src/Calor.Compiler/Ast/TypeNodes.cs) |
 | `EnumExtensionNode` | [`EnumExtensionNode.cs`](../../src/Calor.Compiler/Ast/EnumExtensionNode.cs) |
 | `EnumMemberNode` | [`TypeNodes.cs`](../../src/Calor.Compiler/Ast/TypeNodes.cs) |
-| `ErrExpressionNode` | [`TypeNodes.cs`](../../src/Calor.Compiler/Ast/TypeNodes.cs) |
-| `ErrPatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `EventDefinitionNode` | [`LambdaNodes.cs`](../../src/Calor.Compiler/Ast/LambdaNodes.cs) |
 | `EventSubscribeNode` | [`LambdaNodes.cs`](../../src/Calor.Compiler/Ast/LambdaNodes.cs) |
 | `EventUnsubscribeNode` | [`LambdaNodes.cs`](../../src/Calor.Compiler/Ast/LambdaNodes.cs) |
@@ -120,12 +118,8 @@ Regenerate with `calor self-check docs --fix`. The drift gate compares this enti
 | `NameOfExpressionNode` | [`ModernOperatorNodes.cs`](../../src/Calor.Compiler/Ast/ModernOperatorNodes.cs) |
 | `NegatedPatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `NewExpressionNode` | [`ClassNodes.cs`](../../src/Calor.Compiler/Ast/ClassNodes.cs) |
-| `NoneExpressionNode` | [`TypeNodes.cs`](../../src/Calor.Compiler/Ast/TypeNodes.cs) |
-| `NonePatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `NullCoalesceNode` | [`ModernOperatorNodes.cs`](../../src/Calor.Compiler/Ast/ModernOperatorNodes.cs) |
 | `NullConditionalNode` | [`ModernOperatorNodes.cs`](../../src/Calor.Compiler/Ast/ModernOperatorNodes.cs) |
-| `OkExpressionNode` | [`TypeNodes.cs`](../../src/Calor.Compiler/Ast/TypeNodes.cs) |
-| `OkPatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `OperatorOverloadNode` | [`ClassNodes.cs`](../../src/Calor.Compiler/Ast/ClassNodes.cs) |
 | `OrPatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `OutputNode` | [`FunctionNode.cs`](../../src/Calor.Compiler/Ast/FunctionNode.cs) |
@@ -157,8 +151,6 @@ Regenerate with `calor self-check docs --fix`. The drift gate compares this enti
 | `SetCreationNode` | [`CollectionNodes.cs`](../../src/Calor.Compiler/Ast/CollectionNodes.cs) |
 | `SinceNode` | [`MetadataNodes.cs`](../../src/Calor.Compiler/Ast/MetadataNodes.cs) |
 | `SizeOfNode` | [`UnsafeNodes.cs`](../../src/Calor.Compiler/Ast/UnsafeNodes.cs) |
-| `SomeExpressionNode` | [`TypeNodes.cs`](../../src/Calor.Compiler/Ast/TypeNodes.cs) |
-| `SomePatternNode` | [`PatternNodes.cs`](../../src/Calor.Compiler/Ast/PatternNodes.cs) |
 | `StackAllocNode` | [`UnsafeNodes.cs`](../../src/Calor.Compiler/Ast/UnsafeNodes.cs) |
 | `StringBuilderOperationNode` | [`StringBuilderOperationNode.cs`](../../src/Calor.Compiler/Ast/StringBuilderOperationNode.cs) |
 | `StringLiteralNode` | [`ExpressionNodes.cs`](../../src/Calor.Compiler/Ast/ExpressionNodes.cs) |
