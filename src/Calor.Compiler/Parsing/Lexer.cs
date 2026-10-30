@@ -34,9 +34,7 @@ public sealed class Lexer
         ["K"] = TokenKind.Case,             // §K = Case
         ["Q"] = TokenKind.Requires,         // §Q = Requires (preCondition)
         ["S"] = TokenKind.Ensures,          // §S = Ensures (poStcondition)
-        ["T"] = TokenKind.Type,             // §T = Type
         ["D"] = TokenKind.Record,           // §D = Record (Data)
-        ["V"] = TokenKind.Variant,          // §V = Variant
         ["U"] = TokenKind.Using,            // §U = Using
         ["NS"] = TokenKind.Namespace,        // §NS = Namespace scope
 
@@ -48,7 +46,6 @@ public sealed class Lexer
         ["/L"] = TokenKind.EndFor,          // §/L
         ["/W"] = TokenKind.EndMatch,        // §/W
         ["/K"] = TokenKind.EndCase,         // §/K - closing case tag
-        ["/T"] = TokenKind.EndType,         // §/T
         ["/D"] = TokenKind.EndRecord,       // §/D
         ["/NS"] = TokenKind.EndNamespace,   // §/NS
 
@@ -65,8 +62,6 @@ public sealed class Lexer
         ["GOTO"] = TokenKind.Goto,          // §GOTO{label} = Goto
         ["LABEL"] = TokenKind.Label,        // §LABEL{label} = Label
         ["SEMVER"] = TokenKind.SemVer,      // §SEMVER{MAJOR.MINOR.PATCH} = semantics-version declaration (lexed by ScanSemVerDirective; listed here for the keyword registry / doc-drift check)
-        ["BODY"] = TokenKind.Body,          // §BODY - explicit body start (optional)
-        ["END_BODY"] = TokenKind.EndBody,   // §END_BODY - explicit body end (optional)
 
         // Type system - Option/Result patterns
         ["SM"] = TokenKind.Some,            // §SM = Some
@@ -110,8 +105,6 @@ public sealed class Lexer
         ["CNT"] = TokenKind.Count,
 
         // Generics
-        // Old syntax removed: ["TP"] = TokenKind.TypeParam (use <T> suffix instead)
-        // Old syntax removed: ["G"] = TokenKind.Generic (use List<T> inline instead)
         ["WHERE"] = TokenKind.Where,        // §WHERE = Where
 
         // Classes, Interfaces, Inheritance
@@ -123,10 +116,6 @@ public sealed class Lexer
         ["EXT"] = TokenKind.Extends,
         ["MT"] = TokenKind.Method,          // §MT = Method
         ["/MT"] = TokenKind.EndMethod,      // §/MT
-        ["VR"] = TokenKind.Virtual,         // §VR = Virtual
-        ["OV"] = TokenKind.Override,        // §OV = Override
-        ["AB"] = TokenKind.Abstract,        // §AB = Abstract
-        ["SD"] = TokenKind.Sealed,          // §SD = Sealed
         ["THIS"] = TokenKind.This,
         ["/THIS"] = TokenKind.EndThis,
         ["BASE"] = TokenKind.Base,
@@ -151,7 +140,6 @@ public sealed class Lexer
         ["OP"] = TokenKind.OperatorOverload,
         ["/OP"] = TokenKind.EndOperatorOverload,
         ["ASSIGN"] = TokenKind.Assign,
-        ["DEFAULT"] = TokenKind.Default,
 
         // Try/Catch/Finally
         ["TR"] = TokenKind.Try,             // §TR = Try
@@ -177,7 +165,6 @@ public sealed class Lexer
         ["UNSUB"] = TokenKind.Unsubscribe,
 
         // Async/Await
-        ["ASYNC"] = TokenKind.Async,
         ["AWAIT"] = TokenKind.Await,
         ["AF"] = TokenKind.AsyncFunc,
         ["/AF"] = TokenKind.EndAsyncFunc,
@@ -229,8 +216,6 @@ public sealed class Lexer
         ["SN"] = TokenKind.Since,               // §SN = Since
         ["DP"] = TokenKind.Deprecated,          // §DP = Deprecated
         ["BR"] = TokenKind.Breaking,            // §BR = Breaking
-        ["XP"] = TokenKind.Experimental,        // §XP = Experimental
-        ["SB"] = TokenKind.Stable,              // §SB = Stable
 
         // Extended Features: Future Extensions
         ["DC"] = TokenKind.Decision,            // §DC = Decision
@@ -715,8 +700,8 @@ public sealed class Lexer
             '→' => ScanSingle(TokenKind.Arrow),
             '-' => ScanMinusOrArrowOrNumber(),
             // Unicode quantifiers
-            '∀' => ScanUnicodeQuantifier("forall"),
-            '∃' => ScanUnicodeQuantifier("exists"),
+            '∀' => ScanRemovedQuantifier("forall"),
+            '∃' => ScanRemovedQuantifier("exists"),
             '`' => ScanBacktickIdentifier(),
             '\'' => ScanCharLiteral(),
             '$' => ScanDollarString(),
@@ -864,13 +849,14 @@ public sealed class Lexer
     }
 
     /// <summary>
-    /// Scans a Unicode quantifier symbol (∀ or ∃) and returns it as an identifier token
-    /// with the corresponding keyword text.
+    /// Rejects a removed Unicode quantifier with its canonical spelling.
     /// </summary>
-    private Token ScanUnicodeQuantifier(string keywordText)
+    private Token ScanRemovedQuantifier(string keywordText)
     {
-        Advance(); // consume the Unicode character
-        return new Token(TokenKind.Identifier, keywordText, CurrentSpan(), keywordText);
+        Advance();
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidLispExpression,
+            $"Removed quantifier '{CurrentText()}'. Use '{keywordText}' instead.");
+        return MakeToken(TokenKind.Error);
     }
 
     private Token ScanDotOrNumber()
@@ -2138,6 +2124,28 @@ public sealed class Lexer
     /// </summary>
     private void ReportUnknownSectionMarker(string keyword)
     {
+        var replacement = keyword switch
+        {
+            "T" or "/T" or "V" => "Use §CL or §EN declarations instead.",
+            "DEFAULT" => "Use a wildcard '_' case with §K instead.",
+            "ASYNC" => "Use §AF or §AMT instead.",
+            "VR" => "Use the 'vr' member modifier instead.",
+            "OV" => "Use the 'ov' member modifier instead.",
+            "AB" => "Use the 'abs' declaration modifier instead.",
+            "SD" => "Use the 'seal' declaration modifier instead.",
+            "XP" or "SB" => "Use a /// documentation comment instead.",
+            "BODY" or "END_BODY" => "Use indentation to delimit the function body instead.",
+            "TP" => "Use an inline <T> type-parameter list instead.",
+            "G" => "Use an inline generic type such as List<i32> instead.",
+            _ => null
+        };
+        if (replacement != null)
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnknownSectionMarker,
+                $"Removed section marker '§{keyword}'. {replacement}");
+            return;
+        }
+
         if (keyword is "/SW" or "/ENUM")
         {
             var opener = keyword == "/SW" ? "W" : "EN";

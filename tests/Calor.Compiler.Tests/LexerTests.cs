@@ -7,6 +7,43 @@ namespace Calor.Compiler.Tests;
 
 public class LexerTests
 {
+    [Theory]
+    [InlineData("T", "§CL")]
+    [InlineData("/T", "§CL")]
+    [InlineData("V", "§EN")]
+    [InlineData("DEFAULT", "'_'")]
+    [InlineData("ASYNC", "§AF")]
+    [InlineData("VR", "'vr'")]
+    [InlineData("OV", "'ov'")]
+    [InlineData("AB", "'abs'")]
+    [InlineData("SD", "'seal'")]
+    [InlineData("XP", "///")]
+    [InlineData("SB", "///")]
+    [InlineData("BODY", "indentation")]
+    [InlineData("END_BODY", "indentation")]
+    [InlineData("TP", "<T>")]
+    [InlineData("G", "List<i32>")]
+    public void Tokenize_RemovedKeyword_ReportsReplacement(string marker, string replacement)
+    {
+        var tokens = Tokenize($"§{marker} §M", out var diagnostics);
+
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Equal(TokenKind.Module, tokens[1].Kind);
+        Assert.Contains(replacement, Assert.Single(diagnostics.Errors).Message);
+        Assert.DoesNotContain(marker, Lexer.KeywordNames);
+        Assert.DoesNotContain(marker, SectionMarkerSuggestions.AllMarkers);
+    }
+
+    [Theory]
+    [InlineData("∀", "forall")]
+    [InlineData("∃", "exists")]
+    public void Tokenize_RemovedUnicodeQuantifier_ReportsReplacement(string symbol, string replacement)
+    {
+        var tokens = Tokenize(symbol, out var diagnostics);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Contains(replacement, Assert.Single(diagnostics.Errors).Message);
+    }
+
     private static List<Token> Tokenize(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();

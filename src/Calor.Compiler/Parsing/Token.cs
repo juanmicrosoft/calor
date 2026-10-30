@@ -62,8 +62,6 @@ public enum TokenKind
     In,
     Out,
     Effects,
-    Body,
-    EndBody,
     Call,
     EndCall,
     Arg,
@@ -88,8 +86,6 @@ public enum TokenKind
     Bind,
 
     // Phase 3: Type System
-    Type,
-    EndType,
     Record,
     EndRecord,
     Field,
@@ -101,7 +97,6 @@ public enum TokenKind
     None,
     Ok,
     Err,
-    Variant,
 
     // Phase 4: Contracts and Effects
     Requires,
@@ -143,9 +138,7 @@ public enum TokenKind
     Count,          // §CNT - Collection .Count property
 
     // Phase 7: Generics
-    TypeParam,
     Where,
-    Generic,
 
     // Phase 8: Classes, Interfaces, Inheritance
     Class,
@@ -156,10 +149,6 @@ public enum TokenKind
     Extends,
     Method,
     EndMethod,
-    Virtual,
-    Override,
-    Abstract,
-    Sealed,
     This,
     EndThis,
     Base,
@@ -186,7 +175,6 @@ public enum TokenKind
     BaseCall,
     EndBaseCall,
     Assign,
-    Default,
 
     // Phase 10: Try/Catch/Finally
     Try,
@@ -212,7 +200,6 @@ public enum TokenKind
     Unsubscribe,
 
     // Phase 12: Async/Await
-    Async,
     Await,
     AsyncFunc,          // §AF - Async function
     EndAsyncFunc,       // §/AF - End async function
@@ -258,8 +245,6 @@ public enum TokenKind
     Since,              // §SINCE - API versioning
     Deprecated,         // §DEPRECATED - Deprecation markers
     Breaking,           // §BREAKING - Breaking change markers
-    Experimental,       // §EXPERIMENTAL - Experimental feature markers
-    Stable,             // §STABLE - Stability markers
 
     // Enums and Extensions
     Enum,               // §EN - Enum definition

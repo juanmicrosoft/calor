@@ -17,6 +17,11 @@ write `len`, `cast` and `is-letter`, not `LEN`, `Cast` or `IS-LETTER`.
 The pattern grammar's `and`, `or` and `not` combinators are not expression
 operators.
 
+Quantifiers use `forall` and `exists`; the Unicode spellings are errors.
+Function bodies are delimited by indentation, not `§BODY`/`§END_BODY`.
+Generic types and parameters use inline angle brackets (`List<i32>`, `<T>`),
+not the removed `§G`/`§TP` markers.
+
 ## Integer literals
 
 Integer literals preserve sign, base, width, and signedness through compilation.

@@ -576,7 +576,7 @@ Example:
   §I{char:c}
   §O{Option<i32>}
   §E{alloc}
-  §IF{if1} (and (>= c '0') (<= c '9'))
+  §IF{if1} (&& (>= c '0') (<= c '9'))
     §R §SM (- c '0')
   §EL
     §R §NN

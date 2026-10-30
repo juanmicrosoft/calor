@@ -126,24 +126,24 @@ public class TypeSystemTests
     }
 
     [Fact]
-    public void Lexer_RecognizesTypeKeyword()
+    public void Lexer_RejectsDeadTypeKeyword()
     {
         var tokens = Tokenize("§T", out var diagnostics);
 
-        Assert.False(diagnostics.HasErrors);
+        Assert.True(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Type, tokens[0].Kind);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
     }
 
     [Fact]
-    public void Lexer_RecognizesVariantKeyword()
+    public void Lexer_RejectsDeadVariantKeyword()
     {
         var tokens = Tokenize("§V", out var diagnostics);
 
-        Assert.False(diagnostics.HasErrors);
+        Assert.True(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Variant, tokens[0].Kind);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
     }
 

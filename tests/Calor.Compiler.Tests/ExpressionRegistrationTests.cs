@@ -43,7 +43,6 @@ public class ExpressionRegistrationTests
             [TokenKind.HashSet] = ("§HSET{s:i32} §/HSET{s}", nameof(SetCreationNode)),
             [TokenKind.Has] = ("§HAS{values} 1", nameof(CollectionContainsNode)),
             [TokenKind.Count] = ("§CNT{values}", nameof(CollectionCountNode)),
-            [TokenKind.Generic] = ("synthetic", nameof(GenericTypeNode)),
             [TokenKind.New] = ("§NEW{object} §/NEW", nameof(NewExpressionNode)),
             [TokenKind.AnonymousObject] = ("§ANON Name = \"Ada\" §/ANON", nameof(AnonymousObjectCreationNode)),
             [TokenKind.This] = ("§THIS", nameof(ThisExpressionNode)),
@@ -153,19 +152,6 @@ public class ExpressionRegistrationTests
 
     private static IReadOnlyList<Token> GetExpressionTokens(TokenKind kind, string source)
     {
-        if (kind == TokenKind.Generic)
-        {
-            return
-            [
-                new Token(TokenKind.Generic, "§G", TextSpan.Empty),
-                new Token(TokenKind.OpenBrace, "{", TextSpan.Empty),
-                new Token(TokenKind.Identifier, "List", TextSpan.Empty),
-                new Token(TokenKind.Colon, ":", TextSpan.Empty),
-                new Token(TokenKind.Identifier, "i32", TextSpan.Empty),
-                new Token(TokenKind.CloseBrace, "}", TextSpan.Empty),
-            ];
-        }
-
         var diagnostics = new DiagnosticBag();
         return new Lexer(source, diagnostics)
             .TokenizeAllForParser()

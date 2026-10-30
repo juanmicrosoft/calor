@@ -12,13 +12,13 @@ public static class SectionMarkerSuggestions
     public static readonly IReadOnlyList<string> AllMarkers = new[]
     {
         // Core section markers
-        "M", "F", "C", "B", "R", "I", "O", "A", "E", "L", "W", "K", "Q", "S", "T", "D", "V", "U",
+        "M", "F", "C", "B", "R", "I", "O", "A", "E", "L", "W", "K", "Q", "S", "D", "U",
 
         // Closing tags
-        "/M", "/F", "/C", "/I", "/L", "/W", "/K", "/T", "/D",
+        "/M", "/F", "/C", "/I", "/L", "/W", "/K", "/D",
 
         // Control flow
-        "IF", "EI", "EL", "WH", "/WH", "DO", "/DO", "BK", "CN", "BODY", "END_BODY",
+        "IF", "EI", "EL", "WH", "/WH", "DO", "/DO", "BK", "CN",
 
         // Option/Result types
         "SM", "NN", "OK", "ERR", "FL", "IV",
@@ -27,7 +27,7 @@ public static class SectionMarkerSuggestions
         "ARR", "LIST", "DICT", "SET", "TUPLE", "SPAN", "RANGE", "NEW", "/NEW", "PUSH", "DEL", "IDX", "ITER",
 
         // Async/Threading
-        "ASYNC", "/ASYNC", "AWAIT", "TASK", "LOCK", "/LOCK", "SEM", "ATOMIC",
+        "/ASYNC", "AWAIT", "TASK", "LOCK", "/LOCK", "SEM", "ATOMIC",
 
         // Access modifiers
         "PUB", "PRIV", "INT", "PROT", "STAT", "RO", "CONST",
@@ -36,11 +36,11 @@ public static class SectionMarkerSuggestions
         "WHERE",
 
         // Classes and interfaces
-        "CL", "/CL", "IFACE", "/IFACE", "IMPL", "EXT", "MT", "/MT", "VR", "OV", "AB", "SD",
+        "CL", "/CL", "IFACE", "/IFACE", "IMPL", "EXT", "MT", "/MT",
         "THIS", "/THIS", "BASE", "CTOR", "/CTOR", "OP", "/OP", "DTOR", "/DTOR", "PROP", "/PROP", "GET", "SET", "INIT",
 
         // Patterns
-        "MATCH", "/MATCH", "ARM", "/ARM", "GUARD", "DEFAULT",
+        "MATCH", "/MATCH", "ARM", "/ARM", "GUARD",
 
         // Try/Catch
         "TR", "/TR", "CA", "FI", "TH", "RT", "WHEN",
@@ -64,7 +64,7 @@ public static class SectionMarkerSuggestions
         "US", "/US", "UB", "/UB", "AS",
 
         // Enhanced contracts
-        "CX", "SN", "DP", "BR", "XP", "SB",
+        "CX", "SN", "DP", "BR",
 
         // Future extensions
         "DC", "/DC", "CHOSEN", "REJECTED", "REASON", "CT", "/CT", "VS", "/VS", "HD", "/HD",
@@ -95,9 +95,7 @@ public static class SectionMarkerSuggestions
         ["K"] = "Case",
         ["Q"] = "Requires (precondition)",
         ["S"] = "Ensures (postcondition)",
-        ["T"] = "Type",
         ["D"] = "Record (data)",
-        ["V"] = "Variant",
         ["U"] = "Using",
 
         // Control flow
