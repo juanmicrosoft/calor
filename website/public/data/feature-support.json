@@ -206,7 +206,7 @@
         },
         {
           "name": "named-argument",
-          "description": "Named arguments (param: value) are supported in both statement and expression contexts"
+          "description": "Named arguments (param: value) are supported on method and constructor calls, including target-typed new"
         },
         {
           "name": "declaration-pattern",
