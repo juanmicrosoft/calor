@@ -128,6 +128,27 @@ public class BclLoweringPrerequisiteTests
     }
 
     [Fact]
+    public void InstanceArrayCallThroughType_DoesNotEstablishAProducerType()
+    {
+        var source = """
+            §M{m1:MetadataArrays}
+              §F{f1:Run:pub} () -> i32
+                §B{values} §C{System.Type.GetGenericArguments}
+                §R values.Length
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors);
+        var initializer = Assert.IsType<BindStatementNode>(module.Functions[0].Body[0]).Initializer!;
+        var graph = CallGraphAnalysis.Build(module);
+        Assert.Null(graph.MetadataArrayReceiverType("f1", initializer.Span));
+        var compiled = Program.Compile(source, "type-array-call.calr",
+            new CompilationOptions { UnknownCallPolicy = UnknownCallPolicy.Strict, StatusWriter = TextWriter.Null });
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall && diagnostic.Message.Contains("get_Length"));
+    }
+
+    [Fact]
     public void MetadataArrayCallWithArguments_RemainsUnknown()
     {
         var converted = new CSharpToCalorConverter().Convert("""

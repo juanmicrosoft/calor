@@ -289,7 +289,7 @@ public sealed class Binder
         CallExpressionNode call, BoundExpression? receiver)
     {
         if (call.Arguments.Count != 0 || call.TypeArguments is { Count: > 0 }
-            || receiver is null
+            || receiver is null or BoundTypeReferenceExpression
             || ResolveMetadataArrayReceiver(receiver) is not { } receiverType)
             return null;
 

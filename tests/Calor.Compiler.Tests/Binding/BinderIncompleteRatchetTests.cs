@@ -126,7 +126,17 @@ public class BinderIncompleteRatchetTests
         + "budget waivers. All 72 source-carrier identities remain guarded (63 native, nine "
         + "preserved expressions), including all 47 native generic identities. In-repo visits "
         + "4828 -> 4826 come solely from the approved 06-03 declaration-pattern snapshot "
-        + "(seven -> five visits); incomplete diagnostics remain zero";
+        + "(seven -> five visits); incomplete diagnostics remain zero. "
+        + "#1601 (0.30): current binder visits 25268 to 25240 (-28) reflect ordinary Length "
+        + "serialization, not improved precision or native fidelity. Across 21 files, 55 "
+        + "source Length identities explain the original -54; nameless-inference legacy "
+        + "preservation restores 26 visits. The remaining 28 visits fold operation-plus-receiver "
+        + "into dotted references. Three selected metadata array-property reads remove raw "
+        + "Calor0200 errors in ServiceRegistrar (58 to 55); propagated errors are unchanged. "
+        + "The 13 updated source records retain every source, native, opaque, loss and disposition "
+        + "identity; other diagnostic hashes change only by location or the two unresolved "
+        + "bytes references becoming bytes.Length. This is a current structural inventory "
+        + "correction, not a historical remeasurement or an opacity-budget change";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
