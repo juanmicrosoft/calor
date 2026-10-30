@@ -6142,11 +6142,30 @@ public sealed class Parser
     private void ValidateIdentityFreeHeader(Token token, AttributeCollection attrs, int? maximum)
     {
         var count = int.TryParse(attrs["_posCount"], out var parsed) ? parsed : 0;
-        var first = attrs["_pos0"] ?? "";
-        var sourceId = Ids.IdValidator.IsCanonicalId(first)
-            || IsIdPattern(first) && !(token.Kind == TokenKind.Indexer && AttributeHelper.IsLikelyType(first));
-        if (maximum.HasValue && count > maximum.Value && !(count == 1 && first.Length == 0)
-            || sourceId)
+        var empty = count == 1 && string.IsNullOrEmpty(attrs["_pos0"]);
+        bool InvalidVisibility(int position) => attrs[$"_pos{position}"] is { Length: > 0 } value
+            && !TryParseVisibilityWord(value, out _);
+        static bool IntegralType(string value) => value is
+            "i8" or "u8" or "i16" or "u16" or "i32" or "u32" or "i64" or "u64"
+            or "byte" or "sbyte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong";
+        var invalidField = token.Kind switch
+        {
+            TokenKind.Module when !_parsingModuleMembers => attrs["_pos1"] is { } policy
+                && policy is not ("overflow=checked" or "overflow=unchecked"),
+            TokenKind.Namespace => Enumerable.Range(1, Math.Max(0, count - 1))
+                .Any(index => attrs[$"_pos{index}"] is not ("global" or "named" or "file")),
+            TokenKind.Func or TokenKind.AsyncFunc or TokenKind.Method or TokenKind.AsyncMethod => InvalidVisibility(1),
+            TokenKind.Property => InvalidVisibility(2),
+            TokenKind.Indexer => InvalidVisibility(1),
+            TokenKind.Constructor => attrs["_pos0"] != "stat" && InvalidVisibility(0),
+            TokenKind.Event => InvalidVisibility(1),
+            TokenKind.Enum => attrs["_pos2"] is { } underlying
+                ? InvalidVisibility(1) || !IntegralType(underlying)
+                : attrs["_pos1"] is { } visibilityOrType
+                    && InvalidVisibility(1) && !IntegralType(visibilityOrType),
+            _ => false
+        };
+        if (maximum.HasValue && count > maximum.Value && !empty || invalidField)
         {
             _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
                 $"Source IDs are removed from '{token.Text}'. Remove the leading ID field; tooling maintains declaration identity in .calor/ids.json.");
@@ -7442,39 +7461,17 @@ public sealed class Parser
     /// §ARR[arr1:i32:n]                          // int[] arr1 = new int[n]; (sized with variable)
     /// §ARR[arr2:i32] §A 1 §A 2 §A 3 §/ARR[arr2] // int[] arr2 = { 1, 2, 3 }; (initialized)
     /// </summary>
-    private ArrayCreationNode ParseArrayCreation()
+    private ArrayCreationNode ParseArrayCreation(bool declaration = false)
     {
         var startToken = Expect(TokenKind.Array);
         var attrs = ParseAttributes();
 
-        // Positional: [id:type:size?] or [type:id:size?] for initialized arrays
-        var rawPos0 = attrs["_pos0"] ?? "";
-        var rawPos1 = attrs["_pos1"] ?? "i32";
-        var sizeStr = attrs["_pos2"];
-
-        string id;
-        string elementType;
-
-        // Detect format: {type:id:size} vs {id:type:size}
-        // If pos0 looks like a type and pos1 doesn't, it's {type:id:size}
-        // Exception: dotted names like "Selector.ItemsSource" are property paths (IDs), not types
-        var pos0IsDottedName = rawPos0.Contains('.') && !rawPos0.Contains("::") && !rawPos0.Contains('<');
-        if (!pos0IsDottedName && AttributeHelper.IsLikelyType(rawPos0) && !AttributeHelper.IsLikelyType(rawPos1))
-        {
-            elementType = rawPos0;
-            id = rawPos1;
-        }
-        else
-        {
-            id = rawPos0;
-            elementType = rawPos1;
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            // Auto-generate id for unnamed arrays (e.g., §ARR{:i32} or §ARR{i32})
-            id = $"_arr{startToken.Span.Start}";
-        }
+        var id = GenerateParserAutoId("arr");
+        var name = declaration ? attrs["_pos0"] ?? "" : "";
+        var offset = declaration ? 1 : 0;
+        if (!declaration) ValidateIdentityFreeHeader(startToken, attrs, 2);
+        var elementType = attrs[$"_pos{offset}"] ?? "i32";
+        var sizeStr = attrs[$"_pos{offset + 1}"];
 
         ExpressionNode? size = null;
         var initializer = new List<ExpressionNode>();
@@ -7536,13 +7533,11 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endSpan);
-        var elementTypeKey = string.Equals(elementType, rawPos0, StringComparison.Ordinal)
-            ? "_pos0"
-            : "_pos1";
+        var elementTypeKey = $"_pos{offset}";
         return new ArrayCreationNode(
             span,
             id,
-            id,
+            name,
             elementType,
             size,
             initializer,
@@ -7695,18 +7690,21 @@ public sealed class Parser
     ///   2
     /// §/LIST{list1}
     /// </summary>
-    private ListCreationNode ParseListCreation()
+    private ListCreationNode ParseListCreation(bool declaration = false)
     {
         var startToken = Expect(TokenKind.List);
         var attrs = ParseAttributes();
 
         // Positional: {id:type}
-        var id = attrs["_pos0"] ?? "";
-        var elementType = attrs["_pos1"] ?? "i32";
+        var name = declaration ? attrs["_pos0"] ?? "" : "";
+        var offset = declaration ? 1 : 0;
+        var id = GenerateParserAutoId("list");
+        if (!declaration) ValidateIdentityFreeHeader(startToken, attrs, 1);
+        var elementType = attrs[$"_pos{offset + 0}"] ?? "i32";
 
-        if (string.IsNullOrEmpty(id))
+        if (declaration && string.IsNullOrEmpty(name))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LIST", "id");
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LIST", "name");
         }
 
         var elements = new List<ExpressionNode>();
@@ -7725,11 +7723,11 @@ public sealed class Parser
         return new ListCreationNode(
             span,
             id,
-            id,
+            name,
             elementType,
             elements,
             attrs,
-            attrs.GetSpan("_pos1"));
+            attrs.GetSpan($"_pos{offset + 0}"));
     }
 
     /// <summary>
@@ -7737,7 +7735,7 @@ public sealed class Parser
     /// </summary>
     private BindStatementNode ParseListCreationStatement()
     {
-        var listNode = ParseListCreation();
+        var listNode = ParseListCreation(declaration: true);
         // Wrap in bind statement: §B{type:name} = list
         return new BindStatementNode(
             listNode.Span,
@@ -7755,7 +7753,7 @@ public sealed class Parser
     /// </summary>
     private BindStatementNode ParseArrayCreationStatement()
     {
-        var arrNode = ParseArrayCreation();
+        var arrNode = ParseArrayCreation(declaration: true);
         return new BindStatementNode(
             arrNode.Span,
             arrNode.Name,
@@ -7774,19 +7772,22 @@ public sealed class Parser
     ///   §KV "two" 2
     /// §/DICT{dict1}
     /// </summary>
-    private DictionaryCreationNode ParseDictionaryCreation()
+    private DictionaryCreationNode ParseDictionaryCreation(bool declaration = false)
     {
         var startToken = Expect(TokenKind.Dict);
         var attrs = ParseAttributes();
 
         // Positional: {id:keyType:valueType}
-        var id = attrs["_pos0"] ?? "";
-        var keyType = attrs["_pos1"] ?? "str";
-        var valueType = attrs["_pos2"] ?? "i32";
+        var name = declaration ? attrs["_pos0"] ?? "" : "";
+        var offset = declaration ? 1 : 0;
+        var id = GenerateParserAutoId("dict");
+        if (!declaration) ValidateIdentityFreeHeader(startToken, attrs, 2);
+        var keyType = attrs[$"_pos{offset + 0}"] ?? "str";
+        var valueType = attrs[$"_pos{offset + 1}"] ?? "i32";
 
-        if (string.IsNullOrEmpty(id))
+        if (declaration && string.IsNullOrEmpty(name))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DICT", "id");
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DICT", "name");
         }
 
         var entries = new List<KeyValuePairNode>();
@@ -7805,13 +7806,13 @@ public sealed class Parser
         return new DictionaryCreationNode(
             span,
             id,
-            id,
+            name,
             keyType,
             valueType,
             entries,
             attrs,
-            attrs.GetSpan("_pos1"),
-            attrs.GetSpan("_pos2"));
+            attrs.GetSpan($"_pos{offset + 0}"),
+            attrs.GetSpan($"_pos{offset + 1}"));
     }
 
     /// <summary>
@@ -7819,7 +7820,7 @@ public sealed class Parser
     /// </summary>
     private BindStatementNode ParseDictionaryCreationStatement()
     {
-        var dictNode = ParseDictionaryCreation();
+        var dictNode = ParseDictionaryCreation(declaration: true);
         return new BindStatementNode(
             dictNode.Span,
             dictNode.Name,
@@ -7850,18 +7851,21 @@ public sealed class Parser
     ///   "banana"
     /// §/HSET{set1}
     /// </summary>
-    private SetCreationNode ParseSetCreation()
+    private SetCreationNode ParseSetCreation(bool declaration = false)
     {
         var startToken = Expect(TokenKind.HashSet);
         var attrs = ParseAttributes();
 
         // Positional: {id:type}
-        var id = attrs["_pos0"] ?? "";
-        var elementType = attrs["_pos1"] ?? "str";
+        var name = declaration ? attrs["_pos0"] ?? "" : "";
+        var offset = declaration ? 1 : 0;
+        var id = GenerateParserAutoId("hset");
+        if (!declaration) ValidateIdentityFreeHeader(startToken, attrs, 1);
+        var elementType = attrs[$"_pos{offset + 0}"] ?? "str";
 
-        if (string.IsNullOrEmpty(id))
+        if (declaration && string.IsNullOrEmpty(name))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "HSET", "id");
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "HSET", "name");
         }
 
         var elements = new List<ExpressionNode>();
@@ -7888,11 +7892,11 @@ public sealed class Parser
         return new SetCreationNode(
             span,
             id,
-            id,
+            name,
             elementType,
             elements,
             attrs,
-            attrs.GetSpan("_pos1"));
+            attrs.GetSpan($"_pos{offset + 0}"));
     }
 
     /// <summary>
@@ -7900,7 +7904,7 @@ public sealed class Parser
     /// </summary>
     private BindStatementNode ParseSetCreationStatement()
     {
-        var setNode = ParseSetCreation();
+        var setNode = ParseSetCreation(declaration: true);
         return new BindStatementNode(
             setNode.Span,
             setNode.Name,
@@ -14156,19 +14160,19 @@ public sealed class Parser
         ValidateIdentityFreeHeader(startToken, attrs, null);
 
         var id = GenerateParserAutoId("arr2d");
-        var name = attrs["_pos0"] ?? "_arr2d";
-        var elementType = attrs["_pos1"] ?? "i32";
+        var name = "";
+        var elementType = attrs["_pos0"] ?? "i32";
 
         var dimensionSizes = new List<ExpressionNode>();
         var initializer = new List<IReadOnlyList<ExpressionNode>>();
         var rank = 2;
 
         // Check for dimension sizes in positions 3+
-        var pos3 = attrs["_pos2"];
+        var pos3 = attrs["_pos1"];
         if (pos3 != null)
         {
             // Sized form: §ARR2D{id:name:type:dim1:dim2[:dim3...]}
-            for (int i = 2; ; i++)
+            for (int i = 1; ; i++)
             {
                 var posN = attrs[$"_pos{i}"];
                 if (posN == null) break;
@@ -14223,7 +14227,7 @@ public sealed class Parser
             rank,
             dimensionSizes,
             initializer,
-            attrs.GetSpan("_pos1"));
+            attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
