@@ -49,6 +49,46 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.Equal(before.Declarations.Single(d => d.Kind == IdKind.Function).Id, module.Functions.Single().Id);
     }
 
+    [SkippableFact]
+    public void ActiveInputOwnershipUsesPhysicalProjectBoundaries()
+    {
+        Skip.If(OperatingSystem.IsWindows(), "Requires Unix symlink creation.");
+        var physicalRoot = PathFor("physical/project");
+        Directory.CreateDirectory(physicalRoot);
+        var store = new DeclarationIdentityStore(physicalRoot);
+        store.Sync([Write("physical/project/A.calr", Original)]);
+        Directory.CreateSymbolicLink(PathFor("alias"), PathFor("physical"));
+        var added = Write("alias/project/B.calr", Original.Replace("Demo", "Added"));
+        DeclarationIdentityStore.SyncActiveInputs([added], physicalRoot);
+        Assert.Equal(["A.calr", "B.calr"], store.Sync().Files);
+    }
+
+    [Fact]
+    public void AmbientOwnershipClassificationRecognizesPhysicalTempAndHomeAliases()
+    {
+        Assert.True(DeclarationIdentityStore.IsAmbientRoot(Path.GetTempPath()));
+        Assert.True(DeclarationIdentityStore.IsAmbientRoot(CanonicalPath.Resolve(Path.GetTempPath())));
+        Assert.True(DeclarationIdentityStore.IsAmbientRoot(CanonicalPath.Resolve(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))));
+        Assert.False(DeclarationIdentityStore.IsAmbientRoot(_root));
+    }
+
+    [SkippableFact]
+    public void PhysicalBoundaryComparisonDoesNotAllowSymlinkedIdentitySources()
+    {
+        Skip.If(OperatingSystem.IsWindows(), "Requires Unix symlink creation.");
+        var source = Write("active.calr", Original);
+        Store.Sync([source]);
+        var sidecar = File.ReadAllText(Store.SidecarPath);
+        var link = PathFor("linked.calr");
+        File.CreateSymbolicLink(link, source);
+        Assert.Throws<InvalidDataException>(() => Store.Sync([link]));
+        Assert.Throws<InvalidDataException>(() => Store.Apply([new(link, Original, Original + "\n")]));
+        Assert.Equal(Original, File.ReadAllText(source));
+        Assert.Equal(sidecar, File.ReadAllText(Store.SidecarPath));
+        Assert.False(File.Exists(PathFor(".calor/ids.transaction.json")));
+    }
+
     [Fact]
     public void MigrationOutputUsesExistingProjectStoreWithoutShadowingRegisteredSiblings()
     {

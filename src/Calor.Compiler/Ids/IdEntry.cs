@@ -98,18 +98,11 @@ public sealed class DeclarationIdentityStore
         if (store == null) return null;
         if (store.IncludesRegistration(file)) return store;
         if (projectRoot != null)
-        {
-            var relative = Path.GetRelativePath(Path.GetFullPath(projectRoot), store.Root);
-            return relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                && !Path.IsPathRooted(relative) ? store : null;
-        }
+            return CanonicalPath.IsUnder(CanonicalPath.Resolve(store.Root), CanonicalPath.Resolve(projectRoot)) ? store : null;
 
         // An inferred input directory is not an ownership boundary. A nearer
         // actual project is; ambient temp/home/root stores are not projects.
-        if (store.Root == Path.GetPathRoot(store.Root)
-            || store.Root == Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()))
-            || store.Root == Path.TrimEndingDirectorySeparator(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)))
-            return null;
+        if (IsAmbientRoot(store.Root)) return null;
         for (var directory = Path.GetDirectoryName(Path.GetFullPath(file)); directory != null && directory != store.Root;
              directory = Path.GetDirectoryName(directory))
         {
@@ -120,6 +113,14 @@ public sealed class DeclarationIdentityStore
                 return null;
         }
         return store;
+    }
+
+    internal static bool IsAmbientRoot(string directory)
+    {
+        var canonical = CanonicalPath.Resolve(directory);
+        return canonical == Path.GetPathRoot(canonical)
+            || canonical == CanonicalPath.Resolve(Path.GetTempPath())
+            || canonical == CanonicalPath.Resolve(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     }
 
     public static void AttachIfRegistered(string? file, string source, ModuleNode module)

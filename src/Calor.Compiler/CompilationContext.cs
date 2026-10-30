@@ -25,3 +25,61 @@ public sealed class CompilationContext : IDisposable
         // The ILEffectAnalyzer is disposed by whoever constructed the context.
     }
 }
+
+    /// <summary>
+    /// Canonical-path helpers for project ownership and write confinement.
+    /// Containment decisions compare real filesystem locations, not lexical paths.
+    /// </summary>
+    internal static class CanonicalPath
+    {
+        private const int MaxLinkDepth = 40;
+
+        /// <summary>
+        /// Resolves symlinks in every component of the path. Nonexistent trailing
+        /// components are appended lexically.
+        /// </summary>
+        public static string Resolve(string path) => ResolveCore(Path.GetFullPath(path), 0);
+
+        public static bool IsUnder(string canonicalPath, string canonicalRoot)
+            => string.Equals(canonicalPath, canonicalRoot, StringComparison.Ordinal)
+               || canonicalPath.StartsWith(canonicalRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
+        private static string ResolveCore(string full, int depth)
+        {
+            if (depth > MaxLinkDepth)
+                throw new IOException($"Too many levels of symbolic links resolving '{full}'");
+
+            var root = Path.GetPathRoot(full)!;
+            var parts = full[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            var current = root.TrimEnd(Path.DirectorySeparatorChar);
+            if (current.Length == 0)
+                current = root;
+
+            for (var i = 0; i < parts.Length; i++)
+            {
+                current = Path.Combine(current, parts[i]);
+
+                FileSystemInfo info = Directory.Exists(current)
+                    ? new DirectoryInfo(current)
+                    : new FileInfo(current);
+                if (!info.Exists)
+                {
+                    for (var j = i + 1; j < parts.Length; j++)
+                        current = Path.Combine(current, parts[j]);
+                    return current;
+                }
+
+                var target = info.ResolveLinkTarget(returnFinalTarget: true);
+                if (target != null)
+                {
+                    var remainder = string.Join(Path.DirectorySeparatorChar, parts[(i + 1)..]);
+                    var combined = remainder.Length == 0
+                        ? target.FullName
+                        : Path.Combine(target.FullName, remainder);
+                    return ResolveCore(Path.GetFullPath(combined), depth + 1);
+                }
+            }
+
+            return current;
+        }
+    }

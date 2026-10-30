@@ -20,6 +20,8 @@ Unregistered inputs do not adopt a store above a nearer project boundary or
 an ambient temporary, home or filesystem root.
 Compile-time recovery requires a confirmed registration in the current or
 pending sidecar; merely finding an ancestor store never recovers its journal.
+Ownership comparisons resolve physical directory aliases. Source registration
+and transaction paths still reject symbolic links inside the identity project.
 
 For tooling integration and recovery, use:
 
