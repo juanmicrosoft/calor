@@ -714,7 +714,7 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
         §R §C{left.Equals} §A right §/C
 
     §OP{op02:!=:pub} (Point:left, Point:right) -> bool
-      §R (not (== left right))
+      §R (! (== left right))
 ```
 
 ### Async Method with Try/Catch

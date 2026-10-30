@@ -357,6 +357,7 @@ public readonly struct Token : IEquatable<Token>
     public string Text { get; }
     public TextSpan Span { get; }
     public object? Value { get; }
+    public string? DocComment { get; init; }
     internal int IndentationDepth { get; init; }
 
     public Token(TokenKind kind, string text, TextSpan span, object? value = null)

@@ -68,6 +68,23 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 
 ---
 
+## Documentation comments
+
+Put `///` comments immediately before the declaration they document. Consecutive
+lines form one documentation comment; a blank line or an ordinary `//` comment
+ends the association. The formatter preserves documentation comments.
+
+```calor
+/// Arithmetic helpers.
+§M{m1:Arithmetic}
+  /// Adds two integers.
+  §F{f1:Add:pub} (i32:x, i32:y) -> i32
+    §R (+ x y)
+```
+
+`--require-docs` and `--strict-api` recognize these comments. Contracts and
+executable examples can also document a function's behavior.
+
 ## Types
 
 | Type | Description | C# Equivalent |

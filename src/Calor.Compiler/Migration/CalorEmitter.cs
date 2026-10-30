@@ -137,7 +137,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var normalized = node.DocComment.Replace("\r\n", "\n").Replace("\r", "");
         foreach (var line in normalized.Split('\n'))
         {
-            AppendLine($"// {line.Trim()}");
+            AppendLine($"/// {line.Trim()}");
         }
     }
 
@@ -295,6 +295,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ModuleNode node)
     {
+        EmitDocComment(node);
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
         var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
@@ -856,6 +857,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MethodSignatureNode node)
     {
+        EmitDocComment(node);
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -1077,6 +1079,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ClassFieldNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
         // #1595: a collection default (§LIST/§HSET/§DICT) is written inline with its closer. It
@@ -1243,6 +1246,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IndexerNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -1338,6 +1342,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ConstructorNode node)
     {
+        EmitDocComment(node);
         var visibility = node.IsStatic ? "stat" : GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -1401,6 +1406,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(OperatorOverloadNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -1553,6 +1559,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FunctionNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var isLocal = _nextFunctionIsLocal;
         _nextFunctionIsLocal = false;
@@ -4260,6 +4267,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumExtensionNode node)
     {
+        EmitDocComment(node);
         // Format: §EEXT{id:EnumName} (note: §EXT is for class inheritance)
         AppendLine($"§EEXT{{{node.Id}:{node.EnumName}}}");
         Indent();
@@ -4347,6 +4355,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     // Delegate and event nodes
     public string Visit(DelegateDefinitionNode node)
     {
+        EmitDocComment(node);
         AppendLine($"§DEL{{{node.Id}:{node.Name}}}");
         Indent();
 
@@ -4373,6 +4382,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EventDefinitionNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var delegateType = TypeMapper.CSharpToCalor(node.DelegateType);
 

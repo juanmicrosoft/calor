@@ -16,6 +16,8 @@ public sealed class Lexer
     private int _tokenStart;
     private int _tokenLine;
     private int _tokenColumn;
+    private readonly List<string> _docComments = new();
+    private int _lastDocLine;
 
     private static readonly Dictionary<string, TokenKind> Keywords = new(StringComparer.Ordinal)
     {
@@ -361,7 +363,16 @@ public sealed class Lexer
         => _source[_tokenStart.._position];
 
     private Token MakeToken(TokenKind kind, object? value = null)
-        => new(kind, CurrentText(), CurrentSpan(), value);
+    {
+        string? documentation = null;
+        if (kind is not (TokenKind.Whitespace or TokenKind.Newline))
+        {
+            if (_docComments.Count > 0 && _tokenLine == _lastDocLine + 1)
+                documentation = string.Join("\n", _docComments);
+            _docComments.Clear();
+        }
+        return new Token(kind, CurrentText(), CurrentSpan(), value) { DocComment = documentation };
+    }
 
     public IEnumerable<Token> Tokenize()
     {
@@ -625,6 +636,7 @@ public sealed class Lexer
 
             yield return new Token(tok.Kind, tok.Text, tok.Span, tok.Value)
             {
+                DocComment = tok.DocComment,
                 IndentationDepth = indentStack.Count - 1
             };
         }
@@ -819,10 +831,26 @@ public sealed class Lexer
     {
         if (Lookahead == '/')
         {
+            var commentStart = _position;
+            var commentLine = _line;
+            var lineStart = _source.LastIndexOf('\n', Math.Max(0, commentStart - 1)) + 1;
+            var isDocumentation = Peek(2) == '/'
+                && _source.AsSpan(lineStart, commentStart - lineStart).Trim().IsEmpty;
             // Line comment: skip to end of line
             // Only \n terminates (not bare \r) to handle embedded \r in doc comments
             while (Current != '\n' && Current != '\0')
                 Advance();
+            if (isDocumentation)
+            {
+                if (_lastDocLine + 1 != commentLine)
+                    _docComments.Clear();
+                _docComments.Add(_source[(commentStart + 3).._position].Trim());
+                _lastDocLine = commentLine;
+            }
+            else
+            {
+                _docComments.Clear();
+            }
             return NextToken(); // skip comment entirely, return next real token
         }
         Advance();

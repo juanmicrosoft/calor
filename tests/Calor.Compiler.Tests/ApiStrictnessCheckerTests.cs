@@ -8,6 +8,55 @@ namespace Calor.Compiler.Tests;
 
 public class ApiStrictnessCheckerTests
 {
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void DocumentationComments_SatisfyRequireDocsAndStrictApi_AndSurviveFormatting(string newline)
+    {
+        var source = string.Join(newline,
+            "/// Module documentation.",
+            "§M{m1:Docs}",
+            "  /// Function documentation.",
+            "  /// A second line.",
+            "  §F{f1:Run:pub} () -> void",
+            "  /// Class documentation.",
+            "  §CL{c1:Widget:pub}",
+            "    /// Method documentation.",
+            "    §MT{mt1:Work:pub} () -> void",
+            "    /// Property documentation.",
+            "    §PROP{p1:Value:i32:pub:get}",
+            "  /// Interface documentation.",
+            "  §IFACE{i1:IWidget}");
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal("Module documentation.", module.DocComment);
+        Assert.Equal("Function documentation.\nA second line.", module.Functions.Single().DocComment);
+        var checker = new ApiStrictnessChecker(diagnostics,
+            new ApiStrictnessOptions { RequireDocs = true, StrictApi = true });
+        checker.Check(module);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.MissingDocComment);
+
+        var formatted = new Calor.Compiler.Migration.CalorEmitter().Emit(module);
+        var reparsed = Parse(formatted, out var reparsedDiagnostics);
+        Assert.False(reparsedDiagnostics.HasErrors, string.Join("\n", reparsedDiagnostics));
+        Assert.Equal(module.DocComment, reparsed.DocComment);
+        Assert.Equal(module.Functions.Single().DocComment, reparsed.Functions.Single().DocComment);
+        Assert.Equal(module.Classes.Single().Methods.Single().DocComment,
+            reparsed.Classes.Single().Methods.Single().DocComment);
+    }
+
+    [Theory]
+    [InlineData("// ordinary comment\n")]
+    [InlineData("///\n")]
+    [InlineData("/// detached documentation\n\n")]
+    [InlineData("/// detached documentation\n// ordinary comment\n")]
+    public void DocumentationComments_DoNotAcceptEmptyOrdinaryOrDetachedComments(string comment)
+    {
+        var module = Parse(comment + "§M{m1:Docs}", out var diagnostics);
+        new ApiStrictnessChecker(diagnostics, new ApiStrictnessOptions { RequireDocs = true }).Check(module);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.MissingDocComment);
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();

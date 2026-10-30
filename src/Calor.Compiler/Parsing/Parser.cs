@@ -11,6 +11,12 @@ namespace Calor.Compiler.Parsing;
 /// </summary>
 public sealed class Parser
 {
+    private static T WithDocumentation<T>(T node, Token startToken) where T : AstNode
+    {
+        node.DocComment = startToken.DocComment;
+        return node;
+    }
+
     private delegate ExpressionNode ExpressionParser(Parser parser);
 
     private static readonly IReadOnlyDictionary<TokenKind, ExpressionParser> ExpressionParsers =
@@ -1381,14 +1387,14 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
+        return WithDocumentation(new ModuleNode(span, id, moduleName, usings, interfaces, classes,
             enums, enumExtensions, delegates, functions, attrs,
             issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes,
             typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null,
             GetIdentifierSpan(attrs, moduleNameKey, moduleName),
             moduleItems,
             namespaceScopes,
-            declaredSemanticsVersion);
+            declaredSemanticsVersion), startToken);
     }
 
     private void ParseNamespaceScope(
@@ -1937,13 +1943,13 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, functionNameKey, funcName);
-        return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
+        return WithDocumentation(new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
             properties, lockNode, author, taskRef, identifierSpan: identifierSpan)
         {
             EffectParameters = effectParameters,
-        };
+        }, startToken);
     }
 
     /// <summary>
@@ -2132,13 +2138,13 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, functionNameKey, funcName);
-        return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
+        return WithDocumentation(new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
             properties, lockNode, author, taskRef, isAsync: true, identifierSpan: identifierSpan)
         {
             EffectParameters = effectParameters,
-        };
+        }, startToken);
     }
 
     private ParameterNode ParseParameter()
@@ -9130,7 +9136,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs,
+        return WithDocumentation(new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs,
             indexers: indexers.Count > 0 ? indexers : null,
             baseInterfaceSpans: baseInterfaceSpans,
             identifierSpan: GetIdentifierSpan(attrs, interfaceNameKey, name),
@@ -9140,7 +9146,7 @@ public sealed class Parser
                 || interopBlocks.Any(block =>
                     block.CSharpCode.TrimStart().StartsWith("#", StringComparison.Ordinal))
                     ? interfaceItems
-                    : null);
+                    : null), startToken);
     }
 
     /// <summary>
@@ -9262,10 +9268,10 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs)
+        return WithDocumentation(new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs)
         {
             EffectParameters = effectParameters,
-        };
+        }, startToken);
     }
 
     /// <summary>
@@ -9612,7 +9618,7 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, classNameKey, name);
-        return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
+        return WithDocumentation(new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
             implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, operatorOverloads, attrs, csharpAttrs,
             isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility, interopBlocks: interopBlocks,
             preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
@@ -9624,7 +9630,7 @@ public sealed class Parser
             identifierSpan: identifierSpan,
             baseClassSpan: baseClassSpan,
             implementedInterfaceSpans: implementedInterfaceSpans,
-            items: classItems);
+            items: classItems), startToken);
     }
 
     /// <summary>
@@ -9696,7 +9702,7 @@ public sealed class Parser
         TryRecoverTrailingEffectRow(name, "field");
 
         var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
-        return new ClassFieldNode(
+        return WithDocumentation(new ClassFieldNode(
             span,
             name,
             typeName,
@@ -9707,7 +9713,7 @@ public sealed class Parser
             csharpAttrs,
             GetIdentifierSpan(attrs, "_pos1", name),
             attrs.GetSpan("_pos0"),
-            row);
+            row), startToken);
     }
 
     /// <summary>
@@ -9857,12 +9863,12 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
+        return WithDocumentation(new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
             identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
         {
             EffectParameters = effectParameters,
-        };
+        }, startToken);
     }
 
     /// <summary>
@@ -10012,13 +10018,13 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
+        return WithDocumentation(new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
             isAsync: true,
             identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
         {
             EffectParameters = effectParameters,
-        };
+        }, startToken);
     }
 
     private static MethodModifiers ParseMethodModifiers(string modStr)
@@ -10981,7 +10987,7 @@ public sealed class Parser
 
             // Compact form: no §/PROP closing tag needed
             var compactSpan = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
-            return new PropertyNode(
+            return WithDocumentation(new PropertyNode(
                 compactSpan,
                 id,
                 name,
@@ -10996,7 +11002,7 @@ public sealed class Parser
                 csharpAttrs,
                 GetIdentifierSpan(attrs, propertyNameKey, name),
                 attrs.GetSpan(propertyTypeKey),
-                compactRow);
+                compactRow), startToken);
         }
 
         // v0.17 S1 / #1136 — position 9 on the block form too, read before the
@@ -11056,7 +11062,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new PropertyNode(
+        return WithDocumentation(new PropertyNode(
             span,
             id,
             name,
@@ -11071,7 +11077,7 @@ public sealed class Parser
             csharpAttrs,
             GetIdentifierSpan(attrs, propertyNameKey, name),
             attrs.GetSpan(propertyTypeKey),
-            blockRow);
+            blockRow), startToken);
     }
 
     /// <summary>
@@ -11200,8 +11206,8 @@ public sealed class Parser
                     Advance(); // consume )
             }
 
-            return new IndexerNode(startToken.Span, id, typeName, visibility, modifiers, parameters,
-                getter, setter, initer, attrs, csharpAttrs);
+            return WithDocumentation(new IndexerNode(startToken.Span, id, typeName, visibility, modifiers, parameters,
+                getter, setter, initer, attrs, csharpAttrs), startToken);
         }
 
         // --- Full form with block parameters and accessors ---
@@ -11252,8 +11258,8 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new IndexerNode(span, id, typeName, visibility, modifiers, parameters2,
-            getter2, setter2, initer2, attrs, csharpAttrs);
+        return WithDocumentation(new IndexerNode(span, id, typeName, visibility, modifiers, parameters2,
+            getter2, setter2, initer2, attrs, csharpAttrs), startToken);
     }
 
     /// <summary>
@@ -11426,7 +11432,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs, isStatic);
+        return WithDocumentation(new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs, isStatic), startToken);
     }
 
     /// <summary>
@@ -11518,8 +11524,8 @@ public sealed class Parser
         var kind = OperatorOverloadNode.ResolveOperatorKind(operatorToken, parameters.Count);
 
         var span = startToken.Span.Union(endToken.Span);
-        return new OperatorOverloadNode(span, id, operatorToken, kind, visibility, parameters, output,
-            preconditions, postconditions, body, new AttributeCollection(), csharpAttrs);
+        return WithDocumentation(new OperatorOverloadNode(span, id, operatorToken, kind, visibility, parameters, output,
+            preconditions, postconditions, body, new AttributeCollection(), csharpAttrs), startToken);
     }
 
     /// <summary>
@@ -12731,7 +12737,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new DelegateDefinitionNode(
+        return WithDocumentation(new DelegateDefinitionNode(
             span,
             id,
             name,
@@ -12739,7 +12745,7 @@ public sealed class Parser
             output,
             effects,
             attrs,
-            GetIdentifierSpan(attrs, "_pos1", name));
+            GetIdentifierSpan(attrs, "_pos1", name)), startToken);
     }
 
     /// <summary>
@@ -12787,14 +12793,14 @@ public sealed class Parser
         // Check for accessor bodies (§EADD / §EREM ... §/EVT)
         if (!Check(TokenKind.EventAdd) && !Check(TokenKind.EventRemove))
         {
-            return new EventDefinitionNode(
+            return WithDocumentation(new EventDefinitionNode(
                 startToken.Span,
                 id,
                 name,
                 visibility,
                 delegateType,
                 attrs,
-                attrs.GetSpan(delegateTypeKey));
+                attrs.GetSpan(delegateTypeKey)), startToken);
         }
 
         List<StatementNode>? addBody = null;
@@ -12832,7 +12838,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EventDefinitionNode(
+        return WithDocumentation(new EventDefinitionNode(
             span,
             id,
             name,
@@ -12841,7 +12847,7 @@ public sealed class Parser
             attrs,
             addBody,
             removeBody,
-            attrs.GetSpan(delegateTypeKey));
+            attrs.GetSpan(delegateTypeKey)), startToken);
     }
 
     private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
@@ -14081,7 +14087,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EnumDefinitionNode(
+        return WithDocumentation(new EnumDefinitionNode(
             span,
             id,
             name,
@@ -14090,7 +14096,7 @@ public sealed class Parser
             attrs,
             csharpAttrs,
             visibility,
-            GetIdentifierSpan(attrs, enumNameKey, name));
+            GetIdentifierSpan(attrs, enumNameKey, name)), startToken);
     }
 
     /// <summary>
@@ -14315,7 +14321,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EnumExtensionNode(span, id, enumName, methods, attrs);
+        return WithDocumentation(new EnumExtensionNode(span, id, enumName, methods, attrs), startToken);
     }
 
     #endregion

@@ -54,7 +54,7 @@ public sealed class ApiStrictnessChecker
             _diagnostics.ReportWarning(
                 module.Span,
                 DiagnosticCode.MissingDocComment,
-                $"Module '{module.Name}' is missing documentation. Add §CONTEXT or decision records.");
+                $"Module '{module.Name}' is missing documentation. Add a /// documentation comment.");
         }
 
         // Check each public function
@@ -88,7 +88,7 @@ public sealed class ApiStrictnessChecker
                 func.Span,
                 DiagnosticCode.MissingDocComment,
                 $"Public function '{func.Name}' is missing documentation. " +
-                "Add §ASSUME, §USES, or examples to document behavior.");
+                "Add a /// documentation comment to describe its behavior.");
         }
 
         // Check for stability markers on public APIs without §SINCE
@@ -98,7 +98,7 @@ public sealed class ApiStrictnessChecker
                 func.Span,
                 DiagnosticCode.PublicApiChanged,
                 $"Public function '{func.Name}' has no version marker. " +
-                "Consider adding §SINCE[version] or §EXPERIMENTAL to indicate stability.");
+                "Document the API's stability with a version marker.");
         }
 
         // In strict mode, warn about public functions without contracts
@@ -115,7 +115,7 @@ public sealed class ApiStrictnessChecker
     private void CheckInterface(InterfaceDefinitionNode iface)
     {
         // InterfaceDefinitionNode doesn't have Visibility - treat all as public
-        if (_options.RequireDocs)
+        if (_options.RequireDocs && !HasDocComment(iface))
         {
             // Interfaces should have documentation
             _diagnostics.ReportWarning(
@@ -128,7 +128,7 @@ public sealed class ApiStrictnessChecker
     private void CheckClass(ClassDefinitionNode cls)
     {
         // ClassDefinitionNode doesn't have Visibility - treat all as public
-        if (_options.RequireDocs)
+        if (_options.RequireDocs && !HasDocComment(cls))
         {
             _diagnostics.ReportWarning(
                 cls.Span,
@@ -148,7 +148,7 @@ public sealed class ApiStrictnessChecker
         // Check public properties
         foreach (var prop in cls.Properties)
         {
-            if (prop.Visibility == Visibility.Public && _options.RequireDocs)
+            if (prop.Visibility == Visibility.Public && _options.RequireDocs && !HasDocComment(prop))
             {
                 _diagnostics.ReportInfo(
                     prop.Span,
@@ -163,7 +163,7 @@ public sealed class ApiStrictnessChecker
         if (method.Visibility != Visibility.Public) return;
 
         // Check for documentation
-        if (_options.RequireDocs)
+        if (_options.RequireDocs && !HasDocComment(method))
         {
             _diagnostics.ReportWarning(
                 method.Span,
@@ -174,21 +174,20 @@ public sealed class ApiStrictnessChecker
 
     private static bool HasModuleLevelDocs(ModuleNode module)
     {
-        return module.Context != null ||
-               module.Decisions.Count > 0 ||
+        return HasDocComment(module) ||
                module.Assumptions.Count > 0 ||
                module.Invariants.Count > 0;
     }
 
     private static bool HasFunctionDocs(FunctionNode func)
     {
-        return func.HasExtendedMetadata ||
+        return HasDocComment(func) ||
                func.HasContracts ||
                func.Examples.Count > 0 ||
-               func.Assumptions.Count > 0 ||
-               func.Uses != null ||
-               func.UsedBy != null;
+               func.Assumptions.Count > 0;
     }
+
+    private static bool HasDocComment(AstNode node) => !string.IsNullOrWhiteSpace(node.DocComment);
 }
 
 /// <summary>
