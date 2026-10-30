@@ -136,7 +136,17 @@ public class BinderIncompleteRatchetTests
         + "The 13 updated source records retain every source, native, opaque, loss and disposition "
         + "identity; other diagnostic hashes change only by location or the two unresolved "
         + "bytes references becoming bytes.Length. This is a current structural inventory "
-        + "correction, not a historical remeasurement or an opacity-budget change";
+        + "correction, not a historical remeasurement or an opacity-budget change. "
+        + "Current inventory refreshed on staged 2430c65a7, not final 0.30: named-constructor "
+        + "support exposes AddScanResult and Serilog Logger, moving visits 25240 -> 25276, "
+        + "with 43 additional exact-span mappings, 109 fewer opaque source expressions and "
+        + "66 additional unmapped expressions, not native expressions. Raw binding errors "
+        + "move 1 -> 5 and 7 -> 10 respectively; the indexer-parameter fix moves "
+        + "TrackingCollection 14 -> 13 and conversion success false -> true. The 143 raw "
+        + "and 78 propagated diagnostic identity hashes include those changes and 140 "
+        + "layout-only records; propagated error counts are unchanged. Preserve-all "
+        + "boundaries move 918 -> 914 and expressions 17112 -> 17068, with zero opaque-unmapped "
+        + "boundaries or unconverted files. All source identities and mixed partitions are unchanged";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
