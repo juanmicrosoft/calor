@@ -48,6 +48,8 @@ public class RefOutImplementationTests
                 "int a = 1; Forward(ref a, 7); return a.ToString();", "7"),
             ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
                 "int a = 1, b = 2; Swap<int>(b: ref a, a: ref b); return a + \":\" + b;", "2:1"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int a = 1, b = 2; int seen = Write<int>(value: 9, b: ref a, a: ref b); return seen + \":\" + a + \":\" + b;", "1:1:9"),
         };
         foreach (var witness in witnesses)
             foreach (var surface in Enum.GetValues<Surface>())
