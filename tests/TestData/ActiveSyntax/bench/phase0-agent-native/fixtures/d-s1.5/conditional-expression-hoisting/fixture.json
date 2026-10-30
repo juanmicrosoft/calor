@@ -1,0 +1,21 @@
+{
+  "featureKey": "conditional-expression-hoisting",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 329,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 329,
+  "convertedExpectedDefinedInt": 329,
+  "definedSymbols": [],
+  "currentObservation": {
+    "inputContract": "current-compiler-active-syntax",
+    "reason": "#1600 retires update expressions; seven lazy prefix/postfix operands preserve their exact C# evaluation region instead of emitting retired update aliases or running eager assignment preludes.",
+    "fullyNative": false,
+    "nativeConversionCount": 27,
+    "interopFeatureCounts": { "conditional-expression-hoisting": 7 },
+    "requiredIssueFeatures": ["conditional-expression-hoisting"]
+  }
+}

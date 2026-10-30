@@ -57,6 +57,8 @@
     "tests/TestData/InteropScope/R0/generated/F5-ARRAY-03.mcp-default.calr.txt"
   ],
   "structuredPaths": [
+    "bench/phase0-agent-native/fixtures/d-s1.5/local-function/fixture.json",
+    "bench/phase0-agent-native/fixtures/d-s1.5/conditional-expression-hoisting/fixture.json",
     "tests/TestData/InteropScope/D1/refout-cases.json"
   ],
   "transcriptPaths": [

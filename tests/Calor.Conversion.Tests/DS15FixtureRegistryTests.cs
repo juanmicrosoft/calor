@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Calor.Compiler;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Migration;
@@ -17,8 +18,11 @@ namespace Calor.Conversion.Tests;
 /// The registry is legitimately empty until the first SupportLevel promotion; the
 /// enumeration test pins the location exists either way.
 /// </summary>
-public class DS15FixtureRegistryTests
+public class DS15FixtureRegistryTests(Xunit.Abstractions.ITestOutputHelper output)
 {
+    private static readonly HashSet<string> CurrentExpectationFixtures =
+        ["local-function", "conditional-expression-hoisting"];
+
     private static string RegistryPath()
     {
         // Walk up from the test bin dir to the repo root (marker: Directory.Build.props).
@@ -37,6 +41,31 @@ public class DS15FixtureRegistryTests
             $"A-1.5.7 registry location missing: {root}");
         Assert.True(File.Exists(Path.Combine(root, "README.md")),
             "Registry schema doc (README.md) missing");
+    }
+
+    [Theory]
+    [InlineData("local-function")]
+    [InlineData("conditional-expression-hoisting")]
+    public void CurrentExpectation_ChangesOnlyApprovedClassificationFields(string name)
+    {
+        var repoRoot = Path.GetFullPath(Path.Combine(RegistryPath(), "../../../.."));
+        var original = $"bench/phase0-agent-native/fixtures/d-s1.5/{name}/fixture.json";
+        var resolved = Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentTypedInput(repoRoot, original,
+            Calor.Compiler.Tests.ActiveSyntaxInputs.InputKind.Structured);
+        var historical = JsonNode.Parse(File.ReadAllText(Path.Combine(repoRoot, original)))!.AsObject();
+        var current = JsonNode.Parse(File.ReadAllText(resolved))!.AsObject();
+        Assert.False(historical.ContainsKey("currentObservation"));
+        Assert.NotNull(current["currentObservation"]);
+        foreach (var field in new[]
+        {
+            "lossKindCertifiedAbsent", "expectedLossKinds", "allowedLossKinds", "currentObservation"
+        })
+        {
+            historical.Remove(field);
+            current.Remove(field);
+        }
+        Assert.True(JsonNode.DeepEquals(historical, current),
+            "Only explicit current classification fields may differ; fixture identity, runtime results and symbols stay frozen.");
     }
 
     [Fact]
@@ -65,7 +94,7 @@ public class DS15FixtureRegistryTests
             "Fixture defects (indeterminate = failing):\n" + string.Join("\n", failures));
     }
 
-    private static void ValidateFixture(string dir, string name)
+    private void ValidateFixture(string dir, string name)
     {
 
         // 1. Structure: all four schema components present.
@@ -83,7 +112,24 @@ public class DS15FixtureRegistryTests
 
         // 2. Manifest: featureKey named; the DIRECTORY is the sanitized form of the key
         // (keys may contain spaces/parens/slashes — see README) and must match it.
-        using var doc = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        var relativeManifest = Path.GetRelativePath(repoRoot, manifestPath).Replace('\\', '/');
+        var resolvedManifest = CurrentExpectationFixtures.Contains(name)
+            ? Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentTypedInput(repoRoot, relativeManifest,
+                Calor.Compiler.Tests.ActiveSyntaxInputs.InputKind.Structured)
+            : manifestPath;
+        using var doc = JsonDocument.Parse(File.ReadAllText(resolvedManifest));
+        output.WriteLine(JsonSerializer.Serialize(new
+        {
+            fixture = name,
+            inputContract = "current-compiler-active-syntax",
+            originalExpectationPath = relativeManifest,
+            resolvedExpectationPath = Path.GetRelativePath(repoRoot, resolvedManifest).Replace('\\', '/'),
+            csharpPath = Path.GetRelativePath(repoRoot, inputPath).Replace('\\', '/'),
+            originalCalorPath = Path.GetRelativePath(repoRoot, originalExpectedPath).Replace('\\', '/'),
+            resolvedCalorPath = Path.GetRelativePath(repoRoot, expectedPath).Replace('\\', '/'),
+            originalTestPath = Path.GetRelativePath(repoRoot, originalTestPath).Replace('\\', '/'),
+            resolvedTestPath = Path.GetRelativePath(repoRoot, testPath).Replace('\\', '/')
+        }));
         var featureKey = doc.RootElement.GetProperty("featureKey").GetString();
         Assert.False(string.IsNullOrWhiteSpace(featureKey), $"{name}: featureKey empty");
         Assert.Equal(SanitizeKey(featureKey!), name);
@@ -130,6 +176,31 @@ public class DS15FixtureRegistryTests
             $"{name}: conversion failed: "
             + string.Join("; ", converted.Issues.Select(issue => issue.Message)));
         Assert.NotNull(converted.CalorSource);
+        if (CurrentExpectationFixtures.Contains(name))
+        {
+            var observation = doc.RootElement.GetProperty("currentObservation");
+            Assert.Equal("current-compiler-active-syntax", observation.GetProperty("inputContract").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(observation.GetProperty("reason").GetString()));
+            Assert.Equal(observation.GetProperty("nativeConversionCount").GetInt32(), converted.NativeConversionCount);
+            Assert.Equal(observation.GetProperty("fullyNative").GetBoolean(), converted.Losses.Count == 0);
+            var expectedInterop = observation.GetProperty("interopFeatureCounts").EnumerateObject()
+                .ToDictionary(property => property.Name, property => property.Value.GetInt32());
+            var actualInterop = converted.Losses.Where(loss => loss.Kind == ConversionLossKind.InteropPreserved)
+                .GroupBy(loss => loss.Feature).ToDictionary(group => group.Key, group => group.Count());
+            Assert.Equal(expectedInterop.OrderBy(pair => pair.Key), actualInterop.OrderBy(pair => pair.Key));
+            output.WriteLine(JsonSerializer.Serialize(new
+            {
+                fixture = name,
+                fullyNative = converted.Losses.Count == 0,
+                converted.NativeConversionCount,
+                interopFeatureCounts = actualInterop,
+                issues = converted.Issues.Select(issue => new { issue.Feature, issue.Message })
+            }));
+            Assert.Equal(observation.GetProperty("requiredIssueFeatures").EnumerateArray()
+                .Select(feature => feature.GetString()).Order(),
+                converted.Issues.Select(issue => issue.Feature).Distinct().Order());
+            AssertValueTestPasses(name, File.ReadAllText(inputPath), runtimeEntryPoint!, runtimeExpectedInt);
+        }
         if (certifiedAbsent.ValueKind != JsonValueKind.Null)
         {
             var lossName = certifiedAbsent.GetString();
