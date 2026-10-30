@@ -1,30 +1,24 @@
-import Link from 'next/link';
-
 export function FirstProgram() {
   return (
-    <section aria-labelledby="first-program-title" className="mx-auto w-full max-w-5xl px-6 py-8 lg:px-8">
-      <h2 id="first-program-title" className="text-2xl font-bold">From Calor to a .NET program</h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="min-w-0 rounded-lg bg-calor-navy p-4 text-white">
-          <p className="mb-2 text-sm text-calor-cyan">Program.calr — Calor</p>
-          <pre className="overflow-x-auto text-xs leading-6"><code>{`§M{m001:HelloApp}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"`}</code></pre>
+    <section aria-labelledby="first-program-title" className="mx-auto w-full max-w-5xl px-6 py-12 lg:px-8">
+      <h2 id="first-program-title" className="text-2xl font-bold">A clearer way to work with AI-written code</h2>
+      <p className="mt-3 max-w-3xl text-muted-foreground">
+        Calor is a programming language for .NET teams that use AI coding assistants. It makes expected behavior easier to see and gives you checks to review before you rely on a change.
+      </p>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-lg border p-5">
+          <h3 className="font-semibold">Start with your goal</h3>
+          <p className="mt-2 text-sm text-muted-foreground">After setup, explain the change you want in everyday language. Your coding agent writes the Calor code.</p>
         </div>
-        <div className="min-w-0 rounded-lg border p-4">
-          <p className="mb-2 text-sm font-medium">Run with the .NET 10 SDK and Calor installed</p>
-          <pre className="overflow-x-auto text-xs leading-6"><code>calor run Program.calr</code></pre>
-          <p className="mt-3 text-sm">Program output:</p>
-          <pre className="overflow-x-auto text-sm"><code>Hello from Calor!</code></pre>
+        <div className="rounded-lg border p-5">
+          <h3 className="font-semibold">Make expectations visible</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Calor lets a project record important rules, such as what a function needs and what it promises to return.</p>
+        </div>
+        <div className="rounded-lg border p-5">
+          <h3 className="font-semibold">Use familiar .NET tools</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Calor applications run on the .NET runtime. Build and test them with familiar .NET tools.</p>
         </div>
       </div>
-      <p className="mt-4 text-sm text-muted-foreground">
-        Calor emits C# and uses the .NET SDK to build and run it.{' '}
-        <Link className="text-primary underline" href="/docs/getting-started/hello-world/">
-          Follow the complete setup and first-run steps
-        </Link>. No AI subscription required.
-      </p>
     </section>
   );
 }

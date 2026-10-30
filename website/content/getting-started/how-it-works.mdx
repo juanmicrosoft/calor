@@ -4,67 +4,29 @@ section: "getting-started"
 order: 3
 ---
 
-Project instructions and syntax references guide source generation. The
-compiler reports diagnostics; the agent or developer revises the source and
-runs it again. You can use this workflow without an AI account.
+You describe the change you want. Your coding agent writes the Calor code,
+runs checks, and tests the result. You review whether it did what you asked.
+Project guidance and checks support this process, but do not guarantee that
+the code is correct.
 
-**Reader question:** How do I make, check, and revise a small Calor change?
+**Reader question:** How do I ask my agent for a change and review the result?
 
-## Run one change
+## Prepare a new or existing project
 
 Install the [.NET 10 SDK and Calor](/docs/getting-started/installation/).
-Check that `calor --version` works. These commands assume a terminal and an
-empty directory, not an existing application's source folder.
+Open a terminal in your existing .NET project folder, or create a new project
+in a new folder:
 
 ```bash
-mkdir CalorWorkflow
-cd CalorWorkflow
+dotnet new console -o MyApp
+cd MyApp
 ```
 
-Save this complete program as UTF-8 `Program.calr`. It uses the same
-module, entry point, and console effect as the
-[tested Hello World example](/docs/getting-started/hello-world/).
+## Initialize Calor for your coding agent
 
-```calor
-§M{m001:HelloApp}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"
-```
-
-Compile it to inspect the generated C#, then run the Calor source:
-
-```bash
-calor --input Program.calr --output Program.g.cs
-calor run Program.calr
-```
-
-Compilation creates `Program.g.cs`; the run command prints:
-
-```text
-Hello from Calor!
-```
-
-Change the string to `"Hello again!"` and repeat both commands. The program
-now prints `Hello again!`. No project template, agent, or `calor init` is
-required. `calor run` builds its own managed workspace; the generated C# here
-is for inspection, not an automatically updated project input.
-
-If a command fails, read the first diagnostic's file, location, and message.
-Check that the source uses two-space indentation and that `§E{cw}` declares
-the console output. Fix the source rather than editing generated C#, then
-rerun. A missing tool or SDK is an
-[installation problem](/docs/getting-started/installation/), not a source
-diagnostic. See [compile options](/docs/cli/compile/) for diagnostic output
-and [project integration](/docs/getting-started/) when you want MSBuild to
-regenerate C# automatically.
-
-## Add an agent, if useful
-
-Initialize the integration for your chosen client in a project. Calor writes
-project instructions describing file conventions and syntax, plus references
-the agent can consult for constructs it needs. These guide generation; they
-do not guarantee compliance or successful repair.
+Run `calor init` with your agent's option in that project folder. This adds
+Calor build support and project instructions, tools, and references for the
+agent. Choose one setup below:
 
 | Client setup | Configuration and boundary |
 |:-------------|:---------------------------|
@@ -78,8 +40,34 @@ where the project requires Calor. They are not a filesystem sandbox:
 configuration, client support, and the tool used determine coverage.
 Hook feedback does not guarantee a correct retry.
 
-Ask for one small change, compile it, inspect diagnostics and generated code,
-and run the behavior tests. Repeat only after understanding the failure.
+Open or restart your agent in the same folder and follow its setup prompts.
+For Codex, review and trust the project hooks with `/hooks` and follow the
+smoke test in its setup guide. Other clients have their own setup steps
+linked above.
+
+## Ask for one small change
+
+Describe the behavior you want, including things it should reject. For example:
+
+> Use Calor to add a function that calculates an order total from item prices
+> and quantities. Reject negative prices and quantities. Add tests and run
+> the project's build and tests. Leave unrelated code unchanged.
+
+The agent writes the code; you do not need to create a `.calr` file yourself.
+For an existing C# project, you can instead ask the agent to propose one
+small conversion and wait for your approval. Follow the
+[phased conversion guide](/docs/guides/adding-calor-to-existing-projects/)
+rather than converting the whole application.
+
+## Review and revise
+
+Review the change and its rules against your request. Check the build and
+test results, including any warnings or checks that could not decide.
+If a command failed, read the first error's file, location, and message,
+and ask the agent to address that specific failure. Rerun the affected
+checks and tests after the fix. Do not treat a successful build as proof
+that the requested behavior works.
+
 Supported MCP clients can also request compiler diagnostics through
 `calor_check`; that does not replace executing the application tests.
 
@@ -94,3 +82,10 @@ separates implemented behavior from historical measurements and deferred
 studies. The historical task runner did not test the full feedback loop;
 its scores are not a model-wide reliability result. Neither a hook nor a
 passing example establishes an agent-productivity advantage.
+
+## Optional: use the command line without an agent
+
+Developers who want to inspect a hand-written example can use the
+[manual Hello World reference](/docs/getting-started/hello-world/) without an AI account.
+That is an alternative reference path, not a required step before setting up
+your coding agent.

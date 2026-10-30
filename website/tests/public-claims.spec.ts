@@ -72,6 +72,14 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
   }
 });
 
+test('current converter guides do not describe published releases as pending', async () => {
+  for (const document of ['guides/adding-calor-to-existing-projects', 'guides/csharp-interoperability',
+    'cli/self-check', 'cli/feature-check', 'cli/convert']) {
+    const source = (await readFile(`content/${document}.mdx`, 'utf8')).replace(/\s+/g, ' ');
+    expect(source, document).not.toMatch(/unreleased|not (?:yet )?released(?: yet)?|0\.24, the latest release/i);
+  }
+});
+
 test('0.25 C# interoperability guide is discoverable, version-scoped and bounded', async ({ page }) => {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const guide = '/docs/guides/csharp-interoperability/';
@@ -83,12 +91,14 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
   }
   await page.goto(`${base}${guide}`);
   const article = page.locator('article');
-  // Version scope and bounded claims: unreleased behavior is never presented as the current release.
-  for (const text of ['which is not released yet', 'Changed since 0.24', 'Preserved C# is a migration boundary',
+  // Historical comparisons must not imply that earlier releases are still pending.
+  for (const text of ['converter support introduced in 0.25', '0.25 and 0.24 are earlier releases',
+    'Changed since 0.24', 'Preserved C# is a migration boundary',
     'ref returns (block or', 'reports Partial', 'rescueUnusableMembers: true',
     'passthroughOnError: true', 'conversionPaths.outcome', 'In the tested cases']) {
     await expect(article).toContainText(text);
   }
+  await expect(article).not.toContainText('not released yet');
   await expect(article).not.toContainText(/independently (reviewed|verified)/i);
   const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
     [...new Set(elements.map(element => element.getAttribute('href')!))]);
@@ -320,11 +330,14 @@ for (const width of [1366, 390]) {
   });
 }
 
-test('task-first workflow keeps an account-free path and bounded provider guidance', async ({ page }) => {
+test('agent-first workflow keeps manual reference and bounded provider guidance', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   await page.goto(`${base}/docs/getting-started/how-it-works/`);
   const article = page.locator('article');
+  await expect(article).toContainText('Your coding agent writes the Calor code');
+  await expect(article).toContainText('calor init');
+  await expect(article).toContainText('you do not need to create a .calr file yourself');
   await expect(article).toContainText('without an AI account');
   await expect(article).toContainText('not a filesystem sandbox');
   await expect(article).not.toContainText('reliable system, not a hopeful one');
@@ -582,7 +595,7 @@ test('adoption guidance separates compiler behavior from workflow evidence', asy
   expect(normalizedAdoption).toContain('Workflow savings are unmeasured');
   expect(normalizedAdoption).toContain('not established a qualifying adopter');
   expect(normalizedAdoption).toContain('Only a clean, non-vacuous, assumption-free `proven`');
-  expect(normalizedPhilosophy).toContain('No qualifying adopter, independent adopter handoff');
+  expect(normalizedPhilosophy).toContain('not established a qualifying adopter, independent adopter handoff');
   expect(normalizedPhilosophy).toContain('economic advantage');
   expect(philosophy).not.toContain('Interoperate seamlessly');
   expect(philosophy).not.toContain('existing CI/CD pipeline works');
@@ -852,14 +865,14 @@ test('agent task snapshot keeps provenance, verifier levels and interpretation b
   await expect(article).toContainText('generated C# was not built or executed');
 });
 
-test('readers can distinguish runtime modes, optional proofs and historical measurements', async ({ page }) => {
+test('homepage describes benefits without implying that checks prove the whole program', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   await page.goto(`${base}/`);
-  const contract = page.getByRole('region', { name: 'Compare runtime contracts', exact: true });
-  await expect(contract).toContainText('Optional --verify');
-  await expect(contract).toContainText('Runtime checks depend on contract mode');
-  await contract.getByRole('link', { name: 'verification guarantees and limits' }).click();
+  const benefits = page.getByRole('heading', { name: 'What changes for your team?' }).locator('..');
+  await expect(benefits).toContainText('not to ask you to read unfamiliar symbols all day');
+  await expect(benefits).toContainText('does not guarantee that software is bug-free');
+  await benefits.getByRole('link', { name: 'guide to checks and their limits' }).click();
   await expect(page).toHaveURL(/\/verification-guarantees\/$/);
   const article = page.locator('article');
   for (const text of ['--contract-mode debug', '--contract-mode release', '--contract-mode off',
