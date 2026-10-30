@@ -10931,8 +10931,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // escalate the containing member to §CSHARP interop instead.
         var binaryOp = BinaryOperatorExtensions.FromString(op)
             ?? throw EscalateExpression(binary, "unsupported-binary-operator");
-        // Binary operands are rendered in conditional regions, so only converter hoists escape.
-        var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: true);
+        // Eager updates need statement preludes, not a retired unary expression. The
+        // ordered conversion still refuses to move them before an observable operand.
+        var hasUpdate = binary.DescendantNodes().Any(node => node.Kind() is
+            SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression
+            or SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression);
+        var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: !hasUpdate);
 
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, operands[0], operands[1]);
     }
@@ -12622,6 +12626,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
     {
+        if (prefix.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression)
+            return ConvertUpdateExpression(prefix, prefix.Operand, postfix: false);
+
         if (prefix.IsKind(SyntaxKind.UnaryPlusExpression))
         {
             if (_semanticModel?.GetOperation(prefix) is not Microsoft.CodeAnalysis.Operations.IUnaryOperation
@@ -12652,8 +12659,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.UnaryMinusExpression => UnaryOperator.Negate,
             SyntaxKind.LogicalNotExpression => UnaryOperator.Not,
             SyntaxKind.BitwiseNotExpression => UnaryOperator.BitwiseNot,
-            SyntaxKind.PreIncrementExpression => UnaryOperator.PreIncrement,
-            SyntaxKind.PreDecrementExpression => UnaryOperator.PreDecrement,
             _ => throw EscalateExpression(prefix, "unsupported-prefix-operator")
         };
 
@@ -12741,45 +12746,41 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new RawCSharpExpressionNode(GetTextSpan(postfix), postfix.ToString());
         }
 
-        var operand = ConvertExpression(postfix.Operand);
-
-        if (_conditionalRegionDepth > 0 &&
-            postfix.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression)
-        {
-            var op = postfix.IsKind(SyntaxKind.PostIncrementExpression)
-                ? UnaryOperator.PostIncrement
-                : UnaryOperator.PostDecrement;
-            return new UnaryOperationNode(GetTextSpan(postfix), op, operand);
-        }
-
-        // Convert postfix ++ and -- when used as sub-expressions:
-        // Hoist the increment to a pending statement and return the pre-increment value
         if (postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
             || postfix.OperatorToken.IsKind(SyntaxKind.MinusMinusToken))
-        {
-            // #1633 audit: the hoist reads and writes the operand once each, before the rest of
-            // its statement. That is exact only when the operand's receiver and arguments have
-            // no effect, and nothing evaluated before it in the statement observes the change.
-            CheckPostfixHoist(postfix);
-            var span = GetTextSpan(postfix);
-            // Save original value, then increment via pending statement
-            var tempName = _context.GenerateId("_pre");
-            _pendingStatements.Add(new BindStatementNode(
-                span, tempName, null, false, operand, new AttributeCollection()));
-            ExpressionNode updated = new BinaryOperationNode(span,
-                postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken) ? BinaryOperator.Add : BinaryOperator.Subtract,
-                new ReferenceNode(span, tempName),
-                new IntLiteralNode(span, 1));
-            // #1634: a small integral operand keeps C#'s narrowing cast.
-            if (_semanticModel != null && postfix.SyntaxTree == _semanticModel.SyntaxTree
-                && NarrowingCastType(postfix, postfix.Operand) is { } castType)
-                updated = new TypeOperationNode(span, TypeOp.Cast, updated, castType);
-            _pendingStatements.Add(new AssignmentStatementNode(span, operand, updated));
-            return new ReferenceNode(span, tempName);
-        }
+            return ConvertUpdateExpression(postfix, postfix.Operand, postfix: true);
 
         // For other postfix operators, use fallback
         return CreateFallbackExpression(postfix, "postfix-operator");
+    }
+
+    private ExpressionNode ConvertUpdateExpression(ExpressionSyntax update, ExpressionSyntax operandSyntax, bool postfix)
+    {
+        if (_conditionalRegionDepth > 0)
+            return PreserveConditionalOperand(update);
+        CheckUpdateHoist(update, operandSyntax);
+        var operand = ConvertExpression(operandSyntax);
+        var span = GetTextSpan(update);
+        var original = _context.GenerateId("_pre");
+        _pendingStatements.Add(new BindStatementNode(
+            span, original, null, false, operand, new AttributeCollection()));
+        ExpressionNode updated = new BinaryOperationNode(span,
+            update.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PostIncrementExpression
+                ? BinaryOperator.Add : BinaryOperator.Subtract,
+            new ReferenceNode(span, original), new IntLiteralNode(span, 1));
+        if (_semanticModel != null && update.SyntaxTree == _semanticModel.SyntaxTree
+            && NarrowingCastType(update, operandSyntax) is { } castType)
+            updated = new TypeOperationNode(span, TypeOp.Cast, updated, castType);
+        var result = original;
+        if (!postfix)
+        {
+            result = _context.GenerateId("_preResult");
+            _pendingStatements.Add(new BindStatementNode(
+                span, result, null, false, updated, new AttributeCollection()));
+            updated = new ReferenceNode(span, result);
+        }
+        _pendingStatements.Add(new AssignmentStatementNode(span, operand, updated));
+        return new ReferenceNode(span, result);
     }
 
     /// <summary>
@@ -12789,30 +12790,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// operand is not a fixed local and an earlier operand has an effect, or when the operand's
     /// receiver or arguments have an effect (they would run twice).
     /// </summary>
-    private void CheckPostfixHoist(PostfixUnaryExpressionSyntax postfix)
+    private void CheckUpdateHoist(ExpressionSyntax update, ExpressionSyntax operandSyntax)
     {
-        if (_semanticModel == null || postfix.SyntaxTree != _semanticModel.SyntaxTree)
-            return;
+        if (_semanticModel == null || update.SyntaxTree != _semanticModel.SyntaxTree)
+            throw EscalateExpression(update, "compound-assignment-order");
         var model = _semanticModel;
         // Codex round 2: a user-defined ++/-- is not `_pre + 1`.
-        if (UsesUserDefinedUpdateOperator(postfix))
-            throw EscalateExpression(postfix, "compound-assignment-order");
-        var operand = Unparen(postfix.Operand);
+        if (model.GetOperation(update) is not Microsoft.CodeAnalysis.Operations.IIncrementOrDecrementOperation
+            { OperatorMethod: null })
+            throw EscalateExpression(update, "compound-assignment-order");
+        var operand = Unparen(operandSyntax);
         if (IsDynamicTyped(operand))
-            throw EscalateExpression(postfix, "compound-assignment-order");
+            throw EscalateExpression(update, "compound-assignment-order");
         var parts = DecomposeAssignmentTarget(operand);
         var operandParts = parts is { HasParts: true } ? new[] { parts.Receiver! }.Concat(parts.Arguments ?? []).ToList() : [];
         if (parts == null ? !IsInertExpression(operand) : !operandParts.All(IsInertExpression))
-            throw EscalateExpression(postfix, "compound-assignment-order");
+            throw EscalateExpression(update, "compound-assignment-order");
         // Codex round 3: `_pre = b.P; b.P = _pre + 1` runs the getter between two evaluations of b.
         if (model.GetSymbolInfo(operand).Symbol is IPropertySymbol
             && !operandParts.All(part => IsFixedValue(part, [])))
-            throw EscalateExpression(postfix, "compound-assignment-order");
+            throw EscalateExpression(update, "compound-assignment-order");
 
         // The code that runs before the operand in C#: everything in the same statement (or
         // expression body) that ends before it, outside lambdas, except a plain variable that
         // is only the target of a simple assignment (its location evaluates nothing).
-        SyntaxNode? root = postfix.Ancestors().FirstOrDefault(node => node is StatementSyntax
+        SyntaxNode? root = update.Ancestors().FirstOrDefault(node => node is StatementSyntax
             or AnonymousFunctionExpressionSyntax or ArrowExpressionClauseSyntax or EqualsValueClauseSyntax
                 { Parent: not VariableDeclaratorSyntax { Parent.Parent: LocalDeclarationStatementSyntax } });
         if (root == null)
@@ -12820,7 +12822,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var earlier = root.ChildNodes()
             .SelectMany(child => child.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax))
             .OfType<ExpressionSyntax>()
-            .Where(node => node.Span.End <= postfix.SpanStart && node is not AnonymousFunctionExpressionSyntax)
+            .Where(node => node.Span.End <= update.SpanStart && node is not AnonymousFunctionExpressionSyntax)
             .Where(node => !(node is IdentifierNameSyntax
                 && node.Parent is AssignmentExpressionSyntax { RawKind: (int)SyntaxKind.SimpleAssignmentExpression } target
                 && target.Left == node))
@@ -12831,7 +12833,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Where(node => !node.AncestorsAndSelf().Any(ancestor =>
                 ancestor.Parent is AssignmentExpressionSyntax { Parent: ExpressionStatementSyntax } statementAssignment
                 && statementAssignment.Left == ancestor
-                && !postfix.Ancestors().Contains(ancestor)))
+                && !update.Ancestors().Contains(ancestor)))
             .ToList();
         if (earlier.Count == 0)
             return;
@@ -12842,11 +12844,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var symbol = node is IdentifierNameSyntax or MemberAccessExpressionSyntax
                 ? model.GetSymbolInfo(node).Symbol : null;
             if (variable != null && SymbolEqualityComparer.Default.Equals(symbol, variable))
-                throw EscalateExpression(postfix, "compound-assignment-order");
+                throw EscalateExpression(update, "compound-assignment-order");
+            static bool IsAlias(ISymbol? candidate) =>
+                candidate is IParameterSymbol { RefKind: not RefKind.None }
+                    or ILocalSymbol { RefKind: not RefKind.None };
+            if (IsAlias(variable) && (IsAlias(symbol) || symbol is IFieldSymbol)
+                || IsAlias(symbol) && variable is IFieldSymbol)
+                throw EscalateExpression(update, "compound-assignment-order");
             // Codex round 2: even for a local operand, an earlier operation that can throw (or call
             // user code) must not see, or be preceded by, the increment.
             if (MayActOrThrow(node))
-                throw EscalateExpression(postfix, "compound-assignment-order");
+                throw EscalateExpression(update, "compound-assignment-order");
         }
     }
 

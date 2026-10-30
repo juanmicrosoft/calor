@@ -41,6 +41,13 @@ public class ConverterCompoundAssignmentTests
         yield return ("O-issue-repro", "public class C { public int N() => 2; } public static class Probe { static int x = 1; static C F() { x = 10; return new C(); } public static string Run() { x += F().N(); return x.ToString(); } }", "native");
         yield return ("O-local-postfix-rhs", "public static class Probe { public static string Run() { int x = 1; x += x++; int y = 1; y -= y--; return x + \":\" + y; } }", "native");
         yield return ("O-local-prefix-rhs", "public static class Probe { public static string Run() { int x = 1; x += ++x; return x.ToString(); } }", "native");
+        yield return ("C-prefix-postfix-values", "public static class Probe { public static string Run() { int x = 3; int a = ++x; int b = x++; int c = --x; int d = x--; return a + \":\" + b + \":\" + c + \":\" + d + \":\" + x; } }", "native");
+        yield return ("C-prefix-property-count", "public static class Probe { static int n = 1; static string log = \"\"; static int P { get { log += \"g\"; return n; } set { log += \"s\"; n = value; } } public static string Run() { int a = ++P; int b = P--; return log + \":\" + a + \":\" + b + \":\" + n; } }", "native");
+        yield return ("C-short-circuit-update", "public static class Probe { public static string Run() { int x = 1; bool no = false; bool yes = true; bool a = no && ++x > 0; bool b = yes || x++ > 0; int c = no ? ++x : x--; return a + \":\" + b + \":\" + c + \":\" + x; } }", "preserved");
+        yield return ("C-ref-alias-postfix", "public static class Probe { static int Read(ref int a, ref int b) { return a + b++; } public static string Run() { int x = 1; int seen = Read(ref x, ref x); return seen + \":\" + x; } }", "preserved");
+        yield return ("C-ref-alias-prefix", "public static class Probe { static int Read(ref int a, ref int b) { return a + ++b; } public static string Run() { int x = 1; int seen = Read(ref x, ref x); return seen + \":\" + x; } }", "preserved");
+        yield return ("C-user-prefix-result", "public class W { public int N; public static W operator ++(W w) => new W { N = w.N + 10 }; } public static class Probe { public static string Run() { var x = new W(); var seen = ++x; return seen.N + \":\" + x.N; } }", "preserved");
+        yield return ("C-prefix-before-throw", "public static class Probe { public static string Run() { int x = 1; var a = new int[0]; try { int y = a[0] + ++x; } catch (System.IndexOutOfRangeException) { } return x.ToString(); } }", "preserved");
         yield return ("O-member-receiver-reassigned", "public class B { public int N; } public static class Probe { static B b = new B(), second = new B(); static int G() { b = second; return 5; } public static string Run() { var first = b; b.N += G(); return first.N + \":\" + second.N; } }", "native");
         yield return ("O-member-receiver-call", "public class B { public int N = 1; } public static class Probe { " + Log + "static B b = new B(); static B Get() { log += \"get\"; return b; } public static string Run() { Get().N += G(); Get().N++; Get().N *= 2; return log + b.N; } }", "native");
         yield return ("O-member-receiver-hoisted-rhs", "public class C { public int N() => 3; } public class B { public int V = 1; } public static class Probe { public static string log = \"\"; static B b = new B(); static B Get() { log += \"get\"; return b; } static C F() { log += \"F\"; b = new B { V = 50 }; return new C(); } public static string Run() { var first = b; Get().V += F().N(); return log + first.V + \":\" + b.V; } }", "native");
@@ -172,6 +179,12 @@ public class ConverterCompoundAssignmentTests
             ? Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false })
             : strict;
         Assert.False(relaxed.HasErrors, $"{id} on {surface}: {string.Join("; ", relaxed.Diagnostics.Errors)}\n{calor}");
+        Assert.DoesNotContain(Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(relaxed.Ast!),
+            node => node is Compiler.Ast.UnaryOperationNode
+            {
+                Operator: Compiler.Ast.UnaryOperator.PreIncrement or Compiler.Ast.UnaryOperator.PreDecrement
+                    or Compiler.Ast.UnaryOperator.PostIncrement or Compiler.Ast.UnaryOperator.PostDecrement
+            });
         // A hoist placed outside its loop can make the converted program loop forever.
         var converted = Task.Run(() => RefOutImplementationTests.Run(relaxed.GeneratedCode));
         var finished = await Task.WhenAny(converted, Task.Delay(TimeSpan.FromSeconds(30)));
@@ -208,9 +221,9 @@ public class ConverterCompoundAssignmentTests
     {
         foreach (var (name, _) in Operators)
             Assert.Contains($"(cast {calorType} (", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
-        // Six statement-level ++/-- on v and w, and the updates of k++ and k-- used as values.
+        // Eight statement updates plus k++, ++k and k-- as values all narrow explicitly.
         var increments = Convert(Rows().Single(r => r.Id == $"N-{type}-increment").Source);
-        Assert.Equal(10, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(cast {calorType} \(").Count);
+        Assert.Equal(11, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(cast {calorType} \(").Count);
     }
 
     // Controls: an int target, and a right-hand side that hoists nothing, convert exactly as before.

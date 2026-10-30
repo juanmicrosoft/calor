@@ -33,7 +33,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             "int i = 0; bool gate = false; bool ignored = gate && i++ > 0; return i;",
-            0, expectInterop: false);
+            0, expectInterop: true);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class ConditionalEvaluationMigrationTests
     [Fact]
     public void FieldInitializers_RetainSourceOrder()
     {
-        AssertRoundTrip("return Snapshot;", 1, false, members: """
+        AssertRoundTrip("return Snapshot;", 1, true, members: """
             private static int Seed;
             private static int First = true ? Seed++ : 0;
             private static int Snapshot = Seed;
@@ -92,7 +92,7 @@ public class ConditionalEvaluationMigrationTests
     [Fact]
     public void AutoPropertyInitializers_RetainSourceOrder()
     {
-        AssertRoundTrip("return Snapshot;", 1, false, members: """
+        AssertRoundTrip("return Snapshot;", 1, true, members: """
             private static int Seed;
             private static int First { get; } = true ? Seed++ : 0;
             private static int Snapshot { get; } = Seed;
@@ -295,7 +295,7 @@ public class ConditionalEvaluationMigrationTests
     [InlineData("true && (i++ > 0 || ++i > 0)", 2)]
     public void LogicalOperands_PreserveEvaluationCount(string expression, int expected)
     {
-        AssertRoundTrip($"int i = 0; bool ignored = {expression}; return i;", expected, false);
+        AssertRoundTrip($"int i = 0; bool ignored = {expression}; return i;", expected, true);
     }
 
     [Theory]
@@ -406,7 +406,7 @@ public class ConditionalEvaluationMigrationTests
     public void Coalescing_PreservesConditionalIncrement(string value, int expected)
     {
         AssertRoundTrip($"int i = 0; int? value = {value}; int ignored = value ?? i++; return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -415,7 +415,7 @@ public class ConditionalEvaluationMigrationTests
     public void ConditionalArms_PreserveOrderAndResult(string gate, int expected)
     {
         AssertRoundTrip($"int i = 1; bool gate = {gate}; int value = gate ? i++ : ++i; return value * 10 + i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -436,7 +436,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; try {{ bool ignored = {expression}; }} catch (System.DivideByZeroException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -446,7 +446,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; int? value = {value}; try {{ int ignored = value ?? 1 / i++; }} catch (System.DivideByZeroException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -456,7 +456,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; bool gate = {gate}; try {{ int ignored = gate ? 1 / i++ : 42; }} catch (System.DivideByZeroException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -476,7 +476,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string target = {target}; string ignored = target?.Substring(i++); return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -486,7 +486,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 4; string target = {target}; try {{ string ignored = target?.Substring(i++); }} catch (System.ArgumentOutOfRangeException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -495,7 +495,7 @@ public class ConditionalEvaluationMigrationTests
     public void ConditionalCallStatement_PreservesSkippedArguments(string target, int expected)
     {
         AssertRoundTrip($"int i = 0; string target = {target}; target?.Substring(i++); return i;",
-            expected, false);
+            expected, true);
     }
 
     [Fact]
@@ -512,7 +512,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string target = {target}; int? ignored = target?.Trim().Substring(i++).Length; return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -522,7 +522,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string target = {target}; int? ignored = target?.Trim()?.Substring(i++)?.Length; return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -550,13 +550,14 @@ public class ConditionalEvaluationMigrationTests
     [InlineData("dec", "--i", -1)]
     [InlineData("post-inc", "i++", 1)]
     [InlineData("post-dec", "i--", -1)]
-    public void NativeUnaryMutations_StayInTheirBranch(string operation, string expression, int expected)
+    public void RetiredUnaryMutations_StayPreservedInTheirBranch(string operation, string expression, int expected)
     {
-        AssertRoundTrip($"int i = 0; bool ignored = true && {expression} == 0; return i;", expected, false);
+        AssertRoundTrip($"int i = 0; bool ignored = true && {expression} == 0; return i;", expected, true);
         var node = new Calor.Compiler.Ast.UnaryOperationNode(default,
             Calor.Compiler.Ast.UnaryOperatorExtensions.FromString(operation)!.Value,
             new Calor.Compiler.Ast.ReferenceNode(default, "i"));
-        Assert.Equal($"({operation} i)", new CalorEmitter().Visit(node));
+        var error = Assert.Throws<InvalidOperationException>(() => new CalorEmitter().Visit(node));
+        Assert.Contains("§ASSIGN", error.Message);
     }
 
     [Theory]
@@ -566,7 +567,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string value = {value}; try {{ string ignored = value ?? throw new System.Exception((i++).ToString()); }} catch (System.Exception) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -576,7 +577,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; bool gate = {gate}; try {{ int ignored = gate ? 42 : throw new System.Exception((i++).ToString()); }} catch (System.Exception) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
