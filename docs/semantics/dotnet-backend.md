@@ -475,16 +475,28 @@ public sealed class Circle : Shape, IDrawable
 
 ## 11. Records
 
-### 11.1 Record Definition
+### 11.1 Record Declaration and Construction
+
+Calor preserves C# record declarations with interop; it has no native
+record-declaration marker. Construct an existing record with named constructor
+arguments, not property initializers.
 
 **Calor:**
 ```calor
-§D{Person} (str:Name, i32:Age)
+§M{m1:Records}
+  §CSHARP{public record Person(string Name, int Age);}§/CSHARP
+  §F{f1:Create:pub} () -> Person
+    §E{alloc}
+    §R §NEW{Person} §A[Age] 30 §A[Name] "Alice"
 ```
 
 **C#:**
 ```csharp
 public record Person(string Name, int Age);
+public static class Records
+{
+    public static Person Create() => new Person(Age: 30, Name: "Alice");
+}
 ```
 
 ### 11.2 With Expressions

@@ -57,10 +57,11 @@ The structural Calor score starts at 0.50 and adds:
 | At least one explicit module ID | 0.15 |
 | At least one explicit function ID | 0.20 |
 | Indented body present | 0.10 |
-| Legacy `§V` pattern present | 0.10 |
+| Legacy variable-tag pattern present | 0.10 |
 
-That final detector is a known limitation: current variable bindings use `§B`,
-not `§V`, so current source does not earn the legacy-variable bonus. Optional
+{/* drift:ignore */}
+Current bindings use `§B`, not the legacy `§V` detector. That detector is a known
+limitation: current source does not earn the legacy-variable bonus. Optional
 name-first declarations also do not earn an explicit-ID bonus until IDs are
 materialized in source.
 

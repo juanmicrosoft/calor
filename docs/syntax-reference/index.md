@@ -98,6 +98,11 @@ lock metadata markers are no longer syntax. Move their descriptive text into
 documentation comments instead. Executable `§EX`, assumption `§AS`, invariant
 `§IV`, and property-test `§PT` declarations remain supported.
 
+The formatter also preserves the existing `§SN`, `§DP`, and ordered `§BR`
+version markers. They still drive API stability checks, C# `System.Obsolete`
+attributes, and breaking-change comparisons. Their documentation-based
+replacement is not selected yet.
+
 ## Types
 
 | Type | Description | C# Equivalent |

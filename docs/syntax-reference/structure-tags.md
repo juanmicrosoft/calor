@@ -867,7 +867,7 @@ Type parameters are declared using `<T>` suffix syntax after the tag attributes.
 ```
 
 An **empty** `§IFACE` body — a marker interface — ends at the next type opener
-(`§CL`, `§IFACE`, `§EN`, `§D`, `§DEL`, or a `§CSHARP` block) that sits at
+(`§CL`, `§IFACE`, `§EN`, `§DEL`, or a `§CSHARP` block) that sits at
 **exactly the interface's own column**, because a same-column line produces no
 dedent for the parser to stop on:
 

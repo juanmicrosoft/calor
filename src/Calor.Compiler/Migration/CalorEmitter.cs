@@ -133,8 +133,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.DocComment == null)
             return;
-        // Normalize \r\n and \r to \n to avoid orphaned text from embedded carriage returns
-        var normalized = node.DocComment.Replace("\r\n", "\n").Replace("\r", "");
+        EmitDocumentationText(node.DocComment);
+    }
+
+    private void EmitDocumentationText(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
         foreach (var line in normalized.Split('\n'))
         {
             AppendLine($"/// {line.Trim()}");
@@ -296,6 +300,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ModuleNode node)
     {
         EmitDocComment(node);
+        foreach (var issue in node.Issues) Visit(issue);
+        foreach (var decision in node.Decisions) Visit(decision);
+        if (node.Context != null) Visit(node.Context);
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
         var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
@@ -306,6 +313,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             AppendLine($"§SEMVER{{{node.DeclaredSemanticsVersion}}}");
         }
+        foreach (var assumption in node.Assumptions) Visit(assumption);
+        foreach (var invariant in node.Invariants) Visit(invariant);
 
         if (HasExplicitNamespaceTopology(node))
         {
@@ -1560,6 +1569,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(FunctionNode node)
     {
         EmitDocComment(node);
+        foreach (var issue in node.Issues) Visit(issue);
+        if (node.Uses != null) Visit(node.Uses);
+        if (node.UsedBy != null) Visit(node.UsedBy);
+        if (node.Complexity != null) Visit(node.Complexity);
+        if (node.Lock != null) Visit(node.Lock);
+        if (node.Author != null) Visit(node.Author);
+        if (node.TaskRef != null) Visit(node.TaskRef);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var isLocal = _nextFunctionIsLocal;
         _nextFunctionIsLocal = false;
@@ -1615,6 +1631,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             Visit(post);
         }
+
+        foreach (var example in node.Examples) Visit(example);
+        foreach (var assumption in node.Assumptions) Visit(assumption);
+        if (node.Since != null) Visit(node.Since);
+        if (node.Deprecated != null) Visit(node.Deprecated);
+        foreach (var breaking in node.BreakingChanges) Visit(breaking);
+        foreach (var property in node.Properties) Visit(property);
 
         // Body
         _memberBodyDepth++;
@@ -4498,19 +4521,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"§SET{{{node.PropertyName}}} {value}";
     }
 
-    // Extended metadata nodes - emit as comments
+    // Retained semantic metadata keeps its current syntax until its replacement is measured.
     public string Visit(ExampleNode node)
     {
         var expr = node.Expression.Accept(this);
         var expected = node.Expected.Accept(this);
-        AppendLine($"§EX{{{node.Id ?? ""}}} {expr} == {expected}");
+        var message = node.Message != null ? $":{Visit(new StringLiteralNode(node.Span, node.Message))}" : "";
+        var attributes = node.Id != null || node.Message != null
+            ? $"{{{Visit(new StringLiteralNode(node.Span, node.Id ?? ""))}{message}}}"
+            : "";
+        AppendLine($"§EX{attributes} {expr} -> {expected}");
         return "";
     }
 
     public string Visit(IssueNode node)
     {
         var id = node.Id != null ? $"{node.Id}:" : "";
-        AppendLine($"§{node.Kind.ToString().ToUpper()}{{{id}{node.Category ?? ""}}} {node.Description}");
+        EmitDocumentationText($"{node.Kind} {id}{node.Category ?? ""} ({node.Priority}): {node.Description}");
         return "";
     }
 
@@ -4524,7 +4551,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(UsesNode node)
     {
         var deps = string.Join(", ", node.Dependencies.Select(d => d.Accept(this)));
-        AppendLine($"§USES {deps}");
+        EmitDocumentationText($"Uses: {deps}");
         return "";
     }
 
@@ -4532,14 +4559,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var deps = string.Join(", ", node.Dependents.Select(d => d.Accept(this)));
         var external = node.HasUnknownCallers ? ", [external]" : "";
-        AppendLine($"§USEDBY {deps}{external}");
+        EmitDocumentationText($"Used by: {deps}{external}");
         return "";
     }
 
     public string Visit(AssumeNode node)
     {
-        var category = node.Category.HasValue ? $"{{{node.Category.Value.ToString().ToLower()}}}" : "";
-        AppendLine($"§ASSUME{category} {node.Description}");
+        var category = node.Category.HasValue ? $"{{{node.Category.Value.ToString().ToLowerInvariant()}}}" : "";
+        AppendLine($"§AS{category} {Visit(new StringLiteralNode(node.Span, node.Description))}");
         return "";
     }
 
@@ -4550,50 +4577,57 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.SpaceComplexity.HasValue) parts.Add($"space:{FormatComplexity(node.SpaceComplexity.Value)}");
         if (node.CustomExpression != null) parts.Add(node.CustomExpression);
         var worst = node.IsWorstCase ? "worst:" : "";
-        AppendLine($"§COMPLEXITY{{{worst}{string.Join(",", parts)}}}");
+        EmitDocumentationText($"Complexity: {worst}{string.Join(",", parts)}");
         return "";
     }
 
     public string Visit(SinceNode node)
     {
-        AppendLine($"§SINCE{{{node.Version}}}");
+        AppendLine($"§SN{{{Visit(new StringLiteralNode(node.Span, node.Version))}}}");
         return "";
     }
 
     public string Visit(DeprecatedNode node)
     {
-        var replacement = node.Replacement != null ? $":use={node.Replacement}" : "";
-        var removed = node.RemovedInVersion != null ? $":removed={node.RemovedInVersion}" : "";
-        AppendLine($"§DEPRECATED{{{node.SinceVersion}{replacement}{removed}}}");
+        if (node.Reason != null || node.RemovedInVersion != null)
+            throw new InvalidOperationException(
+                "The current §DP syntax cannot preserve deprecation reason/removal fields. " +
+                "A measured structured-documentation replacement is required before formatting these fields.");
+        var replacement = node.Replacement != null
+            ? $":{Visit(new StringLiteralNode(node.Span, node.Replacement))}" : "";
+        AppendLine($"§DP{{{Visit(new StringLiteralNode(node.Span, node.SinceVersion))}{replacement}}}");
         return "";
     }
 
     public string Visit(BreakingChangeNode node)
     {
-        AppendLine($"§BREAKING{{{node.Version}}} {node.Description}");
+        AppendLine($"§BR{{{Visit(new StringLiteralNode(node.Span, node.Version))}}} "
+            + Visit(new StringLiteralNode(node.Span, node.Description)));
         return "";
     }
 
     public string Visit(DecisionNode node)
     {
-        AppendLine($"§DECISION{{{node.Id}:{node.Title}}}");
-        Indent();
-        AppendLine($"chosen: {node.ChosenOption}");
+        EmitDocumentationText($"Decision {node.Id}: {node.Title}");
+        EmitDocumentationText($"Chosen: {node.ChosenOption}");
         foreach (var reason in node.ChosenReasons)
         {
-            AppendLine($"reason: {reason}");
+            EmitDocumentationText($"Reason: {reason}");
         }
-        Dedent();
-        EmitBlockEnd("§/DECISION");
+        foreach (var rejected in node.RejectedOptions) Visit(rejected);
+        if (node.Context != null) EmitDocumentationText($"Context: {node.Context}");
+        if (node.Date != null)
+            EmitDocumentationText($"Date: {node.Date.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}");
+        if (node.Author != null) EmitDocumentationText($"Author: {node.Author}");
         return "";
     }
 
     public string Visit(RejectedOptionNode node)
     {
-        AppendLine($"rejected: {node.Name}");
+        EmitDocumentationText($"Rejected: {node.Name}");
         foreach (var reason in node.Reasons)
         {
-            AppendLine($"  reason: {reason}");
+            EmitDocumentationText($"Reason: {reason}");
         }
         return "";
     }
@@ -4601,21 +4635,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ContextNode node)
     {
         var partial = node.IsPartial ? ":partial" : "";
-        AppendLine($"§CONTEXT{partial}");
+        EmitDocumentationText($"Context{partial}");
+        foreach (var file in node.VisibleFiles) EmitDocumentationText($"Visible: {Visit(file)}");
+        foreach (var file in node.HiddenFiles) EmitDocumentationText($"Hidden: {Visit(file)}");
+        if (node.FocusTarget != null) EmitDocumentationText($"Focus: {node.FocusTarget}");
         return "";
     }
 
     public string Visit(FileRefNode node)
     {
         var desc = node.Description != null ? $" ({node.Description})" : "";
-        return $"§FILE{{{node.FilePath}}}{desc}";
+        return $"{node.FilePath}{desc}";
     }
 
     public string Visit(PropertyTestNode node)
     {
-        var quantifiers = node.Quantifiers.Count > 0 ? $"∀{string.Join(",", node.Quantifiers)}: " : "";
+        var quantifiers = node.Quantifiers.Count > 0 ? $"forall {string.Join(",", node.Quantifiers)}: " : "";
         var predicate = node.Predicate.Accept(this);
-        AppendLine($"§PROP{{{quantifiers}{predicate}}}");
+        AppendLine($"§PT {quantifiers}{predicate}");
         return "";
     }
 
@@ -4623,20 +4660,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var acquired = node.Acquired.HasValue ? $":acquired={node.Acquired.Value:O}" : "";
         var expires = node.Expires.HasValue ? $":expires={node.Expires.Value:O}" : "";
-        AppendLine($"§LOCK{{agent={node.AgentId}{acquired}{expires}}}");
+        EmitDocumentationText($"Lock: agent={node.AgentId}{acquired}{expires}");
         return "";
     }
 
     public string Visit(AuthorNode node)
     {
         var task = node.TaskId != null ? $":task={node.TaskId}" : "";
-        AppendLine($"§AUTHOR{{agent={node.AgentId}:date={node.Date:yyyy-MM-dd}{task}}}");
+        var date = node.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        EmitDocumentationText($"Author: agent={node.AgentId}:date={date}{task}");
         return "";
     }
 
     public string Visit(TaskRefNode node)
     {
-        AppendLine($"§TASK{{{node.TaskId}}} {node.Description}");
+        EmitDocumentationText($"Task {node.TaskId}: {node.Description}");
         return "";
     }
 

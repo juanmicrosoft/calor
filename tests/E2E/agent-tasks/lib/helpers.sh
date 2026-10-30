@@ -437,7 +437,7 @@ Use contracts to verify your implementation:
 ### Expression Syntax (Lisp-style, prefix notation)
 - Arithmetic: `(+ a b)`, `(- a b)`, `(* a b)`, `(/ a b)`, `(% a b)`
 - Comparison: `(== a b)`, `(!= a b)`, `(< a b)`, `(> a b)`, `(<= a b)`, `(>= a b)`
-- Logical: `(and a b)`, `(or a b)`, `(not a)`
+- Logical: `(&& a b)`, `(|| a b)`, `(! a)`
 - Ternary/Conditional: `(? condition then-expr else-expr)`
 - Negation: `(- 0 x)` for negative x
 
@@ -566,8 +566,10 @@ Example:
   §I{i32:x}
   §O{Option<i32>}
   §E{alloc}
-  §IF{if1} (> x 0) → §R §SM (* x 2)
-  §EL → §R §NN
+  §IF{if1} (> x 0)
+    §R §SM (* x 2)
+  §EL
+    §R §NN
 ```
 
 **Option with char parsing (TryParseDigit pattern):**
@@ -596,20 +598,15 @@ Example:
   §I{i32:b}
   §O{Result<i32,str>}
   §E{alloc}
-  §IF{if1} (!= b 0) → §R §OK (/ a b)
-  §EL → §R §ERR "Division by zero"
+  §IF{if1} (!= b 0)
+    §R §OK (/ a b)
+  §EL
+    §R §ERR "Division by zero"
 ```
 
 ### Control Flow
 
-**Arrow syntax (single statement per branch):**
-```
-§IF{id} condition → action
-§EI condition → action
-§EL → action
-```
-
-**Block syntax (multiple statements per branch):**
+**Block syntax:**
 ```
 §IF{id} condition
   statement1
@@ -620,27 +617,32 @@ Example:
   statement4
 ```
 
-**Example - Arrow syntax (Classify function):**
+**Example - Classify function:**
 ```
 §F{f001:Classify:pub}
   §I{i32:n}
   §O{str}
-  §IF{if1} (< n 0) → §R "negative"
-  §EI (== n 0) → §R "zero"
-  §EL → §R "positive"
+  §IF{if1} (< n 0)
+    §R "negative"
+  §EI (== n 0)
+    §R "zero"
+  §EL
+    §R "positive"
 ```
 
-**Example - Arrow syntax (Max function):**
+**Example - Max function:**
 ```
 §F{f001:Max:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
-  §IF{if1} (>= a b) → §R a
-  §EL → §R b
+  §IF{if1} (>= a b)
+    §R a
+  §EL
+    §R b
 ```
 
-**PREFER arrow syntax** `→` (or `->`) for simple conditionals with single return statements.
+Use indented blocks for every conditional branch, including single-return branches.
 
 **Example - Block syntax (GetGrade function):**
 ```
@@ -1245,7 +1247,8 @@ Use `[type]` for array types:
   §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))
   §B{~allPos:bool} true
   §L{for1:i:0:(- (len arr) 1):1}
-    §IF{if1} (<= arr{i} 0) → §ASSIGN allPos false
+    §IF{if1} (<= arr{i} 0)
+      §ASSIGN allPos false
   §R allPos
 ```
 
@@ -1258,7 +1261,8 @@ Use `[type]` for array types:
   §Q (== n (len arr))
   §S (== result (exists ((i i32)) (&& (&& (>= i 0) (< i n)) (< arr{i} 0))))
   §L{for1:i:0:(- (len arr) 1):1}
-    §IF{if1} (< arr{i} 0) → §R true
+    §IF{if1} (< arr{i} 0)
+      §R true
   §R false
 ```
 
