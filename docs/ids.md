@@ -61,6 +61,7 @@ The shared declaration inventory includes delegates, events, records, unions,
 fields, variants, local functions and proof obligations, including declarations
 inside accessor bodies and conditional branches. Unsupported declaration kinds
 and indistinguishable unnamed proofs fail explicitly rather than disappearing.
+Named modules use module identities; legacy static classes remain class identities.
 MCP refactor actions reject stale source or sidecar snapshots and parameters
 belonging to a different action.
 

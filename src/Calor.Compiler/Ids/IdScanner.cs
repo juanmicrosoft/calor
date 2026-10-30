@@ -83,7 +83,7 @@ public sealed class IdScanner : IAstVisitor
 
     public void Visit(ClassDefinitionNode node)
     {
-        AddEntry(node.Id, IdKind.Class, node.Name, node.Span);
+        AddEntry(node.Id, node.IsModule ? IdKind.Module : IdKind.Class, node.Name, node.Span);
 
         foreach (var property in node.Properties)
             property.Accept(this);

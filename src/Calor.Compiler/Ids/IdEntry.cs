@@ -491,8 +491,8 @@ public sealed class DeclarationIdentityStore
         var containerMoves = new Dictionary<string, string>(StringComparer.Ordinal);
         static string? Scope(DeclarationIdentity declaration) => declaration.Kind switch
         {
-            IdKind.Module => declaration.Name,
-            IdKind.Class or IdKind.Interface => declaration.Container + "." + declaration.Name + "`" + declaration.Signature,
+            IdKind.Module when declaration.Signature.Length == 0 => declaration.Name,
+            IdKind.Module or IdKind.Class or IdKind.Interface => declaration.Container + "." + declaration.Name + "`" + declaration.Signature,
             IdKind.EnumExtension => declaration.Container + "." + declaration.Name + "Extensions",
             IdKind.Function or IdKind.Method or IdKind.OperatorOverload => declaration.Container + "." + declaration.Name + "#" + declaration.Signature,
             IdKind.Property or IdKind.Event or IdKind.Record or IdKind.Union or IdKind.Variant => declaration.Container + "." + declaration.Name,
@@ -559,9 +559,13 @@ public sealed class DeclarationIdentityStore
         do
         {
             mappedContainer = false;
+            var exactScopeAvailable = remainingOld.Values.Where(old => Scope(old) != null).Any(old =>
+                remainingNew.Values.Any(added => old.Kind == added.Kind && old.Signature == added.Signature
+                    && TranslateContainer(old.Container) == added.Container));
             var containers = remainingOld.Values.Where(old => Scope(old) != null).ToDictionary(old => old.Id, old => remainingNew.Values
                 .Where(added => old.Kind == added.Kind && old.Signature == added.Signature
-                    && SameScopeOrFile(old, added)).ToArray(), StringComparer.Ordinal);
+                    && (exactScopeAvailable ? TranslateContainer(old.Container) == added.Container
+                        : SameScopeOrFile(old, added))).ToArray(), StringComparer.Ordinal);
             foreach (var old in remainingOld.Values.Where(old => Scope(old) != null).ToArray())
             {
                 var matches = containers[old.Id];
@@ -722,7 +726,8 @@ public sealed class DeclarationIdentityStore
                         Members(f.Body, scope + "." + f.Name + "#" + Signature(f.Parameters, f.Output, f.TypeParameters.Count));
                         break;
                     case ClassDefinitionNode c:
-                        Add(c, scope, IdKind.Class, c.Name, c.TypeParameters.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        Add(c, scope, c.IsModule ? IdKind.Module : IdKind.Class, c.Name,
+                            c.TypeParameters.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
                         Members(c.Methods.Cast<AstNode>().Concat(c.Properties).Concat(c.Indexers).Concat(c.Constructors)
                             .Concat(c.OperatorOverloads).Concat(c.NestedClasses).Concat(c.NestedInterfaces).Concat(c.NestedEnums)
                             .Concat(c.NestedDelegates).Concat(c.Events).Concat(c.Fields),

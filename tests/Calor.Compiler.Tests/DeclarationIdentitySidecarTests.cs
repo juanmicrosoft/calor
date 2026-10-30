@@ -309,6 +309,55 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Fact]
+    public void NamedModulesUseExactModuleKindAndRetainNestedIdentityAcrossRename()
+    {
+        const string source = """
+            §M{Demo}
+              §M{Tools:pub}
+                §F{Work:pub} () -> i32
+                  §R 1
+                §M{Nested:pub}
+                  §F{Inner:pub} () -> i32
+                    §R 2
+              §CL{Legacy:pub:stat}
+                §MT{Keep:pub:stat} () -> i32
+                  §R 3
+            """;
+        var file = Write("active.calr", source);
+        var before = Store.Sync([file]);
+        Assert.All(before.Declarations.Where(d => d.Name is "Demo" or "Tools" or "Nested"),
+            declaration => Assert.Equal(IdKind.Module, declaration.Kind));
+        Assert.Equal(IdKind.Class, before.Declarations.Single(d => d.Name == "Legacy").Kind);
+        var updated = source.Replace("Tools", "Helpers");
+        var after = Store.Apply([new(file, source, updated)]);
+        Assert.Equal(before.Declarations.Select(d => d.Id).Order(), after.Declarations.Select(d => d.Id).Order());
+        var ast = CalorSourceHelper.Parse(updated, file).Ast!;
+        Assert.True(ast.Classes.Single(node => node.Name == "Helpers").IsModule);
+        Assert.False(ast.Classes.Single(node => node.Name == "Legacy").IsModule);
+        Assert.Equal(after.Declarations.Select(d => d.Id).Order(),
+            new IdScanner().Scan(ast, file).Select(d => d.Id).Order());
+        var bound = new Binder(new DiagnosticBag(), file).Bind(ast);
+        Assert.Contains(bound.SymbolsById.Keys,
+            id => id == SymbolId.Create("declaration", after.Declarations.Single(d => d.Name == "Helpers").Id));
+        var emitted = new CalorEmitter().Emit(ast);
+        Assert.Contains("§M{", emitted);
+        foreach (var declaration in after.Declarations)
+            Assert.DoesNotContain(declaration.Id, emitted);
+    }
+
+    [Fact]
+    public void ConvertedStaticClassesUseModuleIdentityWithoutReclassifyingLegacyStaticClasses()
+    {
+        var result = new CSharpToCalorConverter().Convert(
+            "public static class Tools { public static int Work() => 1; }");
+        Assert.True(result.Success);
+        Assert.True(result.Ast!.Classes.Single().IsModule);
+        var file = Write("converted.calr", result.CalorSource!);
+        var state = Store.Sync([file]);
+        Assert.Equal(IdKind.Module, state.Declarations.Single(d => d.Name == "Tools").Kind);
+    }
+
+    [Fact]
     public void ContractReconstructionPreservesBothSourceAndToolingIdentity()
     {
         var source = Original.Replace("§R x", "§Q (== INT:1 INT:1)\n    §R x");
