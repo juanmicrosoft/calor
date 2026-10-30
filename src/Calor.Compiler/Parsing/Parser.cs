@@ -2441,12 +2441,12 @@ public sealed class Parser
         }
         else if (Check(TokenKind.Func))
         {
-            // 0.25 F3 (#847): a nested §F is a local function. Its placement and
-            // shape are validated by ReturnValidationPass (Calor0211).
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                "Local §F declarations are removed. Use a §B binding with §LAM instead.");
             var enclosingIf = _lastIfToken;
-            var function = ParseFunction();
+            ParseFunction();
             _lastIfToken = enclosingIf;
-            return new LocalFunctionStatementNode(function.Span, function);
+            return null;
         }
         else if (Check(TokenKind.Return))
         {
@@ -3510,7 +3510,7 @@ public sealed class Parser
         // Determine if this is unary or binary based on argument count and operator
         if (args.Count == 1 && IsUnaryOperator(opKind))
         {
-            var unaryOp = GetUnaryOperator(opKind, opText);
+            var unaryOp = GetUnaryOperator(opKind, opText, span);
             if (unaryOp.HasValue)
             {
                 return new UnaryOperationNode(span, unaryOp.Value, args[0]);
@@ -4024,20 +4024,22 @@ public sealed class Parser
     private bool IsUnaryOperator(TokenKind kind)
     {
         return kind is TokenKind.Exclamation or TokenKind.Tilde or TokenKind.Minus
-            or TokenKind.Identifier; // inc/dec and postfix forms
+            or TokenKind.Identifier;
     }
 
-    private UnaryOperator? GetUnaryOperator(TokenKind kind, string text)
+    private UnaryOperator? GetUnaryOperator(TokenKind kind, string text, TextSpan span)
     {
+        if (text is "inc" or "pre-inc" or "dec" or "pre-dec" or "post-inc" or "post-dec")
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                $"Update operator '{text}' is removed. Use §ASSIGN with an explicit value instead.");
+            return null;
+        }
         return text switch
         {
             "!" => UnaryOperator.Not,
             "~" => UnaryOperator.BitwiseNot,
             "-" => UnaryOperator.Negate,
-            "inc" or "pre-inc" => UnaryOperator.PreIncrement,
-            "dec" or "pre-dec" => UnaryOperator.PreDecrement,
-            "post-inc" => UnaryOperator.PostIncrement,
-            "post-dec" => UnaryOperator.PostDecrement,
             _ => null
         };
     }
