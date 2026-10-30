@@ -18,10 +18,19 @@ public static class IdsCommand
             CreateIndexCommand(),
             CreateSyncCommand()
         };
-        command.AddValidator(result =>
+        // Capture obsolete positional actions only to refuse them with guidance;
+        // no source-assignment subcommand is registered.
+        command.AddArgument(new Argument<string[]>("retired-action")
         {
-            if (result.Tokens.Count > 0 && result.Tokens[0].Value == "assign")
-                result.ErrorMessage = "ids assign is retired. Run calor ids sync PROJECT --register FILE; IDs are never written to source.";
+            Arity = ArgumentArity.ZeroOrMore,
+            IsHidden = true
+        });
+        command.SetHandler((InvocationContext context) =>
+        {
+            Console.Error.WriteLine(
+                "Unknown or retired ids action. ids assign is retired. " +
+                "Run calor ids sync PROJECT --register FILE; IDs are never written to source.");
+            context.ExitCode = 1;
         });
         return command;
     }
@@ -156,7 +165,7 @@ public static class IdsCommand
     }
 
     private static bool IsIdentityFailure(Exception ex) =>
-        ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException;
+        ex is IOException or InvalidDataException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException;
 
     private static async Task<List<IdEntry>> ReadEntriesAsync(
         string[] paths, DiagnosticBag diagnostics, DeclarationIdResolver? resolver = null)
@@ -224,25 +233,13 @@ public static class IdsCommand
             // enroll fixtures, archives, build output or symlinked directories.
             if (DeclarationIdentityStore.IsAmbientRoot(full)) continue;
             var store = DeclarationIdentityStore.Find(Path.Combine(full, "__ids_input__.calr"));
-            if (store == null || !File.Exists(store.SidecarPath)) continue;
-            // Read only the registration snapshot to select actual inputs. Finding
-            // an ancestor store alone must not trigger recovery of its journal.
-            var snapshot = JsonSerializer.Deserialize<DeclarationIdentityStore.State>(
-                File.ReadAllText(store.SidecarPath))
-                ?? throw new JsonException("Invalid declaration identity registration snapshot.");
-            if (snapshot.Files == null)
-                throw new JsonException("Missing declaration identity file registrations.");
-            var selected = new List<string>();
-            foreach (var relative in snapshot.Files)
-            {
-                if (string.IsNullOrEmpty(relative) || Path.IsPathRooted(relative)
-                    || relative.Replace('\\', '/').Split('/').Contains("..", StringComparer.Ordinal))
-                    throw new JsonException("Invalid declaration identity file registration.");
-                var file = Path.GetFullPath(Path.Combine(store.Root, relative));
-                if (File.Exists(file) && CanonicalPath.IsUnder(CanonicalPath.Resolve(file), CanonicalPath.Resolve(full)))
-                    selected.Add(file);
-            }
-            if (selected.Count == 0) continue;
+            if (store == null) continue;
+            // Confirm ownership before replaying anything. Pending registrations
+            // include source files that recovery has not created yet.
+            var selected = store.ReadRegisteredInputs()
+                .Where(file => CanonicalPath.IsUnder(CanonicalPath.Resolve(file), CanonicalPath.Resolve(full)))
+                .ToArray();
+            if (selected.Length == 0) continue;
             store.Sync(selected);
             foreach (var file in selected) files.Add(file);
         }

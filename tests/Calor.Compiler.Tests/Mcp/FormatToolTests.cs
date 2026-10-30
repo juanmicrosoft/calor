@@ -41,7 +41,7 @@ public class FormatToolTests
     [Fact]
     public async Task Format_ValidSource_Succeeds()
     {
-        var source = "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n";
+        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n";
         var result = await _tool.ExecuteAsync(CreateArgs(source));
 
         Assert.False(result.IsError);
@@ -53,7 +53,7 @@ public class FormatToolTests
     [Fact]
     public async Task Format_SemanticallyUnsupportedSource_ReportsConservativeFallback()
     {
-        var source = "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"missing effect\"\n";
+        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"missing effect\"\n";
 
         var result = await _tool.ExecuteAsync(CreateArgs(source));
 
@@ -70,8 +70,8 @@ public class FormatToolTests
     public async Task CheckLint_ReadOnlySemanticError_RemainsParseSuccessful()
     {
         var source =
-            "§M{m001:Test}\n" +
-            "  §F{f001:Foo:pub} () -> void\n" +
+            "§M{Test}\n" +
+            "  §F{Foo:pub} () -> void\n" +
             "    §P \"missing effect\"   \n";
 
         var result = await _checkTool.ExecuteAsync(CreateLintArgs(source, fix: false));
@@ -89,8 +89,8 @@ public class FormatToolTests
     public async Task CheckLint_FixSemanticError_IsSuppressedWithoutParseFailure()
     {
         var source =
-            "§M{m001:Test}\n" +
-            "  §F{f001:Foo:pub} () -> void\n" +
+            "§M{Test}\n" +
+            "  §F{Foo:pub} () -> void\n" +
             "    §P \"missing effect\"   \n";
 
         var result = await _checkTool.ExecuteAsync(CreateLintArgs(source, fix: true));
@@ -115,7 +115,7 @@ public class FormatToolTests
     public async Task Format_ParseError_ReturnsEnvelopeDiagnostics()
     {
         // Structural closer tags are a hard parser error (Calor0830)
-        var source = "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n";
+        var source = "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n  §/F\n";
         var result = await _tool.ExecuteAsync(CreateArgs(source));
 
         Assert.True(result.IsError);

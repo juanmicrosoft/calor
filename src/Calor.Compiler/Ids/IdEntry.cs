@@ -216,13 +216,18 @@ public sealed class DeclarationIdentityStore
         return Read().Files.Contains(Relative(file), StringComparer.Ordinal);
     }
 
-    private bool IncludesRegistration(string file)
+    /// <summary>Validated current and pending registrations, without replaying a transaction.</summary>
+    public IReadOnlyList<string> ReadRegisteredInputs()
     {
         using var gate = Acquire();
-        var relative = Relative(file);
-        if (Read(resolveMerge: true).Files.Contains(relative, StringComparer.Ordinal)) return true;
-        return File.Exists(JournalPath) && ReadTransaction().Next.Files.Contains(relative, StringComparer.Ordinal);
+        var files = Read(resolveMerge: true).Files;
+        var pending = File.Exists(JournalPath) ? ReadTransaction().Next.Files : [];
+        return files.Concat(pending).Select(ValidatePath).Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal).ToArray();
     }
+
+    private bool IncludesRegistration(string file) =>
+        ReadRegisteredInputs().Contains(ValidatePath(Relative(file)), StringComparer.Ordinal);
 
     private string Relative(string file)
     {
