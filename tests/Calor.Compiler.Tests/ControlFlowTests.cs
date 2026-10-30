@@ -147,7 +147,6 @@ public class ControlFlowTests
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     [Fact]
@@ -430,7 +429,7 @@ public class ControlFlowTests
     }
 
     [Fact]
-    public void Parse_DoWhileLoop_MismatchedId_ReportsError()
+    public void Parse_DoWhileLoop_SourceIds_ReportsError()
     {
         var source = """
             §M{m001:Test}
@@ -443,9 +442,8 @@ public class ControlFlowTests
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.MismatchedId &&
-            d.Message.Contains("do1") &&
-            d.Message.Contains("do999"));
+            d.Code == DiagnosticCode.UnexpectedToken &&
+            d.Message.Contains("Source IDs are removed"));
     }
 
     [Fact]

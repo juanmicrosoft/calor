@@ -482,7 +482,6 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.InvalidSectionOperator => "Invalid section operator",
         DiagnosticCode.UnterminatedString => "Unterminated string literal",
         DiagnosticCode.UnexpectedToken => "Unexpected token",
-        DiagnosticCode.MismatchedId => "Mismatched construct IDs",
         DiagnosticCode.TypeMismatch => "Type mismatch",
         DiagnosticCode.UndefinedReference => "Undefined reference",
         DiagnosticCode.DuplicateFunctionSignature => "Duplicate function signature",

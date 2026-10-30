@@ -121,20 +121,6 @@ public sealed class AgentDiagnosticTests : IDisposable
     }
 
     [Fact]
-    public void Patches_DoNotTrustClosingIdSuggestionsWithAssumedOffsets()
-    {
-        const string source = "§/LAM{ wrong}";
-        var bag = new DiagnosticBag();
-        bag.ReportMismatchedIdWithFix(new TextSpan(0, source.Length, 1, 1), "LAM", "right", "/LAM", "wrong");
-        var diagnostic = Assert.Single(bag.DiagnosticsWithFixes);
-        Assert.False(diagnostic.Fix.IsSafeToApply);
-        Assert.NotEmpty(diagnostic.Fix.Edits);
-        Assert.Equal(source, DiagnosticFixes.Apply(source, source, "file.calr",
-            bag.DiagnosticsWithFixes, out var applied));
-        Assert.Equal(0, applied);
-    }
-
-    [Fact]
     public void Envelope_FixesJoinByFileAsWellAsPosition()
     {
         var bag = new DiagnosticBag();

@@ -717,7 +717,7 @@ public class ExceptionHandlingTests
     }
 
     [Fact]
-    public void Parse_UsingStatementMismatchedId_ReportsError()
+    public void Parse_UsingStatementSourceIds_ReportsError()
     {
         var source = @"
 §M{m1:Test}
@@ -737,7 +737,8 @@ public class ExceptionHandlingTests
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();
 
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken &&
+            d.Message.Contains("Source IDs are removed"));
     }
 
     #endregion

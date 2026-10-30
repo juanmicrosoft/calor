@@ -371,7 +371,8 @@ public class EnumExtensionTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.MismatchedId);
+        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.UnexpectedToken &&
+            e.Message.Contains("Source IDs are removed"));
     }
 
     [Fact]
@@ -447,7 +448,7 @@ public class EnumExtensionTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.MismatchedId);
+        Assert.Contains(diagnostics.Errors, e => e.Code == DiagnosticCode.LegacyCloserForm);
     }
 
     [Fact]

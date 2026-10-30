@@ -1,28 +1,28 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Text.Json;
-using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Commands;
 
-/// <summary>
-/// CLI command for managing Calor IDs.
-/// </summary>
+/// <summary>CLI commands for tooling-owned declaration identities.</summary>
 public static class IdsCommand
 {
     public static Command Create()
     {
-        var command = new Command("ids", "Manage Calor declaration IDs")
+        var command = new Command("ids", "Manage tooling-owned declaration IDs; use ids sync PROJECT --register FILE")
         {
             CreateCheckCommand(),
-            CreateAssignCommand(),
             CreateIndexCommand(),
             CreateSyncCommand()
         };
-
+        command.AddValidator(result =>
+        {
+            if (result.Tokens.Count > 0 && result.Tokens[0].Value == "assign")
+                result.ErrorMessage = "ids assign is retired. Run calor ids sync PROJECT --register FILE; IDs are never written to source.";
+        });
         return command;
     }
 
@@ -33,7 +33,7 @@ public static class IdsCommand
         {
             AllowMultipleArgumentsPerToken = true
         };
-        var command = new Command("sync", "Synchronize tooling-owned declaration identities without rewriting source") { root, files };
+        var command = new Command("sync", "Synchronize declaration identities without rewriting source") { root, files };
         command.SetHandler((InvocationContext context) =>
         {
             try
@@ -42,7 +42,7 @@ public static class IdsCommand
                 var state = store.Sync(context.ParseResult.GetValueForOption(files));
                 Console.WriteLine($"Synchronized {state.Declarations.Count} declarations in {state.Files.Count} registered files.");
             }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException)
+            catch (Exception ex) when (IsIdentityFailure(ex))
             {
                 Console.Error.WriteLine($"Identity sync failed: {ex.Message}");
                 context.ExitCode = 1;
@@ -53,426 +53,199 @@ public static class IdsCommand
 
     private static Command CreateCheckCommand()
     {
-        var pathsArgument = new Argument<string[]>(
-            name: "paths",
-            description: "Paths to files or directories to check")
+        var paths = new Argument<string[]>("paths", "Active .calr files or directories of registered files")
         {
             Arity = ArgumentArity.OneOrMore
         };
-
-        var allowTestIdsOption = new Option<bool>(
-            aliases: ["--allow-test-ids"],
-            description: "Allow test IDs (f001, m001) in all locations");
-
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show detailed output");
-
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Output format: text or json (envelope v1.1)");
-
-        var command = new Command("check", "Validate IDs (missing, duplicates, invalid format)")
+        var allowTestIds = new Option<bool>("--allow-test-ids", "Allow test identities in the sidecar");
+        var verbose = new Option<bool>(["--verbose", "-v"], "Show detailed output");
+        var format = new Option<string>(["--format", "-f"], () => "text", "Output format: text or json (envelope v1.1)");
+        var command = new Command("check", "Synchronize and validate sidecar declaration identities")
         {
-            pathsArgument,
-            allowTestIdsOption,
-            verboseOption,
-            formatOption
+            paths, allowTestIds, verbose, format
         };
-
-        // Exit code returned through ctx.ExitCode: a code parked only on
-        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
-            ctx.ExitCode = await CheckAsync(
-                ctx.ParseResult.GetValueForArgument(pathsArgument),
-                ctx.ParseResult.GetValueForOption(allowTestIdsOption),
-                ctx.ParseResult.GetValueForOption(verboseOption),
-                ctx.ParseResult.GetValueForOption(formatOption) ?? "text");
+            context.ExitCode = await CheckAsync(
+                context.ParseResult.GetValueForArgument(paths),
+                context.ParseResult.GetValueForOption(allowTestIds),
+                context.ParseResult.GetValueForOption(verbose),
+                context.ParseResult.GetValueForOption(format) ?? "text");
         });
-
-        return command;
-    }
-
-    private static Command CreateAssignCommand()
-    {
-        var pathsArgument = new Argument<string[]>(
-            name: "paths",
-            description: "Paths to files or directories to process")
-        {
-            Arity = ArgumentArity.OneOrMore
-        };
-
-        var dryRunOption = new Option<bool>(
-            aliases: ["--dry-run", "-n"],
-            description: "Show changes without modifying files");
-
-        var fixDuplicatesOption = new Option<bool>(
-            aliases: ["--fix-duplicates"],
-            description: "Reassign duplicate IDs (keeps first occurrence)");
-
-        var allowTestIdsOption = new Option<bool>(
-            aliases: ["--allow-test-ids"],
-            description: "Allow test IDs (f001, m001) - skip those without assigning");
-
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show detailed output");
-
-        var command = new Command("assign", "Add missing IDs to declarations")
-        {
-            pathsArgument,
-            dryRunOption,
-            fixDuplicatesOption,
-            allowTestIdsOption,
-            verboseOption
-        };
-
-        command.SetHandler(AssignAsync, pathsArgument, dryRunOption, fixDuplicatesOption, allowTestIdsOption, verboseOption);
-
         return command;
     }
 
     private static Command CreateIndexCommand()
     {
-        var pathsArgument = new Argument<string[]>(
-            name: "paths",
-            description: "Paths to files or directories to index")
+        var paths = new Argument<string[]>("paths", "Active .calr files or directories of registered files")
         {
             Arity = ArgumentArity.OneOrMore
         };
-
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Output file path (default: calor.ids.json)");
-
-        var command = new Command("index", "Generate an index of all IDs in the project")
+        var output = new Option<FileInfo?>(["--output", "-o"], "Output file path (default: calor.ids.json)");
+        var command = new Command("index", "Synchronize and export sidecar declaration identities") { paths, output };
+        command.SetHandler(async (InvocationContext context) =>
         {
-            pathsArgument,
-            outputOption
-        };
+            var diagnostics = new DiagnosticBag();
+            var entries = await ReadEntriesAsync(context.ParseResult.GetValueForArgument(paths), diagnostics);
+            if (diagnostics.HasErrors)
+            {
+                foreach (var diagnostic in diagnostics) Console.Error.WriteLine(diagnostic);
+                context.ExitCode = 1;
+                return;
+            }
 
-        command.SetHandler(IndexAsync, pathsArgument, outputOption);
+            var outputPath = context.ParseResult.GetValueForOption(output)?.FullName ?? "calor.ids.json";
+            try
+            {
+                // An export is not a second identity store and must never overwrite
+                // source or the authoritative sidecar (including through aliases).
+                var destination = CanonicalPath.Resolve(outputPath);
+                if (Path.GetExtension(destination).Equals(".calr", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Path.GetFileName(Path.GetDirectoryName(destination)), ".calor", StringComparison.OrdinalIgnoreCase)
+                    || entries.Any(entry => CanonicalPath.Resolve(entry.FilePath) == destination))
+                    throw new IOException("Index output must not overwrite source or .calor/ids.json.");
 
+                var json = JsonSerializer.Serialize(entries.Select(entry => new
+                {
+                    id = entry.Id,
+                    kind = entry.Kind.ToString(),
+                    name = entry.Name,
+                    file = Path.GetRelativePath(Directory.GetCurrentDirectory(), entry.FilePath),
+                    line = entry.Span.Line
+                }), new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(outputPath, json);
+                Console.WriteLine($"Indexed {entries.Count} ID(s) to {outputPath}");
+            }
+            catch (Exception ex) when (IsIdentityFailure(ex))
+            {
+                Console.Error.WriteLine($"Identity index failed: {ex.Message}");
+                context.ExitCode = 1;
+            }
+        });
         return command;
     }
 
     private static async Task<int> CheckAsync(string[] paths, bool allowTestIds, bool verbose, string format)
     {
-        var json = format.Equals("json", StringComparison.OrdinalIgnoreCase);
-        var files = CollectFiles(paths);
-        if (files.Count == 0)
+        var diagnostics = new DiagnosticBag();
+        var resolver = new DeclarationIdResolver();
+        var entries = await ReadEntriesAsync(paths, diagnostics, resolver);
+        var result = IdChecker.Check(entries, allowTestIds);
+        foreach (var diagnostic in IdChecker.GenerateDiagnostics(result)) diagnostics.Add(diagnostic);
+
+        if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
         {
-            // Envelope mode: stdout carries exactly one document, always —
-            // including this early exit (envelope schema v1.1 contract).
-            if (json)
+            Console.WriteLine(EnvelopeWriter.Serialize("ids", new
             {
-                Console.WriteLine(EnvelopeWriter.Serialize("ids",
-                    new
-                    {
-                        totalIds = 0,
-                        missing = 0,
-                        invalidFormat = 0,
-                        wrongPrefix = 0,
-                        testIds = 0,
-                        duplicateGroups = 0
-                    },
-                    [new Diagnostic(
-                        DiagnosticCode.CliInputNotFound,
-                        DiagnosticSeverity.Error,
-                        "No .calr files found",
-                        filePath: null,
-                        line: 1,
-                        column: 1)]));
-            }
-            Console.Error.WriteLine("No .calr files found");
-            return 1;
-        }
-
-        if (verbose && !json)
-        {
-            Console.WriteLine($"Checking {files.Count} file(s)...");
-        }
-
-        var allEntries = new List<IdEntry>();
-        var declarationIds = json ? new DeclarationIdResolver() : null;
-
-        foreach (var file in files)
-        {
-            var entries = await ScanFileAsync(file, verbose, declarationIds);
-            if (entries != null)
-            {
-                allEntries.AddRange(entries);
-            }
-        }
-
-        var result = IdChecker.Check(allEntries, allowTestIds);
-
-        if (json)
-        {
-            var data = new
-            {
-                totalIds = allEntries.Count,
+                totalIds = entries.Count,
                 missing = result.MissingIds.Count,
                 invalidFormat = result.InvalidFormatIds.Count,
                 wrongPrefix = result.WrongPrefixIds.Count,
                 testIds = result.TestIdsInProduction.Count,
                 duplicateGroups = result.DuplicateGroups.Count
-            };
-            var jsonDiagnostics = IdChecker.GenerateDiagnostics(result)
-                .OrderBy(d => d.FilePath, StringComparer.Ordinal)
-                .ThenBy(d => d.Span.Line)
-                .ToList();
-            Console.WriteLine(EnvelopeWriter.Serialize("ids", data, jsonDiagnostics, declarationIds));
-            return result.IsValid ? 0 : 1;
-        }
-
-        if (result.IsValid)
-        {
-            Console.WriteLine($"All {allEntries.Count} IDs are valid.");
-            return 0;
-        }
-
-        // Report issues
-        var diagnostics = IdChecker.GenerateDiagnostics(result).ToList();
-
-        foreach (var diag in diagnostics.OrderBy(d => d.FilePath).ThenBy(d => d.Span.Line))
-        {
-            Console.Error.WriteLine(diag.ToString());
-        }
-
-        Console.Error.WriteLine();
-        Console.Error.WriteLine($"Found {result.TotalIssues} issue(s):");
-        if (result.MissingIds.Count > 0)
-            Console.Error.WriteLine($"  Missing IDs: {result.MissingIds.Count}");
-        if (result.InvalidFormatIds.Count > 0)
-            Console.Error.WriteLine($"  Invalid format: {result.InvalidFormatIds.Count}");
-        if (result.WrongPrefixIds.Count > 0)
-            Console.Error.WriteLine($"  Wrong prefix: {result.WrongPrefixIds.Count}");
-        if (result.TestIdsInProduction.Count > 0)
-            Console.Error.WriteLine($"  Test IDs in production: {result.TestIdsInProduction.Count}");
-        if (result.DuplicateGroups.Count > 0)
-            Console.Error.WriteLine($"  Duplicate groups: {result.DuplicateGroups.Count}");
-
-        return 1;
-    }
-
-    private static async Task AssignAsync(string[] paths, bool dryRun, bool fixDuplicates, bool allowTestIds, bool verbose)
-    {
-        var files = CollectFiles(paths);
-        if (files.Count == 0)
-        {
-            Console.Error.WriteLine("No .calr files found");
-            Environment.ExitCode = 1;
-            return;
-        }
-
-        if (verbose || dryRun)
-        {
-            Console.WriteLine($"Processing {files.Count} file(s)...");
-        }
-
-        // First pass: collect existing IDs to avoid duplicates across files
-        var existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        if (!fixDuplicates)
-        {
-            foreach (var file in files)
-            {
-                var entries = await ScanFileAsync(file, verbose: false);
-                if (entries != null)
-                {
-                    foreach (var entry in entries.Where(e => !string.IsNullOrEmpty(e.Id)))
-                    {
-                        // Skip test IDs if allowed
-                        if (allowTestIds && entry.IsTestId)
-                            continue;
-
-                        existingIds.Add(entry.Id);
-                    }
-                }
-            }
-        }
-
-        var totalAssigned = 0;
-        var totalDuplicatesFixed = 0;
-        var modifiedFiles = new List<string>();
-        var allAssignments = new List<IdAssignment>();
-
-        foreach (var file in files)
-        {
-            var content = await File.ReadAllTextAsync(file);
-            var (newContent, assignments) = IdAssigner.AssignIds(content, file, fixDuplicates, existingIds);
-
-            // Update closing tags
-            if (assignments.Count > 0)
-            {
-                newContent = IdAssigner.UpdateClosingTags(newContent, assignments);
-            }
-
-            if (assignments.Count > 0)
-            {
-                allAssignments.AddRange(assignments);
-                totalAssigned += assignments.Count(a => string.IsNullOrEmpty(a.OldId));
-                totalDuplicatesFixed += assignments.Count(a => !string.IsNullOrEmpty(a.OldId));
-
-                if (dryRun)
-                {
-                    Console.WriteLine($"{Path.GetFileName(file)}:");
-                    foreach (var assignment in assignments)
-                    {
-                        if (string.IsNullOrEmpty(assignment.OldId))
-                        {
-                            Console.WriteLine($"  Line {assignment.Line}: {assignment.Kind} '{assignment.Name}' -> {assignment.NewId}");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"  Line {assignment.Line}: {assignment.Kind} '{assignment.Name}': {assignment.OldId} -> {assignment.NewId} (duplicate)");
-                        }
-                    }
-                }
-                else
-                {
-                    await File.WriteAllTextAsync(file, newContent);
-                    modifiedFiles.Add(file);
-
-                    if (verbose)
-                    {
-                        Console.WriteLine($"Modified: {Path.GetFileName(file)} ({assignments.Count} ID(s))");
-                    }
-                }
-            }
-        }
-
-        // Summary
-        if (dryRun)
-        {
-            Console.WriteLine();
-            Console.WriteLine($"Dry run complete. Would assign {totalAssigned} new ID(s), fix {totalDuplicatesFixed} duplicate(s).");
+            }, diagnostics, resolver));
         }
         else
         {
-            Console.WriteLine($"Assigned {totalAssigned} ID(s), fixed {totalDuplicatesFixed} duplicate(s) across {modifiedFiles.Count} file(s).");
+            foreach (var diagnostic in diagnostics.OrderBy(d => d.FilePath).ThenBy(d => d.Span.Line))
+                Console.Error.WriteLine(diagnostic);
+            if (!diagnostics.HasErrors) Console.WriteLine($"All {entries.Count} IDs are valid.");
+            else if (verbose) Console.Error.WriteLine($"Identity check failed with {diagnostics.Errors.Count} error(s).");
         }
-
-        Environment.ExitCode = 0;
+        return diagnostics.HasErrors ? 1 : 0;
     }
 
-    private static async Task IndexAsync(string[] paths, FileInfo? output)
+    private static bool IsIdentityFailure(Exception ex) =>
+        ex is IOException or InvalidOperationException or JsonException or UnauthorizedAccessException or ArgumentException;
+
+    private static async Task<List<IdEntry>> ReadEntriesAsync(
+        string[] paths, DiagnosticBag diagnostics, DeclarationIdResolver? resolver = null)
     {
-        var files = CollectFiles(paths);
-        if (files.Count == 0)
+        var entries = new List<IdEntry>();
+        try
         {
-            Console.Error.WriteLine("No .calr files found");
-            Environment.ExitCode = 1;
-            return;
-        }
-
-        var allEntries = new List<IdEntry>();
-
-        foreach (var file in files)
-        {
-            var entries = await ScanFileAsync(file, verbose: false);
-            if (entries != null)
+            var files = CollectFiles(paths);
+            if (files.Count == 0)
             {
-                allEntries.AddRange(entries);
+                diagnostics.Add(new Diagnostic(DiagnosticCode.CliInputNotFound, DiagnosticSeverity.Error,
+                    "No active .calr files found. Pass active files explicitly or run calor ids sync PROJECT --register FILE.",
+                    null, 1, 1));
+                return entries;
+            }
+            DeclarationIdentityStore.SyncActiveInputs(files);
+            foreach (var file in files)
+            {
+                var source = await File.ReadAllTextAsync(file);
+                var parseDiagnostics = new DiagnosticBag();
+                parseDiagnostics.SetFilePath(file);
+                var module = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics).Parse();
+                foreach (var diagnostic in parseDiagnostics) diagnostics.Add(diagnostic);
+                if (parseDiagnostics.HasErrors) continue;
+
+                var store = DeclarationIdentityStore.Find(file);
+                if (store == null || !store.IsRegistered(file))
+                    throw new InvalidOperationException($"No persisted identity for '{file}'. Run calor ids sync PROJECT --register FILE in a dedicated project directory.");
+                store.Attach(file, source, module);
+                resolver?.AddFile(file, source, module);
+                entries.AddRange(new IdScanner().Scan(module, file));
             }
         }
-
-        var outputPath = output?.FullName ?? "calor.ids.json";
-
-        // Generate JSON index
-        var json = System.Text.Json.JsonSerializer.Serialize(
-            allEntries.Select(e => new
-            {
-                id = e.Id,
-                kind = e.Kind.ToString(),
-                name = e.Name,
-                file = Path.GetRelativePath(Directory.GetCurrentDirectory(), e.FilePath),
-                line = e.Span.Line
-            }),
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-
-        await File.WriteAllTextAsync(outputPath, json);
-
-        Console.WriteLine($"Indexed {allEntries.Count} ID(s) to {outputPath}");
-        Environment.ExitCode = 0;
+        catch (DeclarationIdentityParseException ex)
+        {
+            foreach (var diagnostic in ex.Diagnostics) diagnostics.Add(diagnostic);
+        }
+        catch (FileNotFoundException ex)
+        {
+            diagnostics.Add(new Diagnostic(DiagnosticCode.CliInputNotFound, DiagnosticSeverity.Error,
+                ex.Message, ex.FileName, 1, 1));
+        }
+        catch (Exception ex) when (IsIdentityFailure(ex))
+        {
+            diagnostics.Add(new Diagnostic(DiagnosticCode.DeclarationIdentityUnavailable, DiagnosticSeverity.Error,
+                $"Declaration identity unavailable: {ex.Message}", null, 1, 1));
+        }
+        return entries;
     }
 
     private static List<string> CollectFiles(string[] paths)
     {
-        var files = new List<string>();
-
+        var files = new HashSet<string>(StringComparer.Ordinal);
         foreach (var path in paths)
         {
-            if (Directory.Exists(path))
+            var full = Path.GetFullPath(path);
+            if (File.Exists(full) && full.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
             {
-                files.AddRange(Directory.GetFiles(path, "*.calr", SearchOption.AllDirectories));
+                files.Add(full);
+                continue;
             }
-            else if (File.Exists(path) && path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
+            if (!Directory.Exists(full)) throw new FileNotFoundException($"Input not found: {path}");
+
+            // Directory arguments select registered inputs only. Never recursively
+            // enroll fixtures, archives, build output or symlinked directories.
+            if (DeclarationIdentityStore.IsAmbientRoot(full)) continue;
+            var store = DeclarationIdentityStore.Find(Path.Combine(full, "__ids_input__.calr"));
+            if (store == null || !File.Exists(store.SidecarPath)) continue;
+            // Read only the registration snapshot to select actual inputs. Finding
+            // an ancestor store alone must not trigger recovery of its journal.
+            var snapshot = JsonSerializer.Deserialize<DeclarationIdentityStore.State>(
+                File.ReadAllText(store.SidecarPath))
+                ?? throw new JsonException("Invalid declaration identity registration snapshot.");
+            if (snapshot.Files == null)
+                throw new JsonException("Missing declaration identity file registrations.");
+            var selected = new List<string>();
+            foreach (var relative in snapshot.Files)
             {
-                files.Add(path);
+                if (string.IsNullOrEmpty(relative) || Path.IsPathRooted(relative)
+                    || relative.Replace('\\', '/').Split('/').Contains("..", StringComparer.Ordinal))
+                    throw new JsonException("Invalid declaration identity file registration.");
+                var file = Path.GetFullPath(Path.Combine(store.Root, relative));
+                if (File.Exists(file) && CanonicalPath.IsUnder(CanonicalPath.Resolve(file), CanonicalPath.Resolve(full)))
+                    selected.Add(file);
             }
-            else if (path == ".")
-            {
-                files.AddRange(Directory.GetFiles(Directory.GetCurrentDirectory(), "*.calr", SearchOption.AllDirectories));
-            }
+            if (selected.Count == 0) continue;
+            store.Sync(selected);
+            foreach (var file in selected) files.Add(file);
         }
-
-        return files.Distinct().ToList();
-    }
-
-    private static async Task<IReadOnlyList<IdEntry>?> ScanFileAsync(
-        string filePath, bool verbose, DeclarationIdResolver? declarationIds = null)
-    {
-        try
-        {
-            var content = await File.ReadAllTextAsync(filePath);
-            var diagnostics = new DiagnosticBag();
-            diagnostics.SetFilePath(filePath);
-
-            var lexer = new Lexer(content, diagnostics);
-            var tokens = lexer.TokenizeAllForParser();
-
-            if (diagnostics.HasErrors)
-            {
-                if (verbose)
-                {
-                    Console.Error.WriteLine($"Error lexing {Path.GetFileName(filePath)}");
-                }
-                return null;
-            }
-
-            var parser = new Parser(tokens, diagnostics);
-            var module = parser.Parse();
-
-            if (diagnostics.HasErrors)
-            {
-                if (verbose)
-                {
-                    Console.Error.WriteLine($"Error parsing {Path.GetFileName(filePath)}");
-                }
-                return null;
-            }
-
-            DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(filePath), content, module);
-            declarationIds?.AddFile(filePath, content, module);
-
-            var scanner = new IdScanner();
-            return scanner.Scan(module, filePath);
-        }
-        catch (DeclarationIdentityException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            if (verbose)
-            {
-                Console.Error.WriteLine($"Error processing {Path.GetFileName(filePath)}: {ex.Message}");
-            }
-            return null;
-        }
+        return files.Order(StringComparer.Ordinal).ToList();
     }
 }

@@ -325,7 +325,6 @@ public class ParserTests
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     [Fact]
@@ -344,7 +343,6 @@ public class ParserTests
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     [Fact]

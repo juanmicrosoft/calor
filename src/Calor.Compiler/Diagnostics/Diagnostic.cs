@@ -52,7 +52,6 @@ public static class DiagnosticCode
 
     // Parser errors (Calor0100-0199)
     public const string UnexpectedToken = "Calor0100";
-    public const string MismatchedId = "Calor0101";
     public const string MissingRequiredAttribute = "Calor0102";
     public const string ExpectedKeyword = "Calor0103";
     public const string ExpectedExpression = "Calor0104";
@@ -815,27 +814,6 @@ public static class DiagnosticCode
     /// cannot represent — so it is Assumed, not proven, and nothing is claimed.
     /// </summary>
     public const string ImplicationAssumed = "Calor0819";
-
-    // Legacy structural-ID lint (Calor0820-0822) — Phase 1/2 v6 plan
-    // (drop structural IDs, then introduce compact 12-char IDs).
-
-    /// <summary>
-    /// Info (opt-in lint): a structural opener still carries a legacy
-    /// <c>{id:…}</c> block that the Phase 1 migrator (<c>calor fix
-    /// --drop-structural-ids</c>) can safely remove.
-    ///
-    /// Per RFC §5.7 the diagnostic is informational and must include a
-    /// machine-applicable suggested fix (the byte range to delete).
-    /// </summary>
-    public const string LegacyStructuralId = "Calor0820";
-
-    /// <summary>
-    /// Info (opt-in lint, Phase 2): a Calor declaration uses a 26-char
-    /// ULID payload that the compact migrator (<c>calor fix
-    /// --compact-ids</c>) can rewrite to a 12-char Crockford-lowercase
-    /// compact ID.
-    /// </summary>
-    public const string LegacyUlidPayload = "Calor0821";
 
     /// <summary>
     /// Warning (Phase 2): two declarations in the compile unit produced

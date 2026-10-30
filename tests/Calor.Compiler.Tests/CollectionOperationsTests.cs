@@ -784,7 +784,8 @@ public class CollectionOperationsTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken &&
+            d.Message.Contains("Source IDs are removed"));
     }
 
     [Fact]
@@ -801,7 +802,8 @@ public class CollectionOperationsTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken &&
+            d.Message.Contains("Source IDs are removed"));
     }
 
     [Fact]
@@ -823,7 +825,6 @@ public class CollectionOperationsTests
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     #endregion

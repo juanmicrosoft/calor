@@ -1,25 +1,19 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
-using Calor.Compiler.Ids;
-using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Mcp.Tools;
 
-/// <summary>
-/// MCP tool for formatting Calor source code and managing declaration IDs.
-/// </summary>
+/// <summary>MCP tool for formatting ID-free Calor source.</summary>
 public sealed class FormatTool : McpToolBase
 {
     public override string Name => "calor_format";
 
     public override string Description =>
-        "Format Calor source code or manage declaration IDs. Use action='format' to format code, action='ids' to check/assign IDs.";
+        "Format ID-free Calor source. Persisted declaration IDs belong to .calor/ids.json; use calor ids sync PROJECT --register FILE for identity operations.";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
-
 
     protected override string GetInputSchemaJson() => """
         {
@@ -27,19 +21,19 @@ public sealed class FormatTool : McpToolBase
             "properties": {
                 "source": {
                     "type": "string",
-                    "description": "Calor source code to format or check"
+                    "description": "ID-free Calor source code to format"
                 },
                 "action": {
                     "type": "string",
                     "enum": ["format", "ids"],
-                    "description": "Action to perform. format=format code, ids=check/assign declaration IDs",
+                    "description": "format formats code. ids reports that persisted identity checks require a project file.",
                     "default": "format"
                 },
                 "idsAction": {
                     "type": "string",
-                    "enum": ["check", "assign"],
+                    "enum": ["check"],
                     "default": "check",
-                    "description": "When action=ids: 'check' validates IDs, 'assign' adds missing IDs"
+                    "description": "In-memory source has no persisted identities. Use calor ids sync PROJECT --register FILE. The former assign action is retired."
                 },
                 "options": {
                     "type": "object",
@@ -47,212 +41,49 @@ public sealed class FormatTool : McpToolBase
                         "allowTestIds": {
                             "type": "boolean",
                             "default": false,
-                            "description": "Allow test IDs (f001, m001) without flagging as issues"
-                        },
-                        "fixDuplicates": {
-                            "type": "boolean",
-                            "default": false,
-                            "description": "When assigning, also fix duplicate IDs"
+                            "description": "Compatibility option; in-memory source has no persisted identities"
                         }
                     }
                 }
             },
-            "required": ["source"]
-        ,
-
-        "additionalProperties": false
-
+            "required": ["source"],
+            "additionalProperties": false
         }
         """;
 
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
-        if (string.IsNullOrEmpty(source))
-        {
+        if (source == null)
             return Task.FromResult(McpToolResult.Error("Missing required parameter: source"));
-        }
 
         var action = GetString(arguments, "action") ?? "format";
+        if (action.Equals("ids", StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(McpToolResult.Error(
+                "Source-ID assignment and in-memory identity checks are unavailable. " +
+                "Declaration IDs are tooling-owned in .calor/ids.json. " +
+                "Run calor ids sync PROJECT --register FILE, then calor ids check FILE."));
+        if (!action.Equals("format", StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(McpToolResult.Error($"Unknown format action: {action}"));
 
         try
         {
-            return action.ToLowerInvariant() switch
+            var result = new CalorFormatter().FormatSource(source, "mcp-input.calr");
+            var errors = result.Diagnostics.Where(diagnostic => diagnostic.IsError)
+                .Select(diagnostic => DiagnosticEnvelope.Build(diagnostic)).ToList();
+            return Task.FromResult(McpToolResult.Json(new FormatToolOutput
             {
-                "ids" => HandleIds(source, arguments),
-                _ => HandleFormat(source)
-            };
+                Success = result.Success,
+                FormattedCode = result.Formatted,
+                IsChanged = result.Original != result.Formatted,
+                Errors = errors.Count > 0 ? errors : null,
+                ConservativeFallbackReason = result.ConservativeFallbackReason
+            }, isError: !result.Success));
         }
         catch (Exception ex)
         {
             return Task.FromResult(McpToolResult.Error($"Operation failed: {ex.Message}"));
         }
-    }
-
-    private static Task<McpToolResult> HandleFormat(string source)
-    {
-        var result = FormatSource(source);
-
-        var output = new FormatToolOutput
-        {
-            Success = result.Success,
-            FormattedCode = result.Formatted,
-            IsChanged = result.Original != result.Formatted,
-            Errors = result.Errors.Count > 0 ? result.Errors : null,
-            ConservativeFallbackReason = result.ConservativeFallbackReason
-        };
-
-        return Task.FromResult(McpToolResult.Json(output, isError: !result.Success));
-    }
-
-    private static Task<McpToolResult> HandleIds(string source, JsonElement? arguments)
-    {
-        var idsAction = GetString(arguments, "idsAction") ?? "check";
-        var options = GetOptions(arguments);
-        var allowTestIds = GetBool(options, "allowTestIds");
-        var fixDuplicates = GetBool(options, "fixDuplicates");
-
-        return idsAction.ToLowerInvariant() switch
-        {
-            "assign" => Task.FromResult(AssignIds(source, allowTestIds, fixDuplicates)),
-            _ => Task.FromResult(CheckIds(source, allowTestIds))
-        };
-    }
-
-    private static FormatResult FormatSource(string source)
-    {
-        var formatter = new CalorFormatter();
-        var formatted = formatter.FormatSource(source, "mcp-input.calr");
-        return new FormatResult
-        {
-            Success = formatted.Success,
-            Original = source,
-            Formatted = formatted.Formatted,
-            Errors = formatted.Diagnostics
-                .Where(diagnostic => diagnostic.IsError)
-                .Select(diagnostic => DiagnosticEnvelope.Build(diagnostic))
-                .ToList(),
-            ConservativeFallbackReason = formatted.ConservativeFallbackReason
-        };
-    }
-
-    private static List<EnvelopeDiagnostic> BuildErrorEnvelope(DiagnosticBag diagnostics)
-    {
-        return DiagnosticEnvelope.Build(diagnostics)
-            .Where(e => e.Severity == "error")
-            .ToList();
-    }
-
-    private static McpToolResult CheckIds(string source, bool allowTestIds)
-    {
-        var scan = ScanSource(source);
-        if (scan == null)
-        {
-            return McpToolResult.Error("Failed to parse source code");
-        }
-
-        var (entries, module) = scan.Value;
-        var result = IdChecker.Check(entries, allowTestIds);
-
-        // Real Calor0800-band diagnostics as envelope schema v1.1 entries; a
-        // resolver built from the parsed module populates declarationId
-        // (mirrors the `calor ids check --format json` CLI adoption).
-        var declarationIds = new DeclarationIdResolver();
-        declarationIds.AddFile("mcp-input.calr", source, module);
-
-        var issues = IdChecker.GenerateDiagnostics(result)
-            .OrderBy(d => d.Span.Line)
-            .Select(d => DiagnosticEnvelope.Build(d, declarationIds))
-            .ToList();
-
-        var output = new IdsCheckOutput
-        {
-            Success = result.IsValid,
-            TotalIds = entries.Count,
-            // Count the emitted entries, not IdChecker.TotalIssues: duplicates
-            // are diagnosed one-per-group but tallied n-1 per group, so the two
-            // numbers diverge on duplicate IDs (review of #757 item 1).
-            IssueCount = issues.Count,
-            Issues = issues
-        };
-
-        return McpToolResult.Json(output, isError: !result.IsValid);
-    }
-
-    private static McpToolResult AssignIds(string source, bool allowTestIds, bool fixDuplicates)
-    {
-        var existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        if (!fixDuplicates)
-        {
-            var scan = ScanSource(source);
-            if (scan != null)
-            {
-                foreach (var entry in scan.Value.Entries.Where(e => !string.IsNullOrEmpty(e.Id)))
-                {
-                    if (allowTestIds && entry.IsTestId)
-                        continue;
-                    existingIds.Add(entry.Id);
-                }
-            }
-        }
-
-        var (newContent, assignments) = IdAssigner.AssignIds(source, "mcp-input.calr", fixDuplicates, existingIds);
-
-        // Update closing tags
-        if (assignments.Count > 0)
-        {
-            newContent = IdAssigner.UpdateClosingTags(newContent, assignments);
-        }
-
-        var output = new IdsAssignOutput
-        {
-            Success = true,
-            AssignedCount = assignments.Count(a => string.IsNullOrEmpty(a.OldId)),
-            DuplicatesFixedCount = assignments.Count(a => !string.IsNullOrEmpty(a.OldId)),
-            ModifiedCode = newContent,
-            Assignments = assignments.Select(a => new IdAssignmentOutput
-            {
-                Line = a.Line,
-                Kind = a.Kind.ToString(),
-                Name = a.Name,
-                OldId = string.IsNullOrEmpty(a.OldId) ? null : a.OldId,
-                NewId = a.NewId
-            }).ToList()
-        };
-
-        return McpToolResult.Json(output);
-    }
-
-    private static (IReadOnlyList<IdEntry> Entries, ModuleNode Module)? ScanSource(string source)
-    {
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath("mcp-input.calr");
-
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        if (diagnostics.HasErrors)
-            return null;
-
-        var parser = new Parser(tokens, diagnostics);
-        var module = parser.Parse();
-
-        if (diagnostics.HasErrors)
-            return null;
-
-        var scanner = new IdScanner();
-        return (scanner.Scan(module, "mcp-input.calr"), module);
-    }
-
-    // Format output types
-    private sealed class FormatResult
-    {
-        public bool Success { get; init; }
-        public required string Original { get; init; }
-        public required string Formatted { get; init; }
-        public required List<EnvelopeDiagnostic> Errors { get; init; }
-        public string? ConservativeFallbackReason { get; init; }
     }
 
     private sealed class FormatToolOutput
@@ -266,7 +97,6 @@ public sealed class FormatTool : McpToolBase
         [JsonPropertyName("isChanged")]
         public bool IsChanged { get; init; }
 
-        /// <summary>Envelope schema v1.1 diagnostic entries (real parser diagnostics).</summary>
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<EnvelopeDiagnostic>? Errors { get; init; }
@@ -274,60 +104,5 @@ public sealed class FormatTool : McpToolBase
         [JsonPropertyName("conservativeFallbackReason")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? ConservativeFallbackReason { get; init; }
-    }
-
-    // IDs check output types
-    private sealed class IdsCheckOutput
-    {
-        [JsonPropertyName("success")]
-        public bool Success { get; init; }
-
-        [JsonPropertyName("totalIds")]
-        public int TotalIds { get; init; }
-
-        [JsonPropertyName("issueCount")]
-        public int IssueCount { get; init; }
-
-        /// <summary>Envelope schema v1.1 diagnostic entries (Calor0800-band, with declarationId).</summary>
-        [JsonPropertyName("issues")]
-        public required List<EnvelopeDiagnostic> Issues { get; init; }
-    }
-
-    // IDs assign output types
-    private sealed class IdsAssignOutput
-    {
-        [JsonPropertyName("success")]
-        public bool Success { get; init; }
-
-        [JsonPropertyName("assignedCount")]
-        public int AssignedCount { get; init; }
-
-        [JsonPropertyName("duplicatesFixedCount")]
-        public int DuplicatesFixedCount { get; init; }
-
-        [JsonPropertyName("modifiedCode")]
-        public required string ModifiedCode { get; init; }
-
-        [JsonPropertyName("assignments")]
-        public required List<IdAssignmentOutput> Assignments { get; init; }
-    }
-
-    private sealed class IdAssignmentOutput
-    {
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("kind")]
-        public required string Kind { get; init; }
-
-        [JsonPropertyName("name")]
-        public required string Name { get; init; }
-
-        [JsonPropertyName("oldId")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? OldId { get; init; }
-
-        [JsonPropertyName("newId")]
-        public required string NewId { get; init; }
     }
 }
