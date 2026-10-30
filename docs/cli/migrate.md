@@ -189,6 +189,26 @@ Token Savings: 17,090 tokens (37.8% reduction)
 
 Generate detailed reports for documentation:
 
+### Default-path CI measurement
+
+The `roundtrip-verification (default)` CI job also runs default `calor migrate`
+on isolated copies of the pinned MediatR, Serilog and FluentValidation source
+directories. The `default-migrate-reports` artifact contains the CLI JSON
+envelopes, logs, and a combined JSON/Markdown summary:
+
+- Genuinely failed files, converted-but-blocked files, and files actually written.
+- Fully native written files divided by all discovered input files. Passthrough
+  and unwritten conversions do not count as native output.
+- Written passthrough units grouped by reason, plus discovery exclusions.
+- Explicit build/test status. These source-only copies are not buildable
+  projects, so both statuses are `not-run`, never `passed`.
+
+This report complements the existing project-context round-trip harness; it
+does not replace or relax its build, test, native-conversion or coverage gates.
+The source-directory measurement does not establish that a migration builds.
+Until the preservation fallback ladder is implemented, a failed file can still
+block other converted files from being written.
+
 ### Markdown Report
 
 ```bash

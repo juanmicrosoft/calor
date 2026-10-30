@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
   now produce errors that name the canonical marker. `§/SW` and `§/ENUM` are
   also rejected; end these blocks by dedenting.
 
+### Fixed
+
+- **C# conversion preserves indexer parameters and generic array element types.**
+  Both cases now survive the full C# → Calor → C# pipeline. The 100-snippet
+  scorecard reaches 100 round-trip compilations, with 96 fully native conversions.
+  Preserved C# does not count as native conversion.
+- **Whole-file namespace preservation keeps the original C# compilation unit.**
+  It no longer adds a generated preamble, and passthrough payloads ending with a
+  newline no longer acquire indentation before their terminator.
+
+### Test and CI health
+
+- **Default migration has a separate corpus report.** CI reports failed,
+  converted-but-blocked, written and fully native written files for pinned
+  MediatR, Serilog and FluentValidation source copies. Build and test results
+  remain separate; writing a file is not reported as proof that it builds.
+
 ## [0.29.0] - 2026-10-29
 
 Calor 0.29 fixes nullable-reference and shift analysis, receiver taint tracking, and

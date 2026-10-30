@@ -80,6 +80,7 @@ jobs:
           python3 scripts/check_test_quality.py --self-test
           python3 scripts/check_trx.py --self-test
           python3 scripts/test_roundtrip_baselines.py
+          python3 scripts/test_default_migrate_report.py
 
       # #1545, EXC-RELEASE-GAPS-A-YAML: the release-credential check decides on parsed YAML. Its
       # parser is hash-pinned and installed into its own environment; a missing parser fails it.
@@ -1011,6 +1012,23 @@ jobs:
             --mode ${{ matrix.mode }} \
             --dotnet dotnet \
             --output ./conversion-reports/
+
+      - name: Measure default directory-mode migrate (#1604)
+        if: always() && matrix.mode == 'default'
+        run: |
+          python3 scripts/default_migrate_report.py \
+            --compiler src/Calor.Compiler/bin/Release/net10.0/calor.dll \
+            --output default-migrate-reports
+          cat default-migrate-reports/default-migrate.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload default migrate reports
+        if: always() && matrix.mode == 'default'
+        uses: actions/upload-artifact@v4
+        with:
+          name: default-migrate-reports
+          path: default-migrate-reports/
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Enforce committed round-trip floors (#1030)
         run: |
