@@ -83,7 +83,9 @@ public sealed class S2ObligationResidualTests
                 §O{void}
                 §E{}
             """;
-        AssertWithheld(Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry));
+        var entry = Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry);
+        Assert.Equal(ObligationStatus.Boundary, entry.Status);
+        Assert.Null(entry.Outcome);
     }
 
     [Fact]
@@ -340,7 +342,9 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §Q (|| (== x INT:0) (== (+ x INT:1) INT:-2147483648))
             """;
-        AssertWithheld(Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry));
+        var entry = Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry);
+        Assert.Equal(ObligationStatus.Boundary, entry.Status);
+        Assert.Null(entry.Outcome);
     }
 
     [Fact]

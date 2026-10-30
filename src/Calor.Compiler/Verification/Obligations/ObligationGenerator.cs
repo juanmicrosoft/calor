@@ -1,4 +1,7 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.TypeChecking;
 
@@ -55,6 +58,7 @@ public sealed class ObligationGenerator
         foreach (var func in module.Functions)
         {
             GenerateForFunction(func);
+            GenerateCallObligations(func, module.Functions);
         }
         foreach (var enumExtension in module.EnumExtensions)
         {
@@ -97,6 +101,109 @@ public sealed class ObligationGenerator
 
         // 3. Index bounds obligations from body
         GenerateIndexBoundsForBody(func.Body, func.Parameters, func.Id, func.Visibility);
+    }
+
+    private void GenerateCallObligations(FunctionNode caller, IReadOnlyList<FunctionNode> functions)
+    {
+        var candidates = functions.GroupBy(function => function.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var shadowed = caller.Parameters.Select(parameter => parameter.Name)
+            .Concat(caller.Body.SelectMany(DescendantsAndSelf).OfType<BindStatementNode>().Select(bind => bind.Name))
+            .Concat(caller.Body.SelectMany(DescendantsAndSelf).OfType<LocalFunctionStatementNode>()
+                .Select(local => local.Function.Name))
+            .ToHashSet(StringComparer.Ordinal);
+        var opaqueCaller = caller.Body.Any(FactCollector.IsOpaque);
+        var bindingDiagnostics = new DiagnosticBag();
+        var binder = new Binder(bindingDiagnostics);
+        var variables = caller.Parameters.Select(parameter => (parameter.Name, parameter.TypeName)).ToArray();
+
+        bool ExactArgumentType(ExpressionNode argument, string type)
+        {
+            var errorsBefore = bindingDiagnostics.Errors.Count();
+            var actual = binder.BindVerificationReceiver(argument, variables).Type;
+            return bindingDiagnostics.Errors.Count() == errorsBefore && (type, actual) switch
+            {
+                ("i32" or "int" or "INT", PrimitiveBoundType { Name: "INT", Bits: null or 32, Signed: null or true }) => true,
+                ("i32" or "int" or "INT", NominalBoundType { QualifiedName: "INT", Declaration: null, RoslynSymbol: null }) => true,
+                ("i32" or "int" or "INT", NominalBoundType { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Int32 }) => true,
+                ("bool" or "BOOL", PrimitiveBoundType { Name: "BOOL" }) => true,
+                ("bool" or "BOOL", NominalBoundType { QualifiedName: "BOOL", Declaration: null, RoslynSymbol: null }) => true,
+                ("bool" or "BOOL", NominalBoundType { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Boolean }) => true,
+                _ => false
+            };
+        }
+
+        IEnumerable<AstNode> Calls(AstNode node)
+        {
+            if (node is LambdaExpressionNode or LocalFunctionStatementNode)
+                yield break;
+            if (node is CallExpressionNode or CallStatementNode)
+                yield return node;
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+                foreach (var call in Calls(child))
+                    yield return call;
+        }
+
+        foreach (var node in caller.Body.SelectMany(Calls))
+        {
+            var call = node is CallStatementNode statement
+                ? new CallExpressionNode(statement.Span, statement.Target, statement.Arguments,
+                    statement.ArgumentNames, statement.ArgumentModifiers, statement.TypeArguments)
+                : (CallExpressionNode)node;
+            if (!candidates.TryGetValue(call.Target, out var targets)
+                || !targets.Any(target => target.Parameters.Any(parameter => parameter.InlineRefinement != null)))
+                continue;
+
+            var target = targets.Length == 1 ? targets[0] : null;
+            var canBind = target != null && !opaqueCaller && !shadowed.Contains(call.Target)
+                && target.TypeParameters.Count == 0
+                && call.TypeArguments?.Count is not > 0
+                && call.Arguments.Count == target.Parameters.Count
+                && target.Parameters.All(parameter => parameter.Modifier == ParameterModifier.None)
+                && call.ArgumentModifiers?.Any(modifier => modifier != null) != true
+                && call.Arguments.All(FactCollector.IsPlainCallArgument);
+            var arguments = new Dictionary<string, ExpressionNode>(StringComparer.Ordinal);
+            if (canBind)
+            {
+                for (var index = 0; index < call.Arguments.Count; index++)
+                {
+                    var name = call.ArgumentNames?.ElementAtOrDefault(index) ?? target!.Parameters[index].Name;
+                    if (!target!.Parameters.Any(parameter => parameter.Name == name)
+                        || !arguments.TryAdd(name, call.Arguments[index])
+                        || !ExactArgumentType(call.Arguments[index],
+                            target.Parameters.Single(parameter => parameter.Name == name).TypeName))
+                    {
+                        canBind = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!canBind || target == null || arguments.Count != target.Parameters.Count)
+            {
+                var refusal = _tracker.Add(ObligationKind.Subtype, caller.Id,
+                    $"Call to '{call.Target}' must satisfy its parameter refinements",
+                    new BoolLiteralNode(call.Span, false), call.Span);
+                refusal.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    "Call binding or argument evaluation is not modeled exactly. Callee runtime guards kept.")));
+                continue;
+            }
+
+            var preconditions = ContractVerifier.EffectivePreconditions(target.Parameters, target.Preconditions);
+            var conditions = preconditions.Select(precondition =>
+                FactCollector.SubstituteCallParameters(precondition.Condition, arguments)).ToArray();
+            for (var index = 0; index < preconditions.Count; index++)
+            {
+                var precondition = preconditions[index];
+                var condition = conditions[index];
+                var obligation = _tracker.Add(ObligationKind.Subtype, caller.Id,
+                    $"Call to '{call.Target}' must satisfy its precondition at line {precondition.Span.Line}",
+                    condition ?? precondition.Condition, call.Span);
+                if (conditions.Any(condition => condition == null))
+                    obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        "Call precondition substitution is outside the plain expression model. Callee runtime guards kept.")));
+            }
+        }
     }
 
     private void GenerateForMethod(MethodNode method, ClassDefinitionNode cls)
@@ -550,8 +657,9 @@ public sealed class ObligationGenerator
             if (isOut)
                 obl.CheckedRefinement = "inline refinement";
 
-            // Public functions get boundary status — can't statically verify caller behavior
-            if (visibility == Visibility.Public)
+            // A declaration is a boundary assumption, not a proof about callers.
+            // Actual argument obligations are generated at the call site.
+            if (!isOut || visibility == Visibility.Public)
             {
                 obl.Status = ObligationStatus.Boundary;
                 obl.SuggestedFix = $"Add runtime guard: if (!({param.Name} satisfies predicate)) throw";

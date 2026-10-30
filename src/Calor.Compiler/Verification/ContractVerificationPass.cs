@@ -66,12 +66,13 @@ public sealed class ContractVerificationPass
         {
             _options.CancellationToken.ThrowIfCancellationRequested();
 
-            if (!function.HasContracts)
+            var preconditions = ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions);
+            if (preconditions.Count == 0 && function.Postconditions.Count == 0)
                 continue;
 
-            var result = VerifyFunction(verifier, cache, function);
+            var result = VerifyFunction(verifier, cache, function, preconditions);
             results.Add(result);
-            ReportDiagnostics(function, result);
+            ReportDiagnostics(function, result, preconditions);
         }
 
         // Report summary if any contracts were verified
@@ -100,7 +101,8 @@ public sealed class ContractVerificationPass
     private FunctionVerificationResult VerifyFunction(
         Z3Verifier verifier,
         VerificationCache cache,
-        FunctionNode function)
+        FunctionNode function,
+        IReadOnlyList<RequiresNode> preconditions)
     {
         // Extract parameter information
         var parameters = function.Parameters
@@ -111,7 +113,7 @@ public sealed class ContractVerificationPass
 
         // Verify preconditions with cache
         var preconditionResults = new List<ContractVerificationResult>();
-        foreach (var pre in function.Preconditions)
+        foreach (var pre in preconditions)
         {
             // Try cache first
             if (cache.TryGetPreconditionResult(parameters, pre, out var cached))
@@ -132,7 +134,7 @@ public sealed class ContractVerificationPass
         {
             // Try cache first (the key covers the body when the postcondition references
             // `result` — a body edit must never reuse a stale result-bound proof)
-            if (cache.TryGetPostconditionResult(parameters, outputType, function.Preconditions, post, function.Body, out var cached))
+            if (cache.TryGetPostconditionResult(parameters, outputType, preconditions, post, function.Body, out var cached))
             {
                 postconditionResults.Add(cached!);
                 continue;
@@ -142,10 +144,10 @@ public sealed class ContractVerificationPass
             var result = verifier.VerifyPostcondition(
                 parameters,
                 outputType,
-                function.Preconditions,
+                preconditions,
                 post,
                 function.Body);
-            cache.CachePostconditionResult(parameters, outputType, function.Preconditions, post, function.Body, result);
+            cache.CachePostconditionResult(parameters, outputType, preconditions, post, function.Body, result);
             postconditionResults.Add(result);
         }
 
@@ -156,12 +158,13 @@ public sealed class ContractVerificationPass
             postconditionResults);
     }
 
-    private void ReportDiagnostics(FunctionNode function, FunctionVerificationResult result)
+    private void ReportDiagnostics(FunctionNode function, FunctionVerificationResult result,
+        IReadOnlyList<RequiresNode> preconditions)
     {
-        for (int i = 0; i < result.PreconditionResults.Count && i < function.Preconditions.Count; i++)
+        for (int i = 0; i < result.PreconditionResults.Count && i < preconditions.Count; i++)
         {
             ReportContractDiagnostic(
-                function, result.PreconditionResults[i], function.Preconditions[i].Span, isPrecondition: true);
+                function, result.PreconditionResults[i], preconditions[i].Span, isPrecondition: true);
         }
 
         for (int i = 0; i < result.PostconditionResults.Count && i < function.Postconditions.Count; i++)
@@ -329,10 +332,13 @@ public sealed class ContractVerificationPass
     /// are functions with an implicit `this` receiver, but contracts in §Q/§S
     /// reference parameters and `result`, neither of which depends on `this`.
     /// </summary>
-    private static IEnumerable<FunctionNode> EnumerateContractBearers(ModuleNode module)
+    internal static IEnumerable<FunctionNode> EnumerateContractBearers(ModuleNode module)
     {
         foreach (var f in module.Functions)
             yield return f;
+        foreach (var extension in module.EnumExtensions)
+            foreach (var function in extension.Methods)
+                yield return function;
 
         foreach (var cls in module.Classes)
         {
@@ -345,7 +351,7 @@ public sealed class ContractVerificationPass
     {
         foreach (var m in cls.Methods)
         {
-            if (!m.HasContracts)
+            if (!m.HasContracts && !m.Parameters.Any(parameter => parameter.InlineRefinement != null))
                 continue;
             yield return AdaptMethodAsFunction(m, cls);
         }
@@ -390,12 +396,13 @@ public sealed class ContractVerificationPass
 
         foreach (var function in EnumerateContractBearers(module))
         {
-            if (!function.HasContracts)
+            var preconditions = ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions);
+            if (preconditions.Count == 0 && function.Postconditions.Count == 0)
                 continue;
 
             var skippedResult = new ContractVerificationResult(ContractVerificationStatus.Skipped);
 
-            var preResults = function.Preconditions
+            var preResults = preconditions
                 .Select(_ => skippedResult)
                 .ToList();
 

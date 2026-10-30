@@ -5,6 +5,7 @@ using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.TypeChecking;
+using Calor.Compiler.Verification.Obligations;
 
 namespace Calor.Compiler.Verification;
 
@@ -15,6 +16,24 @@ namespace Calor.Compiler.Verification;
 /// </summary>
 public sealed class ContractVerifier
 {
+    /// <summary>
+    /// Projects parameter entry guards into the existing contract pipeline. Out
+    /// refinements constrain writes, not the uninitialized entry value.
+    /// </summary>
+    internal static IReadOnlyList<RequiresNode> EffectivePreconditions(
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<RequiresNode> preconditions)
+        => parameters
+            .Where(parameter => !parameter.Modifier.HasFlag(ParameterModifier.Out)
+                && parameter.InlineRefinement != null)
+            .Select(parameter => new RequiresNode(
+                parameter.InlineRefinement!.Predicate.Span,
+                FactCollector.SubstituteContractSelf(parameter.InlineRefinement.Predicate, parameter.Name),
+                null,
+                new AttributeCollection()))
+            .Concat(preconditions)
+            .ToArray();
+
     private readonly DiagnosticBag _diagnostics;
     private readonly Binder _contractBinder = new(new DiagnosticBag());
     private IReadOnlyList<(string Name, string Type)> _contractVariables = [];
@@ -44,6 +63,28 @@ public sealed class ContractVerifier
         {
             VerifyFunction(function);
         }
+        VerifyNestedInlineParameters(module);
+
+        void VerifyNestedInlineParameters(AstNode node)
+        {
+            IReadOnlyList<ParameterNode>? parameters = node switch
+            {
+                MethodNode method => method.Parameters,
+                MethodSignatureNode signature => signature.Parameters,
+                ConstructorNode constructor => constructor.Parameters,
+                OperatorOverloadNode op => op.Parameters,
+                FunctionNode function when !module.Functions.Contains(function) => function.Parameters,
+                _ => null
+            };
+            if (parameters?.Any(parameter => parameter.InlineRefinement != null) == true)
+            {
+                _contractVariables = parameters.Select(parameter => (parameter.Name, parameter.TypeName)).ToArray();
+                foreach (var precondition in EffectivePreconditions(parameters, []))
+                    VerifyPrecondition(precondition, parameters);
+            }
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                VerifyNestedInlineParameters(child);
+        }
     }
 
     /// <summary>
@@ -54,9 +95,9 @@ public sealed class ContractVerifier
         _contractVariables = function.Parameters.Select(parameter => (parameter.Name, parameter.TypeName))
             .Concat(function.Output == null ? [] : new[] { ("result", function.Output.TypeName) }).ToArray();
         // Verify preconditions
-        foreach (var requires in function.Preconditions)
+        foreach (var requires in EffectivePreconditions(function.Parameters, function.Preconditions))
         {
-            VerifyPrecondition(requires, function);
+            VerifyPrecondition(requires, function.Parameters);
         }
 
         // Verify postconditions
@@ -66,7 +107,7 @@ public sealed class ContractVerifier
         }
     }
 
-    private void VerifyPrecondition(RequiresNode requires, FunctionNode function)
+    private void VerifyPrecondition(RequiresNode requires, IReadOnlyList<ParameterNode> parameters)
     {
         // Verify that the condition is a boolean expression
         var conditionType = InferExpressionType(requires.Condition);
@@ -83,7 +124,7 @@ public sealed class ContractVerifier
 
         // Verify that the condition only references parameters, indexed type size params, and constants
         var referencedNames = CollectReferences(requires.Condition);
-        var parameterNames = function.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        var parameterNames = parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
 
         foreach (var name in referencedNames)
         {
@@ -225,6 +266,14 @@ public sealed class ContractVerifier
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
             CallExpressionNode call => InferBclCallType(call),
+            StringOperationNode operation => operation.Operation switch
+            {
+                StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
+                    or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
+                    or StringOp.Equals => PrimitiveType.Bool,
+                StringOp.Length or StringOp.IndexOf => PrimitiveType.Int,
+                _ => PrimitiveType.String
+            },
             CharOperationNode operation => operation.Operation switch
             {
                 CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
@@ -237,7 +286,11 @@ public sealed class ContractVerifier
             ForallExpressionNode => PrimitiveType.Bool, // Quantifiers return bool
             ExistsExpressionNode => PrimitiveType.Bool,
             ImplicationExpressionNode => PrimitiveType.Bool,
-            ReferenceNode => null, // Would need symbol table to determine
+            ReferenceNode reference => _contractVariables.FirstOrDefault(variable => variable.Name == reference.Name)
+                is { Type: { } type } ? PrimitiveType.FromName(type) : null,
+            ConditionalExpressionNode conditional
+                when InferExpressionType(conditional.WhenTrue) is { } type
+                    && type == InferExpressionType(conditional.WhenFalse) => type,
             _ => null
         };
     }

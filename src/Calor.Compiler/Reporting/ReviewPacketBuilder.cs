@@ -196,16 +196,18 @@ public sealed class ReviewPacketBuilder
 
         // Function/method lookup so contract text can be sliced from source.
         var functionsById = new Dictionary<string, FunctionNode>(StringComparer.Ordinal);
-        foreach (var fn in module.Functions)
+        foreach (var fn in ContractVerificationPass.EnumerateContractBearers(module))
             functionsById.TryAdd(fn.Id, fn);
 
         foreach (var fnResult in verification.Functions)
         {
             functionsById.TryGetValue(fnResult.FunctionId, out var fnNode);
+            var preconditions = fnNode == null ? null
+                : Verification.ContractVerifier.EffectivePreconditions(fnNode.Parameters, fnNode.Preconditions);
 
             AddContracts(packet, file, module, fnResult.FunctionId, fnResult.FunctionName,
                 "precondition", fnResult.PreconditionResults,
-                i => SliceText(file.Source, fnNode?.Preconditions, i));
+                i => SliceText(file.Source, preconditions, i));
             AddContracts(packet, file, module, fnResult.FunctionId, fnResult.FunctionName,
                 "postcondition", fnResult.PostconditionResults,
                 i => SliceText(file.Source, fnNode?.Postconditions, i));

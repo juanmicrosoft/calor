@@ -98,7 +98,7 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void Generate_PrivateFunctionInlineRefinement_IsPending()
+    public void Generate_PrivateFunctionInlineRefinement_IsBoundary()
     {
         var source = """
             §M{m001:Test}
@@ -117,8 +117,7 @@ public sealed class ObligationTests
         Assert.Single(tracker.Obligations);
         var obl = tracker.Obligations[0];
         Assert.Equal(ObligationKind.RefinementEntry, obl.Kind);
-        // Private function -> stays Pending (solver will check it)
-        Assert.Equal(ObligationStatus.Pending, obl.Status);
+        Assert.Equal(ObligationStatus.Boundary, obl.Status);
     }
 
     [Fact]
@@ -337,7 +336,7 @@ public sealed class ObligationTests
     }
 
     [SkippableFact]
-    public void Solve_InlineRefinementWithSelfRef_DischargesViaZ3()
+    public void Solve_InlineRefinementWithPrecondition_KeepsEntryBoundary()
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
@@ -360,16 +359,16 @@ public sealed class ObligationTests
             o => o.Kind == ObligationKind.RefinementEntry);
         Assert.NotNull(refObl);
         Assert.Equal("age", refObl.ParameterName);
-        // Precondition (>= age 0) should discharge the inline refinement (>= # 0)
-        Assert.Equal(ObligationStatus.Discharged, refObl.Status);
+        Assert.Equal(ObligationStatus.Boundary, refObl.Status);
+        Assert.Null(refObl.Outcome);
     }
 
     [SkippableFact]
-    public void Solve_InlineRefinementWithoutPrecondition_Fails()
+    public void Solve_InlineRefinementWithoutPrecondition_IsNotACallerRefutation()
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Private function WITHOUT precondition — inline refinement can't be verified
+        // A private declaration does not universally claim that every input is valid.
         var source = """
             §M{m001:Test}
               §F{f001:Validate:priv}
@@ -385,8 +384,9 @@ public sealed class ObligationTests
         var refObl = options.ObligationResults.Obligations.FirstOrDefault(
             o => o.Kind == ObligationKind.RefinementEntry);
         Assert.NotNull(refObl);
-        Assert.Equal(ObligationStatus.Failed, refObl.Status);
-        Assert.NotNull(refObl.CounterexampleDescription);
+        Assert.Equal(ObligationStatus.Boundary, refObl.Status);
+        Assert.Null(refObl.CounterexampleDescription);
+        Assert.False(result.HasErrors);
     }
 
     // ───── Obligation Metadata ─────

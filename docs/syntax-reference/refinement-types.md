@@ -152,6 +152,42 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
 §I{baseType:paramName} | (predicate)
 ```
 
+The same predicate can be attached directly in an inline signature:
+
+```calor
+§M{m1:Ranges}
+  §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+    §S (> result lo)
+    §R hi
+```
+
+Here `#` means `hi`. The relationship belongs to the later parameter and can
+reference `lo`. This attachment does not decide the remaining 0.30 declaration
+syntax choices.
+
+Contract verification checks inline entry predicates with the same Z3 path as
+`§Q`, uses them when proving `§S`, and checks that overrides do not strengthen
+them. A satisfiable entry predicate is not a proof that callers satisfy it.
+Inline parameter guards remain boundary checks, including on private functions.
+Refinement verification also generates caller obligations for unambiguous direct
+calls in module-function bodies, outside lambdas, with plain, exactly typed
+`i32`/`bool` arguments.
+Unsupported dispatch, conversions, argument evaluation or predicate substitution
+are reported as unsupported; the callee's runtime guards remain. Caller proofs
+do not remove those guards.
+
+Inline refinements are rechecked when their parameter is assigned. Changing
+another parameter referenced by a predicate does not recheck the dependent
+parameter; the fact collector drops stale entry facts rather than using them
+to prove later obligations. `out` refinements constrain writes, not entry values.
+Vacuous, unsupported and conditional proofs never justify removing a guard.
+
+`§Q`, message-bearing preconditions and named `§RTYPE` remain accepted during
+staged migration. Entry-expression equivalence alone does not establish runtime
+equivalence: exceptions, messages, check order and reassignment behavior differ.
+Zero-parameter and receiver/global-state contracts need a valid canonical
+replacement before removal; they must not be erased or moved onto fake parameters.
+
 ### Examples
 
 ```

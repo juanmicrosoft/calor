@@ -329,7 +329,8 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             if (!classNode.Methods.Any(method =>
                     InterfaceMethodMatches(method, interfaceSource, classNode, interfaces))
-                && interfaceSource.Method.HasContracts)
+                && HasEntryOrPostconditions(interfaceSource.Method.Parameters,
+                    interfaceSource.Method.Preconditions, interfaceSource.Method.Postconditions))
             {
                 _diagnostics.ReportError(
                     classNode.Span,
@@ -354,7 +355,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                     pair.Method.Name,
                     pair.Method.Id,
                     pair.Method.Parameters,
-                    pair.Method.Preconditions,
+                    ContractVerifier.EffectivePreconditions(pair.Method.Parameters, pair.Method.Preconditions),
                     pair.Method.Postconditions,
                     pair.Method.TypeParameters
                         .Select(parameter => parameter.Name)
@@ -419,7 +420,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                 violations);
         }
 
-        if (!implementingMethod.HasContracts)
+        if (!HasEntryOrPostconditions(implementingMethod.Parameters,
+                implementingMethod.Preconditions, implementingMethod.Postconditions))
         {
             if (!orderedSources.Any(source => source.HasContracts))
             {
@@ -449,8 +451,14 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
 
         var parameters = GetParameterList(implementingMethod.Parameters);
+        var inlinePredicates = implementingMethod.Parameters
+            .Select(parameter => parameter.InlineRefinement?.Predicate)
+            .OfType<ExpressionNode>().ToArray();
+        var preconditionSpan = implementingMethod.Preconditions.Count == 0 && inlinePredicates.Length == 1
+            ? inlinePredicates[0].Span : implementingMethod.Span;
         var implementerPrecondition = Conjoin(
-            implementingMethod.Preconditions.Select(contract => contract.Condition),
+            ContractVerifier.EffectivePreconditions(implementingMethod.Parameters, implementingMethod.Preconditions)
+                .Select(contract => contract.Condition),
             implementingMethod.Span);
         var implementerPostcondition = Conjoin(
             implementingMethod.Postconditions.Select(contract => contract.Condition),
@@ -470,7 +478,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                 implementingMethod,
                 source.TypeName,
                 source.MethodName,
-                implementingMethod.Span);
+                preconditionSpan);
             if (preconditionViolation != null)
                 violations.Add(preconditionViolation);
 
@@ -600,14 +608,15 @@ public sealed class ContractInheritanceChecker : IDisposable
                 MethodsMatch(implementingMethod, method, classNode, resolved));
             if (baseMethod != null)
             {
-                if (baseMethod.HasContracts)
+                if (HasEntryOrPostconditions(baseMethod.Parameters,
+                        baseMethod.Preconditions, baseMethod.Postconditions))
                 {
                     yield return new ContractSource(
                         _displayNames[baseClass],
                         baseMethod.Name,
                         baseMethod.Id,
                         baseMethod.Parameters,
-                        baseMethod.Preconditions,
+                        ContractVerifier.EffectivePreconditions(baseMethod.Parameters, baseMethod.Preconditions),
                         baseMethod.Postconditions,
                         baseMethod.TypeParameters
                             .Select(parameter => parameter.Name)
@@ -635,7 +644,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                             pair.Method.Name,
                             pair.Method.Id,
                             pair.Method.Parameters,
-                            pair.Method.Preconditions,
+                            ContractVerifier.EffectivePreconditions(pair.Method.Parameters, pair.Method.Preconditions),
                             pair.Method.Postconditions,
                             pair.Method.TypeParameters
                                 .Select(parameter => parameter.Name)
@@ -721,6 +730,13 @@ public sealed class ContractInheritanceChecker : IDisposable
                 .ToArray()
         };
     }
+
+    private static bool HasEntryOrPostconditions(
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions)
+        => postconditions.Count > 0
+            || ContractVerifier.EffectivePreconditions(parameters, preconditions).Count > 0;
 
     private IEnumerable<KeyValuePair<string, string>> SourceValueBindings(ResolvedDeclaration source)
     {

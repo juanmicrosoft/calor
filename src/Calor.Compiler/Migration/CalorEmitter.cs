@@ -831,11 +831,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     /// <summary>
     /// Format inline parameter list for compact signatures: (type:name, type:name, ...)
-    /// Returns null if any parameter has C# attributes or default values (which can't be inlined).
+    /// Returns null if a parameter still needs the legacy attribute/default layout.
     /// </summary>
     private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
     {
-        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null || p.InlineRefinement != null))
+        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null))
             return null;
 
         return string.Join(", ", parameters.Select(p =>
@@ -848,7 +848,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
             if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
             var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}{FormatEffectRow(p.Row)}";
+            var refinement = p.InlineRefinement == null ? "" : $" | {p.InlineRefinement.Predicate.Accept(this)}";
+            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}{FormatEffectRow(p.Row)}{refinement}";
         }));
     }
 

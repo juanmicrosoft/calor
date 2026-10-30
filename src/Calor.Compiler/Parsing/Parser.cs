@@ -14188,6 +14188,21 @@ public sealed class Parser
                     ReportMisplacedEffectRow(paramName, "parameter");
                 }
 
+                InlineRefinementInfo? inlineRefinement = null;
+                if (Match(TokenKind.Pipe))
+                {
+                    var saved = _insideRefinementPredicate;
+                    _insideRefinementPredicate = true;
+                    try
+                    {
+                        inlineRefinement = new InlineRefinementInfo(paramType, ParseExpression());
+                    }
+                    finally
+                    {
+                        _insideRefinementPredicate = saved;
+                    }
+                }
+
                 // Parse optional default value: = expression
                 ExpressionNode? defaultValue = null;
                 if (Match(TokenKind.Equals))
@@ -14206,6 +14221,7 @@ public sealed class Parser
                     paramAttrs,
                     Array.Empty<CalorAttributeNode>(),
                     defaultValue,
+                    inlineRefinement,
                     identifierSpan: parameterIdentifierSpan,
                     typeNameSpan: parameterTypeSpan,
                     row: inlineRow));
