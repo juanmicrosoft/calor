@@ -145,7 +145,7 @@ public class BinderIncompleteRatchetTests
         JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
             "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.Cases);
 
-    /// <summary>#943: guarded identities whose whole member is now preserved C#; the source stays verbatim there.</summary>
+    /// <summary>Historically preserved member identities; native restoration must match the original registered carrier.</summary>
     private static readonly Lazy<IReadOnlyList<SourceCarrierCase>> PreservedCarrierCases = new(() =>
         JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
             "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.PreservedCases ?? []);
@@ -453,6 +453,69 @@ public class BinderIncompleteRatchetTests
         AssertSourceCarrierPreserved([new IntLiteralNode(firstSpan, 1)], source, carrier);
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
             AssertSourceCarrierPreserved([new IntLiteralNode(firstSpan, 2)], source, carrier));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PreviouslyPreservedSourceCarrier_RequiresExactNativeOrPreservedIdentity(bool preserveMember)
+    {
+        var source = $$"""
+            using System;
+            public static class C
+            {
+                public static object Run(Func<int, bool> filter, int value)
+                {
+                    bool shouldRegister = filter?.Invoke(value) ?? true;
+                    {{(preserveMember ? "bool Captured() => shouldRegister;" : "")}}
+                    return new Tuple<bool, int>(item2: value, item1: {{(preserveMember ? "Captured()" : "shouldRegister")}});
+                }
+            }
+            """;
+        var conditional = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source)
+            .GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ConditionalAccessExpressionSyntax>().Single();
+        var carrier = new SourceCarrierCase("named-constructor.cs",
+            conditional.Span.Start, conditional.Span.End, "ConditionalAccessExpression",
+            conditional.ToString(), nameof(ExpressionCallNode),
+            conditional.WhenNotNull.Span.Start, conditional.WhenNotNull.Span.End,
+            conditional.ToString());
+        var conversion = new Compiler.Migration.CSharpToCalorConverter(
+            new Compiler.Migration.ConversionOptions
+            {
+                Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
+                PreprocessorMode = Compiler.Migration.PreprocessorConversionMode.SelectActiveBranchLossy
+            }).Convert(source);
+        Assert.NotNull(conversion.Ast);
+        AssertSourceCarrierPreservedOrInMember(conversion.Ast, source, carrier);
+        if (preserveMember)
+            Assert.Single(Walk(conversion.Ast).OfType<CSharpInteropBlockNode>());
+        else
+        {
+            Assert.Empty(OpaqueCodeIdentities(conversion.Ast));
+            Assert.Equal(["item2", "item1"],
+                Assert.Single(Walk(conversion.Ast).OfType<NewExpressionNode>()).ArgumentNames);
+        }
+
+        var span = new TextSpan(carrier.CarrierStart,
+            carrier.CarrierEnd - carrier.CarrierStart, 1, 1);
+        var native = new ExpressionCallNode(span,
+            new NullConditionalNode(default, new ReferenceNode(default, "filter"), "Invoke"),
+            [new ReferenceNode(default, "value")]);
+        AssertSourceCarrierPreservedOrInMember(MeasurementModule(native), source, carrier);
+        foreach (var invalid in new[]
+        {
+            MeasurementModule(),
+            MeasurementModule(new RawCSharpExpressionNode(span, carrier.CarrierCode)),
+            MeasurementModule(new ExpressionCallNode(default, native.TargetExpression, native.Arguments)),
+            MeasurementModule(new ExpressionCallNode(span, native.TargetExpression,
+                [new ReferenceNode(default, "other")])),
+            MeasurementModule(new ExpressionCallNode(span,
+                new FieldAccessNode(default, new ReferenceNode(default, "filter"), "Invoke"),
+                native.Arguments))
+        })
+            Assert.Throws<Xunit.Sdk.TrueException>(() =>
+                AssertSourceCarrierPreservedOrInMember(invalid, source, carrier));
     }
 
     [Theory]
@@ -937,11 +1000,20 @@ public class BinderIncompleteRatchetTests
             .Select(evidence => (Action)(() => AssertSourceCarrierPreserved(nodes, source, evidence)))
             .ToArray());
         foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
-        {
-            Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
-            Assert.True(Walk(module).OfType<CSharpInteropBlockNode>().Any(block => block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)),
-                $"Preserved source {evidence.File}:{evidence.SourceStart} is neither native nor inside a §CSHARP member.");
-        }
+            AssertSourceCarrierPreservedOrInMember(module, source, evidence);
+    }
+
+    private static void AssertSourceCarrierPreservedOrInMember(
+        ModuleNode module, string source, SourceCarrierCase evidence)
+    {
+        Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
+        if (Walk(module).OfType<CSharpInteropBlockNode>().Any(block =>
+                block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)))
+            return;
+
+        // New native support must restore the registered kind, span and emitted tokens.
+        // Aggregate source/opacity equalities remain independent of this identity check.
+        AssertSourceCarrierPreserved(Walk(module).OfType<ExpressionNode>().ToArray(), source, evidence);
     }
 
     private static void AssertSourceCarrierPreserved(
