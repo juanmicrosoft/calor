@@ -6622,16 +6622,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-property with default value
         if (node.IsAutoProperty)
         {
-            var getVis = FormatAccessorVisibility(node.Getter?.Visibility);
+            var getVis = FormatAccessorVisibility(node.Getter?.Visibility, node.Visibility);
             var accessors = "get;";
             if (node.Setter != null)
             {
-                var setVis = FormatAccessorVisibility(node.Setter.Visibility);
+                var setVis = FormatAccessorVisibility(node.Setter.Visibility, node.Visibility);
                 accessors = $"{getVis}get; {setVis}set;";
             }
             else if (node.Initer != null)
             {
-                var initVis = FormatAccessorVisibility(node.Initer.Visibility);
+                var initVis = FormatAccessorVisibility(node.Initer.Visibility, node.Visibility);
                 accessors = $"{getVis}get; {initVis}init;";
             }
             if (node.DefaultValue != null)
@@ -6653,17 +6653,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         if (node.Getter != null)
         {
-            Visit(node.Getter);
+            EmitPropertyAccessor(node.Getter, node.Visibility);
         }
 
         if (node.Setter != null)
         {
-            Visit(node.Setter);
+            EmitPropertyAccessor(node.Setter, node.Visibility);
         }
 
         if (node.Initer != null)
         {
-            Visit(node.Initer);
+            EmitPropertyAccessor(node.Initer, node.Visibility);
         }
 
         Dedent();
@@ -6703,16 +6703,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-indexer
         if (node.IsAutoIndexer)
         {
-            var getVis = FormatAccessorVisibility(node.Getter?.Visibility);
+            var getVis = FormatAccessorVisibility(node.Getter?.Visibility, node.Visibility);
             var accessors = "get;";
             if (node.Setter != null)
             {
-                var setVis = FormatAccessorVisibility(node.Setter.Visibility);
+                var setVis = FormatAccessorVisibility(node.Setter.Visibility, node.Visibility);
                 accessors = $"{getVis}get; {setVis}set;";
             }
             else if (node.Initer != null)
             {
-                var initVis = FormatAccessorVisibility(node.Initer.Visibility);
+                var initVis = FormatAccessorVisibility(node.Initer.Visibility, node.Visibility);
                 accessors = $"{getVis}get; {initVis}init;";
             }
             AppendLine($"{modifierStr} {typeName} this[{paramList}] {{ {accessors} }}");
@@ -6726,17 +6726,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         if (node.Getter != null)
         {
-            Visit(node.Getter);
+            EmitPropertyAccessor(node.Getter, node.Visibility);
         }
 
         if (node.Setter != null)
         {
-            Visit(node.Setter);
+            EmitPropertyAccessor(node.Setter, node.Visibility);
         }
 
         if (node.Initer != null)
         {
-            Visit(node.Initer);
+            EmitPropertyAccessor(node.Initer, node.Visibility);
         }
 
         Dedent();
@@ -6745,7 +6745,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
-    private static string FormatAccessorVisibility(Visibility? visibility) => visibility switch
+    private static string FormatAccessorVisibility(Visibility? visibility, Visibility ownerVisibility = Visibility.Public)
+        => visibility == ownerVisibility ? "" : visibility switch
     {
         Visibility.Private => "private ",
         Visibility.PrivateProtected => "private protected ",
@@ -6755,7 +6756,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _ => ""
     };
 
-    public string Visit(PropertyAccessorNode node)
+    public string Visit(PropertyAccessorNode node) => EmitPropertyAccessor(node, Visibility.Public);
+
+    private string EmitPropertyAccessor(PropertyAccessorNode node, Visibility ownerVisibility)
     {
         // #879: property accessors are never verified (EnumerateContractBearers covers
         // functions and class methods only), and this node carries no id. A stale cursor
@@ -6773,15 +6776,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => "get"
         };
 
-        var visibilityPrefix = node.Visibility switch
-        {
-            Visibility.Private => "private ",
-            Visibility.PrivateProtected => "private protected ",
-            Visibility.ProtectedInternal => "protected internal ",
-            Visibility.Internal => "internal ",
-            Visibility.Protected => "protected ",
-            _ => ""
-        };
+        var visibilityPrefix = FormatAccessorVisibility(node.Visibility, ownerVisibility);
 
         if (node.IsAutoImplemented)
         {

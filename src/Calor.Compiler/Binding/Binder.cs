@@ -85,6 +85,7 @@ public sealed class Binder
     private readonly string _sourceIdentity;
     private Scope _scope;
     private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
+    private readonly HashSet<FunctionSymbol> _staticMethodSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
     private readonly Dictionary<ClassDefinitionNode, ClassDefinitionNode> _containingClasses = new();
@@ -739,6 +740,7 @@ public sealed class Binder
         _metadataUsings = module.Usings;
         _scope = new Scope();
         _functionSymbols.Clear();
+        _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
         _containingClasses.Clear();
@@ -1080,6 +1082,8 @@ public sealed class Binder
                 output: method.Output,
                 effectParameters: method.EffectParameters);
             _functionSymbols.Add(method, symbol);
+            if (method.IsStatic)
+                _staticMethodSymbols.Add(symbol);
 
             if (!classScope.TryDeclareOverload(lookupName, symbol, out var duplicate))
             {
@@ -3494,7 +3498,7 @@ public sealed class Binder
         if (name is null)
             return null;
         var head = name.Split('.')[0];
-        if (_scope.LookupAll(head).Count != 0 || ResolveAccessibleMembers(_currentClass, head).Count != 0)
+        if (_scope.LookupAll(head).Count != 0 || ResolveLexicalMembers(head).Count != 0)
             return null;
         var type = TryBuildReferenceType(
             name, _currentClassName, _currentNamespaceIdentity,
@@ -4721,7 +4725,7 @@ public sealed class Binder
 
         var symbols = _scope.LookupAll(refNode.Name);
         if (symbols.Count == 0)
-            symbols = ResolveAccessibleMembers(_currentClass, refNode.Name);
+            symbols = ResolveLexicalMembers(refNode.Name);
 
         if (symbols.Count == 0)
         {
@@ -5715,13 +5719,15 @@ public sealed class Binder
             .ToArray();
         foreach (var lookupName in GetCallLookupNames(target).Distinct(StringComparer.Ordinal))
         {
+            var requireStatic = IsEnclosingLexicalCall(target, lookupName);
             var resolution = ResolveAccessibleOverload(
                 lookupName,
                 argumentTypes,
                 argumentNames,
                 argumentModifiers,
                 typeArguments,
-                allowNullableStringCompatibility);
+                allowNullableStringCompatibility,
+                requireStatic);
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -5754,7 +5760,8 @@ public sealed class Binder
                 // Preserve actual prior rejection, not a guess based on the new
                 // winner: an OBJECT overload may already have accepted this call.
                 var previous = ResolveAccessibleOverload(
-                    lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments);
+                    lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments,
+                    requireStatic: requireStatic);
                 if (previous.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous)
                     resolution = resolution.WithReplacedNativeOverloadError();
             }
@@ -5849,7 +5856,8 @@ public sealed class Binder
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
-        bool allowNullableStringCompatibility = false)
+        bool allowNullableStringCompatibility = false,
+        bool requireStatic = false)
     {
         var candidates = _scope.GetOverloads(lookupName)
             .ToArray();
@@ -5857,7 +5865,7 @@ public sealed class Binder
             return OverloadResolutionResult.NotFound();
 
         var accessibleCandidates = candidates
-            .Where(IsFunctionAccessible)
+            .Where(candidate => IsFunctionAccessible(candidate) && (!requireStatic || _staticMethodSymbols.Contains(candidate)))
             .ToArray();
         if (accessibleCandidates.Length == 0)
             return OverloadResolutionResult.Inaccessible(candidates);
@@ -6254,10 +6262,7 @@ public sealed class Binder
         return function.Visibility switch
         {
             Visibility.Private =>
-                string.Equals(
-                    function.ContainingTypeName,
-                    _currentClassName,
-                    StringComparison.Ordinal),
+                IsWithinDeclaringType(function.ContainingTypeName),
             Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
                 && IsSameOrDerivedClass(_currentClass, function.ContainingTypeName),
@@ -6291,13 +6296,23 @@ public sealed class Binder
             current = ResolveBaseClass(current);
         }
 
-        var enclosing = start;
+        return Array.Empty<Symbol>();
+    }
+
+    private IReadOnlyList<Symbol> ResolveLexicalMembers(string memberName)
+    {
+        var declaredHere = ResolveAccessibleMembers(_currentClass, memberName);
+        if (declaredHere.Count > 0 || memberName.Contains('.', StringComparison.Ordinal))
+            return declaredHere;
+
+        var enclosing = _currentClass;
         while (enclosing != null && _containingClasses.TryGetValue(enclosing, out enclosing))
         {
             var declared = _classScopes[enclosing].LookupAllLocal(memberName);
             if (declared.Count > 0)
             {
-                return declared.All(symbol => symbol is VariableSymbol { IsStatic: true })
+                return declared.All(symbol => symbol is VariableSymbol { IsStatic: true } variable
+                        && IsMemberAccessible(variable))
                     ? declared
                     : Array.Empty<Symbol>();
             }
@@ -6313,10 +6328,7 @@ public sealed class Binder
         return member.Visibility switch
         {
             Visibility.Private =>
-                string.Equals(
-                    member.DeclaringTypeName,
-                    _currentClassName,
-                    StringComparison.Ordinal),
+                IsWithinDeclaringType(member.DeclaringTypeName),
             Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
                 && IsSameOrDerivedClass(_currentClass, member.DeclaringTypeName),
@@ -6324,6 +6336,19 @@ public sealed class Binder
             Visibility.Public => true,
             _ => false,
         };
+    }
+
+    private bool IsWithinDeclaringType(string declaringTypeName)
+    {
+        var current = _currentClass;
+        while (current != null)
+        {
+            if (string.Equals(_qualifiedClassNames[current], declaringTypeName, StringComparison.Ordinal))
+                return true;
+            if (!_containingClasses.TryGetValue(current, out current))
+                break;
+        }
+        return false;
     }
 
     private bool IsSameOrDerivedClass(
@@ -6348,6 +6373,21 @@ public sealed class Binder
             current = baseClass;
         }
 
+        return false;
+    }
+
+    private bool IsEnclosingLexicalCall(string target, string lookupName)
+    {
+        if (target.Contains('.', StringComparison.Ordinal) || _currentClass is null
+            || EnumerateHierarchyLookupNames(_currentClass, target).Contains(lookupName, StringComparer.Ordinal))
+            return false;
+
+        var enclosing = _currentClass;
+        while (_containingClasses.TryGetValue(enclosing, out enclosing))
+        {
+            if (EnumerateHierarchyLookupNames(enclosing, target).Contains(lookupName, StringComparer.Ordinal))
+                return true;
+        }
         return false;
     }
 
@@ -6403,6 +6443,12 @@ public sealed class Binder
                              target))
                 {
                     yield return lookupName;
+                }
+                var enclosing = _currentClass;
+                while (_containingClasses.TryGetValue(enclosing, out enclosing))
+                {
+                    foreach (var lookupName in EnumerateHierarchyLookupNames(enclosing, target))
+                        yield return lookupName;
                 }
             }
 
@@ -6669,7 +6715,7 @@ public sealed class Binder
             string? reason;
             if (arguments[index] is ReferenceNode { Name: "_" } discard)
             {
-                var declared = _scope.LookupAll("_").Count > 0 || ResolveAccessibleMembers(_currentClass, "_").Count > 0;
+                var declared = _scope.LookupAll("_").Count > 0 || ResolveLexicalMembers("_").Count > 0;
                 reason = modifier != "out" ? $"'{modifier} _' is not a discard; only 'out _' is"
                     : declared ? "'out _' would bind to the declared symbol '_', not discard" : null;
                 bound[index] = declared ? BindExpression(discard) : new BoundVariableExpression(discard.Span, CreateUnresolvedVariable(discard));

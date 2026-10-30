@@ -146,6 +146,142 @@ public class StaticModuleDeclarationTests
         Assert.Equal("kept", nested.GetMethod("Pick")!.Invoke(null, ["kept", 1]));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("static ")]
+    public void NestedTypes_CanReadWriteAndCallEnclosingPrivateStaticMembers(string staticModifier)
+    {
+        var source = $$"""
+            namespace Access;
+            public {{staticModifier}}class Outer
+            {
+                private const int Seed = 3;
+                private static int Value = 2;
+                private static int Stored { get; set; } = 1;
+                private static int Twice(int value) { return value * 2; }
+                public class Inner
+                {
+                    public int Run()
+                    {
+                        Value = Value + Seed;
+                        Stored = Stored + 1;
+                        return Twice(Value) + Stored;
+                    }
+                    public class Deep
+                    {
+                        public static int Read() { return Twice(Seed); }
+                    }
+                }
+            }
+            """;
+        var original = Compile(source);
+        var (_, _, generated) = RoundTrip(source);
+        var converted = Compile(generated);
+        foreach (var assembly in new[] { original, converted })
+        {
+            var inner = assembly.GetType("Access.Outer+Inner")!;
+            Assert.Equal(12, inner.GetMethod("Run")!.Invoke(Activator.CreateInstance(inner), null));
+            Assert.Equal(6, assembly.GetType("Access.Outer+Inner+Deep")!.GetMethod("Read")!.Invoke(null, null));
+        }
+    }
+
+    [Theory]
+    [InlineData("unrelated", "CS0122")]
+    [InlineData("outer-to-inner", "CS0122")]
+    [InlineData("sibling", "CS0122")]
+    [InlineData("wrong-receiver", "CS0117")]
+    public void PrivateAccess_DoesNotLeakToUnrelatedOrWrongReceiverTypes(string shape, string expectedCSharpCode)
+    {
+        var declarations = shape switch
+        {
+            "unrelated" => """
+                  §M{m1:Outer:pub}
+                    §FLD{i32:Value:priv:stat} = 3
+                  §M{m2:Caller:pub}
+                    §F{f1:Read:pub} () -> i32
+                      §R Outer.Value
+                """,
+            "outer-to-inner" => """
+                  §M{m1:Outer:pub}
+                    §CL{c1:Inner:pub}
+                      §FLD{i32:Value:priv:stat} = 3
+                    §F{f1:Read:pub} () -> i32
+                      §R Inner.Value
+                """,
+            "sibling" => """
+                  §M{m1:Outer:pub}
+                    §CL{c1:Sibling:pub}
+                      §MT{mt1:Secret:priv:stat} () -> i32
+                        §R 3
+                    §CL{c2:Caller:pub}
+                      §MT{mt2:Read:pub:stat} () -> i32
+                        §R §C{Sibling.Secret} §/C
+                """,
+            _ => """
+                  §M{m1:Outer:pub}
+                    §FLD{i32:Value:priv:stat} = 3
+                    §CL{c1:Inner:pub}
+                      §MT{mt1:Read:pub:stat} () -> i32
+                        §R Inner.Value
+                """
+        };
+        var source = "§M{root:Access}\n" + declarations;
+        var module = Parse(source);
+        var generated = new CSharpEmitter().Emit(module);
+        Assert.Contains(Compilation(generated).GetDiagnostics(), diagnostic => diagnostic.Id == expectedCSharpCode);
+        Assert.True(Program.Compile(source, "private-access.calr").HasErrors);
+    }
+
+    [Theory]
+    [InlineData("private int Secret() { return 1; }", "", "Secret()", "CS0120")]
+    [InlineData("private static int Secret(int value) { return value; }",
+        "private static int Secret(string value) { return 0; }", "Secret(1)", "CS1503")]
+    public void EnclosingLookup_RejectsMissingInstanceAndShadowedOverloads(
+        string outerMethod, string innerMethod, string call, string expectedCode)
+    {
+        var source = $$"""
+            public class Outer
+            {
+                {{outerMethod}}
+                public class Inner
+                {
+                    {{innerMethod}}
+                    public static int Run() { return {{call}}; }
+                }
+            }
+            """;
+        Assert.Contains(Compilation(source).GetDiagnostics(), diagnostic => diagnostic.Id == expectedCode);
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            ValidateRoundTripCSharp = false
+        }).Convert(source);
+        Assert.NotNull(conversion.CalorSource);
+        Assert.True(Program.Compile(conversion.CalorSource, "enclosing-call.calr").HasErrors);
+    }
+
+    [Fact]
+    public void NestedType_CanUsePrivateInstanceMembersThroughAnOuterReceiver()
+    {
+        const string source = """
+            public class Outer
+            {
+                private int Value = 7;
+                private int Read() { return Value; }
+                public class Inner
+                {
+                    public static int Run(Outer owner) { return owner.Read() + owner.Read(); }
+                }
+            }
+            """;
+        var original = Compile(source);
+        var (_, _, generated) = RoundTrip(source);
+        var converted = Compile(generated);
+        foreach (var assembly in new[] { original, converted })
+            Assert.Equal(14, assembly.GetType("Outer+Inner")!.GetMethod("Run")!
+                .Invoke(null, [Activator.CreateInstance(assembly.GetType("Outer")!)]));
+    }
+
     [Fact]
     public async Task ModuleFunctions_AsyncAndLocalFunctionsRoundTrip()
     {
