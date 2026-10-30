@@ -326,7 +326,7 @@ public static class Shapes
         int Scale(int v) => v * factor;
         return Scale(w);
     }
-      }§/CSHARP
+}§/CSHARP
 ```
 
 A member with any local function outside the bounded slice is kept whole as `§CSHARP`.
@@ -404,7 +404,7 @@ public static class Grid
         §RAW
         object[] items = { new List<int> { 1 }, 2 };
         §/RAW
-        §R (len items)
+        §R items.Length
 ```
 
 `Mixed` shows a limit: an element that Calor would write as a block, such as a collection
@@ -455,7 +455,7 @@ none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps th
             }
         }
     }
-      }§/CSHARP
+}§/CSHARP
 ```
 
 The C# compiler still builds the iterator, so laziness, `finally` on dispose, and the
