@@ -53,6 +53,13 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 §O{[u8}}            // returns byte[]
 ```
 
+### Single-precision literals
+
+The lowercase `f` suffix selects a 32-bit floating-point literal, including
+whole numbers and scientific notation: `1.5f`, `42f`, and `1e-3f`.
+Without the suffix, a fraction or exponent selects a 64-bit floating-point
+literal. Values outside the finite 32-bit range produce a diagnostic.
+
 ### Decimal Literals
 
 Calor supports two forms for decimal literals:

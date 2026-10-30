@@ -3018,6 +3018,8 @@ public sealed class Lexer
             {
                 Advance();
             }
+            if (Current == 'f')
+                return ScanSingleSuffix();
             var sciText = CurrentText().Replace("_", "");
             if (double.TryParse(sciText, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var sciValue))
@@ -3049,6 +3051,9 @@ public sealed class Lexer
                 }
             }
 
+            if (Current == 'f')
+                return ScanSingleSuffix();
+
             // Check for decimal suffix (M/m) on float
             if (Current is 'M' or 'm')
             {
@@ -3068,6 +3073,9 @@ public sealed class Lexer
                 return MakeToken(TokenKind.FloatLiteral, floatValue);
             }
         }
+
+        if (Current == 'f')
+            return ScanSingleSuffix();
 
         // Check for decimal suffix on integers (42M, 100m)
         if (Current is 'M' or 'm')
@@ -3131,6 +3139,20 @@ public sealed class Lexer
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");
+        return MakeToken(TokenKind.Error);
+    }
+
+    private Token ScanSingleSuffix()
+    {
+        Advance();
+        var text = CurrentText()[..^1].Replace("_", "", StringComparison.Ordinal);
+        if (float.TryParse(text, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var value) && float.IsFinite(value))
+        {
+            return MakeToken(TokenKind.FloatLiteral, new FloatLiteralInfo(value, IsSingle: true));
+        }
+
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "single-precision number");
         return MakeToken(TokenKind.Error);
     }
 
