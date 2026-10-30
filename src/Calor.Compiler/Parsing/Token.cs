@@ -229,19 +229,11 @@ public enum TokenKind
 
     // Extended Features Phase 1: Quick Wins
     Example,            // §EX - Inline examples/tests
-    Todo,               // §TODO - Structured todo items
-    Fixme,              // §FIXME - Bug markers
-    Hack,               // §HACK - Workaround markers
 
     // Extended Features Phase 2: Core Features
-    Uses,               // §USES - Dependency declarations
-    EndUses,            // §/USES
-    UsedBy,             // §USEDBY - Reverse dependency tracking
-    EndUsedBy,          // §/USEDBY
     Assume,             // §ASSUME - Assumptions
 
     // Extended Features Phase 3: Enhanced Contracts
-    Complexity,         // §COMPLEXITY - Performance contracts
     Since,              // §SINCE - API versioning
     Deprecated,         // §DEPRECATED - Deprecation markers
     Breaking,           // §BREAKING - Breaking change markers
@@ -253,24 +245,7 @@ public enum TokenKind
     EndEnumExtension,   // §/EEXT
 
     // Extended Features Phase 4: Future Extensions
-    Decision,           // §DECISION - Decision records
-    EndDecision,        // §/DECISION
-    Chosen,             // §CHOSEN - Chosen option in decision
-    Rejected,           // §REJECTED - Rejected option in decision
-    Reason,             // §REASON - Reason for decision
-    Context,            // §CONTEXT - Context markers (also used in decisions)
-    EndContext,         // §/CONTEXT
-    Visible,            // §VISIBLE - Visible files in context
-    EndVisible,         // §/VISIBLE
-    HiddenSection,      // §HIDDEN - Hidden files in context (renamed to avoid C# keyword)
-    EndHidden,          // §/HIDDEN
-    Focus,              // §FOCUS - Focus target
-    FileRef,            // §FILE - File reference (renamed to avoid conflict)
     PropertyTest,       // §PROPERTY - Property-based testing (renamed to avoid conflict with Property)
-    Lock,               // §LOCK - Multi-agent locking
-    AgentAuthor,        // §AUTHOR - Agent authorship tracking
-    TaskRef,            // §TASK - Task reference
-    DateMarker,         // §DATE - Date marker
 
     // Yield support
     Yield,              // §YIELD - yield return

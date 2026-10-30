@@ -27,7 +27,7 @@ public static class SectionMarkerSuggestions
         "ARR", "LIST", "DICT", "SET", "TUPLE", "SPAN", "RANGE", "NEW", "/NEW", "PUSH", "DEL", "IDX", "ITER",
 
         // Async/Threading
-        "/ASYNC", "AWAIT", "TASK", "LOCK", "/LOCK", "SEM", "ATOMIC",
+        "/ASYNC", "AWAIT", "LOCK", "/LOCK", "SEM", "ATOMIC",
 
         // Access modifiers
         "PUB", "PRIV", "INT", "PROT", "STAT", "RO", "CONST",
@@ -58,17 +58,16 @@ public static class SectionMarkerSuggestions
         "EN", "/EN", "EEXT", "/EEXT",
 
         // Quick wins
-        "EX", "TD", "FX", "HK",
+        "EX",
 
         // Core features
-        "US", "/US", "UB", "/UB", "AS",
+        "AS",
 
         // Enhanced contracts
-        "CX", "SN", "DP", "BR",
+        "SN", "DP", "BR",
 
-        // Future extensions
-        "DC", "/DC", "CHOSEN", "REJECTED", "REASON", "CT", "/CT", "VS", "/VS", "HD", "/HD",
-        "FC", "FILE", "PT", "LK", "AU", "TASK", "DATE",
+        // Property-based testing
+        "PT",
 
         // Print aliases
         "P", "Pf",

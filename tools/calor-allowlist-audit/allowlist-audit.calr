@@ -1,10 +1,7 @@
-// Audits .calor-csharp-allowlist against the rules the file states in prose.
-// The Calor-first guard reads the allowlist but never validates it, so a
-// deleted or renamed C# file leaves a permanent silent permission behind.
-// Run from the repository root.
-//
-// The module prose belongs in §CT, not a comment; §CT currently breaks the
-// dedent that closes a later §IF (#929), which this program is full of.
+/// Audits .calor-csharp-allowlist against the rules the file states in prose.
+/// The Calor-first guard reads the allowlist but never validates it, so a
+/// deleted or renamed C# file leaves a permanent silent permission behind.
+/// Run from the repository root.
 §M{m001:AllowlistAudit}
   §F{f001:StartsWith:priv} (str:text, str:prefix) -> bool
     §E{}

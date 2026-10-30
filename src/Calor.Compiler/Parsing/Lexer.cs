@@ -202,42 +202,17 @@ public sealed class Lexer
 
         // Extended Features: Quick Wins
         ["EX"] = TokenKind.Example,             // §EX - Inline examples/tests
-        ["TD"] = TokenKind.Todo,                // §TD = Todo
-        ["FX"] = TokenKind.Fixme,               // §FX = Fixme
-        ["HK"] = TokenKind.Hack,                // §HK = Hack
 
         // Extended Features: Core Features
-        ["US"] = TokenKind.Uses,                // §US = Uses
-        ["/US"] = TokenKind.EndUses,            // §/US
-        ["UB"] = TokenKind.UsedBy,              // §UB = UsedBy
-        ["/UB"] = TokenKind.EndUsedBy,          // §/UB
         ["AS"] = TokenKind.Assume,              // §AS = Assume
 
         // Extended Features: Enhanced Contracts
-        ["CX"] = TokenKind.Complexity,          // §CX = Complexity
         ["SN"] = TokenKind.Since,               // §SN = Since
         ["DP"] = TokenKind.Deprecated,          // §DP = Deprecated
         ["BR"] = TokenKind.Breaking,            // §BR = Breaking
 
         // Extended Features: Future Extensions
-        ["DC"] = TokenKind.Decision,            // §DC = Decision
-        ["/DC"] = TokenKind.EndDecision,        // §/DC
-        ["CHOSEN"] = TokenKind.Chosen,          // §CHOSEN - short enough
-        ["REJECTED"] = TokenKind.Rejected,      // Keep for clarity
-        ["REASON"] = TokenKind.Reason,          // Keep for clarity
-        ["CT"] = TokenKind.Context,             // §CT = Context
-        ["/CT"] = TokenKind.EndContext,         // §/CT
-        ["VS"] = TokenKind.Visible,             // §VS = Visible
-        ["/VS"] = TokenKind.EndVisible,         // §/VS
-        ["HD"] = TokenKind.HiddenSection,       // §HD = Hidden
-        ["/HD"] = TokenKind.EndHidden,          // §/HD
-        ["FC"] = TokenKind.Focus,               // §FC = Focus
-        ["FILE"] = TokenKind.FileRef,           // §FILE - keep for clarity
         ["PT"] = TokenKind.PropertyTest,        // §PT = Property test
-        ["LK"] = TokenKind.Lock,                // §LK = Lock
-        ["AU"] = TokenKind.AgentAuthor,         // §AU = Author
-        ["TASK"] = TokenKind.TaskRef,           // §TASK - keep for clarity
-        ["DATE"] = TokenKind.DateMarker,        // §DATE - keep for clarity
 
         // Yield support
         ["YIELD"] = TokenKind.Yield,            // §YIELD = yield return
@@ -2162,6 +2137,11 @@ public sealed class Lexer
             "AB" => "Use the 'abs' declaration modifier instead.",
             "SD" => "Use the 'seal' declaration modifier instead.",
             "XP" or "SB" => "Use a /// documentation comment instead.",
+            "TD" or "FX" or "HK" or "US" or "/US" or "UB" or "/UB" or "CX"
+                or "DC" or "/DC" or "CHOSEN" or "REJECTED" or "REASON"
+                or "CT" or "/CT" or "VS" or "/VS" or "HD" or "/HD"
+                or "FC" or "FILE" or "LK" or "AU" or "TASK" or "DATE"
+                => "Use a /// documentation comment before the declaration instead.",
             "BODY" or "END_BODY" => "Use indentation to delimit the function body instead.",
             "TP" => "Use an inline <T> type-parameter list instead.",
             "G" => "Use an inline generic type such as List<i32> instead.",

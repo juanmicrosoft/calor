@@ -85,6 +85,11 @@ ends the association. The formatter preserves documentation comments.
 `--require-docs` and `--strict-api` recognize these comments. Contracts and
 executable examples can also document a function's behavior.
 
+Issue, dependency, complexity, decision, agent-context, authorship, task, and
+lock metadata markers are no longer syntax. Move their descriptive text into
+documentation comments instead. Executable `§EX`, assumption `§AS`, invariant
+`§IV`, and property-test `§PT` declarations remain supported.
+
 ## Types
 
 | Type | Description | C# Equivalent |

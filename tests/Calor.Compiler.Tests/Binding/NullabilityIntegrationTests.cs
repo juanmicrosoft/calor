@@ -3327,7 +3327,7 @@ public class NullabilityIntegrationTests
         const string source = """
             §M{m1:NewWithArgs}
               §CL{c1:Foo:pub}
-                §CT{c1:pub} (int:x) -> void
+                §CTOR{ct1:pub} (i32:x)
                 §MT{m1:Make:pub:static} () -> Foo
                   §R §NEW{Foo} §A INT:1 §/C
             """;

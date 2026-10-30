@@ -696,11 +696,11 @@ public class EmptyClauseBodyTests
     }
 
     [Fact]
-    public void EmptyDecision_DoesNotSwallowSiblingFunction()
+    public void Documentation_DoesNotSwallowSiblingFunction()
     {
         var module = Parse("""
             §M{m:T}
-              §DC{d1} "empty"
+              /// First function.
               §F{f1:A:pub} () -> i32
                 §E{}
                 §R 1
@@ -709,27 +709,25 @@ public class EmptyClauseBodyTests
                 §R 2
             """);
 
-        Assert.Single(module.Decisions);
+        Assert.Empty(module.Decisions);
+        Assert.Equal("First function.", module.Functions[0].DocComment);
+        Assert.Null(module.Functions[1].DocComment);
         Assert.Equal(new[] { "A", "B" }, module.Functions.Select(f => f.Name));
     }
 
     [Fact]
-    public void EmptyContextSection_DoesNotAdoptSiblingSectionFiles()
+    public void Documentation_DoesNotCreateContextMetadata()
     {
         var module = Parse("""
+            /// Partial view; Secret.calr is not loaded.
             §M{m:T}
-              §CT{partial}
-                §VS
-                §HD
-                  §FILE{Secret.calr}
               §F{f1:A:pub} () -> i32
                 §E{}
                 §R 1
             """);
 
-        Assert.NotNull(module.Context);
-        Assert.Empty(module.Context!.VisibleFiles);
-        Assert.Equal("Secret.calr", Assert.Single(module.Context.HiddenFiles).FilePath);
+        Assert.Null(module.Context);
+        Assert.Equal("Partial view; Secret.calr is not loaded.", module.DocComment);
         Assert.Single(module.Functions);
     }
 

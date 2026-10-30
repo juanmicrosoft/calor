@@ -1272,18 +1272,6 @@ public sealed class Parser
                 moduleItems.Add(node);
             }
             // Extended Features: Module-level metadata
-            else if (Check(TokenKind.Todo))
-            {
-                issues.Add(ParseTodoIssue());
-            }
-            else if (Check(TokenKind.Fixme))
-            {
-                issues.Add(ParseFixmeIssue());
-            }
-            else if (Check(TokenKind.Hack))
-            {
-                issues.Add(ParseHackIssue());
-            }
             else if (Check(TokenKind.Assume))
             {
                 assumptions.Add(ParseAssume());
@@ -1297,14 +1285,6 @@ public sealed class Parser
                 var condition = ParseExpression();
                 var invSpan = invStartToken.Span.Union(condition.Span);
                 invariants.Add(new InvariantNode(invSpan, condition, message, invAttrs));
-            }
-            else if (Check(TokenKind.Decision))
-            {
-                decisions.Add(ParseDecision());
-            }
-            else if (Check(TokenKind.Context))
-            {
-                context = ParseContext();
             }
             else if (Check(TokenKind.CSharpInterop))
             {
@@ -1860,33 +1840,9 @@ public sealed class Parser
             {
                 examples.Add(ParseExample());
             }
-            else if (Check(TokenKind.Todo))
-            {
-                issues.Add(ParseTodoIssue());
-            }
-            else if (Check(TokenKind.Fixme))
-            {
-                issues.Add(ParseFixmeIssue());
-            }
-            else if (Check(TokenKind.Hack))
-            {
-                issues.Add(ParseHackIssue());
-            }
-            else if (Check(TokenKind.Uses))
-            {
-                uses = ParseUses();
-            }
-            else if (Check(TokenKind.UsedBy))
-            {
-                usedBy = ParseUsedBy();
-            }
             else if (Check(TokenKind.Assume))
             {
                 assumptions.Add(ParseAssume());
-            }
-            else if (Check(TokenKind.Complexity))
-            {
-                complexity = ParseComplexity();
             }
             else if (Check(TokenKind.Since))
             {
@@ -1903,18 +1859,6 @@ public sealed class Parser
             else if (Check(TokenKind.PropertyTest))
             {
                 properties.Add(ParsePropertyTest());
-            }
-            else if (Check(TokenKind.Lock))
-            {
-                lockNode = ParseLock();
-            }
-            else if (Check(TokenKind.AgentAuthor))
-            {
-                author = ParseAuthor();
-            }
-            else if (Check(TokenKind.TaskRef))
-            {
-                taskRef = ParseTaskRef();
             }
             else
             {
@@ -2057,33 +2001,9 @@ public sealed class Parser
             {
                 examples.Add(ParseExample());
             }
-            else if (Check(TokenKind.Todo))
-            {
-                issues.Add(ParseTodoIssue());
-            }
-            else if (Check(TokenKind.Fixme))
-            {
-                issues.Add(ParseFixmeIssue());
-            }
-            else if (Check(TokenKind.Hack))
-            {
-                issues.Add(ParseHackIssue());
-            }
-            else if (Check(TokenKind.Uses))
-            {
-                uses = ParseUses();
-            }
-            else if (Check(TokenKind.UsedBy))
-            {
-                usedBy = ParseUsedBy();
-            }
             else if (Check(TokenKind.Assume))
             {
                 assumptions.Add(ParseAssume());
-            }
-            else if (Check(TokenKind.Complexity))
-            {
-                complexity = ParseComplexity();
             }
             else if (Check(TokenKind.Since))
             {
@@ -2100,18 +2020,6 @@ public sealed class Parser
             else if (Check(TokenKind.PropertyTest))
             {
                 properties.Add(ParsePropertyTest());
-            }
-            else if (Check(TokenKind.Lock))
-            {
-                lockNode = ParseLock();
-            }
-            else if (Check(TokenKind.AgentAuthor))
-            {
-                author = ParseAuthor();
-            }
-            else if (Check(TokenKind.TaskRef))
-            {
-                taskRef = ParseTaskRef();
             }
             else
             {
@@ -13308,115 +13216,6 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a TODO issue marker.
-    /// §TODO[t001:perf:high] "Optimize for large n"
-    /// </summary>
-    private IssueNode ParseTodoIssue()
-    {
-        return ParseIssue(IssueKind.Todo, TokenKind.Todo);
-    }
-
-    /// <summary>
-    /// Parses a FIXME issue marker.
-    /// §FIXME[x001:bug:critical] "Integer overflow"
-    /// </summary>
-    private IssueNode ParseFixmeIssue()
-    {
-        return ParseIssue(IssueKind.Fixme, TokenKind.Fixme);
-    }
-
-    /// <summary>
-    /// Parses a HACK issue marker.
-    /// §HACK[h001] "Workaround for API bug"
-    /// </summary>
-    private IssueNode ParseHackIssue()
-    {
-        return ParseIssue(IssueKind.Hack, TokenKind.Hack);
-    }
-
-    private IssueNode ParseIssue(IssueKind kind, TokenKind tokenKind)
-    {
-        var startToken = Expect(tokenKind);
-        var attrs = ParseAttributes();
-        var (id, category, priority) = AttributeHelper.InterpretIssueAttributes(attrs);
-
-        // Expect a string description
-        string description = "";
-        if (Check(TokenKind.StrLiteral))
-        {
-            var strToken = Advance();
-            description = (string)strToken.Value!;
-        }
-        else
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, kind.ToString().ToUpperInvariant(), "description");
-        }
-
-        return new IssueNode(startToken.Span, kind, id, category, priority, description, attrs);
-    }
-
-    /// <summary>
-    /// Parses a USES dependency declaration.
-    /// §USES[ValidateOrder, CalculateTotal, SaveOrder]
-    /// </summary>
-    private UsesNode ParseUses()
-    {
-        var startToken = Expect(TokenKind.Uses);
-        var attrs = ParseAttributes();
-        var targets = AttributeHelper.InterpretDependencyListAttributes(attrs);
-
-        var dependencies = new List<DependencyNode>();
-        foreach (var target in targets)
-        {
-            var isOptional = target.EndsWith('?');
-            var actualTarget = isOptional ? target[..^1] : target;
-
-            // Check for version constraint: target@1.0.0
-            string? version = null;
-            var atIndex = actualTarget.IndexOf('@');
-            if (atIndex > 0)
-            {
-                version = actualTarget[(atIndex + 1)..];
-                actualTarget = actualTarget[..atIndex];
-            }
-
-            dependencies.Add(new DependencyNode(startToken.Span, actualTarget, version, isOptional, new AttributeCollection()));
-        }
-
-        return new UsesNode(startToken.Span, dependencies, attrs);
-    }
-
-    /// <summary>
-    /// Parses a USEDBY reverse dependency declaration.
-    /// §USEDBY[OrderController.Submit, BatchProcessor.Run]
-    /// </summary>
-    private UsedByNode ParseUsedBy()
-    {
-        var startToken = Expect(TokenKind.UsedBy);
-        var attrs = ParseAttributes();
-        var targets = AttributeHelper.InterpretDependencyListAttributes(attrs);
-
-        var dependents = new List<DependencyNode>();
-        bool hasUnknownCallers = false;
-
-        foreach (var target in targets)
-        {
-            if (target == "*" || target.Equals("external", StringComparison.OrdinalIgnoreCase))
-            {
-                hasUnknownCallers = true;
-                continue;
-            }
-
-            var isOptional = target.EndsWith('?');
-            var actualTarget = isOptional ? target[..^1] : target;
-
-            dependents.Add(new DependencyNode(startToken.Span, actualTarget, null, isOptional, new AttributeCollection()));
-        }
-
-        return new UsedByNode(startToken.Span, dependents, hasUnknownCallers, attrs);
-    }
-
-    /// <summary>
     /// Parses an ASSUME assumption declaration.
     /// §ASSUME[env] "Database connection pool initialized"
     /// </summary>
@@ -13439,20 +13238,6 @@ public sealed class Parser
         }
 
         return new AssumeNode(startToken.Span, category, description, attrs);
-    }
-
-    /// <summary>
-    /// Parses a COMPLEXITY performance contract.
-    /// §COMPLEXITY[time:O(n)][space:O(1)]
-    /// §COMPLEXITY[worst:time:O(n)][worst:space:O(n)]
-    /// </summary>
-    private ComplexityNode ParseComplexity()
-    {
-        var startToken = Expect(TokenKind.Complexity);
-        var attrs = ParseAttributes();
-        var (time, space, isWorstCase, custom) = AttributeHelper.InterpretComplexityAttributes(attrs);
-
-        return new ComplexityNode(startToken.Span, time, space, isWorstCase, custom, attrs);
     }
 
     /// <summary>
@@ -13525,283 +13310,6 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a DECISION record.
-    /// §DECISION[d001] "Algorithm selection"
-    ///   §CHOSEN "QuickSort"
-    ///   §REASON "Best average-case performance"
-    ///   §REJECTED "MergeSort"
-    ///     §REASON "Requires O(n) extra space"
-    ///   §CONTEXT "Typical input: 1000-10000 items"
-    ///   §DATE 2024-01-15
-    ///   §AUTHOR "perf-team"
-    /// §/DECISION[d001]
-    /// </summary>
-    private DecisionNode ParseDecision()
-    {
-        var startToken = Expect(TokenKind.Decision);
-        var attrs = ParseAttributes();
-        var id = AttributeHelper.InterpretDecisionAttributes(attrs);
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DECISION", "id");
-            id = "unknown";
-        }
-
-        // Parse title (string literal)
-        string title = "";
-        if (Check(TokenKind.StrLiteral))
-        {
-            var strToken = Advance();
-            title = (string)strToken.Value!;
-        }
-
-        string chosenOption = "";
-        var chosenReasons = new List<string>();
-        var rejectedOptions = new List<RejectedOptionNode>();
-        string? context = null;
-        DateOnly? date = null;
-        string? author = null;
-
-        // Parse decision content. #1485: only the lines indented under the
-        // §DC (or on its header line) belong to it.
-        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndDecision, id);
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDecision) && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
-        {
-            if (Check(TokenKind.Chosen))
-            {
-                Advance();
-                if (Check(TokenKind.StrLiteral))
-                {
-                    var strToken = Advance();
-                    chosenOption = (string)strToken.Value!;
-                }
-            }
-            else if (Check(TokenKind.Reason) && string.IsNullOrEmpty(chosenOption) == false && rejectedOptions.Count == 0)
-            {
-                // This REASON belongs to CHOSEN
-                Advance();
-                if (Check(TokenKind.StrLiteral))
-                {
-                    var strToken = Advance();
-                    chosenReasons.Add((string)strToken.Value!);
-                }
-            }
-            else if (Check(TokenKind.Rejected))
-            {
-                rejectedOptions.Add(ParseRejectedOption());
-            }
-            else if (Check(TokenKind.Context))
-            {
-                Advance();
-                if (Check(TokenKind.StrLiteral))
-                {
-                    var strToken = Advance();
-                    context = (string)strToken.Value!;
-                }
-            }
-            else if (Check(TokenKind.DateMarker))
-            {
-                Advance();
-                var dateAttrs = ParseAttributes();
-                date = AttributeHelper.InterpretDateAttributes(dateAttrs);
-                // Also check for bare date literal
-                if (date == null && Check(TokenKind.Identifier))
-                {
-                    var dateStr = Advance().Text;
-                    if (DateOnly.TryParse(dateStr, out var parsedDate))
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-            else if (Check(TokenKind.AgentAuthor))
-            {
-                Advance();
-                if (Check(TokenKind.StrLiteral))
-                {
-                    var strToken = Advance();
-                    author = (string)strToken.Value!;
-                }
-            }
-            else if (Check(TokenKind.Reason))
-            {
-                // Orphan REASON - skip
-                Advance();
-                if (Check(TokenKind.StrLiteral)) Advance();
-            }
-            else
-            {
-                // Unknown token - skip
-                Advance();
-            }
-        }
-
-        var endToken = ExpectOwnedBlockEnd(TokenKind.EndDecision, bodyOwner);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DECISION", id, "END_DECISION", endId);
-        }
-
-        var span = startToken.Span.Union(endToken.Span);
-        return new DecisionNode(span, id, title, chosenOption, chosenReasons, rejectedOptions, context, date, author, attrs);
-    }
-
-    private RejectedOptionNode ParseRejectedOption()
-    {
-        var startToken = Expect(TokenKind.Rejected);
-        string name = "";
-        if (Check(TokenKind.StrLiteral))
-        {
-            var strToken = Advance();
-            name = (string)strToken.Value!;
-        }
-
-        var reasons = new List<string>();
-        while (Check(TokenKind.Reason))
-        {
-            Advance();
-            if (Check(TokenKind.StrLiteral))
-            {
-                var strToken = Advance();
-                reasons.Add((string)strToken.Value!);
-            }
-        }
-
-        // §REJECTED has no explicit closer -- its indented §REASON list is
-        // implicitly closed by the next sibling or the parent's closer.
-        // In the indent-aware lexer the §REASON body emits a Dedent before
-        // the next §DC content keyword (or §/DC). Swallow it here so the
-        // §DC content loop doesn't mistake it for end-of-§DC.
-        if (Check(TokenKind.Dedent) &&
-            (Peek(1).Kind == TokenKind.Chosen ||
-             Peek(1).Kind == TokenKind.Reason ||
-             Peek(1).Kind == TokenKind.Rejected ||
-             Peek(1).Kind == TokenKind.Context ||
-             Peek(1).Kind == TokenKind.DateMarker ||
-             Peek(1).Kind == TokenKind.AgentAuthor))
-        {
-            Advance();
-        }
-
-        return new RejectedOptionNode(startToken.Span, name, reasons, new AttributeCollection());
-    }
-
-    /// <summary>
-    /// Parses a CONTEXT partial view marker.
-    /// §CONTEXT[partial]
-    ///   §VISIBLE
-    ///     §FILE[OrderService.calr]
-    ///   §/VISIBLE
-    ///   §HIDDEN
-    ///     §FILE[PaymentService.calr] "Not loaded - external"
-    ///   §/HIDDEN
-    ///   §FOCUS[OrderService.ProcessOrder]
-    /// §/CONTEXT
-    /// </summary>
-    private ContextNode ParseContext()
-    {
-        var startToken = Expect(TokenKind.Context);
-        var attrs = ParseAttributes();
-        var isPartial = AttributeHelper.InterpretContextAttributes(attrs);
-
-        var visibleFiles = new List<FileRefNode>();
-        var hiddenFiles = new List<FileRefNode>();
-        string? focusTarget = null;
-
-        // #1485: §CT, §VS and §HD own only the lines indented under them.
-        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndContext, null);
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndContext) && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
-        {
-            if (Check(TokenKind.Visible))
-            {
-                var sectionToken = Advance();
-                var sectionOwner = BeginBlockBody(sectionToken, TokenKind.EndVisible, null);
-                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndVisible) && IsInContextSection(sectionOwner))
-                {
-                    if (Check(TokenKind.FileRef))
-                    {
-                        visibleFiles.Add(ParseFileRef());
-                    }
-                    else
-                    {
-                        Advance();
-                    }
-                }
-                if (Check(TokenKind.EndVisible) || IsOwnedDedent(sectionOwner)
-                    || sectionOwner.Flat && IsBlockEnd(TokenKind.EndVisible))
-                    ExpectBlockEnd(TokenKind.EndVisible);
-            }
-            else if (Check(TokenKind.HiddenSection))
-            {
-                var sectionToken = Advance();
-                var sectionOwner = BeginBlockBody(sectionToken, TokenKind.EndHidden, null);
-                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndHidden) && IsInContextSection(sectionOwner))
-                {
-                    if (Check(TokenKind.FileRef))
-                    {
-                        hiddenFiles.Add(ParseFileRef());
-                    }
-                    else
-                    {
-                        Advance();
-                    }
-                }
-                if (Check(TokenKind.EndHidden) || IsOwnedDedent(sectionOwner)
-                    || sectionOwner.Flat && IsBlockEnd(TokenKind.EndHidden))
-                    ExpectBlockEnd(TokenKind.EndHidden);
-            }
-            else if (Check(TokenKind.Focus))
-            {
-                Advance();
-                var focusAttrs = ParseAttributes();
-                focusTarget = AttributeHelper.InterpretFocusAttributes(focusAttrs);
-            }
-            else if (Check(TokenKind.FileRef))
-            {
-                // Standalone FILE goes to visible by default
-                visibleFiles.Add(ParseFileRef());
-            }
-            else
-            {
-                Advance();
-            }
-        }
-
-        var endToken = ExpectOwnedBlockEnd(TokenKind.EndContext, bodyOwner);
-        var span = startToken.Span.Union(endToken.Span);
-        return new ContextNode(span, isPartial, visibleFiles, hiddenFiles, focusTarget, attrs);
-    }
-
-    /// <summary>
-    /// #1485 -- a §VS/§HD section owns the lines indented under it; in the
-    /// legacy flat layout (section at the module's column) it keeps taking
-    /// §FILE lines at its own column.
-    /// </summary>
-    private bool IsInContextSection(BlockOwner sectionOwner)
-        => IsInBlockBody(sectionOwner)
-           || sectionOwner.IndentColumn <= _moduleIndentColumn && Check(TokenKind.FileRef);
-
-    private FileRefNode ParseFileRef()
-    {
-        var startToken = Expect(TokenKind.FileRef);
-        var attrs = ParseAttributes();
-        var filePath = AttributeHelper.InterpretFileRefAttributes(attrs);
-
-        string? description = null;
-        if (Check(TokenKind.StrLiteral))
-        {
-            var strToken = Advance();
-            description = (string)strToken.Value!;
-        }
-
-        return new FileRefNode(startToken.Span, filePath, description, attrs);
-    }
-
-    /// <summary>
     /// Parses a PROPERTY (property-based testing) declaration.
     /// §PROPERTY ∀arr: (== (Reverse (Reverse arr)) arr)
     /// </summary>
@@ -13862,90 +13370,16 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a LOCK multi-agent locking declaration.
-    /// §LOCK[agent:agent-123][expires:2024-01-15T11:00:00Z]
-    /// </summary>
-    private LockNode ParseLock()
-    {
-        var startToken = Expect(TokenKind.Lock);
-        var attrs = ParseAttributes();
-        var (agentId, acquired, expires) = AttributeHelper.InterpretLockAttributes(attrs);
-
-        if (string.IsNullOrEmpty(agentId))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LOCK", "agent");
-            agentId = "unknown";
-        }
-
-        return new LockNode(startToken.Span, agentId, acquired, expires, attrs);
-    }
-
-    /// <summary>
-    /// Parses an AUTHOR agent authorship tracking declaration.
-    /// §AUTHOR[agent:agent-456][date:2024-01-10][task:PROJ-789]
-    /// </summary>
-    private AuthorNode ParseAuthor()
-    {
-        var startToken = Expect(TokenKind.AgentAuthor);
-        var attrs = ParseAttributes();
-        var (agentId, date, taskId) = AttributeHelper.InterpretAuthorAttributes(attrs);
-
-        if (string.IsNullOrEmpty(agentId))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AUTHOR", "agent");
-            agentId = "unknown";
-        }
-
-        return new AuthorNode(startToken.Span, agentId, date, taskId, attrs);
-    }
-
-    /// <summary>
-    /// Parses a TASK reference.
-    /// §TASK[PROJ-789] "Implement validation"
-    /// </summary>
-    private TaskRefNode ParseTaskRef()
-    {
-        var startToken = Expect(TokenKind.TaskRef);
-        var attrs = ParseAttributes();
-        var taskId = AttributeHelper.InterpretTaskRefAttributes(attrs);
-
-        if (string.IsNullOrEmpty(taskId))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "TASK", "id");
-            taskId = "unknown";
-        }
-
-        // Expect a string description
-        string description = "";
-        if (Check(TokenKind.StrLiteral))
-        {
-            var strToken = Advance();
-            description = (string)strToken.Value!;
-        }
-
-        return new TaskRefNode(startToken.Span, taskId, description, attrs);
-    }
-
-    /// <summary>
     /// Checks if the current token starts an extended metadata declaration.
     /// </summary>
     private bool IsExtendedMetadataStart()
     {
         return Current.Kind is TokenKind.Example
-            or TokenKind.Todo
-            or TokenKind.Fixme
-            or TokenKind.Hack
-            or TokenKind.Uses
-            or TokenKind.UsedBy
             or TokenKind.Assume
-            or TokenKind.Complexity
             or TokenKind.Since
             or TokenKind.Deprecated
             or TokenKind.Breaking
-            or TokenKind.PropertyTest
-            or TokenKind.Lock
-            or TokenKind.AgentAuthor
-            or TokenKind.TaskRef;
+            or TokenKind.PropertyTest;
     }
 
     /// <summary>
@@ -13953,13 +13387,8 @@ public sealed class Parser
     /// </summary>
     private bool IsModuleLevelExtendedMetadataStart()
     {
-        return Current.Kind is TokenKind.Todo
-            or TokenKind.Fixme
-            or TokenKind.Hack
-            or TokenKind.Assume
-            or TokenKind.Invariant
-            or TokenKind.Decision
-            or TokenKind.Context;
+        return Current.Kind is TokenKind.Assume
+            or TokenKind.Invariant;
     }
 
     #endregion
