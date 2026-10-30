@@ -46,6 +46,8 @@ public class BenchmarkRunnerTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(manifest.Benchmarks.Count, result.BenchmarkCount);
+        Assert.Equal(manifest.Benchmarks.Select(entry => entry.Id), result.CaseResults.Select(entry => entry.CaseId));
+        Assert.All(result.CaseResults, entry => Assert.True(entry.CalorSuccess && entry.CSharpSuccess));
         Assert.NotNull(result.Summary);
     }
 
@@ -395,8 +397,8 @@ public class BenchmarkRunnerTests
                     Id = "001",
                     Name = "Test1",
                     Category = "TokenEconomics",
-                    CalorFile = "test1.calr",
-                    CSharpFile = "test1.cs",
+                    CalorFile = "TokenEconomics/HelloWorld.calr",
+                    CSharpFile = "TokenEconomics/HelloWorld.cs",
                     Level = 1,
                     Features = new List<string> { "function", "module" }
                 },
@@ -405,8 +407,8 @@ public class BenchmarkRunnerTests
                     Id = "002",
                     Name = "Test2",
                     Category = "Comprehension",
-                    CalorFile = "test2.calr",
-                    CSharpFile = "test2.cs",
+                    CalorFile = "TokenEconomics/ContractedDivide.calr",
+                    CSharpFile = "TokenEconomics/ContractedDivide.cs",
                     Level = 2,
                     Features = new List<string> { "function", "contracts" }
                 }

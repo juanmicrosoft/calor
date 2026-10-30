@@ -78,6 +78,7 @@ public class TestDataAdapter
     /// <summary>
     /// Creates a current-compiler context without changing the manifest's logical entry.
     /// Metadata retains the original and resolved Calor paths and the unchanged paired C# path.
+    /// Both source files are required; missing inputs fail the load instead of becoming empty code.
     /// </summary>
     public async Task<EvaluationContext> CreateContextAsync(BenchmarkEntry entry)
     {
@@ -94,8 +95,8 @@ public class TestDataAdapter
         if (!File.Exists(csharpPath))
             csharpPath = Path.Combine(_testDataPath, entry.CSharpFile);
 
-        var calorSource = File.Exists(resolvedCalorPath) ? await File.ReadAllTextAsync(resolvedCalorPath) : "";
-        var csharpSource = File.Exists(csharpPath) ? await File.ReadAllTextAsync(csharpPath) : "";
+        var calorSource = await File.ReadAllTextAsync(resolvedCalorPath);
+        var csharpSource = await File.ReadAllTextAsync(csharpPath);
 
         return new EvaluationContext
         {

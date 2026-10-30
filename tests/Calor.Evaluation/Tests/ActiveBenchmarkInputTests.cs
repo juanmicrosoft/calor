@@ -67,6 +67,70 @@ public class ActiveBenchmarkInputTests
             adapter.LoadAllBenchmarksAsync(new BenchmarkManifest { Benchmarks = [entry] }));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MissingUnregisteredInput_FailsTheContextAndWholeManifestLoad(bool missingCalor)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-missing-input-" + Guid.NewGuid().ToString("N"));
+        var testData = Path.Combine(root, "tests/TestData");
+        var benchmarks = Path.Combine(testData, "Benchmarks");
+        Directory.CreateDirectory(benchmarks);
+        try
+        {
+            if (!missingCalor)
+                await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.calr"), "§M{m:Required}\n");
+            else
+                await File.WriteAllTextAsync(Path.Combine(benchmarks, "Required.cs"), "public class Required {}");
+            var entry = new BenchmarkEntry
+            {
+                Id = "missing-input-control", CalorFile = "Required.calr", CSharpFile = "Required.cs"
+            };
+            var adapter = new TestDataAdapter(testData, benchmarks, root);
+            var expected = Path.Combine(testData, missingCalor ? "Required.calr" : "Required.cs");
+            var single = await Assert.ThrowsAsync<FileNotFoundException>(() => adapter.CreateContextAsync(entry));
+            Assert.Equal(expected, single.FileName);
+            var manifest = await Assert.ThrowsAsync<FileNotFoundException>(() =>
+                adapter.LoadAllBenchmarksAsync(new BenchmarkManifest { Benchmarks = [entry] }));
+            Assert.Equal(expected, manifest.FileName);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OrdinaryInputs_StillResolveFromTheTestDataFallbackWithAccuratePaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-fallback-input-" + Guid.NewGuid().ToString("N"));
+        var testData = Path.Combine(root, "tests/TestData");
+        var benchmarks = Path.Combine(testData, "Benchmarks");
+        Directory.CreateDirectory(benchmarks);
+        const string calor = "§M{m:Fallback}\n";
+        const string csharp = "public class Fallback {}";
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(testData, "Fallback.calr"), calor);
+            await File.WriteAllTextAsync(Path.Combine(testData, "Fallback.cs"), csharp);
+            var adapter = new TestDataAdapter(testData, benchmarks, root);
+            var context = await adapter.CreateContextAsync(new BenchmarkEntry
+            {
+                Id = "fallback-control", CalorFile = "Fallback.calr", CSharpFile = "Fallback.cs"
+            });
+            Assert.Equal(calor, context.CalorSource);
+            Assert.Equal(csharp, context.CSharpSource);
+            Assert.Equal(Path.Combine(testData, "Fallback.calr"), context.Metadata["originalCalorPath"]);
+            Assert.Equal(Path.Combine(testData, "Fallback.calr"), context.Metadata["resolvedCalorPath"]);
+            Assert.Equal(Path.Combine(testData, "Fallback.cs"), context.Metadata["csharpPath"]);
+            Assert.Equal(false, context.Metadata["usesActiveSyntax"]);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ExternalFiles_AreLiteralEvenWhenTheirNameMatchesARegisteredBenchmark()
     {
@@ -194,6 +258,46 @@ public class ActiveBenchmarkInputTests
             var exception = await Assert.ThrowsAsync<FileNotFoundException>(() =>
                 runner.RunAllAsync(new BenchmarkManifest { BugScenarios = [bug] }));
             Assert.Equal(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, BenchmarkPrefix, registered), exception.FileName);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task CurrentBugCaller_RejectsMissingOrdinaryInputBeforeCalculating(bool buggyMissing, bool calorMissing)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-missing-bug-input-" + Guid.NewGuid().ToString("N"));
+        var testData = Path.Combine(root, "tests/TestData");
+        var benchmarks = Path.Combine(testData, "Benchmarks");
+        Directory.CreateDirectory(benchmarks);
+        var missing = (buggyMissing ? "Buggy" : "Fixed") + (calorMissing ? ".calr" : ".cs");
+        try
+        {
+            foreach (var role in new[] { "Buggy", "Fixed" })
+                foreach (var extension in new[] { ".calr", ".cs" })
+                {
+                    if (role + extension == missing)
+                        continue;
+                    await File.WriteAllTextAsync(Path.Combine(benchmarks, role + extension),
+                        extension == ".calr" ? "§M{m:Input}\n" : "public class Input {}");
+                }
+            var bug = new BugEntry
+            {
+                Id = "missing-bug-input-control", Description = "Missing files are not bug detections.",
+                Category = "input-control", CalorBuggy = "Buggy.calr", CalorFixed = "Fixed.calr",
+                CSharpBuggy = "Buggy.cs", CSharpFixed = "Fixed.cs"
+            };
+            var adapter = new TestDataAdapter(testData, benchmarks, root);
+            var runner = new BenchmarkRunner(adapter, new BenchmarkRunnerOptions { Categories = ["metadata-only-control"] });
+            var exception = await Assert.ThrowsAsync<FileNotFoundException>(() =>
+                runner.RunAllAsync(new BenchmarkManifest { BugScenarios = [bug] }));
+            Assert.Equal(Path.Combine(testData, missing), exception.FileName);
         }
         finally
         {
