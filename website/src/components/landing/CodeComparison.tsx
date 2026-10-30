@@ -4,13 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { trackCodeComparisonTab } from '@/lib/analytics';
+import landingSnippets from './snippets.json';
 
-const calorCode = `§M{m001:Math}
-  §F{f001:Square:pub} (i32:x) -> i32
-    §E{}
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)`;
+const calorCode = landingSnippets.comparison.code;
 
 const csharpCode = `public static int Square(int x)
 {

@@ -1,10 +1,8 @@
 import Link from 'next/link';
+import landingSnippets from './snippets.json';
 
 export function CatchBugs() {
-  const calorCode = `§F{f001:ProcessOrder:pub} (Order:order) -> void
-  §E{db:rw}
-  §C{SaveOrder} §A order §/C
-  §C{NotifyCustomer} §A order §/C`;
+  const calorCode = landingSnippets.missingEffect.code;
 
   const errorOutput = `Calor0410: ProcessOrder uses a network effect
 that its declaration does not permit.

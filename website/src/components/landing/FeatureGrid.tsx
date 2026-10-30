@@ -4,6 +4,7 @@ import { FileCode, Shield, Fingerprint, Layers, ChevronRight } from 'lucide-reac
 import Link from 'next/link';
 import { trackFeatureLearnMore } from '@/lib/analytics';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
+import landingSnippets from './snippets.json';
 
 const features = [
   {
@@ -11,7 +12,7 @@ const features = [
     description:
       'Contracts declare required inputs and results. Runtime checks depend on contract mode and supported body shapes. Optional --verify asks Z3 to prove supported obligations; inconclusive results are not proofs.',
     icon: Shield,
-    code: '§Q (>= x 0)\n§S (>= result 0)',
+    code: landingSnippets.contracts.code,
     href: '/docs/guides/verification-guarantees/',
   },
   {
@@ -19,7 +20,7 @@ const features = [
     description:
       'The compiler checks known and manifested calls against declared effects; interop and unresolved boundaries stay visible as assumptions or diagnostics.',
     icon: FileCode,
-    code: '§E{db:rw,net:rw}',
+    code: landingSnippets.effects.code,
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
@@ -27,7 +28,7 @@ const features = [
     description:
       'Optional stable IDs give tools a persistent declaration target across supported renames. They do not replace reference resolution, review, or tests.',
     icon: Fingerprint,
-    code: '§F{f001:Process:pub}',
+    code: landingSnippets.stableId.code,
     href: '/docs/philosophy/stable-identifiers/',
   },
   {

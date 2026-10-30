@@ -112,6 +112,45 @@ those shapes is only labelled by review. Output of commands other than
 compilation (`calor query`, `calor analyze`, MCP responses) is labelled
 `illustrative`, not checked.
 
+### Landing-page snippets
+
+The checker also loads `website/src/components/landing/snippets.json` and all
+five registered consumers: `CodeComparison`, `FirstProgram`, `CatchBugs`,
+`FeatureGrid`, and `CompetitivePositioning`. Missing files fail with `Calor1326`.
+Each actual Calor display uses `landingSnippets.<id>.code` from that JSON file.
+Every entry must have exactly one reference in its registered component;
+unknown references, unused entries, and inline Calor source fail with
+`Calor1334`. The guard is a conservative source convention, not a TypeScript
+interpreter: only the five explicitly registered prose literals mentioning
+tags are exempt. Code-display shapes and literal CLI/output exceptions are
+registered too, so expression-only fragments cannot bypass the check by omitting
+tags. New display shapes and prose mentions must be reviewed and registered.
+CLI commands and the comparison's C# code are not Calor programs.
+
+Each entry's `code` is the displayed source, without a second checked copy.
+`before`, `after`, and `indent` provide explicit compilation context for a
+fragment; `inputs` supplies any additional complete Calor modules. The checker
+compiles this context with the same pipeline as MDX examples, including generated
+C# validation. `expectedDiagnostics` must match every error and warning by code,
+severity, message, and multiplicity; positives use an empty array.
+
+There are two complete programs and four fragments. The contract fragment gains
+an `i32` parameter, a pure function, and an identity return; the effect fragment
+gains a function; the stable-ID declaration gains a void, pure body. CatchBugs
+gains an `Order` class and a separate module containing declared-effect stubs for
+`SaveOrder` and `NotifyCustomer`. Those stubs accept `object`, allowing the local
+`Order` type without inventing a database or network implementation. The
+cross-module declaration check reports exactly the missing `net:rw` effect
+(`Calor0410`). This validates the stated assumption, not the omitted real-world
+implementations. The abridged diagnostic displayed on the page remains explicitly
+illustrative, not captured output.
+
+After a website build, `cd website && npm run test:landing` also checks that
+the exported landing page displays each mounted component's shared strings
+exactly once and contains no extra Calor code block. Currently three snippets
+are mounted; `FeatureGrid` and `CompetitivePositioning` are not mounted by
+`website/src/app/page.tsx`, but their sources remain registered and checked.
+
 ## Deep-checked exemplar
 
 The agent syntax exemplar

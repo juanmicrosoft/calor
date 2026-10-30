@@ -1,5 +1,6 @@
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -440,6 +441,183 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     // --- Repository wiring ---
+
+    private static (DocFile Source, List<DocFile> Components) LandingInputs()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        return (new DocFile(WebsiteExampleChecker.LandingSnippetsPath,
+            File.ReadAllText(Path.Combine(root, WebsiteExampleChecker.LandingSnippetsPath))),
+            WebsiteExampleChecker.LandingComponentNames.Select(name =>
+                new DocFile(WebsiteExampleChecker.LandingComponentPath(name),
+                    File.ReadAllText(Path.Combine(root, WebsiteExampleChecker.LandingComponentPath(name))))).ToList());
+    }
+
+    private static DocFile MutateLanding(DocFile source, Action<JsonObject> mutate)
+    {
+        var json = JsonNode.Parse(source.Content)!.AsObject();
+        mutate(json);
+        return source with { Content = json.ToJsonString() };
+    }
+
+    [Fact]
+    public void Landing_SharedDisplayedSourceCompiles_WithExactNegativeDiagnostics()
+    {
+        var (source, components) = LandingInputs();
+        var coverage = new WebsiteExampleChecker.Coverage();
+        var findings = WebsiteExampleChecker.CheckLanding(source, components, coverage);
+        Assert.True(findings.Count == 0, string.Join(Environment.NewLine, findings));
+        Assert.Equal(5, coverage.LandingComponents);
+        Assert.Equal(6, coverage.LandingPrograms);
+        Assert.Equal(4, coverage.LandingFragments);
+        Assert.Equal(1, coverage.LandingNegativePrograms);
+    }
+
+    [Theory]
+    [InlineData("comparison", "§R (* x x)", "§R (* missing x)")]
+    [InlineData("firstProgram", "§P \"Hello from Calor!\"", "§R (+ 1 )")]
+    [InlineData("contracts", "(>= x 0)", "(>= missing 0)")]
+    [InlineData("effects", "§E{db:rw,net:rw}", "§E{db:rw,net:rw}\n§C{MissingType.Save} §/C")]
+    [InlineData("stableId", "§F{f001:Process:pub}", "§F{f001:Process:pub} (MissingType:x)")]
+    [InlineData("missingEffect", "§E{db:rw}", "§E{db:rw,net:rw}")]
+    [InlineData("missingEffect", "NotifyCustomer", "MissingCustomer")]
+    public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
+    {
+        var (source, components) = LandingInputs();
+        source = MutateLanding(source, json =>
+        {
+            var code = json[id]!["code"]!.GetValue<string>();
+            Assert.Contains(original, code);
+            json[id]!["code"] = code.Replace(original, replacement);
+        });
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+    }
+
+    [Fact]
+    public void Landing_MissingSourceComponentsContextAndConsumersFail()
+    {
+        var (source, components) = LandingInputs();
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(null, components),
+            d => d.Code == DiagnosticCode.DocDriftMissingInput);
+        foreach (var component in components)
+            Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components.Where(c => c != component).ToList()),
+                d => d.Code == DiagnosticCode.DocDriftMissingInput && d.FilePath == component.Path);
+
+        foreach (var broken in new[]
+        {
+            "",
+            "{}",
+            "{\"snippet\": {\"code\": \"§P 1\"}}",
+            MutateLanding(source, json => json["comparison"]!["Code"] = json["comparison"]!["code"]!.GetValue<string>()).Content,
+            MutateLanding(source, json => json["contracts"]!["before"] = "").Content,
+            MutateLanding(source, json => json["missingEffect"]!["inputs"] = new JsonArray()).Content,
+            MutateLanding(source, json => json.Remove("comparison")).Content,
+            MutateLanding(source, json => json["extra"] = json["comparison"]!.DeepClone()).Content,
+        })
+            Assert.NotEmpty(WebsiteExampleChecker.CheckLanding(source with { Content = broken }, components));
+
+        var changed = components.Select(c => c with
+        {
+            Content = c.Content.Replace("landingSnippets.comparison.code", "'not checked'")
+        }).ToList();
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, changed),
+            d => d.Message.Contains("exactly one registered consumer"));
+    }
+
+    [Theory]
+    [InlineData("const extra = `§M{m999:Uncovered}`;")]
+    [InlineData("const extra = '§Q (> unknown 0)';")]
+    [InlineData("const extra = `§P \"unchecked\"`;")]
+    [InlineData("const extra = '§R unknown';")]
+    [InlineData("const extra = '\\u00a7M{m999:Uncovered}';")]
+    public void Landing_NewInlineCalorCannotBypassSharedSource(string extra)
+    {
+        var (source, components) = LandingInputs();
+        components[0] = components[0] with { Content = components[0].Content + "\n" + extra };
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components),
+            d => d.Message.Contains("bypasses landing snippet validation"));
+    }
+
+    [Theory]
+    [InlineData("<code>{`(+ x 1)`}</code>")]
+    [InlineData("<pre>{`(+ x 1)`}</pre>")]
+    [InlineData("const extra = { code: '(+ x 1)' };")]
+    public void Landing_ExpressionOnlyDisplaysCannotBypassRegistration(string extra)
+    {
+        var (source, components) = LandingInputs();
+        components[0] = components[0] with { Content = components[0].Content + "\n" + extra };
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteAnnotation);
+    }
+
+    [Fact]
+    public void Landing_GeneratedCSharpValidationAndNegativeRepairAreReal()
+    {
+        var (source, components) = LandingInputs();
+        var brokenType = MutateLanding(source, json =>
+            json["stableId"]!["code"] = "§F{f001:Process:pub} (MissingType:x)");
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(brokenType, components),
+            d => d.Message.Contains("Calor1002"));
+
+        var repaired = MutateLanding(source, json =>
+        {
+            json["missingEffect"]!["code"] = json["missingEffect"]!["code"]!.GetValue<string>()
+                .Replace("§E{db:rw}", "§E{db:rw,net:rw}");
+            json["missingEffect"]!["expectedDiagnostics"] = new JsonArray();
+        });
+        Assert.Empty(WebsiteExampleChecker.CheckLanding(repaired, components));
+        foreach (var field in new[] { "code", "severity", "message" })
+        {
+            var wrongExpectation = MutateLanding(source, json =>
+                json["missingEffect"]!["expectedDiagnostics"]![0]![field] =
+                    field == "code" ? "Calor0200" : field == "severity" ? "Warning" : "Wrong message");
+            Assert.Contains(WebsiteExampleChecker.CheckLanding(wrongExpectation, components),
+                d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+        }
+    }
+
+    [Fact]
+    public void RepositoryScan_LoadsLandingSources_AndReportsEachMissingInput()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var loaded = DocDriftChecker.LoadFromRepository(root, []);
+        Assert.NotNull(loaded.LandingSnippets);
+        Assert.Equal(5, loaded.LandingComponents.Count);
+        var empty = Path.Combine(Path.GetTempPath(), "calor-landing-probe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(empty);
+        try
+        {
+            var errors = new List<Diagnostic>();
+            DocDriftChecker.LoadFromRepository(empty, errors);
+            foreach (var path in WebsiteExampleChecker.LandingComponentNames
+                .Select(WebsiteExampleChecker.LandingComponentPath).Append(WebsiteExampleChecker.LandingSnippetsPath))
+                Assert.Contains(errors, d => d.Code == DiagnosticCode.DocDriftMissingInput && d.FilePath == path);
+        }
+        finally
+        {
+            Directory.Delete(empty, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DocDriftCheck_RunsLandingValidation_NotOnlyMdx()
+    {
+        var (source, components) = LandingInputs();
+        var broken = MutateLanding(source, json =>
+            json["comparison"]!["code"] = json["comparison"]!["code"]!.GetValue<string>().Replace("(* x x)", "(* missing x)"));
+        var inputs = new DocDriftInputs
+        {
+            Version = "0.0.0",
+            LexerKeywords = [],
+            DiagnosticCodes = [],
+            KnownEffectCodes = [],
+            DocumentedEffectCodes = [],
+            LandingSnippets = broken,
+            LandingComponents = components,
+        };
+        Assert.Contains(DocDriftChecker.Check(inputs),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch && d.Message.Contains("comparison"));
+    }
 
     [Fact]
     public void RepositoryScan_ChecksWebsitePages_AndExcludesOnlyNamedHistoricalRecords()

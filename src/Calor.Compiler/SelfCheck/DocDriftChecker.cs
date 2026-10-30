@@ -100,6 +100,10 @@ public sealed class DocDriftInputs
     /// <see cref="WebsiteExampleChecker"/> (#1143).
     /// </summary>
     public IReadOnlyList<DocFile> WebsiteDocs { get; init; } = [];
+
+    /// <summary>Shared displayed landing snippets and their registered TSX consumers.</summary>
+    public DocFile? LandingSnippets { get; init; }
+    public IReadOnlyList<DocFile> LandingComponents { get; init; } = [];
 }
 
 /// <summary>
@@ -208,6 +212,8 @@ public static class DocDriftChecker
         }
 
         diagnostics.AddRange(WebsiteExampleChecker.Check(inputs.WebsiteDocs));
+        if (inputs.LandingSnippets != null || inputs.LandingComponents.Count > 0)
+            diagnostics.AddRange(WebsiteExampleChecker.CheckLanding(inputs.LandingSnippets, inputs.LandingComponents));
 
         return diagnostics;
     }
@@ -324,6 +330,10 @@ public static class DocDriftChecker
             VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs)
                 .Concat(websiteDocs).ToList(),
             WebsiteDocs = websiteDocs,
+            LandingSnippets = LoadDoc(root, WebsiteExampleChecker.LandingSnippetsPath, loadErrors),
+            LandingComponents = WebsiteExampleChecker.LandingComponentNames
+                .Select(name => LoadDoc(root, WebsiteExampleChecker.LandingComponentPath(name), loadErrors))
+                .OfType<DocFile>().ToList(),
             SemanticsVersionDocs = semanticsDocs,
             MirrorDocs = mirrorDocs,
             ExemplarDoc = exemplarDoc,
@@ -988,6 +998,208 @@ public static class DocDriftChecker
 /// </summary>
 public static class WebsiteExampleChecker
 {
+    public static readonly string LandingRelativePath = Path.Combine("website", "src", "components", "landing");
+    public static string LandingSnippetsPath => Path.Combine(LandingRelativePath, "snippets.json");
+    public static IReadOnlyList<string> LandingComponentNames { get; } =
+        ["CodeComparison", "FirstProgram", "CatchBugs", "FeatureGrid", "CompetitivePositioning"];
+    public static string LandingComponentPath(string name) => Path.Combine(LandingRelativePath, name + ".tsx");
+
+    // These are prose, not executable fragments. Everything else containing a section
+    // sign must move to the shared source, including new fragments without a §M opener.
+    private static readonly IReadOnlyDictionary<string, string[]> LandingProse =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["CodeComparison"] =
+            [
+                "'§Q and §S declare the input and normal-return obligations.'",
+                "'§E{} declares no effects; enforcement depends on resolved calls and documented coverage.'",
+            ],
+            ["CompetitivePositioning"] =
+            [
+                "'First-class syntax (§Q, §S)'",
+                "'Declared explicitly (§E)'",
+                "'Expressed via §Q; checked or verified'",
+            ],
+        };
+
+    // Keep code displays simple and fail closed when a component adds a new display
+    // shape. This also catches expression-only fragments with no section-sign tag.
+    private static readonly IReadOnlyDictionary<string, string[]> LandingCodeDisplays =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["CodeComparison"] = ["{activeTab === 'calor' ? calorCode : csharpCode}"],
+            ["FirstProgram"] = ["{landingSnippets.firstProgram.code}", "calor run Program.calr", "Hello from Calor!"],
+            ["CatchBugs"] = ["{calorCode}", "{errorOutput}"],
+            ["FeatureGrid"] = ["{feature.code}"],
+            ["CompetitivePositioning"] = [],
+        };
+
+    public sealed record LandingDiagnostic(string Code, string Severity, string Message);
+    public sealed record LandingSnippet(string Component, string Code, string Before, string After, int Indent,
+        IReadOnlyList<string> Inputs, IReadOnlyList<LandingDiagnostic> ExpectedDiagnostics);
+
+    /// <summary>
+    /// Landing code is rendered directly from JSON, never extracted from TypeScript. The
+    /// source guard enforces that convention while allowing prose mentions of bare tags.
+    /// Context supplies omitted declarations, not an alternative copy of the shown code.
+    /// </summary>
+    public static List<Diagnostic> CheckLanding(DocFile? source, IReadOnlyList<DocFile> components, Coverage? coverage = null)
+    {
+        var findings = new List<Diagnostic>();
+        coverage ??= new Coverage();
+        void Invalid(string message, string path) =>
+            findings.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation, message, path, 1));
+        foreach (var name in LandingComponentNames)
+        {
+            if (!components.Any(c => c.Path == LandingComponentPath(name)))
+                findings.Add(Finding(DiagnosticCode.DocDriftMissingInput,
+                    $"Missing registered landing component {name}", LandingComponentPath(name), 1));
+        }
+        if (source == null)
+        {
+            findings.Add(Finding(DiagnosticCode.DocDriftMissingInput,
+                "Missing shared landing snippet source", LandingSnippetsPath, 1));
+            return findings;
+        }
+
+        Dictionary<string, LandingSnippet>? snippets;
+        try
+        {
+            snippets = JsonSerializer.Deserialize<Dictionary<string, LandingSnippet>>(source.Content,
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    RespectRequiredConstructorParameters = true,
+                    UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow,
+                });
+        }
+        catch (JsonException exception)
+        {
+            Invalid($"Invalid landing snippet source: {exception.Message}", source.Path);
+            return findings;
+        }
+        if (snippets == null || snippets.Count == 0)
+        {
+            Invalid("Landing snippet source must contain registered examples", source.Path);
+            return findings;
+        }
+
+        var references = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var component in components)
+        {
+            coverage.LandingComponents++;
+            var proseOnly = component.Content;
+            var name = Path.GetFileNameWithoutExtension(component.Path);
+            foreach (var prose in LandingProse.GetValueOrDefault(name) ?? [])
+                proseOnly = proseOnly.Replace(prose, "", StringComparison.Ordinal);
+            if (proseOnly.Contains('§') || Regex.IsMatch(proseOnly, @"\\(?:u00[aA]7|u\{0*[aA]7\}|x[aA]7)"))
+                Invalid("Inline Calor source bypasses landing snippet validation; render landingSnippets.<id>.code instead",
+                    component.Path);
+
+            var displays = Regex.Matches(component.Content, @"<code\b[^>]*>(?<body>[\s\S]*?)</code>")
+                .Select(match => match.Groups["body"].Value.Trim()).Order(StringComparer.Ordinal);
+            if (!displays.SequenceEqual((LandingCodeDisplays.GetValueOrDefault(name) ?? []).Order(StringComparer.Ordinal),
+                StringComparer.Ordinal))
+                Invalid("Unregistered landing code display: register its shared source and display shape", component.Path);
+            foreach (Match pre in Regex.Matches(component.Content, @"<pre\b[^>]*>(?<body>[\s\S]*?)</pre>"))
+            {
+                if (!Regex.IsMatch(pre.Groups["body"].Value.Trim(), @"^<code\b[^>]*>[\s\S]*</code>$"))
+                    Invalid("Landing preformatted examples must use a registered code display", component.Path);
+            }
+            foreach (Match property in Regex.Matches(component.Content, @"\bcode:\s*(?<value>[^\r\n]+)"))
+            {
+                var value = property.Groups["value"].Value.Trim();
+                if (!Regex.IsMatch(value, @"^landingSnippets\.[A-Za-z0-9_]+\.code,$")
+                    && !(name == "FeatureGrid" && value == "'calor query impact Save\\n  --effects --row fs:w',"))
+                    Invalid("Unregistered landing code property: Calor fragments must use shared snippet source", component.Path);
+            }
+
+            var uses = Regex.Matches(component.Content, @"\blandingSnippets\.(?<id>[A-Za-z0-9_]+)\.code\b");
+            if (uses.Count > 0 && !component.Content.Contains("import landingSnippets from './snippets.json';", StringComparison.Ordinal))
+                Invalid("Landing snippet consumers must import the shared snippets.json source", component.Path);
+            foreach (Match use in uses)
+            {
+                var id = use.Groups["id"].Value;
+                references[id] = references.GetValueOrDefault(id) + 1;
+                if (!snippets.TryGetValue(id, out var snippet) || snippet == null
+                    || component.Path != LandingComponentPath(snippet.Component))
+                    Invalid($"Unknown or misplaced landing snippet reference '{id}'", component.Path);
+            }
+        }
+
+        foreach (var (id, snippet) in snippets)
+        {
+            if (snippet == null || !Regex.IsMatch(id, @"^[A-Za-z_][A-Za-z0-9_]*$")
+                || !LandingComponentNames.Contains(snippet.Component, StringComparer.Ordinal)
+                || string.IsNullOrWhiteSpace(snippet.Code) || snippet.Before == null || snippet.After == null
+                || (snippet.Before.Length > 0 && !snippet.Before.EndsWith('\n'))
+                || snippet.Indent is < 0 or > 4 || snippet.Indent % 2 != 0
+                || snippet.Inputs == null || snippet.Inputs.Any(string.IsNullOrWhiteSpace)
+                || snippet.ExpectedDiagnostics == null
+                || snippet.ExpectedDiagnostics.Any(d => d == null || d.Code == null || !CodePattern.IsMatch(d.Code)
+                    || d.Severity is not ("Error" or "Warning") || string.IsNullOrWhiteSpace(d.Message)))
+            {
+                Invalid($"Malformed landing snippet '{id}': code, context and exact diagnostic expectations are required", source.Path);
+                continue;
+            }
+            if (references.GetValueOrDefault(id) != 1)
+                Invalid($"Landing snippet '{id}' must have exactly one registered consumer", source.Path);
+            var fragment = !CompleteProgramStart.IsMatch(snippet.Code.TrimStart());
+            if (fragment && string.IsNullOrWhiteSpace(snippet.Before))
+            {
+                Invalid($"Landing fragment '{id}' requires explicit compilation context", source.Path);
+                continue;
+            }
+            var text = snippet.Before + string.Join("\n", snippet.Code.Replace("\r\n", "\n").Split('\n')
+                .Select(line => new string(' ', snippet.Indent) + line)) + "\n" + snippet.After;
+            var program = new Fence("calor", [], text.Split('\n'), 1, text.Split('\n').Length + 1);
+            if (!program.IsCompleteProgram)
+            {
+                Invalid($"Landing snippet '{id}' context must form a complete module", source.Path);
+                continue;
+            }
+            coverage.LandingPrograms++;
+            if (fragment) coverage.LandingFragments++;
+            if (snippet.ExpectedDiagnostics.Count > 0) coverage.LandingNegativePrograms++;
+            var members = new List<Fence> { program };
+            foreach (var input in snippet.Inputs)
+                members.Add(new Fence("calor", [], input.Split('\n'), 1, input.Split('\n').Length + 1));
+            if (members.Any(member => !member.IsCompleteProgram))
+            {
+                Invalid($"Landing snippet '{id}' additional inputs must be complete modules", source.Path);
+                continue;
+            }
+            var compiled = Compile(source, members, findings);
+            if (!compiled.Actual.TryGetValue(program, out var actual))
+                continue;
+            var rest = members.Where(member => !compiled.FailedFiles.Contains(member)).ToList();
+            if (rest.Count > 0 && rest.Count < members.Count)
+            {
+                foreach (var (member, retry) in Compile(source, rest, findings).Actual)
+                {
+                    var known = compiled.Actual[member].Select(d => (d.Code, d.Message)).ToHashSet();
+                    foreach (var error in retry.Where(d => d.IsError && !known.Contains((d.Code, d.Message))))
+                        findings.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                            $"Landing snippet '{id}' context fails after removing failing inputs: {error.Code}: {error.Message}",
+                            source.Path, 1));
+                }
+            }
+            foreach (var member in members.Skip(1))
+            {
+                if (compiled.Actual.TryGetValue(member, out var inputDiagnostics))
+                    actual.AddRange(inputDiagnostics);
+            }
+            static string Key(LandingDiagnostic d) => $"{d.Severity} {d.Code}: {d.Message}";
+            var expected = snippet.ExpectedDiagnostics.Select(Key).Order(StringComparer.Ordinal);
+            var reported = actual.Select(d => $"{d.Severity} {d.Code}: {d.Message}").Order(StringComparer.Ordinal);
+            if (!reported.SequenceEqual(expected, StringComparer.Ordinal))
+                findings.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                    $"Landing snippet '{id}' diagnostics differ: expected [{string.Join("; ", expected)}], " +
+                    $"actual [{string.Join("; ", reported)}]", source.Path, 1));
+        }
+        return findings;
+    }
+
     /// <summary>Repository-relative root of the website's MDX content.</summary>
     public static readonly string ContentRelativePath = Path.Combine("website", "content");
 
@@ -1070,6 +1282,10 @@ public static class WebsiteExampleChecker
         public int GroupedPrograms { get; set; }
         public int CheckedOutputs { get; set; }
         public int IllustrativeOutputs { get; set; }
+        public int LandingComponents { get; set; }
+        public int LandingPrograms { get; set; }
+        public int LandingFragments { get; set; }
+        public int LandingNegativePrograms { get; set; }
     }
 
     /// <summary>True when the page is a historical record excluded from website checks.</summary>

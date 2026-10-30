@@ -54,6 +54,8 @@ public static class SelfCheckCommand
             "(12) website/content/**/*.mdx (historical changelog excluded): checks 1, 2, 5 and forward-only effect tables apply; " +
             "complete ```calor programs compile as `calor --input` does, `expect=CalorNNNN` negatives report exactly those codes, " +
             "`group=` fences compile together, and `output` fences match the real diagnostics (Calor1332-1334). " +
+            "(13) registered landing TSX snippets render shared snippets.json code; complete programs and fragments with " +
+            "explicit context compile to valid C#, and intended negatives match exact error/warning diagnostics. " +
             "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
             "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {

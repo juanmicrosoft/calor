@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import landingSnippets from './snippets.json';
 
 export function FirstProgram() {
   return (
@@ -7,10 +8,7 @@ export function FirstProgram() {
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 rounded-lg bg-calor-navy p-4 text-white">
           <p className="mb-2 text-sm text-calor-cyan">Program.calr — Calor</p>
-          <pre className="overflow-x-auto text-xs leading-6"><code>{`§M{m001:HelloApp}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"`}</code></pre>
+          <pre className="overflow-x-auto text-xs leading-6"><code>{landingSnippets.firstProgram.code}</code></pre>
         </div>
         <div className="min-w-0 rounded-lg border p-4">
           <p className="mb-2 text-sm font-medium">Run with the .NET 10 SDK and Calor installed</p>
