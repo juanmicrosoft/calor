@@ -322,7 +322,7 @@ namespace Calor.Runtime
 
 **Calor:**
 ```calor
-§W{sw1:expr} code
+§R §W{sw1} code
   §K 200 → "OK"
   §K 404 → "Not Found"
   §K _ → "Unknown"

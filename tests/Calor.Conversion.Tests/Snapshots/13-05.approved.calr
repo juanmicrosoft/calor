@@ -1,10 +1,9 @@
 §M{m001:Test_13_05:overflow=unchecked}
   §CL{c001:PatternDemo:pub}
     §MT{m002:Classify:pub} (any:obj) -> str
-      §W{match003:expr} obj
+      §R §W{match003} obj
         §K string { Length: 0 } → "empty string"
         §K string { Length: §PREL{gt} 100 } → "long string"
         §K §PTYPE{int:n} §WHEN (> n 0) → "positive"
         §K _ → "other"
-
 

@@ -391,7 +391,7 @@ Match expressions MUST be exhaustive. The compiler emits `Calor0500: NonExhausti
 ### 8.2 Evaluation
 
 ```calor
-§W{sw1:expr} n
+§R §W{sw1} n
   §K §VAR{x} §WHEN (> x 100) → "large"
   §K 0 → "zero"
   §K _ → "other"

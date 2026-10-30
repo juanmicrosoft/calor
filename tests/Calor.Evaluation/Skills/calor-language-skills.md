@@ -733,7 +733,7 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
 
   §CL{c002:StatusHelper:pub}
     §MT{m003:GetLabel:pub:stat} (Status:s) -> str
-      §W{match004:expr} s
+      §R §W{match004} s
         §K Status.Pending → "Pending Review"
         §K Status.Active → "Active"
         §K Status.Suspended → "Temporarily Suspended"

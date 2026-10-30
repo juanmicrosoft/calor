@@ -1,10 +1,9 @@
 §M{m001:Test_06_01:overflow=unchecked}
   §CL{c001:Grader:pub}
     §MT{m002:GetGrade:pub} (i32:score) -> str
-      §W{match003:expr} score
+      §R §W{match003} score
         §K §PREL{gte} 90 → "A"
         §K §PREL{gte} 80 → "B"
         §K §PREL{gte} 70 → "C"
         §K _ → "F"
-
 

@@ -4,7 +4,7 @@
   §CL{c001:MatchListDemo:pub}
     §MT{m002:GetItems:pub} (i32:category) -> List<str>
       §E{alloc}
-      §W{match003:expr} category
+      §R §W{match003} category
         §K 1
           §LIST{_listStr005:str}
             "a"

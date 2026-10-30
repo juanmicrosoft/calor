@@ -533,16 +533,16 @@
       "id": "switch_expression",
       "csharpConstruct": "switch expression",
       "keywords": ["switch", "match", "pattern", "case", "when"],
-      "calorSyntax": "§W{id:expr} expression with indented §K pattern → result cases",
+      "calorSyntax": "§W{id} expression with indented §K pattern → result cases; use in an expression context, such as §R §W{id}",
       "description": "Pattern matching switch expression. §K introduces each case/pattern. Use _ for default.",
       "examples": [
         {
           "csharp": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }",
-          "calor": "§W{sw1:expr} x\n  §K 1 → \"one\"\n  §K 2 → \"two\"\n  §K _ → \"other\""
+          "calor": "§R §W{sw1} x\n  §K 1 → \"one\"\n  §K 2 → \"two\"\n  §K _ → \"other\""
         },
         {
           "csharp": "shape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
-          "calor": "§W{sw1:expr} shape\n  §K Circle c → §C{c.Area}\n  §K Rectangle r → (* r.Width r.Height)"
+          "calor": "§R §W{sw1} shape\n  §K Circle c → §C{c.Area}\n  §K Rectangle r → (* r.Width r.Height)"
         }
       ]
     },
@@ -1584,7 +1584,7 @@
     },
     "§W": {
       "name": "Switch/Match",
-      "syntax": "§W{id:expr} expression with indented §K pattern → result cases",
+      "syntax": "§W{id} expression with indented §K pattern → result cases; return with §R §W{id}",
       "description": "Pattern matching switch expression.",
       "csharpEquivalent": "expression switch { pattern => result, ... }"
     },

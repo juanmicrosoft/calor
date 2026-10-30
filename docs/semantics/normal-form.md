@@ -452,7 +452,7 @@ loop_exit:
 
 **Source:**
 ```calor
-§W{sw1:expr} target
+§R §W{sw1} target
   §K pattern1 → body1
   §K pattern2 → body2
   §K _ → default

@@ -1692,8 +1692,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.Expression != null)
         {
-            // If the expression is a match expression, emit it as a statement block
-            // since each case already contains a return statement
+            // Match arms need their own lines under the return expression.
             if (node.Expression is MatchExpressionNode matchExpr)
             {
                 EmitMatchExpressionAsStatement(matchExpr);
@@ -1736,17 +1735,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Emits a MatchExpressionNode as a statement block instead of inline expression.
+    /// Emits a multiline returned match expression.
     /// Used when the match expression is the direct child of a return statement.
-    /// Uses :expr suffix to distinguish from match statements when parsing back.
     /// </summary>
     private void EmitMatchExpressionAsStatement(MatchExpressionNode node)
     {
         var target = node.Target.Accept(this);
         var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
 
-        // Add :expr suffix to indicate this is a match expression (not statement)
-        AppendLine($"§W{{{id}:expr}} {target}");
+        AppendLine($"§R §W{{{id}}} {target}");
         Indent();
 
         foreach (var matchCase in node.Cases)

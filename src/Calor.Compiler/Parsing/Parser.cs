@@ -5427,9 +5427,15 @@ public sealed class Parser
             id = "";
         }
 
-        // Check if this is a match expression (indicated by :expr in second positional attribute)
-        // {match003:expr} parses as _pos0="match003", _pos1="expr"
-        var isExpression = attrs["_pos1"] == "expr";
+        if (attrs["_pos1"] == "expr")
+        {
+            var fix = new SuggestedFix(
+                "Return the match expression explicitly with §R",
+                TextEdit.Replace(_diagnostics.CurrentFilePath ?? "", startToken.Span.Line, startToken.Span.Column,
+                    startToken.Span.Line, startToken.Span.Column, "§R "));
+            _diagnostics.ReportErrorWithFix(startToken.Span, DiagnosticCode.UnexpectedToken,
+                "Statement-position §W{...:expr} is removed. Use §R §W{...} for a returned match expression.", fix);
+        }
 
         var target = ParseExpression();
         var matchOwner = BeginBlockBody(startToken, TokenKind.EndMatch, id);
@@ -5445,13 +5451,6 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-
-        // Return MatchExpressionNode wrapped in ReturnStatementNode if :expr was present
-        if (isExpression)
-        {
-            var matchExpr = new MatchExpressionNode(span, id, target, cases, attrs);
-            return new ReturnStatementNode(span, matchExpr);
-        }
 
         return new MatchStatementNode(span, id, target, cases, attrs);
     }
@@ -5490,8 +5489,8 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Lambda))
             {
-                // Lambda-only case body (no arrow) -- from converter output where
-                // inline lambdas appear directly after the pattern.
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    "A lambda match arm requires → before its expression. Use §K pattern → §LAM... .");
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
                 if (IsBlockEnd(TokenKind.EndCase)) ExpectBlockEnd(TokenKind.EndCase);

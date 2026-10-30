@@ -8,6 +8,58 @@ namespace Calor.Compiler.Tests;
 
 public class ControlFlowTests
 {
+    [Fact]
+    public void Parse_ReturnMatchShortcut_IsRejectedWithExplicitReturnReplacement()
+    {
+        var source = """
+            §M{m1:Test}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §W{w1:expr} value
+                  §K _ → 1
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Message.Contains("Use §R §W", StringComparison.Ordinal));
+        Assert.IsType<MatchStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+    }
+
+    [Fact]
+    public void Parse_ExplicitReturnedMatch_IsAnExpression()
+    {
+        var source = """
+            §M{m1:Test}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §R §W{w1} value
+                  §K _ → 1
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Select(d => d.Message)));
+        var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        Assert.IsType<MatchExpressionNode>(returned.Expression);
+    }
+
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("→ ", false)]
+    public void Parse_LambdaMatchArm_RequiresArrow(string arrow, bool hasErrors)
+    {
+        var source = $$"""
+            §M{m1:Test}
+              §F{f1:Probe:pub} (i32:value) -> object
+                §R §W{w1} value
+                  §K _ {{arrow}}§LAM{l1:x:i32} x §/LAM{l1}
+            """;
+
+        Parse(source, out var diagnostics);
+        Assert.Equal(hasErrors, diagnostics.HasErrors);
+        if (hasErrors)
+            Assert.Contains(diagnostics, diagnostic =>
+                diagnostic.Message.Contains("requires →", StringComparison.Ordinal));
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
