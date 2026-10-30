@@ -360,10 +360,8 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// #1485 -- true when this lambda's §/LAM closer follows: one naming
-    /// <paramref name="id"/>, or (for an id-less lambda) the first id-less
-    /// closer not taken by a nested §LAM. The scan ignores indentation but
-    /// stops at the next member or type declaration.
+    /// True when this lambda's closer follows, accounting for nested lambdas.
+    /// The scan ignores indentation but stops at a member or type declaration.
     /// </summary>
     private bool HasLambdaCloserAhead(string? id)
     {
@@ -388,13 +386,7 @@ public sealed class Parser
                     nested++;
                     break;
                 case TokenKind.EndLambda:
-                    var closerId = i + 2 < _tokens.Count
-                                   && _tokens[i + 1].Kind == TokenKind.OpenBrace
-                                   && _tokens[i + 2].Kind == TokenKind.Identifier
-                        ? _tokens[i + 2].Text
-                        : null;
-                    if (!string.IsNullOrEmpty(id) && closerId == id) return true;
-                    if (nested == 0 && (string.IsNullOrEmpty(id) || closerId == null)) return true;
+                    if (nested == 0) return true;
                     if (nested > 0) nested--;
                     break;
             }
@@ -444,7 +436,6 @@ public sealed class Parser
         if (!HasTokenKindAfter(closer, _position)) return false;
 
         var openerKind = OpenerKindOf(closer);
-        var nestedIds = new HashSet<string>(StringComparer.Ordinal);
         var nestedSameKind = 0;
         var lastLine = owner.HeaderLine;
         var lineColumn = -1;
@@ -489,24 +480,9 @@ public sealed class Parser
             }
             if (!onHeaderLine && lineColumn != owner.IndentColumn) continue;
 
-            var braceId = i + 2 < _tokens.Count
-                          && _tokens[i + 1].Kind == TokenKind.OpenBrace
-                          && _tokens[i + 2].Kind == TokenKind.Identifier
-                ? _tokens[i + 2].Text
-                : null;
-
             if (t.Kind == closer)
             {
-                // A closer naming a block opened later in this scan, or an
-                // id-less closer while a nested same-kind block is open, closes
-                // that nested block. Any other closer is ours -- including one
-                // with a mismatched id, which the block end reports.
-                if (braceId != null && braceId != id && nestedIds.Contains(braceId))
-                {
-                    if (nestedSameKind > 0) nestedSameKind--;
-                    continue;
-                }
-                if (braceId == null && nestedSameKind > 0)
+                if (nestedSameKind > 0)
                 {
                     nestedSameKind--;
                     continue;
@@ -515,7 +491,6 @@ public sealed class Parser
             }
 
             if (openerKind is { } kind && t.Kind == kind) nestedSameKind++;
-            if (braceId != null) nestedIds.Add(braceId);
         }
         return false;
     }
@@ -1115,33 +1090,18 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Module);
         _moduleIndentColumn = LineIndentColumnAt(_position - 1);
         var attrs = ParseAttributes();
-        var overflowModifier = attrs["_pos2"];
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
+        var overflowModifier = attrs["_pos1"];
         if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
             attrs.Add("overflow", overflowModifier["overflow=".Length..].Trim());
         if (attrs["overflow"] is { } overflow && overflow is not ("checked" or "unchecked"))
             _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
                 $"Module overflow policy must be 'checked' or 'unchecked', not '{overflow}'.");
 
-        var (id, moduleName) = AttributeHelper.InterpretModuleAttributes(attrs);
-        var moduleNameKey = "_pos1";
+        var id = GenerateParserAutoId("m");
+        var moduleName = attrs["_pos0"] ?? "";
+        var moduleNameKey = "_pos0";
 
-        // --- Compact syntax: optional ID (RFC §1 Phase 1) ---
-        // §M{Calculator} or §M Calculator (1 positional, name only)
-        // is accepted in addition to the legacy §M{m001:Calculator}.
-        var modPosCount = int.TryParse(attrs["_posCount"], out var mpc) ? mpc : 0;
-        if (modPosCount < 2 && !IsIdPattern(id) && !string.IsNullOrEmpty(id))
-        {
-            // Shift: id was actually name.
-            moduleName = id;
-            id = GenerateParserAutoId("m");
-            moduleNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MODULE", "id");
-            id = "";
-        }
         if (string.IsNullOrEmpty(moduleName))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MODULE", "name");
@@ -1324,13 +1284,8 @@ public sealed class Parser
 
         var endToken = ExpectBlockEndAtIndent(TokenKind.EndModule, startToken);
         var endAttrs = ParseAttributes();
-        var endId = AttributeHelper.InterpretEndModuleAttributes(endAttrs);
 
         // Validate ID matching
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MODULE", id, "END_MODULE", endId);
-        }
 
         // Phase 3 (indent-aware): in indent mode, the module body loop exits
         // on the first Dedent -- which may be an INNER block's dedent, not the
@@ -1397,22 +1352,15 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Namespace);
         var attrs = ParseAttributes();
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
+        ValidateIdentityFreeHeader(startToken, attrs, 4);
+        var id = GenerateParserAutoId("ns");
+        var name = attrs["_pos0"] ?? "";
         var scopeMarkers = new[]
         {
+            attrs["_pos1"],
             attrs["_pos2"],
-            attrs["_pos3"],
-            attrs["_pos4"]
+            attrs["_pos3"]
         }.Where(marker => !string.IsNullOrEmpty(marker)).ToArray();
-        var positionCount = int.TryParse(attrs["_posCount"], out var count) ? count : 0;
-        if (positionCount < 2)
-        {
-            name = id;
-            id = GenerateParserAutoId("ns");
-        }
-        if (string.IsNullOrEmpty(id))
-            id = GenerateParserAutoId("ns");
 
         var hasExplicitGlobalMarker = scopeMarkers.Contains(
             "global",
@@ -1554,12 +1502,6 @@ public sealed class Parser
             TokenKind.EndNamespace,
             startToken);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(
-                endToken.Span, "NS", id, "END_NS", endId);
-        }
     }
 
     private bool IsNamespaceSiblingBoundary(Token startToken)
@@ -1748,27 +1690,14 @@ public sealed class Parser
         _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
-        var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
-        var functionNameKey = "_pos1";
+        var id = GenerateParserAutoId("f");
+        var funcName = attrs["_pos0"] ?? "";
+        var visibilityStr = attrs["_pos1"] ?? "";
+        var functionNameKey = "_pos0";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 3 && !IsIdPattern(id))
-        {
-            // Shift: id was actually name, name was visibility
-            visibilityStr = funcName;
-            funcName = id;
-            id = GenerateParserAutoId("f");
-            functionNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "id");
-            id = "";
-        }
         if (string.IsNullOrEmpty(funcName))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "name");
@@ -1879,13 +1808,8 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndFunc, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
         // Validate ID matching
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "FUNC", id, "END_FUNC", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, functionNameKey, funcName);
@@ -1912,26 +1836,14 @@ public sealed class Parser
         _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
-        var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
-        var functionNameKey = "_pos1";
+        var id = GenerateParserAutoId("f");
+        var funcName = attrs["_pos0"] ?? "";
+        var visibilityStr = attrs["_pos1"] ?? "";
+        var functionNameKey = "_pos0";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 3 && !IsIdPattern(id))
-        {
-            visibilityStr = funcName;
-            funcName = id;
-            id = GenerateParserAutoId("f");
-            functionNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AF", "id");
-            id = "";
-        }
         if (string.IsNullOrEmpty(funcName))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AF", "name");
@@ -2039,12 +1951,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndAsyncFunc, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AF", id, "END_AF", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         var identifierSpan = GetIdentifierSpan(attrs, functionNameKey, funcName);
@@ -2377,13 +2284,12 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.RefinedType);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
 
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var baseTypeName = attrs["_pos2"] ?? "";
+        var id = GenerateParserAutoId("rt");
+        var name = attrs["_pos0"] ?? "";
+        var baseTypeName = attrs["_pos1"] ?? "";
 
-        if (string.IsNullOrEmpty(id))
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "RTYPE", "id");
         if (string.IsNullOrEmpty(name))
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "RTYPE", "name");
         if (string.IsNullOrEmpty(baseTypeName))
@@ -2409,7 +2315,7 @@ public sealed class Parser
             baseTypeName,
             predicate,
             attrs,
-            attrs.GetSpan("_pos2"));
+            attrs.GetSpan("_pos1"));
     }
 
     /// <summary>
@@ -2421,14 +2327,13 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.IndexedType);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
 
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var baseTypeName = attrs["_pos2"] ?? "";
-        var sizeParam = attrs["_pos3"] ?? "";
+        var id = GenerateParserAutoId("it");
+        var name = attrs["_pos0"] ?? "";
+        var baseTypeName = attrs["_pos1"] ?? "";
+        var sizeParam = attrs["_pos2"] ?? "";
 
-        if (string.IsNullOrEmpty(id))
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ITYPE", "id");
         if (string.IsNullOrEmpty(name))
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ITYPE", "name");
         if (string.IsNullOrEmpty(baseTypeName))
@@ -2464,7 +2369,7 @@ public sealed class Parser
             sizeParam,
             constraint,
             attrs,
-            attrs.GetSpan("_pos2"));
+            attrs.GetSpan("_pos1"));
     }
 
     /// <summary>
@@ -2475,12 +2380,11 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Proof);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 1);
 
-        var id = attrs["_pos0"] ?? "";
-        var description = attrs["_pos1"];
+        var id = GenerateParserAutoId("po");
+        var description = attrs["_pos0"];
 
-        if (string.IsNullOrEmpty(id))
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PROOF", "id");
 
         var condition = ParseExpression();
 
@@ -5201,12 +5105,8 @@ public sealed class Parser
         // #911 review F6: exactly one header group — a following brace group is a
         // collection-initializer expression, not more header attributes.
         var attrs = ParseAttributes(maxGroups: 1);
-        var id = AttributeHelper.InterpretMatchAttributes(attrs);
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MATCH", "id");
-            id = "";
-        }
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        var id = GenerateParserAutoId("w");
 
         var target = ParseExpression();
         var matchOwner = BeginBlockBody(startToken, TokenKind.EndMatch, id);
@@ -5214,12 +5114,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndMatch, matchOwner);
         var endAttrs = ParseAttributes();
-        var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MATCH", id, "END_MATCH", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new MatchExpressionNode(span, id, target, cases, attrs);
@@ -5231,14 +5126,10 @@ public sealed class Parser
         // #911 review F6: exactly one header group — a following brace group is a
         // collection-initializer expression, not more header attributes.
         var attrs = ParseAttributes(maxGroups: 1);
-        var id = AttributeHelper.InterpretMatchAttributes(attrs);
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MATCH", "id");
-            id = "";
-        }
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        var id = GenerateParserAutoId("w");
 
-        if (attrs["_pos1"] == "expr")
+        if (attrs["_pos0"] == "expr")
         {
             var fix = new SuggestedFix(
                 "Return the match expression explicitly with §R",
@@ -5254,12 +5145,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndMatch, matchOwner);
         var endAttrs = ParseAttributes();
-        var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MATCH", id, "END_MATCH", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
 
@@ -5724,30 +5610,16 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.For);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 4);
 
         // Interpret loop attributes
-        var (id, varName, fromStr, toStr, stepStr) = AttributeHelper.InterpretForAttributes(attrs);
-        var variableKey = "_pos1";
+        var id = GenerateParserAutoId("l");
+        var varName = attrs["_pos0"] ?? "";
+        var fromStr = attrs["_pos1"] ?? "";
+        var toStr = attrs["_pos2"] ?? "";
+        var stepStr = attrs["_pos3"] ?? "";
+        var variableKey = "_pos0";
 
-        // --- Compact syntax: optional ID (RFC §1 Phase 1) ---
-        // §L{var:from:to[:step]} is accepted alongside the legacy
-        // §L{id:var:from:to[:step]}. Disambiguation: when _pos0 does
-        // not match the id pattern, treat the values as shifted left.
-        var forPosCount = int.TryParse(attrs["_posCount"], out var fpc) ? fpc : 0;
-        if (forPosCount < 5 && !IsIdPattern(id) && !string.IsNullOrEmpty(id))
-        {
-            varName = id;
-            fromStr = attrs["_pos1"] ?? "";
-            toStr = attrs["_pos2"] ?? "";
-            stepStr = attrs["_pos3"] ?? "";
-            id = GenerateParserAutoId("l");
-            variableKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FOR", "id");
-        }
         if (string.IsNullOrEmpty(varName))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FOR", "var");
@@ -5781,12 +5653,7 @@ public sealed class Parser
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndFor, bodyOwner);
         var endAttrs = ParseAttributes();
         // Positional: [id]
-        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "FOR", id, "END_FOR", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new ForStatementNode(
@@ -5824,13 +5691,10 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.While);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
 
         // Positional: [id]
-        var id = attrs["_pos0"] ?? attrs["id"] ?? "";
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "WHILE", "id");
-        }
+        var id = GenerateParserAutoId("wh");
 
         // Parse condition expression
         var condition = ParseExpression();
@@ -5842,12 +5706,7 @@ public sealed class Parser
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndWhile, bodyOwner);
         var endAttrs = ParseAttributes();
         // Positional: [id]
-        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "WHILE", id, "END_WHILE", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new WhileStatementNode(span, id, condition, body, attrs);
@@ -5857,13 +5716,10 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Do);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
 
         // Positional: [id]
-        var id = attrs["_pos0"] ?? attrs["id"] ?? "";
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DO", "id");
-        }
+        var id = GenerateParserAutoId("do");
 
         // Parse body statements
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndDo, id);
@@ -5872,12 +5728,7 @@ public sealed class Parser
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndDo, bodyOwner);
         var endAttrs = ParseAttributes();
         // Positional: [id]
-        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DO", id, "END_DO", endId);
-        }
 
         // Parse condition expression (comes after §/DO[id])
         var condition = ParseExpression();
@@ -5947,13 +5798,10 @@ public sealed class Parser
         var startToken = Expect(TokenKind.If);
         _lastIfToken = startToken;
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
 
         // Interpret if attributes
-        var id = AttributeHelper.InterpretIfAttributes(attrs);
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IF", "id");
-        }
+        var id = GenerateParserAutoId("if");
 
         // Parse condition expression
         var condition = ParseExpression();
@@ -6030,12 +5878,7 @@ public sealed class Parser
                 var endToken = ExpectBlockEnd(TokenKind.EndIf);
                 lastBodySpan = endToken.Span;
                 var endAttrs = ParseAttributes();
-                var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-                if (ShouldReportMismatchedId(endId, id, endToken))
-                {
-                    _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
-                }
             }
             var span = startToken.Span.Union(lastBodySpan);
             return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
@@ -6110,12 +5953,7 @@ public sealed class Parser
         var endToken2 = ExpectOwnedBlockEnd(TokenKind.EndIf, clauseOwner);
         var endAttrs2 = ParseAttributes();
         // Positional: [id]
-        var endId2 = endAttrs2["_pos0"] ?? endAttrs2["id"] ?? "";
 
-        if (ShouldReportMismatchedId(endId2, id, endToken2))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken2.Span, "IF", id, "END_IF", endId2);
-        }
 
         var span2 = startToken.Span.Union(endToken2.Span);
         return new IfStatementNode(span2, id, condition, thenBody, elseIfClauses, elseBody, attrs);
@@ -6277,6 +6115,13 @@ public sealed class Parser
     {
         var attrs = new AttributeCollection();
         var groupsParsed = 0;
+        var preceding = _position > 0 ? Peek(-1) : Current;
+        var identityCloser = preceding.Kind is TokenKind.EndLambda or TokenKind.EndDo
+            or TokenKind.EndArray or TokenKind.EndArray2D or TokenKind.EndList
+            or TokenKind.EndDict or TokenKind.EndHashSet or TokenKind.EndNamespace;
+        if (identityCloser && Check(TokenKind.OpenBrace))
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                $"Source IDs are removed. Write '{preceding.Text}' without an identity header; tooling maintains .calor/ids.json.");
 
         // Parse structural braces {} for tag attributes
         // Note: [] is now reserved for array types to align with LLM training
@@ -6292,6 +6137,20 @@ public sealed class Parser
         }
 
         return attrs;
+    }
+
+    private void ValidateIdentityFreeHeader(Token token, AttributeCollection attrs, int? maximum)
+    {
+        var count = int.TryParse(attrs["_posCount"], out var parsed) ? parsed : 0;
+        var first = attrs["_pos0"] ?? "";
+        var sourceId = Ids.IdValidator.IsCanonicalId(first)
+            || IsIdPattern(first) && !(token.Kind == TokenKind.Indexer && AttributeHelper.IsLikelyType(first));
+        if (maximum.HasValue && count > maximum.Value && !(count == 1 && first.Length == 0)
+            || sourceId)
+        {
+            _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
+                $"Source IDs are removed from '{token.Text}'. Remove the leading ID field; tooling maintains declaration identity in .calor/ids.json.");
+        }
     }
 
     private void ParsePositionalAttributes(AttributeCollection attrs)
@@ -7672,12 +7531,7 @@ public sealed class Parser
         {
             var endToken = ExpectBlockEnd(TokenKind.EndArray);
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "ARR", id, "END_ARR", endId);
-            }
             endSpan = endToken.Span;
         }
 
@@ -7795,17 +7649,14 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Foreach);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
 
         // Positional: [id:variable:type] or [id:variable:type:index]
-        var id = attrs["_pos0"] ?? "";
-        var variableName = attrs["_pos1"] ?? "item";
-        var variableType = attrs["_pos2"] ?? "var";
-        var indexVariableName = attrs["_pos3"]; // null if not provided
+        var id = GenerateParserAutoId("each");
+        var variableName = attrs["_pos0"] ?? "item";
+        var variableType = attrs["_pos1"] ?? "var";
+        var indexVariableName = attrs["_pos2"]; // null if not provided
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EACH", "id");
-        }
 
         // Parse collection expression
         var collection = ParseExpression();
@@ -7816,12 +7667,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndForeach, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EACH", id, "END_EACH", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new ForeachStatementNode(
@@ -7833,11 +7679,11 @@ public sealed class Parser
             body,
             attrs,
             indexVariableName,
-            GetIdentifierSpan(attrs, "_pos1", variableName),
+            GetIdentifierSpan(attrs, "_pos0", variableName),
             indexVariableName == null
                 ? null
-                : GetIdentifierSpan(attrs, "_pos3", indexVariableName),
-            attrs.GetSpan("_pos2"));
+                : GetIdentifierSpan(attrs, "_pos2", indexVariableName),
+            attrs.GetSpan("_pos1"));
     }
 
     // Phase 6 Extended: Collections (List, Dictionary, HashSet)
@@ -7873,12 +7719,7 @@ public sealed class Parser
 
         var endToken = ExpectBlockEnd(TokenKind.EndList);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "LIST", id, "END_LIST", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new ListCreationNode(
@@ -7958,12 +7799,7 @@ public sealed class Parser
 
         var endToken = ExpectBlockEnd(TokenKind.EndDict);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DICT", id, "END_DICT", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new DictionaryCreationNode(
@@ -8046,12 +7882,7 @@ public sealed class Parser
 
         var endToken = ExpectBlockEnd(TokenKind.EndHashSet);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "HSET", id, "END_HSET", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new SetCreationNode(
@@ -8279,16 +8110,13 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.EachKV);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
 
         // Positional: {id:keyName:valueName}
-        var id = attrs["_pos0"] ?? "";
-        var keyName = attrs["_pos1"] ?? "key";
-        var valueName = attrs["_pos2"] ?? "value";
+        var id = GenerateParserAutoId("eachkv");
+        var keyName = attrs["_pos0"] ?? "key";
+        var valueName = attrs["_pos1"] ?? "value";
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EACHKV", "id");
-        }
 
         // Parse dictionary expression
         var dictionary = ParseExpression();
@@ -8299,12 +8127,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndEachKV, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EACHKV", id, "END_EACHKV", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new DictionaryForeachNode(span, id, keyName, valueName, dictionary, body, attrs);
@@ -8771,29 +8594,15 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Interface);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name:baseInterface?]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var interfaceNameKey = "_pos1";
-        var pos2 = attrs["_pos2"] ?? "";
+        var id = GenerateParserAutoId("i");
+        var name = attrs["_pos0"] ?? "";
+        var interfaceNameKey = "_pos0";
+        var pos2 = attrs["_pos1"] ?? "";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount >= 1 && !IsIdPattern(id))
-        {
-            // Shift all positionals right: id becomes name, name becomes pos2, etc.
-            pos2 = name;
-            name = id;
-            id = GenerateParserAutoId("i");
-            interfaceNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IFACE", "id");
-        }
         if (string.IsNullOrEmpty(name))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IFACE", "name");
@@ -8852,7 +8661,7 @@ public sealed class Parser
                     baseInterfaces.Add(trimmed);
                 }
             }
-            if (attrs.GetSpan("_pos2") is { } baseInterfaceSpan)
+            if (attrs.GetSpan("_pos1") is { } baseInterfaceSpan)
                 baseInterfaceSpans.Add(baseInterfaceSpan);
         }
         var methods = new List<MethodSignatureNode>();
@@ -8940,17 +8749,7 @@ public sealed class Parser
         {
             endToken = ExpectBlockEnd(TokenKind.EndInterface);
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(
-                    endToken.Span,
-                    "IFACE",
-                    id,
-                    "END_IFACE",
-                    endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -8975,27 +8774,14 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Method);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
+        var id = GenerateParserAutoId("mt");
+        var name = attrs["_pos0"] ?? "";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        var visStr = attrs["_pos2"];
-        if (posCount < 2 && !IsIdPattern(id))
-        {
-            name = id;
-            id = GenerateParserAutoId("m");
-        }
-        else if (posCount == 2 && !IsIdPattern(id))
-        {
-            // #1607 review round 2: `§MT{Run:pub}` in an interface is {name:vis}, not {id:name}.
-            visStr = name;
-            name = id;
-            id = GenerateParserAutoId("m");
-        }
+        var visStr = attrs["_pos1"];
 
         // An interface member is public. The field used to be dropped, so `§MT{m1:Run:bogus}`
         // compiled silently; an unknown word is Calor0122 and any other level is refused too.
@@ -9007,10 +8793,6 @@ public sealed class Parser
                 $"Interface method '{name}' cannot be '{visStr}': interface methods are public. Remove the field or write ':pub'.");
         }
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
-        }
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
         var effectParameters = new List<EffectParameterInfo>();
@@ -9077,12 +8859,7 @@ public sealed class Parser
         else if (TryExpectMemberBlockEnd(TokenKind.EndMethod, startToken, bodyHadContent, out endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -9122,33 +8899,17 @@ public sealed class Parser
         var startToken = Expect(isModule ? TokenKind.Module : TokenKind.Class);
         var closer = isModule ? TokenKind.EndModule : TokenKind.EndClass;
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name:modifiers?] or [id:name:baseClass:modifiers?]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var classNameKey = "_pos1";
-        var pos2 = attrs["_pos2"] ?? "";
-        var pos2Key = "_pos2";
-        var pos3 = attrs["_pos3"];
+        var id = GenerateParserAutoId("c");
+        var name = attrs["_pos0"] ?? "";
+        var classNameKey = "_pos0";
+        var pos2 = attrs["_pos1"] ?? "";
+        var pos2Key = "_pos1";
+        var pos3 = attrs["_pos2"];
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount >= 1 && !IsIdPattern(id) && !IsClassModifierOrVisibility(id))
-        {
-            // Shift all positionals right: id becomes name, name becomes pos2, etc.
-            pos3 = pos2;
-            pos2 = name;
-            pos2Key = "_pos1";
-            name = id;
-            id = GenerateParserAutoId("c");
-            classNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CLASS", "id");
-        }
         if (string.IsNullOrEmpty(name))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CLASS", "name");
@@ -9463,17 +9224,7 @@ public sealed class Parser
         {
             endToken = ExpectOwnedBlockEnd(closer, bodyOwner);
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(
-                    endToken.Span,
-                    "CLASS",
-                    id,
-                    "END_CLASS",
-                    endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -9593,37 +9344,16 @@ public sealed class Parser
         var closer = isModuleFunction ? TokenKind.EndFunc : TokenKind.EndMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name:visibility?:modifiers?]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var methodNameKey = "_pos1";
-        var visStr = attrs["_pos2"] ?? "priv";
-        var modStr = attrs["_pos3"] ?? "";
+        var id = GenerateParserAutoId("mt");
+        var name = attrs["_pos0"] ?? "";
+        var methodNameKey = "_pos0";
+        var visStr = attrs["_pos1"] ?? "priv";
+        var modStr = attrs["_pos2"] ?? "";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        // #1607 review: a two-field header without an ID pattern is the compact {name:vis}
-        // form whatever its second word is (as for §F), so `{Run:prv}` reaches the visibility
-        // check instead of declaring a method named `prv`.
-        if (!IsIdPattern(id) && !string.IsNullOrEmpty(attrs["_pos1"])
-            // A three-field header is {id:name:vis} only when its third field is a visibility;
-            // otherwise it is the compact {name:vis:modifiers} (#1607 review round 2).
-            && (posCount == 2 || posCount == 3 && !IsVisibilityKeyword(attrs["_pos2"] ?? "")))
-        {
-            // Shift: §MT{name:vis:mod}
-            modStr = attrs["_pos2"] ?? "";
-            visStr = name;
-            name = id;
-            id = GenerateParserAutoId("m");
-            methodNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
-        }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr, startToken.Span);
@@ -9721,12 +9451,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(closer, startToken, bodyHadContent, out var endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -9753,36 +9478,16 @@ public sealed class Parser
         var closer = isModuleFunction ? TokenKind.EndAsyncFunc : TokenKind.EndAsyncMethod;
         _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name:visibility?:modifiers?]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var methodNameKey = "_pos1";
-        var visStr = attrs["_pos2"] ?? "priv";
-        var modStr = attrs["_pos3"] ?? "";
+        var id = GenerateParserAutoId("mt");
+        var name = attrs["_pos0"] ?? "";
+        var methodNameKey = "_pos0";
+        var visStr = attrs["_pos1"] ?? "priv";
+        var modStr = attrs["_pos2"] ?? "";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        // #1607 review: a two-field header without an ID pattern is the compact {name:vis}
-        // form whatever its second word is (as for §F), so `{Run:prv}` reaches the visibility
-        // check instead of declaring a method named `prv`.
-        if (!IsIdPattern(id) && !string.IsNullOrEmpty(attrs["_pos1"])
-            // A three-field header is {id:name:vis} only when its third field is a visibility;
-            // otherwise it is the compact {name:vis:modifiers} (#1607 review round 2).
-            && (posCount == 2 || posCount == 3 && !IsVisibilityKeyword(attrs["_pos2"] ?? "")))
-        {
-            modStr = attrs["_pos2"] ?? "";
-            visStr = name;
-            name = id;
-            id = GenerateParserAutoId("m");
-            methodNameKey = "_pos0";
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AMT", "id");
-        }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr, startToken.Span);
@@ -9880,12 +9585,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(closer, startToken, bodyHadContent, out var endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AMT", id, "END_AMT", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -10825,47 +10525,25 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Property);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 5);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name:type:visibility?:modifiers?:accessors?]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var propertyNameKey = "_pos1";
-        var propertyTypeKey = "_pos2";
-        var typeName = attrs["_pos2"] ?? "object";
-        var visStr = attrs["_pos3"] ?? "pub";
-        var modStr = attrs["_pos4"] ?? "";
-        var accessorStr = attrs["_pos5"] ?? "";  // 6th positional for accessor shorthand
+        var id = GenerateParserAutoId("p");
+        var name = attrs["_pos0"] ?? "";
+        var propertyNameKey = "_pos0";
+        var propertyTypeKey = "_pos1";
+        var typeName = attrs["_pos1"] ?? "object";
+        var visStr = attrs["_pos2"] ?? "pub";
+        var modStr = attrs["_pos3"] ?? "";
+        var accessorStr = attrs["_pos4"] ?? "";  // 6th positional for accessor shorthand
 
-        // --- Compact syntax: optional ID ---
-        // Only shift for 4-part format (§PROP{Name:type:vis:accessors}) where ID was omitted.
-        // 3-part format (§PROP{id:name:type}) is the old format -- don't shift.
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount >= 4 && !IsIdPattern(id))
-        {
-            // Shift: id was actually name, name was type, etc.
-            accessorStr = modStr;
-            modStr = visStr;
-            visStr = typeName;
-            typeName = name;
-            propertyTypeKey = "_pos1";
-            name = id;
-            id = GenerateParserAutoId("p");
-            propertyNameKey = "_pos0";
-        }
-
-        // If modStr is an accessor shorthand and there's no explicit accessorStr,
-        // the accessor is in modStr (e.g., §PROP{id:name:type:vis:get,set})
         if (string.IsNullOrEmpty(accessorStr) && IsAccessorShorthand(modStr))
         {
             accessorStr = modStr;
             modStr = "";
         }
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PROP", "id");
-        }
 
         var visibility = ParseVisibility(visStr, startToken.Span);
         var modifiers = ParseMethodModifiers(modStr, startToken.Span);
@@ -10964,12 +10642,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(TokenKind.EndProperty, startToken, bodyHadContent, out endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "PROP", id, "END_PROP", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -11007,19 +10680,16 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Indexer);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 4);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: {id:returnType:visibility[:modifiers[:accessors]]}
-        var id = attrs["_pos0"] ?? "";
-        var typeName = attrs["_pos1"] ?? "object";
-        var visStr = attrs["_pos2"] ?? "pub";
-        var modStr = attrs["_pos3"] ?? "";
-        var accessorStr = attrs["_pos4"] ?? "";
+        var id = GenerateParserAutoId("ix");
+        var typeName = attrs["_pos0"] ?? "object";
+        var visStr = attrs["_pos1"] ?? "pub";
+        var modStr = attrs["_pos2"] ?? "";
+        var accessorStr = attrs["_pos3"] ?? "";
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IXER", "id");
-        }
 
         // If modStr looks like an accessor shorthand and there's no explicit accessorStr,
         // shift it to accessorStr
@@ -11160,12 +10830,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(TokenKind.EndIndexer, startToken, bodyHadContent, out endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IXER", id, "END_IXER", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -11258,26 +10923,13 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Constructor);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 1);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:visibility?]
-        var id = attrs["_pos0"] ?? "";
-        var visStr = attrs["_pos1"] ?? "pub";
+        var id = GenerateParserAutoId("ctor");
+        var visStr = attrs["_pos0"] ?? "pub";
 
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        // #1607 review: a one-field header that is not an ID is the visibility (`§CTOR{pub}`);
-        // an unknown word there is reported below rather than read as an ID.
-        if (posCount < 2 && !string.IsNullOrEmpty(id) && !IsIdPattern(id))
-        {
-            visStr = id;
-            id = GenerateParserAutoId("ctor");
-        }
-
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CTOR", "id");
-        }
 
         var isStatic = visStr.Equals("stat", StringComparison.Ordinal);
         var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr, startToken.Span);
@@ -11334,12 +10986,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(TokenKind.EndConstructor, startToken, bodyHadContent, out var endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CTOR", id, "END_CTOR", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -11362,9 +11009,7 @@ public sealed class Parser
 
         // Parse {id:operator:visibility}
         Expect(TokenKind.OpenBrace);
-        var id = ParseValue();
-
-        Expect(TokenKind.Colon);
+        var id = GenerateParserAutoId("op");
         var operatorToken = ParseOperatorToken();
 
         var visStr = "pub";
@@ -11424,12 +11069,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(TokenKind.EndOperatorOverload, startToken, bodyHadContent, out var endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "OP", id, "END_OP", endId);
-            }
         }
 
         var kind = OperatorOverloadNode.ResolveOperatorKind(operatorToken, parameters.Count);
@@ -11582,16 +11222,13 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Use);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 2);
 
         // Positional: {id:variableName:variableType}
-        var id = attrs["_pos0"] ?? "";
-        var variableName = attrs["_pos1"];
-        var variableType = attrs["_pos2"];
+        var id = GenerateParserAutoId("use");
+        var variableName = attrs["_pos0"];
+        var variableType = attrs["_pos1"];
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "USE", "id");
-        }
 
         // Parse resource expression
         var resource = ParseExpression();
@@ -11602,12 +11239,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndUse, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "USE", id, "END_USE", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new UsingStatementNode(
@@ -11619,21 +11251,18 @@ public sealed class Parser
             body,
             variableName == null
                 ? null
-                : GetIdentifierSpan(attrs, "_pos1", variableName));
+                : GetIdentifierSpan(attrs, "_pos0", variableName));
     }
 
     private TryStatementNode ParseTryStatement()
     {
         var startToken = Expect(TokenKind.Try);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
 
         // Positional: [id]
-        var id = attrs["_pos0"] ?? "";
+        var id = GenerateParserAutoId("tr");
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "TRY", "id");
-        }
 
         // Parse try body. #1485: each clause (§TR/§CA/§FI) owns only the lines
         // indented under it; an empty §CA/§FI leaves a same-column sibling and
@@ -11680,12 +11309,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndTry, clauseOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "TRY", id, "END_TRY", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new TryStatementNode(span, id, tryBody, catchClauses, finallyBody, attrs);
@@ -12367,23 +11991,20 @@ public sealed class Parser
         // #911 review F6: exactly one header group — a following brace group is a
         // collection-initializer expression, not more header attributes.
         var attrs = ParseAttributes(maxGroups: 1);
+        ValidateIdentityFreeHeader(startToken, attrs, null);
 
         // Positional: [id:param1:type1:param2:type2:...] or [id:async:param1:type1:...]
-        var id = attrs["_pos0"] ?? "";
+        var id = GenerateParserAutoId("lam");
         var isAsync = false;
         var isStatic = false;
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LAM", "id");
-        }
 
         // Parse parameters from attributes
         var parameters = new List<LambdaParameterNode>();
         var posCount = attrs["_posCount"];
         if (int.TryParse(posCount, out var count))
         {
-            int i = 1;
+            int i = 0;
             // Check for static/async modifiers
             while (i < count)
             {
@@ -12542,12 +12163,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndLambda, lambdaOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "LAM", id, "END_LAM", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return new LambdaExpressionNode(span, id, parameters, effects, isAsync, expressionBody, statementBody, attrs, isStatic);
@@ -12603,15 +12219,12 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Delegate);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 1);
 
         // Positional: [id:name]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
+        var id = GenerateParserAutoId("del");
+        var name = attrs["_pos0"] ?? "";
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DEL", "id");
-        }
         if (string.IsNullOrEmpty(name))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DEL", "name");
@@ -12645,12 +12258,7 @@ public sealed class Parser
 
         var endToken = ExpectBlockEnd(TokenKind.EndDelegate);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DEL", id, "END_DEL", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new DelegateDefinitionNode(
@@ -12661,7 +12269,7 @@ public sealed class Parser
             output,
             effects,
             attrs,
-            GetIdentifierSpan(attrs, "_pos1", name)), startToken);
+            GetIdentifierSpan(attrs, "_pos0", name)), startToken);
     }
 
     /// <summary>
@@ -12672,29 +12280,16 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Event);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
 
         // Positional: [id:name:visibility:delegateType]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var visStr = attrs["_pos2"] ?? "priv";
-        var delegateType = attrs["_pos3"] ?? "";
+        var id = GenerateParserAutoId("ev");
+        var name = attrs["_pos0"] ?? "";
+        var visStr = attrs["_pos1"] ?? "priv";
+        var delegateType = attrs["_pos2"] ?? "";
 
-        // --- Compact syntax: optional ID (§EVT{Click:pub:EventHandler}, as documented) ---
-        var delegateTypeKey = "_pos3";
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount == 3 && !IsIdPattern(id) && IsVisibilityKeyword(name))
-        {
-            delegateType = visStr;
-            visStr = name;
-            name = id;
-            id = GenerateParserAutoId("e");
-            delegateTypeKey = "_pos2";
-        }
+        var delegateTypeKey = "_pos2";
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "id");
-        }
         if (string.IsNullOrEmpty(name))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "name");
@@ -12745,12 +12340,7 @@ public sealed class Parser
         if (TryExpectMemberBlockEnd(TokenKind.EndEvent, startToken, bodyHadContent, out endToken))
         {
             var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? "";
 
-            if (ShouldReportMismatchedId(endId, id, endToken))
-            {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EVT", id, "END_EVT", endId);
-            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -13396,23 +12986,15 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Enum);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
         var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name] or [id:name:vis] or [id:name:underlyingType] or [id:name:vis:underlyingType]
-        var id = attrs["_pos0"] ?? "";
-        var name = attrs["_pos1"] ?? "";
-        var enumNameKey = "_pos1";
-        var pos2 = attrs["_pos2"];
-        var pos3 = attrs["_pos3"];
-
-        // --- Compact syntax: optional ID ---
-        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id))
-        {
-            name = id;
-            id = GenerateParserAutoId("e");
-            enumNameKey = "_pos0";
-        }
+        var id = GenerateParserAutoId("e");
+        var name = attrs["_pos0"] ?? "";
+        var enumNameKey = "_pos0";
+        var pos2 = attrs["_pos1"];
+        var pos3 = attrs["_pos2"];
 
         // Disambiguate pos2: visibility keyword vs underlying type
         Visibility visibility = Visibility.Public;
@@ -13435,10 +13017,6 @@ public sealed class Parser
             underlyingType = pos2;
         }
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EN", "id");
-        }
         if (string.IsNullOrEmpty(name))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EN", "name");
@@ -13497,12 +13075,7 @@ public sealed class Parser
         }
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndEnum, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EN", id, "END_EN", endId);
-        }
 
         var span = startToken.Span.Union(endToken.Span);
         return WithDocumentation(new EnumDefinitionNode(
@@ -13676,15 +13249,12 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.EnumExtension);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, 1);
 
         // Positional: [id:enumName]
-        var id = attrs["_pos0"] ?? "";
-        var enumName = attrs["_pos1"] ?? "";
+        var id = GenerateParserAutoId("ext");
+        var enumName = attrs["_pos0"] ?? "";
 
-        if (string.IsNullOrEmpty(id))
-        {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EXT", "id");
-        }
         if (string.IsNullOrEmpty(enumName))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EXT", "enumName");
@@ -13716,12 +13286,7 @@ public sealed class Parser
 
         var endToken = ExpectOwnedBlockEnd(TokenKind.EndEnumExtension, bodyOwner);
         var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
 
-        if (ShouldReportMismatchedId(endId, id, endToken))
-        {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EXT", id, "END_EXT", endId);
-        }
 
         // Validate that each extension method has a parameter of the enum type
         if (!string.IsNullOrEmpty(enumName))
@@ -13861,36 +13426,7 @@ public sealed class Parser
         return false;
     }
 
-    private static bool ShouldReportMismatchedId(string endId, string openId, Token endToken)
-    {
-        // Phase 3 (indent-aware): if the block was terminated by a Dedent
-        // or by reaching EOF (no explicit §/X closer), there is no ID to
-        // mismatch against.
-        if (endToken.Kind == TokenKind.Dedent || endToken.Kind == TokenKind.Eof)
-            return false;
 
-        // Phase 4d: structural legacy closers (§/F, §/M, §/CL, ...) are removed
-        // syntax and are already flagged + auto-healed by Calor0830, whose fix
-        // DELETES the entire closer line. Reporting a redundant Calor0101 id
-        // mismatch here would attach a second, conflicting fix (inserting the
-        // opener id into a closer that is being deleted) -- applying both fixes
-        // scrambles the source. The closer is going away entirely, so any id
-        // mismatch on it is moot; let Calor0830 own these tokens.
-        if (StructuralLegacyClosers.Contains(endToken.Kind))
-            return false;
-
-        // If both are the same, no mismatch
-        if (endId == openId)
-            return false;
-
-        // If the open ID was auto-generated and the end ID is empty, that's fine
-        // (compact syntax: §/F or §/MT with no braces)
-        if (openId.Contains("_auto") && string.IsNullOrEmpty(endId))
-            return false;
-
-        // Otherwise it's a real mismatch
-        return true;
-    }
 
     /// <summary>
     /// Determines if a value looks like an ID pattern (e.g., "f001", "m002", "c001", "ctor1").
@@ -14617,21 +14153,22 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Array2D);
         var attrs = ParseAttributes();
+        ValidateIdentityFreeHeader(startToken, attrs, null);
 
-        var id = attrs["_pos0"] ?? "_arr2d";
-        var name = attrs["_pos1"] ?? "_arr2d";
-        var elementType = attrs["_pos2"] ?? "i32";
+        var id = GenerateParserAutoId("arr2d");
+        var name = attrs["_pos0"] ?? "_arr2d";
+        var elementType = attrs["_pos1"] ?? "i32";
 
         var dimensionSizes = new List<ExpressionNode>();
         var initializer = new List<IReadOnlyList<ExpressionNode>>();
         var rank = 2;
 
         // Check for dimension sizes in positions 3+
-        var pos3 = attrs["_pos3"];
+        var pos3 = attrs["_pos2"];
         if (pos3 != null)
         {
             // Sized form: §ARR2D{id:name:type:dim1:dim2[:dim3...]}
-            for (int i = 3; ; i++)
+            for (int i = 2; ; i++)
             {
                 var posN = attrs[$"_pos{i}"];
                 if (posN == null) break;
@@ -14686,7 +14223,7 @@ public sealed class Parser
             rank,
             dimensionSizes,
             initializer,
-            attrs.GetSpan("_pos2"));
+            attrs.GetSpan("_pos1"));
     }
 
     /// <summary>
@@ -14717,7 +14254,8 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.SyncBlock);
         var attrs = ParseAttributes();
-        var id = attrs["_pos0"] ?? "_sync";
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        var id = GenerateParserAutoId("sync");
 
         // Parse lock expression in parentheses
         Expect(TokenKind.OpenParen);
@@ -14743,7 +14281,8 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Unsafe);
         var attrs = ParseAttributes();
-        var id = attrs["_pos0"] ?? "_unsafe";
+        ValidateIdentityFreeHeader(startToken, attrs, 0);
+        var id = GenerateParserAutoId("unsafe");
 
         // #1485: the body owns only lines indented under the opener.
         var bodyOwner = BeginBlockBody(startToken, TokenKind.EndUnsafe, id);
@@ -14764,11 +14303,12 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Fixed);
         var attrs = ParseAttributes();
-        var id = attrs["_pos0"] ?? "_fixed";
-        var pointerName = attrs["_pos1"] ?? "ptr";
-        var pointerType = attrs["_pos2"] ?? "i32*";
-        // The init expression is in _pos3 or we parse after
-        var initStr = attrs["_pos3"];
+        ValidateIdentityFreeHeader(startToken, attrs, 3);
+        var id = GenerateParserAutoId("fixed");
+        var pointerName = attrs["_pos0"] ?? "ptr";
+        var pointerType = attrs["_pos1"] ?? "i32*";
+        // The init expression is in _pos2 or we parse after
+        var initStr = attrs["_pos2"];
 
         ExpressionNode initializer;
         if (initStr != null)
@@ -14796,7 +14336,7 @@ public sealed class Parser
             pointerType,
             initializer,
             body,
-            attrs.GetSpan("_pos2"));
+            attrs.GetSpan("_pos1"));
     }
 
     #endregion
