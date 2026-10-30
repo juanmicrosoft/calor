@@ -653,18 +653,7 @@ public sealed class DeclarationIdentityStore
         foreach (var added in remainingNew.Values)
         {
             string id;
-            if (IdValidator.IsCanonicalId(added.Id))
-            {
-                if (IdGenerator.GetKindFromId(added.Id) != added.Kind)
-                    throw new InvalidOperationException($"Source identity kind does not match declaration kind: {added.Id}");
-                id = added.Id;
-                if (!used.Add(id))
-                    throw new InvalidOperationException($"Duplicated declaration identity in source: {id}");
-            }
-            else
-            {
-                do { id = CompactIdGenerator.Generate(added.Kind); } while (!used.Add(id));
-            }
+            do { id = CompactIdGenerator.Generate(added.Kind); } while (!used.Add(id));
             result.Add(added with { Id = id });
         }
         return new State(SchemaVersion, sources.Keys.Order(StringComparer.Ordinal).ToArray(),

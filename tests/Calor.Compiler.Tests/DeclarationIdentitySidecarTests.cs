@@ -249,14 +249,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.False(File.Exists(PathFor("project/.calor/ids.json")));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void TextClassRenamePreservesSelfTypedMemberIdentity(bool canonicalSourceId)
+    [Fact]
+    public void TextClassRenamePreservesSelfTypedMemberIdentity()
     {
-        var methodId = canonicalSourceId ? CompactIdGenerator.Generate(IdKind.Method) + ":" : "";
-        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{" + methodId
-            + "Echo:pub} (A:value) -> A\n      §R value\n";
+        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{Echo:pub} (A:value) -> A\n      §R value\n";
         var file = Write("active.calr", source);
         var before = Store.Sync([file]);
         var after = source.Replace("§CL{A:", "§CL{B:").Replace("(A:value)", "(B:value)").Replace("-> A", "-> B");
@@ -267,14 +263,10 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             result.Declarations.Single(d => d.Name == "B").Id);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task McpClassRenameReportsExistingTypeIndexLimitationWithoutEdits(bool canonicalSourceId)
+    [Fact]
+    public async Task McpClassRenameReportsExistingTypeIndexLimitationWithoutEdits()
     {
-        var methodId = canonicalSourceId ? CompactIdGenerator.Generate(IdKind.Method) + ":" : "";
-        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{" + methodId
-            + "Echo:pub} (A:value) -> A\n      §R value\n"
+        var source = "§M{Demo}\n  §CL{A:pub}\n    §MT{Echo:pub} (A:value) -> A\n      §R value\n"
             + "    §MT{Echo:pub} (i32:value) -> i32\n      §R value\n";
         var file = Write("active.calr", source);
         Store.Sync([file]);
@@ -339,28 +331,24 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, "property")]
-    [InlineData(true, "property")]
-    [InlineData(false, "indexer")]
-    [InlineData(true, "indexer")]
-    [InlineData(false, "init")]
-    [InlineData(true, "init")]
-    [InlineData(false, "event")]
-    [InlineData(true, "event")]
-    public void AccessorLocalDeclarationsHaveDistinctStableScopes(bool sourceIds, string memberKind)
+    [InlineData("property")]
+    [InlineData("indexer")]
+    [InlineData("init")]
+    [InlineData("event")]
+    public void AccessorLocalProofsHaveDistinctStableScopes(string memberKind)
     {
         var member = memberKind switch
         {
-            "property" => "§PROP{" + (sourceIds ? "p001:" : "") + "P:i32:pub}",
-            "init" => "§PROP{" + (sourceIds ? "p001:" : "") + "P:i32:pub}",
-            "indexer" => "§IXER{ix001:i32:pub}\n      §I{i32:index}",
-            _ => "§EVT{" + (sourceIds ? "e001:" : "") + "Changed:pub:EventHandler}"
+            "property" => "§PROP{P:i32:pub}",
+            "init" => "§PROP{P:i32:pub}",
+            "indexer" => "§IXER{i32:pub}\n      §I{i32:index}",
+            _ => "§EVT{Changed:pub:EventHandler}"
         };
         var firstAccessor = memberKind == "event" ? "§EADD" : "§GET";
         var secondAccessor = memberKind == "event" ? "§EREM" : memberKind == "init" ? "§INIT" : "§SET";
         var source = "§M{Demo}\n  §CL{A:pub}\n    " + member + "\n"
-            + "      " + firstAccessor + "\n        §F{" + (sourceIds ? "f001:" : "") + "Helper:priv} () -> i32\n          §R 1\n"
-            + "      " + secondAccessor + "\n        §F{" + (sourceIds ? "f002:" : "") + "Helper:priv} () -> i32\n          §R 2\n";
+            + "      " + firstAccessor + "\n        §PROOF{\"Helper\"} (> 1 0)\n        §R 1\n"
+            + "      " + secondAccessor + "\n        §PROOF{\"Helper\"} (> 1 0)\n        §R 2\n";
         var file = Write("active.calr", source);
         var before = Store.Sync([file]).Declarations.Where(d => d.Name == "Helper").ToArray();
         Assert.Equal(2, before.Length);
@@ -455,11 +443,11 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Fact]
-    public void MismatchedCanonicalSourceKindCannotLeaveAnInvalidJournal()
+    public void RemovedSourceIdentityFieldCannotLeaveAnInvalidJournal()
     {
         var source = Original.Replace("§F{Add", "§F{" + CompactIdGenerator.Generate(IdKind.Module) + ":Add");
         var file = Write("active.calr", source);
-        Assert.Contains("kind", Assert.Throws<InvalidOperationException>(() => Store.Sync([file])).Message);
+        Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync([file]));
         Assert.False(File.Exists(Store.SidecarPath));
         Assert.False(File.Exists(PathFor(".calor/ids.transaction.json")));
         Assert.Equal(source, File.ReadAllText(file));
@@ -483,11 +471,11 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     {
         const string source = """
             §M{Demo}
-              §CL{c001:Parts:pub:partial}
-                §MT{mt001:First:pub} () -> i32
+              §CL{Parts:pub:partial}
+                §MT{First:pub} () -> i32
                   §R 1
-              §CL{c002:Parts:pub:partial}
-                §MT{mt002:Second:pub} () -> i32
+              §CL{Parts:pub:partial}
+                §MT{Second:pub} () -> i32
                   §R 2
             """;
         var file = Write("active.calr", source);
@@ -509,9 +497,9 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
             §M{Demo}
               §CL{Container:pub}
                 §FLD{i32:count:pub}
-                §EVT{ev001:Changed:pub:EventHandler}
+                §EVT{Changed:pub:EventHandler}
               §F{Main:pub} () -> i32
-                §PROOF{po001:positive} (> 1 0)
+                §PROOF{positive} (> 1 0)
                 §R 1
             """;
         var file = Write("active.calr", source);
@@ -641,7 +629,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var emitted = new CalorEmitter().Emit(parsed.Ast!);
         foreach (var declaration in state.Declarations)
             Assert.DoesNotContain(declaration.Id, emitted);
-        Assert.Contains(parsed.Ast!.Functions.Single().SourceId, emitted);
+        Assert.DoesNotContain(parsed.Ast!.Functions.Single().SourceId, emitted);
     }
 
     [Fact]
@@ -874,13 +862,13 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Fact]
-    public void CanonicalSourceIdentityIsImportedWithoutRepointingIt()
+    public void CanonicalLookingSemanticNameNeverSelectsSidecarIdentity()
     {
         var functionId = CompactIdGenerator.Generate(IdKind.Function);
-        var source = Original.Replace("§F{Add", "§F{" + functionId + ":Add");
+        var source = Original.Replace("§F{Add", "§F{" + functionId);
         var file = Write("active.calr", source);
         var state = Store.Sync([file]);
-        Assert.Equal(functionId, state.Declarations.Single(d => d.Name == "Add").Id);
+        Assert.NotEqual(functionId, state.Declarations.Single(d => d.Name == functionId).Id);
         Assert.Equal(source, File.ReadAllText(file));
     }
 
@@ -1044,7 +1032,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         var file = Write("active.calr", Original);
         if (registered) Store.Sync([file]);
         var before = File.Exists(Store.SidecarPath) ? File.ReadAllText(Store.SidecarPath) : null;
-        var duplicate = Original + "\n  §F{OtherId:Add:pub} (i32:x) -> i32\n    §R x\n";
+        var duplicate = Original + "\n  §F{Add:pub} (i32:x) -> i32\n    §R x\n";
         File.WriteAllText(file, duplicate);
         var failure = Assert.Throws<DeclarationIdentityParseException>(() => Store.Sync([file]));
         var diagnostic = Assert.Single(failure.Diagnostics.Errors);
@@ -1097,21 +1085,22 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
     }
 
     [Fact]
-    public void DelegateEventFieldLocalFunctionAndProofIdentitiesSurviveEdits()
+    public void DelegateEventFieldLambdaAndProofIdentitiesSurviveEdits()
     {
         const string source = """
             §M{Demo}
-              §DEL{d001:Transform}
-                §I{i32:x}
+              §DEL{Transform}
+                §I{i32:value}
                 §O{i32}
               §CL{A:pub}
-                §EVT{ev001:Changed:pub:EventHandler}
+                §EVT{Changed:pub:EventHandler}
                 §FLD{i32:value:pub}
               §F{Main:pub} () -> i32
-                §F{Local:priv} () -> i32
-                  §IF{check} true
-                    §PROOF{po001:positive} (> 1 0)
+                §B{Local:System.Func<i32>} §LAM{}
+                  §IF true
+                    §PROOF{"positive"} (> 1 0)
                   §R 1
+                §/LAM
                 §R 0
             """;
         var initialParse = CalorSourceHelper.Parse(source);
@@ -1122,7 +1111,7 @@ public sealed class DeclarationIdentitySidecarTests : IDisposable
         Assert.Contains(before.Declarations, d => d.Kind == IdKind.Event);
         Assert.Contains(before.Declarations, d => d.Kind == IdKind.Field);
         Assert.Contains(before.Declarations, d => d.Kind == IdKind.ProofObligation);
-        Assert.Contains(before.Declarations, d => d.Name == "Local" && d.Container.Contains("Main"));
+        Assert.Contains(before.Declarations, d => d.Kind == IdKind.ProofObligation && d.Container.Contains("Main"));
         var updated = source.Replace("Transform", "Convert").Replace("Changed", "Updated")
             .Replace("Local", "Inner").Replace("positive", "valid");
         var after = Store.Apply([new(file, source, updated)]);

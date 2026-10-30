@@ -5766,7 +5766,7 @@ public sealed class Parser
         // Expect §EL (else)
         if (!Check(TokenKind.Else))
         {
-            _diagnostics.ReportError(Current.Span, "Calor0101", "IF expression requires an else clause (§EL)");
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken, "IF expression requires an else clause (§EL)");
             return thenExpr;
         }
         Expect(TokenKind.Else);
@@ -6150,10 +6150,17 @@ public sealed class Parser
         static bool IntegralType(string value) => value is
             "i8" or "u8" or "i16" or "u16" or "i32" or "u32" or "i64" or "u64"
             or "byte" or "sbyte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong";
+        if (maximum.HasValue && count > maximum.Value && !empty)
+        {
+            _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
+                $"Source IDs are removed from '{token.Text}'. Remove the leading ID field; tooling maintains declaration identity in .calor/ids.json.");
+            return;
+        }
         var invalidField = token.Kind switch
         {
             TokenKind.Module when !_parsingModuleMembers => attrs["_pos1"] is { } policy
-                && policy is not ("overflow=checked" or "overflow=unchecked"),
+                && (!policy.StartsWith("overflow=", StringComparison.Ordinal)
+                    || policy["overflow=".Length..].Trim() is not ("checked" or "unchecked")),
             TokenKind.Namespace => Enumerable.Range(1, Math.Max(0, count - 1))
                 .Any(index => attrs[$"_pos{index}"] is not ("global" or "named" or "file")),
             TokenKind.Func or TokenKind.AsyncFunc or TokenKind.Method or TokenKind.AsyncMethod => InvalidVisibility(1),
@@ -6167,10 +6174,30 @@ public sealed class Parser
                     && InvalidVisibility(1) && !IntegralType(visibilityOrType),
             _ => false
         };
-        if (maximum.HasValue && count > maximum.Value && !empty || invalidField)
+        if (invalidField)
         {
-            _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
-                $"Source IDs are removed from '{token.Text}'. Remove the leading ID field; tooling maintains declaration identity in .calor/ids.json.");
+            var position = token.Kind switch
+            {
+                TokenKind.Property => 2,
+                TokenKind.Constructor => 0,
+                TokenKind.Namespace => Enumerable.Range(1, count - 1)
+                    .First(index => attrs[$"_pos{index}"] is not ("global" or "named" or "file")),
+                TokenKind.Enum when !InvalidVisibility(1) && attrs["_pos2"] != null => 2,
+                _ => 1
+            };
+            var expected = token.Kind switch
+            {
+                TokenKind.Module => "overflow=checked or overflow=unchecked",
+                TokenKind.Namespace => "a namespace marker (global, named, or file)",
+                TokenKind.Constructor => "a visibility or stat",
+                TokenKind.Enum when position == 2 => "an integral enum underlying type",
+                TokenKind.Enum when attrs["_pos2"] == null => "a visibility or integral enum underlying type",
+                _ => "a visibility (pub, priv, prot, int, prot-int, or priv-prot)"
+            };
+            var key = $"_pos{position}";
+            var span = attrs.TryGetSpan(key, out var fieldSpan) ? fieldSpan : token.Span;
+            _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                $"Invalid header field '{attrs[key]}' in '{token.Text}'; expected {expected}.");
         }
     }
 
@@ -13433,66 +13460,6 @@ public sealed class Parser
     }
 
 
-
-    /// <summary>
-    /// Determines if a value looks like an ID pattern (e.g., "f001", "m002", "c001", "ctor1").
-    /// Used for disambiguation when the first positional might be an ID or a name.
-    ///
-    /// ID patterns:
-    /// - A letter prefix followed by digits: f001, m002, c001, p001, e001, i001
-    /// - "ctor" followed by digits: ctor1, ctor2
-    /// - Contains underscore followed by digits: my_001
-    /// - Explicitly empty string (treated as needing an ID)
-    ///
-    /// NOT ID patterns (these are names):
-    /// - PascalCase identifiers: Main, GetValue, IShape, MyClass
-    /// - camelCase identifiers: getValue, myMethod
-    /// - Visibility keywords: pub, pri, pro
-    /// - Modifier keywords: abs, seal, static
-    /// </summary>
-    private static bool IsIdPattern(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return false;
-
-        // Check for common ID patterns: letter(s) + digits
-        // e.g., f001, m002, c001, p001, e001, i001, ctor1, op1
-        var i = 0;
-
-        // Consume leading lowercase letters
-        while (i < value.Length && char.IsLower(value[i]))
-            i++;
-
-        // Must have consumed at least one letter and remaining must be all digits
-        if (i > 0 && i < value.Length)
-        {
-            var allDigits = true;
-            for (var j = i; j < value.Length; j++)
-            {
-                if (!char.IsDigit(value[j]))
-                {
-                    allDigits = false;
-                    break;
-                }
-            }
-            if (allDigits)
-                return true;
-        }
-
-        // Also match patterns with underscore like "f_001" or "my_id_001"
-        if (value.Contains('_'))
-        {
-            var lastUnderscore = value.LastIndexOf('_');
-            if (lastUnderscore < value.Length - 1)
-            {
-                var suffix = value.Substring(lastUnderscore + 1);
-                if (suffix.All(char.IsDigit))
-                    return true;
-            }
-        }
-
-        return false;
-    }
 
     /// <summary>
     /// Known accessor keywords used in compact property shorthand.

@@ -7,6 +7,78 @@ namespace Calor.Compiler.Tests;
 public sealed class IdentityFreeSyntaxTests
 {
     [Fact]
+    public void ConversionAndReemissionNeverSerializeDeclarationOrBlockIdentity()
+    {
+        const string csharp = """
+            using System;
+            public class Sample
+            {
+                public int Value { get; set; }
+                public int this[int index] { get => index; }
+                public Sample() { }
+                public int Run(int x)
+                {
+                    Func<int, int> f = y => y + 1;
+                    for (int i = 0; i < 2; i = i + 1) { x = f(x); }
+                    while (x < 0) { x = x + 1; }
+                    return x;
+                }
+            }
+            """;
+        var conversion = new Migration.CSharpToCalorConverter().Convert(csharp);
+        Assert.False(conversion.HasErrors, string.Join("\n", conversion.Issues) + "\n" + conversion.CalorSource);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(conversion.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var emitted = new Migration.CalorEmitter().Emit(module);
+        module.ToolingId = Ids.CompactIdGenerator.Generate(Ids.IdKind.Module);
+        foreach (var cls in module.Classes)
+        {
+            cls.ToolingId = Ids.CompactIdGenerator.Generate(Ids.IdKind.Class);
+            foreach (var method in cls.Methods)
+                method.ToolingId = Ids.CompactIdGenerator.Generate(Ids.IdKind.Method);
+        }
+        Assert.Equal(emitted, new Migration.CalorEmitter().Emit(module));
+        var roundTripDiagnostics = new DiagnosticBag();
+        new Parser(new Lexer(emitted, roundTripDiagnostics).TokenizeAllForParser(), roundTripDiagnostics).Parse();
+        Assert.False(roundTripDiagnostics.HasErrors, string.Join("\n", roundTripDiagnostics));
+        Assert.Contains("§CTOR{pub}", emitted);
+        Assert.Contains("§PROP{Value:", emitted);
+        Assert.Contains("§LAM{y:", emitted);
+        Assert.DoesNotContain("§/LAM{", emitted);
+    }
+
+    [Fact]
+    public void SidecarIdentityDoesNotComeFromAnIdentityShapedSemanticName()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "calor-source-free-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var name = Ids.CompactIdGenerator.Generate(Ids.IdKind.Function);
+            var source = $"§M{{m001}}\n  §F{{{name}:pub}} () -> void\n    §E{{}}\n";
+            var file = Path.Combine(directory, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Ids.DeclarationIdentityStore(directory);
+            var state = store.Sync([file]);
+            var identity = Assert.Single(state.Declarations.Where(d => d.Kind == Ids.IdKind.Function));
+            Assert.Equal(name, identity.Name);
+            Assert.NotEqual(name, identity.Id);
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            store.Attach(file, source, module);
+            Assert.Equal(identity.Id, Assert.Single(module.Functions).Id);
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.DoesNotContain(identity.Id, new Migration.CalorEmitter().Emit(module));
+            Assert.False(diagnostics.HasErrors);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void IdentityShapedNamesHaveOnlyCurrentSemanticMeaning()
     {
         const string source = """
@@ -67,6 +139,8 @@ public sealed class IdentityFreeSyntaxTests
     [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §HSET{str} \"a\" §/HSET")]
     [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §B{items} §ARR2D{i32:1:2} §/ARR2D")]
     [InlineData("§M{Demo}\n  §F{Run:pub} () -> void\n    §LIST{items:i32}\n      1\n      2")]
+    [InlineData("§M{Demo:overflow=checked}")]
+    [InlineData("§M{Demo:overflow=unchecked}")]
     public void CurrentHeadersHaveNoIdentityField(string source)
     {
         var diagnostics = new DiagnosticBag();
@@ -96,7 +170,25 @@ public sealed class IdentityFreeSyntaxTests
         new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.Contains(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.UnexpectedToken
-            && diagnostic.Message.Contains("Source IDs are removed", StringComparison.Ordinal)
-            && diagnostic.Message.Contains(".calor/ids.json", StringComparison.Ordinal));
+            && (diagnostic.Message.Contains("Source IDs are removed", StringComparison.Ordinal)
+                && diagnostic.Message.Contains(".calor/ids.json", StringComparison.Ordinal)
+                || diagnostic.Message.Contains("Invalid header field", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("expected", StringComparison.Ordinal)));
+    }
+
+    [Theory]
+    [InlineData("§M{Demo:overflow=bogus}", "overflow= bogus", "overflow=checked", 9)]
+    [InlineData("§M{Demo}\n  §F{Run:bogus} () -> void", "bogus", "visibility", 10)]
+    [InlineData("§M{Demo}\n  §NS{Outer:bogus}", "bogus", "namespace marker", 13)]
+    public void InvalidCurrentFieldsAreLocatedAndNeverSuggestDeletingTheName(
+        string source, string invalidField, string expected, int column)
+    {
+        var diagnostics = new DiagnosticBag();
+        new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var diagnostic = Assert.Single(diagnostics.Where(d => d.Message.Contains("Invalid header field")));
+        Assert.Contains(invalidField, diagnostic.Message);
+        Assert.Contains(expected, diagnostic.Message);
+        Assert.Equal(column, diagnostic.Span.Column);
+        Assert.DoesNotContain("Remove the leading ID", diagnostic.Message);
     }
 }
