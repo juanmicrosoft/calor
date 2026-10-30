@@ -12617,14 +12617,32 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SymbolDisplayFormat.MinimallyQualifiedFormat.AddMiscellaneousOptions(
                 SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)));
 
-    private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
+    private ExpressionNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
     {
+        if (prefix.IsKind(SyntaxKind.UnaryPlusExpression))
+        {
+            if (_semanticModel?.GetOperation(prefix) is not Microsoft.CodeAnalysis.Operations.IUnaryOperation
+                { OperatorMethod: null, Type: { } resultType }
+                || !IsBuiltInUnaryPlusType(resultType)
+                || _semanticModel.GetTypeInfo(prefix.Operand).Type is not { } operandType
+                || !IsBuiltInUnaryPlusType(operandType))
+                throw EscalateExpression(prefix, "unsupported-prefix-operator");
+
+            // Unary numeric promotion is an identity or widening conversion, including
+            // lifted nullable operands. A cast preserves the result type and one evaluation.
+            var targetType = resultType is INamedTypeSymbol
+                { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+                ? $"System.Nullable<{CalorTypeName(nullable.TypeArguments[0], prefix.SpanStart)}>"
+                : CalorTypeName(resultType, prefix.SpanStart);
+            return new TypeOperationNode(GetTextSpan(prefix), TypeOp.Cast,
+                ConvertExpression(prefix.Operand), targetType);
+        }
+
         var operand = ConvertExpression(prefix.Operand);
 
         // #774: exhaustive SyntaxKind mapping — an unknown prefix operator must
-        // NEVER silently become negation. Unary plus (+x) has no Calor node and
-        // could change user-defined operator+ overload resolution, so it escalates
-        // to §CSHARP interop rather than being dropped. AddressOf / pointer-deref /
+        // NEVER silently become negation. User-defined unary plus stays preserved;
+        // only proven built-in promotion is lowered above. AddressOf / pointer-deref /
         // index-from-end are dispatched earlier and never reach this method.
         var unaryOp = prefix.Kind() switch
         {
@@ -12637,6 +12655,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
 
         return new UnaryOperationNode(GetTextSpan(prefix), unaryOp, operand);
+    }
+
+    private static bool IsBuiltInUnaryPlusType(ITypeSymbol type)
+    {
+        if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
+            type = nullable.TypeArguments[0];
+        return type.SpecialType is SpecialType.System_SByte or SpecialType.System_Byte
+            or SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Char
+            or SpecialType.System_Int32 or SpecialType.System_UInt32
+            or SpecialType.System_Int64 or SpecialType.System_UInt64
+            or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
     }
 
     private IndexFromEndNode ConvertIndexFromEndExpression(PrefixUnaryExpressionSyntax node)

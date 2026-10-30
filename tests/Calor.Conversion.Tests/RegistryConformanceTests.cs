@@ -470,7 +470,7 @@ public class RegistryConformanceTests
     // ------------------------------------------------------------------
     // Prefix unary operators (#774): exhaustive SyntaxKind mapping — an
     // unknown prefix operator must never silently become negation, and unary
-    // plus (no Calor node) escalates instead of being dropped.
+    // plus uses a native cast only for proven built-in numeric promotion.
     // ------------------------------------------------------------------
 
     [Theory]
@@ -498,15 +498,13 @@ public class RegistryConformanceTests
     }
 
     [Fact]
-    public void PrefixUnary_UnaryPlus_EscalatesToInterop()
+    public void PrefixUnary_UserDefinedUnaryPlus_EscalatesToInterop()
     {
-        // +x has no Calor node and could change user-defined operator+ overload
-        // resolution. The old code silently mapped ANY unknown prefix operator
-        // (including +) to negation, turning `+x` into `-x`. It must escalate.
         var csharp = """
             public class U
             {
-                public int Pos(int x)
+                public static U operator +(U x) { return new U(); }
+                public U Pos(U x)
                 {
                     return +x;
                 }

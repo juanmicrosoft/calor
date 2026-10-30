@@ -12,6 +12,102 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class OperatorOverloadTests
 {
+    [Theory]
+    [InlineData("byte", "255", "Int32:255")]
+    [InlineData("sbyte", "-128", "Int32:-128")]
+    [InlineData("short", "-32768", "Int32:-32768")]
+    [InlineData("ushort", "65535", "Int32:65535")]
+    [InlineData("char", "'A'", "Int32:65")]
+    [InlineData("int", "System.Int32.MinValue", "Int32:-2147483648")]
+    [InlineData("uint", "4294967295U", "UInt32:4294967295")]
+    [InlineData("long", "System.Int64.MinValue", "Int64:-9223372036854775808")]
+    [InlineData("ulong", "18446744073709551615UL", "UInt64:18446744073709551615")]
+    [InlineData("float", "1.5F", "Single:1.5")]
+    [InlineData("double", "1.5D", "Double:1.5")]
+    [InlineData("decimal", "1.5M", "Decimal:1.5")]
+    public void Migration_BuiltInUnaryPlus_PreservesPromotionAndSingleEvaluation(
+        string type, string value, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                static int calls;
+                static {{type}} Next() { calls++; return {{value}}; }
+                static string Pick<T>(T value) { return typeof(T).Name + ":" + value; }
+                public static string Run() { return Pick(+Next()) + ":" + calls; }
+            }
+            """;
+        AssertNativeUnaryPlusRoundTrip(source, expected + ":1");
+    }
+
+    [Theory]
+    [InlineData("byte?", "null", "<null>")]
+    [InlineData("byte?", "255", "Int32:255")]
+    [InlineData("int?", "null", "<null>")]
+    [InlineData("int?", "-1", "Int32:-1")]
+    public void Migration_LiftedUnaryPlus_PreservesNullablePromotion(string type, string value, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                static string Pick<T>(T? value) where T : struct
+                {
+                    if (value == null) return "<null>";
+                    return typeof(T).Name + ":" + value;
+                }
+                public static string Run() { {{type}} x = {{value}}; return Pick(+x); }
+            }
+            """;
+        AssertNativeUnaryPlusRoundTrip(source, expected);
+    }
+
+    [Theory]
+    [InlineData("0.0", "0")]
+    [InlineData("-0.0", "-9223372036854775808")]
+    [InlineData("System.Double.NaN", "-2251799813685248")]
+    [InlineData("System.Double.PositiveInfinity", "9218868437227405312")]
+    public void Migration_UnaryPlus_PreservesFloatingPointBits(string value, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    double x = {{value}};
+                    return System.BitConverter.DoubleToInt64Bits(+x).ToString();
+                }
+            }
+            """;
+        AssertNativeUnaryPlusRoundTrip(source, expected);
+    }
+
+    [Theory]
+    [InlineData("public class Value { public static int Calls; public static Value operator +(Value x) { Calls++; return new Value(); } }",
+        "Value x = new Value(); var y = +x; return Value.Calls.ToString();", "1")]
+    [InlineData("public class Value { public static implicit operator short(Value x) { return 7; } public static explicit operator int(Value x) { return 9; } }",
+        "Value x = new Value(); return (+x).ToString();", "7")]
+    [InlineData("", "dynamic x = 7; return (+x).ToString();", "7")]
+    public void Migration_UnprovenUnaryPlus_IsPreserved(string declaration, string body, string expected)
+    {
+        var source = declaration + " public static class Probe { public static string Run() { " + body + " } }";
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.Contains(conversion.Losses, loss => loss.Feature == "unsupported-prefix-operator");
+        Assert.Contains("+x", conversion.CalorSource);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(source));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(ParseAndEmit(conversion.CalorSource!)));
+    }
+
+    private static void AssertNativeUnaryPlusRoundTrip(string source, string expected)
+    {
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        Assert.DoesNotContain("§CS", conversion.CalorSource);
+        Assert.Contains("cast", conversion.CalorSource);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(source));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(ParseAndEmit(conversion.CalorSource!)));
+    }
+
     #region Parsing Tests
 
     [Fact]

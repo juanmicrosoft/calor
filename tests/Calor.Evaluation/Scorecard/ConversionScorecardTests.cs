@@ -25,7 +25,8 @@ public class ConversionScorecardTests
     // 0.28 (#1679): 94 -> 95. 092_Events.cs snapshots the delegate before hoisting an
     // initializer proved to run no user code. Round-trip stays 98.
     // 0.30: full indexer parameters and generic sized arrays survive reparse.
-    private const int BASELINE_FULLY_CONVERTED = 96;
+    // Built-in unary plus retains numeric promotion through a native cast.
+    private const int BASELINE_FULLY_CONVERTED = 97;
     private const int BASELINE_ROUNDTRIP = 100;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
@@ -121,6 +122,16 @@ public class ConversionScorecardTests
         Assert.Equal(2, records.Total);
         Assert.Equal(0, records.Passed);
         Assert.Equal(0, records.Rate);
+    }
+
+    [Fact]
+    public void BuiltInUnaryPlus_IsNativeWithoutPreservation()
+    {
+        var result = Assert.Single(Scorecard.Results.Where(result => result.Id == "017"));
+        Assert.Equal(SnippetStatus.FullyConverted, result.Status);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.SemanticLossCount);
+        Assert.True(result.RoundTripSuccess);
     }
 
     [Fact]

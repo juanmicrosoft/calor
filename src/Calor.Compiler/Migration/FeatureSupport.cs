@@ -961,8 +961,8 @@ public static class FeatureSupport
         {
             Name = "unsupported-prefix-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Prefix unary operator (e.g. unary +) has no Calor node; the containing member is preserved as §CSHARP interop (never substituted with negation)",
-            Workaround = "Drop the redundant unary + or keep the member as §CSHARP interop"
+            Description = "Built-in numeric unary + converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary + is preserved as §CSHARP interop (never dropped or substituted with negation)",
+            Workaround = "Keep user-defined or unresolved unary + as C# interop"
         },
         ["unsupported-slice-subpattern"] = new FeatureInfo
         {
