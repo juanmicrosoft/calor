@@ -228,8 +228,11 @@ public class Calor0270CorpusVolumeTests
     // converted once: FluentValidation 330 -> 235, MediatR 29 -> 27, modules unchanged: 377/47 -> 280/47.
     // #1588/#1686: explicit preservation reduces serilog 18 -> 13 and FluentValidation
     // 235 -> 210, not binding precision. All 364 converted modules still parse and bind.
-    private const int AggregateDiagnostics = 250;
-    private const int AggregateModulesWithDiagnostics = 45;
+    // 0.30 named-constructor support exposes Serilog's Logger(configureLogger, ...) body:
+    // its unresolved lc.CreateLogger receiver adds one Info, 250/45 -> 251/46.
+    // This is native-body visibility, not improved type resolution or Length precision.
+    private const int AggregateDiagnostics = 251;
+    private const int AggregateModulesWithDiagnostics = 46;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
