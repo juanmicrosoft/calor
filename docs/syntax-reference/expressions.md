@@ -7,6 +7,16 @@ nav_order: 3
 
 # Expressions
 
+## Operator spelling
+
+Arithmetic, comparison, logical and bitwise expressions use symbols:
+`+ - * / % ** == != < <= > >= && || ! & | ^ << >> ~`.
+Word aliases such as `add`, `and`, `eq` and `negate` are errors; diagnostics
+name the replacement symbol. Built-in expression heads are case-sensitive:
+write `len`, `cast` and `is-letter`, not `LEN`, `Cast` or `IS-LETTER`.
+The pattern grammar's `and`, `or` and `not` combinators are not expression
+operators.
+
 ## Integer literals
 
 Integer literals preserve sign, base, width, and signedness through compilation.

@@ -351,27 +351,27 @@ public static class BinaryOperatorExtensions
 {
     public static BinaryOperator? FromString(string? value)
     {
-        return value?.ToUpperInvariant() switch
+        return value switch
         {
-            "ADD" or "+" => BinaryOperator.Add,
-            "SUB" or "SUBTRACT" or "-" => BinaryOperator.Subtract,
-            "MUL" or "MULTIPLY" or "*" => BinaryOperator.Multiply,
-            "DIV" or "DIVIDE" or "/" => BinaryOperator.Divide,
-            "MOD" or "MODULO" or "%" => BinaryOperator.Modulo,
-            "POW" or "POWER" or "**" => BinaryOperator.Power,
-            "EQ" or "EQUAL" or "==" => BinaryOperator.Equal,
-            "NEQ" or "NOTEQUAL" or "NE" or "!=" => BinaryOperator.NotEqual,
-            "LT" or "LESSTHAN" or "<" => BinaryOperator.LessThan,
-            "LTE" or "LE" or "LESSOREQUAL" or "<=" => BinaryOperator.LessOrEqual,
-            "GT" or "GREATERTHAN" or ">" => BinaryOperator.GreaterThan,
-            "GTE" or "GE" or "GREATEROREQUAL" or ">=" => BinaryOperator.GreaterOrEqual,
-            "AND" or "&&" => BinaryOperator.And,
-            "OR" or "||" => BinaryOperator.Or,
-            "BAND" or "BITWISEAND" or "&" => BinaryOperator.BitwiseAnd,
-            "BOR" or "BITWISEOR" or "|" => BinaryOperator.BitwiseOr,
-            "BXOR" or "BITWISEXOR" or "^" => BinaryOperator.BitwiseXor,
-            "SHL" or "LEFTSHIFT" or "<<" => BinaryOperator.LeftShift,
-            "SHR" or "RIGHTSHIFT" or ">>" => BinaryOperator.RightShift,
+            "+" => BinaryOperator.Add,
+            "-" => BinaryOperator.Subtract,
+            "*" => BinaryOperator.Multiply,
+            "/" => BinaryOperator.Divide,
+            "%" => BinaryOperator.Modulo,
+            "**" => BinaryOperator.Power,
+            "==" => BinaryOperator.Equal,
+            "!=" => BinaryOperator.NotEqual,
+            "<" => BinaryOperator.LessThan,
+            "<=" => BinaryOperator.LessOrEqual,
+            ">" => BinaryOperator.GreaterThan,
+            ">=" => BinaryOperator.GreaterOrEqual,
+            "&&" => BinaryOperator.And,
+            "||" => BinaryOperator.Or,
+            "&" => BinaryOperator.BitwiseAnd,
+            "|" => BinaryOperator.BitwiseOr,
+            "^" => BinaryOperator.BitwiseXor,
+            "<<" => BinaryOperator.LeftShift,
+            ">>" => BinaryOperator.RightShift,
             _ => null
         };
     }

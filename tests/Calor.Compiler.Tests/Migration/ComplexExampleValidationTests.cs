@@ -45,7 +45,7 @@ public class ComplexExampleValidationTests
                     §I{Point:left}
                     §I{Point:right}
                     §O{bool}
-                    §R (not (== left right))
+                    §R (! (== left right))
                   §/OP{op02}
             """;
 

@@ -20,9 +20,6 @@ public static class OperatorSuggestions
         // Logical operators
         "&&", "||", "!",
 
-        // Word forms of operators
-        "and", "or", "not", "mod", "eq", "ne", "neq", "lt", "le", "lte", "gt", "ge", "gte",
-
         // Bitwise operators
         "&", "|", "^", "<<", ">>", "~",
 

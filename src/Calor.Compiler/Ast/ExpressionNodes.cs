@@ -257,15 +257,15 @@ public static class UnaryOperatorExtensions
 {
     public static UnaryOperator? FromString(string? value)
     {
-        return value?.ToUpperInvariant() switch
+        return value switch
         {
-            "NEG" or "NEGATE" or "-" => UnaryOperator.Negate,
-            "NOT" or "!" => UnaryOperator.Not,
-            "BNOT" or "BITWISENOT" or "~" => UnaryOperator.BitwiseNot,
-            "INC" or "++" or "PRE-INC" => UnaryOperator.PreIncrement,
-            "DEC" or "--" or "PRE-DEC" => UnaryOperator.PreDecrement,
-            "POST-INC" => UnaryOperator.PostIncrement,
-            "POST-DEC" => UnaryOperator.PostDecrement,
+            "-" => UnaryOperator.Negate,
+            "!" => UnaryOperator.Not,
+            "~" => UnaryOperator.BitwiseNot,
+            "inc" or "++" or "pre-inc" => UnaryOperator.PreIncrement,
+            "dec" or "--" or "pre-dec" => UnaryOperator.PreDecrement,
+            "post-inc" => UnaryOperator.PostIncrement,
+            "post-dec" => UnaryOperator.PostDecrement,
             _ => null
         };
     }

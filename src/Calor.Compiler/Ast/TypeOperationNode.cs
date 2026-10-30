@@ -79,7 +79,7 @@ public static class TypeOpExtensions
     /// </summary>
     public static TypeOp? FromString(string? name)
     {
-        return name?.ToLowerInvariant() switch
+        return name switch
         {
             "cast" => TypeOp.Cast,
             "is" => TypeOp.Is,

@@ -56,7 +56,7 @@ public static class StringBuilderOpExtensions
     /// </summary>
     public static StringBuilderOp? FromString(string? name)
     {
-        return name?.ToLowerInvariant() switch
+        return name switch
         {
             "sb-new" => StringBuilderOp.New,
             "sb-append" => StringBuilderOp.Append,

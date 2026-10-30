@@ -143,7 +143,7 @@ public sealed class NodeIdCanonicalizationPropertyTests
         for (var index = 1; index <= sample.MethodCount; index++)
         {
             source.AppendLine($"    §MT{{{Header(IdKind.Method, "mt", 20 + index, $"Apply{index}:pub")}}} (bool:flag) -> bool");
-            source.AppendLine($"      §R (or flag BOOL:{(index % 2 == 0 ? "true" : "false")})");
+            source.AppendLine($"      §R (|| flag BOOL:{(index % 2 == 0 ? "true" : "false")})");
         }
         return source.ToString();
     }

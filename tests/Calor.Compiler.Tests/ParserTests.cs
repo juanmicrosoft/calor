@@ -7,6 +7,55 @@ namespace Calor.Compiler.Tests;
 
 public class ParserTests
 {
+    [Theory]
+    [InlineData("add", "+")]
+    [InlineData("SUBTRACT", "-")]
+    [InlineData("mul", "*")]
+    [InlineData("div", "/")]
+    [InlineData("mod", "%")]
+    [InlineData("pow", "**")]
+    [InlineData("eq", "==")]
+    [InlineData("ne", "!=")]
+    [InlineData("lt", "<")]
+    [InlineData("le", "<=")]
+    [InlineData("gt", ">")]
+    [InlineData("ge", ">=")]
+    [InlineData("and", "&&")]
+    [InlineData("or", "||")]
+    [InlineData("not", "!")]
+    [InlineData("band", "&")]
+    [InlineData("bor", "|")]
+    [InlineData("bxor", "^")]
+    [InlineData("shl", "<<")]
+    [InlineData("shr", ">>")]
+    [InlineData("negate", "-")]
+    [InlineData("bnot", "~")]
+    public void Parse_RemovedWordOperator_NamesSymbol(string word, string symbol)
+    {
+        Parse($"§M{{m001:Test}}\n  §F{{f001:Test:pub}} () -> i32\n    §R ({word} 1 2)",
+            out var diagnostics);
+
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.InvalidLispExpression &&
+            diagnostic.Message.Contains($"Use '{symbol}'"));
+        Assert.Null(BinaryOperatorExtensions.FromString(word));
+        Assert.Null(UnaryOperatorExtensions.FromString(word));
+    }
+
+    [Theory]
+    [InlineData("LEN", "\"x\"")]
+    [InlineData("Cast", "i32 1")]
+    [InlineData("IS-LETTER", "'A'")]
+    [InlineData("SB-NEW", "")]
+    [InlineData("INC", "1")]
+    public void Parse_OperatorNames_AreExactCase(string name, string arguments)
+    {
+        Parse($"§M{{m001:Test}}\n  §F{{f001:Test:pub}} () -> i32\n    §R ({name} {arguments})",
+            out var diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+    }
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();

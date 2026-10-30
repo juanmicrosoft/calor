@@ -28,7 +28,7 @@ public static class StringComparisonModeExtensions
     /// </summary>
     public static StringComparisonMode? FromKeyword(string? keyword)
     {
-        return keyword?.ToLowerInvariant() switch
+        return keyword switch
         {
             "ordinal" => StringComparisonMode.Ordinal,
             "ignore-case" => StringComparisonMode.IgnoreCase,
@@ -180,7 +180,7 @@ public static class StringOpExtensions
     /// </summary>
     public static StringOp? FromString(string? name)
     {
-        return name?.ToLowerInvariant() switch
+        return name switch
         {
             // Query operations
             "len" => StringOp.Length,

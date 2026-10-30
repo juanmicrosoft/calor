@@ -3954,7 +3954,7 @@ public sealed class Parser
         }
 
         // Handle function calls: (CALL target arg1 arg2 ...)
-        if (opText.Equals("CALL", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
+        if (opText == "CALL" && args.Count >= 1)
         {
             // First arg is the target -- extract dotted name from AST node
             var target = args[0] switch
@@ -3999,11 +3999,8 @@ public sealed class Parser
             return new CallExpressionNode(span, opText, args);
         }
 
-        // Unknown operator -- check if this looks like a C# construct the converter
-        // couldn't decompose (PascalCase names like EqualsExpression, IsExpression).
-        // Treat those as non-error recoveries to avoid failing on converted code.
-        var isPascalCase = opText.Length > 0 && char.IsUpper(opText[0]) && opText.Any(char.IsLower);
-        if (!isPascalCase)
+        // Unknown heads are errors regardless of casing; PascalCase must not bypass
+        // exact-case operator matching.
         {
             var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
             var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
@@ -4163,8 +4160,7 @@ public sealed class Parser
                 Advance();
                 return (TokenKind.Arrow, "->", span);
             case TokenKind.Identifier:
-                // Support word operators like "and", "or", "not", "mod"
-                // Also support hyphenated identifiers like "char-at", "is-letter", "sb-new", "regex-test"
+                // Support hyphenated identifiers like "char-at", "is-letter", "sb-new", "regex-test".
                 var startSpan = span;
                 Advance();
 
@@ -4182,20 +4178,37 @@ public sealed class Parser
                 // For hyphenated identifiers, compute the full span
                 var fullSpan = opName.Contains('-') ? startSpan.Union(endSpan) : startSpan;
 
-                return (TokenKind.Identifier, opName.ToLowerInvariant() switch
+                var replacement = opName.ToLowerInvariant() switch
                 {
+                    "add" => "+",
+                    "sub" or "subtract" or "neg" or "negate" => "-",
+                    "mul" or "multiply" => "*",
+                    "div" or "divide" => "/",
                     "and" => "&&",
                     "or" => "||",
                     "not" => "!",
-                    "mod" => "%",
-                    "eq" => "==",
-                    "ne" or "neq" => "!=",
-                    "lt" => "<",
-                    "le" or "lte" => "<=",
-                    "gt" => ">",
-                    "ge" or "gte" => ">=",
-                    _ => opName
-                }, fullSpan);
+                    "mod" or "modulo" => "%",
+                    "pow" or "power" => "**",
+                    "eq" or "equal" => "==",
+                    "ne" or "neq" or "notequal" => "!=",
+                    "lt" or "lessthan" => "<",
+                    "le" or "lte" or "lessorequal" => "<=",
+                    "gt" or "greaterthan" => ">",
+                    "ge" or "gte" or "greaterorequal" => ">=",
+                    "band" or "bitwiseand" => "&",
+                    "bor" or "bitwiseor" => "|",
+                    "bxor" or "bitwisexor" => "^",
+                    "shl" or "leftshift" => "<<",
+                    "shr" or "rightshift" => ">>",
+                    "bnot" or "bitwisenot" => "~",
+                    _ => null
+                };
+                if (replacement != null)
+                {
+                    _diagnostics.ReportError(fullSpan, DiagnosticCode.InvalidLispExpression,
+                        $"Removed word operator '{opName}'. Use '{replacement}' instead.");
+                }
+                return (TokenKind.Identifier, opName, fullSpan);
             default:
                 // Provide helpful message based on what was found
                 var hint = token.Kind switch
@@ -4231,14 +4244,14 @@ public sealed class Parser
     private bool IsUnaryOperator(TokenKind kind)
     {
         return kind is TokenKind.Exclamation or TokenKind.Tilde or TokenKind.Minus
-            or TokenKind.Identifier; // for 'not'
+            or TokenKind.Identifier; // inc/dec and postfix forms
     }
 
     private UnaryOperator? GetUnaryOperator(TokenKind kind, string text)
     {
         return text switch
         {
-            "!" or "not" => UnaryOperator.Not,
+            "!" => UnaryOperator.Not,
             "~" => UnaryOperator.BitwiseNot,
             "-" => UnaryOperator.Negate,
             "inc" or "pre-inc" => UnaryOperator.PreIncrement,
