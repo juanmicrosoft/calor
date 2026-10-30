@@ -2787,7 +2787,7 @@ public sealed class Parser
             var expr = ParseMultiDimArrayCreation();
             return new ExpressionStatementNode(expr.Span, expr);
         }
-        else if (Check(TokenKind.Push) || Check(TokenKind.Add))
+        else if (Check(TokenKind.Push))
         {
             return ParseCollectionPush();
         }
@@ -8276,19 +8276,17 @@ public sealed class Parser
     /// <summary>
     /// Parses collection push (add).
     /// §PUSH{list1} value      // list.Add(value)
-    /// §ADD{set1} value        // set.Add(value) - alias for PUSH, idiomatic for HashSet
+    /// §PUSH{set1} value       // set.Add(value)
     /// </summary>
     private CollectionPushNode ParseCollectionPush()
     {
-        // Accept either PUSH or ADD token
-        var startToken = Check(TokenKind.Push) ? Expect(TokenKind.Push) : Expect(TokenKind.Add);
-        var tokenName = startToken.Kind == TokenKind.Push ? "PUSH" : "ADD";
+        var startToken = Expect(TokenKind.Push);
         var attrs = ParseAttributes();
         var collectionName = attrs["_pos0"] ?? "";
 
         if (string.IsNullOrEmpty(collectionName))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, tokenName, "collection name");
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PUSH", "collection name");
         }
 
         var value = ParseExpression();
@@ -8666,7 +8664,7 @@ public sealed class Parser
     /// <summary>
     /// Parses a WHERE clause and adds constraints to the appropriate type parameter.
     /// New syntax: §WHERE T : class, IComparable&lt;T&gt;
-    /// Old syntax: §WR{T:constraint1,constraint2}
+    /// Braced syntax: §WHERE{T:constraint1,constraint2}
     /// </summary>
     private void ParseWhereClause(List<TypeParameterNode> typeParameters)
     {
@@ -8690,7 +8688,7 @@ public sealed class Parser
         }
         else if (Check(TokenKind.OpenBrace))
         {
-            // OLD SYNTAX: §WR{T:constraint1,constraint2}
+            // Braced syntax: §WHERE{T:constraint1,constraint2}
             var attrs = ParseAttributes();
 
             typeParamName = attrs["_pos0"] ?? "";

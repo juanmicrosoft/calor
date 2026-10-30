@@ -303,7 +303,7 @@ public class EdgeCaseTests
               §F{f001:Describe}
                 §I{i32:n}
                 §O{str}
-                §SW{sw001} n
+                §W{sw001} n
                   §CS{cs001} 0
                   §R "zero"
                   §/CS{cs001}

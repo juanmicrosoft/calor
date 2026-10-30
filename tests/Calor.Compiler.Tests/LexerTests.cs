@@ -24,6 +24,80 @@ public class LexerTests
         Assert.Equal(TokenKind.Module, tokens[0].Kind);
     }
 
+    [Theory]
+    [InlineData("SW", "W")]
+    [InlineData("ENUM", "EN")]
+    [InlineData("WR", "WHERE")]
+    [InlineData("ADD", "PUSH")]
+    [InlineData("when", "WHEN")]
+    public void Tokenize_RemovedAlias_ReportsCanonicalMarkerAndFix(string alias, string canonical)
+    {
+        var source = $"§{alias}{{value}}";
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.DoesNotContain(alias, Lexer.KeywordNames);
+        Assert.DoesNotContain(alias, SectionMarkerSuggestions.AllMarkers);
+        var diagnostic = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains($"'§{canonical}'", diagnostic.Message);
+
+        var fix = Assert.Single(diagnostics.DiagnosticsWithFixes);
+        var edit = Assert.Single(fix.Fix.Edits);
+        Assert.Equal(1, edit.StartLine);
+        Assert.Equal(1, edit.StartColumn);
+        Assert.Equal(1, edit.EndLine);
+        Assert.Equal(alias.Length + 2, edit.EndColumn);
+        Assert.Equal($"§{canonical}", edit.NewText);
+        var corrected = edit.NewText + source[(edit.EndColumn - 1)..];
+        var correctedTokens = Tokenize(corrected, out var correctedDiagnostics);
+        Assert.False(correctedDiagnostics.HasErrors);
+        Assert.NotEqual(TokenKind.Error, correctedTokens[0].Kind);
+    }
+
+    [Theory]
+    [InlineData("/SW", "W")]
+    [InlineData("/ENUM", "EN")]
+    public void Tokenize_RemovedAliasCloser_RequiresDedentInsteadOfAnotherCloser(string alias, string canonical)
+    {
+        var tokens = Tokenize($"§{alias}", out var diagnostics);
+
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.DoesNotContain(alias, Lexer.KeywordNames);
+        Assert.DoesNotContain(alias, SectionMarkerSuggestions.AllMarkers);
+        var diagnostic = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains($"'§{canonical}'", diagnostic.Message);
+        Assert.Contains("dedenting", diagnostic.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
+    }
+
+    [Theory]
+    [InlineData("W", TokenKind.Match)]
+    [InlineData("EN", TokenKind.Enum)]
+    [InlineData("WHERE", TokenKind.Where)]
+    [InlineData("PUSH", TokenKind.Push)]
+    [InlineData("WHEN", TokenKind.When)]
+    public void Tokenize_CanonicalAliasReplacement_ReturnsCorrectToken(string marker, TokenKind kind)
+    {
+        var tokens = Tokenize($"§{marker}", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(kind, tokens[0].Kind);
+        Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+    }
+
+    [Fact]
+    public void Tokenize_RemovedAlias_DoesNotConsumeFollowingMarker()
+    {
+        var tokens = Tokenize("§SW §W", out var diagnostics);
+
+        Assert.Single(diagnostics.Errors);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+        Assert.Equal(TokenKind.Match, tokens[1].Kind);
+        Assert.Equal(TokenKind.Eof, tokens[2].Kind);
+    }
+
     [Fact]
     public void Tokenize_AllKeywords_ReturnsCorrectTokens()
     {

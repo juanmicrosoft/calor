@@ -26,7 +26,7 @@ public enum IdKind
     /// <summary>Constructor declaration (§CTOR).</summary>
     Constructor,
 
-    /// <summary>Enum declaration (§EN/§ENUM).</summary>
+    /// <summary>Enum declaration (§EN).</summary>
     Enum,
 
     /// <summary>Enum extension declaration (§EXT).</summary>

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Section markers have one spelling.** Use `§W`, `§EN`, `§WHERE`, `§PUSH`
+  and `§WHEN`. The aliases `§SW`, `§ENUM`, `§WR`, `§ADD` and lowercase `§when`
+  now produce errors that name the canonical marker. `§/SW` and `§/ENUM` are
+  also rejected; end these blocks by dedenting.
+
 ## [0.29.0] - 2026-10-29
 
 Calor 0.29 fixes nullable-reference and shift analysis, receiver taint tracking, and

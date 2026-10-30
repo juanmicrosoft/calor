@@ -1423,15 +1423,6 @@ C# `this[string key] { get; set; }` becomes `§IXER{ix1:str:pub:get,set} (str:ke
 §ERR "message"        Err(message)
 ```
 
-## Switch/Match (Additional)
-
-Alternative alias `§SW` is available for `§W`:
-
-```
-§SW{id} target            Same as §W{id} target
-  Cases are indented under `§SW`; the match ends at the next dedent
-```
-
 ## Pattern Matching Enhancements
 
 ### Relational Patterns
@@ -1504,7 +1495,7 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 ## Enum Extensions
 
 ```
-§ENUM{id:Name}            Enum (legacy alias for §EN)
+§EN{id:Name}              Enum
   Enum members are indented; the enum ends at the next dedent
 
 §EEXT{id:EnumName}        Extension methods for enum
@@ -1626,10 +1617,10 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 §CAST{targetType} expr    Explicit cast
 ```
 
-### Where Clause (Legacy)
+### Where Clause
 
 ```
-§WR T : constraint           Where clause (legacy, prefer §WHERE)
+§WHERE T : constraint        Where clause
 ```
 
 ### Async Modifier
@@ -1641,7 +1632,7 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 ### Adding to Collections
 
 ```
-§ADD{collection} item     Add item to collection
+§PUSH{collection} item    Add item to a list or set
 ```
 
 ## Preprocessor Directives

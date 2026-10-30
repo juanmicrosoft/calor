@@ -130,7 +130,6 @@ public enum TokenKind
     EndHashSet,     // §/HSET
     KeyValue,       // §KV - Dictionary key-value pair
     Push,           // §PUSH - Add to list/set
-    Add,            // §ADD - Add to set (alias for PUSH, idiomatic for HashSet)
     Put,            // §PUT - Add/update dictionary entry
     Remove,         // §REM - Remove from collection
     SetIndex,       // §SETIDX - Set list element by index
@@ -263,8 +262,8 @@ public enum TokenKind
     Stable,             // §STABLE - Stability markers
 
     // Enums and Extensions
-    Enum,               // §EN or §ENUM - Enum definition
-    EndEnum,            // §/EN or §/ENUM
+    Enum,               // §EN - Enum definition
+    EndEnum,            // §/EN
     EnumExtension,      // §EEXT - Enum extension methods (note: §EXT is for class inheritance)
     EndEnumExtension,   // §/EEXT
 

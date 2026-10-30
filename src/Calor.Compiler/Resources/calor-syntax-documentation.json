@@ -1804,12 +1804,6 @@
       "description": "Marks a class as sealed, preventing inheritance.",
       "csharpEquivalent": "public sealed class Name"
     },
-    "§SW": {
-      "name": "Switch/Match",
-      "syntax": "§W{id:expr} expression with indented §K cases",
-      "description": "Pattern matching switch expression. Prefer §W with indented §K cases.",
-      "csharpEquivalent": "expression switch { patterns }"
-    },
     "§BODY": {
       "name": "Body Start",
       "syntax": "Indent the body under the header",
@@ -1978,18 +1972,6 @@
       "syntax": "§FL{type:name}",
       "description": "Alias for §FLD. Defines a field in a class.",
       "csharpEquivalent": "private Type name;"
-    },
-    "§WR": {
-      "name": "Where Constraint (Legacy)",
-      "syntax": "§WR{T:constraint}",
-      "description": "Legacy syntax for generic type constraints. Prefer §WHERE.",
-      "csharpEquivalent": "where T : constraint"
-    },
-    "§ENUM": {
-      "name": "Enum (Legacy)",
-      "syntax": "§EN{id:Name:vis[:underlyingType]}",
-      "description": "Legacy syntax for enum definition. Prefer §EN.",
-      "csharpEquivalent": "public enum Name { members }"
     },
     "§EEXT": {
       "name": "Enum Extension",

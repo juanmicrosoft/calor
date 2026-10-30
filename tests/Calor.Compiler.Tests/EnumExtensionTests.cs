@@ -39,14 +39,15 @@ public class EnumExtensionTests
     }
 
     [Fact]
-    public void Lexer_RecognizesLegacyEnumKeyword()
+    public void Lexer_RejectsLegacyEnumKeyword()
     {
         var tokens = Tokenize("§ENUM", out var diagnostics);
 
-        Assert.False(diagnostics.HasErrors);
+        Assert.True(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Enum, tokens[0].Kind);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+        Assert.Contains("'§EN'", Assert.Single(diagnostics.Errors).Message);
     }
 
     [Fact]
@@ -61,14 +62,15 @@ public class EnumExtensionTests
     }
 
     [Fact]
-    public void Lexer_RecognizesLegacyEndEnumKeyword()
+    public void Lexer_RejectsLegacyEndEnumKeyword()
     {
         var tokens = Tokenize("§/ENUM", out var diagnostics);
 
-        Assert.False(diagnostics.HasErrors);
+        Assert.True(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndEnum, tokens[0].Kind);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
         Assert.Equal(TokenKind.Eof, tokens[1].Kind);
+        Assert.Contains("dedenting", Assert.Single(diagnostics.Errors).Message);
     }
 
     [Fact]

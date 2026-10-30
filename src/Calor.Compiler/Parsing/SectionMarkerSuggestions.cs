@@ -18,13 +18,13 @@ public static class SectionMarkerSuggestions
         "/M", "/F", "/C", "/I", "/L", "/W", "/K", "/T", "/D",
 
         // Control flow
-        "IF", "EI", "EL", "WH", "/WH", "DO", "/DO", "SW", "/SW", "BK", "CN", "BODY", "END_BODY",
+        "IF", "EI", "EL", "WH", "/WH", "DO", "/DO", "BK", "CN", "BODY", "END_BODY",
 
         // Option/Result types
         "SM", "NN", "OK", "ERR", "FL", "IV",
 
         // Arrays and collections
-        "ARR", "LIST", "DICT", "SET", "TUPLE", "SPAN", "RANGE", "NEW", "/NEW", "ADD", "DEL", "IDX", "ITER",
+        "ARR", "LIST", "DICT", "SET", "TUPLE", "SPAN", "RANGE", "NEW", "/NEW", "PUSH", "DEL", "IDX", "ITER",
 
         // Async/Threading
         "ASYNC", "/ASYNC", "AWAIT", "TASK", "LOCK", "/LOCK", "SEM", "ATOMIC",
@@ -33,7 +33,7 @@ public static class SectionMarkerSuggestions
         "PUB", "PRIV", "INT", "PROT", "STAT", "RO", "CONST",
 
         // Generics
-        "WR", "WHERE",
+        "WHERE",
 
         // Classes and interfaces
         "CL", "/CL", "IFACE", "/IFACE", "IMPL", "EXT", "MT", "/MT", "VR", "OV", "AB", "SD",
@@ -55,7 +55,7 @@ public static class SectionMarkerSuggestions
         "ASM", "/ASM", "NAME", "DEPS", "/DEPS", "TESTS", "/TESTS", "SIG", "REST",
 
         // Enums
-        "EN", "ENUM", "/EN", "/ENUM", "EEXT", "/EEXT",
+        "EN", "/EN", "EEXT", "/EEXT",
 
         // Quick wins
         "EX", "TD", "FX", "HK",
@@ -106,7 +106,6 @@ public static class SectionMarkerSuggestions
         ["EL"] = "Else",
         ["WH"] = "While",
         ["DO"] = "Do-while",
-        ["SW"] = "Switch/Match",
         ["BK"] = "Break",
         ["CN"] = "Continue",
 
@@ -168,6 +167,10 @@ public static class SectionMarkerSuggestions
         ["FOREACH"] = "L",
         ["FOR"] = "L",
         ["SWITCH"] = "W",
+        ["SW"] = "W",
+        ["ENUM"] = "EN",
+        ["WR"] = "WHERE",
+        ["ADD"] = "PUSH",
         ["CASE"] = "K",
         ["REQUIRES"] = "Q",
         ["PRECONDITION"] = "Q",

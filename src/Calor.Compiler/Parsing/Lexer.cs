@@ -60,8 +60,6 @@ public sealed class Lexer
         ["/WH"] = TokenKind.EndWhile,       // §/WH
         ["DO"] = TokenKind.Do,              // §DO = Do (do-while loop)
         ["/DO"] = TokenKind.EndDo,          // §/DO
-        ["SW"] = TokenKind.Match,           // §SW = Switch/Match (alias)
-        ["/SW"] = TokenKind.EndMatch,       // §/SW
         ["BK"] = TokenKind.Break,           // §BK = Break
         ["CN"] = TokenKind.Continue,        // §CN = Continue
         ["GOTO"] = TokenKind.Goto,          // §GOTO{label} = Goto
@@ -99,7 +97,6 @@ public sealed class Lexer
         ["/HSET"] = TokenKind.EndHashSet,
         ["KV"] = TokenKind.KeyValue,
         ["PUSH"] = TokenKind.Push,
-        ["ADD"] = TokenKind.Add,
         ["PUT"] = TokenKind.Put,
         ["REM"] = TokenKind.Remove,
         ["SETIDX"] = TokenKind.SetIndex,
@@ -115,8 +112,7 @@ public sealed class Lexer
         // Generics
         // Old syntax removed: ["TP"] = TokenKind.TypeParam (use <T> suffix instead)
         // Old syntax removed: ["G"] = TokenKind.Generic (use List<T> inline instead)
-        ["WR"] = TokenKind.Where,           // §WR = Where (legacy, still supported)
-        ["WHERE"] = TokenKind.Where,        // §WHERE = Where (new syntax)
+        ["WHERE"] = TokenKind.Where,        // §WHERE = Where
 
         // Classes, Interfaces, Inheritance
         ["CL"] = TokenKind.Class,           // §CL = Class
@@ -165,7 +161,6 @@ public sealed class Lexer
         ["TH"] = TokenKind.Throw,           // §TH = Throw
         ["RT"] = TokenKind.Rethrow,         // §RT = Rethrow
         ["WHEN"] = TokenKind.When,
-        ["when"] = TokenKind.When,       // Accept lowercase from legacy converter output
 
         // Lambdas, Delegates, Events
         ["LAM"] = TokenKind.Lambda,
@@ -212,9 +207,7 @@ public sealed class Lexer
 
         // Enums and Extensions
         ["EN"] = TokenKind.Enum,                // §EN = Enum (short form)
-        ["ENUM"] = TokenKind.Enum,              // §ENUM = Enum (legacy)
         ["/EN"] = TokenKind.EndEnum,            // §/EN
-        ["/ENUM"] = TokenKind.EndEnum,          // §/ENUM (legacy)
         ["EEXT"] = TokenKind.EnumExtension,     // §EEXT = Enum Extension (note: §EXT is for class inheritance)
         ["/EEXT"] = TokenKind.EndEnumExtension, // §/EEXT
 
@@ -2145,6 +2138,14 @@ public sealed class Lexer
     /// </summary>
     private void ReportUnknownSectionMarker(string keyword)
     {
+        if (keyword is "/SW" or "/ENUM")
+        {
+            var opener = keyword == "/SW" ? "W" : "EN";
+            _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnknownSectionMarker,
+                $"Removed closing marker '§{keyword}'. End the '§{opener}' block by dedenting instead.");
+            return;
+        }
+
         // Special case: §CAST is a common mistake — casting uses Lisp syntax
         if (keyword.Equals("CAST", StringComparison.OrdinalIgnoreCase))
         {

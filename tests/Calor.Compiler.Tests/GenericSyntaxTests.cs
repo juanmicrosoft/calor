@@ -176,13 +176,12 @@ public class GenericSyntaxTests
     }
 
     [Fact]
-    public void Parse_OldSyntax_StillSupported()
+    public void Parse_BracedWhereConstraint()
     {
-        // Old §WR{T:class} syntax should still work during transition
         var source = """
             §M{m001:Test}
               §F{f001:Identity:pub}<T>
-                  §WR{T:class}
+                  §WHERE{T:class}
                   §I{T:value}
                   §O{T}
             """;

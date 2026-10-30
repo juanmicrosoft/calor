@@ -215,7 +215,7 @@ public static partial class IdAssigner
                 IdKind.Property => $@"§/PROP\{{{Regex.Escape(assignment.OldId)}\}}",
                 IdKind.Method => $@"§/MT\{{{Regex.Escape(assignment.OldId)}\}}",
                 IdKind.Constructor => $@"§/CTOR\{{{Regex.Escape(assignment.OldId)}\}}",
-                IdKind.Enum => $@"§/(?:EN|ENUM)\{{{Regex.Escape(assignment.OldId)}\}}",
+                IdKind.Enum => $@"§/EN\{{{Regex.Escape(assignment.OldId)}\}}",
                 IdKind.EnumExtension => $@"§/EXT\{{{Regex.Escape(assignment.OldId)}\}}",
                 IdKind.OperatorOverload => $@"§/OP\{{{Regex.Escape(assignment.OldId)}\}}",
                 _ => null
@@ -274,8 +274,8 @@ public static partial class IdAssigner
     [GeneratedRegex(@"§CTOR\{(?<id>[^:}]*)(?::(?<name>[^}]+))?\}", RegexOptions.IgnoreCase)]
     private static partial Regex ConstructorPatternRegex();
 
-    // §EN{id:name} or §ENUM{id:name}
-    [GeneratedRegex(@"§(?:EN|ENUM)\{(?<id>[^:}]*):(?<name>[^:}]+)(?::[^}]*)?\}", RegexOptions.IgnoreCase)]
+    // §EN{id:name}
+    [GeneratedRegex(@"§EN\{(?<id>[^:}]*):(?<name>[^:}]+)(?::[^}]*)?\}", RegexOptions.IgnoreCase)]
     private static partial Regex EnumPatternRegex();
 
     // §EXT{id:enumName}

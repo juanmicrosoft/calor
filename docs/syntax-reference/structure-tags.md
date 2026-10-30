@@ -920,8 +920,8 @@ implementations.
 
 **Legacy syntax (still supported):**
 ```
-§WR{T:class}                        // T must be a reference type
-§WR{T:IComparable}                  // T must implement interface
+§WHERE{T:class}                     // T must be a reference type
+§WHERE{T:IComparable}               // T must implement interface
 ```
 
 ### Generic Type References

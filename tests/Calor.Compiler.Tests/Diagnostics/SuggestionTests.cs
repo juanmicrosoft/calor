@@ -92,7 +92,11 @@ public class SuggestionTests
     [InlineData("CLL", "CL")] // Typo - one character off from CL (class)
     [InlineData("IFF", "IF")] // Typo - one character off
     [InlineData("ELL", "EL")] // Typo of EL (else) - one character off
-    [InlineData("WR", "WR")] // Exact match (where)
+    [InlineData("WR", "WHERE")]
+    [InlineData("SW", "W")]
+    [InlineData("ENUM", "EN")]
+    [InlineData("ADD", "PUSH")]
+    [InlineData("when", "WHEN")]
     [InlineData("LAM", "LAM")] // Exact match (lambda)
     [InlineData("FL", "FL")] // Exact match (field)
     [InlineData("FF", "F")] // One character off from F

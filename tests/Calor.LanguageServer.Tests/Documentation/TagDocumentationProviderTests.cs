@@ -101,6 +101,16 @@ public class TagDocumentationProviderTests
         Assert.Null(doc);
     }
 
+    [Theory]
+    [InlineData("§SW")]
+    [InlineData("§ENUM")]
+    [InlineData("§WR")]
+    [InlineData("§ADD")]
+    public void GetTagDocumentation_RemovedAlias_ReturnsNull(string tag)
+    {
+        Assert.Null(TagDocumentationProvider.Instance.GetTagDocumentation(tag));
+    }
+
     [Fact]
     public void GetTagDocumentation_NullOrEmpty_ReturnsNull()
     {
@@ -370,7 +380,6 @@ public class TagDocumentationProviderTests
     [InlineData("§OV", "Override")]
     [InlineData("§AB", "Abstract")]
     [InlineData("§SD", "Sealed")]
-    [InlineData("§SW", "Switch")]
     [InlineData("§TD", "Todo")]
     [InlineData("§FX", "Fixme")]
     [InlineData("§HK", "Hack")]
