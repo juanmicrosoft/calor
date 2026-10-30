@@ -809,15 +809,13 @@ public static class FeatureSupport
 
         // #777 (WS-W4 D4): local functions are never hoisted to module level — the
         // call site build-breaks or silently rebinds to a same-named member.
-        // 0.25 F3 (#847): the bounded slice converts natively IN PLACE as a nested
-        // §F (a C# static local function). Every other local function preserves its
-        // whole member as §CSHARP interop (a counted loss), as before.
+        // #1600: only faithful same-point lambda bindings are native.
         ["local-function"] = new FeatureInfo
         {
             Name = "local-function",
             Support = SupportLevel.Partial,
-            Description = "A non-capturing local function declared directly in a method body, without attributes, type parameters, async/unsafe/extern, yield, nested local functions, or ref/out/in/params/default parameters, converts in place to a nested §F (a C# static local function). A member with any other local function is preserved verbatim as a §CSHARP interop block",
-            Workaround = "Make the local function static (pass captured values as parameters) and non-generic, or keep the member as a §CSHARP interop block"
+            Description = "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed §B lambda binding. Forward/recursive calls, method-group uses, captures, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as §CSHARP interop",
+            Workaround = "Use an existing lambda binding with calls after its declaration, or keep the original member as §CSHARP interop"
         },
 
         // #1139: a property or indexer accessor that yields is a C# iterator.

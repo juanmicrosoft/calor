@@ -4594,8 +4594,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return Array.Empty<StatementNode>();
     }
 
-    /// <summary>0.25 F3 (#847): the native local-function slice (see FeatureSupport
-    /// "local-function"); anything else is preserved as interop.</summary>
+    /// <summary>The local-function slice representable as a same-point lambda binding.
+    /// Forward, recursive and method-group uses retain their original C# declaration.</summary>
     private bool IsNativeLocalFunction(LocalFunctionStatementSyntax local)
     {
         if (local.Parent is not BlockSyntax { Parent: MethodDeclarationSyntax }
@@ -4610,31 +4610,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || local.DescendantNodes().Any(node =>
                 node is YieldStatementSyntax or LocalFunctionStatementSyntax))
             return false;
-        return !CapturesEnclosingState(local) && HasOnlyCheckedValueUses(local);
+        if (_semanticModel == null || local.SyntaxTree != _semanticModel.SyntaxTree
+            || _semanticModel.GetDeclaredSymbol(local) is not IMethodSymbol symbol
+            || symbol.Parameters.Length > 16
+            || !CanUseDelegateType(symbol.ReturnType)
+            || symbol.Parameters.Any(parameter => !CanUseDelegateType(parameter.Type)))
+            return false;
+        return !CapturesEnclosingState(local) && HasOnlySamePointCalls(local, symbol);
     }
 
-    /// <summary>0.25 F3 (#847): method-group uses only where Calor checks the row (Calor0211).</summary>
-    private static bool HasOnlyCheckedValueUses(LocalFunctionStatementSyntax local)
+    private static bool CanUseDelegateType(ITypeSymbol type) =>
+        !type.IsRefLikeType && type.TypeKind is not (TypeKind.Error or TypeKind.Pointer or TypeKind.FunctionPointer);
+
+    private bool HasOnlySamePointCalls(LocalFunctionStatementSyntax local, IMethodSymbol symbol)
     {
         var body = (BlockSyntax)local.Parent!;
+        var hasCall = false;
         foreach (var use in body.DescendantNodes().OfType<IdentifierNameSyntax>()
                      .Where(name => name.Identifier.ValueText == local.Identifier.ValueText
                          && !IsQualifiedMemberName(name) && name.Parent is not NameColonSyntax))
         {
-            var inLambda = use.Ancestors().TakeWhile(node => node != body).OfType<AnonymousFunctionExpressionSyntax>().Any();
-            var allowed = use.Parent switch
-            {
-                InvocationExpressionSyntax invocation => invocation.Expression == use,
-                ArgumentSyntax { Parent.Parent: InvocationExpressionSyntax { Expression: IdentifierNameSyntax or MemberAccessExpressionSyntax } } => true,
-                EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax } or ReturnStatementSyntax => !inLambda,
-                AssignmentExpressionSyntax { RawKind: (int)SyntaxKind.SimpleAssignmentExpression, Left: IdentifierNameSyntax, Parent: ExpressionStatementSyntax } assignment
-                    => !inLambda && assignment.Right == use,
-                _ => false,
-            };
-            if (!allowed)
+            var resolved = _semanticModel!.GetSymbolInfo(use).Symbol;
+            if (resolved == null)
                 return false;
+            if (!SymbolEqualityComparer.Default.Equals(resolved, symbol))
+                continue;
+            if (use.SpanStart < local.Span.End
+                || use.Parent is not InvocationExpressionSyntax invocation || invocation.Expression != use
+                || invocation.ArgumentList.Arguments.Any(argument => argument.NameColon != null)
+                || use.Ancestors().TakeWhile(node => node != body)
+                    .Any(node => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
+                return false;
+            hasCall = true;
         }
-        return true;
+        return hasCall;
     }
 
     /// <summary>Whether a local function uses an enclosing local or parameter, or
@@ -4690,25 +4699,63 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _ => false,
         };
 
-    /// <summary>0.25 F3 (#847): converts a native-slice local function in place.</summary>
-    private LocalFunctionStatementNode ConvertLocalFunction(LocalFunctionStatementSyntax local)
+    private BindStatementNode ConvertLocalFunction(LocalFunctionStatementSyntax local)
     {
         var savedReassigned = _reassignedVariables;
+        var savedPending = _pendingStatements.ToList();
+        _pendingStatements.Clear();
         _reassignedVariables = CollectReassignedVariables(local);
         try
         {
-            var id = _context.GenerateId("f");
-            var parameters = ConvertParameters(local.ParameterList);
+            var parameters = ConvertParameters(local.ParameterList)
+                .Select(parameter => new LambdaParameterNode(parameter.Span, parameter.Name, parameter.TypeName))
+                .ToArray();
             var returnType = MapDeclarationType(local.ReturnType);
-            var output = returnType != "void" ? new OutputNode(GetTextSpan(local.ReturnType), returnType) : null;
-            var body = ConvertMethodBody(local.Body, local.ExpressionBody);
-            var function = new FunctionNode(GetTextSpan(local), id, local.Identifier.ValueText,
-                Visibility.Private, parameters, output, effects: null, body, new AttributeCollection());
-            return new LocalFunctionStatementNode(GetTextSpan(local), function);
+            var parameterTypes = parameters.Select(parameter => parameter.TypeName!).ToList();
+            var delegateType = returnType == "void"
+                ? parameterTypes.Count == 0 ? "System.Action" : $"System.Action<{string.Join(",", parameterTypes)}>"
+                : $"System.Func<{string.Join(",", parameterTypes.Append(returnType))}>";
+            ExpressionNode? expression = null;
+            IReadOnlyList<StatementNode>? statements = null;
+            if (local.ExpressionBody != null && returnType != "void")
+            {
+                expression = ConvertExpression(local.ExpressionBody.Expression);
+                if (EmitterMayHoist(expression))
+                {
+                    var valueName = _context.GenerateId("_localResult");
+                    _pendingStatements.Add(new BindStatementNode(expression.Span, valueName, returnType,
+                        isMutable: false, expression, new AttributeCollection()));
+                    expression = new ReferenceNode(expression.Span, valueName);
+                }
+                if (_pendingStatements.Count > 0)
+                {
+                    statements = _pendingStatements.Append<StatementNode>(
+                        new ReturnStatementNode(expression.Span, expression)).ToList();
+                    expression = null;
+                }
+            }
+            else if (local.ExpressionBody != null)
+            {
+                var statement = ConvertExpressionToStatement(local.ExpressionBody.Expression, GetTextSpan(local.ExpressionBody));
+                statements = _pendingStatements.ToList();
+                if (statement != null)
+                    statements = statements.Append(statement).ToList();
+            }
+            else
+            {
+                statements = ConvertMethodBody(local.Body, null);
+            }
+            var lambda = new LambdaExpressionNode(GetTextSpan(local), _context.GenerateId("lam"),
+                parameters, effects: null, isAsync: false, expression, statements,
+                new AttributeCollection(), isStatic: true);
+            return new BindStatementNode(GetTextSpan(local), local.Identifier.ValueText, delegateType,
+                isMutable: false, lambda, new AttributeCollection());
         }
         finally
         {
             _reassignedVariables = savedReassigned;
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(savedPending);
         }
     }
 

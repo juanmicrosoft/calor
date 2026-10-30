@@ -1572,17 +1572,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
-    /// <summary>
-    /// 0.25 F3 (#847): a local function is a nested <c>§F{id:Name}</c> with no
-    /// visibility segment, written in place at the current indentation.
-    /// </summary>
     public string Visit(LocalFunctionStatementNode node)
-    {
-        _nextFunctionIsLocal = true;
-        return Visit(node.Function);
-    }
-
-    private bool _nextFunctionIsLocal;
+        => throw new InvalidOperationException("Local functions must be lowered to §B lambda bindings before Calor emission");
 
     public string Visit(FunctionNode node)
     {
@@ -1595,9 +1586,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Author != null) Visit(node.Author);
         if (node.TaskRef != null) Visit(node.TaskRef);
         var visibility = GetVisibilityShorthand(node.Visibility);
-        var isLocal = _nextFunctionIsLocal;
-        _nextFunctionIsLocal = false;
-        var visibilitySegment = isLocal ? "" : ":" + visibility;
+        var visibilitySegment = ":" + visibility;
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var functionName = node.Name;

@@ -1,3 +1,5 @@
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
 using Xunit;
 using Xunit.Abstractions;
@@ -308,9 +310,9 @@ public class WedgeW4SliceAStructuralTests
     // (no same-named member) build-breaks (the call site is orphaned from the
     // hoisted function → CS0103), and when a same-named member DOES exist the
     // orphaned call silently rebinds to it and compiles clean (LossCount==0, wrong
-    // behaviour) — the §1 predicate-trust blocker. 0.25 F3 (#847): the bounded
-    // slice now converts IN PLACE as a nested §F (a C# static local function), so
-    // the call still names the local function. Everything else escalates the
+    // behaviour) — the §1 predicate-trust blocker. #1600: the bounded
+    // slice converts in place as a typed lambda binding, so the call still
+    // names its lexical binding. Everything else escalates the
     // whole member to §CSHARP interop. Behaviour is compared by execution in
     // Calor.Compiler.Tests LocalFunctionConversionTests.
 
@@ -321,8 +323,12 @@ public class WedgeW4SliceAStructuralTests
             l => l.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain(result.Issues, i => i.Feature == "local-function");
         Assert.DoesNotContain("§CSHARP", result.CalorSource);
-        // In place: a nested §F with no visibility segment, inside the member.
-        Assert.Matches(@"\n {6,}§F\{f\d+:" + localName + @"\}", result.CalorSource);
+        var binding = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(result.Ast!)
+            .OfType<BindStatementNode>().Where(node => node.Name == localName));
+        Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(result.Ast!),
+            node => node is LocalFunctionStatementNode);
+        Assert.Contains("§LAM{", result.CalorSource);
         // Never hoisted as a module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
     }
@@ -631,7 +637,7 @@ public class WedgeW4SliceAStructuralTests
     }
 
     [Fact]
-    public void D4_MutuallyRecursiveLocalFunctions_ConvertNativelyInPlace()
+    public void D4_MutuallyRecursiveLocalFunctions_PreserveTheMember()
     {
         var csharp = """
             public class C
@@ -646,12 +652,12 @@ public class WedgeW4SliceAStructuralTests
             """;
 
         var result = Convert(csharp);
-        AssertLocalFunctionNative(result, "Even");
-        AssertLocalFunctionNative(result, "Odd");
+        AssertLocalFunctionEscalated(result, "Even");
+        AssertLocalFunctionEscalated(result, "Odd");
     }
 
     [Fact]
-    public void D4_RecursiveLocalFunction_ConvertsNativelyInPlace()
+    public void D4_RecursiveLocalFunction_PreservesTheMember()
     {
         var csharp = """
             public class F
@@ -668,7 +674,7 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionNative(Convert(csharp), "Fac");
+        AssertLocalFunctionEscalated(Convert(csharp), "Fac");
     }
 
     [Fact]
@@ -677,7 +683,7 @@ public class WedgeW4SliceAStructuralTests
         // C-1: the class has both `int Foo() => 999` and a local `int Foo() => 1`.
         // The source M() returns 1; a naive hoist would orphan the call and silently
         // rebind it to the class method (round-trip M() == 999). In place, the
-        // nested §F keeps the call on the local function.
+        // lambda binding keeps the call on the local function.
         var csharp = """
             public class C
             {

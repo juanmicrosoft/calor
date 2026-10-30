@@ -17,9 +17,8 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// 0.25 F3 (#847): non-capturing local functions convert IN PLACE to a nested
-/// <c>§F</c>, emitted as a C# <c>static</c> local function, so a call keeps naming
-/// the local function (never a hoisted module function or a same-named member).
+/// #1600: safe non-capturing local functions become same-point lambda bindings.
+/// Forward calls, recursion and method-group conversions preserve the member.
 /// Every registered row is converted on every surface, compiled with DEFAULT options
 /// (effects enforced, no <c>--permissive-effects</c>), run, and compared with the
 /// original C#. Shapes outside the slice stay preserved as <c>§CSHARP</c>.
@@ -189,16 +188,36 @@ public class LocalFunctionConversionTests
         }
         """;
 
+    private const string SamePointLambdas = """
+        public static class Probe
+        {
+            private static string Log = "";
+            private static int Visits;
+            public static string Run()
+            {
+                static int Twice(int x) => x * 2;
+                void Note(int x) { Log += x; Visits++; }
+                int Widen(byte x) => x;
+                int Effect(int x) { Visits++; return x + Visits; }
+                Note(Twice(3));
+                int value = Effect(Widen(2));
+                return Log + ":" + value + ":" + Visits + ":" + Pick("first", "second");
+            }
+            private static T Pick<T>(T a, T b)
+            {
+                T First(T x, T y) => x;
+                return First(a, b);
+            }
+        }
+        """;
+
     public static TheoryData<string, string, Surface> NativeRows()
     {
         var data = new TheoryData<string, string, Surface>();
         foreach (var surface in Enum.GetValues<Surface>())
         {
-            data.Add("F3-LOCAL-01", "3|120", surface);
             data.Add("F3-LOCAL-02", "3|1002", surface);
-            data.Add("F3-LOCAL-03", "6|5|60|3000|502", surface);
-            data.Add("more-shapes", "11|False|xy6|16", surface);
-            data.Add("edge-shapes", "ab|42|14|p", surface);
+            data.Add("same-point", "6:4:2:first", surface);
         }
         return data;
     }
@@ -212,6 +231,7 @@ public class LocalFunctionConversionTests
         {
             "more-shapes" => MoreShapes,
             "edge-shapes" => EdgeShapes,
+            "same-point" => SamePointLambdas,
             _ => R0Fixture(row)
         };
         Assert.Equal(expected, Run(source));
@@ -221,14 +241,16 @@ public class LocalFunctionConversionTests
         Assert.DoesNotContain("§CSHARP", calor);
         Assert.DoesNotContain("§CS{", calor);
         Assert.Empty(losses);
-        Assert.Matches(@"\n {6,}§F\{f\d+:[A-Za-z]+\} \(", calor);
+        Assert.Contains("§LAM{", calor);
 
         // Default compile: effects enforced, no --permissive-effects.
         var compilation = Program.Compile(calor, row + ".calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
             string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
-        Assert.Contains("static int ", compilation.GeneratedCode);
+        Assert.Contains("static (", compilation.GeneratedCode);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(compilation.Ast!),
+            node => node is LocalFunctionStatementNode);
         Assert.Equal(expected, Run(compilation.GeneratedCode));
     }
 
@@ -240,6 +262,10 @@ public class LocalFunctionConversionTests
             data.Add("F3-LOCAL-04", "5|g3|2", 3, surface);
             data.Add("F3-LOCAL-05", "42", 1, surface);
             data.Add("mixed", "8", 1, surface);
+            data.Add("F3-LOCAL-01", "3|120", 1, surface);
+            data.Add("F3-LOCAL-03", "6|5|60|3000|502", 1, surface);
+            data.Add("more-shapes", "11|False|xy6|16", 2, surface);
+            data.Add("edge-shapes", "ab|42|14|p", 1, surface);
         }
         return data;
     }
@@ -253,6 +279,8 @@ public class LocalFunctionConversionTests
         {
             "F3-LOCAL-05" => AsyncLocal,
             "mixed" => MixedMember,
+            "more-shapes" => MoreShapes,
+            "edge-shapes" => EdgeShapes,
             _ => R0Fixture(row)
         };
         Assert.Equal(expected, Run(source));
@@ -281,6 +309,8 @@ public class LocalFunctionConversionTests
     [Theory]
     [InlineData("F3-LOCAL-04")]
     [InlineData("F3-LOCAL-05")]
+    [InlineData("F3-LOCAL-01")]
+    [InlineData("F3-LOCAL-03")]
     public void NoFallback_RefusesOutsideTheSlice_ByName(string row)
     {
         var result = new CSharpToCalorConverter(NoFallbackOptions())
@@ -291,9 +321,7 @@ public class LocalFunctionConversionTests
     }
 
     [Theory]
-    [InlineData("F3-LOCAL-01")]
     [InlineData("F3-LOCAL-02")]
-    [InlineData("F3-LOCAL-03")]
     public void NoFallback_AcceptsTheSlice(string row)
     {
         var result = new CSharpToCalorConverter(NoFallbackOptions()).Convert(R0Fixture(row));
@@ -315,6 +343,15 @@ public class LocalFunctionConversionTests
     [InlineData("public int M() { int v = 1; int L(ref int x) => x; return L(ref v); }")]
     [InlineData("public int M() { static T L<T>(T x) => x; return L(1); }")]
     [InlineData("public C() { int L() => 1; L(); }")]
+    [InlineData("public int M() { return L(1); int L(int x) => x; }")]
+    [InlineData("public int M() { int L(int x) => x == 0 ? 1 : L(x - 1); return L(3); }")]
+    [InlineData("public int M() { int A(int x) => B(x); int B(int x) => x; return A(1); }")]
+    [InlineData("public int M() { int L(int x) => x; return L(x: 1); }")]
+    [InlineData("public int M() { int L(int x) => x; System.Func<int,int> f = L; return f(1); }")]
+    [InlineData("public int M() { int L(int x) => x; System.Func<int> f = () => L(1); return f(); }")]
+    [InlineData("public int M() { int L(params int[] x) => x.Length; return L(1); }")]
+    [InlineData("public int M() { int L(System.Span<int> x) => x.Length; return L(new int[1]); }")]
+    [InlineData("public int M() { int L() => 9; return 1; }")]
     // Method-group uses where Calor does not check the effect row (Codex round 3).
     [InlineData("public System.Func<int, int>[] M() { int L(int x) => x; return new System.Func<int, int>[] { L }; }")]
     [InlineData("public System.Func<int, int> M(System.Func<int, int> f) { int L(int x) => x; return f ?? L; }")]
@@ -344,7 +381,8 @@ public class LocalFunctionConversionTests
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "local-function");
         Assert.DoesNotContain("§CSHARP", result.CalorSource);
-        Assert.Matches(@"\n {6,}§F\{f\d+:L\} \(", result.CalorSource!);
+        Assert.Contains("§LAM{", result.CalorSource!);
+        Assert.DoesNotMatch(@"\n {6,}§F\{f\d+:L\}", result.CalorSource!);
         if (!compile)
             return;
         var compilation = Program.Compile(result.CalorSource!, "shape.calr",
@@ -417,9 +455,30 @@ public class LocalFunctionConversionTests
             case Surface.LibraryDefault:
                 return Library(new ConversionOptions());
             case Surface.CliDefault or Surface.CliPassthrough:
-                return Library(ConvertCommand.BuildCSharpToCalorOptions(
-                    benchmark: false, verbose: false, explain: false, noFallback: false,
-                    passthrough: surface == Surface.CliPassthrough, explicitCallClosers: false));
+            {
+                var dir = Directory.CreateTempSubdirectory("calor-local-lambda-").FullName;
+                try
+                {
+                    File.WriteAllText(Path.Combine(dir, "Fixture.cs"), source);
+                    var flags = surface == Surface.CliPassthrough ? new[] { "--passthrough" } : [];
+                    var (exit, stdout, stderr) = CliTestHarness.RunCli(dir,
+                        ["convert", "Fixture.cs", "-o", "Fixture.calr", "--format", "json", .. flags]);
+                    Assert.True(exit == 0, stdout + "\n" + stderr);
+                    using var document = JsonDocument.Parse(stdout);
+                    var data = document.RootElement.GetProperty("data");
+                    var losses = data.TryGetProperty("losses", out var locations)
+                        ? locations.EnumerateArray().Select(loss => loss.GetProperty("feature").GetString()!).ToList()
+                        : [];
+                    Assert.Equal(data.GetProperty("lossCount").GetInt32(), losses.Count);
+                    Assert.Equal(losses.Count == 0 ? "native" : "preserved",
+                        data.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+                    return (File.ReadAllText(Path.Combine(dir, "Fixture.calr")), losses);
+                }
+                finally
+                {
+                    Directory.Delete(dir, recursive: true);
+                }
+            }
             case Surface.McpDefault or Surface.McpPassthroughOnError or Surface.McpPassthroughOnErrorModuleName:
             {
                 var args = new Dictionary<string, object> { ["source"] = source };
