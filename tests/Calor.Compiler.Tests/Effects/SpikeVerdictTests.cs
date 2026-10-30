@@ -1099,7 +1099,8 @@ public sealed class SpikeVerdictTests
     {
         var (exitCode, diagnostics) = PpE1Probe.Compile(source);
         string[] formatted = [.. diagnostics
-            .Select(d => $"{d.Severity} {d.Code}@{d.Line},{d.Column}")
+            .Select(d => $"{d.Severity} {d.Code}@{d.Line},{d.Column}"
+                + (d.Code == "Calor1312" ? $": {d.Message}" : ""))
             .OrderBy(s => s, StringComparer.Ordinal)];
         return (exitCode, formatted);
     }
