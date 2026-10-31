@@ -23,12 +23,12 @@ namespace ContractZ3Test
     {
         public int Process(int value)
         {
-            if (!(value >= -10)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= -10", "mt001", Calor.Runtime.ContractKind.Requires, startOffset: 214, length: 17, sourceFile: null, line: 10, column: 7, condition: "value >= -10");
+            if (!(value >= -10)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= -10", "mt_auto5", Calor.Runtime.ContractKind.Requires, startOffset: 188, length: 17, sourceFile: null, line: 10, column: 7, condition: "value >= -10");
             int __calorPostconditionResult0;
             __calorPostconditionResult0 = checked(value + 1);
             goto __calorPostconditionExit0;
             __calorPostconditionExit0:
-            if (!(__calorPostconditionResult0 >= 1)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 >= 1", "mt001", Calor.Runtime.ContractKind.Ensures, startOffset: 238, length: 16, sourceFile: null, line: 11, column: 7, condition: "__calorPostconditionResult0 >= 1");
+            if (!(__calorPostconditionResult0 >= 1)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 >= 1", "mt_auto5", Calor.Runtime.ContractKind.Ensures, startOffset: 212, length: 16, sourceFile: null, line: 11, column: 7, condition: "__calorPostconditionResult0 >= 1");
             return __calorPostconditionResult0;
         }
 
@@ -38,12 +38,12 @@ namespace ContractZ3Test
     {
         public int Process(int value)
         {
-            if (!(value >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= 0", "mt002", Calor.Runtime.ContractKind.Requires, startOffset: 387, length: 15, sourceFile: null, line: 19, column: 7, condition: "value >= 0");
+            if (!(value >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= 0", "mt_auto7", Calor.Runtime.ContractKind.Requires, startOffset: 350, length: 15, sourceFile: null, line: 19, column: 7, condition: "value >= 0");
             int __calorPostconditionResult1;
             __calorPostconditionResult1 = checked(value + 10);
             goto __calorPostconditionExit1;
             __calorPostconditionExit1:
-            if (!(__calorPostconditionResult1 >= 10)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult1 >= 10", "mt002", Calor.Runtime.ContractKind.Ensures, startOffset: 409, length: 17, sourceFile: null, line: 20, column: 7, condition: "__calorPostconditionResult1 >= 10");
+            if (!(__calorPostconditionResult1 >= 10)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult1 >= 10", "mt_auto7", Calor.Runtime.ContractKind.Ensures, startOffset: 372, length: 17, sourceFile: null, line: 20, column: 7, condition: "__calorPostconditionResult1 >= 10");
             return __calorPostconditionResult1;
         }
 

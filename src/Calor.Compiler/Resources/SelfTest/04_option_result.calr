@@ -1,5 +1,5 @@
-§M{m001:TypeSystem}
-  §F{f001:Main:pub} () -> void
+§M{TypeSystem}
+  §F{Main:pub} () -> void
     §E{cw}
     §B{present:?i32} 42
     §B{absent:?i32} null

@@ -1,5 +1,5 @@
-§M{m001:SkillSyntax}
-  §F{f001:Main:pub} () -> void
+§M{SkillSyntax}
+  §F{Main:pub} () -> void
     §E{cw}
     §C{Console.WriteLine} §A "=== Calor Skill Syntax Validation ===" §/C
     §C{Console.WriteLine} §A "" §/C
@@ -7,32 +7,32 @@
     §C{TestComparison} §/C
     §C{TestControlFlow} §/C
 
-  §F{f002:TestArithmetic:priv} () -> void
+  §F{TestArithmetic:priv} () -> void
     §E{cw}
     §C{Console.WriteLine} §A "Testing arithmetic operators..." §/C
 
-  §F{f003:Add:pub} (i32:a, i32:b) -> i32
+  §F{Add:pub} (i32:a, i32:b) -> i32
     §R (+ a b)
 
-  §F{f004:Subtract:pub} (i32:a, i32:b) -> i32
+  §F{Subtract:pub} (i32:a, i32:b) -> i32
     §R (- a b)
 
-  §F{f005:Multiply:pub} (i32:a, i32:b) -> i32
+  §F{Multiply:pub} (i32:a, i32:b) -> i32
     §R (* a b)
 
-  §F{f006:TestComparison:priv} () -> void
+  §F{TestComparison:priv} () -> void
     §E{cw}
     §C{Console.WriteLine} §A "Testing comparison operators..." §/C
 
-  §F{f007:IsPositive:pub} (i32:x) -> bool
+  §F{IsPositive:pub} (i32:x) -> bool
     §R (> x 0)
 
-  §F{f008:IsZero:pub} (i32:x) -> bool
+  §F{IsZero:pub} (i32:x) -> bool
     §R (== x 0)
 
-  §F{f009:TestControlFlow:priv} () -> void
+  §F{TestControlFlow:priv} () -> void
     §E{cw}
     §C{Console.WriteLine} §A "Testing control flow..." §/C
-    §L{for1:i:1:5:1}
+    §L{i:1:5:1}
       §C{Console.WriteLine} §A i §/C
 

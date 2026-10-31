@@ -1,31 +1,31 @@
-§M{m1:Transliterator}
+§M{Transliterator}
   §U{System}
   §U{System.Collections.Generic}
   §U{System.Text}
 
-  §CL{c0:TransliteratorBase:pub:abs}
-    §PROP{p001:Name:str:pub:abs:get}
+  §CL{TransliteratorBase:pub:abs}
+    §PROP{Name:str:pub:abs:get}
 
 
-  §CL{c1:CyrillicToLatin:pub}
+  §CL{CyrillicToLatin:pub}
     §EXT{TransliteratorBase}
 
     §FLD{str:_mappings:priv}
 
-    §PROP{p001:Name:str:pub:over:get}
+    §PROP{Name:str:pub:over:get}
 
-    §CTOR{ctor1:pub} (str:name)
+    §CTOR{pub} (str:name)
       §ASSIGN this._mappings name
 
-    §MT{mt1:Transliterate:pub} (str:input) -> str
+    §MT{Transliterate:pub} (str:input) -> str
       §E{cw,cr,mut,alloc}
       §B{~dict} §NEW{Dictionary<char,str>} §/NEW
-      §B{[char]:buf} §ARR{char:buf:256}
+      §B{[char]:buf} §ARR{char:256}
       §B{~sb} §NEW{StringBuilder} §/NEW
       §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
-      §L{l1:i:0:(len input):1}
+      §L{i:0:(len input):1}
         §B{char:ch} §IDX{input} i
-        §IF{if1} (== ch (char-lit "Y"))
+        §IF (== ch (char-lit "Y"))
           §C{sb.Append} §A "Y" §/C
         §EL
           §C{sb.Append} §A ch §/C
