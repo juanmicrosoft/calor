@@ -616,6 +616,21 @@ class RepositoryGuards(unittest.TestCase):
         self.assertTrue(all(error.split("|", 3)[1:3] == ["Calor0830", "-"]
                             for error in malformed["errors"]))
 
+    def test_current_gold_references_require_default_compilation(self):
+        mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)
+        groups = {f: g for g in self.manifest["groups"] for f in g["files"]}
+        gold = [current for original, current in mapping.items()
+                if original.startswith("bench/phase0-agent-native/pairs/")
+                and "/reference/calor/" in original]
+        self.assertTrue(gold)
+        for current in gold:
+            with self.subTest(current=current):
+                group = groups[current]
+                self.assertEqual(group["expect"], "compile")
+                self.assertEqual(group["mode"], "each")
+                self.assertEqual(group.get("options", []), [])
+                self.assertNotIn("errors", group)
+
     def test_codegen_only_failures_are_not_incidental_negatives(self):
         for g in self.manifest["groups"]:
             if g.get("negativeKind") == "incidental":

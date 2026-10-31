@@ -2648,6 +2648,36 @@
       "evidence": "BenchCorpusCompilesTests.PairProgram_CompilesWithoutErrors compiles each gold reference independently with default CompilationOptions."
     },
     {
+      "id": "active:gold-pairs:current-completion",
+      "files": [
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/N1-001-string-utils/reference/calor/TextUtils.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/N1-002-inventory/reference/calor/Inventory.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/N1-003-csv-row/reference/calor/CsvRow.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/N1-005-order-pipeline/reference/calor/OrderPipeline.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W1-003-ledger-rules/reference/calor/Ledger.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W2-001-int-stats/reference/calor/Stats.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W2-002-parity-encoder/reference/calor/ParityEncoder.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W2-003-window-stats/reference/calor/WindowStats.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W2-004-interval-clip/reference/calor/Spans.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W2-005-scheduler/reference/calor/Scheduler.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W3-001-audit-log/reference/calor/AuditLog.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W3-002-config-store/reference/calor/ConfigStore.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5A-001-report-audit/reference/calor/Report.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5A-002-inventory-log/reference/calor/Inventory.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5A-003-config-echo/reference/calor/Config.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5B-001-shipping-quote/reference/calor/Quote.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5B-002-loyalty-points/reference/calor/Loyalty.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5B-003-request-quota/reference/calor/Quota.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5C-001-catalog-cache/reference/calor/Catalog.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5C-002-ledger-view/reference/calor/Ledger.calr",
+        "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W5C-003-session-index/reference/calor/Session.calr"
+      ],
+      "mode": "each",
+      "expect": "compile",
+      "options": [],
+      "evidence": "Additional explicitly registered current gold-reference copies from ActiveSyntax/inputs.json. BenchCorpusCompilesTests.PairProgram_CompilesWithoutErrors resolves each original to its current copy and requires independent compilation under default CompilationOptions, including strict effects and generated-C# validation. These are positive reference programs, not deliberately defective starters; historical original bytes and all prior Tier 2 registrations remain unchanged."
+    },
+    {
       "id": "active:folder-sync-starter",
       "files": [
         "tests/TestData/ActiveSyntax/bench/phase0-agent-native/pairs/W3-004-sync-folder/calor/FolderSync.calr"
