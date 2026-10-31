@@ -35,6 +35,7 @@ public sealed class BatchTool : McpToolBase
         "action='analyze': Analyze convertibility of an entire C# project directory. " +
         "Returns aggregate scores, tier breakdowns, and top blockers across the project. " +
         "action='compile': Compile .calr files in batch. Discovers files via directory, explicit paths, or glob pattern. " +
+        "Synchronizes tooling identity for selected active inputs before compilation; identity metadata failures fail closed. " +
         "Returns per-file pass/fail with error summaries.";
 
     public override McpToolAnnotations? Annotations => new() { DestructiveHint = true };
@@ -618,6 +619,57 @@ public sealed class BatchTool : McpToolBase
         var totalErrors = 0;
         var errorCategories = new Dictionary<string, int>();
 
+        var inputErrors = new Dictionary<string, IReadOnlyList<EnvelopeDiagnostic>>(StringComparer.Ordinal);
+        var activeFiles = new List<string>();
+        foreach (var path in filePaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(path) || !path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
+                DeclarationIdentityStore.Find(path)?.ReadRegisteredInputs();
+                DeclarationIdentityStore.Describe(path, File.ReadAllText(path));
+                activeFiles.Add(path);
+            }
+            catch (DeclarationIdentityParseException ex)
+            {
+                inputErrors[path] = DiagnosticEnvelope.Build(ex.Diagnostics)
+                    .Where(diagnostic => diagnostic.Severity == "error").ToArray();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+                or JsonException or UnauthorizedAccessException)
+            {
+                inputErrors[path] = [ConversionIssueEnvelope.Message(
+                    DiagnosticCode.DeclarationIdentityUnavailable, "error", ex.Message, path)];
+            }
+        }
+
+        try
+        {
+            DeclarationIdentityStore.SyncActiveInputs(activeFiles,
+                Directory.Exists(baseDir) ? baseDir : null);
+            foreach (var path in activeFiles)
+            {
+                if (DeclarationIdentityStore.Find(path)?.IsRegistered(path) != true)
+                    throw new InvalidOperationException(
+                        $"Declaration identity requires a non-ambient project directory for '{path}'.");
+            }
+        }
+        catch (DeclarationIdentityParseException ex)
+        {
+            foreach (var path in activeFiles)
+                inputErrors[path] = DiagnosticEnvelope.Build(ex.Diagnostics)
+                    .Where(diagnostic => diagnostic.Severity == "error").ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+            or JsonException or UnauthorizedAccessException)
+        {
+            foreach (var path in activeFiles)
+                inputErrors[path] = [ConversionIssueEnvelope.Message(
+                    DiagnosticCode.DeclarationIdentityUnavailable, "error", ex.Message, path)];
+        }
+
         foreach (var path in filePaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -638,6 +690,21 @@ public sealed class BatchTool : McpToolBase
                     continue;
                 }
 
+                if (inputErrors.TryGetValue(path, out var identityErrors))
+                {
+                    fileResults.Add(new CompileFileResult
+                    {
+                        FilePath = path,
+                        Success = false,
+                        ErrorCount = identityErrors.Count,
+                        Errors = identityErrors.ToList()
+                    });
+                    totalErrors++;
+                    foreach (var error in identityErrors)
+                        IncrementCategory(errorCategories, error.Code);
+                    continue;
+                }
+
                 var source = File.ReadAllText(path);
                 var compileOptions = new CompilationOptions
                 {
@@ -655,7 +722,7 @@ public sealed class BatchTool : McpToolBase
                 if (compileResult.Ast != null)
                 {
                     declarationIds = new DeclarationIdResolver();
-                    declarationIds.AddFile(path, source, compileResult.Ast);
+                    declarationIds.AddFile(path, source, compileResult.Ast, identitiesAttached: true);
                 }
                 var errors = DiagnosticEnvelope.Build(compileResult.Diagnostics, declarationIds)
                     .Where(e => e.Severity == "error")
