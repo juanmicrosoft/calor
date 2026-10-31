@@ -45,6 +45,9 @@ no substitute tokenizer or estimated result is reported here.
 
 ### Fixed
 
+- **Declaration identity uses less memory.** Symbol IDs share their prefixes,
+  and source fingerprints stream into the hash instead of building large
+  intermediate strings. Serialized IDs and fingerprint values stay unchanged.
 - **C# conversion preserves indexer parameters and generic array element types.**
   Both cases now survive the full C# → Calor → C# pipeline. The 100-snippet
   scorecard reaches 100 round-trip compilations, with 98 fully native conversions.
