@@ -20,7 +20,7 @@
     §MT{Transliterate:pub} (str:input) -> str
       §E{cw,cr,mut,alloc}
       §B{~dict} §NEW{Dictionary<char,str>} §/NEW
-      §B{[char]:buf} §ARR{buf:256}
+      §B{[char]:buf} §ARR{char:256}
       §B{~sb} §NEW{StringBuilder} §/NEW
       §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
       §L{i:0:(len input):1}

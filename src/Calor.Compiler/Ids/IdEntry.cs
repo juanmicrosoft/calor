@@ -698,7 +698,10 @@ public sealed class DeclarationIdentityStore
     {
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(diagnosticPath ?? file);
-        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        if (diagnostics.HasErrors)
+            throw new DeclarationIdentityParseException(diagnosticPath ?? file, diagnostics);
+        var module = new Parser(tokens, diagnostics).Parse();
         if (diagnostics.HasErrors)
             throw new DeclarationIdentityParseException(diagnosticPath ?? file, diagnostics);
         var declarations = Describe(file, module);

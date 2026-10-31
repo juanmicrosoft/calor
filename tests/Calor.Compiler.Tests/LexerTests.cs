@@ -1,5 +1,6 @@
 // migrate_inline_calor: skip - fixture intentionally embeds closer-form Calor literals or uses position/template patterns incompatible with auto-migration.
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -7,6 +8,29 @@ namespace Calor.Compiler.Tests;
 
 public class LexerTests
 {
+    [Theory]
+    [InlineData("§M{Bad}\n  §F{Main:pub} () -> void\n    §INVALID_TAG\n", DiagnosticCode.UnknownSectionMarker)]
+    [InlineData("§M{Bad}\n  §F{Main:pub} () -> void\n    §E{cw}\n    §P \"unfinished\n", DiagnosticCode.UnterminatedString)]
+    public void LexicalErrors_RemainFatalWithoutGenericParserCascades(string source, string code)
+    {
+        var result = Program.Compile(source, "lexical-error.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Equal(code, Assert.Single(result.Diagnostics.Errors).Code);
+        var exception = Assert.Throws<DeclarationIdentityParseException>(() =>
+            DeclarationIdentityStore.Describe("lexical-error.calr", source));
+        Assert.Equal(code, Assert.Single(exception.Diagnostics.Errors).Code);
+    }
+
+    [Fact]
+    public void IdentityParsing_StillRejectsParserErrorsAfterSuccessfulLexing()
+    {
+        const string source = "§M{Bad}\n  §F{Main:pub} () -> void\n    §R §/C\n";
+        var exception = Assert.Throws<DeclarationIdentityParseException>(() =>
+            DeclarationIdentityStore.Describe("parser-error.calr", source));
+        Assert.Contains(exception.Diagnostics.Errors, error => error.Code == DiagnosticCode.UnexpectedToken);
+    }
+
     [Theory]
     [InlineData("int:42", "INT:")]
     [InlineData("Str:\"x\"", "STR:")]
