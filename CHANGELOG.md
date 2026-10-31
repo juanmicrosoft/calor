@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking changes
 
+- **Default C# migration preserves instead of refusing.** Failed native conversion
+  falls back to member, type or whole-file C# preservation. This reverses the
+  previous all-or-nothing contract: one failed input no longer blocks valid
+  siblings, and project validation failures do not discard exact original output.
+  The destructive `--lossy` and `--select-active-preprocessor-branch-lossy` options
+  are removed. Invalid input and write failures remain errors.
 - **Section markers have one spelling.** Use `§W`, `§EN`, `§WHERE`, `§PUSH`
   and `§WHEN`. The aliases `§SW`, `§ENUM`, `§WR`, `§ADD` and lowercase `§when`
   now produce errors that name the canonical marker. `§/SW` and `§/ENUM` are
@@ -60,7 +66,10 @@ no substitute tokenizer or estimated result is reported here.
   `out`/`in` and nullable-type-parameter `ref T?` declarations remain preserved.
 - **Whole-file namespace preservation keeps the original C# compilation unit.**
   It no longer adds a generated preamble, and passthrough payloads ending with a
-  newline no longer acquire indentation before their terminator.
+  newline no longer acquire indentation before their terminator. EOF line
+  comments, including delimiter text, survive without an injected newline.
+  UTF-8 BOMs and CRLF line endings are retained. UTF-16 and UTF-32 inputs retain
+  source text but generate UTF-8; their original encoding and bytes are not retained.
 
 ### Test and CI health
 
@@ -68,6 +77,8 @@ no substitute tokenizer or estimated result is reported here.
   converted-but-blocked, written and fully native written files for pinned
   MediatR, Serilog and FluentValidation source copies. Build and test results
   remain separate; writing a file is not reported as proof that it builds.
+  The report fails CI if any discovered file is not written, after saving the
+  complete per-project results.
 
 ## [0.29.0] - 2026-10-29
 
