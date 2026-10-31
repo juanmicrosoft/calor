@@ -1,0 +1,40 @@
+§M{Ledger}
+  §F{EntryLine:pub} (str:label, i32:amount) -> str
+    §E{}
+    §R (+ label (+ "=" §C{amount.ToString} §/C))
+
+  §F{AppendEntry:pub} (str:path, str:label, i32:amount) -> void
+    §E{fs:w}
+    §B{line:str} §C{EntryLine} §A label §A amount §/C
+    §B{record:str} (+ line ";")
+    §C{File.AppendAllText} §A path §A record §/C
+
+  §F{ReadLedger:pub} (str:path) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF (! exists)
+      §R ""
+    §R §C{File.ReadAllText} §A path §/C
+
+  §F{ReportOf:pub} (str:content) -> str
+    §E{}
+    §R (+ "ledger[" (+ §C{content.Length.ToString} §/C "]"))
+
+  §F{BalanceReport:pub} (str:path) -> str
+    §E{fs:r}
+    §B{content:str} §C{ReadLedger} §A path §/C
+    §R §C{ReportOf} §A content §/C
+
+  §F{HasEntries:pub} (str:path) -> bool
+    §E{fs:r}
+    §B{content:str} §C{ReadLedger} §A path §/C
+    §R (> (len content) 0)
+
+  §F{DescribeLedger:pub} (str:path) -> str
+    §E{fs:r}
+    §R (+ "ledger: " §C{BalanceReport} §A path §/C)
+
+  §F{LedgerSize:pub} (str:path) -> i32
+    §E{fs:r}
+    §B{content:str} §C{ReadLedger} §A path §/C
+    §R (len content)

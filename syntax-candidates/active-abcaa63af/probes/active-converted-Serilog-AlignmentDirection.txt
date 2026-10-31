@@ -1,0 +1,8 @@
+§M{Serilog.Parsing:overflow=unchecked}
+  §NS{Serilog.Parsing:file}
+    /// Defines the direction of the alignment.
+    §EN{AlignmentDirection:pub}
+      Left
+      Right
+
+

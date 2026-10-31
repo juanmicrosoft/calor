@@ -1,0 +1,3 @@
+class C pub
+  fn F pub (int:x) -> int
+    return x

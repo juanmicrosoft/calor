@@ -1,0 +1,13 @@
+§M{m001:MediatR.Pipeline:overflow=unchecked}
+  §NS{ns001:MediatR.Pipeline:file}
+    §U{System.Threading}
+    §U{System.Threading.Tasks}
+
+    // Defines a request post-processor for a request
+    // @typeparam TRequest — Request type
+    // @typeparam TResponse — Response type
+    §IFACE{i002:IRequestPostProcessor<in TRequest,in TResponse>}
+      §WHERE TRequest : notnull
+      §MT{m003:Process} (TRequest:request, TResponse:response, CancellationToken:cancellationToken) -> Task
+
+

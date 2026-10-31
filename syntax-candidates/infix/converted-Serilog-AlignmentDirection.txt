@@ -1,0 +1,5 @@
+module Serilog.Parsing overflow unchecked
+  // Defines the direction of the alignment.
+  enum AlignmentDirection pub
+    Left
+    Right

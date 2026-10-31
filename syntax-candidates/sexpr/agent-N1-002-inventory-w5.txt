@@ -1,0 +1,20 @@
+module Inventory
+  fn AddItem pub stat (Dictionary<string,int>:items, string:name, int:qty) -> void
+    effects mut
+    if (items.ContainsKey name)
+      set (index items name) (+ (index items name) qty)
+    else
+      set (index items name) qty
+  fn RemoveItem pub stat (Dictionary<string,int>:items, string:name, int:qty) -> void
+    effects mut
+    if (items.ContainsKey name)
+      let remaining = (- (index items name) qty)
+      if (<= remaining 0)
+        (items.Remove name)
+      else
+        set (index items name) remaining
+  fn TotalCount pub stat (Dictionary<string,int>:items) -> int
+    let ~total = 0
+    each (k,v) in items
+      set total (+ total v)
+    return total

@@ -1,0 +1,4 @@
+module FluentValidation.Internal overflow unchecked
+  // Determines whether or not a rule should execute.
+  interface IValidatorSelector
+    fn CanExecute (IValidationRule:rule, string?:propertyPath, IValidationContext:context) -> bool

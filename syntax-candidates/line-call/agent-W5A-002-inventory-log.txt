@@ -1,0 +1,26 @@
+module Inventory
+  fn FormatItem pub stat (string:name, int:count) -> string
+    effects
+    return (+ name (+ " x" (count.ToString)))
+  fn CountTotal pub stat (int:shelf, int:backroom) -> int
+    effects
+    return (+ shelf backroom)
+  fn FormatStock pub stat (string:name, int:shelf, int:backroom) -> string
+    effects
+    let int:total = §C{CountTotal} shelf backroom
+    let string:line = §C{FormatItem} name total
+    return line
+  fn SaveStock pub stat (string:path, string:name, int:shelf, int:backroom) -> void
+    effects fs:w
+    let string:line = §C{FormatStock} name shelf backroom
+    §C{File.WriteAllText} path line
+  fn FormatRestock pub stat (string:name, int:needed) -> string
+    effects
+    return (+ "restock " (+ name (+ ": " (needed.ToString))))
+  fn RestockAmount pub stat (int:shelf, int:backroom, int:target) -> int
+    effects
+    let int:total = §C{CountTotal} shelf backroom
+    if (>= total target)
+      return 0
+    else
+      return (- target total)

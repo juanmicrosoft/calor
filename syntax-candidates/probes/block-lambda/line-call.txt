@@ -1,0 +1,5 @@
+let Func<int,int>:f =
+  lambda (int:x)
+    let int:y = (+ x 1)
+    return y
+§C{Use} f

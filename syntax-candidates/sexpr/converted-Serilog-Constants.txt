@@ -1,0 +1,4 @@
+module Serilog.Core overflow unchecked
+  // Constants used in the core logging pipeline and associated types.
+  class Constants pub stat
+    field string:SourceContextPropertyName pub const = "SourceContext"

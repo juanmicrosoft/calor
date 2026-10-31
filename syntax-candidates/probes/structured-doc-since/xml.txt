@@ -1,0 +1,3 @@
+/// <since>1.2.0</since>
+fn Old pub stat () -> void
+  return

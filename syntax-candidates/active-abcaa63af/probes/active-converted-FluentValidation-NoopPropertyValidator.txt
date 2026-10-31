@@ -1,0 +1,10 @@
+§M{FluentValidation.Validators:overflow=unchecked}
+  §NS{FluentValidation.Validators:file}
+    §CL{NoopPropertyValidator<T,TProperty>:pub:abs}
+      §EXT{PropertyValidator<T,TProperty>}
+
+      §MT{IsValid:pub:over} (ValidationContext<T>:context, TProperty:value) -> bool
+        §R true
+
+
+

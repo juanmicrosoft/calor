@@ -1,0 +1,33 @@
+module Session
+  fn IndexLine pub stat (string:sessionId, int:hits) -> string
+    effects
+    return sessionId + ("=" + hits.ToString())
+  fn WriteIndex pub stat (string:path, string:sessionId, int:hits) -> void
+    effects fs:w
+    let string:line = IndexLine(sessionId, hits)
+    File.WriteAllText(path, line)
+  fn ReadIndex pub stat (string:path) -> string
+    effects fs:r
+    let bool:exists = File.Exists(path)
+    if !exists
+      return ""
+    return File.ReadAllText(path)
+  fn MarkActive pub stat (string:sessionId) -> void
+    effects fs:w
+    WriteIndex("session-active.txt", sessionId, 1)
+  fn LookupSession pub stat (string:path, string:sessionId) -> string
+    effects fs:r
+    let string:content = ReadIndex(path)
+    return sessionId + ("#" + content.Length.ToString())
+  fn HasIndex pub stat (string:path) -> bool
+    effects fs:r
+    let string:content = ReadIndex(path)
+    return content.Length > 0
+  fn DescribeSession pub stat (string:path, string:sessionId) -> string
+    effects fs:r
+    let string:inner = LookupSession(path, sessionId)
+    return "session: " + inner
+  fn IndexSize pub stat (string:path) -> int
+    effects fs:r
+    let string:content = ReadIndex(path)
+    return content.Length

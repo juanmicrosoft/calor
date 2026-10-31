@@ -1,0 +1,2 @@
+raw reason=delegate 27
+public delegate void D();

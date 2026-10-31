@@ -1,0 +1,9 @@
+module FluentValidation.Resources overflow unchecked
+  using System.Globalization
+  // Allows the default error message translations to be managed.
+  interface ILanguageManager
+    // Whether localization is enabled.
+    property bool:Enabled pub get,set
+    // Default culture to use for all requests to the LanguageManager. If not specified, uses the current UI culture.
+    property CultureInfo?:Culture pub get,set
+    fn GetString (string?:key, CultureInfo?:culture = null) -> string?

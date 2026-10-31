@@ -1,0 +1,14 @@
+§M{FluentValidation:overflow=unchecked}
+  §NS{FluentValidation:file}
+    §U{System}
+
+    /// Validator implementation that allows rules to be defined without inheriting from AbstractValidator.
+    §CL{InlineValidator<T>:pub}
+      §EXT{AbstractValidator<T>}
+
+      /// Allows configuration of the validator.
+      §MT{Add<TProperty>:pub} (Func<InlineValidator<T>, IRuleBuilderOptions<T, TProperty>>:ruleCreator)
+        §C{ruleCreator} §THIS
+
+
+

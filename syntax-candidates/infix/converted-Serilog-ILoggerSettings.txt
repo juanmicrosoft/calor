@@ -1,0 +1,4 @@
+module Serilog.Configuration overflow unchecked
+  // Implemented on types that apply settings to a logger configuration.
+  interface ILoggerSettings
+    fn Configure (LoggerConfiguration:loggerConfiguration)

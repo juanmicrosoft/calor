@@ -1,0 +1,4 @@
+/// @breaking version="2.0.0" description="Requires x > 0 & y < 5"
+/// @breaking version="3.0.0" description="Requires options"
+fn Old pub stat () -> void
+  return

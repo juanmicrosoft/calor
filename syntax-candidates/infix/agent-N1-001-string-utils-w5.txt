@@ -1,0 +1,25 @@
+module TextUtils
+  fn Slugify pub stat (string:s) -> string
+    effects
+    let string:lower = s.ToLowerInvariant()
+    return lower.Replace(" ", "-")
+  fn Truncate pub stat (string:s, int:maxLen) -> string
+    effects
+    if s.Length <= maxLen
+      return s
+    elif maxLen > 3
+      return string.Concat(s.Substring(0, maxLen - 3), "...")
+    else
+      return s.Substring(0, maxLen)
+  fn WordCount pub stat (string:s) -> int
+    effects
+    let count = 0
+    let inWord = false
+    range i from 0 to s.Length - 1 step 1
+      if char.IsWhiteSpace(s[i])
+        set inWord false
+      else
+        if !inWord
+          set count count + 1
+        set inWord true
+    return count

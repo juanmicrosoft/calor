@@ -1,0 +1,11 @@
+module MediatR.NotificationPublishers overflow unchecked
+  using System.Collections.Generic
+  using System.Threading
+  using System.Threading.Tasks
+  // Awaits each notification handler in a single foreach loop: foreach (var handler in handlers) { await handler(notification, cancellationToken); }
+  class ForeachAwaitPublisher pub
+    implements INotificationPublisher
+    fn async Publish pub (Seq<NotificationHandlerExecutor>:handlerExecutors, INotification:notification, CancellationToken:cancellationToken)
+      each handler in handlerExecutors
+        let _chainHandlerCallback005 = handler.HandlerCallback(notification, cancellationToken)
+        let _ = await _chainHandlerCallback005.ConfigureAwait(false)

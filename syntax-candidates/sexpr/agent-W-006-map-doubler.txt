@@ -1,0 +1,21 @@
+module MapAfter
+  fn Map pub stat <eff e> (int[]:xs, Func<int,int>:f effects e) -> int[]
+    effects e,alloc,mut
+    let int:n = (member xs Length)
+    let ~int[]:out = (array int n)
+    range i from 0 to n step 1
+      set (index out i) (f (index xs i))
+    return out
+  fn Double pub stat (int:x) -> int
+    effects
+    return (* x 2)
+  fn Announce pub stat (int:x) -> int
+    effects cw
+    (Console.WriteLine x)
+    return x
+  fn UsePure pub stat (int[]:xs) -> int[]
+    effects alloc,mut
+    return (Map xs Double)
+  fn UseImpure pub stat (int[]:xs) -> int[]
+    effects alloc,mut,cw
+    return (Map xs Announce)

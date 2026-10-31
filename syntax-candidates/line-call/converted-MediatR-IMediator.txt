@@ -1,0 +1,3 @@
+module MediatR overflow unchecked
+  // Defines a mediator to encapsulate request/response and publishing interaction patterns
+  interface IMediator : ISender,IPublisher

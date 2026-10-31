@@ -1,0 +1,5 @@
+module M
+	fn F pub stat (int:x) -> int
+		if x > 0
+			return x
+		return 0

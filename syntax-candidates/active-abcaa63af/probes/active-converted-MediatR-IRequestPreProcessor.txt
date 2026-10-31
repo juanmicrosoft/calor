@@ -1,0 +1,12 @@
+§M{MediatR.Pipeline:overflow=unchecked}
+  §NS{MediatR.Pipeline:file}
+    §U{System.Threading}
+    §U{System.Threading.Tasks}
+
+    /// Defined a request pre-processor for a handler
+    /// @typeparam TRequest — Request type
+    §IFACE{IRequestPreProcessor<in TRequest>}
+      §WHERE TRequest : notnull
+      §MT{Process} (TRequest:request, CancellationToken:cancellationToken) -> Task
+
+

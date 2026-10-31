@@ -1,0 +1,20 @@
+§M{Inventory}
+  §F{AddItem:pub} (Dictionary<str, i32>:items, str:name, i32:qty) -> void
+    §E{mut}
+    §IF §HAS{items} §KEY name
+      §PUT{items} name (+ §IDX items name qty)
+    §EL
+      §PUT{items} name qty
+  §F{RemoveItem:pub} (Dictionary<str, i32>:items, str:name, i32:qty) -> void
+    §E{mut}
+    §IF §HAS{items} §KEY name
+      §B{remaining} (- §IDX items name qty)
+      §IF (<= remaining 0)
+        §REM{items} name
+      §EL
+        §PUT{items} name remaining
+  §F{TotalCount:pub} (Dictionary<str, i32>:items) -> i32
+    §B{~total} 0
+    §EACHKV{k:v} items
+      §ASSIGN total (+ total v)
+    §R total

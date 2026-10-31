@@ -1,0 +1,61 @@
+module CsvRow
+  fn NeedsQuoting pub stat (string:field) -> bool
+    effects
+    return (|| (field.Contains ",") (|| (field.Contains "\"") (|| (field.Contains "\r") (field.Contains "\n"))))
+  fn EscapeField pub stat (string:field) -> string
+    effects
+    let bool:q = §C{NeedsQuoting} field
+    if (== q true)
+      return (+ "\"" (+ (field.Replace "\"" "\"\"") "\""))
+    return field
+  fn JoinRow pub stat (List<string>:fields) -> string
+    effects
+    let ~string:result = ""
+    let ~bool:first = true
+    each f in fields
+      if (== first true)
+        set first false
+      else
+        set result (+ result ",")
+      let string:esc = §C{EscapeField} f
+      set result (+ result esc)
+    return result
+  fn SplitRow pub stat (string:line) -> List<string>
+    effects mut,alloc
+    let List<string>:result = (new List<string>)
+    let int:n = (member line Length)
+    let ~int:i = 0
+    let ~bool:more = true
+    while (== more true)
+      let ~string:field = ""
+      if (&& (< i n) (== (line.Substring i 1) "\""))
+        set i (+ i 1)
+        let ~bool:scan = true
+        while (== scan true)
+          if (>= i n)
+            set scan false
+          else
+            let string:c = §C{line.Substring} i 1
+            if (== c "\"")
+              if (&& (< (+ i 1) n) (== (line.Substring (+ i 1) 1) "\""))
+                set field (+ field "\"")
+                set i (+ i 2)
+              else
+                set i (+ i 1)
+                set scan false
+            else
+              set field (+ field c)
+              set i (+ i 1)
+      else
+        while (&& (< i n) (! (== (line.Substring i 1) ",")))
+          set field (+ field (line.Substring i 1))
+          set i (+ i 1)
+      §C{result.Add} field
+      if (< i n)
+        set i (+ i 1)
+        if (== i n)
+          §C{result.Add} ""
+          set more false
+      else
+        set more false
+    return result

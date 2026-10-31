@@ -1,0 +1,33 @@
+module Ledger
+  fn EntryLine pub stat (string:label, int:amount) -> string
+    effects
+    return (+ label (+ "=" (amount.ToString)))
+  fn AppendEntry pub stat (string:path, string:label, int:amount) -> void
+    effects fs:w
+    let string:line = §C{EntryLine} label amount
+    let string:record = (+ line ";")
+    §C{File.AppendAllText} path record
+  fn ReadLedger pub stat (string:path) -> string
+    effects fs:r
+    let bool:exists = §C{File.Exists} path
+    if (! exists)
+      return ""
+    return §C{File.ReadAllText} path
+  fn ReportOf pub stat (string:content) -> string
+    effects
+    return (+ "ledger[" (+ (. (member content Length) ToString) "]"))
+  fn BalanceReport pub stat (string:path) -> string
+    effects fs:r
+    let string:content = §C{ReadLedger} path
+    return §C{ReportOf} content
+  fn HasEntries pub stat (string:path) -> bool
+    effects fs:r
+    let string:content = §C{ReadLedger} path
+    return (> (member content Length) 0)
+  fn DescribeLedger pub stat (string:path) -> string
+    effects fs:r
+    return (+ "ledger: " (BalanceReport path))
+  fn LedgerSize pub stat (string:path) -> int
+    effects fs:r
+    let string:content = §C{ReadLedger} path
+    return (member content Length)

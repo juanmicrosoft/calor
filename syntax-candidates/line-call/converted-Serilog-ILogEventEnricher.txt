@@ -1,0 +1,4 @@
+module Serilog.Core overflow unchecked
+  // Applied during logging to add additional information to log events.
+  interface ILogEventEnricher
+    fn Enrich (LogEvent:logEvent, ILogEventPropertyFactory:propertyFactory)

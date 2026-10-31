@@ -1,0 +1,30 @@
+§M{MiddlewareAfter}
+  §F{RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+    §E{e}
+    §B{first:i32} §C{g}
+    §B{second:i32} §C{g}
+    §R (+ first second)
+
+  §F{Beat:pub} () -> i32
+    §E{cw}
+    §P "beat"
+    §R 1
+
+  §IFACE{IPipelineBehavior}
+    §MT{Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e}
+
+  §CL{RetryBehavior:pub}
+    §IMPL{IPipelineBehavior}
+    §FLD{Func<i32>:_step:priv} §E{}
+    §CTOR{pub}
+      §ASSIGN _step §LAM §R 1 §/LAM
+    §MT{Handle:pub}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e}
+      §R §C{RunTwice} §A next §/C
+    §MT{Probe:pub} () -> i32
+      §E{cw}
+      §B{Func<i32>:step} §LAM §R §C{Beat} §/LAM
+      §R §C{RunTwice} §A step §/C
+    §MT{Twice:pub} () -> i32
+      §R §C{RunTwice} §A _step §/C

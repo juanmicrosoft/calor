@@ -1,0 +1,8 @@
+module MediatR.Pipeline overflow unchecked
+  using System.Threading
+  using System.Threading.Tasks
+  // Defined a request pre-processor for a handler
+  // @typeparam TRequest — Request type
+  interface IRequestPreProcessor<in TRequest>
+    where TRequest : notnull
+    fn Process (TRequest:request, CancellationToken:cancellationToken) -> Task

@@ -1,0 +1,6 @@
+§M{CallbackAfter}
+  §CL{Counter:pub}
+    §FLD{Action<i32>:onChange:priv} §E{cw}
+    §MT{Bump:pub} (i32:n) -> void
+      §E{cw}
+      §C{onChange} §A n §/C

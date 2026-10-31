@@ -1,0 +1,27 @@
+module TextUtils
+  fn Slugify pub stat (string:s) -> string
+    effects
+    let string:lower = (s.ToLowerInvariant)
+    return (lower.Replace " " "-")
+  fn Truncate pub stat (string:s, int:maxLen) -> string
+    effects
+    let int:n = (member s Length)
+    if (<= n maxLen)
+      return s
+    if (> maxLen 3)
+      return (+ (s.Substring 0 (- maxLen 3)) "...")
+    return (s.Substring 0 maxLen)
+  fn WordCount pub stat (string:s) -> int
+    effects
+    let ~int:count = 0
+    let ~bool:inWord = false
+    let int:n = (member s Length)
+    range i from 0 to (- n 1) step 1
+      let string:c = (s.Substring i 1)
+      if (|| (== c " ") (|| (== c "\t") (|| (== c "\r") (== c "\n"))))
+        set inWord false
+      else
+        if (! inWord)
+          set count (+ count 1)
+          set inWord true
+    return count

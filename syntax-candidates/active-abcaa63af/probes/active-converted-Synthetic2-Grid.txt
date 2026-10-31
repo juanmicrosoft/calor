@@ -1,0 +1,69 @@
+§M{GeoLib:overflow=unchecked}
+  §NS{GeoLib:file}
+    /// Simple integer-grid helpers — deliberately arithmetic/boundary-dense so the round-trip converter produces native regions and standard mutation operators (boundary, off-by-one, arithmetic, swap-return) have well-covered sites. A second corpus subject for Slice C.
+    §M{Grid:pub}
+      §F{SumOfSquares:pub} (i32:a, i32:b) -> i32
+        §R (+ (* a a) (* b b))
+
+      §F{Triple:pub} (i32:x) -> i32
+        §R (* x 3)
+
+      §F{Area:pub} (i32:width, i32:height) -> i32
+        §R (* width height)
+
+      §F{Perimeter:pub} (i32:width, i32:height) -> i32
+        §R (* 2 (+ width height))
+
+      §F{InBounds:pub} (i32:x, i32:y, i32:width, i32:height) -> bool
+        §IF (|| (< x 0) (< y 0))
+          §R false
+        §IF (|| (>= x width) (>= y height))
+          §R false
+        §R true
+
+      §F{ClampIndex:pub} (i32:index, i32:length) -> i32
+        §IF (< index 0)
+          §R 0
+        §IF (>= index length)
+          §R (- length 1)
+        §R index
+
+      §F{ManhattanDistance:pub} (i32:x1, i32:y1, i32:x2, i32:y2) -> i32
+        §B{i32:dx} (- x1 x2)
+        §B{i32:dy} (- y1 y2)
+        §R (+ §C{Math.Abs} §A dx §/C §C{Math.Abs} §A dy §/C)
+
+      §F{CellCount:pub} (i32:rows, i32:cols) -> i32
+        §B{~total:i32} 0
+        §IF true
+          §B{~r:i32} 0
+          §B{~_forFirst015:bool} true
+          §WH true
+            §IF _forFirst015
+              §ASSIGN _forFirst015 false
+            §EL
+              §ASSIGN r (+ r 1)
+            §IF (< r rows)
+            §EL
+              §BK
+            §IF true
+              §IF true
+                §B{~c:i32} 0
+                §B{~_forFirst018:bool} true
+                §WH true
+                  §IF _forFirst018
+                    §ASSIGN _forFirst018 false
+                  §EL
+                    §ASSIGN c (+ c 1)
+                  §IF (< c cols)
+                  §EL
+                    §BK
+                  §IF true
+                    §ASSIGN total (+ total 1)
+        §R total
+
+      §F{IsSquare:pub} (i32:width, i32:height) -> bool
+        §R (== width height)
+
+
+

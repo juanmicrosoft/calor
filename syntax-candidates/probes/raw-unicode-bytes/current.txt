@@ -1,0 +1,4 @@
+raw unsupported <<CALOR_RAW
+var s = "λ😀";
+
+CALOR_RAW

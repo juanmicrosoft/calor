@@ -1,0 +1,8 @@
+§M{m001:Serilog.Core:overflow=unchecked}
+  §NS{ns001:Serilog.Core:file}
+    // Constants used in the core logging pipeline and associated types.
+    §CL{c002:Constants:pub:stat}
+      §FLD{str:SourceContextPropertyName:pub:const} = "SourceContext"
+
+
+

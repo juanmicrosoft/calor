@@ -1,0 +1,5 @@
+raw unsupported <<CALOR_RAW
+public string S = @"first
+  second";
+
+CALOR_RAW

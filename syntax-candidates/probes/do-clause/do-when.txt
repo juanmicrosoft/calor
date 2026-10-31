@@ -1,0 +1,3 @@
+do
+  set r Read()
+when r < 0

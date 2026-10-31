@@ -1,0 +1,6 @@
+raw unsupported <<CALOR_RAW
+#if NEVER
+"} unmatched {
+#endif
+
+CALOR_RAW

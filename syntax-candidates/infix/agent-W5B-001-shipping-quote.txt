@@ -1,0 +1,28 @@
+module Quote
+  fn BaseFee pub stat (int:weight) -> int
+    effects
+    return weight * 3
+  fn DistanceFee pub stat (int:distance) -> int
+    effects
+    return distance * 2
+  fn QuoteWithSurcharge pub stat (int:baseAmount, int:surcharge, int:cap) -> int
+    effects
+    ensures result <= cap
+    let int:total = baseAmount + surcharge
+    if total > cap
+      return cap
+    return total
+  fn QuoteTotal pub stat (int:weight, int:distance, int:cap) -> int
+    effects
+    let int:baseAmount = BaseFee(weight)
+    let int:extra = DistanceFee(distance)
+    return QuoteWithSurcharge(baseAmount, extra, cap)
+  fn QuoteWithFloor pub stat (int:baseAmount, int:surcharge, int:cap, int:floor) -> int
+    effects
+    let int:capped = QuoteWithSurcharge(baseAmount, surcharge, cap)
+    if capped < floor
+      return floor
+    return capped
+  fn FormatQuote pub stat (int:amount) -> string
+    effects
+    return string.Concat("quote: ", amount.ToString())

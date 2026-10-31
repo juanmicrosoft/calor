@@ -1,0 +1,6 @@
+module Serilog.Core overflow unchecked
+  // Describes the reason for a logging failure.
+  enum LoggingFailureKind pub
+    Temporary
+    Permanent
+    Final

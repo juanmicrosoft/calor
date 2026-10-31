@@ -1,0 +1,19 @@
+§M{m001:FluentValidation.Internal:overflow=unchecked}
+  §NS{ns001:FluentValidation.Internal:file}
+    §U{System.Collections.Generic}
+    §U{System.Linq}
+
+    §CL{c002:CompositeValidatorSelector:int}
+      §IMPL{IValidatorSelector}
+
+      §FLD{Seq<IValidatorSelector>:_selectors:priv}
+
+      §CTOR{ctor003:pub} (Seq<IValidatorSelector>:selectors)
+        §ASSIGN _selectors selectors
+
+      §MT{m004:CanExecute:pub} (IValidationRule:rule, ?str:propertyPath, IValidationContext:context) -> bool
+        §B{_lam006} §LAM{lam005:s:IValidatorSelector} §C{s.CanExecute} §A rule §A propertyPath §A context §/C §/LAM{lam005}
+        §R §C{_selectors.Any} _lam006
+
+
+

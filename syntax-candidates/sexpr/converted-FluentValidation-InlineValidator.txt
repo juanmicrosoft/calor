@@ -1,0 +1,8 @@
+module FluentValidation overflow unchecked
+  using System
+  // Validator implementation that allows rules to be defined without inheriting from AbstractValidator.
+  class InlineValidator<T> pub
+    extends AbstractValidator<T>
+    // Allows configuration of the validator.
+    fn Add<TProperty> pub (Func<InlineValidator<T>, IRuleBuilderOptions<T, TProperty>>:ruleCreator)
+      (ruleCreator this)

@@ -1,0 +1,2 @@
+fn F (string?:x) -> string?
+  return x

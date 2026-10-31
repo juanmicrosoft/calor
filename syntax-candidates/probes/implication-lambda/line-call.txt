@@ -1,0 +1,1 @@
+let f = (lambda (bool:p, bool:q) (-> p q))

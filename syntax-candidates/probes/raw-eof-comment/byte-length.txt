@@ -1,0 +1,2 @@
+raw unsupported 38
+public int X => 1; // no final newline

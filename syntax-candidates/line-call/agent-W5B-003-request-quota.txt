@@ -1,0 +1,28 @@
+module Quota
+  fn BaseAllowance pub stat (int:tier) -> int
+    effects
+    return (* tier 5)
+  fn BurstBonus pub stat (int:priority) -> int
+    effects
+    return (* priority 2)
+  fn GrantRequests pub stat (int:requested, int:maxAllowed) -> int
+    effects
+    ensures (<= result maxAllowed)
+    if (> requested maxAllowed)
+      return maxAllowed
+    return requested
+  fn GrantForTier pub stat (int:tier, int:priority, int:maxAllowed) -> int
+    effects
+    let int:allowance = §C{BaseAllowance} tier
+    let int:bonus = §C{BurstBonus} priority
+    let int:requested = (+ allowance bonus)
+    return §C{GrantRequests} requested maxAllowed
+  fn GrantWithMinimum pub stat (int:requested, int:maxAllowed, int:minGrant) -> int
+    effects
+    let int:capped = §C{GrantRequests} requested maxAllowed
+    if (< capped minGrant)
+      return minGrant
+    return capped
+  fn FormatGrant pub stat (int:amount) -> string
+    effects
+    return §C{string.Concat} "granted: " (amount.ToString)

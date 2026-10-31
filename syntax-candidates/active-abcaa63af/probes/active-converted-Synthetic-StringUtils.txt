@@ -1,0 +1,53 @@
+§M{SyntheticLib:overflow=unchecked}
+  §NS{SyntheticLib:file}
+    §CL{StringUtils:pub}
+      §MT{Reverse:pub:stat} (str:input) -> str
+        §E{throw,alloc,mut}
+        §IF (== input null)
+          §TH §NEW{ArgumentNullException} §A (nameof input) §/NEW
+        §B{char[]:chars} §C{input.ToCharArray}
+        §C{Array.Reverse} chars
+        §R §NEW{string} §A chars §/NEW
+
+      §MT{IsPalindrome:pub:stat} (str:input) -> bool
+        §E{throw,alloc,mut}
+        §IF (== input null)
+          §R false
+        §B{str:cleaned} §C{input.ToLowerInvariant}
+        §B{str:reversed} §C{Reverse} cleaned
+        §R (== cleaned reversed)
+
+      §MT{CountOccurrences:pub:stat} (str:text, char:target) -> i32
+        §IF (== text null)
+          §R 0
+        §B{~count:i32} 0
+        §IF true
+          §B{~i:i32} 0
+          §B{~_forFirst009:bool} true
+          §WH true
+            §IF _forFirst009
+              §ASSIGN _forFirst009 false
+            §EL
+              §ASSIGN i (+ i 1)
+            §IF (< i (len text))
+            §EL
+              §BK
+            §IF true
+              §IF (== §IDX{text} i target)
+                §ASSIGN count (+ count 1)
+        §R count
+
+      §MT{Truncate:pub:stat} (str:input, i32:maxLength) -> str
+        §IF (== input null)
+          §R ""
+        §IF (<= (len input) maxLength)
+          §R input
+        §R (+ (substr input 0 maxLength) "...")
+
+      §MT{Capitalize:pub:stat} (str:input) -> str
+        §IF (isempty input)
+          §R (?? input "")
+        §R (+ §C{char.ToUpperInvariant} §A §IDX{input} 0 §/C (substr input 1))
+
+
+

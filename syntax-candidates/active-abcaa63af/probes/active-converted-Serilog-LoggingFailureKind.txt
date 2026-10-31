@@ -1,0 +1,9 @@
+§M{Serilog.Core:overflow=unchecked}
+  §NS{Serilog.Core:file}
+    /// Describes the reason for a logging failure.
+    §EN{LoggingFailureKind:pub}
+      Temporary
+      Permanent
+      Final
+
+

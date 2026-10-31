@@ -1,0 +1,1351 @@
+{
+  "schema_version": 1,
+  "source_commit": "d82f3ae95175ecd09581c6922701706be72b0ca9",
+  "target_model": "Claude Opus 5.5",
+  "baseline": "current",
+  "population": {
+    "primer": 1,
+    "converted": 20,
+    "agent": 20
+  },
+  "selection": "6 MediatR +6 Serilog +6 FluentValidation +1 Synthetic +1 Synthetic2; hand-selected, declaration-heavy convenience sample, not the 283-file corpus census. Agent files: 9 guarantees +6 higher-order +3 e1 +2 w5, all run-1; not 20 independent tasks.",
+  "comparison": "current vs modern families is a combined migration/teaching comparison, not additive savings. infix/sexpr/line-call families share identical non-expression scaffolding. Focused probes isolate spellings and are never pooled into population totals.",
+  "semantic_status": "current/ is frozen historical measurement source, not active new-grammar source. Other families are speculative hand-authored design payloads, NOT accepted compiler syntax, migrated active benchmark copies or runtime-equivalence evidence. Preserve invalid agent mutability and the inclusive map-doubler bound rather than silently fixing historical outputs. Future migrated active copies remain separate from frozen originals.",
+  "historical_inputs": "Frozen baseline originals are retained unchanged. current/ is an immutable historical measurement copy, not active new-grammar source. Future migrated active copies must be separate; speculative infix/sexpr/line-call files are session-only design payloads, not migrated benchmark originals.",
+  "active_refresh": {
+    "commit": "abcaa63af601935c12e8b209aa9f0ecbf702825a",
+    "labeling": "Probe variant 'current' is always the frozen HISTORICAL input; 'active-abcaa63af' is the integrated grammar. Population samples (41) are unchanged and carry no active arm.",
+    "converted": "20/20 converted via converter API with baseline options; calor format --check found 0 parse errors (12 conservatively unchanged for lack of project/effects context). Provenance: active-abcaa63af/converted-provenance.json.",
+    "agent_gate": "Superseded by translated copies: 20 paired probes (population active-agent, probe-translated-agent-*) pair each frozen historical agent file with a session-only active-abcaa63af translation (active-agent/provenance.json). Dispositions: 17 equivalent (abcaa63af MSBuild + held-out oracle equals historical pass count); W-005 equivalent-nonbuilding (reproduces frozen starter Calor0410/0411 multiset); W-004/W-006 translated unedited starters from invalid runs, held-out oracle not applicable. Not agent outputs or an evaluation arm; the 41-sample population has no active arm.",
+    "unpaired_context": "Teaching/Generated server-instructions.md (== MCP initialize instructions, captured in active-abcaa63af/mcp/mcp-instructions.md), overview.md and current-language-reference.md have no d82f3ae source counterpart; recorded as context, not paired probes."
+  },
+  "samples": [
+    {
+      "id": "converted-MediatR-IMediator",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/IMediator.cs",
+      "variants": {
+        "current": "current/converted-MediatR-IMediator.txt",
+        "infix": "infix/converted-MediatR-IMediator.txt",
+        "sexpr": "sexpr/converted-MediatR-IMediator.txt",
+        "line-call": "line-call/converted-MediatR-IMediator.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-RequestExceptionActionProcessorStrategy",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs",
+      "variants": {
+        "current": "current/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "infix": "infix/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "sexpr": "sexpr/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "line-call": "line-call/converted-MediatR-RequestExceptionActionProcessorStrategy.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-INotificationPublisher",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/INotificationPublisher.cs",
+      "variants": {
+        "current": "current/converted-MediatR-INotificationPublisher.txt",
+        "infix": "infix/converted-MediatR-INotificationPublisher.txt",
+        "sexpr": "sexpr/converted-MediatR-INotificationPublisher.txt",
+        "line-call": "line-call/converted-MediatR-INotificationPublisher.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-IRequestPreProcessor",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/Pipeline/IRequestPreProcessor.cs",
+      "variants": {
+        "current": "current/converted-MediatR-IRequestPreProcessor.txt",
+        "infix": "infix/converted-MediatR-IRequestPreProcessor.txt",
+        "sexpr": "sexpr/converted-MediatR-IRequestPreProcessor.txt",
+        "line-call": "line-call/converted-MediatR-IRequestPreProcessor.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-IRequestPostProcessor",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/Pipeline/IRequestPostProcessor.cs",
+      "variants": {
+        "current": "current/converted-MediatR-IRequestPostProcessor.txt",
+        "infix": "infix/converted-MediatR-IRequestPostProcessor.txt",
+        "sexpr": "sexpr/converted-MediatR-IRequestPostProcessor.txt",
+        "line-call": "line-call/converted-MediatR-IRequestPostProcessor.txt"
+      }
+    },
+    {
+      "id": "converted-MediatR-ForeachAwaitPublisher",
+      "population": "converted",
+      "source": "MediatR/src/MediatR/NotificationPublishers/ForeachAwaitPublisher.cs",
+      "variants": {
+        "current": "current/converted-MediatR-ForeachAwaitPublisher.txt",
+        "infix": "infix/converted-MediatR-ForeachAwaitPublisher.txt",
+        "sexpr": "sexpr/converted-MediatR-ForeachAwaitPublisher.txt",
+        "line-call": "line-call/converted-MediatR-ForeachAwaitPublisher.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-ILoggerSettings",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Configuration/ILoggerSettings.cs",
+      "variants": {
+        "current": "current/converted-Serilog-ILoggerSettings.txt",
+        "infix": "infix/converted-Serilog-ILoggerSettings.txt",
+        "sexpr": "sexpr/converted-Serilog-ILoggerSettings.txt",
+        "line-call": "line-call/converted-Serilog-ILoggerSettings.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-ILogEventEnricher",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/ILogEventEnricher.cs",
+      "variants": {
+        "current": "current/converted-Serilog-ILogEventEnricher.txt",
+        "infix": "infix/converted-Serilog-ILogEventEnricher.txt",
+        "sexpr": "sexpr/converted-Serilog-ILogEventEnricher.txt",
+        "line-call": "line-call/converted-Serilog-ILogEventEnricher.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-ILogEventFilter",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/ILogEventFilter.cs",
+      "variants": {
+        "current": "current/converted-Serilog-ILogEventFilter.txt",
+        "infix": "infix/converted-Serilog-ILogEventFilter.txt",
+        "sexpr": "sexpr/converted-Serilog-ILogEventFilter.txt",
+        "line-call": "line-call/converted-Serilog-ILogEventFilter.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-Constants",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/Constants.cs",
+      "variants": {
+        "current": "current/converted-Serilog-Constants.txt",
+        "infix": "infix/converted-Serilog-Constants.txt",
+        "sexpr": "sexpr/converted-Serilog-Constants.txt",
+        "line-call": "line-call/converted-Serilog-Constants.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-AlignmentDirection",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Parsing/AlignmentDirection.cs",
+      "variants": {
+        "current": "current/converted-Serilog-AlignmentDirection.txt",
+        "infix": "infix/converted-Serilog-AlignmentDirection.txt",
+        "sexpr": "sexpr/converted-Serilog-AlignmentDirection.txt",
+        "line-call": "line-call/converted-Serilog-AlignmentDirection.txt"
+      }
+    },
+    {
+      "id": "converted-Serilog-LoggingFailureKind",
+      "population": "converted",
+      "source": "Serilog/src/Serilog/Core/LoggingFailureKind.cs",
+      "variants": {
+        "current": "current/converted-Serilog-LoggingFailureKind.txt",
+        "infix": "infix/converted-Serilog-LoggingFailureKind.txt",
+        "sexpr": "sexpr/converted-Serilog-LoggingFailureKind.txt",
+        "line-call": "line-call/converted-Serilog-LoggingFailureKind.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-IValidatorSelector",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Internal/IValidatorSelector.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-IValidatorSelector.txt",
+        "infix": "infix/converted-FluentValidation-IValidatorSelector.txt",
+        "sexpr": "sexpr/converted-FluentValidation-IValidatorSelector.txt",
+        "line-call": "line-call/converted-FluentValidation-IValidatorSelector.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-ChildRulesContainer",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Internal/ChildRulesContainer.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-ChildRulesContainer.txt",
+        "infix": "infix/converted-FluentValidation-ChildRulesContainer.txt",
+        "sexpr": "sexpr/converted-FluentValidation-ChildRulesContainer.txt",
+        "line-call": "line-call/converted-FluentValidation-ChildRulesContainer.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-NoopPropertyValidator",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Validators/NoopPropertyValidator.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-NoopPropertyValidator.txt",
+        "infix": "infix/converted-FluentValidation-NoopPropertyValidator.txt",
+        "sexpr": "sexpr/converted-FluentValidation-NoopPropertyValidator.txt",
+        "line-call": "line-call/converted-FluentValidation-NoopPropertyValidator.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-InlineValidator",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/InlineValidator.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-InlineValidator.txt",
+        "infix": "infix/converted-FluentValidation-InlineValidator.txt",
+        "sexpr": "sexpr/converted-FluentValidation-InlineValidator.txt",
+        "line-call": "line-call/converted-FluentValidation-InlineValidator.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-ILanguageManager",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Resources/ILanguageManager.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-ILanguageManager.txt",
+        "infix": "infix/converted-FluentValidation-ILanguageManager.txt",
+        "sexpr": "sexpr/converted-FluentValidation-ILanguageManager.txt",
+        "line-call": "line-call/converted-FluentValidation-ILanguageManager.txt"
+      }
+    },
+    {
+      "id": "converted-FluentValidation-CompositeValidatorSelector",
+      "population": "converted",
+      "source": "FluentValidation/src/FluentValidation/Internal/CompositeValidatorSelector.cs",
+      "variants": {
+        "current": "current/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "infix": "infix/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "sexpr": "sexpr/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "line-call": "line-call/converted-FluentValidation-CompositeValidatorSelector.txt"
+      }
+    },
+    {
+      "id": "converted-Synthetic-StringUtils",
+      "population": "converted",
+      "source": "Synthetic/SyntheticLib/StringUtils.cs",
+      "variants": {
+        "current": "current/converted-Synthetic-StringUtils.txt",
+        "infix": "infix/converted-Synthetic-StringUtils.txt",
+        "sexpr": "sexpr/converted-Synthetic-StringUtils.txt",
+        "line-call": "line-call/converted-Synthetic-StringUtils.txt"
+      }
+    },
+    {
+      "id": "converted-Synthetic2-Grid",
+      "population": "converted",
+      "source": "Synthetic2/GeoLib/Grid.cs",
+      "variants": {
+        "current": "current/converted-Synthetic2-Grid.txt",
+        "infix": "infix/converted-Synthetic2-Grid.txt",
+        "sexpr": "sexpr/converted-Synthetic2-Grid.txt",
+        "line-call": "line-call/converted-Synthetic2-Grid.txt"
+      }
+    },
+    {
+      "id": "agent-W5A-001-report-audit",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-001-report-audit/calor-v10-verify/run-1/final-src/Report.calr",
+      "variants": {
+        "current": "current/agent-W5A-001-report-audit.txt",
+        "infix": "infix/agent-W5A-001-report-audit.txt",
+        "sexpr": "sexpr/agent-W5A-001-report-audit.txt",
+        "line-call": "line-call/agent-W5A-001-report-audit.txt"
+      }
+    },
+    {
+      "id": "agent-W5A-002-inventory-log",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-1/final-src/Inventory.calr",
+      "variants": {
+        "current": "current/agent-W5A-002-inventory-log.txt",
+        "infix": "infix/agent-W5A-002-inventory-log.txt",
+        "sexpr": "sexpr/agent-W5A-002-inventory-log.txt",
+        "line-call": "line-call/agent-W5A-002-inventory-log.txt"
+      }
+    },
+    {
+      "id": "agent-W5A-003-config-echo",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-003-config-echo/calor-v10-verify/run-1/final-src/Config.calr",
+      "variants": {
+        "current": "current/agent-W5A-003-config-echo.txt",
+        "infix": "infix/agent-W5A-003-config-echo.txt",
+        "sexpr": "sexpr/agent-W5A-003-config-echo.txt",
+        "line-call": "line-call/agent-W5A-003-config-echo.txt"
+      }
+    },
+    {
+      "id": "agent-W5B-001-shipping-quote",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-001-shipping-quote/calor-v10-verify/run-1/final-src/Quote.calr",
+      "variants": {
+        "current": "current/agent-W5B-001-shipping-quote.txt",
+        "infix": "infix/agent-W5B-001-shipping-quote.txt",
+        "sexpr": "sexpr/agent-W5B-001-shipping-quote.txt",
+        "line-call": "line-call/agent-W5B-001-shipping-quote.txt"
+      }
+    },
+    {
+      "id": "agent-W5B-002-loyalty-points",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-002-loyalty-points/calor-v10-verify/run-1/final-src/Loyalty.calr",
+      "variants": {
+        "current": "current/agent-W5B-002-loyalty-points.txt",
+        "infix": "infix/agent-W5B-002-loyalty-points.txt",
+        "sexpr": "sexpr/agent-W5B-002-loyalty-points.txt",
+        "line-call": "line-call/agent-W5B-002-loyalty-points.txt"
+      }
+    },
+    {
+      "id": "agent-W5B-003-request-quota",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-003-request-quota/calor-v10-verify/run-1/final-src/Quota.calr",
+      "variants": {
+        "current": "current/agent-W5B-003-request-quota.txt",
+        "infix": "infix/agent-W5B-003-request-quota.txt",
+        "sexpr": "sexpr/agent-W5B-003-request-quota.txt",
+        "line-call": "line-call/agent-W5B-003-request-quota.txt"
+      }
+    },
+    {
+      "id": "agent-W5C-001-catalog-cache",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5C-001-catalog-cache/calor-v10-verify/run-1/final-src/Catalog.calr",
+      "variants": {
+        "current": "current/agent-W5C-001-catalog-cache.txt",
+        "infix": "infix/agent-W5C-001-catalog-cache.txt",
+        "sexpr": "sexpr/agent-W5C-001-catalog-cache.txt",
+        "line-call": "line-call/agent-W5C-001-catalog-cache.txt"
+      }
+    },
+    {
+      "id": "agent-W5C-002-ledger-view",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5C-002-ledger-view/calor-v10-verify/run-1/final-src/Ledger.calr",
+      "variants": {
+        "current": "current/agent-W5C-002-ledger-view.txt",
+        "infix": "infix/agent-W5C-002-ledger-view.txt",
+        "sexpr": "sexpr/agent-W5C-002-ledger-view.txt",
+        "line-call": "line-call/agent-W5C-002-ledger-view.txt"
+      }
+    },
+    {
+      "id": "agent-W5C-003-session-index",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/guarantees-probe-001/W5C-003-session-index/calor-v10-verify/run-1/final-src/Session.calr",
+      "variants": {
+        "current": "current/agent-W5C-003-session-index.txt",
+        "infix": "infix/agent-W5C-003-session-index.txt",
+        "sexpr": "sexpr/agent-W5C-003-session-index.txt",
+        "line-call": "line-call/agent-W5C-003-session-index.txt"
+      }
+    },
+    {
+      "id": "agent-W-001-middleware-stage",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-001-middleware-stage/calor+v0.15.0/run-1/final-src/A3-middleware.calr",
+      "variants": {
+        "current": "current/agent-W-001-middleware-stage.txt",
+        "infix": "infix/agent-W-001-middleware-stage.txt",
+        "sexpr": "sexpr/agent-W-001-middleware-stage.txt",
+        "line-call": "line-call/agent-W-001-middleware-stage.txt"
+      }
+    },
+    {
+      "id": "agent-W-002-map-and-report",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-002-map-and-report/calor+v0.15.0/run-1/final-src/A3-map.calr",
+      "variants": {
+        "current": "current/agent-W-002-map-and-report.txt",
+        "infix": "infix/agent-W-002-map-and-report.txt",
+        "sexpr": "sexpr/agent-W-002-map-and-report.txt",
+        "line-call": "line-call/agent-W-002-map-and-report.txt"
+      }
+    },
+    {
+      "id": "agent-W-006-map-doubler",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-006-map-doubler/calor+v0.15.0/run-1/final-src/A3-map.calr",
+      "variants": {
+        "current": "current/agent-W-006-map-doubler.txt",
+        "infix": "infix/agent-W-006-map-doubler.txt",
+        "sexpr": "sexpr/agent-W-006-map-doubler.txt",
+        "line-call": "line-call/agent-W-006-map-doubler.txt"
+      }
+    },
+    {
+      "id": "agent-W-003-match-fallback",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-003-match-fallback/calor+v0.15.0/run-1/final-src/A3-match.calr",
+      "variants": {
+        "current": "current/agent-W-003-match-fallback.txt",
+        "infix": "infix/agent-W-003-match-fallback.txt",
+        "sexpr": "sexpr/agent-W-003-match-fallback.txt",
+        "line-call": "line-call/agent-W-003-match-fallback.txt"
+      }
+    },
+    {
+      "id": "agent-W-004-counter-peek",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-004-counter-peek/calor+v0.15.0/run-1/final-src/A3-callback.calr",
+      "variants": {
+        "current": "current/agent-W-004-counter-peek.txt",
+        "infix": "infix/agent-W-004-counter-peek.txt",
+        "sexpr": "sexpr/agent-W-004-counter-peek.txt",
+        "line-call": "line-call/agent-W-004-counter-peek.txt"
+      }
+    },
+    {
+      "id": "agent-W-005-pipeline-trace",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w-rows-dry-001/W-005-pipeline-trace/calor+v0.15.0/run-1/final-src/A2.calr",
+      "variants": {
+        "current": "current/agent-W-005-pipeline-trace.txt",
+        "infix": "infix/agent-W-005-pipeline-trace.txt",
+        "sexpr": "sexpr/agent-W-005-pipeline-trace.txt",
+        "line-call": "line-call/agent-W-005-pipeline-trace.txt"
+      }
+    },
+    {
+      "id": "agent-N1-001-string-utils",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-001-string-utils/calor+0.15.0/run-1/final-src/TextUtils.calr",
+      "variants": {
+        "current": "current/agent-N1-001-string-utils.txt",
+        "infix": "infix/agent-N1-001-string-utils.txt",
+        "sexpr": "sexpr/agent-N1-001-string-utils.txt",
+        "line-call": "line-call/agent-N1-001-string-utils.txt"
+      }
+    },
+    {
+      "id": "agent-N1-002-inventory",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-002-inventory/calor+0.15.0/run-1/final-src/Inventory.calr",
+      "variants": {
+        "current": "current/agent-N1-002-inventory.txt",
+        "infix": "infix/agent-N1-002-inventory.txt",
+        "sexpr": "sexpr/agent-N1-002-inventory.txt",
+        "line-call": "line-call/agent-N1-002-inventory.txt"
+      }
+    },
+    {
+      "id": "agent-N1-003-csv-row",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor+0.15.0/run-1/final-src/CsvRow.calr",
+      "variants": {
+        "current": "current/agent-N1-003-csv-row.txt",
+        "infix": "infix/agent-N1-003-csv-row.txt",
+        "sexpr": "sexpr/agent-N1-003-csv-row.txt",
+        "line-call": "line-call/agent-N1-003-csv-row.txt"
+      }
+    },
+    {
+      "id": "agent-N1-001-string-utils-w5",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w5-parity-002/N1-001-string-utils/calor+treatment/run-1/final-src/TextUtils.calr",
+      "variants": {
+        "current": "current/agent-N1-001-string-utils-w5.txt",
+        "infix": "infix/agent-N1-001-string-utils-w5.txt",
+        "sexpr": "sexpr/agent-N1-001-string-utils-w5.txt",
+        "line-call": "line-call/agent-N1-001-string-utils-w5.txt"
+      }
+    },
+    {
+      "id": "agent-N1-002-inventory-w5",
+      "population": "agent",
+      "source": "bench/phase0-agent-native/epochs/w5-parity-002/N1-002-inventory/calor+treatment/run-1/final-src/Inventory.calr",
+      "variants": {
+        "current": "current/agent-N1-002-inventory-w5.txt",
+        "infix": "infix/agent-N1-002-inventory-w5.txt",
+        "sexpr": "sexpr/agent-N1-002-inventory-w5.txt",
+        "line-call": "line-call/agent-N1-002-inventory-w5.txt"
+      }
+    },
+    {
+      "id": "primer",
+      "population": "primer",
+      "source": "src/Calor.Compiler/Resources/agent-syntax-exemplar.md",
+      "variants": {
+        "current": "current/primer.txt",
+        "infix": "infix/primer.txt",
+        "sexpr": "sexpr/primer.txt",
+        "line-call": "line-call/primer.txt"
+      }
+    }
+  ],
+  "probes": [
+    {
+      "id": "probe-sigil",
+      "population": "sigil",
+      "source": "hand-authored/sigil",
+      "note": "Only tags change; no IDs in any variant.",
+      "variants": {
+        "current": "probes/sigil/current.txt",
+        "ascii-at": "probes/sigil/ascii-at.txt",
+        "ascii-hash": "probes/sigil/ascii-hash.txt",
+        "no-sigil-uppercase": "probes/sigil/no-sigil-uppercase.txt",
+        "no-sigil-lowercase": "probes/sigil/no-sigil-lowercase.txt"
+      }
+    },
+    {
+      "id": "probe-braces",
+      "population": "braces",
+      "source": "hand-authored/braces",
+      "note": "Attribute delimiters only; IDs are excluded by epic decision.",
+      "variants": {
+        "current": "probes/braces/current.txt",
+        "spaces": "probes/braces/spaces.txt"
+      }
+    },
+    {
+      "id": "probe-type-names",
+      "population": "type-names",
+      "source": "hand-authored/type-names",
+      "note": "Same underlying .NET types.",
+      "variants": {
+        "current": "probes/type-names/current.txt",
+        "csharp": "probes/type-names/csharp.txt"
+      }
+    },
+    {
+      "id": "probe-visibility",
+      "population": "visibility",
+      "source": "hand-authored/visibility",
+      "note": "Both public; requires a public-default grammar for the second candidate.",
+      "variants": {
+        "current": "probes/visibility/current.txt",
+        "public-default": "probes/visibility/public-default.txt"
+      }
+    },
+    {
+      "id": "probe-indentation",
+      "population": "indentation",
+      "source": "hand-authored/indentation",
+      "note": "Same block nesting; tabs remain a measured alternative, not a preference.",
+      "variants": {
+        "current": "probes/indentation/current.txt",
+        "one-space": "probes/indentation/one-space.txt",
+        "tabs": "probes/indentation/tabs.txt"
+      }
+    },
+    {
+      "id": "probe-arrow",
+      "population": "arrow",
+      "source": "hand-authored/arrow",
+      "note": "Signature arrow, not implication or lambda.",
+      "variants": {
+        "current": "probes/arrow/current.txt",
+        "unicode": "probes/arrow/unicode.txt"
+      }
+    },
+    {
+      "id": "probe-field-order",
+      "population": "field-order",
+      "source": "hand-authored/field-order",
+      "note": "Tie breaker specified by #1600 is type:name.",
+      "variants": {
+        "current": "probes/field-order/current.txt",
+        "name-first": "probes/field-order/name-first.txt"
+      }
+    },
+    {
+      "id": "probe-mutability",
+      "population": "mutability",
+      "source": "hand-authored/mutability",
+      "note": "Same mutable local; no compound assignment.",
+      "variants": {
+        "current": "probes/mutability/current.txt",
+        "mut": "probes/mutability/mut.txt",
+        "var": "probes/mutability/var.txt"
+      }
+    },
+    {
+      "id": "probe-function-keyword",
+      "population": "function-keyword",
+      "source": "hand-authored/function-keyword",
+      "note": "One function tag, explicit static modifier.",
+      "variants": {
+        "current": "probes/function-keyword/current.txt",
+        "func": "probes/function-keyword/func.txt",
+        "function": "probes/function-keyword/function.txt"
+      }
+    },
+    {
+      "id": "probe-effects-contracts",
+      "population": "effects-contracts",
+      "source": "hand-authored/effects-contracts",
+      "note": "One precondition position: inline refinement; no §Q alternative.",
+      "variants": {
+        "current": "probes/effects-contracts/current.txt",
+        "words": "probes/effects-contracts/words.txt",
+        "symbols": "probes/effects-contracts/symbols.txt"
+      }
+    },
+    {
+      "id": "probe-array-spellings",
+      "population": "array-spellings",
+      "source": "hand-authored/array-spellings",
+      "note": "Ranks/jaggedness preserved; last variant combines type-name and array choices.",
+      "variants": {
+        "current": "probes/array-spellings/current.txt",
+        "csharp-arrays": "probes/array-spellings/csharp-arrays.txt",
+        "csharp-arrays-types": "probes/array-spellings/csharp-arrays-types.txt"
+      }
+    },
+    {
+      "id": "probe-nullable",
+      "population": "nullable",
+      "source": "hand-authored/nullable",
+      "note": "Same nullable .NET type; Option/Result are not candidates.",
+      "variants": {
+        "current": "probes/nullable/current.txt",
+        "suffix": "probes/nullable/suffix.txt"
+      }
+    },
+    {
+      "id": "probe-snapshot-loop",
+      "population": "snapshot-loop",
+      "source": "hand-authored/snapshot-loop",
+      "note": "Both snapshot from/to/step once in that order, inclusive bounds, overflow stops.",
+      "variants": {
+        "current": "probes/snapshot-loop/current.txt",
+        "compact": "probes/snapshot-loop/compact.txt"
+      }
+    },
+    {
+      "id": "probe-reevaluated-loop",
+      "population": "reevaluated-loop",
+      "source": "hand-authored/reevaluated-loop",
+      "note": "End reevaluates per test and Step per increment; no bound +/-1 rewrite; C# overflow context explicit.",
+      "variants": {
+        "current": "probes/reevaluated-loop/current.txt",
+        "compact": "probes/reevaluated-loop/compact.txt"
+      }
+    },
+    {
+      "id": "probe-do-clause",
+      "population": "do-clause",
+      "source": "hand-authored/do-clause",
+      "note": "Trailing clause at owner indentation; native C# do in every candidate, never first-flag while.",
+      "variants": {
+        "current": "probes/do-clause/current.txt",
+        "repeat-until": "probes/do-clause/repeat-until.txt",
+        "do-when": "probes/do-clause/do-when.txt"
+      }
+    },
+    {
+      "id": "probe-computed-calls",
+      "population": "computed-calls",
+      "source": "hand-authored/computed-calls",
+      "note": "Callee/receiver, index, then arguments each evaluate once in original order.",
+      "variants": {
+        "current": "probes/computed-calls/current.txt",
+        "sexpr": "probes/computed-calls/sexpr.txt",
+        "line-call": "probes/computed-calls/line-call.txt"
+      }
+    },
+    {
+      "id": "probe-generic-call",
+      "population": "generic-call",
+      "source": "hand-authored/generic-call",
+      "note": "Prefix head scans balanced generic arguments only in callee position; comparisons stay operators.",
+      "variants": {
+        "current": "probes/generic-call/current.txt",
+        "sexpr": "probes/generic-call/sexpr.txt",
+        "line-call": "probes/generic-call/line-call.txt"
+      }
+    },
+    {
+      "id": "probe-zero-group-tuple",
+      "population": "zero-group-tuple",
+      "source": "hand-authored/zero-group-tuple",
+      "note": "Infix parentheses group, () calls, comma tuple. Prefix (f) is a call; tuple is reserved, @tuple escapes names.",
+      "variants": {
+        "current": "probes/zero-group-tuple/current.txt",
+        "sexpr": "probes/zero-group-tuple/sexpr.txt",
+        "line-call": "probes/zero-group-tuple/line-call.txt"
+      }
+    },
+    {
+      "id": "probe-implication-lambda",
+      "population": "implication-lambda",
+      "source": "hand-authored/implication-lambda",
+      "note": "-> only means implication in prefix head position; signature arrow is outside expressions.",
+      "variants": {
+        "current": "probes/implication-lambda/current.txt",
+        "sexpr": "probes/implication-lambda/sexpr.txt",
+        "line-call": "probes/implication-lambda/line-call.txt"
+      }
+    },
+    {
+      "id": "probe-reserved-head",
+      "population": "reserved-head",
+      "source": "hand-authored/reserved-head",
+      "note": "Case-sensitive calls; Add is not arithmetic. Removed builtins/word operators cannot capture user names.",
+      "variants": {
+        "current": "probes/reserved-head/current.txt",
+        "sexpr": "probes/reserved-head/sexpr.txt",
+        "line-call": "probes/reserved-head/line-call.txt"
+      }
+    },
+    {
+      "id": "probe-block-lambda",
+      "population": "block-lambda",
+      "source": "hand-authored/block-lambda",
+      "note": "No §/LAM. Infix/line body ends by dedent; prefix delimiter ) closes the expression, not a structural closer tag. Inline expression bodies remain the same lambda node with one expression body.",
+      "variants": {
+        "current": "probes/block-lambda/current.txt",
+        "sexpr": "probes/block-lambda/sexpr.txt",
+        "line-call": "probes/block-lambda/line-call.txt"
+      }
+    },
+    {
+      "id": "probe-interpolation-runtime-int",
+      "population": "interpolation-runtime-int",
+      "source": "hand-authored/interpolation-runtime-int",
+      "note": "All represent C# runtime interpolation $\"value={1}\" under their respective candidate grammars, never literal placeholder text.",
+      "variants": {
+        "current": "probes/interpolation-runtime-int/current.txt",
+        "reuse-dollar": "probes/interpolation-runtime-int/reuse-dollar.txt",
+        "grouped": "probes/interpolation-runtime-int/grouped.txt",
+        "explicit-equals": "probes/interpolation-runtime-int/explicit-equals.txt"
+      }
+    },
+    {
+      "id": "probe-interpolation-runtime-format",
+      "population": "interpolation-runtime-format",
+      "source": "hand-authored/interpolation-runtime-format",
+      "note": "Same runtime hole, alignment 4 and format D2; grouped parentheses belong only to the expression.",
+      "variants": {
+        "current": "probes/interpolation-runtime-format/current.txt",
+        "reuse-dollar": "probes/interpolation-runtime-format/reuse-dollar.txt",
+        "grouped": "probes/interpolation-runtime-format/grouped.txt",
+        "explicit-equals": "probes/interpolation-runtime-format/explicit-equals.txt"
+      }
+    },
+    {
+      "id": "probe-interpolation-literal-placeholder",
+      "population": "interpolation-literal-placeholder",
+      "source": "hand-authored/interpolation-literal-placeholder",
+      "note": "All are literal ${1}, ${0} and ${name} text, not runtime interpolation; A migrates numeric placeholders to existing backslash escape.",
+      "variants": {
+        "current": "probes/interpolation-literal-placeholder/current.txt",
+        "reuse-dollar": "probes/interpolation-literal-placeholder/reuse-dollar.txt",
+        "grouped": "probes/interpolation-literal-placeholder/grouped.txt",
+        "explicit-equals": "probes/interpolation-literal-placeholder/explicit-equals.txt"
+      }
+    },
+    {
+      "id": "probe-interpolation-runtime-nested",
+      "population": "interpolation-runtime-nested",
+      "source": "hand-authored/interpolation-runtime-nested",
+      "note": "Same nested runtime expression; B/C consistently mark runtime holes, not an extra accepted alias.",
+      "variants": {
+        "current": "probes/interpolation-runtime-nested/current.txt",
+        "reuse-dollar": "probes/interpolation-runtime-nested/reuse-dollar.txt",
+        "grouped": "probes/interpolation-runtime-nested/grouped.txt",
+        "explicit-equals": "probes/interpolation-runtime-nested/explicit-equals.txt"
+      }
+    },
+    {
+      "id": "probe-interpolation-runtime-name",
+      "population": "interpolation-runtime-name",
+      "source": "hand-authored/interpolation-runtime-name",
+      "note": "Lexical owner confirmed ${name} is an expression today; only initial-digit holes are LiteralPlaceholder. Backslash escape is literal in all candidates.",
+      "variants": {
+        "current": "probes/interpolation-runtime-name/current.txt",
+        "reuse-dollar": "probes/interpolation-runtime-name/reuse-dollar.txt",
+        "grouped": "probes/interpolation-runtime-name/grouped.txt",
+        "explicit-equals": "probes/interpolation-runtime-name/explicit-equals.txt"
+      }
+    },
+    {
+      "id": "probe-raw-crlf",
+      "population": "raw-crlf",
+      "source": "hand-authored/raw-crlf",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-crlf/current.txt",
+        "byte-length": "probes/raw-crlf/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-raw-no-final-newline",
+      "population": "raw-no-final-newline",
+      "source": "hand-authored/raw-no-final-newline",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-no-final-newline/current.txt",
+        "byte-length": "probes/raw-no-final-newline/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-raw-eof-comment",
+      "population": "raw-eof-comment",
+      "source": "hand-authored/raw-eof-comment",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-eof-comment/current.txt",
+        "byte-length": "probes/raw-eof-comment/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-raw-raw-string",
+      "population": "raw-raw-string",
+      "source": "hand-authored/raw-raw-string",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-raw-string/current.txt",
+        "byte-length": "probes/raw-raw-string/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-raw-inactive-malformed",
+      "population": "raw-inactive-malformed",
+      "source": "hand-authored/raw-inactive-malformed",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-inactive-malformed/current.txt",
+        "byte-length": "probes/raw-inactive-malformed/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-raw-delimiter-collision",
+      "population": "raw-delimiter-collision",
+      "source": "hand-authored/raw-delimiter-collision",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-delimiter-collision/current.txt",
+        "byte-length": "probes/raw-delimiter-collision/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-raw-unicode-bytes",
+      "population": "raw-unicode-bytes",
+      "source": "hand-authored/raw-unicode-bytes",
+      "note": "Same exact UTF-8 payload; fence strips exactly its framing LF, not payload newlines. Length never counts characters.",
+      "variants": {
+        "current": "probes/raw-unicode-bytes/current.txt",
+        "byte-length": "probes/raw-unicode-bytes/byte-length.txt"
+      }
+    },
+    {
+      "id": "probe-reason-marker",
+      "population": "reason-marker",
+      "source": "hand-authored/reason-marker",
+      "note": "All identify the same converter rescue reason; syntactic marker is not cryptographic authorization.",
+      "variants": {
+        "current": "probes/reason-marker/current.txt",
+        "reason-equals": "probes/reason-marker/reason-equals.txt",
+        "compact": "probes/reason-marker/compact.txt"
+      }
+    },
+    {
+      "id": "probe-structured-doc-since",
+      "population": "structured-doc-since",
+      "source": "hand-authored/structured-doc-since",
+      "note": "Identical SinceNode.Version=1.2.0 and declaration attachment; same since/stability consumers and generated SINCE comment. Structured docs must be parsed, not merely retained as prose. Function scaffold is shared draft syntax, not an accepted grammar claim.",
+      "variants": {
+        "current": "probes/structured-doc-since/current.txt",
+        "xml": "probes/structured-doc-since/xml.txt",
+        "at-doc": "probes/structured-doc-since/at-doc.txt",
+        "json-doc": "probes/structured-doc-since/json-doc.txt"
+      }
+    },
+    {
+      "id": "probe-structured-doc-deprecated",
+      "population": "structured-doc-deprecated",
+      "source": "hand-authored/structured-doc-deprecated",
+      "note": "Identical DeprecatedNode.SinceVersion=1.4.0 and Replacement=NewApi; Reason and RemovedInVersion remain null. Reconstruct the same metadata and existing System.Obsolete message; do not convert it to a harmless documentation comment or add an error flag.",
+      "variants": {
+        "current": "probes/structured-doc-deprecated/current.txt",
+        "xml": "probes/structured-doc-deprecated/xml.txt",
+        "at-doc": "probes/structured-doc-deprecated/at-doc.txt",
+        "json-doc": "probes/structured-doc-deprecated/json-doc.txt"
+      }
+    },
+    {
+      "id": "probe-structured-doc-deprecated-no-replacement",
+      "population": "structured-doc-deprecated-no-replacement",
+      "source": "hand-authored/structured-doc-deprecated-no-replacement",
+      "note": "Identical deprecated-since metadata with null Replacement, Reason, RemovedInVersion; missing replacement is not an empty or guessed symbol. Existing Obsolete semantics are unchanged.",
+      "variants": {
+        "current": "probes/structured-doc-deprecated-no-replacement/current.txt",
+        "xml": "probes/structured-doc-deprecated-no-replacement/xml.txt",
+        "at-doc": "probes/structured-doc-deprecated-no-replacement/at-doc.txt",
+        "json-doc": "probes/structured-doc-deprecated-no-replacement/json-doc.txt"
+      }
+    },
+    {
+      "id": "probe-structured-doc-breaking",
+      "population": "structured-doc-breaking",
+      "source": "hand-authored/structured-doc-breaking",
+      "note": "Identical ordered BreakingChangeNode list with separate version and exact decoded description. XML entities decode once. Preserve CompareApiVersions marker recognition and emitted BREAKING comments; do not collapse entries into unstructured text.",
+      "variants": {
+        "current": "probes/structured-doc-breaking/current.txt",
+        "xml": "probes/structured-doc-breaking/xml.txt",
+        "at-doc": "probes/structured-doc-breaking/at-doc.txt",
+        "json-doc": "probes/structured-doc-breaking/json-doc.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-MediatR-IMediator",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-MediatR-IMediator",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-MediatR-IMediator.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-MediatR-IMediator.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-MediatR-RequestExceptionActionProcessorStrategy",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-MediatR-RequestExceptionActionProcessorStrategy",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-MediatR-RequestExceptionActionProcessorStrategy.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-MediatR-RequestExceptionActionProcessorStrategy.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-MediatR-INotificationPublisher",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-MediatR-INotificationPublisher",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-MediatR-INotificationPublisher.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-MediatR-INotificationPublisher.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-MediatR-IRequestPreProcessor",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-MediatR-IRequestPreProcessor",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-MediatR-IRequestPreProcessor.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-MediatR-IRequestPreProcessor.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-MediatR-IRequestPostProcessor",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-MediatR-IRequestPostProcessor",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-MediatR-IRequestPostProcessor.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-MediatR-IRequestPostProcessor.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-MediatR-ForeachAwaitPublisher",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-MediatR-ForeachAwaitPublisher",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-MediatR-ForeachAwaitPublisher.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-MediatR-ForeachAwaitPublisher.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Serilog-ILoggerSettings",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Serilog-ILoggerSettings",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Serilog-ILoggerSettings.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Serilog-ILoggerSettings.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Serilog-ILogEventEnricher",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Serilog-ILogEventEnricher",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Serilog-ILogEventEnricher.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Serilog-ILogEventEnricher.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Serilog-ILogEventFilter",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Serilog-ILogEventFilter",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Serilog-ILogEventFilter.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Serilog-ILogEventFilter.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Serilog-Constants",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Serilog-Constants",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Serilog-Constants.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Serilog-Constants.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Serilog-AlignmentDirection",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Serilog-AlignmentDirection",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Serilog-AlignmentDirection.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Serilog-AlignmentDirection.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Serilog-LoggingFailureKind",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Serilog-LoggingFailureKind",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Serilog-LoggingFailureKind.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Serilog-LoggingFailureKind.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-FluentValidation-IValidatorSelector",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-FluentValidation-IValidatorSelector",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-FluentValidation-IValidatorSelector.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-FluentValidation-IValidatorSelector.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-FluentValidation-ChildRulesContainer",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-FluentValidation-ChildRulesContainer",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-FluentValidation-ChildRulesContainer.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-FluentValidation-ChildRulesContainer.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-FluentValidation-NoopPropertyValidator",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-FluentValidation-NoopPropertyValidator",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-FluentValidation-NoopPropertyValidator.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-FluentValidation-NoopPropertyValidator.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-FluentValidation-InlineValidator",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-FluentValidation-InlineValidator",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-FluentValidation-InlineValidator.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-FluentValidation-InlineValidator.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-FluentValidation-ILanguageManager",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-FluentValidation-ILanguageManager",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-FluentValidation-ILanguageManager.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-FluentValidation-ILanguageManager.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-FluentValidation-CompositeValidatorSelector",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-FluentValidation-CompositeValidatorSelector",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-FluentValidation-CompositeValidatorSelector.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-FluentValidation-CompositeValidatorSelector.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Synthetic-StringUtils",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Synthetic-StringUtils",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Synthetic-StringUtils.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Synthetic-StringUtils.txt"
+      }
+    },
+    {
+      "id": "probe-active-converted-Synthetic2-Grid",
+      "population": "active-converted",
+      "source": "active-refresh/active-converted-Synthetic2-Grid",
+      "note": "HISTORICAL current = frozen d82f3ae baseline-harness ConvertedCalor; active = abcaa63af CSharpToCalorConverter.Convert with the same row's snapshotted ConversionOptions (ValidateRoundTripCSharp=false, no references). Conversion-only: not harness compile/test/acceptance evidence. Delta mixes converter and grammar changes; not pure syntax savings.",
+      "variants": {
+        "current": "current/converted-Synthetic2-Grid.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-converted-Synthetic2-Grid.txt"
+      }
+    },
+    {
+      "id": "probe-active-primer",
+      "population": "active-teaching",
+      "source": "active-refresh/active-primer",
+      "note": "HISTORICAL current = frozen d82f3ae agent-syntax-exemplar.md (MCP primer); active = abcaa63af exemplar generated from Teaching/reference.json (78 constructs, 80 programs). Content scope also changed; not a pure spelling delta.",
+      "variants": {
+        "current": "current/primer.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-primer.txt"
+      }
+    },
+    {
+      "id": "probe-active-init-AGENTS",
+      "population": "active-init",
+      "source": "active-refresh/active-init-AGENTS",
+      "note": "Raw init template ({{VERSION}} unsubstituted, as embedded) at d82f3ae (historical) vs abcaa63af (generated active). Content and guidance changed; not a pure spelling delta.",
+      "variants": {
+        "current": "active-abcaa63af/probes/historical-init-AGENTS.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-init-AGENTS.txt"
+      }
+    },
+    {
+      "id": "probe-active-init-CLAUDE",
+      "population": "active-init",
+      "source": "active-refresh/active-init-CLAUDE",
+      "note": "Raw init template ({{VERSION}} unsubstituted, as embedded) at d82f3ae (historical) vs abcaa63af (generated active). Content and guidance changed; not a pure spelling delta.",
+      "variants": {
+        "current": "active-abcaa63af/probes/historical-init-CLAUDE.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-init-CLAUDE.txt"
+      }
+    },
+    {
+      "id": "probe-active-init-GEMINI",
+      "population": "active-init",
+      "source": "active-refresh/active-init-GEMINI",
+      "note": "Raw init template ({{VERSION}} unsubstituted, as embedded) at d82f3ae (historical) vs abcaa63af (generated active). Content and guidance changed; not a pure spelling delta.",
+      "variants": {
+        "current": "active-abcaa63af/probes/historical-init-GEMINI.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-init-GEMINI.txt"
+      }
+    },
+    {
+      "id": "probe-active-init-copilot-instructions",
+      "population": "active-init",
+      "source": "active-refresh/active-init-copilot-instructions",
+      "note": "Raw init template ({{VERSION}} unsubstituted, as embedded) at d82f3ae (historical) vs abcaa63af (generated active). Content and guidance changed; not a pure spelling delta.",
+      "variants": {
+        "current": "active-abcaa63af/probes/historical-init-copilot-instructions.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-init-copilot-instructions.txt"
+      }
+    },
+    {
+      "id": "probe-active-mcp-tools",
+      "population": "active-mcp",
+      "source": "active-refresh/active-mcp-tools",
+      "note": "MCP tools/list result.tools as json.dumps(indent=2, ensure_ascii=False)+newline. current = parent 2fd5309e4 real capture (19 tools); active = abcaa63af calor mcp stdio capture (19 tools, 4 changed definitions). Counted as single user-message text, NOT provider tools-channel budget.",
+      "variants": {
+        "current": "active-abcaa63af/probes/historical-mcp-tools-2fd5309e4.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/active-mcp-tools.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5A-001-report-audit",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5A-001-report-audit",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 5/5 vs historical result.json heldout 5/5.",
+      "variants": {
+        "current": "current/agent-W5A-001-report-audit.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5A-001-report-audit.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5A-002-inventory-log",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5A-002-inventory-log",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 8/8 vs historical result.json heldout 8/8.",
+      "variants": {
+        "current": "current/agent-W5A-002-inventory-log.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5A-002-inventory-log.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5A-003-config-echo",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5A-003-config-echo",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 6/6 vs historical result.json heldout 6/6.",
+      "variants": {
+        "current": "current/agent-W5A-003-config-echo.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5A-003-config-echo.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5B-001-shipping-quote",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5B-001-shipping-quote",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 9/9 vs historical result.json heldout 9/9.",
+      "variants": {
+        "current": "current/agent-W5B-001-shipping-quote.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5B-001-shipping-quote.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5B-002-loyalty-points",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5B-002-loyalty-points",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 9/9 vs historical result.json heldout 9/9.",
+      "variants": {
+        "current": "current/agent-W5B-002-loyalty-points.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5B-002-loyalty-points.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5B-003-request-quota",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5B-003-request-quota",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 9/9 vs historical result.json heldout 9/9.",
+      "variants": {
+        "current": "current/agent-W5B-003-request-quota.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5B-003-request-quota.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5C-001-catalog-cache",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5C-001-catalog-cache",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 6/6 vs historical result.json heldout 6/6.",
+      "variants": {
+        "current": "current/agent-W5C-001-catalog-cache.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5C-001-catalog-cache.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5C-002-ledger-view",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5C-002-ledger-view",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 6/6 vs historical result.json heldout 6/6.",
+      "variants": {
+        "current": "current/agent-W5C-002-ledger-view.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5C-002-ledger-view.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W5C-003-session-index",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W5C-003-session-index",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 6/6 vs historical result.json heldout 6/6.",
+      "variants": {
+        "current": "current/agent-W5C-003-session-index.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W5C-003-session-index.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W-001-middleware-stage",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W-001-middleware-stage",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 7/7 vs historical result.json heldout 7/7.",
+      "variants": {
+        "current": "current/agent-W-001-middleware-stage.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W-001-middleware-stage.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W-002-map-and-report",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W-002-map-and-report",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 11/11 vs historical result.json heldout 11/11.",
+      "variants": {
+        "current": "current/agent-W-002-map-and-report.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W-002-map-and-report.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W-006-map-doubler",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W-006-map-doubler",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: translated-starter-oracle-not-applicable. Unedited pairs/<task>/starter-b fixture from an invalid/censored run (agent exit 1, empty journal); historical heldout 0 is not a test result. Active copy builds clean (frozen starter compiled clean); held-out suite fails to COMPILE because it references the task-required member the agent never added (absent in frozen original too). Not equivalence evidence of task behavior; no historical oracle comparison exists.",
+      "variants": {
+        "current": "current/agent-W-006-map-doubler.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W-006-map-doubler.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W-003-match-fallback",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W-003-match-fallback",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 10/10 vs historical result.json heldout 10/10.",
+      "variants": {
+        "current": "current/agent-W-003-match-fallback.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W-003-match-fallback.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W-004-counter-peek",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W-004-counter-peek",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: translated-starter-oracle-not-applicable. Unedited pairs/<task>/starter-b fixture from an invalid/censored run (agent exit 1, empty journal); historical heldout 0 is not a test result. Active copy builds clean (frozen starter compiled clean); held-out suite fails to COMPILE because it references the task-required member the agent never added (absent in frozen original too). Not equivalence evidence of task behavior; no historical oracle comparison exists.",
+      "variants": {
+        "current": "current/agent-W-004-counter-peek.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W-004-counter-peek.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-W-005-pipeline-trace",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-W-005-pipeline-trace",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent-nonbuilding. Frozen historical starter-b multiset (ppw-seeded-compiles.json, arm B): exit 1, (23,9) Calor0410 error, (26,24)/(28,19) Calor0411 warnings; active CLI reproduces exactly that multiset and MSBuild fails on the same Calor0410. Not fixed by design. Historical run invalid (agent exit 1, empty journal); no held-out baseline exists.",
+      "variants": {
+        "current": "current/agent-W-005-pipeline-trace.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-W-005-pipeline-trace.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-N1-001-string-utils",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-N1-001-string-utils",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 11/11 vs historical result.json heldout 11/11.",
+      "variants": {
+        "current": "current/agent-N1-001-string-utils.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-N1-001-string-utils.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-N1-002-inventory",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-N1-002-inventory",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 10/10 vs historical result.json heldout 10/10.",
+      "variants": {
+        "current": "current/agent-N1-002-inventory.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-N1-002-inventory.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-N1-003-csv-row",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-N1-003-csv-row",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 20/20 vs historical result.json heldout 20/20.",
+      "variants": {
+        "current": "current/agent-N1-003-csv-row.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-N1-003-csv-row.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-N1-001-string-utils-w5",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-N1-001-string-utils-w5",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 11/11 vs historical result.json heldout 11/11.",
+      "variants": {
+        "current": "current/agent-N1-001-string-utils-w5.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-N1-001-string-utils-w5.txt"
+      }
+    },
+    {
+      "id": "probe-translated-agent-N1-002-inventory-w5",
+      "population": "active-agent",
+      "source": "active-refresh/translated-agent-N1-002-inventory-w5",
+      "note": "TRANSLATED HISTORICAL INPUT: current = frozen historical agent file; active = session-only copy translated by confirmed abcaa63af rules only (active-agent/translate.py). NOT a new agent output or evaluation arm. Disposition: equivalent. Active MSBuild default pipeline + arm-shared held-out suite 10/10 vs historical result.json heldout 10/10.",
+      "variants": {
+        "current": "current/agent-N1-002-inventory-w5.txt",
+        "active-abcaa63af": "active-abcaa63af/probes/translated-agent-N1-002-inventory-w5.txt"
+      }
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+# Calor syntax exemplar (candidate reference sheet)
+
+Calor compiles to C#. Blocks end by dedent, at 2 spaces per level.
+No declaration or statement IDs appear in source; tooling maintains declaration
+identity in a sidecar. Module functions are static, class functions are instance
+unless marked stat. One fn tag supports async, virt, over, abs and seal modifiers.
+Visibility is explicit here; pub-default is a separate measurement, not assumed.
+
+## Core forms
+
+```
+module Name
+fn Name pub stat (string:x) -> string
+effects
+effects fs:r,fs:w,mut,cw
+let string:name = value
+let ~int:count = 0
+set count (+ count 1)
+fn Check pub stat (int:x | (>= # 0)) -> int
+  ensures (>= result 0)
+  return x
+if condition
+elif condition
+else
+while condition
+range i from 0 to 9 step 1
+each x in items
+each (k,v) in dictionary
+```
+
+Effects: an empty row is pure; fs:r reads files, fs:w writes files, fs:rw does
+both, mut mutates a collection or heap, cw writes to the console. Callers must
+cover their callees' effects. Parameter effect rows stay inline; return rows
+follow the return type. Inline parameter refinements are the only precondition.
+Postconditions use result. Invariants, proof obligations and assertions remain.
+Range headers snapshot inclusive endpoints and step once in that order; zero
+step throws, increment overflow stops. Re-evaluated counted loops are a distinct
+header, not a reinterpretation of range. Native do keeps definite assignment:
+
+```
+for i = 0; (< i (NextBound)); i = (+ i 1)
+  (Use i)
+do
+  set answer (Read)
+while (< answer 0)
+```
+
+## Calls and expressions
+
+```
+(Obj.Method arg1 arg2)
+let string[]:lines = (File.ReadAllLines path)
+(File.AppendAllText path (+ key (+ "=" (+ value "\n"))))
+let bool:ok = (File.Exists path)
+let int:n = (LocalFunc x)
+(. (new Foo) M x)
+let Func<int,int>:f = (lambda (int:x) (+ x 1))
+let int:n = (member s Length)
+let string:c = (line.Substring i 1)
+let List<string>:items = (new List<string>)
+(items.Add x)
+let int:n = (member items Count)
+let string:e = (index items i)
+let Dictionary<string,int>:ages = (new Dictionary<string,int>)
+set (index ages key) value
+```
+
+Calls evaluate callee/receiver and arguments left-to-right, exactly once.
+Dictionary indexed assignment is upsert, not Add; array writes retain bounds
+obligations. File.ReadAllLines returns string[], not List<string>. All array ranks
+use C# spellings: int[], int[,], int[][]. Bare literals use suffixes for numeric
+types. Nullability uses T?; exceptions replace Result. Strings use \" and \n escapes.
+Use .NET library operations, not a second Calor collection/string vocabulary.
+
+## Complete programs
+
+```calor
+module Contracts
+  fn Square pub stat (int:x | (>= # 0)) -> int
+    ensures (>= result 0)
+    return (* x x)
+  fn Divide pub stat (int:a, int:b | (!= # 0)) -> int
+    return (/ a b)
+```
+
+```calor
+module Branching
+  fn Sign pub stat (int:x) -> int
+    if (> x 0)
+      return 1
+    elif (< x 0)
+      return (- 0 1)
+    else
+      return 0
+```
+
+```calor
+module Files
+  fn Append pub stat (string:path, string:key, string:value) -> void
+    effects fs:w
+    (File.AppendAllText path (+ key (+ "=" (+ value "\n"))))
+  fn CountLines pub stat (string:path) -> int
+    effects fs:r
+    let bool:ok = (File.Exists path)
+    if (! ok)
+      return 0
+    let string[]:lines = (File.ReadAllLines path)
+    return (member lines Length)
+```
+
+```calor
+module Strings
+  fn FirstField pub stat (string:line) -> string
+    effects
+    let int:i = (line.IndexOf "," StringComparison.Ordinal)
+    if (< i 0)
+      return line
+    return (line.Substring 0 i)
+```
+
+```calor
+module Collections
+  fn Tally pub stat (string:key) -> int
+    effects mut,alloc
+    let Dictionary<string,int>:counts = (new Dictionary<string,int>)
+    set (index counts key) 1
+    return (index counts key)
+```
+
+```calor
+module Effects
+  fn Greet pub stat (string:name) -> void
+    effects cw
+    (Console.WriteLine "Hello")
+    (Console.WriteLine name)
+```
+
+```calor
+module Loops
+  fn PrintOneToFive pub stat () -> void
+    effects cw
+    range i from 1 to 5 step 1
+      (Console.WriteLine i)
+```
+
+```calor
+module Bindings
+  fn Demo pub stat () -> void
+    effects cw
+    let string:greeting = "Ada"
+    let ~int:count = 0
+    (Console.WriteLine greeting)
+    (Console.WriteLine count)
+```
+
+```calor
+module Classes
+  class Greeter pub
+    fn Greet pub () -> string
+      return "hello"
+```
+
+## Common mistakes
+
+Do not write structural closers, IDs, an arrow-if, a rebind instead of set, or
+an else containing only an if (use elif). Function return type follows the
+signature arrow, never a header field. Unknown visibility is an error.
+Only result denotes the postcondition result. Keywords and types are case-sensitive.
+User names colliding with reserved words need @ escaping, not case-folding.

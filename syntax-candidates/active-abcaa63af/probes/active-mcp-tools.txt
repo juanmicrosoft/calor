@@ -1,0 +1,1404 @@
+[
+  {
+    "name": "calor_compile",
+    "description": "Compile Calor source code to C#. Auto-fixes parser, ID, and effect errors by default. Follow with calor_verify for contracts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Calor source code to compile (single file mode)"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of .calr file paths to compile (batch mode, alternative to source)"
+        },
+        "projectPath": {
+          "type": "string",
+          "description": "Path to directory containing .calr files to compile (batch mode, alternative to source)"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Path to a .calr file on disk. If 'source' is omitted, the file is read and compiled. Also used for diagnostic messages."
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "verify": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable Z3 contract verification"
+            },
+            "keepProvenGuards": {
+              "type": "boolean",
+              "default": false,
+              "description": "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; only matters with verify=true)"
+            },
+            "analyze": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable advanced analyses (dataflow, bug patterns, taint)"
+            },
+            "contractMode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "debug",
+                "release"
+              ],
+              "default": "debug",
+              "description": "Contract enforcement mode"
+            },
+            "effectMode": {
+              "type": "string",
+              "enum": [
+                "strict",
+                "default",
+                "permissive"
+              ],
+              "default": "default",
+              "description": "Effect enforcement mode: strict (errors for unknown calls), default (warnings), permissive (suppress all effect errors, for converted code)"
+            },
+            "autoFix": {
+              "type": "boolean",
+              "default": true,
+              "description": "Apply deterministic safe diagnostic patches and recompile. Heuristic and effect-policy suggestions are not applied. Set false to skip auto-fix."
+            },
+            "enforceEffects": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enforce effect declarations (the CLI's --enforce-effects; false is --no-enforce-effects)"
+            },
+            "requireDocs": {
+              "type": "boolean",
+              "default": false,
+              "description": "Require documentation on public functions and types (the CLI's --require-docs)"
+            },
+            "crossModule": {
+              "type": "boolean",
+              "default": false,
+              "description": "Batch mode only: compile the file set as ONE project the way `calor -i a.calr -i b.calr` does — cross-module effect enforcement, contractMode/effectMode/enforceEffects/requireDocs honored, every diagnostic returned as an envelope entry under each file's diagnostics[]. Without it, batch mode compiles each file alone with contracts off and effects permissive (migration triage)."
+            }
+          }
+        },
+        "checkCompat": {
+          "type": "boolean",
+          "default": false,
+          "description": "After compilation, verify generated C# is API-compatible (namespace preservation, pattern checks)"
+        },
+        "expectedNamespace": {
+          "type": "string",
+          "description": "Expected namespace in generated code when checkCompat is true (e.g., 'Calor.Runtime')"
+        },
+        "expectedPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Patterns that must appear in generated code when checkCompat is true"
+        },
+        "forbiddenPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Patterns that must NOT appear in generated code when checkCompat is true"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_verify",
+    "description": "Verify Calor contracts using Z3 SMT solver. Returns verification results with counterexamples for failed contracts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Calor source code to verify"
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 5000,
+          "description": "Z3 solver timeout per contract in milliseconds"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_analyze",
+    "description": "Analyze Calor code — security/bug patterns, migration assessment scoring, or C# interop block minimization",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "security",
+            "assess",
+            "minimize"
+          ],
+          "description": "Analysis type. security=security/bug pattern analysis, assess=8-dimension migration scoring, minimize=analyze C# interop blocks for native Calor equivalents",
+          "default": "security"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source code to analyze (Calor for security/minimize, C# for assess)"
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "enableDataflow": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable dataflow analysis (security action)"
+            },
+            "enableBugPatterns": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable bug pattern detection (security action)"
+            },
+            "enableTaintAnalysis": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable security taint analysis (security action)"
+            },
+            "threshold": {
+              "type": "integer",
+              "default": 0,
+              "description": "Minimum score (0-100) to include in results (assess action)"
+            }
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "File path/name for identification"
+              },
+              "source": {
+                "type": "string",
+                "description": "C# source code content"
+              }
+            },
+            "required": [
+              "path",
+              "source"
+            ]
+          },
+          "description": "Multiple C# files to assess (assess action, multi-file mode)"
+        },
+        "csharpCode": {
+          "type": "string",
+          "description": "Raw C# code from an interop block to analyze directly (minimize action)"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Path to a .calr file to analyze for §CSHARP blocks (minimize action)"
+        },
+        "directoryPath": {
+          "type": "string",
+          "description": "Path to a directory to analyze recursively. For 'security'/'minimize' scans .calr files; for 'assess' scans .cs files."
+        },
+        "maxFiles": {
+          "type": "integer",
+          "description": "Maximum number of files to analyze when using directoryPath (default: no limit)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_check",
+    "description": "Run Calor quality checks and snippet validation: diagnose, lint, typecheck, validate, or loop (build, execute tests and verify a path snapshot; failures only). Loop runs arbitrary test code.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "diagnose",
+            "lint",
+            "typecheck",
+            "validate",
+            "loop"
+          ],
+          "description": "diagnose=diagnostics, lint=format compliance, typecheck=types, validate=snippet, loop=build+tests+contracts for path",
+          "default": "diagnose"
+        },
+        "source": {
+          "type": "string",
+          "description": "Calor source code to check (used as snippet for validate action)"
+        },
+        "path": {
+          "type": "string",
+          "description": "File or directory to snapshot, build, test (tests/*.cs xUnit) and verify (loop only). Executes arbitrary tests; does not edit sources."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 600,
+          "description": "Per build/test process timeout (loop only)."
+        },
+        "verificationTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5000,
+          "description": "Solver timeout per contract (loop only)."
+        },
+        "apply": {
+          "type": "boolean",
+          "description": "Apply deterministic safe patches and return fixed source with freshly computed diagnostics. Heuristic suggestions are not applied (diagnose action, default: false)."
+        },
+        "strictApi": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable strict API checking (diagnose action)"
+        },
+        "requireDocs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require documentation on public functions (diagnose action)"
+        },
+        "fix": {
+          "type": "boolean",
+          "default": false,
+          "description": "Return auto-fixed code in the response (lint action)"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Optional file path for diagnostic messages (typecheck action)"
+        },
+        "context": {
+          "type": "object",
+          "description": "Context for wrapping the snippet (validate action)",
+          "properties": {
+            "location": {
+              "type": "string",
+              "enum": [
+                "expression",
+                "statement",
+                "function_body",
+                "module_body"
+              ],
+              "default": "statement",
+              "description": "Where in code structure this snippet appears"
+            },
+            "returnType": {
+              "type": "string",
+              "description": "Expected return type for the containing function"
+            },
+            "parameters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type"
+                ]
+              },
+              "description": "Variables in scope"
+            },
+            "surroundingCode": {
+              "type": "string",
+              "description": "Code that precedes the snippet"
+            }
+          }
+        },
+        "lexerOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Stop after lexer - token validation only (validate action)"
+        },
+        "showTokens": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include token stream in output (validate action)"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "source"
+          ]
+        },
+        {
+          "required": [
+            "action",
+            "path"
+          ],
+          "properties": {
+            "action": {
+              "const": "loop"
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {}
+  },
+  {
+    "name": "calor_convert",
+    "description": "Convert C# source code to Calor. Returns generated Calor code, conversion issues, and validation diagnostics.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "C# source code to convert to Calor (required unless inputPath is provided)"
+        },
+        "inputPath": {
+          "type": "string",
+          "description": "Path to a C# file to convert (alternative to source)"
+        },
+        "outputPath": {
+          "type": "string",
+          "description": "Path to write the generated Calor output file"
+        },
+        "moduleName": {
+          "type": "string",
+          "description": "Module name for the generated Calor code"
+        },
+        "fallback": {
+          "type": "boolean",
+          "description": "Enable graceful fallback for unsupported constructs (default: true)"
+        },
+        "explain": {
+          "type": "boolean",
+          "description": "Include detailed explanation of unsupported features (default: false)"
+        },
+        "validate": {
+          "type": "boolean",
+          "description": "Run full validation pipeline: auto-fix, diagnose, and compat check (default: false)"
+        },
+        "conversionMode": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "interop"
+          ],
+          "description": "Conversion mode: 'standard' (default) or 'interop' for §CSHARP blocks"
+        },
+        "fidelity": {
+          "type": "string",
+          "enum": [
+            "lossless",
+            "lossy"
+          ],
+          "description": "Fidelity contract. 'lossless' is the default; 'lossy' explicitly permits reported substitutions or drops."
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "convert",
+            "validate",
+            "roundtrip",
+            "assess"
+          ],
+          "description": "Conversion mode. convert=C# to Calor, validate=convert+compile back, roundtrip=C#→Calor→C# fidelity check, assess=score convertibility without converting",
+          "default": "convert"
+        },
+        "expectedNamespace": {
+          "type": "string",
+          "description": "Expected namespace in generated C# (for validate mode compat check)"
+        },
+        "expectedPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Patterns that must appear in generated C# (for validate mode)"
+        },
+        "forbiddenPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Patterns that must NOT appear in generated C# (for validate mode)"
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "quick": {
+              "type": "boolean",
+              "default": false,
+              "description": "Stage 1 only: static analysis without conversion attempt (faster, for assess mode)"
+            }
+          }
+        },
+        "selectActivePreprocessorBranchLossy": {
+          "type": "boolean",
+          "description": "Explicitly lossy opt-in: keep only the branch Roslyn activates for the supplied symbols (default: false; requires lossy fidelity)"
+        },
+        "stripPreprocessor": {
+          "type": "boolean",
+          "description": "Deprecated compatibility alias for selectActivePreprocessorBranchLossy. Omitted callers preserve every branch."
+        },
+        "definedSymbols": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Conditional-compilation symbols supplied to Roslyn"
+        },
+        "configuration": {
+          "type": "string",
+          "description": "Configuration recorded in conversion metadata"
+        },
+        "targetFramework": {
+          "type": "string",
+          "description": "Target framework recorded in conversion metadata"
+        },
+        "languageVersion": {
+          "type": "string",
+          "description": "C# language version used by Roslyn"
+        },
+        "documentationMode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "parse",
+            "diagnose"
+          ],
+          "description": "Roslyn documentation mode"
+        },
+        "sourceCodeKind": {
+          "type": "string",
+          "enum": [
+            "regular",
+            "script"
+          ],
+          "description": "Roslyn source kind"
+        },
+        "parseFeatures": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Roslyn CSharpParseOptions feature key/value map"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Metadata references with optional extern aliases"
+        },
+        "passthroughOnError": {
+          "type": "boolean",
+          "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
+        },
+        "explicitCallClosers": {
+          "type": "boolean",
+          "description": "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision (default: false — v0.6.1 default elides zero-arg §/C)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_batch",
+    "description": "Batch operations on a C# project. action='convert': Convert an entire C# project to Calor in a single call. Discovers .cs files, converts each to Calor, and writes output files. Module names are derived from C# namespace declarations. Use moduleNameOverride to force a specific namespace. IMPORTANT: If results contain §CSHARP interop blocks, use calor_help to check for native equivalents. action='analyze': Analyze convertibility of an entire C# project directory. Returns aggregate scores, tier breakdowns, and top blockers across the project. action='compile': Compile .calr files in batch. Discovers files via directory, explicit paths, or glob pattern. Returns per-file pass/fail with error summaries.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "convert",
+            "analyze",
+            "compile"
+          ],
+          "description": "Batch operation to perform",
+          "default": "convert"
+        },
+        "projectPath": {
+          "type": "string",
+          "description": "Path to the C# project directory or .csproj file"
+        },
+        "maxFiles": {
+          "type": "integer",
+          "description": "Maximum number of files to process (convert default: 0 = no limit, analyze default: 500)"
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Run conversions in parallel (default: false to limit memory usage, convert only)"
+        },
+        "outputDirectory": {
+          "type": "string",
+          "description": "Directory to write converted .calr files (default: alongside source files, convert only)"
+        },
+        "quick": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use quick analysis only — stage 1 static analysis, no conversion attempt (analyze only)"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "interop"
+          ],
+          "description": "Conversion mode: 'standard' (default) or 'interop' (convert only)"
+        },
+        "validate": {
+          "type": "boolean",
+          "description": "Validate each converted file by parsing and compiling the generated Calor (default: false, convert only)"
+        },
+        "excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob-like patterns for files to exclude (e.g., [\"**/Emit/**\", \"**/DynamicProxy*\"]). Also reads patterns from .calor-ignore file if present. (analyze only)"
+        },
+        "includeTests": {
+          "type": "boolean",
+          "description": "Include test files in the migration (default: true, convert only)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preview what would be converted without writing files (default: false, convert only)"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of files to skip before processing — for pagination with maxFiles (convert only)"
+        },
+        "directoryFilter": {
+          "type": "string",
+          "description": "Glob pattern to filter directories (e.g., 'src/**' to only include src/, convert only)"
+        },
+        "skipConverted": {
+          "type": "boolean",
+          "description": "Skip files that already have a corresponding .calr output file (default: false, convert only)"
+        },
+        "moduleNameOverride": {
+          "type": "string",
+          "description": "Override the module name for all converted files (convert only)"
+        },
+        "skipOnError": {
+          "type": "boolean",
+          "description": "Continue processing when a file fails (default: true)"
+        },
+        "passthroughOnError": {
+          "type": "boolean",
+          "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicit list of .calr file paths to compile (compile only)"
+        },
+        "glob": {
+          "type": "string",
+          "description": "Glob pattern to match .calr files, e.g. '**/*.calr' (compile only, requires projectPath as base directory)"
+        },
+        "directory": {
+          "type": "string",
+          "description": "Path to directory containing .calr files to compile recursively (compile only, alternative to projectPath)"
+        },
+        "summary": {
+          "type": "boolean",
+          "description": "Return compact summary instead of full per-file details. Shows total/passed/failed counts, error categories, and only failed files with their top 3 errors. Default: false"
+        }
+      },
+      "required": [
+        "projectPath"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "calor_help",
+    "description": "Get help with Calor syntax, feature support, error explanations, or working examples",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "syntax",
+            "features",
+            "error",
+            "example"
+          ],
+          "description": "Help topic. syntax=C# to Calor syntax mapping (fuzzy match), features=feature support registry, error=explain error code/message, example=load working Calor examples",
+          "default": "syntax"
+        },
+        "query": {
+          "type": "string",
+          "description": "C# construct or feature topic to look up (e.g., 'object instantiation', 'for loop', 'async', 'overview'). Used with action=syntax."
+        },
+        "feature": {
+          "type": "string",
+          "description": "Query a specific feature by name (e.g., 'named-argument', 'with-expression'). Used with action=features."
+        },
+        "supportLevel": {
+          "type": "string",
+          "enum": [
+            "Full",
+            "Partial",
+            "NotSupported",
+            "ManualRequired"
+          ],
+          "description": "List all features at a specific support level. Used with action=features."
+        },
+        "error": {
+          "type": "string",
+          "description": "The error code (e.g., 'CALOR0042') or error message text to explain. Used with action=error."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name or keyword to search for (e.g., 'foreach', 'async', 'generic', 'hello_world'). Used with action=example."
+        },
+        "list": {
+          "type": "boolean",
+          "description": "If true, list all available examples with descriptions. Used with action=example.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_navigate",
+    "description": "Navigate Calor source code — go to definition, find references, search symbols, get type info, or inspect scope",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "definition",
+            "references",
+            "find",
+            "info",
+            "scope"
+          ],
+          "description": "Navigation action. definition=jump to symbol definition, references=find all usages, find=search symbols by name, info=get type/contract info at position, scope=list what is in scope at position"
+        },
+        "source": {
+          "type": "string",
+          "description": "Calor source code (use this OR filePath)"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Path to a .calr file (use this OR source)"
+        },
+        "line": {
+          "type": "integer",
+          "description": "Line number (1-based) where the symbol is located"
+        },
+        "column": {
+          "type": "integer",
+          "description": "Column number (1-based) where the symbol is located"
+        },
+        "query": {
+          "type": "string",
+          "description": "Symbol name to search for (action=find, case-insensitive partial match)"
+        },
+        "symbolId": {
+          "type": "string",
+          "description": "Calor unique ID of the symbol (action=references)"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Filter by symbol kind: function, class, interface, enum, method, field, property (action=find)"
+        },
+        "includeTypes": {
+          "type": "boolean",
+          "description": "Include type information for variables (action=scope, default: true)"
+        },
+        "includeDetails": {
+          "type": "boolean",
+          "description": "Include extra details such as contracts and grouped references (action=references uses this as groupByKind; action=scope uses this as includeContracts; default varies by action)"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_structure",
+    "description": "Analyze code structure — document outline, call graph, or change impact analysis",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "outline",
+            "callgraph",
+            "impact"
+          ],
+          "description": "Structure analysis. outline=hierarchical symbol tree, callgraph=callers/callees/cycles, impact=blast radius of changes",
+          "default": "outline"
+        },
+        "source": {
+          "type": "string",
+          "description": "Calor source code (use this OR filePath)"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Path to a .calr file (use this OR source)"
+        },
+        "symbolId": {
+          "type": "string",
+          "description": "Calor unique ID of the symbol (e.g., 'f001') — used by callgraph and impact"
+        },
+        "line": {
+          "type": "integer",
+          "description": "Line number (1-based) of the symbol — used by callgraph and impact"
+        },
+        "column": {
+          "type": "integer",
+          "description": "Column number (1-based) of the symbol — used by callgraph and impact"
+        },
+        "depth": {
+          "type": "integer",
+          "description": "Maximum traversal depth (1-5, default: 1 for callgraph, 3 for impact)"
+        },
+        "changeType": {
+          "type": "string",
+          "enum": [
+            "signature",
+            "type",
+            "rename",
+            "delete",
+            "contract"
+          ],
+          "description": "Type of change being considered (default: signature) — used by impact"
+        },
+        "includeDetails": {
+          "type": "boolean",
+          "description": "Include detailed information like parameter types and contracts (default: true) — used by outline"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "callers",
+            "callees",
+            "both"
+          ],
+          "description": "Which direction to traverse (default: both) — used by callgraph"
+        },
+        "includeEffects": {
+          "type": "boolean",
+          "description": "Include effect annotations on each node (default: true) — used by callgraph"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_query",
+    "description": "Ask the project index about a declaration: who calls it (callers), what it calls (callees), what a change to it could affect (impact; with effects=true, which callers' declared effect rows a new row would stop fitting), or its declared and inferred effect rows (effects). Reads the index `calor index build` writes under <projectDirectory>/obj/calor and answers byte-identically to `calor query`; a stale or missing index is rebuilt first unless noBuild=true. Every answer says when it may be PARTIAL and why.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectDirectory": {
+          "type": "string",
+          "description": "Project directory whose .calr files the index covers (the CLI's --project). Must be inside the server root (`calor mcp --root`); the path is canonicalized (symlinks and `..` resolved) before it is checked and used, and refusals name the canonical path"
+        },
+        "facet": {
+          "type": "string",
+          "enum": [
+            "callers",
+            "callees",
+            "impact",
+            "effects"
+          ],
+          "description": "callers=what calls the declaration, callees=what it calls, impact=what a change to it could affect, effects=its declared and inferred effect rows and the verdict between them"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Declaration name to ask about"
+        },
+        "inFile": {
+          "type": "string",
+          "description": "Disambiguate when several files declare the name (project-relative path, the CLI's --in-file)"
+        },
+        "effects": {
+          "type": "boolean",
+          "default": false,
+          "description": "facet=impact only: effect-row blast radius — which affected callers' declared rows the subject's row would stop fitting (the CLI's --effects)"
+        },
+        "row": {
+          "type": "string",
+          "description": "With effects=true: the row the subject would carry after the change, as comma-separated effect codes (e.g. \"cw,fs:w\"; \"\" for pure). Default: its current declared row (the CLI's --row)"
+        },
+        "noBuild": {
+          "type": "boolean",
+          "default": false,
+          "description": "Refuse a missing or stale index instead of rebuilding it (the CLI's --no-build)"
+        },
+        "indexPath": {
+          "type": "string",
+          "description": "READ-ONLY override: a directory (or the .calor-index.json file) holding an index built with `calor index build --output`, inside the server root. The index is never rebuilt or written through this argument — a stale or missing one is refused. Default: <projectDirectory>/obj/calor, which IS rebuilt when stale unless noBuild is true"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "text"
+          ],
+          "default": "json",
+          "description": "json=the envelope document `calor query … --json` prints; text=the lines `calor query` prints"
+        }
+      },
+      "required": [
+        "projectDirectory",
+        "facet",
+        "symbol"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_edit_preview",
+    "description": "Preview the effects of an edit before committing it. Given original and modified Calor source, reports compilation errors, contract violations, effect inconsistencies, and dangling references. Returns a verdict: safe, safe_with_warnings, or breaking.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "originalSource": {
+          "type": "string",
+          "description": "The original Calor source code before the edit"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Original file path, required to preserve project sidecar identity across the preview"
+        },
+        "modifiedSource": {
+          "type": "string",
+          "description": "The modified Calor source code after the edit"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "compile",
+              "contracts",
+              "effects",
+              "references"
+            ]
+          },
+          "description": "Which checks to run (default: all)"
+        }
+      },
+      "required": [
+        "originalSource",
+        "modifiedSource"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_format",
+    "description": "Format ID-free Calor source. Persisted declaration IDs belong to .calor/ids.json; use calor ids sync PROJECT --register FILE for identity operations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "ID-free Calor source code to format"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "format",
+            "ids"
+          ],
+          "description": "format formats code. ids reports that persisted identity checks require a project file.",
+          "default": "format"
+        },
+        "idsAction": {
+          "type": "string",
+          "enum": [
+            "check"
+          ],
+          "default": "check",
+          "description": "In-memory source has no persisted identities. Use calor ids sync PROJECT --register FILE. The former assign action is retired."
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "allowTestIds": {
+              "type": "boolean",
+              "default": false,
+              "description": "Compatibility option; in-memory source has no persisted identities"
+            }
+          }
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_session_open",
+    "description": "Open a project session over a directory. Parses every .calr file under it and returns a sessionId plus per-file parse status. Pass the sessionId to calor_file_write so its checks see the whole project; the session re-checks files changed on disk automatically.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "directory": {
+          "type": "string",
+          "description": "Root directory of the project (all .calr files under it, recursively)"
+        }
+      },
+      "required": [
+        "directory"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "calor_session_close",
+    "description": "Close a project session opened by calor_session_open and release its in-memory state.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "The session to close"
+        }
+      },
+      "required": [
+        "sessionId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_file_write",
+    "description": "Write a .calr file transactionally: the content is auto-healed (indentation, forbidden closers), checked (compile, contracts, effects, references), then applied atomically — or rejected with diagnostics and the file left untouched when the edit is breaking. Creates the file if it does not exist. Writes are confined to the session root (or the server's working directory without a session). Pass a sessionId from calor_session_open to check references across the whole project. Optional rename/move actions preserve declaration identity with recoverable multi-file updates; preview validates without applying.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "write",
+            "rename",
+            "move"
+          ],
+          "default": "write"
+        },
+        "projectDirectory": {
+          "type": "string"
+        },
+        "filePath": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "newName": {
+          "type": "string"
+        },
+        "destinationFile": {
+          "type": "string"
+        },
+        "destinationLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "destinationColumn": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "preview": {
+          "type": "boolean",
+          "default": false
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "originalSource": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "modifiedSource": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "path",
+              "originalSource",
+              "modifiedSource"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "path": {
+          "type": "string",
+          "description": "Path of the .calr file to write (created if missing)"
+        },
+        "content": {
+          "type": "string",
+          "description": "The complete new file content"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Optional session from calor_session_open; widens reference checks to the session's file set"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "compile",
+              "contracts",
+              "effects",
+              "references"
+            ]
+          },
+          "description": "Which checks to run (default: all)"
+        },
+        "heal": {
+          "type": "boolean",
+          "description": "Auto-heal indentation/closer slips before checking (default: true)"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "rename",
+                  "move"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "action",
+              "projectDirectory",
+              "filePath",
+              "line",
+              "column"
+            ]
+          },
+          "else": {
+            "required": [
+              "path",
+              "content"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "rename"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "newName"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "move"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "changes",
+              "destinationFile",
+              "destinationLine",
+              "destinationColumn"
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_refine",
+    "description": "Work with Calor's refinement type system — obligations, bounds checking, diagnostics, guards, fix suggestions, and type inference",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "obligations",
+            "bounds",
+            "diagnose",
+            "guards",
+            "fixes",
+            "types"
+          ],
+          "description": "Refinement action. obligations=generate proof obligations, bounds=verify array bounds, diagnose=diagnose type failures, guards=discover guards, fixes=suggest fix templates, types=suggest refined types"
+        },
+        "source": {
+          "type": "string",
+          "description": "Calor source code to analyze"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "File path for resolving project sidecar declaration identity"
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 5000,
+          "description": "Z3 solver timeout per obligation in milliseconds (obligations action)"
+        },
+        "function_id": {
+          "type": "string",
+          "description": "Optional: filter results to a specific function ID"
+        },
+        "obligation_id": {
+          "type": "string",
+          "description": "Optional: specific obligation ID to target (guards, fixes actions)"
+        },
+        "policy": {
+          "type": "string",
+          "enum": [
+            "default",
+            "strict",
+            "permissive"
+          ],
+          "default": "default",
+          "description": "Obligation policy: default, strict (all errors), permissive (all guards) (diagnose action)"
+        }
+      },
+      "required": [
+        "action",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_fix",
+    "description": "Auto-fix common Calor compilation errors. Fixes NEW{object} placeholders and ID conflicts. Non-destructive — unfixable code is left as-is.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Calor source code to fix"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Path to a .calr file to fix. If 'source' is also provided, 'source' takes precedence."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Specific error codes to fix. Values: 'new_object', 'id_conflicts'. Default: fix all known errors."
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "calor_migrate",
+    "description": "Full project migration pipeline: assess convertibility, convert C# to Calor, compile, auto-fix, and report results",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectPath": {
+          "type": "string",
+          "description": "Path to .csproj file or directory containing C# files"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "assess",
+            "convert",
+            "compile",
+            "fix",
+            "full"
+          ],
+          "description": "Which phase to run (default: full)",
+          "default": "full"
+        },
+        "maxFiles": {
+          "type": "integer",
+          "description": "Limit number of files to process"
+        },
+        "autoFix": {
+          "type": "boolean",
+          "description": "Whether to auto-fix common errors after conversion (default: true)",
+          "default": true
+        },
+        "explicitCallClosers": {
+          "type": "boolean",
+          "description": "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision (default: false — v0.6.1 default elides zero-arg §/C)",
+          "default": false
+        },
+        "fidelity": {
+          "type": "string",
+          "enum": [
+            "lossless",
+            "lossy"
+          ],
+          "description": "Fidelity contract. Lossless is the default.",
+          "default": "lossless"
+        }
+      },
+      "required": [
+        "projectPath"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "calor_self_test",
+    "description": "Run compiler self-test: compiles embedded reference .calr files and diffs output against golden .cs files. Use this to verify the compiler is working correctly.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scenario": {
+          "type": "string",
+          "description": "Optional: run only a specific scenario by name (e.g., '01_hello_world')"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  }
+]

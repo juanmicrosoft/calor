@@ -1,0 +1,6 @@
+§M{m001:MediatR:overflow=unchecked}
+  §NS{ns001:MediatR:file}
+    // Defines a mediator to encapsulate request/response and publishing interaction patterns
+    §IFACE{i002:IMediator:ISender,IPublisher}
+
+

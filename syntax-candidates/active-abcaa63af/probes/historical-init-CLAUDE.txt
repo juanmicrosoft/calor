@@ -1,0 +1,160 @@
+<!-- BEGIN CalorC SECTION - DO NOT EDIT -->
+<!-- calor-template-version: 1 -->
+## Calor-First Project
+
+This is an **Calor-first project**. All new code MUST be written in Calor. Existing C# files should be converted to Calor before modification.
+
+### MANDATORY Rules for AI Agents
+
+**Rule 0: Read the primer before writing Calor**
+- **At session start, read the `calor://primer` MCP resource once** — a measured syntax exemplar that in one experiment (E1a, n=30) brought green-field Calor to C# iteration parity on one task. Having it in context up front matters more than any single lookup.
+- Use `calor_help` MCP tool for syntax guidance when needed
+
+**Rule 1: Never create new `.cs` files**
+- All new code MUST be written in Calor (`.calr` files)
+- Calor files compile automatically during `dotnet build`
+- Use `calor_help` MCP tool for syntax assistance
+
+**Rule 2: Convert C# to Calor before modifying**
+- Before modifying ANY `.cs` file, convert it to Calor first using `calor_convert` MCP tool
+- Make your changes in the new `.calr` file, not the original `.cs` file
+- Delete the original `.cs` file after successful conversion
+- Run `calor analyze <file.cs>` to understand the file's complexity before conversion
+
+**Rule 3: Never edit generated files**
+- Files ending in `.g.cs` are auto-generated from Calor - do not edit them
+- If you need to change generated output, edit the source `.calr` file instead
+
+**Rule 4: Compile after writing**
+- After writing or editing ANY `.calr` file, use `calor_compile` (autoFix is on by default)
+- If errors remain, diagnostics with a `fix` field contain concrete edits — apply them directly
+- Diagnostics without a `fix` field require reasoning about the error message
+
+### Workflow for Any Code Change
+
+1. **Session start** → Read `calor://primer` for syntax examples
+2. **New feature/file?** → Create `.calr` file
+3. **Modify existing `.cs` file?** → Convert to `.calr` first using `calor_convert`
+4. **After any .calr change** → `calor_compile` (auto-fixes most errors)
+5. **If errors remain** → Apply `fix` edits from diagnostics, or reason about the message
+
+**On-demand resources** (read when needed, not at session start):
+- `calor://effects` — before writing `§E{...}` declarations
+- `calor://tags` — when unsure about opening/closing tag forms
+- `calor://id-prefixes` — when creating new IDs
+
+### Pre-PR Agent Testing
+
+Before creating a PR that modifies Calor compiler, parser, or verification:
+
+```bash
+./tests/E2E/agent-tasks/run-agent-tests.sh
+```
+
+All tasks must pass (2/3 runs succeed). If tests fail, investigate before proceeding.
+
+### File Types
+- `.calr` - Calor source files (**use this for all code**)
+- `.g.cs` - Generated C# files (never edit)
+- `.cs` - Legacy C# files (**convert to Calor before modifying**)
+
+#### Available MCP Tools (15 tools)
+
+**Compilation & Verification:**
+- `calor_compile` - Compile Calor to C# (autoFix on by default)
+- `calor_verify` - Verify contracts with Z3 SMT solver
+- `calor_check` - Diagnostics, lint, typecheck, or snippet validation (use action: "diagnose", "lint", "typecheck", "validate")
+
+**Analysis:**
+- `calor_analyze` - Security/bug patterns, migration assessment, or interop minimization
+
+**Code Transformation:**
+- `calor_convert` - Convert C# to Calor
+- `calor_format` - Format Calor source code or manage IDs (action: "format" or "ids")
+- `calor_fix` - Auto-fix compilation errors and ID conflicts
+- `calor_migrate` - Full C# → Calor migration pipeline (assess + convert + compile + fix)
+
+**Batch Operations:**
+- `calor_batch` - Batch compile/convert multiple files or a project directory
+
+**Navigation:**
+- `calor_navigate` - Go to definition, find references, search symbols (action: "definition", "references", "find", "symbol", "scope")
+- `calor_structure` - Document outline, call graph, or change impact analysis
+- `calor_query` - Ask the project index about a declaration (facet: "callers", "callees", "impact", "effects"; `effects`/`row` with impact for the effect-row blast radius) — same answers as `calor query`
+
+**Syntax & Documentation:**
+- `calor_help` - Syntax reference, feature support, error explanations, working examples
+
+**Preview & Refinement:**
+- `calor_edit_preview` - Preview edit effects before committing
+- `calor_refine` - Refinement type analysis (obligations, bounds checking)
+
+**Testing:**
+- `calor_self_test` - Run compiler self-test suite
+
+#### MCP Resources
+
+**Read at session start:**
+- `calor://primer` - Canonical Calor examples (module, function, effects, contracts, class, IDs)
+
+**Read on demand:**
+- `calor://effects` - Valid effect codes (before writing `§E{...}`)
+- `calor://tags` - Section tag opening/closing forms (before creating blocks)
+- `calor://id-prefixes` - ULID prefixes (before creating IDs)
+- `calor://workflows` - Decision trees for common tasks
+
+**Reference (use `calor_help` instead for quick lookups):**
+- `calor://syntax-reference` - Complete syntax documentation
+- `calor://error-catalog` - All diagnostic codes with fix patterns
+
+#### Key Commands
+```bash
+calor analyze <path>                 # Score files for Calor migration potential
+calor --input file.calr -o file.g.cs # Compile Calor to C#
+calor --input file.calr --verify --analyze -v  # Deep analysis (security, bugs, contracts)
+calor convert file.cs                # Convert C# to Calor
+calor convert file.calr              # Convert Calor to C#
+```
+
+#### Calor v2+ Syntax Reference
+
+Calor is **indent-only**: a block's body is indented under its opener and ends at
+the next dedent. There are **no closing tags** — never write `§/`-prefixed closers.
+
+| Structure | Syntax |
+|-----------|--------|
+| Module | `§M{id:Name}` (body indented) |
+| Function | `§F{id:name:vis} (type:name, ...) -> retType` |
+| Async Func | `§AF{id:name:vis} (type:name, ...) -> retType` |
+| Effects | `§E{cw,db,net}` |
+| Loop | `§L{id:var:from:to:step}` (body indented) |
+| Conditional | `§IF{id} (cond)` + `§EI (cond)` / `§EL`; inline `→ §R expr` |
+| Try/Catch | `§TR{id}` ... `§CA{Type:var}` ... `§FI` (indent-only) |
+
+**Expressions (Lisp-style):** `(+ a b)`, `(== x 0)`, `(% i 15)`
+
+**Statements:**
+- Print: `§P "message"` or `§P variable`
+- Bind: `§B{name} expr`
+- Return: `§R expr`
+- Await: `§AWAIT expr` or `§AWAIT{false} expr`
+
+**Contracts:** `§Q (> x 0)` (precondition), `§S (>= result 0)` (postcondition)
+
+**Collections (indent-only; items indented under the opener):**
+- List: `§LIST{name:type}` then indented values; append with `§PUSH{name} value`
+- Dict: `§DICT{name:key:val}` then indented `§KV key value`; set with `§PUT{name} key value`
+- HashSet: `§HSET{name:type}` then indented values
+
+#### Type Mappings
+| C# | Calor |
+|---|---|
+| `int` | `i32` |
+| `long` | `i64` |
+| `string` | `str` |
+| `bool` | `bool` |
+| `void` | `void` |
+| `Task<T>` | (use `§AF`/`§AMT`) |
+
+*Generated by calor v{{VERSION}}*
+<!-- END CalorC SECTION -->

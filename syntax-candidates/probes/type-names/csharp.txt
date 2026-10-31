@@ -1,0 +1,2 @@
+fn F (int:x, double:y, long:z, byte:b, string:s) -> double
+  return y

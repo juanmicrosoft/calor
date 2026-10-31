@@ -1,0 +1,17 @@
+§M{MediatR.NotificationPublishers:overflow=unchecked}
+  §U{System.Collections.Generic}
+  §U{System.Threading}
+  §U{System.Threading.Tasks}
+
+  §NS{MediatR.NotificationPublishers:file}
+    /// Awaits each notification handler in a single foreach loop: foreach (var handler in handlers) { await handler(notification, cancellationToken); }
+    §CL{ForeachAwaitPublisher:pub}
+      §IMPL{INotificationPublisher}
+
+      §AMT{Publish:pub} (Seq<NotificationHandlerExecutor>:handlerExecutors, INotification:notification, CancellationToken:cancellationToken)
+        §EACH{handler:var} handlerExecutors
+          §B{_chainHandlerCallback005} §C{handler.HandlerCallback} §A notification §A cancellationToken §/C
+          §B{_} §AWAIT §C{_chainHandlerCallback005.ConfigureAwait} false
+
+
+

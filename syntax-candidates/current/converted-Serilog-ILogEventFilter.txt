@@ -1,0 +1,7 @@
+§M{m001:Serilog.Core:overflow=unchecked}
+  §NS{ns001:Serilog.Core:file}
+    // Provides filtering of the log event stream.
+    §IFACE{i002:ILogEventFilter}
+      §MT{m003:IsEnabled} (LogEvent:logEvent) -> bool
+
+

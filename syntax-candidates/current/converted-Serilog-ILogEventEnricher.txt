@@ -1,0 +1,7 @@
+§M{m001:Serilog.Core:overflow=unchecked}
+  §NS{ns001:Serilog.Core:file}
+    // Applied during logging to add additional information to log events.
+    §IFACE{i002:ILogEventEnricher}
+      §MT{m003:Enrich} (LogEvent:logEvent, ILogEventPropertyFactory:propertyFactory)
+
+
