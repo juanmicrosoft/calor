@@ -254,6 +254,122 @@ public class ArrayExpressionConversionTests
     }
 
     [Theory]
+    [MemberData(nameof(SizedArraySurfaces))]
+    public async Task ArrayValuedLocalLambdas_CompileByDefaultAndRunLikeTheOriginal(Surface surface)
+    {
+        var source = File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+            "tests/TestData/InteropScope/T1/fixtures/X-INT-07.cs.txt"));
+        var expected = Run(source);
+        var calor = await ConvertNativeWithRealCliAsync(source, surface);
+        Assert.DoesNotContain("§CS", calor);
+        Assert.DoesNotContain("§RAW", calor);
+        var compilation = Program.Compile(calor, "array-local-lambdas.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [MemberData(nameof(SizedArraySurfaces))]
+    public async Task EarlierBinaryOperands_AreEvaluatedBeforeLaterUpdates(Surface surface)
+    {
+        const string source = """
+            public class B
+            {
+                public static int V;
+                static B() { Probe.X = 10; }
+            }
+            public class C
+            {
+                public static int V;
+                static C() { Probe.Hits++; }
+            }
+            public class Failing
+            {
+                public static int V;
+                static Failing()
+                {
+                    Probe.Log += "f";
+                    int unused = Probe.Missing[0];
+                }
+            }
+            public static class Probe
+            {
+                public static int X = 1;
+                public static int Hits;
+                public static string Log = "";
+                public static int[] Missing;
+                public static string Run()
+                {
+                    int seen = B.V + X++;
+                    string first = X + ":" + seen;
+                    int local = 1;
+                    int secondSeen = C.V + local++;
+                    string second = Hits + ":" + local;
+                    int x = 10;
+                    int[] a = new int[30];
+                    a[x + x++] += 5;
+                    string third = a[20] + ":" + a[21] + ":" + x;
+                    x = 10;
+                    int[] b = new int[30];
+                    b[x + x++] = 5;
+                    string fourth = b[20] + ":" + b[21] + ":" + x;
+                    int other = 3;
+                    try { int unused = Failing.V + other++; }
+                    catch (System.TypeInitializationException) { }
+                    return first + "|" + second + "|" + third + "|" + fourth
+                        + "|" + other + ":" + Log;
+                }
+            }
+            """;
+        const string expected = "11:10|1:2|5:0:11|5:0:11|3:f";
+        Assert.Equal(expected, Run(source));
+        var calor = await ConvertNativeWithRealCliAsync(source, surface);
+        Assert.DoesNotContain("§CS", calor);
+        Assert.DoesNotContain("§RAW", calor);
+        var compilation = Program.Compile(calor, "eager-binary-order.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [MemberData(nameof(SizedArraySurfaces))]
+    public async Task FieldInitializerUpdates_PreserveTheirStorageAndExecutionPoint(Surface surface)
+    {
+        const string source = """
+            public class Notice
+            {
+                private static int _value = ++Probe.N;
+                private static int _sum = Probe.N + ++Probe.N;
+                private static int _last = Probe.N++;
+                public static string Read() => _value + ":" + _sum + ":" + _last;
+            }
+            public static class Probe
+            {
+                public static int N = 4;
+                public static string Run()
+                {
+                    string seen = Notice.Read();
+                    return seen + ":" + N;
+                }
+            }
+            """;
+        const string expected = "5:11:6:7";
+        Assert.Equal(expected, Run(source));
+        var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
+        Assert.Equal(new[] { "field", "field", "field" }, losses);
+        Assert.Contains("private static int _value = ++Probe.N;", calor);
+        var compilation = Program.Compile(calor, "preserved-field-update.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
     [MemberData(nameof(EagerArrayAddressArguments))]
     public async Task EagerArrayAddresses_AreValidatedBeforeLaterArgumentEffects(
         string modifier, string scenario, Surface surface)

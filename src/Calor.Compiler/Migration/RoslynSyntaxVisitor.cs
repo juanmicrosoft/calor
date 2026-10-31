@@ -64,7 +64,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// <summary>#943 (D1 RO-DECL-1): `out var x` / `out T x` lowered to a binding before their statement.</summary>
     private readonly HashSet<DeclarationExpressionSyntax> _loweredOutDeclarations = new();
     private int _conditionalRegionDepth;
-    private HashSet<ExpressionSyntax>? _evaluatedEagerArrayOperands;
+    private HashSet<ExpressionSyntax>? _evaluatedOperands;
 
     /// <summary>
     /// Maps variable names to their resolved type names for effect inference.
@@ -8057,23 +8057,68 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     private List<ExpressionNode> ConvertOrderedExpressions(
-        IEnumerable<ExpressionSyntax> expressions, bool stageComplexArguments = false, bool inPlace = false)
+        IEnumerable<ExpressionSyntax> expressions, bool stageComplexArguments = false, bool inPlace = false,
+        bool captureBeforeUpdates = false)
     {
         var syntax = expressions.ToArray();
         var converted = new List<ExpressionNode>(syntax.Length);
-        for (var index = 0; index < syntax.Length; index++)
+        var savedOperands = _evaluatedOperands;
+        if (captureBeforeUpdates)
+            _evaluatedOperands = savedOperands == null ? [] : new(savedOperands);
+        try
         {
-            var mark = _pendingStatements.Count;
-            var value = inPlace ? ConvertInPlace(syntax[index], always: true) : ConvertExpression(syntax[index]);
-            if (HoistsHaveEffects(mark) || !inPlace
-                && !(stageComplexArguments && IsComplexArgument(value)) && EmitterMayHoist(value))
+            for (var index = 0; index < syntax.Length; index++)
             {
-                for (var earlier = 0; earlier < index; earlier++)
-                    RequireFixedEarlierOperand(syntax[earlier], converted[earlier], syntax[index..]);
+                var mark = _pendingStatements.Count;
+                var value = inPlace ? ConvertInPlace(syntax[index], always: true) : ConvertExpression(syntax[index]);
+                if (HoistsHaveEffects(mark) || !inPlace
+                    && !(stageComplexArguments && IsComplexArgument(value)) && EmitterMayHoist(value))
+                {
+                    for (var earlier = 0; earlier < index; earlier++)
+                        RequireFixedEarlierOperand(syntax[earlier], converted[earlier], syntax[index..]);
+                }
+                // Ref aliases and address-sensitive operands retain their existing preservation boundary.
+                if (captureBeforeUpdates && syntax.Skip(index + 1).Any(ContainsUpdateExpression)
+                    && _semanticModel != null && syntax[index].SyntaxTree == _semanticModel.SyntaxTree
+                    && _semanticModel.GetOperation(syntax[index]) is
+                        Microsoft.CodeAnalysis.Operations.ILocalReferenceOperation { Local.RefKind: RefKind.None }
+                        or Microsoft.CodeAnalysis.Operations.IParameterReferenceOperation { Parameter.RefKind: RefKind.None }
+                        or Microsoft.CodeAnalysis.Operations.IFieldReferenceOperation { Field.IsStatic: true })
+                    value = CaptureEvaluatedOperand(syntax[index], value);
+                converted.Add(value);
             }
-            converted.Add(value);
+            return converted;
         }
-        return converted;
+        finally
+        {
+            if (captureBeforeUpdates)
+                _evaluatedOperands = savedOperands;
+        }
+    }
+
+    private static bool ContainsUpdateExpression(SyntaxNode expression) =>
+        expression.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
+            .Any(node => node.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PostIncrementExpression
+                or SyntaxKind.PreDecrementExpression or SyntaxKind.PostDecrementExpression);
+
+    private ExpressionNode CaptureEvaluatedOperand(ExpressionSyntax operand, ExpressionNode? value = null)
+    {
+        if (_semanticModel == null || operand.SyntaxTree != _semanticModel.SyntaxTree)
+            throw EscalateExpression(operand, "compound-assignment-order");
+        var info = _semanticModel.GetTypeInfo(operand);
+        var type = info.ConvertedType ?? info.Type;
+        if (type == null || type.IsAnonymousType || type.IsRefLikeType
+            || type.TypeKind is TypeKind.Error or TypeKind.Dynamic)
+            throw EscalateExpression(operand, "compound-assignment-order");
+        var displayFormat = SymbolDisplayFormat.FullyQualifiedFormat
+            .WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)
+            .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+        value ??= ConvertExpression(operand);
+        var name = _context.GenerateId("_arrayOperand");
+        _pendingStatements.Add(new BindStatementNode(GetTextSpan(operand), name,
+            TypeMapper.CSharpToCalor(type.ToDisplayString(displayFormat)), false, value, new AttributeCollection()));
+        (_evaluatedOperands ??= []).Add(operand);
+        return new ReferenceNode(GetTextSpan(operand), name);
     }
 
     private void RequireFixedEarlierOperand(
@@ -10615,7 +10660,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && expression is ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax
                 or InitializerExpressionSyntax { RawKind: (int)SyntaxKind.ArrayInitializerExpression }
                 or ElementAccessExpressionSyntax
-            && HasArrayStatementContext(expression)
+            && HasStatementTemporaryContext(expression)
             && expression.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
                 .Any(node => node.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PostIncrementExpression
                     or SyntaxKind.PreDecrementExpression or SyntaxKind.PostDecrementExpression))
@@ -10991,10 +11036,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ?? throw EscalateExpression(binary, "unsupported-binary-operator");
         // Eager updates need statement preludes, not a retired unary expression. The
         // ordered conversion still refuses to move them before an observable operand.
-        var hasUpdate = binary.DescendantNodes().Any(node => node.Kind() is
-            SyntaxKind.PreIncrementExpression or SyntaxKind.PreDecrementExpression
-            or SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression);
-        var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: !hasUpdate);
+        var hasUpdate = ContainsUpdateExpression(binary);
+        var operands = ConvertOrderedExpressions([binary.Left, binary.Right], inPlace: !hasUpdate,
+            captureBeforeUpdates: hasUpdate && HasStatementTemporaryContext(binary));
 
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, operands[0], operands[1]);
     }
@@ -12816,6 +12860,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (_conditionalRegionDepth > 0)
             return PreserveConditionalOperand(update);
+        if (!HasStatementTemporaryContext(update))
+            throw EscalateExpression(update, "compound-assignment-order");
         CheckUpdateHoist(update, operandSyntax);
         var operand = ConvertExpression(operandSyntax);
         var span = GetTextSpan(update);
@@ -12847,7 +12893,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// (the statement stays C#) when an earlier operand reads the operand's variable, when the
     /// operand is not a fixed local and an earlier operand has an effect, or when the operand's
     /// receiver or arguments have an effect (they would run twice).
-    /// Operands already evaluated by eager-array lowering do not constrain the later hoist.
+    /// Operands already captured by eager lowering do not constrain the later hoist.
     /// </summary>
     private void CheckUpdateHoist(ExpressionSyntax update, ExpressionSyntax operandSyntax)
     {
@@ -12883,7 +12929,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .OfType<ExpressionSyntax>()
             .Where(node => node.Span.End <= update.SpanStart && node is not AnonymousFunctionExpressionSyntax)
             .Where(node => !node.AncestorsAndSelf().OfType<ExpressionSyntax>()
-                .Any(ancestor => _evaluatedEagerArrayOperands?.Contains(ancestor) == true))
+                .Any(ancestor => _evaluatedOperands?.Contains(ancestor) == true))
             .Where(node => !(node is IdentifierNameSyntax
                 && node.Parent is AssignmentExpressionSyntax { RawKind: (int)SyntaxKind.SimpleAssignmentExpression } target
                 && target.Left == node))
@@ -15238,7 +15284,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return false;
     }
 
-    private static bool HasArrayStatementContext(ExpressionSyntax expression)
+    private static bool HasStatementTemporaryContext(ExpressionSyntax expression)
     {
         // Field/property defaults and constructor arguments cannot drain statement temporaries.
         foreach (var ancestor in expression.Ancestors())
@@ -15259,27 +15305,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (_semanticModel == null || expression.SyntaxTree != _semanticModel.SyntaxTree)
             throw EscalateExpression(expression, "compound-assignment-order");
-        var savedOperands = _evaluatedEagerArrayOperands;
-        _evaluatedEagerArrayOperands = savedOperands == null ? [] : new(savedOperands);
+        var savedOperands = _evaluatedOperands;
+        _evaluatedOperands = savedOperands == null ? [] : new(savedOperands);
         try
         {
             var displayFormat = SymbolDisplayFormat.FullyQualifiedFormat
                 .WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)
                 .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
-            ExpressionNode Capture(ExpressionSyntax operand)
-            {
-                var info = _semanticModel.GetTypeInfo(operand);
-                var type = info.ConvertedType ?? info.Type;
-                if (type == null || type.IsAnonymousType || type.IsRefLikeType
-                    || type.TypeKind is TypeKind.Error or TypeKind.Dynamic)
-                    throw EscalateExpression(operand, "compound-assignment-order");
-                var value = ConvertExpression(operand);
-                var name = _context.GenerateId("_arrayOperand");
-                _pendingStatements.Add(new BindStatementNode(GetTextSpan(operand), name,
-                    TypeMapper.CSharpToCalor(type.ToDisplayString(displayFormat)), false, value, new AttributeCollection()));
-                _evaluatedEagerArrayOperands.Add(operand);
-                return new ReferenceNode(GetTextSpan(operand), name);
-            }
+            ExpressionNode Capture(ExpressionSyntax operand) => CaptureEvaluatedOperand(operand);
 
             var span = GetTextSpan(expression);
             if (expression is ElementAccessExpressionSyntax access)
@@ -15360,7 +15393,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         : new MultiDimArrayAccessNode(span, array, position);
                     _pendingStatements.Add(new AssignmentStatementNode(GetTextSpan(element), target, value));
                     // The store also forces the element's implicit conversion before the next update.
-                    _evaluatedEagerArrayOperands.Add(element);
+                    _evaluatedOperands.Add(element);
                 }
             }
             Fill(initializer, []);
@@ -15368,7 +15401,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         finally
         {
-            _evaluatedEagerArrayOperands = savedOperands;
+            _evaluatedOperands = savedOperands;
         }
     }
 
