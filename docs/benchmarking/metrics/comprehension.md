@@ -69,8 +69,8 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 ### Calor (High Clarity)
 
 ```
-§M{m001:Calculator}
-  §F{f001:Divide:pub}
+§M{Calculator}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -130,8 +130,8 @@ namespace Calculator
 
 | Information | Extraction Method |
 |:------------|:------------------|
-| Function name | Parse `§F{id:name:vis}` |
-| Function ID | Parse `§F{id:name:vis}` |
+| Function name | Parse `§F{name:vis}` |
+| Function ID | Parse `§F{name:vis}` |
 | Inputs | Find all `§I{type:name}` |
 | Output type | Parse `§O{type}` |
 | Side effects | Parse `§E{codes}` |

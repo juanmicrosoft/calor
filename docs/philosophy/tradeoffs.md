@@ -78,7 +78,7 @@ Calor's tradeoff pays off when:
 ### 1. Agents Need to Reason About Behavior
 
 ```
-§F{f001:TransferFunds:pub}
+§F{TransferFunds:pub}
   §I{Account:from}
   §I{Account:to}
   §I{i32:amount}
@@ -100,7 +100,7 @@ An agent can reason about this function's behavior without reading the implement
 ### 2. Agents Need to Detect Contract Violations
 
 ```
-§F{f001:CalculateDiscount:pub}
+§F{CalculateDiscount:pub}
   §I{f64:price}
   §I{f64:discount_percent}
   §O{f64}
@@ -123,10 +123,10 @@ An agent can immediately verify:
 // Instruction: "Change the loop in f001 to iterate from 0 instead of 1"
 
 // Before
-§L{for1:i:1:100:1}
+§L{i:1:100:1}
 
 // After - target is unambiguous
-§L{for1:i:0:100:1}
+§L{i:0:100:1}
 ```
 
 No ambiguity about which loop to modify. No risk of changing the wrong one.
@@ -156,7 +156,7 @@ Calor's syntax is optimized for machine parsing:
 if (x > 0) return x;
 
 // Less familiar
-§IF{if1} (> x 0)
+§IF (> x 0)
   §R x
 ```
 

@@ -38,7 +38,7 @@ Every caller must remember to pass valid values. Every callee must remember to v
 In Calor, constraints are part of the parameter declaration:
 
 ```
-§F{f001:ConfigureServer:pub}
+§F{ConfigureServer:pub}
   §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
   §I{str:hostname} | (> (len #) INT:0)
   §I{i32:maxConnections} | (> # INT:0)
@@ -51,13 +51,13 @@ In Calor, constraints are part of the parameter declaration:
 For reusable constraints, define named refinement types:
 
 ```
-§M{m001:Server}
+§M{Server}
 
-  §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-    §RTYPE{r2:NonEmpty:str} (> (len #) INT:0)
-      §RTYPE{r3:Positive:i32} (> # INT:0)
+  §RTYPE{Port:i32} (&& (>= # INT:1) (<= # INT:65535))
+    §RTYPE{NonEmpty:str} (> (len #) INT:0)
+      §RTYPE{Positive:i32} (> # INT:0)
 
-        §F{f001:ConfigureServer:pub}
+        §F{ConfigureServer:pub}
           §I{Port:port}
           §I{NonEmpty:hostname}
           §I{Positive:maxConnections}
@@ -101,19 +101,19 @@ A transfer function where:
 - After a transfer, the balance must remain non-negative
 
 ```
-§M{m001:Banking}
+§M{Banking}
 
-  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
+  §RTYPE{PositiveAmount:i32} (> # INT:0)
+    §RTYPE{NonNegBalance:i32} (>= # INT:0)
 
-      §F{f001:Transfer:pub}
+      §F{Transfer:pub}
         §I{NonNegBalance:balance}
         §I{PositiveAmount:amount}
         §O{i32}
         §Q (>= balance amount)                  // sufficient funds
 
         §B{newBalance:i32} (- balance amount)
-        §PROOF{p1:balance-safe} (>= newBalance INT:0)
+        §PROOF{balance-safe} (>= newBalance INT:0)
 
         §R newBalance
 
@@ -134,14 +134,14 @@ Z3 proves it: given `balance >= amount` and `amount > 0`, then `balance - amount
 Remove the precondition:
 
 ```
-§F{f002:UnsafeTransfer:pub}
+§F{UnsafeTransfer:pub}
   §I{NonNegBalance:balance}
   §I{PositiveAmount:amount}
   §O{i32}
   // No §Q — missing sufficient funds check!
 
   §B{newBalance:i32} (- balance amount)
-  §PROOF{p1:balance-safe} (>= newBalance INT:0)
+  §PROOF{balance-safe} (>= newBalance INT:0)
 
   §R newBalance
 ```
@@ -163,15 +163,15 @@ This is where refinement types and MCP tools combine. Instead of manually diagno
 An agent has written code with unconstrained parameters:
 
 ```
-§M{m001:Calculator}
+§M{Calculator}
 
-  §F{f001:Divide:pub}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
     §R (/ a b)
 
-  §F{f002:IndexArray:pub}
+  §F{IndexArray:pub}
     §I{i32:index}
     §I{i32:size}
     §O{i32}
@@ -185,7 +185,7 @@ The agent calls `calor_suggest_types`:
 
 ```json
 {
-  "source": "§M{m001:Calculator} ..."
+  "source": "§M{Calculator} ..."
 }
 ```
 
@@ -289,7 +289,7 @@ Response:
     {
       "obligation_id": "obl_0",
       "description": "Add if-guard returning error",
-      "calor_expression": "§IF{g1} (== b INT:0)\n  §R (err \"division by zero\")",
+      "calor_expression": "§IF (== b INT:0)\n  §R (err \"division by zero\")",
       "insertion_kind": "if_guard",
       "confidence": "medium"
     }
@@ -385,7 +385,7 @@ public int Sum(int[] items, int i)
 Calor's indexed types (`§ITYPE`) attach a size parameter to a collection type. The compiler then tracks bounds and uses Z3 to prove accesses are safe:
 
 ```
-§ITYPE{it1:SizedList:List:n}
+§ITYPE{SizedList:List:n}
 ```
 
 This declares `SizedList` as a `List` with `n` elements. The size parameter `n` becomes a Z3 variable.
@@ -395,10 +395,10 @@ This declares `SizedList` as a `List` with `n` elements. The size parameter `n` 
 When you access an indexed-typed array, the obligation engine generates an `IndexBounds` obligation. If the function has preconditions bounding the index, Z3 proves it safe:
 
 ```
-§M{m001:SafeAccess}
-  §ITYPE{it1:SizedList:List:n}
+§M{SafeAccess}
+  §ITYPE{SizedList:List:n}
 
-    §F{f001:GetElement:priv}
+    §F{GetElement:priv}
       §I{SizedList:items}
       §I{i32:n}
       §I{i32:i}
@@ -418,7 +418,7 @@ The obligation engine:
 Without a precondition, Z3 finds a counterexample:
 
 ```
-§F{f002:UnsafeGet:priv}
+§F{UnsafeGet:priv}
   §I{SizedList:items}
   §I{i32:n}
   §I{i32:i}
@@ -431,7 +431,7 @@ Without a precondition, Z3 finds a counterexample:
 Indexed types can have constraints on the size parameter:
 
 ```
-§ITYPE{it1:NonEmptyList:List:n} (> # INT:0)   // n must be > 0
+§ITYPE{NonEmptyList:List:n} (> # INT:0)   // n must be > 0
 ```
 
 This constraint is added as a Z3 assumption when solving bounds obligations, making it easier to prove access safety.
@@ -474,7 +474,7 @@ Like refinement types, indexed types are erased in C#:
 
 | Calor | C# |
 |:------|:---|
-| `§ITYPE{it1:SizedList:List:n}` | *(nothing)* |
+| `§ITYPE{SizedList:List:n}` | *(nothing)* |
 | `§I{SizedList:items}` | `List items` |
 | `§I{SizedList<i32>:items}` | `List<int> items` |
 

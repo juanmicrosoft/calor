@@ -68,8 +68,8 @@ benchmarks. Their recorded versions and results remain unchanged; see
 The repository includes a deliberately refutable postcondition fixture:
 
 ```calor
-§M{m1:OutcomeRefuted}
-  §F{f1:Dec:pub} (i32:x) -> i32
+§M{OutcomeRefuted}
+  §F{Dec:pub} (i32:x) -> i32
     §Q (> x 0)
     §S (> result 10)
     §R (- x 1)
@@ -109,7 +109,7 @@ claim that verification proves arbitrary preconditions at every call site.
 A postcondition constrains normal returns, not whether every input returns successfully:
 
 ```calor
-§F{f001:Square:pub} (i32:x) -> i32
+§F{Square:pub} (i32:x) -> i32
   §E{}
   §Q (>= x 0)
   §S (>= result 0)

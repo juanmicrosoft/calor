@@ -51,9 +51,9 @@ C# static class with the same name. The converter uses this existing form for
 C# static classes, including nested ones:
 
 ```calor
-§M{m0:Library}
-  §M{c1:Utilities:pub}
-    §F{f1:Twice:pub} (i32:value) -> i32
+§M{Library}
+  §M{Utilities:pub}
+    §F{Twice:pub} (i32:value) -> i32
       §R (* value 2)
 ```
 
@@ -71,7 +71,7 @@ Functions are the primary code containers.
 ### Syntax
 
 ```calor
-§F{name:visibility}
+§F{visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (required)
   §E{effects}          // effects (optional)
@@ -143,7 +143,7 @@ Async functions use `§AF` instead of `§F` and automatically wrap return types 
 ### Syntax
 
 ```calor
-§AF{name:visibility}
+§AF{visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (auto-wrapped to Task<T>)
   // body with §AWAIT expressions
@@ -194,7 +194,7 @@ Async methods in classes use `§AMT` instead of `§MT`.
 ### Syntax
 
 ```calor
-§AMT{id:name:visibility}
+§AMT{name:visibility}
   §I{type:param}
   §O{type}
   // body
@@ -203,8 +203,8 @@ Async methods in classes use `§AMT` instead of `§MT`.
 ### Example
 
 ```calor
-§CL{c001:DataService:pub}
-  §AMT{mt001:GetUserAsync:pub}
+§CL{DataService:pub}
+  §AMT{GetUserAsync:pub}
     §I{i32:id}
     §O{User}
     §B{user} §AWAIT §C{_repository.FindAsync} §A id §/C
@@ -216,9 +216,9 @@ Async methods in classes use `§AMT` instead of `§MT`.
 Async methods support the same modifiers as regular methods:
 
 ```calor
-§AMT{mt001:ProcessAsync:pub:virt}    // public virtual async
-§AMT{mt002:HandleAsync:prot:ovr}     // protected override async
-§AMT{mt003:ComputeAsync:pub:stat}    // public static async
+§AMT{ProcessAsync:pub:virt}    // public virtual async
+§AMT{HandleAsync:prot:ovr}     // protected override async
+§AMT{ComputeAsync:pub:stat}    // public static async
 ```
 
 ---
@@ -252,7 +252,7 @@ Emits: `var data = await client.GetAsync(url).ConfigureAwait(false);`
 ### Using Await in Conditions and Expressions
 
 ```calor
-§IF{if1} §AWAIT §C{IsValidAsync} §A id §/C
+§IF §AWAIT §C{IsValidAsync} §A id §/C
   §P "Valid"
 
 §R §AWAIT §C{ComputeAsync} §A x §/C
@@ -267,9 +267,9 @@ Lambda expressions create anonymous functions using `§LAM`/`§/LAM` blocks.
 ### Syntax
 
 ```calor
-§LAM{id:param1:type1}              // single parameter
-§LAM{id:param1:type1:param2:type2} // multiple parameters
-§LAM{id}                           // no parameters
+§LAM{param1:type1}              // single parameter
+§LAM{param1:type1:param2:type2} // multiple parameters
+§LAM{}                           // no parameters
 ```
 
 The header encodes parameters as colon-separated `name:type` pairs after the ID.
@@ -278,7 +278,7 @@ Parameters without known types use `object` as the default type.
 ### Single Parameter
 
 ```calor
-§B{doubler} §LAM{lam1:x:i32} (* x 2) §/LAM{lam1}
+§B{doubler} §LAM{x:i32} (* x 2) §/LAM
 ```
 
 Emits: `var doubler = (int x) => x * 2;`
@@ -288,20 +288,20 @@ Emits: `var doubler = (int x) => x * 2;`
 Parameters are listed as consecutive `name:type` pairs:
 
 ```calor
-§B{add} §LAM{lam1:a:i32:b:i32} (+ a b) §/LAM{lam1}
+§B{add} §LAM{a:i32:b:i32} (+ a b) §/LAM
 ```
 
 Emits: `var add = (int a, int b) => a + b;`
 
 **Three parameters:**
 ```calor
-§B{combine} §LAM{lam1:x:i32:y:str:z:bool} §C{Process} §A x §A y §A z §/C §/LAM{lam1}
+§B{combine} §LAM{x:i32:y:str:z:bool} §C{Process} §A x §A y §A z §/C §/LAM
 ```
 
 ### No Parameters
 
 ```calor
-§B{getTime} §LAM{lam1} §C{DateTime.Now} §/C §/LAM{lam1}
+§B{getTime} §LAM{} §C{DateTime.Now} §/C §/LAM
 ```
 
 ### As LINQ Arguments
@@ -309,8 +309,8 @@ Emits: `var add = (int a, int b) => a + b;`
 Lambdas are commonly used as arguments inside `§C{...}` calls:
 
 ```calor
-§C{numbers.Where} §A §LAM{lam1:n:i32} (!= (% n 3) 0) §/LAM{lam1} §/C
-§C{items.Select} §A §LAM{lam2:x:i32} (* x 2) §/LAM{lam2} §/C
+§C{numbers.Where} §A §LAM{n:i32} (!= (% n 3) 0) §/LAM §/C
+§C{items.Select} §A §LAM{x:i32} (* x 2) §/LAM §/C
 ```
 
 ### Statement Body Lambdas
@@ -318,10 +318,10 @@ Lambdas are commonly used as arguments inside `§C{...}` calls:
 For multi-statement bodies, include statements between the tags:
 
 ```calor
-§B{printer} §LAM{lam1:x:i32}
+§B{printer} §LAM{x:i32}
 §P x
 §P (* x 2)
-§/LAM{lam1}
+§/LAM
 ```
 
 ### Async Lambdas
@@ -329,10 +329,10 @@ For multi-statement bodies, include statements between the tags:
 Add `async` after the ID, before parameters:
 
 ```calor
-§LAM{lam1:async:x:i32}
+§LAM{async:x:i32}
 §B{result} §AWAIT §C{ProcessAsync} §A x §/C
 §R result
-§/LAM{lam1}
+§/LAM
 ```
 
 > **Note:** `§I{type:name}` inline parameter declarations are NOT supported inside
@@ -343,81 +343,30 @@ Add `async` after the ID, before parameters:
 
 ## Local Functions
 
-A local function is a `§F` written inside the body of another `§F` or `§MT`. It is a
-named helper that belongs to that one callable. Calor emits it in place as a C#
-`static` local function. Added in 0.25 (#847).
+Local `§F` declarations are removed. For a local callable value, bind an ordinary
+.NET delegate type to a lambda. Declare the binding before using it.
 
-### Syntax
-
-```calor
-§F{id:Name} (type:param) -> returnType
-  body
-```
-
-Leave out the visibility segment: a local function is never visible outside its body.
-
-### Rules
-
-- **Scope.** The name is visible in the whole enclosing body, including statements
-  *before* the declaration, and inside every local function of that body. A local
-  function can call itself and its siblings.
-- **Name resolution.** A bare call such as `§C{Add}` names the local function, even
-  when the class has a method `Add`, inherits one, or has an overload. This matches C#.
-- **No capture.** The body sees its own parameters, its own bindings, sibling local
-  functions and static members. It does not see the enclosing locals, parameters or
-  instance members. Because the C# output is `static`, a capture is a compile error
-  (`Calor1002` reporting `CS8421`), never a silent reference to a same-named field.
-- **Effects.** A local function has no `§E` of its own. Its body's effects are charged
-  to the enclosing callable where it is declared, whether or not it is called. Calls
-  to it charge nothing more. If it escapes as a delegate value, the value's effect row
-  is the union of all local function bodies of that callable.
-- **As a value.** You can pass a local function as a delegate, but only where its effect
-  row is checked: directly as a `§B` initializer, a `§R` value or the value of an `§ASSIGN`
-  to a simple name (or a `?:` branch of one of those), outside lambdas, or as a `§C{…}`
-  argument. Anywhere else (inside `??`, an array, a qualified store, `§C X …` arguments)
-  is a `Calor0211` error.
-- **Placement and shape.** It must sit directly in a `§F` or `§MT` body. It cannot be
-  nested in a block, a lambda or another local function, and it cannot declare `§E`,
-  `§Q`/`§S`, effect rows, type parameters or refinement types, contain `§PROOF`, or
-  use `§YIELD`. Each of these is a `Calor0211` error.
-- **Verification.** Contracts of the enclosing callable are not proven through a local
-  function body; their runtime checks stay in place.
+This is not a forward-declared static local function. Do not copy the old
+recursive or mutually recursive local-`§F` recipes into active source. During C#
+conversion, supported local functions lower to bindings and lambdas; unsupported
+shapes remain explicitly preserved C#, rather than changing behavior silently.
 
 ### Example
 
 ```calor
-§M{m001:LocalFunctions}
-  §M{c001:Probe:pub}
-    §F{m002:Add:pub} (i32:x) -> i32
-      §R (+ x 1000)
-
-    §F{m003:UseShadow:pub} () -> i32
-      §F{f001:Add} (i32:x) -> i32
-        §R (+ x 1)
-      §R §C{Add} §A 2 §/C
-
-    §F{m004:Fact:pub} (i32:n) -> i32
-      §R §C{Go} §A n §/C
-      §F{f002:Go} (i32:k) -> i32
-        §IF{if1} (<= k 1)
-          §R 1
-        §R (* k §C{Go} §A (- k 1) §/C)
+§M{LocalCallables}
+  §F{Use:pub} (i32:value) -> i32
+    §E{alloc}
+    §B{addOne:Func<i32,i32>} §LAM{x:i32}
+      §R (+ x 1)
+    §/LAM
+    §R §C{addOne} §A value §/C
 ```
 
-`UseShadow` returns 3: its call names the local `Add`, not the class method. `Fact`
-calls `Go` before `Go` is declared, and `Go` calls itself. The C# output is:
-
-```csharp
-public static int UseShadow()
-{
-    static int Add(int x)
-    {
-        return checked(x + 1);
-    }
-
-    return Add(2);
-}
-```
+`Use(2)` returns 3. The binding is named `addOne`; the lambda header contains only
+its parameter name and type, not a source identity field. Its body ends at the
+required `§/LAM` delimiter. Effect checking still applies to lambda bodies and
+their callers.
 
 ---
 
@@ -428,7 +377,7 @@ Delegates define function signatures that can be passed as values.
 ### Syntax
 
 ```calor
-§DEL{id:name}
+§DEL{name}
   §I{type:param}       // parameters (0 or more)
   §O{type}             // return type (optional for void)
   §E{effects}          // effects (optional)
@@ -438,7 +387,7 @@ Delegates define function signatures that can be passed as values.
 
 **Calculator delegate:**
 ```calor
-§DEL{d001:Calculator}
+§DEL{Calculator}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -448,7 +397,7 @@ Emits: `public delegate int Calculator(int a, int b);`
 
 **Void delegate:**
 ```calor
-§DEL{d001:Logger}
+§DEL{Logger}
   §I{str:message}
 ```
 
@@ -456,7 +405,7 @@ Emits: `public delegate void Logger(string message);`
 
 **Delegate with effects:**
 ```calor
-§DEL{d001:FileProcessor}
+§DEL{FileProcessor}
   §I{str:path}
   §O{bool}
   §E{fs:rw}
@@ -471,7 +420,7 @@ Enums define a set of named constants.
 ### Syntax
 
 ```calor
-§EN{id:Name}
+§EN{Name}
   Member1
   Member2 = 1
   Member3 = 2
@@ -479,7 +428,7 @@ Enums define a set of named constants.
 
 With underlying type:
 ```calor
-§EN{id:Name:underlyingType}
+§EN{Name:underlyingType}
   ...
 ```
 
@@ -487,7 +436,7 @@ With underlying type:
 
 **Simple enum:**
 ```calor
-§EN{e001:Color}
+§EN{Color}
   Red
   Green
   Blue
@@ -505,7 +454,7 @@ public enum Color
 
 **Enum with explicit values:**
 ```calor
-§EN{e001:StatusCode}
+§EN{StatusCode}
   Ok = 200
   NotFound = 404
   Error = 500
@@ -513,7 +462,7 @@ public enum Color
 
 **Enum with underlying type:**
 ```calor
-§EN{e001:Flags:u8}
+§EN{Flags:u8}
   None = 0
   Read = 1
   Write = 2
@@ -538,8 +487,8 @@ Extension methods can be added to enums using `§EEXT` (Enum EXTension).
 ### Syntax
 
 ```calor
-§EEXT{id:EnumName}
-  §F{f001:MethodName:pub}
+§EEXT{EnumName}
+  §F{MethodName:pub}
     §I{EnumName:self}
     §O{returnType}
     // body using self
@@ -550,21 +499,21 @@ The first parameter with the enum type (or named `self`) becomes the `this` para
 ### Example
 
 ```calor
-§EN{e001:Color}
+§EN{Color}
   Red
   Green
   Blue
 
-§EEXT{ext001:Color}
-  §F{f001:ToHex:pub}
+§EEXT{Color}
+  §F{ToHex:pub}
     §I{Color:self}
     §O{str}
-    §W{sw1} self
+    §W self
     §K Color.Red → §R "#FF0000"
     §K Color.Green → §R "#00FF00"
     §K Color.Blue → §R "#0000FF"
 
-  §F{f002:IsPrimary:pub}
+  §F{IsPrimary:pub}
     §I{Color:self}
     §O{bool}
     §R (|| (== self Color.Red) (|| (== self Color.Green) (== self Color.Blue)))
@@ -608,7 +557,7 @@ Events allow objects to notify subscribers of state changes.
 ### Syntax
 
 ```calor
-§EVT{id:name:visibility:delegateType}
+§EVT{name:visibility:delegateType}
 ```
 
 | Part | Description |
@@ -621,9 +570,9 @@ Events allow objects to notify subscribers of state changes.
 ### Example
 
 ```calor
-§CL{c001:Button:pub}
-  §EVT{e001:Click:pub:EventHandler}
-    §EVT{e002:ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
+§CL{Button:pub}
+  §EVT{Click:pub:EventHandler}
+    §EVT{ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
 ```
 
 Emits:
@@ -695,7 +644,7 @@ Input parameters define function arguments.
 ### Multiple Parameters
 
 ```calor
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §I{i32:c}
@@ -752,11 +701,11 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 ### Usage in Fields and Methods
 
 ```calor
-§CL{c001:DataProcessor}
+§CL{DataProcessor}
   §FLD{[u8}:_buffer:priv}       // private byte[] _buffer
   §FLD{[i32}:_indices:priv}     // private int[] _indices
 
-  §MT{m001:ProcessData:pub}
+  §MT{ProcessData:pub}
     §I{[str}:args}              // string[] args parameter
     §O{i32}
     §R args.Length
@@ -789,7 +738,7 @@ dedents back to (or past) the parent column.
     §O{void}
     §E{cw}
     §L{i:1:10:1}
-      §IF{if1} (> i 5)
+      §IF (> i 5)
         §P i
       §EL
         §P "small"
@@ -805,12 +754,12 @@ If you write them anyway, the compiler rejects them with `Calor0830`;
 | Opener | Purpose |
 |:-------|:--------|
 | `§M{name}` | Module |
-| `§F{name:vis}` | Function |
-| `§AF{name:vis}` | Async function |
+| `§F{vis}` | Function |
+| `§AF{vis}` | Async function |
 | `§CL{name}` | Class |
 | `§IFACE{name}` | Interface |
-| `§MT{name:vis}` | Method |
-| `§AMT{name:vis}` | Async method |
+| `§MT{vis}` | Method |
+| `§AMT{vis}` | Async method |
 | `§L{var:from:to:step}` | For loop |
 | `§WH cond` | While loop |
 | `§DO` | Do-while loop (condition on closing line during transition) |
@@ -821,7 +770,7 @@ If you write them anyway, the compiler rejects them with `Calor0830`;
 | `§DEL{name}` | Delegate definition |
 | `§EN{name}` | Enum |
 | `§EEXT{enumName}` | Enum extension methods |
-| `§PROP{name:type:vis}` | Property (may carry an effect row: `§PROP{...} §E{cw}`, since 0.17) |
+| `§PROP{type:vis}` | Property (may carry an effect row: `§PROP{...} §E{cw}`, since 0.17) |
 | `§EVT{name:vis:type}` | Event (single line, no block) |
 | `§C{target}` | Call expression (`§/C` ends the argument list) |
 
@@ -836,11 +785,11 @@ Calor supports generic functions, classes, interfaces, and methods using angle b
 Type parameters are declared using `<T>` suffix syntax after the tag attributes.
 
 ```calor
-§F{id:name:vis}<T>         // Generic function with one type parameter
-§F{id:name:vis}<T, U>      // Generic function with two type parameters
-§CL{id:name}<T>            // Generic class
-§IFACE{id:name}<T>         // Generic interface
-§MT{id:name:vis}<T>        // Generic method
+§F{name:vis}<T>         // Generic function with one type parameter
+§F{name:vis}<T, U>      // Generic function with two type parameters
+§CL{name}<T>            // Generic class
+§IFACE{name}<T>         // Generic interface
+§MT{name:vis}<T>        // Generic method
 ```
 
 ### Constraints
@@ -877,7 +826,7 @@ Generic types are written inline using angle bracket syntax.
 
 **Generic identity function:**
 ```calor
-§F{f001:Identity:pub}<T>
+§F{Identity:pub}<T>
   §I{T:value}
   §O{T}
   §R value
@@ -885,25 +834,25 @@ Generic types are written inline using angle bracket syntax.
 
 **Generic class with constraint:**
 ```calor
-§CL{c001:Repository:pub}<T>
+§CL{Repository:pub}<T>
   §WHERE T : class
   §FLD{List<T>:_items:priv}
 
-  §MT{m001:Add:pub}
+  §MT{Add:pub}
     §I{T:item}
     §O{void}
     §C{_items.Add} §A item §/C
 
-  §MT{m002:GetAll:pub}
+  §MT{GetAll:pub}
     §O{IReadOnlyList<T>}
     §R _items
 ```
 
 **Generic interface:**
 ```calor
-§IFACE{i001:IRepository}<T>
+§IFACE{IRepository}<T>
   §WHERE T : class
-  §MT{m001:Get}
+  §MT{Get}
     §I{i32:id}
     §O{T}
 ```
@@ -915,10 +864,10 @@ an empty `§IFACE` ends at the next **type** opener — `§CL`, `§IFACE`, `§EN
 the `§IFACE` itself:
 
 ```calor
-§M{m001:Demo}
-  §IFACE{i001:IMarker}
-  §CL{c001:Thing:pub}
-    §MT{mt1:Go:pub} () -> void
+§M{Demo}
+  §IFACE{IMarker}
+  §CL{Thing:pub}
+    §MT{Go:pub} () -> void
       §E{}
 ```
 
@@ -946,22 +895,22 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ### Syntax
 
 ```calor
-§CL{id:name}[@AttributeName]
-§CL{id:name}[@AttributeName(args)]
-§MT{id:name:vis}[@Attr1][@Attr2]
+§CL{name}[@AttributeName]
+§CL{name}[@AttributeName(args)]
+§MT{name:vis}[@Attr1][@Attr2]
 ```
 
 ### Examples
 
 **Class with routing attributes (ASP.NET Core):**
 ```calor
-§CL{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
-  §MT{m001:Post:pub}[@HttpPost]
+§CL{JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+  §MT{Post:pub}[@HttpPost]
 ```
 
 **Property with validation:**
 ```calor
-§PROP{p001:Email:str:pub}[@Required][@EmailAddress]
+§PROP{Email:str:pub}[@Required][@EmailAddress]
   §GET
     §SET
 ```

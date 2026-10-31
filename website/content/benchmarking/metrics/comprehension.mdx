@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 3
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
 
 **Category:** Comprehension
 **Historical dashboard result:** Calor wins (1.84x across 217 programs)
@@ -69,8 +70,8 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 ### Calor (High Clarity)
 
 ```calor
-§M{m001:Calculator}
-  §F{f001:Divide:pub}
+§M{Calculator}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -131,8 +132,8 @@ aggregate historical result.
 
 | Information | Extraction Method |
 |:------------|:------------------|
-| Function name | Parse `§F{id:name:vis}` |
-| Function ID | Parse `§F{id:name:vis}` |
+| Function name | Parse `§F{name:vis}` |
+| Function ID | Parse `§F{name:vis}` |
 | Inputs | Find all `§I{type:name}` |
 | Output type | Parse `§O{type}` |
 | Side effects | Parse `§E{codes}` |

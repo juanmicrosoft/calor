@@ -333,7 +333,7 @@ String operations can be freely composed with each other and with other Calor ex
 
 ```
 // Validate input
-§IF{v1} (== (len input) 0)
+§IF (== (len input) 0)
   §R "Input required"
 §EI (! (regex-test input "^[a-zA-Z]+$"))
   §R "Letters only"
@@ -344,7 +344,7 @@ String operations can be freely composed with each other and with other Calor ex
 ### In Contracts
 
 ```
-§F{f001:ProcessName:pub}
+§F{ProcessName:pub}
   §I{string:name}
   §O{string}
   §Q (> (len name) 0)                    // Requires: non-empty
@@ -369,11 +369,11 @@ String operations can throw exceptions at runtime:
 
 ```
 // Check length before accessing
-§IF{safe} (> (len s) 0)
+§IF (> (len s) 0)
   §B{first} (char-at s 0)
 
 // Check index before substring
-§IF{valid} (&& (>= start 0) (<= (+ start len) (len s)))
+§IF (&& (>= start 0) (<= (+ start len) (len s)))
   §B{sub} (substr s start len)
 ```
 

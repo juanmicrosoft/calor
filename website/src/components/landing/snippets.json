@@ -1,7 +1,7 @@
 {
   "comparison": {
     "component": "CodeComparison",
-    "code": "§M{m001:Math}\n  §F{f001:Square:pub} (i32:x) -> i32\n    §E{}\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)",
+    "code": "§M{Math}\n  §F{Square:pub} (i32:x) -> i32\n    §E{}\n    §Q (>= x 0)\n    §S (>= result 0)\n    §R (* x x)",
     "before": "",
     "after": "",
     "indent": 0,
@@ -10,7 +10,7 @@
   },
   "firstProgram": {
     "component": "FirstProgram",
-    "code": "§M{m001:HelloApp}\n  §F{f001:Main:pub} () -> void\n    §E{cw}\n    §P \"Hello from Calor!\"",
+    "code": "§M{HelloApp}\n  §F{Main:pub} () -> void\n    §E{cw}\n    §P \"Hello from Calor!\"",
     "before": "",
     "after": "",
     "indent": 0,
@@ -19,12 +19,12 @@
   },
   "missingEffect": {
     "component": "CatchBugs",
-    "code": "§F{f001:ProcessOrder:pub} (Order:order) -> void\n  §E{db:rw}\n  §C{SaveOrder} §A order §/C\n  §C{NotifyCustomer} §A order §/C",
-    "before": "§M{m001:OrderService}\n  §CL{c001:Order:pub}\n",
+    "code": "§F{ProcessOrder:pub} (Order:order) -> void\n  §E{db:rw}\n  §C{SaveOrder} §A order §/C\n  §C{NotifyCustomer} §A order §/C",
+    "before": "§M{OrderService}\n  §CL{Order:pub}\n",
     "after": "",
     "indent": 2,
     "inputs": [
-      "§M{m002:OrderDependencies}\n  §F{f002:SaveOrder:pub} (object:order) -> void\n    §E{db:rw}\n  §F{f003:NotifyCustomer:pub} (object:order) -> void\n    §E{net:rw}\n"
+      "§M{OrderDependencies}\n  §F{SaveOrder:pub} (object:order) -> void\n    §E{db:rw}\n  §F{NotifyCustomer:pub} (object:order) -> void\n    §E{net:rw}\n"
     ],
     "expectedDiagnostics": [
       {
@@ -37,7 +37,7 @@
   "contracts": {
     "component": "FeatureGrid",
     "code": "§Q (>= x 0)\n§S (>= result 0)",
-    "before": "§M{m001:ContractContext}\n  §F{f001:Identity:pub} (i32:x) -> i32\n    §E{}\n",
+    "before": "§M{ContractContext}\n  §F{Identity:pub} (i32:x) -> i32\n    §E{}\n",
     "after": "    §R x\n",
     "indent": 4,
     "inputs": [],
@@ -46,7 +46,7 @@
   "effects": {
     "component": "FeatureGrid",
     "code": "§E{db:rw,net:rw}",
-    "before": "§M{m001:EffectContext}\n  §F{f001:Process:pub} () -> void\n",
+    "before": "§M{EffectContext}\n  §F{Process:pub} () -> void\n",
     "after": "",
     "indent": 4,
     "inputs": [],
@@ -54,8 +54,8 @@
   },
   "stableId": {
     "component": "FeatureGrid",
-    "code": "§F{f001:Process:pub}",
-    "before": "§M{m001:IdContext}\n",
+    "code": "§F{Process:pub}",
+    "before": "§M{IdContext}\n",
     "after": "    §O{void}\n    §E{}\n",
     "indent": 2,
     "inputs": [],

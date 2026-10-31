@@ -44,7 +44,7 @@ Calor asks: *What if we designed a language from the ground up for AI agents?*
 ```
 
 **What Calor tells the agent directly:**
-- Optional ID slot: add `§F{f002:Square:pub}` if you need a stable handle for tooling
+- Optional ID slot: add `§F{Square:pub}` if you need a stable handle for tooling
 - Precondition (`§Q`): `x >= 0`
 - Postcondition (`§S`): `result >= 0`
 - No side effects (no `§E` declaration)

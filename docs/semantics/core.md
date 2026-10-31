@@ -144,7 +144,7 @@ Calor uses **lexical scoping** with parent chain lookup. See `src/Calor.Compiler
 
 ```calor
 §B{x:i32} 1
-§IF{if1} true
+§IF true
   §B{inner:i32} (+ x 1)
   §P inner                     // Prints 2
 §P x                           // Prints 1 (outer x unchanged)
@@ -173,7 +173,7 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF{if1} true
+§IF true
   §R INT:42   // Returns from function, not just if block
 ```
 
@@ -188,8 +188,8 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§M{m1:Overflow}
-  §F{f1:Increment:pub} (i32:value) -> i32
+§M{Overflow}
+  §F{Increment:pub} (i32:value) -> i32
     §E{}
     §R (+ value INT:1)
 // Increment(int.MaxValue) throws OverflowException.
@@ -354,7 +354,7 @@ Effects track side-effect capabilities of functions.
 ### 7.2 Effect Declaration
 
 ```calor
-§F{f001:readFile:pub}
+§F{readFile:pub}
   §I{string:path}
   §O{string}
   §E{fs:r,throw}
@@ -378,7 +378,7 @@ Match expressions MUST be exhaustive. The compiler emits `Calor0500: NonExhausti
 ### 8.2 Evaluation
 
 ```calor
-§R §W{sw1} n
+§R §W n
   §K §VAR{x} §WHEN (> x 100) → "large"
   §K 0 → "zero"
   §K _ → "other"
@@ -402,7 +402,7 @@ Patterns are tried in **declaration order**. First matching pattern wins.
 ### 9.1 Try/Catch/Finally
 
 ```calor
-§TR{tr1}
+§TR
   body
 §CA{ExceptionType:var}
   handler
@@ -505,7 +505,7 @@ See `docs/semantics/versioning.md` for details on semantics versioning.
 Modules can declare required semantics version:
 
 ```calor
-§M{m001:MyModule}
+§M{MyModule}
   §SEMVER{2.0.0}
 ```
 

@@ -62,11 +62,11 @@ Intel macOS is not supported because upstream Z3 does not provide a valid x64 bi
 ### 2. Write the first module
 
 ```calor
-§M{m001:Pricing}
-  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32
+§M{Pricing}
+  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32
     §Q (>= cap 0)
     §S (<= result cap)
-    §IF{if1} (> amount cap)
+    §IF (> amount cap)
       §R cap
     §R amount
 ```

@@ -105,8 +105,8 @@ point estimate.
 
 **Calor:**
 ```
-§M{m001:Hello}
-  §F{f001:Main:pub}
+§M{Hello}
+  §F{Main:pub}
     §O{void}
     §E{cw}
     §P "Hello World"
@@ -133,12 +133,12 @@ class Program
 
 **Calor:**
 ```
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
+§M{FizzBuzz}
+  §F{Main:pub}
     §O{void}
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"
@@ -169,7 +169,7 @@ for (int i = 1; i <= 100; i++)
 
 **Calor:**
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -220,7 +220,7 @@ line-level compactness on the representative corpus.
 ### 1. Explicit Tags
 
 ```
-§M{m001:Name}    // Module requires tag + ID + name
+§M{Name}    // Module requires tag + ID + name
 
 // vs C#
 namespace Name   // Just keyword + name
@@ -240,7 +240,7 @@ Nested structures use indentation instead of structural closers:
 ```
 §F{f001}
   §L{for1}
-    §IF{if1}
+    §IF
       §P i
 ```
 

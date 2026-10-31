@@ -17,7 +17,7 @@ Calor is built on five core principles that guide every language design decision
 |:----------|:---------------|:--------------|
 | **Explicit over implicit** | Effects declared with `§E{cw, fs:r, net:rw}` | Know side effects without reading implementation |
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Stable IDs when you want them** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` (IDs optional) | Precise references that survive refactoring |
+| **Stable IDs when you want them** | `§F{Main}`, `§L{i:1:100:1}` (IDs optional) | Precise references that survive refactoring |
 | **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost; familiar from training data |
 | **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
@@ -34,7 +34,7 @@ In traditional languages, side effects are implicit. You have to read the entire
 Calor requires explicit effect declarations:
 
 ```
-§F{f001:SaveUser:pub}
+§F{SaveUser:pub}
   §I{User:user}
   §O{bool}
   §E{db:rw, net:rw}        // Explicit: database and network effects
@@ -75,7 +75,7 @@ Calor requires explicit effect declarations:
 Preconditions and postconditions aren't comments or assertions buried in code - they're first-class syntax elements:
 
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -107,10 +107,10 @@ With [`--verify`](/calor/philosophy/static-verification/), the compiler uses Z3 
 Every structural element has a unique identifier that persists across refactoring:
 
 ```
-§M{m001:Calculator}           // Module ID: m001
-  §F{f001:Add:pub}              // Function ID: f001
-    §L{for1:i:1:100:1}          // Loop ID: for1
-      §IF{if1} (> i 50)         // Conditional ID: if1
+§M{Calculator}           // Module ID: m001
+  §F{Add:pub}              // Function ID: f001
+    §L{i:1:100:1}          // Loop ID: for1
+      §IF (> i 50)         // Conditional ID: if1
     // ...
 ```
 
@@ -125,10 +125,10 @@ Every structural element has a unique identifier that persists across refactorin
 
 | Element | Convention | Example |
 |:--------|:-----------|:--------|
-| Modules | `m_` + ULID | `§M{m_01J5X7...:Calculator}` |
-| Functions | `f_` + ULID | `§F{f_01J5X7...:Add:pub}` |
+| Modules | `m_` + ULID | `§M{Calculator}` |
+| Functions | `f_` + ULID | `§F{Add:pub}` |
 | Classes | `c_` + ULID | `§CL{c_01J5X7...:MyClass}` |
-| Test files | Sequential | `§F{f001:Add:pub}` |
+| Test files | Sequential | `§F{Add:pub}` |
 
 [Learn more: Stable Identifiers](/calor/philosophy/stable-identifiers/) - Why IDs matter and how challenges are overcome
 
@@ -155,8 +155,8 @@ at the next line that dedents back to the parent column.
 
 ### Legacy Closer Tags
 
-Pre-Phase-4d Calor used explicit closer tags such as `§/M{m001}` and
-`§/F{f001}` (removed in Phase 4d). Modern Calor is indent-only; bulk-migrate
+Pre-Phase-4d Calor used explicit closer tags such as `§/M` and
+`§/F` (removed in Phase 4d). Modern Calor is indent-only; bulk-migrate
 older sources with [`calor format`](/calor/cli/format/).
 
 ---

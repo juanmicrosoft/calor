@@ -213,8 +213,8 @@ arguments, just like statement calls. Indent the arguments beneath the
 containing statement and align `§/C` with that statement:
 
 ```calor
-§M{m001:CallExpressions}
-  §F{f001:ClampScore:pub} (i32:score) -> i32
+§M{CallExpressions}
+  §F{ClampScore:pub} (i32:score) -> i32
     §E{}
     §B{value:i32} §C{Math.Clamp}
       §A[value] score
@@ -262,7 +262,7 @@ without blaming the following valid return statement.
 ### In Conditions
 
 ```
-§IF{if1} (> x 0)
+§IF (> x 0)
   §P "positive"
 §EI (< x 0)
   §P "negative"
@@ -284,8 +284,8 @@ without blaming the following valid return statement.
 Loop bounds can be expressions:
 
 ```
-§L{for1:i:0:(- n 1):1}    // i from 0 to n-1
-§L{for2:j:1:(* 2 n):2}    // j from 1 to 2n, step 2
+§L{i:0:(- n 1):1}    // i from 0 to n-1
+§L{j:1:(* 2 n):2}    // j from 1 to 2n, step 2
 ```
 
 ---
@@ -307,11 +307,11 @@ Check if a collection contains an element.
 **Examples:**
 ```
 // Check if list contains element
-§IF{if1} §HAS{numbers} 5
+§IF §HAS{numbers} 5
   §P "Found 5"
 
 // Check if key exists in dictionary
-§IF{if2} §HAS{ages} §KEY "alice"
+§IF §HAS{ages} §KEY "alice"
   §P "Alice found"
 
 // Use in binding
@@ -332,7 +332,7 @@ Get the number of elements in a collection.
 §B{size} §CNT{items}
 
 // Use in condition
-§IF{if1} (> §CNT{queue} 0)
+§IF (> §CNT{queue} 0)
   §P "Queue not empty"
 
 // Use in loop bound
@@ -343,7 +343,7 @@ Get the number of elements in a collection.
 ### Using Collection Expressions in Contracts
 
 ```
-§F{f001:ProcessItems:pub}
+§F{ProcessItems:pub}
   §I{List<i32>:items}
   §O{i32}
   §Q (> §CNT{items} 0)           // Requires: items not empty

@@ -162,7 +162,7 @@ Calor's design principles benefit agent refactoring:
 
 ### 1. Unique IDs
 ```
-§F{f001:Calculate:pub}    # Stable reference across edits
+§F{Calculate:pub}    # Stable reference across edits
 ```
 Agents can target specific elements without ambiguity.
 
@@ -181,7 +181,7 @@ Effects are tracked through refactorings, preventing silent side-effect changes.
 
 ### 4. Structural Markers
 ```
-§F{id:name:vis}           # Opener + indented body (terminates at dedent)
+§F{name:vis}           # Opener + indented body (terminates at dedent)
   §I{type:param}
   …body…
 ```

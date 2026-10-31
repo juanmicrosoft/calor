@@ -126,7 +126,7 @@ This isn't incremental improvement. It's a phase transition that makes previousl
 ### Compile-Time Effect Verification
 
 ```
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db:rw}                  // Declares: only database effects
@@ -179,7 +179,7 @@ This means effect verification extends beyond Calor code to the entire .NET ecos
 ### Runtime Contract Verification
 
 ```
-§F{f001:Withdraw:pub}
+§F{Withdraw:pub}
   §I{i32:amount}
   §I{Account:account}
   §O{i32}
@@ -229,11 +229,11 @@ public static int Withdraw(int amount, Account account)
 Runtime checks catch violations when they happen. But with Z3, the compiler can go further — proving contracts correct at compile time:
 
 ```
-§F{f004:ClampPositive:pub}
+§F{ClampPositive:pub}
   §I{i32:x}
   §O{i32}
   §S (>= result 0)
-  §IF{if001} (< x 0)
+  §IF (< x 0)
     §R 0
     §ELSE{if001}
     §R x

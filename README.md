@@ -32,7 +32,7 @@ Traditional languages make agents *infer* these answers through complex analysis
 |-----------|------------------------|---------------|
 | **Explicit over implicit** | Effects declared with `§E{cw, fs:r, net:rw}` | Know side effects without reading implementation |
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Stable IDs when you want them** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` (IDs are optional) | Precise references that survive refactoring |
+| **Tooling-owned identity** | `.calor/ids.json`; no declaration IDs in source | Precise references preserved by supported refactoring tools |
 | **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost (~16% fewer tokens in our studies) |
 | **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
@@ -62,7 +62,7 @@ public static int Square(int x)
 ```
 
 **What Calor tells the agent directly:**
-- Optional ID slot: `§F{f002:Square:pub}` if you need a stable handle for tooling; otherwise just `§F{Square:pub}`
+- Optional ID slot: `§F{Square:pub}` if you need a stable handle for tooling; otherwise just `§F{Square:pub}`
 - Precondition (`§Q`): `x >= 0`
 - Postcondition (`§S`): `result >= 0`
 - No side effects (no `§E` declaration)
@@ -141,8 +141,8 @@ language server itself is unaffected and remains supported.
 ### Your First Calor Program
 
 ```
-§M{m001:Hello}
-  §F{f001:Main:pub}
+§M{Hello}
+  §F{Main:pub}
     §O{void}
     §E{cw}
     §P "Hello from Calor!"

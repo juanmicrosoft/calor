@@ -16,8 +16,8 @@ Let's walk through a complete Calor program to understand the syntax.
 Here's the simplest Calor program:
 
 ```
-§M{m001:Hello}
-  §F{f001:Main:pub}
+§M{Hello}
+  §F{Main:pub}
     §O{void}
     §E{cw}
     §P "Hello from Calor!"
@@ -30,7 +30,7 @@ Here's the simplest Calor program:
 ### Module Declaration
 
 ```
-§M{m001:Hello}
+§M{Hello}
 ```
 
 | Part | Meaning |
@@ -42,7 +42,7 @@ Here's the simplest Calor program:
 ### Function Declaration
 
 ```
-§F{f001:Main:pub}
+§F{Main:pub}
 ```
 
 | Part | Meaning |
@@ -144,8 +144,8 @@ namespace Hello
 ### With Input Parameters
 
 ```
-§M{m001:Greeter}
-  §F{f001:Greet:pub}
+§M{Greeter}
+  §F{Greet:pub}
     §I{str:name}
     §O{void}
     §E{cw}
@@ -155,8 +155,8 @@ namespace Hello
 ### With Return Value
 
 ```
-§M{m001:Math}
-  §F{f001:Add:pub}
+§M{Math}
+  §F{Add:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -166,8 +166,8 @@ namespace Hello
 ### With Contracts
 
 ```
-§M{m001:SafeMath}
-  §F{f001:Divide:pub}
+§M{SafeMath}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -183,7 +183,7 @@ namespace Hello
 | Concept | Calor | C# Equivalent |
 |:--------|:-----|:--------------|
 | Module | `§M{Name}` | `namespace Name` |
-| Function | `§F{Name:vis}` | `public static void Name()` |
+| Function | `§F{vis}` | `public static void Name()` |
 | Input | `§I{type:name}` | Parameter |
 | Output | `§O{type}` | Return type |
 | Effects | `§E{codes}` | (No equivalent - implicit) |

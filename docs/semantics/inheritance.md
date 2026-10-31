@@ -11,8 +11,8 @@ Classes can have the following modifiers that affect their inheritance behavior:
 ### 1.1 Abstract Classes (`abs`)
 
 ```calor
-§CL{c1:Shape:abs}
-  §MT{mt1:Area:pub:abs}
+§CL{Shape:abs}
+  §MT{Area:pub:abs}
     §O{double}
 ```
 
@@ -33,7 +33,7 @@ public abstract class Shape
 ### 1.2 Sealed Classes (`seal`)
 
 ```calor
-§CL{c1:FinalClass:seal}
+§CL{FinalClass:seal}
 ```
 
 **Semantics:**
@@ -51,8 +51,8 @@ public sealed class FinalClass { }
 > **Note:** Static class modifier is not fully implemented in the parser. Use static methods within regular classes instead.
 
 ```calor
-§CL{c1:Utilities:pub}
-  §MT{mt1:Helper:pub:stat}
+§CL{Utilities:pub}
+  §MT{Helper:pub:stat}
     §O{void}
 ```
 
@@ -74,7 +74,7 @@ public class Utilities
 > **Note:** Partial class modifier is not fully implemented in the parser.
 
 ```calor
-§CL{c1:DataService:partial}
+§CL{DataService:partial}
 ```
 
 **Semantics:**
@@ -94,7 +94,7 @@ public partial class DataService { }
 ### 2.1 Base Class (`§EXT`)
 
 ```calor
-§CL{c1:Circle:pub}
+§CL{Circle:pub}
   §EXT{Shape}
   // ...
 ```
@@ -110,7 +110,7 @@ public partial class DataService { }
 ### 2.2 Interface Implementation (`§IMPL`)
 
 ```calor
-§CL{c1:GameObject:pub}
+§CL{GameObject:pub}
   §IMPL{IMovable}
   §IMPL{IDrawable}
   // ...
@@ -127,7 +127,7 @@ public partial class DataService { }
 ### 2.3 Combined Inheritance
 
 ```calor
-§CL{c1:Dog:pub}
+§CL{Dog:pub}
   §EXT{Animal}
   §IMPL{IPet}
   §IMPL{ITrainable}
@@ -146,7 +146,7 @@ public class Dog : Animal, IPet, ITrainable { ... }
 ### 3.1 Virtual Methods (`virt`)
 
 ```calor
-§MT{mt1:Speak:pub:virt}
+§MT{Speak:pub:virt}
   §O{str}
   §R "..."
 ```
@@ -167,7 +167,7 @@ public virtual string Speak()
 ### 3.2 Override Methods (`over`)
 
 ```calor
-§MT{mt1:Speak:pub:over}
+§MT{Speak:pub:over}
   §O{str}
   §R "Woof!"
 ```
@@ -188,7 +188,7 @@ public override string Speak()
 ### 3.3 Abstract Methods (`abs`)
 
 ```calor
-§MT{mt1:Area:pub:abs}
+§MT{Area:pub:abs}
   §O{double}
 ```
 
@@ -206,7 +206,7 @@ public abstract double Area();
 ### 3.4 Sealed Override (`seal over`)
 
 ```calor
-§MT{mt1:Compute:pub:seal over}
+§MT{Compute:pub:seal over}
   §O{i32}
   §R 42
 ```
@@ -227,7 +227,7 @@ public override sealed int Compute()
 ### 3.5 Static Methods (`stat`)
 
 ```calor
-§MT{mt1:Create:pub:stat}
+§MT{Create:pub:stat}
   §O{MyClass}
   §R §NEW{MyClass}
 ```
@@ -246,7 +246,7 @@ public override sealed int Compute()
 To call a base class method, use `base.MethodName` as the call target:
 
 ```calor
-§MT{mt1:GetValue:pub:over}
+§MT{GetValue:pub:over}
   §O{i32}
   §R (+ §C{base.GetValue} §/C 5)
 ```
@@ -269,7 +269,7 @@ public override int GetValue()
 ### 4.2 Constructor Base Initializer
 
 ```calor
-§CTOR{ctor1:pub}
+§CTOR{pub}
   §I{str:name}
   §I{str:breed}
   §BASE §A name §/BASE
@@ -300,14 +300,14 @@ Derived classes may **weaken** (but not strengthen) preconditions:
 
 ```calor
 // Base class
-§MT{mt1:Process:pub:virt}
+§MT{Process:pub:virt}
   §I{i32:value}
   §O{i32}
   §Q (> value 0)      // Requires positive
   §R (* value 2)
 
 // Derived class - OK: accepts wider range
-§MT{mt1:Process:pub:over}
+§MT{Process:pub:over}
   §I{i32:value}
   §O{i32}
   §Q (>= value 0)     // Also accepts zero
@@ -320,13 +320,13 @@ Derived classes may **strengthen** (but not weaken) postconditions:
 
 ```calor
 // Base class
-§MT{mt1:GetValue:pub:virt}
+§MT{GetValue:pub:virt}
   §O{i32}
   §S (>= result 0)     // Ensures non-negative
   §R 10
 
 // Derived class - OK: guarantees stronger condition
-§MT{mt1:GetValue:pub:over}
+§MT{GetValue:pub:over}
   §O{i32}
   §S (> result 0)      // Ensures strictly positive
   §R 42
@@ -365,11 +365,11 @@ These rules ensure that objects of derived classes can substitute for objects of
 **Example:**
 ```calor
 // Base class
-§MT{mt1:Method:prot:virt}
+§MT{Method:prot:virt}
   §O{void}
 
 // Derived - OK: increasing visibility
-§MT{mt1:Method:pub:over}
+§MT{Method:pub:over}
   §O{void}
 ```
 
@@ -388,11 +388,11 @@ Return types support covariance:
 
 ```calor
 // Base class returns Animal
-§MT{mt1:Clone:pub:virt}
+§MT{Clone:pub:virt}
   §O{Animal}
 
 // Derived can return Dog (more specific)
-§MT{mt1:Clone:pub:over}
+§MT{Clone:pub:over}
   §O{Dog}
 ```
 
@@ -430,10 +430,10 @@ Return types support covariance:
 - **Multiple modifiers**: When combining modifiers (e.g., `seal` and `over`), use space separation in the modifiers field, not colon separation:
   ```calor
   // Correct:
-  §MT{mt1:Method:pub:seal over}
+  §MT{Method:pub:seal over}
 
   // Incorrect:
-  §MT{mt1:Method:pub:seal:over}
+  §MT{Method:pub:seal:over}
   ```
 
 ---

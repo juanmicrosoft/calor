@@ -21,7 +21,7 @@ const csharpCode = `public static int Square(int x)
 const annotations = {
   calor: [
     '§Q and §S declare the input and normal-return obligations.',
-    'The optional f001 ID gives editing tools a named target when preserved across edits.',
+    'Tools keep persistent declaration identity in .calor/ids.json, outside the source.',
     '§E{} declares no effects; enforcement depends on resolved calls and documented coverage.',
   ],
   csharp: [

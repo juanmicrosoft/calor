@@ -239,12 +239,12 @@ The only closers you should ever write are `§/C` (call argument lists) and `§/
 (block lambdas).
 
 ```
-§M{id:Name}                Module
-§F{id:name:vis} (T:x) -> R  Function with inline signature
+§M{Name}                   Module
+§F{name:vis} (T:x) -> R     Function with inline signature
 §B{name:type}              Immutable binding
 §B{~name:type}             Mutable binding
-§L{id:var:from:to:step}    For loop
-§IF{id} (cond)             If (body indented)
+§L{var:from:to:step}        For loop
+§IF (cond)                 If (body indented)
 §EI (cond)                  ElseIf (at parent column)
 §EL                         Else (at parent column)
 §C{object.method} §A arg §/C  Method call with argument
@@ -258,11 +258,11 @@ Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
 ` ```calor ` blocks starting with `§M` are parse-checked by `calor self-check docs`):
 
 ```calor
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub} () -> void
+§M{FizzBuzz}
+  §F{Main:pub} () -> void
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"
@@ -271,6 +271,11 @@ Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
 ```
 
 **Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
+
+Declaration IDs never appear in active source. Tools maintain them in the
+per-project `.calor/ids.json` sidecar; commit it alongside source. Build and
+project tools synchronize active inputs automatically. Use identity-aware
+rename and move tools; plain-text reconciliation rejects ambiguous matches.
 
 ## Adding New AST Nodes — Checklist
 

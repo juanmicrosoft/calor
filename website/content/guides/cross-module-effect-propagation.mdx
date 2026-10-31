@@ -19,9 +19,9 @@ Suppose you split your code across two files:
 **`OrderService.calr`**
 
 ```calor group=orders,orders-using
-§M{m001:OrderService}
+§M{OrderService}
 
-  §F{f001:SaveOrder:pub}
+  §F{SaveOrder:pub}
     §O{void}
     §E{db:w}
     // A real implementation writes the order to a database here.
@@ -31,9 +31,9 @@ Suppose you split your code across two files:
 **`Handler.calr`**
 
 ```calor group=orders expect=Calor0410,Calor0417
-§M{m002:Handler}
+§M{Handler}
 
-  §F{f001:HandleRequest:pub}
+  §F{HandleRequest:pub}
     §O{void}
     §C{SaveOrder} §/C
 
@@ -63,7 +63,7 @@ under "Undeclared public functions" below.
 Fix by adding the effect to the caller:
 
 ```calor
-§F{f001:HandleRequest:pub}
+§F{HandleRequest:pub}
   §O{void}
   §E{db:w}                    ← now declared
   §C{SaveOrder} §/C
@@ -173,10 +173,10 @@ Two patterns work:
 ### 1. Using directive + bare name
 
 ```calor group=orders-using
-§M{m002:Handler}
+§M{Handler}
   §U{OrderService}                // adds `using OrderService;` to generated C#
 
-  §F{f001:HandleRequest:pub}
+  §F{HandleRequest:pub}
     §O{void}
     §E{db:w}
     §C{SaveOrder} §/C             // resolves via the using directive
@@ -186,7 +186,7 @@ Two patterns work:
 ### 2. Module-qualified call
 
 ```calor
-§F{f001:HandleRequest:pub}
+§F{HandleRequest:pub}
   §O{void}
   §E{db:w}
   §C{OrderService.SaveOrder} §/C

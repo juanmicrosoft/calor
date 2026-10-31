@@ -175,7 +175,7 @@ A `§B{name}` declaration must carry **either** a `:type` annotation
 choose a type for the new symbol.
 
 ```calor
-§F{f001:Foo:pub} () -> i32
+§F{Foo:pub} () -> i32
   §B{x}            // Calor0250: §B{x} requires :type or initializer
   §R INT:0
 ```
@@ -226,7 +226,7 @@ refused: `§ASSIGN`, compound assignment, `(inc x)`/`(dec x)`, a `§A{ref}` or
 §B{x:i32} 1
 §ASSIGN x 2          // Calor0213: 'x' is an immutable binding
 
-§L{l1:i:0:9:1}
+§L{i:0:9:1}
   §ASSIGN i 5        // Calor0213: 'i' is a §L loop variable
 ```
 

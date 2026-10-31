@@ -59,7 +59,7 @@ The Calor linter is designed specifically for **agent-optimized code**, not huma
 |--------|---------------------|--------------|
 | **Indentation** | Enforce style indentation | Preserve meaningful block indentation |
 | **Whitespace** | Format for readability | Eliminate unnecessary whitespace |
-| **Identifiers** | Descriptive names encouraged | Abbreviated IDs (`m1`, `f1`, `l1`) |
+| **Identifiers** | Descriptive names encouraged | Source names remain names; persistent IDs live outside source |
 | **Blank lines** | Separate logical sections | Remove all blank lines |
 | **Comments** | Encouraged for clarity | Stripped (contracts replace comments) |
 | **Line length** | 80-120 character limits | No limit (single-line preferred) |
@@ -69,7 +69,7 @@ The Calor linter is designed specifically for **agent-optimized code**, not huma
 AI coding agents process code as tokens. Every character costs tokens and processing time. The Calor linter optimizes for:
 
 1. **Minimal token count** - Fewer tokens = faster processing, lower cost
-2. **Unambiguous structure** - Indentation defines blocks; tags and IDs identify elements
+2. **Unambiguous structure** - Indentation defines blocks; tags introduce language constructs
 3. **Consistent format** - No style variations that add noise to agent context
 4. **Semantic density** - Maximum information per token
 
@@ -91,28 +91,23 @@ public void Main() {
 Calor uses indent-only blocks with explicit tags and IDs:
 
 ```calor
-§F{f1:Main:pub}
+§F{Main:pub}
   §O{void}
-  §L{l1:i:0:10:1}
-    §IF{i1} (== (% i 2) 0)
+  §L{i:0:10:1}
+    §IF (== (% i 2) 0)
       §P i
 ```
 
-The structure is explicit in indentation; IDs like `l1` identify blocks without requiring closing tags.
+The structure is explicit in indentation. Identity fields are not part of block headers.
 
 ## Lint Rules
 
-### ID Abbreviation
+### Declaration Identity
 
-Identifiers should use the shortest unambiguous form.
-
-| Issue | Input | Fixed |
-|-------|-------|-------|
-| Padded module ID | `§M{m001:Name}` | `§M{m1:Name}` |
-| Padded function ID | `§F{f001:Main}` | `§F{f1:Main}` |
-| Verbose loop ID | `§L{for1:i:...}` | `§L{l1:i:...}` |
-| Verbose if ID | `§IF{if1}` | `§IF{i1}` |
-| Verbose while ID | `§WH{while1}` | `§WH{w1}` |
+There is no source-ID abbreviation rule. Declaration IDs belong in the
+tooling-maintained `.calor/ids.json` sidecar, not in source headers.
+Use [`ids check`](/docs/cli/ids/) to validate persisted identity state.
+The formatter must not treat a program name such as `f001` as an ID to shorten.
 
 ### Whitespace
 
@@ -122,7 +117,7 @@ Use two spaces per block level. Avoid trailing whitespace and unnecessary blank 
 |-------|---------|
 | Wrong indent width | `    §P "text"` (4 spaces where 2 expected) |
 | Leading tabs | `\t§P "text"` (leading tab) |
-| Trailing whitespace | `§M{m1:Name}  ` (trailing spaces) |
+| Trailing whitespace | `§M{Name}  ` (trailing spaces) |
 | Blank lines | Empty lines between statements |
 | Multiple blank lines | Consecutive empty lines |
 
@@ -132,7 +127,7 @@ Tags should use the canonical format.
 
 | Issue | Input | Fixed |
 |-------|-------|-------|
-| External visibility | `§F{f1:Main} pub` | `§F{f1:Main:pub}` |
+| External visibility | `§F{Main} pub` | `§F{Main:pub}` |
 
 ### Expression Format
 
@@ -170,13 +165,8 @@ Effects should use abbreviated codes.
 # Lint a single file
 calor lint src/hello.calr
 
-# Output:
-# src/hello.calr
-#   line 1: padded_id - Module ID 'm001' should be 'm1'
-#   line 2: padded_id - Function ID 'f001' should be 'f1'
-#   line 3: leading_whitespace - Line has 2 leading spaces
-#
-# 3 issues found (3 fixable)
+# Machine-readable findings for the same source
+calor lint src/hello.calr --format json
 ```
 
 ### Auto-Fix

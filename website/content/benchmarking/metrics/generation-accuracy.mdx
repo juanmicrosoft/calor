@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 6
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
 
 **Category:** Generation Accuracy
 **Historical dashboard result:** Calor narrowly wins (1.02x across 217 programs)
@@ -95,7 +96,7 @@ public static int Add(int a, int b)
 
 ```calor
 // Calor: Novel syntax, less exposure
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -133,7 +134,7 @@ public static int Add(int a, int b)
 
 **Calor generation (typical):**
 ```calor
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -146,7 +147,7 @@ public static int Add(int a, int b)
 
 **Calor generation (common error):**
 ```calor
-§F{f001:Add:pub}
+§F{Add:pub}
 §I{i32:a}
 §I{i32:b}
 §O{i32}
@@ -166,7 +167,7 @@ public static int Add(int a, int b)
 |:------|:------|:--------|
 | Misindented body | Body not indented under opener | `§F{f001}` followed by unindented statements |
 | Missing block body | Forgot statements inside a block | `§L{for1}` with no indented body |
-| Wrong nesting | Dedented or indented at the wrong level | `§IF{if1}` body aligned with parent |
+| Wrong nesting | Dedented or indented at the wrong level | `§IF` body aligned with parent |
 | Missing module wrapper | No enclosing `§M{}` block | Function outside module |
 
 ### Common C# Errors

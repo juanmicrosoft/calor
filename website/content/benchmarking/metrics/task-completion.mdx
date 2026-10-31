@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 7
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
 
 **Category:** Task Completion
 **Status:** Separate historical LLM-runner result; not part of the historical eight-metric dashboard
@@ -121,8 +122,8 @@ These are different questions that require different benchmarks.
 
 **Generated Calor:**
 ```calor
-§M{m001:SafeDivideModule}
-  §F{f001:SafeDivide:pub}
+§M{SafeDivideModule}
+  §F{SafeDivide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -152,7 +153,7 @@ Both compile and pass tests. But note that Calor uses a **contract** (`§Q (!= b
 
 **Generated Calor:**
 ```calor
-§F{f001:NormalizeScore:pub}
+§F{NormalizeScore:pub}
   §I{i32:score}
   §I{i32:maxScore}
   §O{i32}

@@ -15,7 +15,7 @@
       "Output: <dir>/Shapes.calr"
     ],
     "stderr": [],
-    "calor": "§M{Shapes:overflow=unchecked}\n  §NS{_global:global}\n    §M{Shapes:pub}\n      §F{Area:pub} (i32:w, i32:h) -> i32\n        §B{Clamp:System.Func<i32,i32>} §LAM{v:i32}\n          §R (? (< v 0) 0 v)\n        §/LAM\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n}§/CSHARP\n\n\n\n"
+    "calor": "§M{Shapes:overflow=unchecked}\n  §NS{_global:global}\n    §M{Shapes:pub}\n      §F{Area:pub} (i32:w, i32:h) -> i32\n        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n}§/CSHARP\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Shapes.cs -o Shapes.calr --format json",
@@ -103,7 +103,7 @@
       "info:Calor1343:method",
       "warning:Calor1343:local-function"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Shapes:pub}\n      §F{Area:pub} (i32:w, i32:h) -> i32\n        §B{Clamp:System.Func<i32,i32>} §LAM{v:i32}\n          §R (? (< v 0) 0 v)\n        §/LAM\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n}§/CSHARP\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Shapes:pub}\n      §F{Area:pub} (i32:w, i32:h) -> i32\n        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n}§/CSHARP\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -136,6 +136,6 @@
       "info:Calor1343:method",
       "warning:Calor1343:local-function"
     ],
-    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Shapes:pub}\n      §F{Area:pub} (i32:w, i32:h) -> i32\n        §B{Clamp:System.Func<i32,i32>} §LAM{v:i32}\n          §R (? (< v 0) 0 v)\n        §/LAM\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n}§/CSHARP\n\n\n\n"
+    "calorSource": "§M{ConvertedModule:overflow=unchecked}\n  §NS{_global:global}\n    §M{Shapes:pub}\n      §F{Area:pub} (i32:w, i32:h) -> i32\n        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM\n        §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)\n\n      §CSHARP{\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n}§/CSHARP\n\n\n\n"
   }
 }

@@ -20,7 +20,7 @@ In traditional languages, you must read the entire implementation to know if a f
 Calor requires explicit effect declarations:
 
 ```calor
-§F{f001:SaveUser:pub}
+§F{SaveUser:pub}
   §I{User:user}
   §O{bool}
   §E{db:rw,net:rw}        // Declares: database and network operations
@@ -41,7 +41,7 @@ Now an agent knows immediately what side effects to expect.
 Place the effect declaration after the output type:
 
 ```calor
-§F{id:name:vis}
+§F{name:vis}
   §I{...}
   §O{...}
   §E{effects}             // Here
@@ -62,8 +62,8 @@ function's effect declaration. A `§E{...}` on the **same line** as a function
 type belongs to that callback, binding, field, property, or return value.
 
 ```calor
-§M{m001:Callbacks}
-  §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+§M{Callbacks}
+  §F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
     §E{cw}
     §R §C{transform} §A value §/C
 ```
@@ -79,24 +79,24 @@ permissions.
 ### Where a row can appear
 
 ```calor
-§M{m001:Rows}
-  §F{f001:Use:pub} (Func<i32,i32>:callback §E{cw}, i32:value) -> Func<i32,i32> §E{cw}
+§M{Rows}
+  §F{Use:pub} (Func<i32,i32>:callback §E{cw}, i32:value) -> Func<i32,i32> §E{cw}
     §E{cw}
     §B{saved:Func<i32,i32>} §E{cw} callback
-    §B{local} §LAM{lam1:x:i32} §E{cw}
+    §B{local} §LAM{x:i32} §E{cw}
       §P x
       §R x
-    §/LAM{lam1}
+    §/LAM
     §R callback
 
-  §DEL{d001:Handler}
+  §DEL{Handler}
     §I{i32:value}
     §O{void}
     §E{cw}
 
-  §CL{c001:Callbacks:pub}
+  §CL{Callbacks:pub}
     §FLD{Action<i32>:onChange:priv} §E{cw}
-    §PROP{p001:Current:Action<i32>:pub:get,set} §E{cw}
+    §PROP{Current:Action<i32>:pub:get,set} §E{cw}
 ```
 
 Rows are supported on:
@@ -117,8 +117,8 @@ passed to it. Declare an effect placeholder with `<eff name>` and use it in the
 callback and function rows:
 
 ```calor
-§M{m001:HigherOrder}
-  §F{f001:Twice:pub}<eff e> (Func<i32,i32>:callback §E{e}, i32:value) -> i32
+§M{HigherOrder}
+  §F{Twice:pub}<eff e> (Func<i32,i32>:callback §E{e}, i32:value) -> i32
     §E{e}
     §B{first:i32} §C{callback} §A value §/C
     §R §C{callback} §A first §/C
@@ -199,7 +199,7 @@ boundary.
 ### Pure Function (No Effects)
 
 ```calor
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -210,7 +210,7 @@ boundary.
 Or explicitly:
 
 ```calor
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -221,7 +221,7 @@ Or explicitly:
 ### Console Output
 
 ```calor
-§F{f001:Greet:pub}
+§F{Greet:pub}
   §I{str:name}
   §O{void}
   §E{cw}                  // Console write
@@ -231,7 +231,7 @@ Or explicitly:
 ### File Operations
 
 ```calor
-§F{f001:CopyFile:pub}
+§F{CopyFile:pub}
   §I{str:source}
   §I{str:dest}
   §O{bool}
@@ -242,7 +242,7 @@ Or explicitly:
 ### Network Call
 
 ```calor
-§F{f001:FetchData:pub}
+§F{FetchData:pub}
   §I{str:url}
   §O{str!str}
   §E{net:rw}              // Network operations
@@ -252,7 +252,7 @@ Or explicitly:
 ### Database with Logging
 
 ```calor
-§F{f001:CreateUser:pub}
+§F{CreateUser:pub}
   §I{User:user}
   §O{i32}
   §E{db:rw,cw}            // Database and console (for logging)
@@ -262,7 +262,7 @@ Or explicitly:
 ### Multiple Effects
 
 ```calor
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db:rw,net:rw,fs:w,cw} // Database, network, filesystem write, console write
@@ -277,14 +277,14 @@ Or explicitly:
 
 ```calor
 // Read-only file operation
-§F{f001:LoadConfig:pub}
+§F{LoadConfig:pub}
   §I{str:path}
   §O{Config}
   §E{fs:r}                // Only filesystem read
   // ...
 
 // Read-write file operation
-§F{f002:UpdateConfig:pub}
+§F{UpdateConfig:pub}
   §I{str:path}
   §I{Config:config}
   §O{void}
@@ -295,7 +295,7 @@ Or explicitly:
 ### Interactive Console
 
 ```calor
-§F{f001:Prompt:pub}
+§F{Prompt:pub}
   §I{str:question}
   §O{str}
   §E{cw,cr}               // Console write and read
@@ -318,7 +318,7 @@ Or explicitly:
 
 "This function should be pure, but it has effects":
 ```calor
-§F{f001:Calculate:pub}
+§F{Calculate:pub}
   §O{i32}
   §E{cw}                  // Wait, why is Calculate logging?
 ```
@@ -335,11 +335,11 @@ Or explicitly:
 
 ```calor
 // If f1 calls f2, f1's effects must include f2's effects
-§F{f001:ProcessAndSave:pub}
+§F{ProcessAndSave:pub}
   §E{db:rw,cw}            // Must include f002's effects
   §C{f002:Process} ... §/C
 
-§F{f002:Process:priv}
+§F{Process:priv}
   §E{cw}                  // Has console write effect
   // ...
 ```

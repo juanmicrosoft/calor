@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 9
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
 
 **Category:** Information Density
 **Static dashboard result:** C# scores higher (0.97x Calor/C# across 217 programs)
@@ -88,7 +89,7 @@ This single line conveys:
 
 **Calor equivalent:**
 ```calor
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -123,12 +124,12 @@ But C# has no equivalent, so it doesn't get penalized for missing this informati
 
 **Calor:**
 ```calor
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
+§M{FizzBuzz}
+  §F{Main:pub}
     §O{void}
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"

@@ -16,7 +16,7 @@ Calor provides loops and conditionals with explicit structure.
 ### For Loop Syntax
 
 ```
-§L{id:var:from:to:step}
+§L{var:from:to:step}
   // body
 ```
 
@@ -51,38 +51,38 @@ silently treated as snapshot ranges.
 
 **Count 1 to 10:**
 ```
-§L{for1:i:1:10:1}
+§L{i:1:10:1}
   §P i
 ```
 
 **Count down:**
 ```
-§L{for1:i:10:1:-1}
+§L{i:10:1:-1}
   §P i
 ```
 
 **Count by 2s:**
 ```
-§L{for1:i:0:100:2}
+§L{i:0:100:2}
   §P i
 ```
 
 **Using variable bounds:**
 ```
-§L{for1:i:1:n:1}
+§L{i:1:n:1}
   §P i
 ```
 
 **Using expressions:**
 ```
-§L{for1:i:0:(- n 1):1}
+§L{i:0:(- n 1):1}
   §P i
 ```
 
 ### While Loop Syntax
 
 ```
-§WH{id} condition
+§WH condition
   // body
 ```
 
@@ -96,7 +96,7 @@ silently treated as snapshot ranges.
 **Simple countdown:**
 ```
 §B{~i} 10
-§WH{while1} (> i 0)
+§WH (> i 0)
   §P i
   §ASSIGN i (- i 1)
 ```
@@ -104,18 +104,18 @@ silently treated as snapshot ranges.
 **Read until done:**
 ```
 §B{~running} true
-§WH{while1} running
+§WH running
   §B{input} §C{Console.ReadLine} §/C
-  §IF{if1} (== input "quit")
+  §IF (== input "quit")
     §ASSIGN running false
 ```
 
 ### Do-While Loop Syntax
 
 ```
-§DO{id}
+§DO
   // body (executes at least once)
-§/DO{id} (condition)
+§/DO (condition)
 ```
 
 | Part | Description |
@@ -127,36 +127,36 @@ The condition is placed at the end to match the semantics: the body always execu
 
 The loop variable must be declared MUTABLE (`§B{~name:type}`) and updated with `§ASSIGN` inside the body. Re-binding it with a second `§B` inside the loop shadows the outer one, which is `Calor0255` (C# forbids it, CS0136), and the condition on the closer would then reference a variable the generated code cannot see.
 
-`§/DO{id} (condition)` is **required**. It is retained — unlike the structural closers removed in Phase 4d — precisely because it carries the condition, and there is nowhere else to put it. The id must match the opening `§DO{id}`; a mismatch is reported as a mismatched-id error.
+`§/DO (condition)` is **required**. It is retained — unlike the structural closers removed in Phase 4d — precisely because it carries the condition, and there is nowhere else to put it. The id must match the opening `§DO`; a mismatch is reported as a mismatched-id error.
 
 ### Do-While Loop Examples
 
 **Execute at least once:**
 ```
 §B{~i} 0
-§DO{do1}
+§DO
   §P i
   §ASSIGN i (+ i 1)
-§/DO{do1} (< i INT:10)
+§/DO (< i INT:10)
 ```
 
 **Menu loop (always show menu first):**
 ```
 §B{~choice:i32} 0
-§DO{do1}
+§DO
   §P "1. Option A"
   §P "2. Option B"
   §P "3. Exit"
   §ASSIGN choice §C{ReadChoice} §/C
-§/DO{do1} (!= choice INT:3)
+§/DO (!= choice INT:3)
 ```
 
 **Retry until success:**
 ```
 §B{~success:bool} false
-§DO{do1}
+§DO
   §ASSIGN success §C{TryOperation} §/C
-§/DO{do1} (! success)
+§/DO (! success)
 ```
 
 ---
@@ -168,7 +168,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 ### Syntax
 
 ```
-§EACHKV{id:keyVar:valueVar} dictName
+§EACHKV{keyVar:valueVar} dictName
   // body uses keyVar and valueVar
 ```
 
@@ -187,7 +187,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
   §KV "alice" 30
   §KV "bob" 25
 
-§EACHKV{e1:name:age} ages
+§EACHKV{name:age} ages
   §P name
   §P age
 ```
@@ -195,14 +195,14 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 **Sum all values:**
 ```
 §B{~total} 0
-§EACHKV{e1:k:v} scores
+§EACHKV{k:v} scores
   §ASSIGN total (+ total v)
 ```
 
 **Conditional processing:**
 ```
-§EACHKV{e1:key:val} data
-  §IF{if1} (> val 100)
+§EACHKV{key:val} data
+  §IF (> val 100)
     §P key
 ```
 
@@ -210,9 +210,9 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 
 | Loop Type | Use Case |
 |:----------|:---------|
-| `§L{id:var:from:to:step}` | Numeric ranges |
+| `§L{var:from:to:step}` | Numeric ranges |
 | `§EACH{id:var} collection` | Lists, arrays, sets |
-| `§EACHKV{id:k:v} dict` | Dictionaries (key-value pairs) |
+| `§EACHKV{k:v} dict` | Dictionaries (key-value pairs) |
 
 ---
 
@@ -223,7 +223,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 For simple single-action branches:
 
 ```
-§IF{id} condition
+§IF condition
   action
 §EI condition
   action
@@ -236,7 +236,7 @@ For simple single-action branches:
 For complex branches:
 
 ```
-§IF{id} condition
+§IF condition
   // multiple statements
 §EI condition
   // multiple statements
@@ -252,7 +252,7 @@ For complex branches:
 | `condition` | Boolean expression |
 | `§EI` | Else-if (optional, can repeat) at same column as `§IF` |
 | `§EL` | Else (optional, at most one) at same column as `§IF` |
-| `§IF{id} cond` | Explicit ID form (optional, for tooling references) |
+| `§IF cond` | Explicit ID form (optional, for tooling references) |
 
 ---
 
@@ -261,14 +261,14 @@ For complex branches:
 ### Simple If
 
 ```
-§IF{if1} (> x 0)
+§IF (> x 0)
   §P "positive"
 ```
 
 ### If-Else
 
 ```
-§IF{if1} (> x 0)
+§IF (> x 0)
   §P "positive"
 §EL
   §P "not positive"
@@ -277,7 +277,7 @@ For complex branches:
 ### If-ElseIf-Else
 
 ```
-§IF{if1} (> x 0)
+§IF (> x 0)
   §P "positive"
 §EI (< x 0)
   §P "negative"
@@ -288,7 +288,7 @@ For complex branches:
 ### Single Line with Multiple Branches
 
 ```
-§IF{if1} (== (% i 15) 0)
+§IF (== (% i 15) 0)
   §P "FizzBuzz"
 §EI (== (% i 3) 0)
   §P "Fizz"
@@ -301,8 +301,8 @@ For complex branches:
 ### Nested Conditionals
 
 ```
-§IF{if1} (> x 0)
-  §IF{if2} (< x 100)
+§IF (> x 0)
+  §IF (< x 100)
     §P "between 0 and 100"
   §EL
     §P "100 or greater"
@@ -313,12 +313,12 @@ For complex branches:
 ## FizzBuzz Complete Example
 
 ```
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
+§M{FizzBuzz}
+  §F{Main:pub}
     §O{void}
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"
@@ -333,14 +333,14 @@ For complex branches:
 ## Loop with Conditional
 
 ```
-§M{m001:Example}
-  §F{f001:PrintEvens:pub}
+§M{Example}
+  §F{PrintEvens:pub}
     §I{i32:n}
     §O{void}
     §E{cw}
     §Q (> n 0)
-    §L{for1:i:1:n:1}
-      §IF{if1} (== (% i 2) 0)
+    §L{i:1:n:1}
+      §IF (== (% i 2) 0)
         §P i
 ```
 
@@ -351,11 +351,11 @@ For complex branches:
 Use conditionals with return for early exit:
 
 ```
-§F{f001:Factorial:pub}
+§F{Factorial:pub}
   §I{i32:n}
   §O{i32}
   §Q (>= n 0)
-  §IF{if1} (<= n 1)
+  §IF (<= n 1)
     §R 1
   §EL
     §R (* n §C{Factorial} §A (- n 1) §/C)
@@ -369,7 +369,7 @@ Use `§YIELD expression` to produce the next iterator value and `§YBRK` to stop
 iteration:
 
 ```
-§F{f001:Count:pub}
+§F{Count:pub}
   §O{i32}
   §YIELD 1
   §YIELD 2
@@ -403,7 +403,7 @@ Pattern matching provides concise multi-way branching with C# switch expression 
 ### Switch Expression Syntax
 
 ```
-§W{id} expression
+§W expression
   §K pattern1
     §R result1
   §K pattern2
@@ -420,14 +420,14 @@ Pattern matching provides concise multi-way branching with C# switch expression 
 | `pattern` | Pattern to match |
 | `→` | Arrow to result (single expression) |
 | `_` | Wildcard (matches anything) |
-| `§W{id} expr` | Explicit ID form (optional) |
+| `§W expr` | Explicit ID form (optional) |
 
 ### Literal Patterns
 
 Match exact values:
 
 ```
-§B{day} §W{sw1} dayNum
+§B{day} §W dayNum
   §K 0 → "Sunday"
   §K 1 → "Monday"
   §K 2 → "Tuesday"
@@ -447,7 +447,7 @@ Match value ranges using relational operators:
 
 **Example - Grade calculation:**
 ```
-§B{grade} §W{sw1} score
+§B{grade} §W score
   §K §PREL{gte} 90 → "A"
   §K §PREL{gte} 80 → "B"
   §K §PREL{gte} 70 → "C"
@@ -460,7 +460,7 @@ Match value ranges using relational operators:
 Capture the matched value and add conditions:
 
 ```
-§B{desc} §W{sw1} value
+§B{desc} §W value
   §K §VAR{n} §WHEN (> n 100) → "large positive"
   §K §VAR{n} §WHEN (> n 0) → "small positive"
   §K 0 → "zero"
@@ -485,7 +485,7 @@ Use a statement-position match for cases with multiple statements. Indentation
 delimits each block:
 
 ```
-§W{sw1} x
+§W x
   §K 1
     §R "one"
   §K 2
@@ -495,7 +495,7 @@ delimits each block:
     §R "other"
 ```
 
-An expression-position match, such as `§R §W{sw1} x` or a binding initializer,
+An expression-position match, such as `§R §W x` or a binding initializer,
 supports arrow arms and blocks containing exactly one `§R value`. Other block
 shapes produce the fatal diagnostic `Calor1006`: the compiler does not discard
 statements or substitute `default`. This restriction also applies inside lambdas
@@ -504,11 +504,11 @@ and when optional type checking is disabled.
 ### Complete Example
 
 ```
-§M{m001:HttpStatus}
-  §F{f001:GetStatusMessage:pub}
+§M{HttpStatus}
+  §F{GetStatusMessage:pub}
     §I{i32:code}
     §O{str}
-    §R §W{sw1} code
+    §R §W code
       §K 200 → "OK"
       §K 201 → "Created"
       §K 400 → "Bad Request"

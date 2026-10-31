@@ -143,18 +143,18 @@ The current output keeps the ordinary class and its static members:
 
 {/* w1-transcript: W1-F6-rescue */}
 ```calor
-§M{m001:Counter:overflow=unchecked}
-  §NS{ns_global:_global:global}
-    §CL{c001:Counter:pub}
+§M{Counter:overflow=unchecked}
+  §NS{_global:global}
+    §CL{Counter:pub}
       §FLD{i32:count:priv:stat}
 
-      §PROP{p002:Count:i32:priv:stat}
+      §PROP{Count:i32:priv:stat}
         §GET{priv}
           §R count
         §SET{priv}
           §ASSIGN count value
 
-      §MT{m003:Next:pub} () -> i32
+      §MT{Next:pub} () -> i32
         §ASSIGN Count (+ Count 1)
         §R Count
 ```
@@ -230,14 +230,14 @@ transcripts behind each example.
 
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
-| `namespace` | `§M{id:Name}` module |
-| `class` | `§CL{id:Name:vis}` class |
-| class `method` | `§MT{id:Name:vis}` method |
-| `property` | `§PROP{id:Name:vis:type}` property |
-| `field` | `§FLD{id:type:name}` field |
-| `if/else if/else` | `§IF{id}` / `§EI` / `§EL` branches (end at dedent) |
-| `for` loop | `§L{id:var:from:to:step}` |
-| `while` loop | `§WH{id}` |
+| `namespace` | `§M{Name}` module |
+| `class` | `§CL{Name:vis}` class |
+| class `method` | `§MT{Name:vis}` method |
+| `property` | `§PROP{Name:vis:type}` property |
+| `field` | `§FLD{type:name}` field |
+| `if/else if/else` | `§IF` / `§EI` / `§EL` branches (end at dedent) |
+| `for` loop | `§L{var:from:to:step}` |
+| `while` loop | `§WH` |
 
 ### Local Functions
 
@@ -254,9 +254,9 @@ Since 0.25 (#847), a C# local function converts natively when it is in this slic
   initializer, `return` value or simple assignment value. Other uses, such as an array
   element, keep the member as C#.
 
-It becomes a nested `§F` in the same method, and the compiler emits it back as a C#
-`static` local function in the same place. So a call keeps naming the local function,
-even when the class has a method with the same name. Converted output compiles with
+It becomes a typed delegate binding with a static `§LAM` in the same method.
+The binding preserves local name shadowing, even when the class has a method
+with the same name. Converted output compiles with
 default options; `--permissive-effects` is not needed for these members.
 
 ```csharp
@@ -275,15 +275,15 @@ public static class Probe
 converts to:
 
 ```calor
-§M{m001:Probe}
-  §M{c001:Probe:pub}
-    §F{m002:Add:pub} (i32:x) -> i32
-      §R (+ x 1000)
+§M{Probe:overflow=unchecked}
+  §NS{_global:global}
+    §M{Probe:pub}
+      §F{Add:pub} (i32:x) -> i32
+        §R (+ x 1000)
 
-    §F{m003:UseShadow:pub} () -> i32
-      §F{f001:Add} (i32:x) -> i32
-        §R (+ x 1)
-      §R §C{Add} 2
+      §F{UseShadow:pub} () -> i32
+        §B{Add:System.Func<i32, i32>} §LAM{static:x:i32} (+ x 1) §/LAM
+        §R §C{Add} 2
 ```
 
 If a member has any local function outside the slice (capturing, generic, async,
@@ -317,9 +317,9 @@ public IEnumerable<int> Steps
 converts to:
 
 ```calor
-§M{m001:Countdown}
+§M{Countdown}
   §U{System.Collections.Generic}
-  §CL{c001:Countdown:pub}
+  §CL{Countdown:pub}
     §FLD{i32:Start:pub} = 3
 
     §CSHARP{
@@ -351,18 +351,18 @@ the getter return its result. Calling an iterator method also defers the work, s
 the timing is the same:
 
 ```calor
-§M{m001:Countdown}
+§M{Countdown}
   §U{System.Collections.Generic}
-  §CL{c001:Countdown:pub}
+  §CL{Countdown:pub}
     §FLD{i32:Start:pub} = 3
 
-    §PROP{p001:Steps:Seq<i32>:pub}
+    §PROP{Steps:Seq<i32>:pub}
       §GET{pub}
         §R §C{CountDown}
 
-    §MT{m002:CountDown:priv} () -> Seq<i32>
+    §MT{CountDown:priv} () -> Seq<i32>
       §E{}
-      §L{for1:i:Start:1:-1}
+      §L{i:Start:1:-1}
         §YIELD i
 ```
 
@@ -480,30 +480,30 @@ public static class Grid
 converts to:
 
 ```calor
-§M{m001:Grids}
-  §M{c001:Grid:pub}
-    §F{m002:Pick:pub} (bool:wide, i32:v) -> i32[,]
+§M{Grids}
+  §M{Grid:pub}
+    §F{Pick:pub} (bool:wide, i32:v) -> i32[,]
       §E{alloc}
-      §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}
+      §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D
 
-    §F{m007:Sum:pub} (i32[]:xs, i32:start) -> i32
+    §F{Sum:pub} (i32[]:xs, i32:start) -> i32
       §B{~s:i32} start
-      §EACH{each008:x:var} xs
+      §EACH{x:var} xs
         §ASSIGN s (+ s x)
       §R s
 
-    §F{m009:Total:pub} (i32:v) -> i32
+    §F{Total:pub} (i32:v) -> i32
       §E{alloc}
-      §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+      §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
 ```
 
 Three forms make this work:
 
 - **Inline `§ARR2D`.** In expression position the array is written on one line and
-  ends with `§/ARR2D{id}`, the same way `§ARR` already did. An object initializer
+  ends with `§/ARR2D`, the same way `§ARR` already did. An object initializer
   used as an element stays on its `§ROW` line (`§NEW{Cell} V = v §/NEW`). The
   converter no longer moves it into a temporary variable ahead of the statement.
-- **Rank 3 and up.** `§ARR2D{id:id:i32:2:1:2}` followed by `§ROW` lines gives the
+- **Rank 3 and up.** `§ARR2D{i32:2:1:2}` followed by `§ROW` lines gives the
   shape. The rows are the innermost vectors in row-major order. A row count that
   does not match the shape is a C# compile error, never padded or cut.
 - **Grouped element access.** `(§IDX2D g 0 1).V` reads a member of an element.

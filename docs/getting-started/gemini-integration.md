@@ -152,7 +152,7 @@ The Calor skills teach Gemini:
 
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
-- Conditional statements: `§IF{id} condition` with an indented body
+- Conditional statements: `§IF condition` with an indented body
 - Type system: `i32`, `f64`, `str`, `bool`, nullable types (`?str`), arrays
 
 ### Best Practices
@@ -200,13 +200,13 @@ that n >= 0 and postcondition that result >= 1
 
 **Expected Response:**
 ```
-§M{m001:Math}
-  §F{f001:Factorial:pub}
+§M{Math}
+  §F{Factorial:pub}
     §I{i32:n}
     §O{i32}
     §Q (>= n 0)
     §S (>= result 1)
-    §IF{if1} (<= n 1)
+    §IF (<= n 1)
       §R 1
     §EL
       §R (* n §C{Factorial} §A (- n 1) §/C)
@@ -230,7 +230,7 @@ Create a PaymentService class with:
 ```
 Is there a bug in this Calor code?
 
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}

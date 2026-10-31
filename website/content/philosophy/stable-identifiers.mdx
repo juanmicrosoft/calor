@@ -4,125 +4,79 @@ section: "philosophy"
 order: 3
 ---
 
-Calor can embed an identifier in a structural declaration so tools can target
-that declaration independently of its name or file location. In current syntax,
-source IDs are **optional**: the parser creates an in-memory `_auto` ID when an
-opener omits one.
+Calor separates a declaration's **name** from its **identity**. Names belong in
+source. Persistent identities belong in the tooling-maintained per-project
+sidecar, `.calor/ids.json`.
 
 ```calor
-// Compact source: the parser supplies an in-memory ID
 §M{Calculator}
   §F{Calculate:pub} (i32:x) -> i32
     §E{}
     §R (* x 2)
-
-// Explicit source identity for durable external references
-§M{m_3hj8x2bw9pkq:Calculator}
-  §F{f_7k9m2npqrstv:Calculate:pub} (i32:x) -> i32
-    §E{}
-    §R (* x 2)
 ```
 
-Explicit IDs are useful when an agent, index, generated artifact, or review
-packet needs a durable target. They are not magic history: a rename or file move
-keeps the identity only if the editing tool preserves the ID, and a copied or
-extracted declaration must receive a new one.
+There is no optional ID-first source form. Agents edit the program, not identity
+fields. Build and project tools synchronize active compilation inputs
+automatically. Commit the sidecar alongside the source.
 
----
-
-## What Explicit IDs Solve
-
-Names and locations are fragile references:
+## Why names and locations are not enough
 
 | Reference | Failure mode |
 |:----------|:-------------|
 | File and line | Earlier edits move the line |
 | Declaration name | Renames and overloads make it stale or ambiguous |
-| Content hash | Any implementation edit changes it |
-| Preserved Calor ID | Remains stable across rename, move, and body edits |
+| Content hash | A body edit changes it |
+| Preserved declaration ID | Identifies the same declaration after a supported rename, move, or body edit |
 
-That makes explicit IDs helpful for precise edits, navigation indexes, and
-round-trip metadata. Collision checks make accidental reuse visible, but IDs do
-not eliminate ordinary textual merge conflicts when two branches edit the same
-lines.
+These IDs let navigation, refactoring, diagnostics, and verification refer to
+the same declaration without adding bookkeeping to every source header.
 
----
+## Preserve identity; do not guess it
 
-## Optional and Explicit Forms
+| Operation | Identity behavior |
+|:----------|:------------------|
+| Reformat or change a body | Preserve the declaration's identity |
+| Rename or move through a supported refactoring tool | Carry the exact identity with the edit |
+| Add, copy, or extract a declaration | Create a new identity |
+| Make plain-text edits | Synchronize and preserve only unambiguous matches |
+| Make several indistinguishable changes | Refuse reconciliation until the ambiguity is resolved |
 
-Structural openers accept either their compact name-first form or an explicit
-ID-first form. Indentation ends the block; structural closer tags were removed
-and now produce `Calor0830`.
+For example, two renamed overloads can look equally plausible to a matcher.
+Choosing whichever appears first would silently redirect old references.
+Calor rejects that ambiguity instead. Transactional refactoring can supply an
+explicit old-to-new mapping when plain-text reconciliation cannot.
 
-| Operation | Explicit ID behavior |
-|:----------|:---------------------|
-| Rename declaration | Preserve the existing ID |
-| Move declaration or file | Preserve the existing ID |
-| Reformat or change the body | Preserve the existing ID |
-| Extract a helper | Give the helper a new ID |
-| Copy or clone a declaration | Give the copy a new ID |
+In-memory parsing does not mint persisted project identities. Snapshot-local
+handles for unsaved declarations, locals, or lambdas are not durable sidecar IDs.
+Do not store them as long-lived external references.
 
-Omitting IDs is the simplest authoring style. Materialize explicit IDs when the
-repository needs persistent cross-tool identity:
+## Transactions and merges
 
-```bash
-# Preview and then assign IDs to compact declarations
-calor ids assign src/ --dry-run
-calor ids assign src/
+Identity-aware writes journal the source and sidecar update together. After a
+crash, synchronization can recover the pending transaction. If an external edit
+conflicts with recovery, it stops instead of overwriting that edit.
 
-# Validate formats, prefixes, duplicates, and production/test policy
-calor ids check src/
-```
+Independent branch additions can merge without replacing existing identities.
+Conflicting edits to one identity are not resolved by assigning new IDs or
+choosing one side arbitrarily. Review and resolve the conflict explicitly.
 
----
+LSP rename returns source and sidecar changes in one client-applied
+`WorkspaceEdit`. It requires transactional text-edit support and saved source
+buffers. This is not a filesystem compare-and-swap guarantee against unrelated
+writers.
 
-## ID Formats
-
-New IDs use a kind prefix plus a 12-character lowercase Crockford Base32
-payload. Legacy 26-character uppercase ULID payloads remain accepted for
-backward compatibility.
-
-| Kind | Compact example | Legacy accepted example |
-|:-----|:----------------|:------------------------|
-| Module | `m_3hj8x2bw9pkq` | `m_01J5X7K9M2NPQRSTABWXYZ12` |
-| Function | `f_7k9m2npqrstv` | `f_01J5X7K9M2NPQRSTABWXYZ12` |
-| Class | `c_z4w7n5q2gxht` | `c_01J5X7K9M2NPQRSTABWXYZ12` |
-| Interface | `i_9p3hxq7m4nbk` | `i_01J5X7K9M2NPQRSTABWXYZ12` |
-| Method | `mt_5v8b3kxq2nhp` | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
-
-Short IDs such as `m001` and `f001` are for `tests/`, `docs/`, and
-`examples/` (or an explicit `--allow-test-ids` workflow), not production
-source.
-
-To migrate legacy ULID payloads without changing their mapped identity:
+## Inspect or recover a project
 
 ```bash
-calor fix src/ --compact-ids --log compact-ids.json
-calor fix src/ --compact-ids --revert --log compact-ids.json
+calor ids sync .
+calor ids check .
+calor ids index src/Calculator.calr --output declaration-index.json
 ```
 
-The migration is reversible only while its log is available.
+Directory arguments operate on registered inputs, not every `.calr` file in the
+repository. Historical benchmark and experiment originals remain separate from
+active compilation inputs and retain their original bytes.
 
----
-
-## Tooling
-
-```bash
-calor ids check src/                         # text validation
-calor ids check src/ --format json           # schema 2.0 envelope
-calor ids assign src/ --fix-duplicates       # keep first, reassign repeats
-calor ids index src/ --output calor.ids.json # declaration index
-```
-
-Keep ID-preservation rules in agent instructions and run `ids check` in CI.
-The compiler catches malformed, wrongly prefixed, duplicated, and disallowed
-test IDs; repository history or an edit hook is needed to detect that a valid ID
-was deliberately replaced with another valid ID.
-
----
-
-## Next
-
-- [CLI Reference: ids](/docs/cli/ids/) - Validate, assign, and index IDs
-- [CLI Reference: fix](/docs/cli/fix/) - Run reversible ID migrations
-- [Tradeoffs](/docs/philosophy/tradeoffs/) - Where explicit identity helps and what it costs
+See the [`ids` command reference](/docs/cli/ids/) for explicit registration,
+validation, and index export. The source-rewriting `ids assign` command is
+removed.

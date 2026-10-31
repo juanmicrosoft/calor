@@ -44,10 +44,10 @@ foreach (var value in new[] { 46340, 46341 })
   for (const page of ['philosophy/static-verification', 'benchmarking/metrics/contract-verification']) {
     const doc = (await readFile(`content/${page}.mdx`, 'utf8')).replace(/\r/g, '');
     const example = [...doc.matchAll(/```calor\n([\s\S]*?)```/g)]
-      .map(match => match[1]).find(source => /^§F\{[^}\n]*:Square:/.test(source));
+      .map(match => match[1]).find(source => /^§F\{Square:/.test(source));
     assert.ok(example, `Missing published Square example in ${page}`);
     await writeFile(path.join(workspace, 'Snippet.calr'),
-      `§M{m1:DocsSquare}\n${example.trimEnd().split('\n').map(line => `  ${line}`).join('\n')}\n`);
+      `§M{DocsSquare}\n${example.trimEnd().split('\n').map(line => `  ${line}`).join('\n')}\n`);
     for (const mode of ['debug', 'off']) {
       for (const verify of [false, true]) {
         run([compiler, '--input', 'Snippet.calr', '--output', 'Snippet.g.cs',
@@ -69,7 +69,9 @@ foreach (var value in new[] { 46340, 46341 })
   console.log('Published Square examples trap in debug/off with verification on/off; converted C# preserves unchecked results.');
 
   const comparison = await readFile('src/components/landing/CodeComparison.tsx', 'utf8');
-  const calorFragment = comparison.match(/const calorCode = `([\s\S]*?)`;/)?.[1];
+  assert.match(comparison, /const calorCode = landingSnippets\.comparison\.code;/);
+  const snippets = JSON.parse(await readFile('src/components/landing/snippets.json', 'utf8'));
+  const calorFragment = snippets.comparison.code;
   const csharpFragment = comparison.match(/const csharpCode = `([\s\S]*?)`;/)?.[1];
   assert.ok(calorFragment && csharpFragment, 'Missing homepage comparison fragments');
   await writeFile(path.join(workspace, 'Program.cs'), `

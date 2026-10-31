@@ -213,14 +213,14 @@ missing `#r` or `#load` targets are errors rather than silently accepted.
 
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
-| `namespace` | `§M{id:Name}` module |
-| `class` | `§CL{id:Name:vis}` class |
-| `method` | `§F{id:Name:vis}` function |
-| `property` | `§PROP{id:Name:vis:type}` property |
+| `namespace` | `§M{Name}` module |
+| `class` | `§CL{Name:vis}` class |
+| `method` | `§F{Name:vis}` function |
+| `property` | `§PROP{Name:vis:type}` property |
 | `field` | `§FLD{id:type:name}` field |
-| `if/else if/else` | `§IF{id}` / `§EI` / `§EL` branches (end at dedent) |
-| `for` loop | `§L{id:var:from:to:step}` |
-| `while` loop | `§WH{id}` |
+| `if/else if/else` | `§IF` / `§EI` / `§EL` branches (end at dedent) |
+| `for` loop | `§L{var:from:to:step}` |
+| `while` loop | `§WH` |
 | `try/catch` | Native exception handling with `§TR` / `§CA` |
 | `?.`, `??` | Nullable references and null-conditional / null-coalescing expressions |
 

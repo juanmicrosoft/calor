@@ -21,7 +21,7 @@ arithmetic. See
 When you write contracts in Calor:
 
 ```calor
-§F{f001:Square:pub} (i32:x) -> i32
+§F{Square:pub} (i32:x) -> i32
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
@@ -249,7 +249,7 @@ In Calor, you declare the contract and request Z3 verification with `--verify`.
 This floating-point example reports `unsupported`, which is an honest result:
 
 ```calor
-§F{f001:Sqrt}(x: f64) -> f64
+§F{Sqrt}(x: f64) -> f64
   §Q (>= x 0.0)
   §S (>= result 0.0)
   §R (* x x)

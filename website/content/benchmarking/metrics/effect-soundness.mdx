@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 11
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
 
 **Feature:** Compiler-enforced effect declarations
 **Related metric:** [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/) (measures side effect management quality)
@@ -75,7 +76,7 @@ error Calor0410: Function 'ProcessOrder' uses effect 'network'
 A function declared with only database effects:
 
 ```calor
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db:rw}                    // Declares: only database effects
@@ -105,7 +106,7 @@ To fix, either:
 ### Hidden Network Calls
 
 ```calor
-§F{f001:Calculate:pub}
+§F{Calculate:pub}
   §O{i32}
   §E{}                         // Claims to be pure
 
@@ -116,7 +117,7 @@ To fix, either:
 ### Undeclared Database Writes
 
 ```calor
-§F{f001:GetUser:pub}
+§F{GetUser:pub}
   §I{i32:id}
   §O{User}
   §E{db:r}                     // Claims read-only
@@ -129,7 +130,7 @@ To fix, either:
 ### Logging in "Pure" Functions
 
 ```calor
-§F{f001:ValidateEmail:pub}
+§F{ValidateEmail:pub}
   §I{str:email}
   §O{bool}
   §E{}                         // Claims no effects
@@ -146,14 +147,14 @@ Callers must include all effects of their callees:
 
 ```calor
 // Callee has console write effect
-§F{f002:LogMessage:priv}
+§F{LogMessage:priv}
   §I{str:msg}
   §O{void}
   §E{cw}
   §P msg
 
 // Caller MUST include cw effect
-§F{f001:ProcessAndLog:pub}
+§F{ProcessAndLog:pub}
   §I{Data:data}
   §O{void}
   §E{db:rw,cw}                 // Must include cw because we call LogMessage
@@ -228,7 +229,7 @@ public async Task<User> GetUser(int id)
 ### Calor Equivalent
 
 ```calor
-§F{f001:GetUser:pub}
+§F{GetUser:pub}
   §I{i32:id}
   §O{User}
   §E{db:r,cw,net:rw}           // EXPLICIT: database read, console, network

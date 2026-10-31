@@ -59,7 +59,7 @@ Claude can verify your contracts are correct:
 ```
 You: Does this function have any contract violations?
 
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -218,9 +218,9 @@ if (x > 0) {
 
 Calor code:
 ```calor
-§IF{if1} (> x 0)
-  §L{for1:i:0:n:1}
-    §IF{if2} (> y 0)
+§IF (> x 0)
+  §L{i:0:n:1}
+    §IF (> y 0)
       // ...
 ```
 
@@ -232,10 +232,10 @@ Tell Claude: "Change the loop `for1` to start at 1 instead of 0"
 
 ```calor
 // Before
-§L{for1:i:0:n:1}
+§L{i:0:n:1}
 
 // After
-§L{for1:i:1:n:1}
+§L{i:1:n:1}
 ```
 
 The ID `for1` uniquely identifies the target. No confusion with other loops.
@@ -243,7 +243,7 @@ The ID `for1` uniquely identifies the target. No confusion with other loops.
 ### 3. Explicit Contracts for Verification
 
 ```calor
-§F{f001:CalculateInterest:pub}
+§F{CalculateInterest:pub}
   §I{f64:principal}
   §I{f64:rate}
   §I{i32:years}
@@ -263,7 +263,7 @@ Claude can verify:
 ### 4. Effects for Side Effect Analysis
 
 ```calor
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db,net,cw}
@@ -291,13 +291,13 @@ and postcondition that result >= 1
 
 **Claude generates:**
 ```calor
-§M{m001:Math}
-  §F{f001:Factorial:pub}
+§M{Math}
+  §F{Factorial:pub}
     §I{i32:n}
     §O{i32}
     §Q (>= n 0)
     §S (>= result 1)
-    §IF{if1} (<= n 1)
+    §IF (<= n 1)
       §R 1
     §EL
       §R (* n §C{Factorial} §A (- n 1) §/C)
@@ -309,7 +309,7 @@ and postcondition that result >= 1
 ```
 Is there a bug in this code?
 
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -331,7 +331,7 @@ Otherwise division by zero is possible.
 ```
 Refactor this to extract the calculation into a separate function:
 
-§F{f001:Main:pub}
+§F{Main:pub}
   §O{void}
   §E{cw}
   §B{x} (* 5 5)
@@ -340,12 +340,12 @@ Refactor this to extract the calculation into a separate function:
 
 **Claude generates:**
 ```calor
-§F{f001:Square:priv}
+§F{Square:priv}
   §I{i32:n}
   §O{i32}
   §R (* n n)
 
-§F{f002:Main:pub}
+§F{Main:pub}
   §O{void}
   §E{cw}
   §B{x} §C{Square} §A 5 §/C
@@ -387,12 +387,13 @@ Convert src/Services/PaymentService.cs to Calor
 
 ### Refactoring Calor
 
-Reference specific elements by their IDs for precise edits:
+Use declaration names for an unambiguous request, or obtain persistent IDs from
+`calor ids index`. Identity-aware tools update source and `.calor/ids.json` together:
 
 ```
 In PaymentService.calr:
-- Extract the validation logic from f002 into a new private function
-- Add a postcondition to f001 ensuring the result is positive
+- Extract the validation logic from ValidatePayment into a new private function
+- Add a postcondition to CalculateTotal ensuring the result is positive
 ```
 
 ---

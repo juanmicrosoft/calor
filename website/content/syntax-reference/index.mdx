@@ -38,8 +38,8 @@ for current forms and complete examples checked by the compiler.
 | Ensures | `§S expr` | `§S (>= result 0)` |
 | For Loop | `§L{var:from:to:step}` | `§L{i:1:100:1}` |
 | While Loop | `§WH condition` | `§WH (> i 0)` |
-| Do-While Loop | `§DO{id}` (body indented) | `§DO{do1}` then `§/DO{do1} cond` |
-| If/ElseIf/Else | `§IF{id} cond` then `§EI` / `§EL` at same column | `§IF{if1} (> x 0)` |
+| Do-While Loop | `§DO` (body indented) | `§DO` then `§/DO cond` |
+| If/ElseIf/Else | `§IF cond` then `§EI` / `§EL` at same column | `§IF (> x 0)` |
 | Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
 | Print | `§P expr` | `§P "Hello"` |
@@ -47,17 +47,17 @@ for current forms and complete examples checked by the compiler.
 | Binding | `§B{name} expr` | `§B{x} (+ 1 2)` |
 | Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
 | Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
-| List | `§LIST{id:type}` | `§LIST{nums:i32}` |
-| Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
-| HashSet | `§HSET{id:type}` | `§HSET{tags:str}` |
+| List binding | `§LIST{name:type}` | `§LIST{nums:i32}` |
+| Dictionary binding | `§DICT{name:kType:vType}` | `§DICT{ages:str:i32}` |
+| HashSet binding | `§HSET{name:type}` | `§HSET{tags:str}` |
 | Key-Value | `§KV key value` | `§KV "alice" 30` |
 | Push | `§PUSH{coll} value` | `§PUSH{nums} 5` |
 | Put | `§PUT{dict} key value` | `§PUT{ages} "bob" 25` |
 | Set Index | `§SETIDX{list} idx val` | `§SETIDX{nums} 0 10` |
 | Contains | `§HAS{coll} value` | `§HAS{nums} 5` |
 | Count | `§CNT{coll}` | `§CNT{nums}` |
-| Dict Foreach | `§EACHKV{id:k:v} dict` | `§EACHKV{e1:k:v} ages` |
-| Switch | `§W{id} expr` | `§W{sw1} score` |
+| Dict Foreach | `§EACHKV{k:v} dict` | `§EACHKV{k:v} ages` |
+| Switch | `§W expr` | `§W score` |
 | Case | `§K pattern → result` | `§K 200 → "OK"` |
 | Wildcard | `§K _` | `§K _ → "default"` |
 | Relational | `§PREL{op} value` | `§PREL{gte} 90` |
@@ -113,16 +113,15 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 
 ## ID Conventions
 
-Stable IDs are **optional** on structural openers and are auto-assigned
-by the parser when omitted. Provide an explicit ID only when you want
-to reference the element from external tooling (e.g. `calor navigate`).
+Declaration IDs never appear in source. Tools maintain persistent identities in
+the project's `.calor/ids.json` sidecar and synchronize active compilation inputs.
+Use supported rename and move tools to carry exact identity across refactoring.
+Plain-text reconciliation refuses ambiguous matches.
 
-| Element | Auto-assigned form | Explicit form |
-|:--------|:-------------------|:--------------|
-| Modules | `§M{Calculator}` | `§M{m001:Calculator}` |
-| Functions | `§F{Add:pub}` | `§F{f001:Add:pub}` |
-| Loops | `§L{i:1:10:1}` | `§L{for1:i:1:10:1}` |
-| Conditionals | none: an `§IF` statement always needs an ID | `§IF{if1} cond` |
+Names such as `nums` in a standalone list binding are program identifiers, not
+identity fields. Collection expressions use type-only headers, for example
+`§B{nums:List<i32>} §LIST{i32} 1 2`.
+See [Stable Identifiers](/docs/philosophy/stable-identifiers/).
 
 ---
 
@@ -134,7 +133,7 @@ to reference the element from external tooling (e.g. `calor navigate`).
     §O{void}
     §E{cw}
     §L{i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"

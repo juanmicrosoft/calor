@@ -88,7 +88,7 @@ This single line conveys:
 
 **Calor equivalent:**
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -121,12 +121,12 @@ But C# has no equivalent, so it doesn't get penalized for missing this informati
 
 **Calor:**
 ```
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
+§M{FizzBuzz}
+  §F{Main:pub}
     §O{void}
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"

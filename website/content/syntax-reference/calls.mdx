@@ -62,7 +62,7 @@ arguments use form (3) or (4).
    argument. Without this rule, a `§IF` / `§W` / `§NEW` on the next
    line at the same indent would be silently absorbed as the argument
    (because each of those tokens is also an expression-start). Writing
-   `§C{Foo}` on one line and `§IF{c} ... §EL → ...` on the next always
+   `§C{Foo}` on one line and `§IF ... §EL → ...` on the next always
    parses as two siblings — zero-arg call, then a separate `§IF`.
 7. **Both `§/C` and abbreviated `§/C{id}` are still accepted** for
    forms (1), (2), (3), and (4) — no source file needs to be rewritten.
@@ -163,7 +163,7 @@ For complete nullable-input examples, see
 ### Statement context
 
 ```calor
-§F{f1:Greet:pub} (str:name) -> void
+§F{Greet:pub} (str:name) -> void
   §E{cw}
 
   §C{Console.WriteLine} (concat "Hello, " name)   // implicit close
@@ -172,7 +172,7 @@ For complete nullable-input examples, see
 ### Expression context — zero-arg
 
 ```calor
-§F{f1:Count:pub} () -> i32
+§F{Count:pub} () -> i32
 
   §B{n:i32} §C{items.Count}            // zero-arg, implicit close
   §R n
@@ -181,7 +181,7 @@ For complete nullable-input examples, see
 ### Expression context — one inline arg
 
 ```calor
-§F{f1:Doubled:pub} (i32:x) -> i32
+§F{Doubled:pub} (i32:x) -> i32
 
   §B{y:i32} §C{Math.Abs} x             // one inline arg, implicit close
   §R (* y 2)
@@ -190,7 +190,7 @@ For complete nullable-input examples, see
 ### Expression context — two or more args (explicit form)
 
 ```calor
-§F{f1:Clamp:pub} (i32:x) -> i32
+§F{Clamp:pub} (i32:x) -> i32
 
   §B{lo:i32} INT:0
   §B{hi:i32} INT:100
@@ -217,23 +217,23 @@ argument by reference. Mark the argument with the same modifier: `§A{ref} x`,
 (`Bump(ref count)`), never a copy, so the callee's writes are visible to the caller.
 
 ```calor
-§M{m001:RefOutDemo}
-  §F{f001:Bump:pub} (i32:x:ref) -> void
+§M{RefOutDemo}
+  §F{Bump:pub} (i32:x:ref) -> void
     §ASSIGN x (+ x 1)
 
-  §F{f002:Twice:pub} (i32:x:in) -> i32
+  §F{Twice:pub} (i32:x:in) -> i32
     §R (* x 2)
 
-  §F{f003:ParseOr:pub} (str:text, i32:fallback) -> i32
+  §F{ParseOr:pub} (str:text, i32:fallback) -> i32
     §B{~n:i32} 0
-    §IF{if1} §C{Int32.TryParse} §A text §A{out} n §/C
+    §IF §C{Int32.TryParse} §A text §A{out} n §/C
       §R n
     §R fallback
 
-  §F{f004:IsNumber:pub} (str:text) -> bool
+  §F{IsNumber:pub} (str:text) -> bool
     §R §C{Int32.TryParse} §A text §A{out} _ §/C
 
-  §F{f005:Main:pub} () -> i32
+  §F{Main:pub} () -> i32
     §B{~count:i32} 1
     §C{Bump} §A{ref} count §/C
     §B{doubled:i32} §C{Twice} §A{in} count §/C
@@ -271,11 +271,11 @@ lambda, stay C#. Give a hand-written binding an initial value too, because a bar
 for the converter's full list.
 
 ```calor expect=Calor0212
-§M{m001:RefOutRejected}
-  §F{f001:Bump:pub} (i32:x:ref) -> void
+§M{RefOutRejected}
+  §F{Bump:pub} (i32:x:ref) -> void
     §ASSIGN x (+ x 1)
 
-  §F{f002:Main:pub} () -> i32
+  §F{Main:pub} () -> i32
     §B{~v:i32} 1
     §C{Bump} §A{ref} (+ v 1) §/C
     §R v

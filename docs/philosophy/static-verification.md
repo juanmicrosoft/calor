@@ -17,11 +17,11 @@ Every contract in Calor gets a runtime check. But with Z3, the compiler can go f
 Consider a function with multiple code paths:
 
 ```calor
-§F{f004:ClampPositive:pub}
+§F{ClampPositive:pub}
   §I{i32:x}
   §O{i32}
   §S (>= result 0)
-  §IF{if001} (< x 0)
+  §IF (< x 0)
     §R 0
     §ELSE{if001}
     §R x
@@ -36,7 +36,7 @@ Z3 proves the postcondition holds on all paths. The runtime check is elided.
 For simpler cases, verification is even more straightforward:
 
 ```calor
-§F{f001:Square:pub}
+§F{Square:pub}
   §I{i32:x}
   §O{i32}
   §Q (>= x 0)
@@ -76,7 +76,7 @@ Z3 couldn't determine if the contract always holds (timeout, complexity limit, o
 Z3 found a counterexample showing the contract can be violated. A warning is emitted with the counterexample, and the runtime check is preserved.
 
 ```calor
-§F{f005:BadDecrement:pub}
+§F{BadDecrement:pub}
   §I{i32:x}
   §O{i32}
   §S (>= result 0)

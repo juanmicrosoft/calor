@@ -163,7 +163,7 @@ A `§B{name}` declaration must carry **either** a `:type` annotation
 choose a type for the new symbol.
 
 ```
-§F{f001:Foo:pub}
+§F{Foo:pub}
   §O{i32}
   §B{x}            // Calor0250: §B{x} requires :type or initializer
   §R INT:0
@@ -219,7 +219,7 @@ It fires in three positions — binding, return, and reassignment:
 ```
 §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C   // Calor0254 (binding)
 
-§F{f:Get:pub} (str:path) -> List<str>                   // Calor0254 (return)
+§F{Get:pub} (str:path) -> List<str>                   // Calor0254 (return)
   §R §C{File.ReadAllLines} §A path §/C
 
 §B{~items:List<str>}                                     // Calor0254 (reassign)
@@ -234,7 +234,7 @@ function/method declares a concrete-collection parameter (matched positionally,
 by call arity so overloads resolve):
 
 ```
-§F{f:Take:pub} (List<str>:items) -> i32
+§F{Take:pub} (List<str>:items) -> i32
   §R (len items)
 §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C   // Calor0254 at the argument
 ```
@@ -269,7 +269,7 @@ refused: `§ASSIGN`, compound assignment, `(inc x)`/`(dec x)`, a `§A{ref}` or
 §B{x:i32} 1
 §ASSIGN x 2          // Calor0213: 'x' is an immutable binding
 
-§L{l1:i:0:9:1}
+§L{i:0:9:1}
   §ASSIGN i 5        // Calor0213: 'i' is a §L loop variable
 ```
 
@@ -343,10 +343,10 @@ scope. C# forbids a nested local from shadowing an enclosing local/parameter
 
 ```
 §B{~x:i32} 0
-§IF{i1} (> x 0)
+§IF (> x 0)
   §B{x:str} "hi"   // Calor0255: inner local 'x' shadows the outer 'x'
 
-§L{l1:i:0:9:1}
+§L{i:0:9:1}
   §B{i:i32} 5      // Calor0255: shadows the loop variable 'i'
 ```
 

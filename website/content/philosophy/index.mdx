@@ -19,7 +19,7 @@ When an AI agent reads code, it needs answers to specific questions:
 | What does this function **do**? | Infer from implementation | Explicit contracts (`§Q`, `§S`) |
 | What are the **side effects**? | Guess from I/O patterns | Declared with `§E{cw,fs:r,net:rw}` |
 | What **constraints** must hold? | Parse exception patterns | First-class preconditions/postconditions |
-| How do I **precisely reference** this? | Hope line numbers don't change | Optional stable IDs (`§F{f001:Main}`) |
+| How do I **precisely reference** this? | Hope line numbers don't change | Optional stable IDs (`§F{Main}`) |
 | Where does this **scope end**? | Count braces, handle nesting | Indentation (Python-style) |
 
 Traditional languages make agents *infer* these answers through complex analysis. Calor makes them *explicit* in the syntax.
@@ -52,7 +52,7 @@ public int Divide(int a, int b) {
 
 ```calor
 // Calor — Z3 catches the bug at compile time
-§F{f001:Divide:pub} (i32:a, i32:b) -> i32
+§F{Divide:pub} (i32:a, i32:b) -> i32
   §E{}
   §Q (!= b 0)          // ← Contract: b must not be zero
   §S (>= result 0)     // ← Contract: result non-negative
@@ -90,8 +90,8 @@ the [results caveats](/docs/benchmarking/results/) alongside the numbers.
 Calor deliberately optimizes for machine readability over human aesthetics:
 
 ```calor
-§M{m001:Calculator}
-  §F{f001:Add:pub}
+§M{Calculator}
+  §F{Add:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -100,9 +100,9 @@ Calor deliberately optimizes for machine readability over human aesthetics:
 
 This might look unusual to human programmers, but for an AI agent:
 
-1. **No ambiguity** - Indentation defines scope and stable IDs identify blocks
-2. **Semantic density** - Type, visibility, and ID in one declaration
-3. **Precise targeting** - `f001` uniquely identifies this function across any refactoring
+1. **Explicit scope** - Indentation defines blocks
+2. **Semantic density** - Type and visibility appear in the declaration
+3. **Precise targeting** - Sidecar identities survive supported renames and moves; ambiguous edits are rejected
 4. **Symbolic operations** - `(+ a b)` is directly manipulable without parsing precedence
 
 ---

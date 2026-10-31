@@ -16,10 +16,15 @@ collateral-edit risk. It does not run an AI agent or apply real edits.
 ## Why Targeting Matters
 
 An editing tool must find the intended declaration, locate its scope, and avoid
-changing similar code nearby. Calor provides two useful signals:
+changing similar code nearby. The historical representation measured here used
+two signals:
 
 - explicit structural markers such as `§F`, `§L`, and `§IF`;
-- optional source IDs that can distinguish otherwise similar structural targets.
+- source IDs that distinguished otherwise similar structural targets.
+
+The following excerpt quotes that earlier syntax. Current Calor keeps declaration
+identity in `.calor/ids.json`; these historical heuristic scores have not been
+remeasured for the sidecar representation.
 
 ```calor
 §L{for1:i:1:100:1}
@@ -61,9 +66,9 @@ The structural Calor score starts at 0.50 and adds:
 
 {/* drift:ignore */}
 Current bindings use `§B`, not the legacy `§V` detector. That detector is a known
-limitation: current source does not earn the legacy-variable bonus. Optional
-name-first declarations also do not earn an explicit-ID bonus until IDs are
-materialized in source.
+limitation: current source does not earn the legacy-variable bonus. Current
+ID-free declarations also do not earn the calculator's explicit-source-ID bonus.
+Do not insert IDs into active source to change that score.
 
 The C# structural score starts at 0.50, adds namespace, class, and method
 signals, subtracts for deeper brace structure, and is capped at 0.85.
@@ -78,9 +83,9 @@ calculator's explicit-structure hypothesis. It is **not** a measured 36%
 improvement in production edit success, an agent accuracy experiment, or proof
 that an ID survives a refactor automatically.
 
-An explicit ID survives a rename or move only when the editing tool preserves
-it. Copies and extracted declarations need new IDs, and indentation—not closer
-tags—defines structural scope in v0.12.
+Current refactoring tools carry sidecar IDs through supported renames and moves.
+Copies and extracted declarations need new identities. Ambiguous plain-text
+changes fail reconciliation instead of guessing which ID to preserve.
 
 For actual agent behavior, use a blinded task suite that performs edits, runs the
 compiler and tests, and measures unintended changes. Keep that evidence separate
@@ -88,7 +93,7 @@ from this static metric.
 
 ---
 
-## Example Targeting Operations
+## Historical Simulated Targeting Operations
 
 ```text
 Delete function f002  -> remove its §F opener and indented body
@@ -106,5 +111,5 @@ a universal tooling comparison.
 ## Next
 
 - [Benchmark Methodology](/docs/benchmarking/methodology/) - Corpus, calculators, and validity limits
-- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Optional source IDs and preservation rules
+- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Current sidecar identity and preservation rules
 - [Refactoring Stability](/docs/benchmarking/metrics/refactoring-stability/) - The separate refactoring heuristic

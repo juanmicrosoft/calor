@@ -22,7 +22,7 @@ In traditional code, you must read the entire implementation to know if a functi
 Calor requires explicit declaration:
 
 ```
-§F{f001:SaveUser:pub}
+§F{SaveUser:pub}
   §I{User:user}
   §O{bool}
   §E{db:rw,net:rw}        // Declares: database and network operations
@@ -43,7 +43,7 @@ Now an agent knows immediately what side effects to expect.
 Place the effect declaration after the output type:
 
 ```
-§F{id:name:vis}
+§F{name:vis}
   §I{...}
   §O{...}
   §E{effects}             // Here
@@ -67,7 +67,7 @@ comparison — you can now say what that inner function is allowed to do. Write 
 `§E{...}` tag on the **same line** as the type it describes:
 
 ```
-§F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+§F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
 ```
 
 That says: *`transform` may write to the console.* Before this, there was no way to say
@@ -80,12 +80,12 @@ Almost everyone already writes the second form, so almost nothing changes.
 ### The nine places you can write one
 
 ```
-§F{f001:F:pub} () -> void
+§F{F:pub} () -> void
   §E{cw}                                    // 1. the function's own declaration
 
-§B{f} §LAM{lam1:x:i32} §E{cw} ... §/LAM{lam1} // 2. a lambda
+§B{f} §LAM{x:i32} §E{cw} ... §/LAM // 2. a lambda
 
-§DEL{d001:Handler}
+§DEL{Handler}
   §I{i32:x}
   §O{void}
   §E{cw}                                    // 3. a delegate
@@ -96,7 +96,7 @@ Almost everyone already writes the second form, so almost nothing changes.
 () -> Func<i32> §E{cw}                      //    …or the arrow spelling
 §B{f:Func<i32,i32>} §E{cw} <initializer>    // 7. a binding
 §FLD{Action<i32>:onChange:priv} §E{cw}       // 8. a field
-§PROP{p1:OnChange:Action<i32>:pub:get,set} §E{cw}  // 9. a property (0.17)
+§PROP{OnChange:Action<i32>:pub:get,set} §E{cw}  // 9. a property (0.17)
 ```
 
 A type carries **one** row. To allow several effects, put them in the one row —
@@ -109,7 +109,7 @@ more and no less. Write a placeholder in the type-parameter list with `eff`, the
 name in the rows:
 
 ```
-§F{f001:Twice:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
+§F{Twice:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
   §E{e}
   §R INT:0
 ```
@@ -154,7 +154,7 @@ exactly as calling a named function charges its `§E`. A lambda's body is compar
 declared row, and a lambda bound to a row-less `§B` gives the `§B` the body's row:
 
 ```
-§F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+§F{Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
   §E{cw}
   §R §C{transform} §A value §/C     // charges cw to Apply; Apply declares it — clean
 ```
@@ -242,7 +242,7 @@ Leave off `--row` to use the declaration's current row; `--row ""` asks about a 
 ### Pure Function (No Effects)
 
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -253,7 +253,7 @@ Leave off `--row` to use the declaration's current row; `--row ""` asks about a 
 Or explicitly:
 
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -264,7 +264,7 @@ Or explicitly:
 ### Console Output
 
 ```
-§F{f001:Greet:pub}
+§F{Greet:pub}
   §I{str:name}
   §O{void}
   §E{cw}                  // Console write
@@ -274,7 +274,7 @@ Or explicitly:
 ### File Operations
 
 ```
-§F{f001:CopyFile:pub}
+§F{CopyFile:pub}
   §I{str:source}
   §I{str:dest}
   §O{bool}
@@ -285,7 +285,7 @@ Or explicitly:
 ### Network Call
 
 ```
-§F{f001:FetchData:pub}
+§F{FetchData:pub}
   §I{str:url}
   §O{str!str}
   §E{net:rw}              // Network operations
@@ -295,7 +295,7 @@ Or explicitly:
 ### Database with Logging
 
 ```
-§F{f001:CreateUser:pub}
+§F{CreateUser:pub}
   §I{User:user}
   §O{i32}
   §E{db:rw,cw}            // Database and console (for logging)
@@ -305,7 +305,7 @@ Or explicitly:
 ### Multiple Effects
 
 ```
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db:rw,net:rw,fs:w,cw} // Database, network, filesystem write, console write
@@ -320,14 +320,14 @@ Or explicitly:
 
 ```
 // Read-only file operation
-§F{f001:LoadConfig:pub}
+§F{LoadConfig:pub}
   §I{str:path}
   §O{Config}
   §E{fs:r}                // Only filesystem read
   // ...
 
 // Read-write file operation
-§F{f002:UpdateConfig:pub}
+§F{UpdateConfig:pub}
   §I{str:path}
   §I{Config:config}
   §O{void}
@@ -338,7 +338,7 @@ Or explicitly:
 ### Interactive Console
 
 ```
-§F{f001:Prompt:pub}
+§F{Prompt:pub}
   §I{str:question}
   §O{str}
   §E{cw,cr}               // Console write and read
@@ -361,7 +361,7 @@ Or explicitly:
 
 "This function should be pure, but it has effects":
 ```
-§F{f001:Calculate:pub}
+§F{Calculate:pub}
   §O{i32}
   §E{cw}                  // Wait, why is Calculate logging?
 ```
@@ -378,11 +378,11 @@ Or explicitly:
 
 ```
 // If f1 calls f2, f1's effects must include f2's effects
-§F{f001:ProcessAndSave:pub}
+§F{ProcessAndSave:pub}
   §E{db:rw,cw}            // Must include f002's effects
   §C{f002:Process} ... §/C
 
-§F{f002:Process:priv}
+§F{Process:priv}
   §E{cw}                  // Has console write effect
   // ...
 ```
@@ -425,10 +425,10 @@ The compiler doesn't just check individual functions. It performs **interprocedu
 You cannot hide an effect by burying it in helper functions.
 
 ```
-§F{f001:Helper:priv}
+§F{Helper:priv}
   §C{Console.WriteLine} "hidden"   // Has cw effect
 
-§F{f002:Main:pub}
+§F{Main:pub}
   §O{void}
   // No §E declaration
   §C{f001:Helper}                  // ERROR: cw effect leaks through

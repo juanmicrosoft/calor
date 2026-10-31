@@ -85,12 +85,12 @@ The compiler emits a C# interpolated string (`$"..."`), so formatting uses the s
 including the current culture.
 
 ```calor
-§M{m001:Receipt}
-  §F{f001:Line:pub} (str:item, f64:amount) -> str
+§M{Receipt}
+  §F{Line:pub} (str:item, f64:amount) -> str
     §E{}
     §R "${item,-8}|${amount,10:F2}|${(* amount 2):F1}"
 
-  §F{f002:Main:pub} () -> void
+  §F{Main:pub} () -> void
     §E{cw}
     §P §C{Line} §A "coffee" §A 3.5 §/C
 ```
@@ -110,8 +110,8 @@ name or a Calor expression. This function must declare `cr` (console read). With
 with `Calor0410`, the "undeclared effect" error:
 
 ```calor
-§M{m001:Greeting}
-  §F{f001:Greet:pub} () -> str
+§M{Greeting}
+  §F{Greet:pub} () -> str
     §E{cr}
     §R "hello ${Console.ReadLine()}"
 ```

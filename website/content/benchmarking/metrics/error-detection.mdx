@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 4
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
 
 **Category:** Error Detection
 **Historical dashboard result:** Calor wins (1.49x across 217 programs)
@@ -69,7 +70,7 @@ Base score: 0.30, cap at 0.90
 ### Calor with Contracts
 
 ```calor
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -181,13 +182,13 @@ No benchmark measurement was rerun.
 ### Calor Code
 
 ```calor
-§F{f001:SafeDivide:pub}
+§F{SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{?i32}
   §Q (!= b 0)
   §S (== result (/ a b))
-  §IF{if1} (== b 0)
+  §IF (== b 0)
     §R null
   §EL
     §R (/ a b)

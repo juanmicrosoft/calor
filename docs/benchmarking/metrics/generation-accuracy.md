@@ -90,7 +90,7 @@ public static int Add(int a, int b)
 
 ```
 // Calor: Novel syntax, less exposure
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -128,7 +128,7 @@ public static int Add(int a, int b)
 
 **Calor generation (typical):**
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -141,7 +141,7 @@ public static int Add(int a, int b)
 
 **Calor generation (common error):**
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
 §I{i32:a}
 §I{i32:b}
 §O{i32}
@@ -161,7 +161,7 @@ public static int Add(int a, int b)
 |:------|:------|:--------|
 | Misindented body | Body not indented under opener | `§F{f001}` followed by unindented statements |
 | Missing block body | Forgot statements inside a block | `§L{for1}` with no indented body |
-| Wrong nesting | Dedented or indented at the wrong level | `§IF{if1}` body aligned with parent |
+| Wrong nesting | Dedented or indented at the wrong level | `§IF` body aligned with parent |
 | Missing module wrapper | No enclosing `§M{}` block | Function outside module |
 
 ### Common C# Errors

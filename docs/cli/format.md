@@ -230,7 +230,7 @@ MyModule.calr
 --- original
 +++ formatted
 @@ -5,7 +5,7 @@
- §F{f001:Calculate:pub}
+ §F{Calculate:pub}
    §I{i32:a}
    §I{i32:b}
 -  §O{i32}
@@ -278,17 +278,17 @@ The lossless Calor formatter applies these rules:
 
 ```calor
 // Before (inconsistent)
-§M{m001:Math}
+§M{Math}
     /// Adds two values.
-    §F{f001:Add:pub} (i32:a, i32:b) -> i32
+    §F{Add:pub} (i32:a, i32:b) -> i32
         §R (+ a b)
 ```
 
 ```calor
 // After (formatted)
-§M{m001:Math}
+§M{Math}
   /// Adds two values.
-  §F{f001:Add:pub} (i32:a, i32:b) -> i32
+  §F{Add:pub} (i32:a, i32:b) -> i32
     §R (+ a b)
 ```
 

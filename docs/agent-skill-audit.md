@@ -35,7 +35,7 @@ This audit compares implemented Calor language features (from `Lexer.cs` and `Pa
 4. **Fixed lexer bug for `§??` and `§?.`** - Added special case handling in `ScanSectionMarker()`
 5. **Added Generics section** - Was missing from base calor.md
 6. **Fixed `§EACH` syntax** - Was `§EACH{id:var:coll}`, corrected to `§EACH{id:var} coll`
-7. **Fixed `§LAM` syntax** - Added proper format `§LAM{id:param:type}...§/LAM{id}`
+7. **Fixed `§LAM` syntax** - Added proper format `§LAM{param:type}...§/LAM`
 8. **Fixed validation regex** - Updated CI tests to properly match special tokens (`§??`, `§?.`, `§^`)
 
 ---
@@ -64,13 +64,13 @@ All documented syntax was tested against `Parser.cs` to confirm full parser supp
 
 ```bash
 # Async - PASSES
-§AF{1:GetDataAsync:pub}
+§AF{GetDataAsync:pub}
   §O{str}
   §B{str:result} §AWAIT §C{GetStringAsync}§/C
   §R result
 
 # Try/Catch - PASSES
-§TR{t1}
+§TR
   §R (/ a b)
 §CA{DivideByZeroException:ex}
   §R 0
@@ -78,7 +78,7 @@ All documented syntax was tested against `Parser.cs` to confirm full parser supp
 # Collections - PASSES
 §LIST{items:i32}
   1 2 3
-§/LIST{items}
+§/LIST
 §PUSH{items} 4
 §B{i32:count} §CNT{items}
 ```
@@ -96,33 +96,33 @@ All documented syntax was tested against `Parser.cs` to confirm full parser supp
 The following features were **fully documented** in this update:
 
 ### ✅ Async/Await - NOW DOCUMENTED
-- `§AF{id:Name:vis}` - Async function declaration
-- `§AMT{id:Name:vis}` - Async method declaration
+- `§AF{Name:vis}` - Async function declaration
+- `§AMT{Name:vis}` - Async method declaration
 - `§AWAIT expr` / `§AWAIT{false} expr` - Await with optional ConfigureAwait
 - Full template with working syntax in `calor.md`
 
 ### ✅ Collections - NOW DOCUMENTED
-- `§LIST{name:type}`, `§DICT{name:key:val}`, `§HSET{name:type}`
+- `§LIST{name:type}`, `§DICT{key:val}`, `§HSET{type}`
 - Operations: `§PUSH`, `§PUT`, `§REM`, `§SETIDX`, `§CLR`, `§INS`
 - Queries: `§HAS`, `§CNT`
 - Iteration: `§EACH`, `§EACHKV`
 - Full template with working syntax in `calor.md`
 
 ### ✅ Exception Handling - NOW DOCUMENTED
-- `§TR{id}` with indented body, `§CA{Type:var}`, and optional `§FI` clauses
+- `§TR` with indented body, `§CA{Type:var}`, and optional `§FI` clauses
 - `§TH "message"` - Throw
 - `§RT` - Rethrow
 - `§WHEN condition` - Exception filter
 - Full template with working syntax in `calor.md`
 
 ### ✅ Lambdas & Delegates - NOW DOCUMENTED
-- `§LAM{id:param:type}...§/LAM{id}` - Lambda expressions
-- `§DEL{id:Name:vis}` - Delegate definitions (body indents below)
+- `§LAM{param:type}...§/LAM` - Lambda expressions
+- `§DEL{Name:vis}` - Delegate definitions (body indents below)
 - Inline lambda syntax: `(x:i32) → (+ x 1)`
 - Full template with working syntax in `calor.md`
 
 ### ✅ Events - NOW DOCUMENTED
-- `§EVT{id:Name:vis:DelegateType}` - Event declaration
+- `§EVT{Name:vis:DelegateType}` - Event declaration
 - `§SUB event handler` - Subscribe
 - `§UNSUB event handler` - Unsubscribe
 - Full template with working syntax in `calor.md`
@@ -149,7 +149,7 @@ The following features were **fully documented** in this update:
 ## Syntax Fixes Applied
 
 ### ✅ Bracket Syntax - FIXED
-All files now use curly braces `§IF{id}` (not square brackets `§IF[id]`)
+All files now use curly braces `§IF` (not square brackets `§IF[id]`)
 
 ### ✅ File Extension - FIXED
 GEMINI.md.template now uses `.calr` (not `.calor`)

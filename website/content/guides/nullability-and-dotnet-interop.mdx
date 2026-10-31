@@ -65,8 +65,8 @@ are intentionally invalid. Their corrected controls use an explicit default.
 **Rejected:** `input` on line 4, column 22.
 
 ```calor expect=Calor0272
-§M{m1:InitRejected}
-  §F{f1:Copy:pub} (?str:input) -> void
+§M{InitRejected}
+  §F{Copy:pub} (?str:input) -> void
     §E{}
     §B{required:str} input
 ```
@@ -74,8 +74,8 @@ are intentionally invalid. Their corrected controls use an explicit default.
 **Corrected:** choose a meaningful default for missing input.
 
 ```calor
-§M{m1:InitSafe}
-  §F{f1:Copy:pub} (?str:input) -> void
+§M{InitSafe}
+  §F{Copy:pub} (?str:input) -> void
     §E{}
     §B{required:str} (?? input "anonymous")
 ```
@@ -85,8 +85,8 @@ are intentionally invalid. Their corrected controls use an explicit default.
 **Rejected:** `input` on line 4, column 8.
 
 ```calor expect=Calor0273
-§M{m1:ReturnRejected}
-  §F{f1:Name:pub} (?str:input) -> str
+§M{ReturnRejected}
+  §F{Name:pub} (?str:input) -> str
     §E{}
     §R input
 ```
@@ -94,8 +94,8 @@ are intentionally invalid. Their corrected controls use an explicit default.
 **Corrected:** return a non-null fallback.
 
 ```calor
-§M{m1:ReturnSafe}
-  §F{f1:Name:pub} (?str:input) -> str
+§M{ReturnSafe}
+  §F{Name:pub} (?str:input) -> str
     §E{}
     §R (?? input "anonymous")
 ```
@@ -105,10 +105,10 @@ are intentionally invalid. Their corrected controls use an explicit default.
 **Rejected:** `input` on line 6, column 17.
 
 ```calor expect=Calor0274
-§M{m1:ArgumentRejected}
-  §F{f1:Take:pub} (str:value) -> void
+§M{ArgumentRejected}
+  §F{Take:pub} (str:value) -> void
     §E{}
-  §F{f2:Send:pub} (?str:input) -> void
+  §F{Send:pub} (?str:input) -> void
     §E{}
     §C{Take} §A input §/C
 ```
@@ -116,10 +116,10 @@ are intentionally invalid. Their corrected controls use an explicit default.
 **Corrected:** default before crossing the boundary.
 
 ```calor
-§M{m1:ArgumentSafe}
-  §F{f1:Take:pub} (str:value) -> void
+§M{ArgumentSafe}
+  §F{Take:pub} (str:value) -> void
     §E{}
-  §F{f2:Send:pub} (?str:input) -> void
+  §F{Send:pub} (?str:input) -> void
     §E{}
     §C{Take} §A (?? input "anonymous") §/C
 ```
@@ -129,11 +129,11 @@ the result does not waive it. Named arguments are matched to the named
 parameter, not to their source position:
 
 ```calor
-§M{m1:NamedSafe}
-  §F{f1:Choose:pub} (str:required, ?str:optional) -> str
+§M{NamedSafe}
+  §F{Choose:pub} (str:required, ?str:optional) -> str
     §E{}
     §R required
-  §F{f2:Send:pub} (?str:input) -> str
+  §F{Send:pub} (?str:input) -> str
     §E{}
     §R §C{Choose} §A[optional] input §A[required] "ready" §/C
 ```
@@ -150,8 +150,8 @@ A default changes behavior when the input is missing. If absence is an error,
 throw instead. Declare the allocation and throw effects:
 
 ```calor
-§M{m1:ThrowSafe}
-  §F{f1:Require:pub} (?str:input) -> str
+§M{ThrowSafe}
+  §F{Require:pub} (?str:input) -> str
     §E{alloc,throw}
     §R (?? input §TH §NEW{ArgumentNullException})
 ```
@@ -159,10 +159,10 @@ throw instead. Declare the allocation and throw effects:
 A typed pattern binds a new non-null value in its matching arm:
 
 ```calor
-§M{m1:PatternSafe}
-  §F{f1:Name:pub} (?str:input) -> str
+§M{PatternSafe}
+  §F{Name:pub} (?str:input) -> str
     §E{}
-    §R §W{w1:expr} input
+    §R §W input
       §K §PTYPE{str:text} → text
       §K _ → "anonymous"
 ```
@@ -199,8 +199,8 @@ For example, an environment variable may be absent. Preserve that possibility
 or choose an application-specific default:
 
 ```calor
-§M{m1:EnvironmentSafe}
-  §F{f1:Name:pub} () -> str
+§M{EnvironmentSafe}
+  §F{Name:pub} () -> str
     §E{env}
     §B{input} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_NAME" §/C
     §R (?? input "anonymous")

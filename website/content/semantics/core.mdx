@@ -126,7 +126,7 @@ Calor uses **lexical scoping** with parent chain lookup.
 
 ```calor
 §B{x} INT:1
-§IF{if1} BOOL:true
+§IF BOOL:true
   §B{x} INT:2   // Shadows outer x
   §P x          // Prints 2
 §P x            // Prints 1 (outer x unchanged)
@@ -155,7 +155,7 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF{if1} BOOL:true
+§IF BOOL:true
   §R INT:42   // Returns from function, not just if block
 ```
 

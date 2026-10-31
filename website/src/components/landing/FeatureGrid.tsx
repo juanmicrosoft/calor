@@ -26,7 +26,7 @@ const features = [
   {
     name: 'Stable Declaration IDs',
     description:
-      'Optional stable IDs give tools a persistent declaration target across supported renames. They do not replace reference resolution, review, or tests.',
+      'Tools maintain declaration IDs in .calor/ids.json across supported renames. No IDs appear in source. Identity does not replace reference resolution, review, or tests.',
     icon: Fingerprint,
     code: landingSnippets.stableId.code,
     href: '/docs/philosophy/stable-identifiers/',

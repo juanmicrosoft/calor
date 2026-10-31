@@ -8,7 +8,7 @@ Deferred items from M2 gap analysis. These are known limitations, not bugs.
 
 **Example**:
 ```
-§IF{if1} (< i n)
+§IF (< i n)
   §R §IDX items i       // guard holds — should discharge
 §EL
   §R §IDX items i       // guard does NOT hold — should fail

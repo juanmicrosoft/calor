@@ -48,7 +48,7 @@ Preconditions specify what must be true when calling a function.
 Functions can have multiple preconditions:
 
 ```calor
-§F{f001:CreateUser:pub}
+§F{CreateUser:pub}
   §I{str:name}
   §I{i32:age}
   §O{User}
@@ -85,11 +85,11 @@ In postconditions, `result` refers to the return value:
 ### Examples
 
 ```calor
-§F{f001:Abs:pub}
+§F{Abs:pub}
   §I{i32:x}
   §O{i32}
   §S (>= result 0)                       // absolute value is non-negative
-  §IF{if1} (>= x 0)
+  §IF (>= x 0)
     §R x
   §EL
     §R (- 0 x)
@@ -100,7 +100,7 @@ In postconditions, `result` refers to the return value:
 ## Complete Contract Example
 
 ```calor
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:dividend}
   §I{i32:divisor}
   §O{i32}
@@ -123,7 +123,7 @@ In postconditions, `result` refers to the return value:
 ### Range Validation
 
 ```calor
-§F{f001:Clamp:pub}
+§F{Clamp:pub}
   §I{i32:value}
   §I{i32:min}
   §I{i32:max}
@@ -137,7 +137,7 @@ In postconditions, `result` refers to the return value:
 ### Non-Empty Collection
 
 ```calor
-§F{f001:First:pub}
+§F{First:pub}
   §I{List:items}
   §O{?Item}
   §Q (> (count items) 0)                 // list not empty
@@ -148,7 +148,7 @@ In postconditions, `result` refers to the return value:
 ### State Preservation
 
 ```calor
-§F{f001:Increment:pub}
+§F{Increment:pub}
   §I{i32:x}
   §O{i32}
   §S (== result (+ x 1))                 // result is exactly x + 1
@@ -158,7 +158,7 @@ In postconditions, `result` refers to the return value:
 ### Balance Transfers
 
 ```calor
-§F{f001:Transfer:pub}
+§F{Transfer:pub}
   §I{Account:from}
   §I{Account:to}
   §I{i32:amount}
@@ -179,7 +179,7 @@ In postconditions, `result` refers to the return value:
 An agent can understand function behavior without reading implementation:
 
 ```calor
-§F{f001:SquareRoot:pub}
+§F{SquareRoot:pub}
   §I{f64:x}
   §O{f64}
   §Q (>= x 0)                            // Only works for non-negative
@@ -225,7 +225,7 @@ Add context to failures:
 Recommended order in function definition:
 
 ```calor
-§F{id:name:vis}
+§F{name:vis}
   §I{...}           // 1. Inputs
   §O{...}           // 2. Output
   §E{...}           // 3. Effects (optional)

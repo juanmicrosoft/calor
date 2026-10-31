@@ -69,7 +69,7 @@ Base score: 0.30, cap at 0.90
 ### Calor with Contracts
 
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -181,13 +181,13 @@ No benchmark measurement was rerun.
 ### Calor Code
 
 ```
-§F{f001:SafeDivide:pub}
+§F{SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{?i32}
   §Q (!= b 0)
   §S (== result (/ a b))
-  §IF{if1} (== b 0)
+  §IF (== b 0)
     §R null
   §EL
     §R (/ a b)

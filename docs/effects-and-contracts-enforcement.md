@@ -252,8 +252,8 @@ file once (the first build after the switch is a full one).
 ### Function with Effects
 
 ```
-§M{m1:Greeting}
-  §F{f001:WriteGreeting:pub}
+§M{Greeting}
+  §F{WriteGreeting:pub}
     §I{str:name}
     §O{void}
     §E{cw}
@@ -263,8 +263,8 @@ file once (the first build after the switch is a full one).
 ### Pure Function with Contracts
 
 ```
-§M{m1:Math}
-  §F{f001:Divide:pub}
+§M{Math}
+  §F{Divide:pub}
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -276,14 +276,14 @@ file once (the first build after the switch is a full one).
 ### Function Calling Another with Effects
 
 ```
-§M{m1:App}
-  §F{f001:LoadUserName:priv}
+§M{App}
+  §F{LoadUserName:priv}
     §I{i32:userId}
     §O{str}
     §E{fs:r}
   // ... file read implementation
 
-  §F{f002:GreetUser:pub}
+  §F{GreetUser:pub}
     §I{i32:userId}
     §O{void}
     §E{cw, fs:r}                  // Must declare both effects

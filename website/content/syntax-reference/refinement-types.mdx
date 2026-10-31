@@ -13,9 +13,9 @@ Refinement types let you constrain values at the type level. A refined type is a
 
 | Syntax | Purpose | Example |
 |:-------|:--------|:--------|
-| `§RTYPE{id:Name:base} (pred)` | Define a named refinement type | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` |
+| `§RTYPE{Name:base} (pred)` | Define a named refinement type | `§RTYPE{NatInt:i32} (>= # INT:0)` |
 | `§I{type:param} \| (pred)` | Inline refinement on a parameter | `§I{i32:age} \| (>= # INT:0)` |
-| `§PROOF{id:desc} (expr)` | Proof obligation (assert a fact) | `§PROOF{p1:positive} (>= x INT:0)` |
+| `§PROOF{desc} (expr)` | Proof obligation (assert a fact) | `§PROOF{positive} (>= x INT:0)` |
 | `#` | Self-reference (the value being refined) | `(>= # INT:0)` |
 
 ---
@@ -27,7 +27,7 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 ### Syntax
 
 ```calor
-§RTYPE{id:Name:baseType} (predicate)
+§RTYPE{Name:baseType} (predicate)
 ```
 
 - `id` — unique identifier (e.g., `r1`)
@@ -38,9 +38,9 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 ### Examples
 
 ```calor
-§RTYPE{r1:NatInt:i32} (>= # INT:0)
-§RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-§RTYPE{r3:NonEmpty:str} (> (len #) INT:0)
+§RTYPE{NatInt:i32} (>= # INT:0)
+§RTYPE{Port:i32} (&& (>= # INT:1) (<= # INT:65535))
+§RTYPE{NonEmpty:str} (> (len #) INT:0)
 ```
 
 These read as:
@@ -53,9 +53,9 @@ These read as:
 Once defined, use the name as a parameter type:
 
 ```calor
-§RTYPE{r1:NatInt:i32} (>= # INT:0)
+§RTYPE{NatInt:i32} (>= # INT:0)
 
-  §F{f001:Process:pub}
+  §F{Process:pub}
     §I{NatInt:count}
     §O{void}
   // count is guaranteed non-negative
@@ -70,12 +70,12 @@ when one predicate implies the other. Binding, passing, returning or assigning a
 `Nat` is expected is a type error (`Calor0202`):
 
 ```calor
-§M{m001:Ids}
-  §RTYPE{r1:Nat:i32} (>= # INT:0)
-  §RTYPE{r2:Pos:i32} (> # INT:0)
-  §F{f001:ToNat:pub} (i32:v) -> Nat
+§M{Ids}
+  §RTYPE{Nat:i32} (>= # INT:0)
+  §RTYPE{Pos:i32} (> # INT:0)
+  §F{ToNat:pub} (i32:v) -> Nat
     §R v
-  §F{f002:Use:pub} (Pos:p) -> Nat
+  §F{Use:pub} (Pos:p) -> Nat
     §B{n:Nat} §C{ToNat} §A p §/C
     §R n
 ```
@@ -83,10 +83,10 @@ when one predicate implies the other. Binding, passing, returning or assigning a
 Binding the `Pos` directly is rejected with `Calor0202`:
 
 ```calor expect=Calor0202
-§M{m001:Ids}
-  §RTYPE{r1:Nat:i32} (>= # INT:0)
-  §RTYPE{r2:Pos:i32} (> # INT:0)
-  §F{f001:Use:pub} (Pos:p) -> Nat
+§M{Ids}
+  §RTYPE{Nat:i32} (>= # INT:0)
+  §RTYPE{Pos:i32} (> # INT:0)
+  §F{Use:pub} (Pos:p) -> Nat
     §B{n:Nat} p
     §R n
 ```
@@ -151,7 +151,7 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
 ### Examples
 
 ```calor
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b} | (!= # INT:0)         // b must be non-zero
   §O{i32}
@@ -159,7 +159,7 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
 ```
 
 ```calor
-§F{f002:SetPort:pub}
+§F{SetPort:pub}
   §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
   §O{void}
   // ...
@@ -180,7 +180,7 @@ Inline refinements can coexist with default parameter values:
 The `#` symbol refers to the value being constrained. It is only valid inside refinement predicates:
 
 ```calor
-§RTYPE{r1:Positive:i32} (> # INT:0)     // # = the i32 value
+§RTYPE{Positive:i32} (> # INT:0)     // # = the i32 value
 §I{i32:x} | (>= # INT:0)                // # = x
 ```
 
@@ -195,7 +195,7 @@ A proof obligation asserts that a condition holds at a specific point in the fun
 ### Syntax
 
 ```calor
-§PROOF{id:description} (boolean-expression)
+§PROOF{description} (boolean-expression)
 §PROOF{id} (boolean-expression)
 ```
 
@@ -205,13 +205,13 @@ A proof obligation asserts that a condition holds at a specific point in the fun
 ### Examples
 
 ```calor
-§F{f001:Transfer:pub}
+§F{Transfer:pub}
   §I{i32:balance}
   §I{i32:amount} | (> # INT:0)
   §O{i32}
   §Q (>= balance amount)
 
-  §PROOF{p1:non-negative} (>= (- balance amount) INT:0)
+  §PROOF{non-negative} (>= (- balance amount) INT:0)
 
   §R (- balance amount)
 ```
@@ -237,11 +237,11 @@ Refinement types are a **compile-time construct**. In the emitted C#, they are e
 
 | Calor | Emitted C# |
 |:------|:-----------|
-| `§RTYPE{r1:NatInt:i32} (>= # INT:0)` | *(nothing — erased)* |
+| `§RTYPE{NatInt:i32} (>= # INT:0)` | *(nothing — erased)* |
 | `§I{NatInt:count}` | `int count` |
 | `§I{i32:x} \| (>= # INT:0)` | `int x` |
-| `§PROOF{p1:check} (cond)` (Discharged) | `// PROVEN: proof obligation [p1: check]` by default; `--keep-proven-guards` emits the runtime guard instead |
-| `§PROOF{p1:check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
+| `§PROOF{check} (cond)` (Discharged) | `// PROVEN: proof obligation [p1: check]` by default; `--keep-proven-guards` emits the runtime guard instead |
+| `§PROOF{check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
 
 The refinement constrains what values are valid. Since 0.15, a Discharged
 obligation's guard is replaced with a proof comment by default; pass
@@ -308,14 +308,14 @@ arithmetic operands: `(- balance amount)` on two `§RTYPE`-typed parameters has 
 `i32`, not the refinement, because the difference can break the predicate.
 
 ```calor
-§M{m001:Banking}
-  §F{f001:Transfer:pub}
+§M{Banking}
+  §F{Transfer:pub}
     §I{i32:balance} | (>= # INT:0)
     §I{i32:amount} | (> # INT:0)
     §O{i32}
     §Q (>= balance amount)                  // sufficient funds
 
-    §PROOF{p1:balance-safe} (>= (- balance amount) INT:0)
+    §PROOF{balance-safe} (>= (- balance amount) INT:0)
 
     §R (- balance amount)
 ```

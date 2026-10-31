@@ -56,8 +56,8 @@ cd tests/Calor.Evaluation/Benchmarks/YourBenchmark
 Create `program.calr`:
 
 ```
-§M{m001:YourModule}
-  §F{f001:Main:pub}
+§M{YourModule}
+  §F{Main:pub}
     §O{void}
     §E{cw}
   // Your implementation
@@ -144,19 +144,19 @@ dotnet run --project tests/Calor.Evaluation -- --output report.json
 ### Calor (`factorial.calr`)
 
 ```
-§M{m001:Math}
-  §F{f001:Factorial:pub}
+§M{Math}
+  §F{Factorial:pub}
     §I{i32:n}
     §O{i32}
     §Q (>= n 0)
     §Q (<= n 12)
     §S (>= result 1)
-    §IF{if1} (<= n 1)
+    §IF (<= n 1)
       §R 1
     §EL
       §R (* n §C{Factorial} §A (- n 1) §/C)
 
-  §F{f002:Main:pub}
+  §F{Main:pub}
     §O{void}
     §E{cw}
     §P §C{Factorial} §A 5 §/C

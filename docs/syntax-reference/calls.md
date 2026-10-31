@@ -81,7 +81,7 @@ silently dropping the modifier.
    argument. Without this rule, a `§IF` / `§W` / `§NEW` on the next
    line at the same indent would be silently absorbed as the argument
    (because each of those tokens is also an expression-start). Writing
-   `§C{Foo}` on one line and `§IF{c} ... §EL → ...` on the next always
+   `§C{Foo}` on one line and `§IF ... §EL → ...` on the next always
    parses as two siblings — zero-arg call, then a separate `§IF`.
 7. **Both `§/C` and abbreviated `§/C{id}` are still accepted** for
    forms (1), (2), (3), and (4) — no source file needs to be rewritten.
@@ -223,17 +223,17 @@ generated C# passes the caller's storage, never a copy. Contract:
 `docs/plans/v0.25-refout-contract.md` (#1427); implementation #943.
 
 ```calor
-§M{m001:RefOutDemo}
-  §F{f001:Bump:pub} (i32:x:ref) -> void
+§M{RefOutDemo}
+  §F{Bump:pub} (i32:x:ref) -> void
     §ASSIGN x (+ x 1)
 
-  §F{f002:ParseOr:pub} (str:text, i32:fallback) -> i32
+  §F{ParseOr:pub} (str:text, i32:fallback) -> i32
     §B{~n:i32} 0
-    §IF{if1} §C{Int32.TryParse} §A text §A{out} n §/C
+    §IF §C{Int32.TryParse} §A text §A{out} n §/C
       §R n
     §R fallback
 
-  §F{f003:Main:pub} () -> i32
+  §F{Main:pub} () -> i32
     §B{~count:i32} 1
     §C{Bump} §A{ref} count §/C
     §R (+ count §C{ParseOr} §A "40" §A 0 §/C)

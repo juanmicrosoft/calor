@@ -177,7 +177,7 @@ The Calor skills teach Claude:
 
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
-- Conditional statements: `§IF{id} condition` with an indented body
+- Conditional statements: `§IF condition` with an indented body
 - Type system: `i32`, `f64`, `str`, `bool`, nullable types (`?str`), arrays
 
 ### Best Practices
@@ -206,26 +206,26 @@ If you're using Claude outside of Claude Code, you can teach it Calor by includi
 I'm working with Calor, a language for AI agents that compiles to C#.
 
 Key syntax:
-- §M{id:Name} - Module; body indents below
-- §F{id:Name:vis} - Function (pub/pri); body indents below
+- §M{Name} - Module; body indents below
+- §F{Name:vis} - Function (pub/pri); body indents below
 - §I{type:name} - Input parameter
 - §O{type} - Output type
 - §E{cw,fs:r,net:rw} - Effects (console write, file read, network)
 - §Q condition - Requires (precondition)
 - §S condition - Ensures (postcondition)
-- §L{id:var:from:to:step} - Loop; body indents below
-- §IF{id} cond with an indented body; §EI/§EL branches align with §IF
+- §L{var:from:to:step} - Loop; body indents below
+- §IF cond with an indented body; §EI/§EL branches align with §IF
 - §P expr - Print
 - §R expr - Return
 - (+ a b), (* a b), (== a b) - Lisp-style expressions
 
 Example:
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
+§M{FizzBuzz}
+  §F{Main:pub}
     §O{void}
     §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0)
         §P "FizzBuzz"
       §EI (== (% i 3) 0)
         §P "Fizz"
@@ -257,9 +257,9 @@ if (x > 0) {
 
 Calor code:
 ```
-§IF{if1} (> x 0)
-  §L{for1:i:0:n:1}
-    §IF{if2} (> y 0)
+§IF (> x 0)
+  §L{i:0:n:1}
+    §IF (> y 0)
       // ...
 ```
 
@@ -271,10 +271,10 @@ Tell Claude: "Change the loop `for1` to start at 1 instead of 0"
 
 ```
 // Before
-§L{for1:i:0:n:1}
+§L{i:0:n:1}
 
 // After
-§L{for1:i:1:n:1}
+§L{i:1:n:1}
 ```
 
 The ID `for1` uniquely identifies the target. No confusion with other loops.
@@ -282,7 +282,7 @@ The ID `for1` uniquely identifies the target. No confusion with other loops.
 ### 3. Explicit Contracts for Verification
 
 ```
-§F{f001:CalculateInterest:pub}
+§F{CalculateInterest:pub}
   §I{f64:principal}
   §I{f64:rate}
   §I{i32:years}
@@ -302,7 +302,7 @@ Claude can verify:
 ### 4. Effects for Side Effect Analysis
 
 ```
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db:rw,net:rw,cw}  // Explicit effects
@@ -330,13 +330,13 @@ that n >= 0 and postcondition that result >= 1
 
 **Response:**
 ```
-§M{m001:Math}
-  §F{f001:Factorial:pub}
+§M{Math}
+  §F{Factorial:pub}
     §I{i32:n}
     §O{i32}
     §Q (>= n 0)
     §S (>= result 1)
-    §IF{if1} (<= n 1)
+    §IF (<= n 1)
       §R 1
     §EL
       §R (* n §C{Factorial} §A (- n 1) §/C)
@@ -348,7 +348,7 @@ that n >= 0 and postcondition that result >= 1
 ```
 Is there a bug in this Calor code?
 
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -370,7 +370,7 @@ Otherwise division by zero is possible.
 ```
 Refactor this to extract the calculation into a separate function:
 
-§F{f001:Main:pub}
+§F{Main:pub}
   §O{void}
   §E{cw}
   §B{x} (* 5 5)
@@ -379,12 +379,12 @@ Refactor this to extract the calculation into a separate function:
 
 **Response:**
 ```
-§F{f001:Square:priv}
+§F{Square:priv}
   §I{i32:n}
   §O{i32}
   §R (* n n)
 
-§F{f002:Main:pub}
+§F{Main:pub}
   §O{void}
   §E{cw}
   §B{x} §C{Square} §A 5 §/C

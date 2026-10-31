@@ -1,134 +1,85 @@
 ---
 title: ids
-description: Validate, materialize, and index Calor declaration IDs
+description: Synchronize, validate, and index tooling-maintained declaration identities
 ---
 
-```bash
-calor ids <command> [paths] [options]
+Calor declarations have **no IDs in source**. Tools maintain their persistent
+identities in the project's `.calor/ids.json` sidecar. Commit that file alongside
+the source; do not copy its IDs into declaration headers.
+
+```calor
+§M{Calculator}
+  §F{Double:pub} (i32:value) -> i32
+    §R (* value 2)
 ```
 
-Current Calor syntax permits structural openers without source IDs. The parser
-gives those declarations in-memory `_auto` IDs; use `ids assign` only when your
-repository needs explicit, durable source identity.
+Build, check, watch, migration, and project indexing synchronize their actual
+active inputs automatically. They do not recursively enroll every `.calr` file
+in a repository. Frozen historical inputs stay outside that active input set.
 
 | Command | Purpose |
 |:--------|:--------|
-| `check` | Validate source IDs, including prefixes, formats, duplicate values, and test-ID policy |
-| `assign` | Add compact IDs to declarations that omit them and optionally repair duplicates |
-| `index` | Write a JSON declaration index |
+| `sync` | Reconcile registered inputs, register explicit inputs, or recover an interrupted transaction |
+| `check` | Synchronize selected active inputs and validate their persisted identities |
+| `index` | Export a declaration index using sidecar identities |
 
----
+## `ids sync`
+
+```bash
+# Explicit registration when using identity tooling without a build.
+calor ids sync . --register src/Calculator.calr
+
+# Reconcile existing registrations and recover interrupted transactions.
+calor ids sync .
+```
+
+The project directory owns the sidecar. Without `--register`, `sync` reconciles
+the already registered files. It never writes IDs into source.
+
+Unambiguous changes preserve identity. If several old and new declarations
+could match, synchronization fails without changing the sidecar. Use a
+transactional rename or move tool to supply an exact mapping instead of choosing
+an ID manually.
 
 ## `ids check`
 
 ```bash
-calor ids check <paths...> [options]
+calor ids check src/Calculator.calr
+calor ids check src/Calculator.calr --format json
+calor ids check .
 ```
 
-| Option | Description |
-|:-------|:------------|
-| `--allow-test-ids` | Allow short IDs such as `f001` and `m001` outside test paths |
-| `-v`, `--verbose` | Show file-processing detail in text mode |
-| `-f`, `--format <text\|json>` | Select text output or the schema 2.0 machine envelope |
+An explicit file argument selects an active input. A directory selects its
+registered inputs, including validated pending registrations needed for recovery;
+it does not scan every source file below that directory.
 
-Exit code `0` means every scanned ID passed; `1` means the command found an ID
-problem or no `.calr` inputs. JSON mode writes one envelope to stdout and keeps
-human diagnostics on stderr.
-
-```bash
-calor ids check src/
-calor ids check src/ --format json
-```
-
-The check validates the current tree. It cannot infer from a standalone snapshot
-that one otherwise-valid ID was replaced by another; use version control or an
-edit hook when ID-churn detection matters.
-
----
-
-## `ids assign`
-
-```bash
-calor ids assign <paths...> [options]
-```
-
-| Option | Short | Description |
-|:-------|:------|:------------|
-| `--dry-run` | `-n` | Preview assignments without writing files |
-| `--fix-duplicates` | | Keep the first occurrence and reassign later duplicates |
-| `--allow-test-ids` | | Leave allowed short test IDs unchanged |
-| `--verbose` | `-v` | List changed files and assignments |
-
-Assignments use the current compact format, such as `f_7k9m2npqrstv`.
-
-```bash
-calor ids assign src/ --dry-run
-calor ids assign src/
-calor ids assign src/ --fix-duplicates
-```
-
----
+The check rejects duplicate IDs, invalid kind prefixes, malformed sidecars,
+ambiguous reconciliation, and unavailable identity state. Invalid source retains
+its lexer or parser diagnostics. Identity failures use `Calor0806`.
+`--format json` returns the shared diagnostic envelope.
 
 ## `ids index`
 
 ```bash
-calor ids index <paths...> [--output <file>]
+calor ids index src/Calculator.calr --output declaration-index.json
 ```
 
-`--output` (`-o`) defaults to `calor.ids.json`. The file contains an array of
-entries:
+An exported index describes declarations and their identities. It is a report,
+not another authoritative store. Output cannot overwrite `.calr` source or a file
+directly inside `.calor`.
 
-```json
-[
-  {
-    "id": "f_7k9m2npqrstv",
-    "kind": "Function",
-    "name": "Calculate",
-    "file": "src/calculator.calr",
-    "line": 3
-  }
-]
-```
+## Refactoring and recovery
 
----
+MCP and LSP refactoring preserve exact identity across supported renames and
+moves. Source and sidecar changes travel together. LSP rename requires a client
+with transactional text-edit support and refuses unsaved buffers that differ
+from disk.
 
-## Formats and Policy
+An interrupted journaled update recovers during synchronization. Recovery
+refuses to overwrite a conflicting external edit. Independent branch additions
+can reconcile from ordinary or diff3 Git conflict markers; conflicting changes
+to one identity require an explicit resolution.
 
-The canonical form is a kind prefix plus 12 lowercase Crockford Base32
-characters. The compiler still accepts legacy 26-character uppercase ULID
-payloads.
-
-| Kind | Compact example |
-|:-----|:----------------|
-| Module | `m_3hj8x2bw9pkq` |
-| Function | `f_7k9m2npqrstv` |
-| Class | `c_z4w7n5q2gxht` |
-| Method | `mt_5v8b3kxq2nhp` |
-| Constructor | `ctor_9m4z7x2qhwjt` |
-
-Short sequential IDs are accepted in `tests/`, `docs/`, and `examples/`.
-Formatting preserves explicit IDs. The legacy `calor fix --compact-ids`
-migration option has been removed.
-
----
-
-## Suggested Workflow
-
-```bash
-# Compact authoring form is valid
-calor -i src/app.calr -o generated/app.g.cs
-
-# Materialize persistent IDs when external tools need them
-calor ids assign src/ --dry-run
-calor ids assign src/
-
-# Validate in CI and generate an index for navigation tools
-calor ids check src/
-calor ids index src/ --output calor.ids.json
-```
-
-## See Also
-
-- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Identity semantics and limits
-- [calor fix](/docs/cli/fix/) - Reversible syntax migrations
-- [Structured Output](/docs/cli/structured-output/) - Envelope behavior and exit codes
+The old source-rewriting `ids assign` command is removed. Use `ids sync`, not
+source-ID insertion or duplicate reassignment. See
+[Stable Identifiers](/docs/philosophy/stable-identifiers/) for the identity model.

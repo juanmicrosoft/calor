@@ -87,9 +87,9 @@ A module declares the semantics version it was written for with a
 `§SEMVER` directive, conventionally the first line of the module body:
 
 ```calor
-§M{m001:MyModule}
+§M{MyModule}
   §SEMVER{2.0.0}
-  §F{f001:Main:pub} () -> void
+  §F{Main:pub} () -> void
     §E{}
     §R
 ```
@@ -395,7 +395,7 @@ Example — refused legacy module:
 
 <!-- drift:ignore -->
 ```calor
-§M{m1:Legacy}
+§M{Legacy}
   §SEMVER{1.0.0}
 ```
 

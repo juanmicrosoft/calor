@@ -38,8 +38,9 @@ new inputs explicitly or use the ordinary build/project input discovery.
 Neither command writes IDs into source.
 
 `ids check` validates sidecar identities, including duplicate IDs, kind prefixes,
-and supported payload formats. `--allow-test-ids` allows short test identities in
-the sidecar. `--format json` returns the shared diagnostic envelope, including
+and supported canonical payload formats. The compatibility flag `--allow-test-ids`
+does not permit noncanonical entries in persisted sidecars.
+`--format json` returns the shared diagnostic envelope, including
 input, parse, and identity failures. Invalid source keeps its lexer/parser
 diagnostics; unavailable or ambiguous persisted identity uses `Calor0806`.
 An exported index is a report, not another authoritative identity store.
@@ -85,11 +86,12 @@ changed overloads remain ambiguous unless tooling supplies an explicit mapping.
 Failed parsing or ambiguous reconciliation must not write a partial sidecar.
 
 The shared declaration inventory includes delegates, events, records, unions,
-fields, variants, local functions, and proof obligations, including declarations
+fields, variants, and proof obligations, including declarations
 inside accessor bodies and conditional branches. Unsupported declaration kinds
 and indistinguishable unnamed proofs fail explicitly rather than disappearing.
 Accessor-local declarations have separate get, set, init, add, and remove scopes.
-Named modules use module identities; static classes use class identities.
+Module declarations use module identities; legacy static-class declarations
+retain class identities.
 
 ## Transactions and refactoring
 

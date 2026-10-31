@@ -300,6 +300,7 @@
     "tests/TestData/InteropScope/W1/transcripts/W1-F1-refout.json",
     "tests/TestData/InteropScope/W1/transcripts/W1-F2-interpolation.json",
     "tests/TestData/InteropScope/W1/transcripts/W1-F3-local-functions.json",
+    "tests/TestData/InteropScope/W1/transcripts/W1-F4-iterator-accessor.json",
     "tests/TestData/InteropScope/W1/transcripts/W1-F5-arrays.json",
     "tests/TestData/InteropScope/W1/transcripts/W1-F6-project.json",
     "tests/TestData/InteropScope/W1/transcripts/W1-F6-rescue.json"

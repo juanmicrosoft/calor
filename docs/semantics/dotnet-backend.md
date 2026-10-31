@@ -296,7 +296,7 @@ type; no Calor-specific absence/error runtime types are required.
 
 **Calor:**
 ```calor
-§R §W{sw1} code
+§R §W code
   §K 200 → "OK"
   §K 404 → "Not Found"
   §K _ → "Unknown"
@@ -369,7 +369,7 @@ catch (IOException ex) when (ex.Message == "Not found")
 
 **Calor async function:**
 ```calor
-§F{f1:fetchData:pub:async}
+§F{fetchData:pub:async}
   §O{Task{string}}
   ...
 ```
@@ -414,11 +414,11 @@ await expr.ConfigureAwait(false)
 
 **Calor:**
 ```calor
-§CL{c1:Circle:pub:seal}
+§CL{Circle:pub:seal}
   §EXT{Shape}
   §IMPL{IDrawable}
   §FLD{f64:Radius:priv}
-  §MT{mt1:Area:pub:over} () -> f64
+  §MT{Area:pub:over} () -> f64
     §R (* 3.14159 (* this.Radius this.Radius))
 ```
 
@@ -457,9 +457,9 @@ arguments, not property initializers.
 
 **Calor:**
 ```calor
-§M{m1:Records}
+§M{Records}
   §CSHARP{public record Person(string Name, int Age);}§/CSHARP
-  §F{f1:Create:pub} () -> Person
+  §F{Create:pub} () -> Person
     §E{alloc}
     §R §NEW{Person} §A[Age] 30 §A[Name] "Alice"
 ```

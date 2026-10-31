@@ -143,11 +143,11 @@ means a nullable `Foo` reference. These annotations do not wrap the value.
 Postfix spellings such as `str?` are also nullable annotations.
 
 ```calor
-§M{m1:NullableReferenceExample}
-  §F{f1:Identity:pub} (?str:value) -> ?str
+§M{NullableReferenceExample}
+  §F{Identity:pub} (?str:value) -> ?str
     §E{}
     §R value
-  §F{f2:Greeting:pub} () -> ?str
+  §F{Greeting:pub} () -> ?str
     §E{}
     §B{greeting:?str} "hello"
     §R greeting
@@ -167,8 +167,8 @@ Use ordinary values or `null` for absence. A fallback uses the existing
 null-coalescing expression:
 
 ```calor
-§M{m1:NullableFallback}
-  §F{f1:Greeting:pub} (?str:name) -> str
+§M{NullableFallback}
+  §F{Greeting:pub} (?str:name) -> str
     §E{}
     §R (?? name "anonymous")
 ```
@@ -181,10 +181,10 @@ Return the ordinary success type and throw an exception on failure. Declare
 the exception effect `throw` (and `alloc` when constructing the exception).
 
 ```calor
-§M{m1:Division}
-  §F{f1:Divide:pub} (i32:a, i32:b) -> i32
+§M{Division}
+  §F{Divide:pub} (i32:a, i32:b) -> i32
     §E{throw,alloc}
-    §IF{if1} (== b 0)
+    §IF (== b 0)
       §TH §NEW{ArgumentException} §A "Division by zero" §/NEW
     §R (/ a b)
 ```
@@ -233,7 +233,7 @@ Generic types can be nested.
 When defining generic functions or classes, type parameters (like `T`, `U`) can be used as types.
 
 ```
-§F{f001:First:pub}<T>
+§F{First:pub}<T>
   §I{List<T>:items}
   §O{T}
   §R items[0]
@@ -313,9 +313,9 @@ instead, such as a field or property default or an element of another collection
 collection on one line and close it with its id:
 
 ```
-§FLD{List<i32>:xs:pub} = §LIST{xs:i32} 1 2 3 §/LIST{xs}
-§FLD{List<List<i32>>:grid:pub} = §LIST{grid:List<i32>} §LIST{row:i32} 1 §/LIST{row} §/LIST{grid}
-§PROP{p1:Tags:HashSet<str>:pub:get} = §HSET{tags:str} "a" "b" §/HSET{tags}
+§FLD{List<i32>:xs:pub} = §LIST{i32} 1 2 3 §/LIST
+§FLD{List<List<i32>>:grid:pub} = §LIST{List<i32>} §LIST{i32} 1 §/LIST §/LIST
+§PROP{Tags:HashSet<str>:pub:get} = §HSET{str} "a" "b" §/HSET
 ```
 
 This compiles to `new List<int>() { 1, 2, 3 }`: the elements are added in order, as a C#
@@ -363,7 +363,7 @@ collection initializer does.
 Types matter in contracts for proper comparisons:
 
 ```
-§F{f001:Clamp:pub}
+§F{Clamp:pub}
   §I{i32:value}
   §I{i32:min}
   §I{i32:max}

@@ -391,7 +391,7 @@ end_block:
 
 **Source:**
 ```calor
-§IF{if1} (condition)
+§IF (condition)
   then_body
 §EL
   else_body
@@ -413,7 +413,7 @@ end_label:
 
 **Source:**
 ```calor
-§WH{w1} (condition)
+§WH (condition)
   body
 ```
 
@@ -431,7 +431,7 @@ loop_exit:
 
 **Source:**
 ```calor
-§L{for1:i:0:10:1}
+§L{i:0:10:1}
   body
 ```
 
@@ -452,7 +452,7 @@ loop_exit:
 
 **Source:**
 ```calor
-§R §W{sw1} target
+§R §W target
   §K pattern1 → body1
   §K pattern2 → body2
   §K _ → default
@@ -486,7 +486,7 @@ match_end:
 
 **Source:**
 ```calor
-§F{f1:myFunc:pub} (i32:x) -> i32
+§F{myFunc:pub} (i32:x) -> i32
   §Q (> x 0)
   §R x
 ```
@@ -505,7 +505,7 @@ precond_ok:
 
 **Source:**
 ```calor
-§F{f1:myFunc:pub} (i32:expr) -> i32
+§F{myFunc:pub} (i32:expr) -> i32
   §S (> result 0)
   §R expr
 ```
@@ -629,7 +629,7 @@ public interface ICnfVisitor<T>
 ### Source
 
 ```calor
-§F{f1:sumIfPositive:pub}
+§F{sumIfPositive:pub}
   §I{i32:a} §I{i32:b}
   §O{i32}
   §Q (&& (> a 0) (> b 0))

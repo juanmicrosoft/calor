@@ -15,11 +15,11 @@ Refinement types let you constrain values at the type level. A refined type is a
 
 | Syntax | Purpose | Example |
 |:-------|:--------|:--------|
-| `§RTYPE{id:Name:base} (pred)` | Define a named refinement type | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` |
-| `§ITYPE{id:Name:base:size}` | Define an indexed (size-parameterized) type | `§ITYPE{it1:SizedList:List:n}` |
-| `§ITYPE{id:Name:base:size} (pred)` | Indexed type with size constraint | `§ITYPE{it1:NonEmpty:List:n} (> # INT:0)` |
+| `§RTYPE{Name:base} (pred)` | Define a named refinement type | `§RTYPE{NatInt:i32} (>= # INT:0)` |
+| `§ITYPE{Name:base:size}` | Define an indexed (size-parameterized) type | `§ITYPE{SizedList:List:n}` |
+| `§ITYPE{Name:base:size} (pred)` | Indexed type with size constraint | `§ITYPE{NonEmpty:List:n} (> # INT:0)` |
 | `§I{type:param} \| (pred)` | Inline refinement on a parameter | `§I{i32:age} \| (>= # INT:0)` |
-| `§PROOF{id:desc} (expr)` | Proof obligation (assert a fact) | `§PROOF{p1:positive} (>= x INT:0)` |
+| `§PROOF{desc} (expr)` | Proof obligation (assert a fact) | `§PROOF{positive} (>= x INT:0)` |
 | `#` | Self-reference (the value being refined) | `(>= # INT:0)` |
 
 ---
@@ -31,7 +31,7 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 ### Syntax
 
 ```
-§RTYPE{id:Name:baseType} (predicate)
+§RTYPE{Name:baseType} (predicate)
 ```
 
 - `id` — unique identifier (e.g., `r1`)
@@ -41,7 +41,7 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 
 Named predicates are **closed**: `#` is their only external value input. They
 cannot capture a parameter, local, global, receiver, property or function reference
-from a later use site. For example, `§RTYPE{r1:Above:i32} (> # n)` is rejected with
+from a later use site. For example, `§RTYPE{Above:i32} (> # n)` is rejected with
 `Calor1105` at `n`, even when every use happens to have a parameter named `n`.
 Use an inline parameter predicate for relationships such as `(i32:n, i32:x | (> # n))`.
 
@@ -67,9 +67,9 @@ operations. These errors are reported at the offending reference/expression
 ### Examples
 
 ```
-§RTYPE{r1:NatInt:i32} (>= # INT:0)
-§RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-§RTYPE{r3:NonEmpty:str} (> (len #) INT:0)
+§RTYPE{NatInt:i32} (>= # INT:0)
+§RTYPE{Port:i32} (&& (>= # INT:1) (<= # INT:65535))
+§RTYPE{NonEmpty:str} (> (len #) INT:0)
 ```
 
 These read as:
@@ -82,9 +82,9 @@ These read as:
 Once defined, use the name as a parameter type:
 
 ```
-§RTYPE{r1:NatInt:i32} (>= # INT:0)
+§RTYPE{NatInt:i32} (>= # INT:0)
 
-  §F{f001:Process:pub}
+  §F{Process:pub}
     §I{NatInt:count}
     §O{void}
   // count is guaranteed non-negative
@@ -99,12 +99,12 @@ when one predicate implies the other. Binding, passing, returning or assigning a
 `Nat` is expected is a type error (`Calor0202`):
 
 ```calor
-§M{m001:Ids}
-  §RTYPE{r1:Nat:i32} (>= # INT:0)
-  §RTYPE{r2:Pos:i32} (> # INT:0)
-  §F{f001:ToNat:pub} (i32:v) -> Nat
+§M{Ids}
+  §RTYPE{Nat:i32} (>= # INT:0)
+  §RTYPE{Pos:i32} (> # INT:0)
+  §F{ToNat:pub} (i32:v) -> Nat
     §R v
-  §F{f002:Use:pub} (Pos:p) -> Nat
+  §F{Use:pub} (Pos:p) -> Nat
     §B{n:Nat} §C{ToNat} §A p §/C
     §R n
 ```
@@ -112,10 +112,10 @@ when one predicate implies the other. Binding, passing, returning or assigning a
 Binding the `Pos` directly is rejected with `Calor0202`:
 
 ```calor expect=Calor0202
-§M{m001:Ids}
-  §RTYPE{r1:Nat:i32} (>= # INT:0)
-  §RTYPE{r2:Pos:i32} (> # INT:0)
-  §F{f001:Use:pub} (Pos:p) -> Nat
+§M{Ids}
+  §RTYPE{Nat:i32} (>= # INT:0)
+  §RTYPE{Pos:i32} (> # INT:0)
+  §F{Use:pub} (Pos:p) -> Nat
     §B{n:Nat} p
     §R n
 ```
@@ -180,8 +180,8 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
 The same predicate can be attached directly in an inline signature:
 
 ```calor
-§M{m1:Ranges}
-  §F{f1:Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
+§M{Ranges}
+  §F{Upper:pub} (i32:lo, i32:hi | (> # lo)) -> i32
     §S (> result lo)
     §R hi
 ```
@@ -216,7 +216,7 @@ replacement before removal; they must not be erased or moved onto fake parameter
 ### Examples
 
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b} | (!= # INT:0)         // b must be non-zero
   §O{i32}
@@ -224,7 +224,7 @@ replacement before removal; they must not be erased or moved onto fake parameter
 ```
 
 ```
-§F{f002:SetPort:pub}
+§F{SetPort:pub}
   §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
   §O{void}
   // ...
@@ -245,7 +245,7 @@ Inline refinements can coexist with default parameter values:
 The `#` symbol refers to the value being constrained. It is only valid inside refinement predicates:
 
 ```
-§RTYPE{r1:Positive:i32} (> # INT:0)     // # = the i32 value
+§RTYPE{Positive:i32} (> # INT:0)     // # = the i32 value
 §I{i32:x} | (>= # INT:0)                // # = x
 ```
 
@@ -260,7 +260,7 @@ A proof obligation asserts that a condition holds at a specific point in the fun
 ### Syntax
 
 ```
-§PROOF{id:description} (boolean-expression)
+§PROOF{description} (boolean-expression)
 §PROOF{id} (boolean-expression)
 ```
 
@@ -270,14 +270,14 @@ A proof obligation asserts that a condition holds at a specific point in the fun
 ### Examples
 
 ```
-§F{f001:Transfer:pub}
+§F{Transfer:pub}
   §I{i32:balance}
   §I{i32:amount} | (> # INT:0)
   §O{i32}
   §Q (>= balance amount)
 
   §B{newBalance:i32} (- balance amount)
-  §PROOF{p1:non-negative} (>= newBalance INT:0)
+  §PROOF{non-negative} (>= newBalance INT:0)
 
   §R newBalance
 ```
@@ -302,8 +302,8 @@ Indexed types are size-parameterized types — a collection type annotated with 
 ### Syntax
 
 ```
-§ITYPE{id:Name:baseType:sizeParam}                     // no constraint
-§ITYPE{id:Name:baseType:sizeParam} (constraint on #)   // with constraint
+§ITYPE{Name:baseType:sizeParam}                     // no constraint
+§ITYPE{Name:baseType:sizeParam} (constraint on #)   // with constraint
 ```
 
 - `id` — unique identifier (e.g., `it1`)
@@ -315,9 +315,9 @@ Indexed types are size-parameterized types — a collection type annotated with 
 ### Examples
 
 ```
-§ITYPE{it1:SizedList:List:n}                            // List with n elements
+§ITYPE{SizedList:List:n}                            // List with n elements
 §ITYPE{it2:NonEmptyArr:i32[}:n} (> # INT:0)             // array with n > 0 elements
-§ITYPE{it3:BoundedVec:List:n} (&& (> # INT:0) (< # INT:1000))
+§ITYPE{BoundedVec:List:n} (&& (> # INT:0) (< # INT:1000))
 ```
 
 ### Using Indexed Types
@@ -325,9 +325,9 @@ Indexed types are size-parameterized types — a collection type annotated with 
 Declare a parameter with the indexed type name. The size parameter becomes a Z3 variable available in preconditions and postconditions:
 
 ```
-§ITYPE{it1:SizedList:List:n}
+§ITYPE{SizedList:List:n}
 
-  §F{f001:Sum:priv}
+  §F{Sum:priv}
     §I{SizedList:items}        // items has n elements
     §I{i32:n}                  // size parameter as explicit param
     §I{i32:i}
@@ -344,7 +344,7 @@ Indexed type definitions are erased in C#. Parameters with indexed type names ar
 
 | Calor | Emitted C# |
 |:------|:-----------|
-| `§ITYPE{it1:SizedList:List:n}` | *(nothing — erased)* |
+| `§ITYPE{SizedList:List:n}` | *(nothing — erased)* |
 | `§I{SizedList:items}` | `List items` |
 | `§I{SizedList<i32>:items}` | `List<int> items` |
 
@@ -356,11 +356,11 @@ Refinement types are a **compile-time construct**. In the emitted C#, they are e
 
 | Calor | Emitted C# |
 |:------|:-----------|
-| `§RTYPE{r1:NatInt:i32} (>= # INT:0)` | *(nothing — erased)* |
+| `§RTYPE{NatInt:i32} (>= # INT:0)` | *(nothing — erased)* |
 | `§I{NatInt:count}` | `int count` |
 | `§I{i32:x} \| (>= # INT:0)` | `int x` |
-| `§PROOF{p1:check} (cond)` (Discharged) | `// PROVEN: proof obligation [p1: check]` (default since v0.15); runtime guard with `--keep-proven-guards` |
-| `§PROOF{p1:check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
+| `§PROOF{check} (cond)` (Discharged) | `// PROVEN: proof obligation [p1: check]` (default since v0.15); runtime guard with `--keep-proven-guards` |
+| `§PROOF{check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
 
 The refinement constrains what values are valid. The obligation engine verifies those constraints and emits runtime guards only where verification fails.
 
@@ -421,20 +421,20 @@ Failed obligations emit warnings and guards instead of errors. Use during develo
 ## Complete Example
 
 ```
-§M{m001:Banking}
+§M{Banking}
 
 // Named refinement types
-  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
+  §RTYPE{PositiveAmount:i32} (> # INT:0)
+    §RTYPE{NonNegBalance:i32} (>= # INT:0)
 
-      §F{f001:Transfer:pub}
+      §F{Transfer:pub}
         §I{NonNegBalance:balance}
         §I{PositiveAmount:amount}
         §O{i32}
         §Q (>= balance amount)                  // sufficient funds
 
         §B{result:i32} (- balance amount)
-        §PROOF{p1:balance-safe} (>= result INT:0)
+        §PROOF{balance-safe} (>= result INT:0)
 
         §R result
 

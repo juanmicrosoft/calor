@@ -71,11 +71,11 @@ The [full list of build settings](/docs/cli/init/#build-settings) is on the
 ## 2. Add a Small Module
 
 ```calor
-§M{m001:Pricing}
-  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32
+§M{Pricing}
+  §F{ClampToCap:pub} (i32:amount, i32:cap) -> i32
     §Q (>= cap 0)
     §S (<= result cap)
-    §IF{if1} (> amount cap)
+    §IF (> amount cap)
       §R cap
     §R amount
 ```

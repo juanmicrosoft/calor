@@ -111,38 +111,38 @@ with default options:
 
 {/* w1-transcript: W1-F1-refout */}
 ```calor
-§M{m001:Inventory:overflow=unchecked}
+§M{Inventory:overflow=unchecked}
   §U{System.Collections.Generic}
 
-  §NS{ns_global:_global:global}
-    §M{c001:Inventory:pub}
-      §F{m002:ParseOr:pub} (str:text, i32:fallback) -> i32
+  §NS{_global:global}
+    §M{Inventory:pub}
+      §F{ParseOr:pub} (str:text, i32:fallback) -> i32
         §B{~n:i32} `default`
-        §IF{if003} §C{int.TryParse} §A text §A{out} n §/C
+        §IF §C{int.TryParse} §A text §A{out} n §/C
           §R n
         §R fallback
 
-      §F{m004:CountOf:pub} (Dict<str, i32>:stock, str:item) -> i32
+      §F{CountOf:pub} (Dict<str, i32>:stock, str:item) -> i32
         §B{~count:i32} `default`
         §C{stock.TryGetValue} §A item §A{out} count §/C
         §R count
 
-      §F{m005:IsNumber:pub} (str:text) -> bool
+      §F{IsNumber:pub} (str:text) -> bool
         §R §C{int.TryParse} §A text §A{out} _ §/C
 
-      §F{m006:Bump:pub} (i32:x:ref)
+      §F{Bump:pub} (i32:x:ref)
         §ASSIGN x (+ x 1)
 
-      §F{m007:Twice:pub} (i32:x:in) -> i32
+      §F{Twice:pub} (i32:x:in) -> i32
         §R (* x 2)
 
-      §F{m008:Run:pub} () -> i32
+      §F{Run:pub} () -> i32
         §B{~total:i32} 1
         §C{Bump} §A{ref} total §/C
         §R (+ §C{Twice} §A{in} total §/C §C{ParseOr} §A "40" §A 0 §/C)
 ```
 
-(`§NS{ns_global:_global:global}` stands for C#'s global namespace, and
+(`§NS{_global:global}` stands for C#'s global namespace, and
 `overflow=unchecked` keeps C#'s default integer overflow behavior.)
 
 **What converts natively:**
@@ -291,7 +291,8 @@ A C# local function converts natively when it is *bounded*:
   initializer, a `return` value or the value of a simple assignment. Any other use, such
   as `new Func<int, int>[] { Clamp }`, keeps the member as C#.
 
-It becomes a nested `§F`, emitted back as a C# `static` local function.
+It becomes a typed delegate binding with a static `§LAM`. Its binding keeps the
+local name and scope; active source has no local `§F` declaration.
 
 {/* w1-source: W1-F3-local-functions */}
 ```csharp
@@ -315,12 +316,11 @@ public static class Shapes
 
 {/* w1-transcript: W1-F3-local-functions */}
 ```calor
-§M{m001:Shapes:overflow=unchecked}
-  §NS{ns_global:_global:global}
-    §M{c001:Shapes:pub}
-      §F{m002:Area:pub} (i32:w, i32:h) -> i32
-        §F{f003:Clamp} (i32:v) -> i32
-          §R (? (< v 0) 0 v)
+§M{Shapes:overflow=unchecked}
+  §NS{_global:global}
+    §M{Shapes:pub}
+      §F{Area:pub} (i32:w, i32:h) -> i32
+        §B{Clamp:System.Func<i32, i32>} §LAM{static:v:i32} (? (< v 0) 0 v) §/LAM
         §R (* §C{Clamp} §A w §/C §C{Clamp} §A h §/C)
 
       §CSHARP{
@@ -384,26 +384,26 @@ public static class Grid
 
 {/* w1-transcript: W1-F5-arrays */}
 ```calor
-§M{m001:Grid:overflow=unchecked}
+§M{Grid:overflow=unchecked}
   §U{System.Collections.Generic}
 
-  §NS{ns_global:_global:global}
-    §M{c001:Grid:pub}
-      §F{m002:Pick:pub} (bool:wide, i32:v) -> i32[,]
+  §NS{_global:global}
+    §M{Grid:pub}
+      §F{Pick:pub} (bool:wide, i32:v) -> i32[,]
         §E{alloc}
-        §R §IF{tern000} wide → §ARR2D{arr2d003:arr2d003:i32} §ROW v (+ v 1) §/ARR2D{arr2d003} §EL → §ARR2D{arr2d005:arr2d005:i32} §ROW v §/ARR2D{arr2d005}
+        §R §IF wide → §ARR2D{i32} §ROW v (+ v 1) §/ARR2D §EL → §ARR2D{i32} §ROW v §/ARR2D
 
-      §F{m007:Sum:pub} (i32[]:xs, i32:start) -> i32
+      §F{Sum:pub} (i32[]:xs, i32:start) -> i32
         §B{~s:i32} start
-        §EACH{each008:x:var} xs
+        §EACH{x:var} xs
           §ASSIGN s (+ s x)
         §R s
 
-      §F{m009:Total:pub} (i32:v) -> i32
+      §F{Total:pub} (i32:v) -> i32
         §E{alloc}
-        §R §C{Sum} §A §ARR{arrI32010:i32} v (* v 2) §/ARR{arrI32010} §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
+        §R §C{Sum} §A §ARR{i32} v (* v 2) §/ARR §A §IDX2D §C{Pick} §A true §A v §/C 0 1 §/C
 
-      §F{m011:Mixed:pub} () -> i32
+      §F{Mixed:pub} () -> i32
         §RAW
         object[] items = { new List<int> { 1 }, 2 };
         §/RAW
@@ -435,15 +435,15 @@ none (`§YIELD` inside a getter is error `Calor0209`), so the converter keeps th
 
 {/* w1-transcript: W1-F4-iterator-accessor */}
 ```calor
-§M{m001:Countdown:overflow=unchecked}
+§M{Countdown:overflow=unchecked}
   §U{System.Collections.Generic}
 
-  §NS{ns_global:_global:global}
-    §CL{c001:Countdown:pub}
+  §NS{_global:global}
+    §CL{Countdown:pub}
       §FLD{i32:Start:pub} = 3
 
-      §MT{m002:First:pub} () -> i32
-        §EACH{each003:s:var} Steps
+      §MT{First:pub} () -> i32
+        §EACH{s:var} Steps
           §R s
         §R 0
 

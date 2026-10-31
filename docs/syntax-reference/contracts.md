@@ -35,7 +35,7 @@ Preconditions specify what must be true when calling a function.
 Functions can have multiple preconditions:
 
 ```
-§F{f001:CreateUser:pub}
+§F{CreateUser:pub}
   §I{str:name}
   §I{i32:age}
   §O{User}
@@ -72,11 +72,11 @@ In postconditions, `result` refers to the return value:
 ### Examples
 
 ```
-§F{f001:Abs:pub}
+§F{Abs:pub}
   §I{i32:x}
   §O{i32}
   §S (>= result 0)                       // absolute value is non-negative
-  §IF{if1} (>= x 0)
+  §IF (>= x 0)
     §R x
   §EL
     §R (- 0 x)
@@ -87,7 +87,7 @@ In postconditions, `result` refers to the return value:
 ## Complete Contract Example
 
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:dividend}
   §I{i32:divisor}
   §O{i32}
@@ -156,7 +156,7 @@ parameter types. Declared custom `Length` members remain ordinary properties.
 ### Range Validation
 
 ```
-§F{f001:Clamp:pub}
+§F{Clamp:pub}
   §I{i32:value}
   §I{i32:min}
   §I{i32:max}
@@ -170,7 +170,7 @@ parameter types. Declared custom `Length` members remain ordinary properties.
 ### Non-Empty Collection
 
 ```
-§F{f001:First:pub}
+§F{First:pub}
   §I{List:items}
   §O{?Item}
   §Q (> (count items) 0)                 // list not empty
@@ -181,7 +181,7 @@ parameter types. Declared custom `Length` members remain ordinary properties.
 ### State Preservation
 
 ```
-§F{f001:Increment:pub}
+§F{Increment:pub}
   §I{i32:x}
   §O{i32}
   §S (== result (+ x 1))                 // result is exactly x + 1
@@ -191,7 +191,7 @@ parameter types. Declared custom `Length` members remain ordinary properties.
 ### Balance Transfers
 
 ```
-§F{f001:Transfer:pub}
+§F{Transfer:pub}
   §I{Account:from}
   §I{Account:to}
   §I{i32:amount}
@@ -262,7 +262,7 @@ Implication `p -> q` is equivalent to `!p || q`.
 #### All Array Elements Non-Negative
 
 ```
-§F{f001:ProcessArray:pub}
+§F{ProcessArray:pub}
   §I{i32:n}
   §O{bool}
   §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
@@ -272,7 +272,7 @@ Implication `p -> q` is equivalent to `!p || q`.
 #### Array Contains Target (Search Precondition)
 
 ```
-§F{f001:BinarySearch:pub}
+§F{BinarySearch:pub}
   §I{i32:n}
   §I{i32:target}
   §O{i32}
@@ -285,7 +285,7 @@ Implication `p -> q` is equivalent to `!p || q`.
 #### Matrix Symmetry (Multiple Variables)
 
 ```
-§F{f001:CheckSymmetric:pub}
+§F{CheckSymmetric:pub}
   §I{i32:n}
   §O{bool}
   §Q (forall ((i i32) (j i32))
@@ -342,7 +342,7 @@ The verifier emits an informational diagnostic for nested quantifiers to help id
 An agent can understand function behavior without reading implementation:
 
 ```
-§F{f001:SquareRoot:pub}
+§F{SquareRoot:pub}
   §I{f64:x}
   §O{f64}
   §Q (>= x 0)                            // Only works for non-negative
@@ -388,7 +388,7 @@ Add context to failures:
 Recommended order in function definition:
 
 ```
-§F{id:name:vis}
+§F{name:vis}
   §I{...}           // 1. Inputs
   §O{...}           // 2. Output
   §E{...}           // 3. Effects (optional)
@@ -472,7 +472,7 @@ A common question: Do contracts count as effects?
 **No.** Contract checks are verification mechanisms, not operational effects:
 
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}

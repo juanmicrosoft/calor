@@ -100,8 +100,8 @@ paths may bypass lifecycle hooks.
 After init, create `.calr` files and they compile automatically. Create `Program.calr`:
 
 ```
-§M{m001:MyApp}
-  §F{f001:Main:pub}
+§M{MyApp}
+  §F{Main:pub}
     §O{void}
     §E{cw}
     §P "Hello from Calor!"
