@@ -479,7 +479,7 @@ public sealed class CSharpToCalorConverter
         // of that missing context.
         var model = CSharpCompilation.Create(
             "PreservationSourceValidation", [tree],
-            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)])
+            GeneratedCSharpCompiler.References)
             .GetSemanticModel(tree);
         var types = model.GetTypeInfo(expression);
         return types.Type is { SpecialType: not SpecialType.None, TypeKind: not TypeKind.Error }
@@ -950,8 +950,8 @@ public sealed class CSharpToCalorConverter
             return new ConversionResult { Success = false, Context = context };
         }
 
-        // Use replacement fallback to handle files with unpaired surrogates
-        // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
+        // Decode strictly and retain source BOMs; malformed bytes must not
+        // become replacement text that could be reported as preserved.
         var source = await ReadSourceFileAsync(csharpFilePath, cancellationToken);
         var result = Convert(source, csharpFilePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();

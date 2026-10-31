@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Xunit;
@@ -146,6 +147,52 @@ public sealed class LosslessConversionContractTests
                 "Preserved.calr", new CompilationOptions { DeferGeneratedOutputValidation = true });
             Assert.False(compiled.HasErrors);
             Assert.Equal(original, compiled.GeneratedCode);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DefaultCli_Csproj_MissingGeneratedContextWritesExactOriginalAsUnverified()
+    {
+        var directory = Directory.CreateTempSubdirectory("calor-default-generated-context-").FullName;
+        var project = Path.Combine(directory, "Original.csproj");
+        File.WriteAllText(project, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <Target Name="GenerateRequiredType" BeforeTargets="CoreCompile">
+                <WriteLinesToFile File="$(IntermediateOutputPath)Generated.cs"
+                  Lines="public class GeneratedDependency { }" Overwrite="true" />
+                <ItemGroup><Compile Include="$(IntermediateOutputPath)Generated.cs" /></ItemGroup>
+              </Target>
+            </Project>
+            """);
+        const string original = "[assembly: System.Reflection.AssemblyMetadata(\"oracle\", \"generated\")]\r\npublic class Consumer { public GeneratedDependency Create() => new GeneratedDependency(); }\r\n";
+        var source = Path.Combine(directory, "Consumer.cs");
+        File.WriteAllText(source, original);
+        try
+        {
+            await RestoreAsync(project);
+            await RunProjectCommandAsync(project, "build");
+            var reportPath = Path.Combine(directory, "report.json");
+            var migrated = CliTestHarness.RunCli(directory, "migrate", project, "--report", reportPath);
+            Assert.True(migrated.ExitCode == 0, migrated.StdOut + migrated.StdErr);
+            var report = JsonDocument.Parse(File.ReadAllText(reportPath))
+                .RootElement.GetProperty("data");
+            Assert.Equal(1, report.GetProperty("summary").GetProperty("totalFiles").GetInt32());
+            Assert.Equal(0, report.GetProperty("summary").GetProperty("failedFiles").GetInt32());
+            var file = Assert.Single(report.GetProperty("fileResults").EnumerateArray());
+            Assert.Equal("unverified", file.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+            Assert.Equal("failed", file.GetProperty("conversionPaths").GetProperty("roundTrip").GetString());
+            Assert.Contains(file.GetProperty("issues").EnumerateArray(), issue =>
+                issue.GetProperty("feature").GetString() == "roundtrip-csharp-validation"
+                && issue.GetProperty("message").GetString()!.Contains("CS0246", StringComparison.Ordinal));
+            var compiled = Program.Compile(File.ReadAllText(Path.ChangeExtension(source, ".calr")),
+                "Consumer.calr", new CompilationOptions { DeferGeneratedOutputValidation = true });
+            Assert.False(compiled.HasErrors);
+            Assert.Equal(File.ReadAllBytes(source), Encoding.UTF8.GetBytes(compiled.GeneratedCode!));
         }
         finally
         {
@@ -855,7 +902,10 @@ public sealed class LosslessConversionContractTests
         }
     }
 
-    private static async Task RestoreAsync(string projectPath)
+    private static Task RestoreAsync(string projectPath)
+        => RunProjectCommandAsync(projectPath, "restore");
+
+    private static async Task RunProjectCommandAsync(string projectPath, string command)
     {
         var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet")
         {
@@ -863,9 +913,9 @@ public sealed class LosslessConversionContractTests
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        startInfo.ArgumentList.Add("restore");
+        startInfo.ArgumentList.Add(command);
         startInfo.ArgumentList.Add(projectPath);
-        startInfo.ArgumentList.Add("--ignore-failed-sources");
+        startInfo.ArgumentList.Add(command == "restore" ? "--ignore-failed-sources" : "--no-restore");
         using var process = System.Diagnostics.Process.Start(startInfo)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();

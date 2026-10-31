@@ -924,7 +924,7 @@ public sealed class ProjectMigrator
                 var exact = string.Equals(result.GeneratedCSharp,
                     await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken),
                     StringComparison.Ordinal);
-                if (!exact || projectFilePath != null)
+                if (!exact)
                 {
                     result.Status = FileMigrationStatus.Failed;
                     result.OutputPath = null;
