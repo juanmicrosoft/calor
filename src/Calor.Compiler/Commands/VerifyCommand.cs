@@ -696,24 +696,46 @@ public static class VerifyCommand
             return 2;
         }
 
-        static Ast.ModuleNode? ParseFile(FileInfo file, out bool hadErrors)
+        static Ast.ModuleNode? ParseFile(FileInfo file, out bool hadErrors, out string? identityError)
         {
             hadErrors = false;
+            identityError = null;
             if (!file.Exists)
             {
                 hadErrors = true;
                 return null;
             }
             var diagnostics = new Diagnostics.DiagnosticBag();
-            var lexer = new Parsing.Lexer(File.ReadAllText(file.FullName), diagnostics);
-            var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
+            var source = File.ReadAllText(file.FullName);
+            var lexer = new Parsing.Lexer(source, diagnostics);
+            var tokens = lexer.TokenizeAllForParser();
+            if (diagnostics.HasErrors)
+            {
+                hadErrors = true;
+                return null;
+            }
+            var parser = new Parsing.Parser(tokens, diagnostics);
             var module = parser.Parse();
             hadErrors = diagnostics.HasErrors;
+            if (!hadErrors)
+            {
+                try
+                {
+                    Ids.DeclarationIdentityStore.SyncActiveInputs([file.FullName]);
+                    Ids.DeclarationIdentityStore.AttachIfRegistered(file.FullName, source, module);
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+                    or System.Text.Json.JsonException or UnauthorizedAccessException)
+                {
+                    identityError = $"--weakening-check: declaration identity unavailable for '{file.FullName}': {ex.Message}";
+                    return null;
+                }
+            }
             return module;
         }
 
         static Ast.FunctionNode? FindDeclaration(Ast.ModuleNode? module, string id)
-            => module?.Functions.FirstOrDefault(f => f.Id == id);
+            => module?.Functions.SingleOrDefault(f => f.ToolingId == id);
 
         static List<Ast.ExpressionNode> Preconditions(Ast.FunctionNode fn)
             => fn.Preconditions.Select(p => p.Condition).ToList();
@@ -759,7 +781,12 @@ public static class VerifyCommand
             return 0;
         }
 
-        var frozenModule = ParseFile(files[0], out var frozenErrors);
+        var frozenModule = ParseFile(files[0], out var frozenErrors, out var frozenIdentityError);
+        if (frozenIdentityError != null)
+        {
+            Console.Error.WriteLine(frozenIdentityError);
+            return 2;
+        }
         var frozenFn = FindDeclaration(frozenModule, declarationId);
         if (frozenErrors || frozenFn == null)
         {
@@ -767,7 +794,12 @@ public static class VerifyCommand
             return 2;
         }
 
-        var finalModule = ParseFile(files[1], out var finalErrors);
+        var finalModule = ParseFile(files[1], out var finalErrors, out var finalIdentityError);
+        if (finalIdentityError != null)
+        {
+            Console.Error.WriteLine(finalIdentityError);
+            return 2;
+        }
         if (finalErrors || finalModule == null)
         {
             return Emit(declarationId, weakened: true, indeterminate: false,

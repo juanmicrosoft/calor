@@ -15,7 +15,7 @@ calor verify <files...> [options]
 calor verify src/Math.calr
 calor verify a.calr b.calr --timeout 10000
 calor verify src/Math.calr --format json
-calor verify old.calr new.calr --weakening-check f001
+calor verify old/input.calr new/input.calr --weakening-check "$DECLARATION_ID"
 ```
 
 ## Options
@@ -29,6 +29,19 @@ calor verify old.calr new.calr --weakening-check f001
 | `--no-cache` | Disable verification-result caching |
 | `--clear-cache` | Clear the verification cache first |
 | `--weakening-check` | Compare one declaration across exactly two files for contract weakening |
+
+## Contract Weakening and Identity
+
+Set `DECLARATION_ID` to the function's durable ID from `.calor/ids.json`, not
+its name or a parser-local ID. The two files must belong to project snapshots
+that preserve the same declaration identity and carry their sidecars.
+Verification synchronizes and attaches those identities before comparing
+contracts. A rename that preserves identity does not replace the declaration;
+an independently recreated identity does.
+
+Corrupt or ambiguous identity metadata returns exit `2` without a weakening
+verdict. This mode compares current-syntax snapshots. Historical experiments
+keep their original compiler and inputs.
 
 ## Status and Exit Contract
 
