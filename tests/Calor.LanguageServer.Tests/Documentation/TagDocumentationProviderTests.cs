@@ -19,11 +19,8 @@ public class TagDocumentationProviderTests
     {
         var provider = TagDocumentationProvider.Instance;
 
-        // If the documentation JSON is available (from file system during tests),
-        // this should return true
-        // Note: This may be false if the embedded resource isn't available,
-        // but the file system fallback should work during development
-        Assert.True(provider.IsLoaded || provider.GetAllTags().Count == 0);
+        Assert.True(provider.IsLoaded);
+        Assert.NotEmpty(provider.GetAllTags());
     }
 
     [Fact]
@@ -376,26 +373,35 @@ public class TagDocumentationProviderTests
     }
 
     [Theory]
-    [InlineData("§VR", "Virtual")]
-    [InlineData("§OV", "Override")]
-    [InlineData("§AB", "Abstract")]
-    [InlineData("§SD", "Sealed")]
-    [InlineData("§TD", "Todo")]
-    [InlineData("§FX", "Fixme")]
-    [InlineData("§HK", "Hack")]
+    [InlineData("§VR")]
+    [InlineData("§OV")]
+    [InlineData("§AB")]
+    [InlineData("§SD")]
+    [InlineData("§TD")]
+    [InlineData("§FX")]
+    [InlineData("§HK")]
+    [InlineData("§XP")]
+    [InlineData("§SB")]
+    [InlineData("§LK")]
+    [InlineData("§CX")]
+    [InlineData("§DC")]
+    [InlineData("§CT")]
+    [InlineData("§HD")]
+    [InlineData("§AU")]
+    [InlineData("§US")]
+    [InlineData("§T")]
+    public void GetTagDocumentation_RetiredMetadataAndModifierTags_AreNotTaught(string tag)
+    {
+        var provider = TagDocumentationProvider.Instance;
+
+        Assert.True(provider.IsLoaded);
+        Assert.Null(provider.GetTagDocumentation(tag));
+    }
+
+    [Theory]
     [InlineData("§DP", "Deprecated")]
-    [InlineData("§XP", "Experimental")]
-    [InlineData("§SB", "Stable")]
-    [InlineData("§LK", "Lock")]
-    [InlineData("§CX", "Complexity")]
     [InlineData("§AS", "Assume")]
-    [InlineData("§DC", "Decision")]
-    [InlineData("§CT", "Context")]
-    [InlineData("§HD", "Hidden")]
-    [InlineData("§AU", "Author")]
-    [InlineData("§US", "Uses")]
-    [InlineData("§T", "Type")]
-    public void GetTagDocumentation_NewTags_HaveDocumentation(string tag, string expectedNamePart)
+    public void GetTagDocumentation_CurrentAnnotationTags_HaveDocumentation(string tag, string expectedNamePart)
     {
         var provider = TagDocumentationProvider.Instance;
         if (!provider.IsLoaded) return;
@@ -411,39 +417,41 @@ public class TagDocumentationProviderTests
     #region Modifier Tag Tests
 
     [Fact]
-    public void GetTagDocumentation_VirtualModifier_HasCorrectSyntax()
+    public void GetTagDocumentation_VirtualModifier_IsDocumentedOnMethods()
     {
         var provider = TagDocumentationProvider.Instance;
-        if (!provider.IsLoaded) return;
 
-        var doc = provider.GetTagDocumentation("§VR");
+        Assert.Null(provider.GetTagDocumentation("§VR"));
+        var doc = provider.GetTagDocumentation("§MT");
 
         Assert.NotNull(doc);
-        Assert.Contains("virt", doc.Syntax.ToLower());
+        Assert.Contains("virt", doc.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("virtual", doc.CSharpEquivalent, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void GetTagDocumentation_OverrideModifier_HasCorrectSyntax()
+    public void GetTagDocumentation_OverrideModifier_IsDocumentedOnMethods()
     {
         var provider = TagDocumentationProvider.Instance;
-        if (!provider.IsLoaded) return;
 
-        var doc = provider.GetTagDocumentation("§OV");
+        Assert.Null(provider.GetTagDocumentation("§OV"));
+        var doc = provider.GetTagDocumentation("§MT");
 
         Assert.NotNull(doc);
-        Assert.Contains("ov", doc.Syntax.ToLower());
+        Assert.Contains("ov", doc.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("override", doc.CSharpEquivalent, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void GetTagDocumentation_AbstractModifier_HasCorrectSyntax()
+    public void GetTagDocumentation_AbstractModifier_IsDocumentedOnMethods()
     {
         var provider = TagDocumentationProvider.Instance;
-        if (!provider.IsLoaded) return;
 
-        var doc = provider.GetTagDocumentation("§AB");
+        Assert.Null(provider.GetTagDocumentation("§AB"));
+        var doc = provider.GetTagDocumentation("§MT");
 
         Assert.NotNull(doc);
-        Assert.Contains("ab", doc.Syntax.ToLower());
+        Assert.Contains("abs", doc.Description, StringComparison.OrdinalIgnoreCase);
     }
 
     #endregion
@@ -451,15 +459,12 @@ public class TagDocumentationProviderTests
     #region Documentation Comment Tag Tests
 
     [Fact]
-    public void GetTagDocumentation_TodoTag_HasCSharpEquivalent()
+    public void GetTagDocumentation_RetiredTodoTag_IsNotTaughtAsSyntax()
     {
         var provider = TagDocumentationProvider.Instance;
-        if (!provider.IsLoaded) return;
 
-        var doc = provider.GetTagDocumentation("§TD");
-
-        Assert.NotNull(doc);
-        Assert.Contains("TODO", doc.CSharpEquivalent);
+        Assert.True(provider.IsLoaded);
+        Assert.Null(provider.GetTagDocumentation("§TD"));
     }
 
     [Fact]
