@@ -1,0 +1,54 @@
+§M{WindowStats}
+  §F{WindowSum:pub} ([i32]:values, i32:start, i32:count) -> i32
+    §E{}
+    §Q (>= start 0)
+    §Q (> count 0)
+    §Q (<= (+ start count) §LEN values)
+    §B{~total:i32} 0
+    §B{~i:i32} start
+    §WH (< i (+ start count))
+      §ASSIGN total (+ total §IDX values i)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{WindowMin:pub} ([i32]:values, i32:start, i32:count) -> i32
+    §E{}
+    §Q (>= start 0)
+    §Q (> count 0)
+    §Q (<= (+ start count) §LEN values)
+    §B{~best:i32} §IDX values start
+    §B{~i:i32} (+ start 1)
+    §WH (< i (+ start count))
+      §B{v:i32} §IDX values i
+      §IF (< v best)
+        §ASSIGN best v
+      §ASSIGN i (+ i 1)
+    §R best
+
+  §F{MaxWindowSum:pub} ([i32]:values, i32:count) -> i32
+    §E{}
+    §Q (> count 0)
+    §Q (<= count §LEN values)
+    §B{~best:i32} §C{WindowSum} §A values §A 0 §A count §/C
+    §B{~s:i32} 1
+    §WH (<= s (- §LEN values count))
+      §B{cur:i32} §C{WindowSum} §A values §A s §A count §/C
+      §IF (> cur best)
+        §ASSIGN best cur
+      §ASSIGN s (+ s 1)
+    §R best
+
+  §F{CountAbove:pub} ([i32]:values, i32:count, i32:threshold) -> i32
+    §E{}
+    §Q (> count 0)
+    §S (>= result 0)
+    §IF (> count §LEN values)
+      §R 0
+    §B{~n:i32} 0
+    §B{~s:i32} 0
+    §WH (<= s (- §LEN values count))
+      §B{cur:i32} §C{WindowSum} §A values §A s §A count §/C
+      §IF (> cur threshold)
+        §ASSIGN n (+ n 1)
+      §ASSIGN s (+ s 1)
+    §R n

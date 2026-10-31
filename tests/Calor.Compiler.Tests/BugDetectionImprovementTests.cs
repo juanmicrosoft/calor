@@ -953,7 +953,9 @@ namespace MathOps {
 
         foreach (var file in buggyFiles)
         {
-            var source = File.ReadAllText(file);
+            var relativePath = Path.Combine("tests", "TestData", Path.GetRelativePath(testDataDir, file));
+            var currentPath = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(), relativePath);
+            var source = File.ReadAllText(currentPath);
             var module = Parse(source, out var parseDiag);
             Assert.False(parseDiag.HasErrors,
                 $"File {Path.GetFileName(file)} has parse errors: {string.Join("\n", parseDiag.Select(d => d.Message))}");
