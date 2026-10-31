@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Mcp.Tools;
 using Xunit;
 
@@ -151,8 +152,11 @@ public class BatchConvertToolTests
 
         try
         {
-            File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
+            var path = Path.Combine(tempDir, "BindError.calr");
+            File.WriteAllText(path,
                 "§M{Test}\n  §F{Foo:pub} () -> void\n    §B{x}\n");
+            var state = new DeclarationIdentityStore(tempDir).Sync([path]);
+            var functionId = Assert.Single(state.Declarations, declaration => declaration.Name == "Foo").Id;
 
             var args = JsonDocument.Parse($$"""
                 {
@@ -167,7 +171,7 @@ public class BatchConvertToolTests
             var entry = file.GetProperty("errors").EnumerateArray()
                 .Single(e => e.GetProperty("code").GetString() == "Calor0250");
 
-            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+            Assert.Equal(functionId, entry.GetProperty("declarationId").GetString());
         }
         finally
         {
@@ -175,4 +179,3 @@ public class BatchConvertToolTests
         }
     }
 }
-

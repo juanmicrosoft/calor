@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Mcp.Tools;
 using Microsoft.CodeAnalysis;
@@ -457,8 +458,8 @@ public class ConvertToolTests
     public async Task ExecuteAsync_WithNonCapturingLocalFunction_ConvertsInPlace()
     {
         // #777 (WS-W4 D4): never hoisted to a module-level function (the hoist orphans
-        // the call site — build break or silent rebind). 0.25 F3 (#847): a
-        // non-capturing local function converts in place to a nested §F.
+        // the call site — build break or silent rebind). A safe non-capturing
+        // local function converts in place to a lambda binding.
         var args = JsonDocument.Parse("""
             {
                 "source": "public class Example { public int Calculate(int x) { int Square(int n) => n * n; return Square(x); } }",
@@ -473,8 +474,16 @@ public class ConvertToolTests
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
         Assert.DoesNotContain("\u00A7CSHARP", calorSource);
-        // Nested inside Calculate (indented under its §MT), not a module-level §F.
-        Assert.Matches(@"\n {6,}\u00A7F\{f\d+:Square\} \(i32:n\) -> i32", calorSource);
+        var compiled = Program.Compile(calorSource, "local-function.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        var module = Assert.IsType<ModuleNode>(compiled.Ast);
+        Assert.Empty(module.Functions);
+        var method = Assert.Single(Assert.Single(module.Classes).Methods);
+        Assert.Equal("Calculate", method.Name);
+        var binding = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.Equal("Square", binding.Name);
+        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.Equal("n", Assert.Single(lambda.Parameters).Name);
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public sealed class NullabilityDocumentationTests
         foreach (Match example in examples)
         {
             var source = example.Groups["source"].Value.Replace("\r\n", "\n");
-            var name = Regex.Match(source, @"§M\{m1:(\w+)\}").Groups[1].Value;
+            var name = Regex.Match(source, @"§M\{(\w+)\}").Groups[1].Value;
             Assert.NotEmpty(name);
             // The fence annotation self-check enforces (#1143) must agree with this test's table.
             Assert.Equal(ExpectedDiagnostic(name).Code is { Length: > 0 } code ? $" expect={code}" : "",

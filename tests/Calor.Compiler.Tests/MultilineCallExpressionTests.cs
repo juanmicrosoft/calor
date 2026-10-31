@@ -88,7 +88,7 @@ public class MultilineCallExpressionTests
                 §B{~value:i32} 0
                 §EACH{ch} §C{Text}
                   §IF §C{Truth}
-                    (inc value)
+                    §ASSIGN value (+ value 1)
                 §WH §C{Never}
                   §C{Math.Abs} §A 9 §/C
                 §R (+ value (+ §C{One}

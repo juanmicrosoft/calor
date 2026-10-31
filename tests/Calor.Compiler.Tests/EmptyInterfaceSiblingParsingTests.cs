@@ -32,7 +32,7 @@ public class EmptyInterfaceSiblingParsingTests
     [InlineData("§CL{Impl:pub}\n    §IMPL{IMarker}")]
     [InlineData("§IFACE{IOther}\n    §MT{Run} () -> void")]
     [InlineData("§EN{Mode:pub}\n    Fast\n    Slow")]
-    [InlineData("§DEL{Handler:pub}\n    §I{i32:x}\n    §O{bool}")]
+    [InlineData("§DEL{Handler}\n    §I{i32:x}\n    §O{bool}")]
     [InlineData("§CSHARP{public class Sibling { }}§/CSHARP")]
     public void EmptyInterface_FollowedBySameColumnSibling_Parses(string sibling)
     {

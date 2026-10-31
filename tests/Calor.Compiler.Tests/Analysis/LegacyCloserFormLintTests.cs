@@ -37,7 +37,7 @@ public class LegacyCloserFormLintTests
     [Fact]
     public void FlagsLegacyClosersWithIdPayload()
     {
-        const string src = "§M{Calc}\n§/M\n";
+        const string src = "§M{Calc}\n§/M{m1}\n";
         var findings = LegacyCloserFormLint.Scan(src, "c.calr");
 
         var f = Assert.Single(findings);

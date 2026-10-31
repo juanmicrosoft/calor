@@ -129,13 +129,20 @@ public class StructuralControlFlowTests
                 §R value
 
               §F{ExactOnce:pub} () -> i32
-                §B{~fromCalls:i32} INT:0
-                §B{~toCalls:i32} INT:0
-                §B{~stepCalls:i32} INT:0
+                §B{fromCounter:Counter} §NEW{Counter} §/NEW
+                §B{toCounter:Counter} §NEW{Counter} §/NEW
+                §B{stepCounter:Counter} §NEW{Counter} §/NEW
                 §B{~value:i32} INT:0
-                §L{i:(pre-inc fromCalls):(+ (pre-inc toCalls) INT:2):(pre-inc stepCalls)}
+                §L{i:fromCounter.Next:(+ toCounter.Next INT:2):stepCounter.Next}
                   §B{~value:i32} (+ (* value INT:10) i)
-                §R (+ (* value INT:1000) (+ (* fromCalls INT:100) (+ (* toCalls INT:10) stepCalls)))
+                §R (+ (* value INT:1000) (+ (* fromCounter.Calls INT:100) (+ (* toCounter.Calls INT:10) stepCounter.Calls)))
+
+              §CL{Counter:pub}
+                §FLD{i32:Calls:pub}
+                §PROP{Next:i32:pub}
+                  §GET
+                    §ASSIGN Calls (+ Calls INT:1)
+                    §R Calls
 
               §F{Collision:pub} () -> i32
                 §B{__calorForFrom:i32} INT:7

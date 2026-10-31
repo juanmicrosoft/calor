@@ -302,7 +302,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{Test}\n§F{Test:pub}\n§O{i32}\n§B{x} 0\n§L{i:BOOL:true:10:1}\n  §B{x} (+ x i)\n\n§R x\n\n"
+                "source": "§M{Test}\n  §F{Test:pub} () -> i32\n    §B{~x:i32} 0\n    §L{i:true:10:1}\n      §ASSIGN x (+ x i)\n    §R x\n"
             }
             """).RootElement;
 

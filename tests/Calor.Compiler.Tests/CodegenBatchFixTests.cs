@@ -254,7 +254,7 @@ public class CodegenBatchFixTests
 §M{Test}
   §F{Main:pub}
       §O{void}
-      §B{[i32]:nums} §ARR{nums} §A 1 §A 2 §A 3 §/ARR
+      §B{[i32]:nums} §ARR{i32} §A 1 §A 2 §A 3 §/ARR
 ";
         var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
@@ -270,12 +270,12 @@ public class CodegenBatchFixTests
     [Fact]
     public void Fix5_ArrayInitializer_RoundtripThroughParser()
     {
-        // §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR should parse and generate correct C#
+        // §ARR{i32} §A 1 §A 2 §A 3 §/ARR should parse and generate correct C#
         var source = @"
 §M{Test}
   §F{Main:pub}
       §O{void}
-      §B{[i32]:nums} §ARR{nums} §A 1 §A 2 §A 3 §/ARR
+      §B{[i32]:nums} §ARR{i32} §A 1 §A 2 §A 3 §/ARR
 ";
 
         var result = ParseAndEmit(source);

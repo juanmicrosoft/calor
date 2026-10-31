@@ -75,7 +75,7 @@ public class PreprocessorBindingTests
 
     [Theory]
     [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§ASSIGN x 2\n§R x")]
-    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§B{y} (inc x)\n§R y")]
+    [InlineData("§PP{DEBUG}\n  §B{x:i32} 1\n§B{y} x\n§ASSIGN x (+ x 1)\n§R y")]
     [InlineData("§PP{DEBUG}\n  §B{a:i32} 0\n§PPE\n  §B{x:i32} 1\n§ASSIGN x 2\n§R x")]
     public void Binder_WriteToPreprocessorLocalShadowingAWritableField_IsCalor0213(string body)
     {

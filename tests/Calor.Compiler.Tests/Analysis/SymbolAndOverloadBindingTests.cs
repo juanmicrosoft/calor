@@ -1194,12 +1194,13 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Equal(expressionCall.Span, unresolved.Span);
 
         var astDiagnostics = new DiagnosticBag();
-        var astGraph = CallGraphAnalysis.Build(Parse(source, astDiagnostics));
+        var ast = Parse(source, astDiagnostics);
+        var astGraph = CallGraphAnalysis.Build(ast);
         Assert.False(
             astDiagnostics.HasErrors,
             string.Join(", ", astDiagnostics.Select(diagnostic => diagnostic.Message)));
         Assert.Contains(astGraph.UnresolvedCalls, call =>
-            call.CallerId == "f1"
+            call.CallerId == Assert.Single(ast.Functions).Id
             && call.Target == "<expression-call>"
             && call.Span == expressionCall.Span);
     }
