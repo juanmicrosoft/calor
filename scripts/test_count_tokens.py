@@ -100,6 +100,38 @@ class AnthropicTests(unittest.TestCase):
         urls = {call.args[0].full_url for call in client.opener.open.call_args_list}
         self.assertEqual({tool.API_ROOT + "/v1/messages/count_tokens"}, urls)
 
+    def budgeted(self, budget, *effects):
+        client = tool.Anthropic("test-secret", budget)
+        client.opener = Mock()
+        client.opener.open.side_effect = list(effects)
+        client.sleep = Mock()
+        return client
+
+    def test_attempt_budget_caps_metadata_pagination(self):
+        pages = [response({"data": [{"id": f"p{index}", "display_name": "Other"}],
+                           "has_more": True, "last_id": f"p{index}"})
+                 for index in range(5)]
+        client = self.budgeted(3, *pages)
+        with self.assertRaises(tool.MeasurementError) as found:
+            client.resolve_model("Claude Opus 5.5")
+        self.assertIn("budget of 3 exhausted", str(found.exception))
+        self.assertEqual(3, client.opener.open.call_count)
+        self.assertEqual(3, client.requests)
+
+    def test_attempt_budget_caps_retries_exactly(self):
+        limited = HTTPError(tool.API_ROOT, 429, "limited", {}, None)
+        client = self.budgeted(2, limited, limited, response({"input_tokens": 5}))
+        with self.assertRaises(tool.MeasurementError) as found:
+            client.count(MODEL["id"], "text")
+        self.assertIn("exhausted", str(found.exception))
+        self.assertEqual(2, client.opener.open.call_count)
+        client = self.budgeted(3, limited, limited, response({"input_tokens": 5}))
+        self.assertEqual(5, client.count(MODEL["id"], "text"))
+        self.assertEqual(3, client.requests)
+        with self.assertRaises(tool.MeasurementError):
+            client.count(MODEL["id"], "text")
+        self.assertEqual(3, client.opener.open.call_count)
+
     def test_invalid_json_and_nonobject_response(self):
         client = tool.Anthropic("test-secret")
         client.opener = Mock()
@@ -202,9 +234,12 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(1, row["files"])
 
     def run_main(self, *extra):
+        return self.run_cli(str(self.path), *extra)
+
+    def run_cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = tool.main([str(self.path), *extra])
+            code = tool.main(list(argv))
         return code, out.getvalue(), err.getvalue()
 
     def test_validation_without_credentials_never_calls_api(self):
@@ -278,7 +313,7 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(0, code, err)
         digest = next(line.split("=", 1)[1] for line in out.splitlines()
                       if line.startswith("inputs_sha256="))
-        self.assertIn("request_count=83", out)
+        self.assertIn("planned_min_requests=83", out)
         self.assertEqual(0, self.run_main("--validate-only", "--expect-inputs-sha256", digest)[0])
         (self.root / "after.txt").write_bytes("§ after\r\n".encode("utf-8"))
         code, _, err = self.run_main("--validate-only", "--expect-inputs-sha256", digest)
@@ -301,6 +336,53 @@ class ManifestTests(unittest.TestCase):
                 self.assertEqual(2, code)
                 self.assertIn("payload", err)
                 self.manifest = original
+
+    def test_symlinks_and_nonplain_paths_rejected_even_inside_directory(self):
+        (self.root / "sub").mkdir()
+        (self.root / "inner.txt").symlink_to(self.root / "before.txt")
+        (self.root / "linkdir").symlink_to(self.root / "sub")
+        (self.root / "sub" / "x.txt").write_text("x")
+        for relative in ("inner.txt", "sub/../before.txt", "./before.txt", "sub//x.txt",
+                         "linkdir/x.txt", "sub\\x.txt", "sub", ""):
+            with self.subTest(relative=relative):
+                original = json.loads(json.dumps(self.manifest))
+                self.manifest["samples"][0]["variants"]["infix"] = relative
+                self.save()
+                code, _, err = self.run_main("--validate-only")
+                self.assertEqual(2, code, relative)
+                self.assertIn("payload", err)
+                self.manifest = original
+        self.save()
+        self.assertEqual(0, self.run_main("--validate-only")[0])
+
+    def test_symlinked_manifest_or_root_rejected(self):
+        self.save()
+        link = self.root / "linked.json"
+        link.symlink_to(self.path)
+        code, _, err = self.run_cli(str(link), "--validate-only")
+        self.assertEqual(2, code)
+        self.assertIn("symlinks are not allowed", err)
+        outer = tempfile.TemporaryDirectory()
+        self.addCleanup(outer.cleanup)
+        payload = Path(outer.name) / "payload"
+        payload.mkdir()
+        (payload / "data").symlink_to(self.root)
+        code, _, err = self.run_cli(str(payload / "data" / "manifest.json"), "--validate-only",
+                                    "--payload-root", str(payload))
+        self.assertEqual(2, code)
+        self.assertIn("symlinks are not allowed", err)
+        (Path(outer.name) / "rootlink").symlink_to(self.root)
+        code, _, err = self.run_cli(str(Path(outer.name) / "rootlink" / "manifest.json"),
+                                    "--validate-only", "--payload-root",
+                                    str(Path(outer.name) / "rootlink"))
+        self.assertEqual(2, code)
+        self.assertIn("symlinks are not allowed", err)
+        code, _, err = self.run_cli(str(self.path), "--validate-only", "--payload-root",
+                                    str(payload))
+        self.assertEqual(2, code)
+        self.assertIn("inside the payload root", err)
+        self.assertEqual(0, self.run_cli(str(self.path), "--validate-only", "--payload-root",
+                                         str(self.root))[0])
 
     def test_expected_model_and_request_bound_fail_closed(self):
         code, _, err = self.run_main("--validate-only", "--expect-target-model", "Claude Opus 5")
@@ -333,7 +415,9 @@ class ManifestTests(unittest.TestCase):
         report = json.loads(self.output.read_text())
         self.assertEqual({"tool_commit": "b" * 40, "payload_commit": "c" * 40},
                          report["attestation"])
-        self.assertEqual(83, report["request_count"])
+        self.assertEqual(83, report["planned_min_requests"])
+        self.assertEqual(83, report["http_attempts"])
+        self.assertEqual(83, report["max_http_attempts"])
         self.assertEqual("before.txt", report["samples"][0]["variants"]["current"]["path"])
         self.assertIn(report["inputs_sha256"], table.read_text())
         for text in (self.output.read_text(), table.read_text(), out, err):
@@ -372,6 +456,7 @@ class WorkflowTests(unittest.TestCase):
                                        r"workflow_run|repository_dispatch):")
         self.assertRegex(self.code, r"\npermissions:\n  contents: read\n\n")
         self.assertEqual(4, self.code.count("persist-credentials: false"))
+        self.assertNotRegex(self.code, r": write\b")
         self.assertEqual(4, self.code.count("uses: actions/checkout@"))
 
     def test_secret_only_in_count_step_after_offline_preflight(self):
@@ -402,6 +487,20 @@ class WorkflowTests(unittest.TestCase):
         for line in self.code.splitlines():
             if "${{ inputs." in line:
                 self.assertRegex(line, r"^\s+([A-Z0-9_]+|ref): \$\{\{ inputs\.[a-z0-9_]+ \}\}$")
+
+    def test_existing_environment_and_symlink_free_payload_required(self):
+        preflight, count = self.job("preflight"), self.job("count")
+        self.assertIn("permissions:\n      contents: read\n      actions: read\n", preflight)
+        check = 'gh api "repos/$GITHUB_REPOSITORY/environments/anthropic-count-tokens"'
+        self.assertEqual(1, self.code.count(check))
+        self.assertIn("--jq .name", preflight)
+        self.assertLess(preflight.index(check), preflight.index("uses: actions/checkout@"))
+        self.assertNotIn("-X", preflight)
+        self.assertNotIn("--method", preflight)
+        for body in (preflight, count):
+            self.assertIn("-type l", body)
+            self.assertIn("--payload-root payload", body)
+            self.assertLess(body.index("-type l"), body.index("scripts/count_tokens.py"))
 
     def test_results_uploaded_only_after_complete_count(self):
         count = self.job("count")
