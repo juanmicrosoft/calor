@@ -50,7 +50,8 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
             var actual = Measure(source);
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             output.WriteLine($"{actual}; allocated bytes: {allocated}");
-            Assert.Equal(new Counters(4729, 1351, 580, 760, 580), actual);
+            // Source-ID removal changes tokens, not bound work or the allocation budget.
+            Assert.Equal(new Counters(4527, 1351, 580, 760, 580), actual);
             Assert.InRange(allocated, baselineBytes * 98 / 100, baselineBytes * 102 / 100);
         }
     }

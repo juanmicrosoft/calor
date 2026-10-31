@@ -72,8 +72,9 @@ public class StaticModuleActiveInputTests
                 }
             }
             Assert.Equal(3, changedCells);
+            Change(expected["cli-migrate"]!["conversionPaths"]!, "roundTrip", "deferred", "verified");
             Assert.True(JsonNode.DeepEquals(expected, actual),
-                $"{original}: only source IDs, module/function spellings and the exact W1-F3 Clamp lambda projection may change.");
+                $"{original}: only source IDs, module/function spellings, the exact W1-F3 Clamp lambda projection and completed project validation may change.");
         }
     }
 
@@ -99,6 +100,7 @@ public class StaticModuleActiveInputTests
         var migrate = expected["cli-migrate"]!;
         Change(migrate, "exit", 1, 0);
         Change(migrate["conversionPaths"]!, "outcome", "refused", "native");
+        Change(migrate["conversionPaths"]!, "roundTrip", "deferred", "verified");
         var mcp = expected["mcp-convert"]!;
         Change(mcp, "isError", true, false);
         Change(mcp, "success", false, true);
@@ -115,7 +117,7 @@ public class StaticModuleActiveInputTests
         Assert.Contains("§CSHARP", passthrough["calorSource"]!.GetValue<string>());
         passthrough["calorSource"] = native;
         Assert.True(JsonNode.DeepEquals(expected, actual),
-            "Private-property repair may change only the explicitly attributed native/rescue/output fields.");
+            "Private-property repair and completed project validation may change only the explicitly attributed fields.");
     }
 
     [Fact]
@@ -133,6 +135,7 @@ public class StaticModuleActiveInputTests
             foreach (var file in surface["files"]!.AsArray())
             {
                 Change(file!["conversionPaths"]!, "outcome", "refused", "native");
+                Change(file["conversionPaths"]!, "roundTrip", "deferred", "verified");
                 var issues = file["issues"]!.AsArray();
                 for (var index = issues.Count - 1; index >= 0; index--)
                 {
@@ -142,7 +145,7 @@ public class StaticModuleActiveInputTests
             }
         }
         Assert.True(JsonNode.DeepEquals(expected, actual),
-            "Only successful project classification/write counts and the resolved compile error may change; warnings stay exact.");
+            "Only successful project classification/write counts, completed validation and the resolved compile error may change; warnings stay exact.");
     }
 
     private static (JsonNode Expected, JsonNode Actual) Transcripts(string id)

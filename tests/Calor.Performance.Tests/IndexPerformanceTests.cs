@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Calor.Compiler.Tests;
 using Calor.Compiler.Indexing;
 using Xunit;
 using Xunit.Abstractions;
@@ -31,8 +32,15 @@ public sealed class IndexPerformanceFixture
     // test would spend that budget on setup rather than on coverage.
     public IndexPerformanceFixture()
     {
-        Root = FindFixtureRoot();
-        Sources = ProjectIndexBuilder.DiscoverSources(Root);
+        var originalRoot = FindFixtureRoot();
+        var repository = ActiveSyntaxInputs.RepositoryRoot;
+        Sources = ProjectIndexBuilder.DiscoverSources(originalRoot)
+            .Select(source => ActiveSyntaxInputs.ForCurrentCompiler(repository, source)).ToArray();
+        Root = Path.Combine(repository, ActiveSyntaxInputs.RelativeRoot,
+            Path.GetRelativePath(repository, originalRoot));
+        Assert.All(Sources, source => Assert.StartsWith(Root + Path.DirectorySeparatorChar, source));
+        Assert.Equal(Sources.Order(StringComparer.Ordinal),
+            ProjectIndexBuilder.DiscoverSources(Root).Order(StringComparer.Ordinal));
         Options = new ProjectIndexBuilder.Options(Root, "perf-gate", Sources);
         Index = ProjectIndexBuilder.Build(Options);
     }

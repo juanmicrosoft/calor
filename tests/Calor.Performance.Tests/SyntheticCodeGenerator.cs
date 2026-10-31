@@ -48,8 +48,7 @@ public static class SyntheticCodeGenerator
 
         for (var f = 1; f <= functions; f++)
         {
-            var funcId = $"f{f:D3}";
-            sb.AppendLine($"  §F{{{funcId}:TaintFunc{f}:pub}}");
+            sb.AppendLine($"  §F{{TaintFunc{f}:pub}}");
             sb.AppendLine($"    §I{{string:user_input}}");
             sb.AppendLine($"    §O{{string}}");
 
@@ -97,15 +96,14 @@ public static class SyntheticCodeGenerator
 
         for (var f = 1; f <= functions; f++)
         {
-            var funcId = $"f{f:D3}";
-            sb.AppendLine($"  §F{{{funcId}:LoopFunc{f}:pub}}");
+            sb.AppendLine($"  §F{{LoopFunc{f}:pub}}");
             sb.AppendLine($"    §I{{i32:n}}");
             sb.AppendLine($"    §O{{i32}}");
             sb.AppendLine($"    §B{{result:i32}} INT:0");
 
             for (var l = 1; l <= loopsPerFunction; l++)
             {
-                GenerateNestedLoop(sb, l, nestingDepth, 2);
+                GenerateNestedLoop(sb, nestingDepth, 2);
             }
 
             sb.AppendLine($"    §R result");
@@ -127,8 +125,7 @@ public static class SyntheticCodeGenerator
 
         for (var f = 1; f <= functions; f++)
         {
-            var funcId = $"f{f:D3}";
-            sb.AppendLine($"  §F{{{funcId}:ControlFlow{f}:pub}}");
+            sb.AppendLine($"  §F{{ControlFlow{f}:pub}}");
             sb.AppendLine($"    §I{{i32:x}}");
             sb.AppendLine($"    §I{{i32:y}}");
             sb.AppendLine($"    §O{{i32}}");
@@ -150,8 +147,7 @@ public static class SyntheticCodeGenerator
         bool includeLoops,
         bool includeConditionals)
     {
-        var funcId = $"f{functionNumber:D3}";
-        sb.AppendLine($"  §F{{{funcId}:TestFunc{functionNumber}:pub}}");
+        sb.AppendLine($"  §F{{TestFunc{functionNumber}:pub}}");
         sb.AppendLine($"    §I{{i32:x}}");
         sb.AppendLine($"    §I{{i32:y}}");
         sb.AppendLine($"    §O{{i32}}");
@@ -182,7 +178,7 @@ public static class SyntheticCodeGenerator
                 case 2 when includeConditionals && remainingStatements >= 3:
                     // Conditional
                     varCounter++;
-                    sb.AppendLine($"    §IF{{if{functionNumber}_{varCounter}}} (> x INT:0)");
+                    sb.AppendLine($"    §IF (> x INT:0)");
                     sb.AppendLine($"      §B{{v{varCounter}:i32}} (+ x y)");
                     sb.AppendLine($"    §EL");
                     varCounter++;
@@ -192,9 +188,8 @@ public static class SyntheticCodeGenerator
 
                 case 3 when includeLoops && remainingStatements >= 4:
                     // For loop
-                    var loopId = $"l{varCounter}";
                     sb.AppendLine($"    §B{{sum{varCounter}:i32}} INT:0");
-                    sb.AppendLine($"    §L{{{loopId}:i:1:10:1}}");
+                    sb.AppendLine($"    §L{{i:1:10:1}}");
                     sb.AppendLine($"      §B{{sum{varCounter}:i32}} (+ sum{varCounter} i)");
                     remainingStatements -= 4;
                     break;
@@ -226,16 +221,14 @@ public static class SyntheticCodeGenerator
         }
     }
 
-    private static void GenerateNestedLoop(StringBuilder sb, int loopNum, int depth, int indent)
+    private static void GenerateNestedLoop(StringBuilder sb, int depth, int indent)
     {
         var indentStr = new string(' ', indent * 2);
-        var loopId = $"l{loopNum}d{depth}";
-
-        sb.AppendLine($"{indentStr}§L{{{loopId}:i{depth}:0:n:1}}");
+        sb.AppendLine($"{indentStr}§L{{i{depth}:0:n:1}}");
 
         if (depth > 1)
         {
-            GenerateNestedLoop(sb, loopNum, depth - 1, indent + 1);
+            GenerateNestedLoop(sb, depth - 1, indent + 1);
         }
         else
         {
@@ -253,7 +246,7 @@ public static class SyntheticCodeGenerator
             return;
         }
 
-        sb.AppendLine($"{indentStr}§IF{{if{depth}}} (> x INT:{depth})");
+        sb.AppendLine($"{indentStr}§IF (> x INT:{depth})");
         GenerateNestedConditionals(sb, depth - 1, indent + 1);
         sb.AppendLine($"{indentStr}§EI (< x INT:-{depth})");
         sb.AppendLine($"{indentStr}  §B{{result:i32}} (- x y)");
