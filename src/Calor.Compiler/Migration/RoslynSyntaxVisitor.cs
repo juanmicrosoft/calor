@@ -64,6 +64,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// <summary>#943 (D1 RO-DECL-1): `out var x` / `out T x` lowered to a binding before their statement.</summary>
     private readonly HashSet<DeclarationExpressionSyntax> _loweredOutDeclarations = new();
     private int _conditionalRegionDepth;
+    private HashSet<ExpressionSyntax>? _evaluatedEagerArrayOperands;
 
     /// <summary>
     /// Maps variable names to their resolved type names for effect inference.
@@ -10610,6 +10611,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.ExpressionsConverted++;
 
+        if (_conditionalRegionDepth == 0
+            && expression is ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax
+                or InitializerExpressionSyntax { RawKind: (int)SyntaxKind.ArrayInitializerExpression }
+                or ElementAccessExpressionSyntax
+            && HasArrayStatementContext(expression)
+            && expression.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax)
+                .Any(node => node.Kind() is SyntaxKind.PreIncrementExpression or SyntaxKind.PostIncrementExpression
+                    or SyntaxKind.PreDecrementExpression or SyntaxKind.PostDecrementExpression))
+            return ConvertEagerArrayUpdate(expression);
+
         if (_conditionalRegionDepth > 0 && expression is InvocationExpressionSyntax conditionalInvocation &&
             conditionalInvocation.ArgumentList.Arguments.Any(argument =>
                 argument.Expression is DeclarationExpressionSyntax declaration
@@ -12836,6 +12847,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// (the statement stays C#) when an earlier operand reads the operand's variable, when the
     /// operand is not a fixed local and an earlier operand has an effect, or when the operand's
     /// receiver or arguments have an effect (they would run twice).
+    /// Operands already evaluated by eager-array lowering do not constrain the later hoist.
     /// </summary>
     private void CheckUpdateHoist(ExpressionSyntax update, ExpressionSyntax operandSyntax)
     {
@@ -12870,6 +12882,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .SelectMany(child => child.DescendantNodesAndSelf(node => node is not AnonymousFunctionExpressionSyntax))
             .OfType<ExpressionSyntax>()
             .Where(node => node.Span.End <= update.SpanStart && node is not AnonymousFunctionExpressionSyntax)
+            .Where(node => !node.AncestorsAndSelf().OfType<ExpressionSyntax>()
+                .Any(ancestor => _evaluatedEagerArrayOperands?.Contains(ancestor) == true))
             .Where(node => !(node is IdentifierNameSyntax
                 && node.Parent is AssignmentExpressionSyntax { RawKind: (int)SyntaxKind.SimpleAssignmentExpression } target
                 && target.Left == node))
@@ -15222,6 +15236,140 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return true;
 
         return false;
+    }
+
+    private static bool HasArrayStatementContext(ExpressionSyntax expression)
+    {
+        // Field/property defaults and constructor arguments cannot drain statement temporaries.
+        foreach (var ancestor in expression.Ancestors())
+        {
+            if (ancestor is VariableDeclarationSyntax { Variables.Count: > 1 })
+                return false;
+            if (ancestor is StatementSyntax or AnonymousFunctionExpressionSyntax)
+                return true;
+            if (ancestor is ArrowExpressionClauseSyntax arrow)
+                return arrow.Parent is BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax or AccessorDeclarationSyntax;
+            if (ancestor is MemberDeclarationSyntax or ConstructorInitializerSyntax)
+                return false;
+        }
+        return false;
+    }
+
+    private ExpressionNode ConvertEagerArrayUpdate(ExpressionSyntax expression)
+    {
+        if (_semanticModel == null || expression.SyntaxTree != _semanticModel.SyntaxTree)
+            throw EscalateExpression(expression, "compound-assignment-order");
+        var savedOperands = _evaluatedEagerArrayOperands;
+        _evaluatedEagerArrayOperands = savedOperands == null ? [] : new(savedOperands);
+        try
+        {
+            var displayFormat = SymbolDisplayFormat.FullyQualifiedFormat
+                .WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)
+                .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+            ExpressionNode Capture(ExpressionSyntax operand)
+            {
+                var info = _semanticModel.GetTypeInfo(operand);
+                var type = info.ConvertedType ?? info.Type;
+                if (type == null || type.IsAnonymousType || type.IsRefLikeType
+                    || type.TypeKind is TypeKind.Error or TypeKind.Dynamic)
+                    throw EscalateExpression(operand, "compound-assignment-order");
+                var value = ConvertExpression(operand);
+                var name = _context.GenerateId("_arrayOperand");
+                _pendingStatements.Add(new BindStatementNode(GetTextSpan(operand), name,
+                    TypeMapper.CSharpToCalor(type.ToDisplayString(displayFormat)), false, value, new AttributeCollection()));
+                _evaluatedEagerArrayOperands.Add(operand);
+                return new ReferenceNode(GetTextSpan(operand), name);
+            }
+
+            var span = GetTextSpan(expression);
+            if (expression is ElementAccessExpressionSyntax access)
+            {
+                if (_semanticModel.GetOperation(access) is not
+                    Microsoft.CodeAnalysis.Operations.IArrayElementReferenceOperation)
+                    throw EscalateExpression(expression, "compound-assignment-order");
+                if (access.ArgumentList.Arguments.Count > 1)
+                    _context.RecordFeatureUsage("multidim-array");
+                var receiver = Capture(access.Expression);
+                var indices = access.ArgumentList.Arguments.Select(argument => Capture(argument.Expression)).ToList();
+                return indices.Count == 1
+                    ? new ArrayAccessNode(span, receiver, indices[0])
+                    : new MultiDimArrayAccessNode(span, receiver, indices);
+            }
+
+            var typeInfo = _semanticModel.GetTypeInfo(expression);
+            if ((typeInfo.Type ?? typeInfo.ConvertedType) is not IArrayTypeSymbol arrayType)
+                throw EscalateExpression(expression, "compound-assignment-order");
+            if (expression is InitializerExpressionSyntax)
+                _context.RecordFeatureUsage("array-initializer");
+            if (arrayType.Rank > 1)
+                _context.RecordFeatureUsage("multidim-array");
+            var initializer = expression switch
+            {
+                ArrayCreationExpressionSyntax creation => creation.Initializer,
+                ImplicitArrayCreationExpressionSyntax creation => creation.Initializer,
+                InitializerExpressionSyntax initialization => initialization,
+                _ => null
+            };
+            var dimensions = expression is ArrayCreationExpressionSyntax explicitCreation
+                ? explicitCreation.Type.RankSpecifiers[0].Sizes
+                    .Where(size => size is not OmittedArraySizeExpressionSyntax).Select(Capture).ToList()
+                : [];
+            var elementType = TypeMapper.CSharpToCalor(arrayType.ElementType.ToDisplayString(displayFormat));
+            var id = _context.GenerateId("arr");
+            ExpressionNode Allocate(IReadOnlyList<ExpressionNode> sizes) => arrayType.Rank == 1
+                ? new ArrayCreationNode(span, id, id, elementType, sizes[0], [], new AttributeCollection())
+                : new MultiDimArrayCreationNode(span, id, id, elementType, arrayType.Rank,
+                    sizes, []);
+
+            if (initializer == null)
+                return Allocate(dimensions);
+
+            if (dimensions.Count == 0)
+            {
+                var level = initializer;
+                for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+                {
+                    dimensions.Add(new IntLiteralNode(span, level.Expressions.Count));
+                    if (dimension + 1 < arrayType.Rank)
+                        level = level.Expressions.FirstOrDefault() as InitializerExpressionSyntax
+                            ?? throw EscalateExpression(expression, "compound-assignment-order");
+                }
+            }
+
+            // C# allocates before any initializer expression or element conversion runs.
+            var arrayName = _context.GenerateId("_initializedArray");
+            _pendingStatements.Add(new BindStatementNode(span, arrayName, null, false,
+                Allocate(dimensions), new AttributeCollection()));
+            var array = new ReferenceNode(span, arrayName);
+            void Fill(InitializerExpressionSyntax level, List<ExpressionNode> indices)
+            {
+                for (var index = 0; index < level.Expressions.Count; index++)
+                {
+                    var element = level.Expressions[index];
+                    List<ExpressionNode> position = [.. indices, new IntLiteralNode(span, index)];
+                    if (position.Count < arrayType.Rank)
+                    {
+                        if (element is not InitializerExpressionSyntax nested)
+                            throw EscalateExpression(element, "compound-assignment-order");
+                        Fill(nested, position);
+                        continue;
+                    }
+                    var value = ConvertExpression(element);
+                    ExpressionNode target = position.Count == 1
+                        ? new ArrayAccessNode(span, array, position[0])
+                        : new MultiDimArrayAccessNode(span, array, position);
+                    _pendingStatements.Add(new AssignmentStatementNode(GetTextSpan(element), target, value));
+                    // The store also forces the element's implicit conversion before the next update.
+                    _evaluatedEagerArrayOperands.Add(element);
+                }
+            }
+            Fill(initializer, []);
+            return array;
+        }
+        finally
+        {
+            _evaluatedEagerArrayOperands = savedOperands;
+        }
     }
 
     private ExpressionNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)

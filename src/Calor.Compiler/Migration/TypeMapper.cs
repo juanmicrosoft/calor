@@ -422,6 +422,14 @@ public static class TypeMapper
             return $"{CalorToCSharp(nullableReferent)}?";
         }
 
+        // Peel ranks before expanded scalar attributes, which also contain brackets.
+        var rankStart = calorType.LastIndexOf('[');
+        if (rankStart > 0 && calorType.EndsWith(']')
+            && calorType[(rankStart + 1)..^1].All(c => c == ','))
+        {
+            return CalorToCSharp(calorType[..rankStart]) + calorType[rankStart..];
+        }
+
         // Handle expanded INT format: INT[bits=N][signed=B] -> sbyte/short/int/long/byte/ushort/uint/ulong
         // Must check for "bits=" to avoid matching multi-dim array types like INT[,]
         if (calorType.StartsWith("INT[bits=", StringComparison.Ordinal))
@@ -463,21 +471,6 @@ public static class TypeMapper
             var elementType = calorType[1..^1];
             var mappedElement = CalorToCSharp(elementType);
             return $"{mappedElement}[]";
-        }
-
-        // Handle array types T[] -> T_mapped[], T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
-        {
-            var bracketStart = calorType.IndexOf('[');
-            if (bracketStart > 0 && calorType.EndsWith("]"))
-            {
-                var suffix = calorType[bracketStart..];
-                if (suffix.All(c => c == '[' || c == ']' || c == ','))
-                {
-                    var elementType = calorType[..bracketStart];
-                    var mappedElement = CalorToCSharp(elementType);
-                    return $"{mappedElement}{suffix}";
-                }
-            }
         }
 
         // Handle tuple types (i32, str) -> (int, string)

@@ -43,6 +43,16 @@ public class ArrayExpressionConversionTests
         Enum.GetValues<Surface>().Select(surface => new object[] { surface });
 
     [Theory]
+    [InlineData("u8[]", "byte[]")]
+    [InlineData("u16[,]", "ushort[,]")]
+    [InlineData("u32[][,]", "uint[][,]")]
+    [InlineData("i64[][]", "long[][]")]
+    [InlineData("f32[,,][]", "float[,,][]")]
+    [InlineData("List<u8[]>[]", "List<byte[]>[]")]
+    public void ExpandedNumericArrayTypes_KeepEveryRank(string compact, string expected) =>
+        Assert.Equal(expected, TypeMapper.CalorToCSharp(Parsing.AttributeHelper.ExpandType(compact)));
+
+    [Theory]
     [MemberData(nameof(SizedArraySurfaces))]
     public async Task SizedArrayBindings_UseIdentityFreeHeaders_AndPreserveRuntime(Surface surface)
     {
@@ -81,7 +91,162 @@ public class ArrayExpressionConversionTests
             """;
         const string expected = "3:7:2:x:0:sn";
         Assert.Equal(expected, Run(source));
-        string calor;
+        var calor = await ConvertNativeWithRealCliAsync(source, surface);
+        Assert.DoesNotContain("§CS", calor);
+        Assert.Contains("§ARR{T:count}", calor);
+        Assert.Contains("§ARR{i32:0}", calor);
+        var compilation = Program.Compile(calor, "sized-array.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [MemberData(nameof(SizedArraySurfaces))]
+    public async Task EagerArrayUpdates_PreserveReadsConversionsAliasesAndExceptionTiming(Surface surface)
+    {
+        const string source = """
+            using System;
+            public struct Number
+            {
+                public int Value;
+                public Number(int value) { Value = value; }
+                public static implicit operator int(Number number)
+                {
+                    Probe.Log += "c";
+                    if (number.Value < 0) throw new InvalidOperationException();
+                    return number.Value;
+                }
+            }
+            public static class Probe
+            {
+                public static string Log = "";
+                private static int[,] Current;
+                private static Number Read(int value) { Log += "r"; return new Number(value); }
+                private static int Stop() { Log += "t"; throw new InvalidOperationException(); }
+                private static int[,] Missing() { Log += "n"; return null; }
+                private static int[,] Get() { Log += "g"; return Current; }
+                private static int Rebind()
+                {
+                    Log += "r";
+                    Current = new int[1, 1];
+                    Current[0, 0] = 9;
+                    return 0;
+                }
+                private static string Alias(ref int left, ref int right)
+                {
+                    int[] values = { left, right++, left };
+                    return values[0] + ":" + values[1] + ":" + values[2] + ":" + left;
+                }
+                public static string Run()
+                {
+                    int n = 1;
+                    int[] values = { n, n++, n };
+                    int[,] shape = new int[n, n++];
+                    shape[0, 0] = 7;
+                    int k = 0;
+                    int picked = shape[k, k++];
+                    string result = values[0] + ":" + values[1] + ":" + values[2] + ":" + n + ":" + picked + ":" + k;
+                    int q = 0;
+                    try { int[] bad = { Read(-1), q++, Read(9) }; }
+                    catch (InvalidOperationException) { result += "|" + q + ":" + Log; }
+                    Log = "";
+                    try { int[,] bad = new int[Stop(), q++]; }
+                    catch (InvalidOperationException) { result += "|" + q + ":" + Log; }
+                    Log = "";
+                    int negative = -1;
+                    try { int[,] bad = new int[negative, q++]; }
+                    catch (OverflowException) { result += "|" + q; }
+                    q = 0;
+                    try { int bad = Missing()[q, q++]; }
+                    catch (NullReferenceException) { result += "|" + q + ":" + Log; }
+                    Log = "";
+                    q = 0;
+                    try { int bad = shape[Read(-1), q++]; }
+                    catch (InvalidOperationException) { result += "|" + q + ":" + Log; }
+                    q = 0;
+                    try { int bad = shape[99, q++]; }
+                    catch (IndexOutOfRangeException) { result += "|" + q; }
+                    byte small = 255;
+                    byte[] narrow = { small++, small };
+                    result += "|" + narrow[0] + ":" + narrow[1] + ":" + small;
+                    int prefix = 0;
+                    int[] prefixes = { ++prefix, prefix, prefix++, prefix };
+                    result += "|" + prefixes[0] + prefixes[1] + prefixes[2] + prefixes[3] + ":" + prefix;
+                    int alias = 1;
+                    result += "|" + Alias(ref alias, ref alias);
+                    int[,] rectangle = { { n, n++ }, { n, n++ } };
+                    result += "|" + (rectangle[0, 0] + rectangle[0, 1] + rectangle[1, 0] + rectangle[1, 1]) + ":" + n;
+                    int[][] nested = { new[] { n, n++ }, new[] { n, n++ } };
+                    result += "|" + (nested[0][0] + nested[0][1] + nested[1][0] + nested[1][1]) + ":" + n;
+                    Current = shape;
+                    Log = "";
+                    q = 0;
+                    int beforeRebind = Get()[q++, Rebind()];
+                    return result + "|" + beforeRebind + ":" + Current[0, 0] + ":" + q + ":" + Log;
+                }
+            }
+            """;
+        const string expected = "1:1:2:3:7:1|0:rc|0:t|1|1:n|0:rc|1|255:0:0|1112:2|1:1:2:2|14:5|22:7|7:9:1:gr";
+        Assert.Equal(expected, Run(source));
+        var calor = await ConvertNativeWithRealCliAsync(source, surface);
+        Assert.DoesNotContain("§CS", calor);
+        Assert.DoesNotMatch(@"\((?:inc|pre-inc|dec|pre-dec|post-inc|post-dec)\s", calor);
+        Assert.Contains("§ASSIGN", calor);
+        var compilation = Program.Compile(calor, "eager-array.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
+    [Theory]
+    [MemberData(nameof(SizedArraySurfaces))]
+    public async Task InPlaceArrayUpdateBoundaries_RemainExplicitlyNonNative(Surface surface)
+    {
+        const string source = """
+            public static class Probe
+            {
+                private static int Seed = 2;
+                private static int[] Initial = { Seed, Seed++, Seed };
+                private static string Lazy()
+                {
+                    int next = 0;
+                    bool flag = false;
+                    int[] values = { flag ? next++ : 4, next++, next };
+                    return values[0] + ":" + values[1] + ":" + values[2] + ":" + next;
+                }
+                public static string Run()
+                {
+                    int multi = 1;
+                    int[] first = { multi, multi++ }, second = { multi, multi++ };
+                    return Lazy() + "|" + Initial[0] + Initial[1] + Initial[2] + ":" + Seed
+                        + "|" + first[0] + first[1] + second[0] + second[1] + ":" + multi;
+                }
+            }
+            """;
+        const string expected = "4:0:1:1|223:3|1122:3";
+        Assert.Equal(expected, Run(source));
+        var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
+        Assert.Contains("conditional-expression-hoisting", losses);
+        Assert.Contains("§CS", calor);
+        var compilation = Program.Compile(calor, "preserved-array-update.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
+        Assert.Equal(expected, Run(compilation.GeneratedCode));
+    }
+
+    private static async Task<string> ConvertNativeWithRealCliAsync(string source, Surface surface)
+    {
+        var (calor, losses) = await ConvertWithRealCliAsync(source, surface);
+        Assert.Empty(losses);
+        return calor;
+    }
+
+    private static async Task<(string Calor, List<string> Losses)> ConvertWithRealCliAsync(string source, Surface surface)
+    {
         if (surface is Surface.CliDefault or Surface.CliPassthrough)
         {
             var dir = Directory.CreateTempSubdirectory("calor-sized-array-").FullName;
@@ -94,29 +259,23 @@ public class ArrayExpressionConversionTests
                 Assert.True(exit == 0, stdout + "\n" + stderr);
                 using var document = JsonDocument.Parse(stdout);
                 var data = document.RootElement.GetProperty("data");
-                Assert.Equal(0, data.GetProperty("lossCount").GetInt32());
-                Assert.Equal("native", data.GetProperty("conversionPaths").GetProperty("outcome").GetString());
-                calor = File.ReadAllText(Path.Combine(dir, "Fixture.calr"));
+                var losses = data.TryGetProperty("losses", out var items) && items.ValueKind == JsonValueKind.Array
+                    ? items.EnumerateArray().Select(loss => loss.GetProperty("feature").GetString()!).ToList()
+                    : [];
+                Assert.Equal(losses.Count, data.GetProperty("lossCount").GetInt32());
+                var outcome = data.GetProperty("conversionPaths").GetProperty("outcome").GetString();
+                if (losses.Count == 0)
+                    Assert.Equal("native", outcome);
+                else
+                    Assert.NotEqual("native", outcome);
+                return (File.ReadAllText(Path.Combine(dir, "Fixture.calr")), losses);
             }
             finally
             {
                 Directory.Delete(dir, recursive: true);
             }
         }
-        else
-        {
-            var converted = await ConvertAsync(source, surface);
-            Assert.Empty(converted.Losses);
-            calor = converted.Calor;
-        }
-        Assert.DoesNotContain("§CS", calor);
-        Assert.Contains("§ARR{T:count}", calor);
-        Assert.Contains("§ARR{i32:0}", calor);
-        var compilation = Program.Compile(calor, "sized-array.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.False(compilation.HasErrors,
-            string.Join(Environment.NewLine, compilation.Diagnostics.Errors) + "\n" + calor);
-        Assert.Equal(expected, Run(compilation.GeneratedCode));
+        return await ConvertAsync(source, surface);
     }
 
     // Element order around a call that mutates what the other elements read, in
