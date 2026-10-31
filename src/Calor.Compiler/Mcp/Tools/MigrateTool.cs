@@ -301,10 +301,8 @@ public sealed class MigrateTool : McpToolBase
             try
             {
                 var source = await File.ReadAllTextAsync(path, ct);
-                var (fixed1, fixes1) = FixTool.FixNewObject(source);
-                var (fixedFinal, fixes3) = FixTool.FixIdConflicts(fixed1);
-
-                var totalFixes = fixes1.Count + fixes3.Count;
+                var (fixedFinal, fixes) = FixTool.FixNewObject(source);
+                var totalFixes = fixes.Count;
 
                 if (totalFixes > 0)
                 {
@@ -547,9 +545,8 @@ public sealed class MigrateTool : McpToolBase
                 try
                 {
                     var source = await File.ReadAllTextAsync(path, ct);
-                    var (fixed1, fixes1) = FixTool.FixNewObject(source);
-                    var (fixedFinal, fixes3) = FixTool.FixIdConflicts(fixed1);
-                    var totalFixes = fixes1.Count + fixes3.Count;
+                    var (fixedFinal, fixes) = FixTool.FixNewObject(source);
+                    var totalFixes = fixes.Count;
 
                     if (totalFixes > 0)
                     {

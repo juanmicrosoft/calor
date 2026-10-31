@@ -39,7 +39,7 @@ public class FixToolTests
     [Fact]
     public void FixNewObject_ReplacesFromBindingType()
     {
-        var source = "§B{b1:result:List<int>} §NEW{object}§/NEW{object}";
+        var source = "§B{result:List<int>} §NEW{object}§/NEW{object}";
         var (result, fixes) = FixTool.FixNewObject(source);
 
         Assert.Contains("§NEW{List<int>}", result);
@@ -82,37 +82,59 @@ public class FixToolTests
     [Fact]
     public void FixNewObject_LeavesUnresolvable()
     {
-        var source = "§B{b1:x} §NEW{object}§/NEW";
+        var source = "§B{x} §NEW{object}§/NEW";
         var (result, fixes) = FixTool.FixNewObject(source);
 
         Assert.Contains("§NEW{object}", result);
         Assert.Empty(fixes);
     }
 
-    // ── FixIdConflicts ──────────────────────────────────────────────
-
-    [Fact]
-    public void FixIdConflicts_RenumbersDuplicates()
+    [Theory]
+    [InlineData("id_conflicts")]
+    [InlineData("ID_CONFLICTS")]
+    public async Task ExecuteAsync_SourceIdConflictRule_IsRejected(string rule)
     {
         var source = "§F{Foo:pub}\n§R 1\n\n§F{Bar:pub}\n§R 2\n";
-        var (result, fixes) = FixTool.FixIdConflicts(source);
+        var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+            new { source, errors = new[] { "new_object", rule } }));
 
-        // First f1 should remain, second should be renumbered
-        Assert.Single(fixes);
-        Assert.Equal("id_conflicts", fixes[0].Rule);
-        // The renamed ID should appear in both opening and closing tags
-        Assert.Contains("§F{Foo:pub}", result);
-        Assert.DoesNotContain("§F{f1:Bar", result);
+        Assert.True(result.IsError);
+        Assert.Contains(".calor/ids.json", result.Content[0].Text!);
+        Assert.DoesNotContain("fixedSource", result.Content[0].Text!);
     }
 
     [Fact]
-    public void FixIdConflicts_NoConflictsNoChange()
+    public async Task ExecuteAsync_DefaultRules_PreserveOverloadsAndRepeatedCalls()
     {
-        var source = "§F{Foo:pub}\n\n§F{Bar:pub}\n";
-        var (result, fixes) = FixTool.FixIdConflicts(source);
+        const string source = """
+            §M{Names}
+              §F{Echo:pub} (i32:value) -> i32
+                §R value
+              §F{Echo:pub} (str:value) -> str
+                §R value
+              §F{Use:pub} () -> i32
+                §B{first:i32} §C{Echo} §A 1 §/C
+                §R §C{Echo} §A first §/C
+            """;
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(new { source }));
 
-        Assert.Equal(source, result);
-        Assert.Empty(fixes);
+        Assert.False(result.IsError);
+        var output = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        Assert.Equal(source, output.GetProperty("fixedSource").GetString());
+        Assert.False(output.GetProperty("wasModified").GetBoolean());
+        Assert.Equal(0, output.GetProperty("fixCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnknownRule_ReturnsError()
+    {
+        var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+            new { source = "§M{Test}", errors = new[] { "unknown_rule" } }));
+
+        Assert.True(result.IsError);
+        Assert.Contains("Unsupported fix rule", result.Content[0].Text!);
     }
 
     // ── Integration via MCP ─────────────────────────────────────────
@@ -146,7 +168,7 @@ public class FixToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_FixAll_AppliesAllPasses()
+    public async Task ExecuteAsync_FixAll_AppliesSupportedRules()
     {
         var args = JsonDocument.Parse("""
             {

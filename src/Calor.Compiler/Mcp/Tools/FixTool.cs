@@ -13,7 +13,7 @@ public sealed class FixTool : McpToolBase
     public override string Name => "calor_fix";
 
     public override string Description =>
-        "Auto-fix common Calor compilation errors. Fixes NEW{object} placeholders and ID conflicts. Non-destructive — unfixable code is left as-is.";
+        "Auto-fix NEW{object} placeholders using their type context. Declaration names, call targets and sidecar identities are never rewritten.";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
 
@@ -32,7 +32,7 @@ public sealed class FixTool : McpToolBase
                 "errors": {
                     "type": "array",
                     "items": { "type": "string" },
-                    "description": "Specific error codes to fix. Values: 'new_object', 'id_conflicts'. Default: fix all known errors."
+                    "description": "Specific fix rules. Supported value: 'new_object'. Default: apply all supported rules. Source ID conflict repair is not supported."
                 }
             },
             "additionalProperties": false
@@ -44,6 +44,14 @@ public sealed class FixTool : McpToolBase
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");
         var errorCodes = GetStringArray(arguments, "errors");
+        var unsupportedRule = errorCodes.FirstOrDefault(
+            rule => !rule.Equals("new_object", StringComparison.OrdinalIgnoreCase));
+        if (unsupportedRule != null)
+        {
+            return McpToolResult.Error(unsupportedRule.Equals("id_conflicts", StringComparison.OrdinalIgnoreCase)
+                ? "Source ID conflict repair is no longer supported. Declaration identities live in .calor/ids.json; calor_fix does not rename declarations or call targets."
+                : $"Unsupported fix rule: '{unsupportedRule}'. Supported rule: 'new_object'.");
+        }
 
         // Resolve source from file if needed
         if (string.IsNullOrEmpty(source))
@@ -63,25 +71,11 @@ public sealed class FixTool : McpToolBase
         var sizeError = ValidateSourceSize(source);
         if (sizeError != null) return sizeError;
 
-        var fixAll = errorCodes.Count == 0;
-        var fixes = new List<FixEntry>();
-        var current = source;
-
+        string current;
+        List<FixEntry> fixes;
         try
         {
-            if (fixAll || errorCodes.Contains("new_object", StringComparer.OrdinalIgnoreCase))
-            {
-                var (result, applied) = FixNewObject(current);
-                current = result;
-                fixes.AddRange(applied);
-            }
-
-            if (fixAll || errorCodes.Contains("id_conflicts", StringComparer.OrdinalIgnoreCase))
-            {
-                var (result, applied) = FixIdConflicts(current);
-                current = result;
-                fixes.AddRange(applied);
-            }
+            (current, fixes) = FixNewObject(source);
         }
         catch (Exception ex)
         {
@@ -132,7 +126,7 @@ public sealed class FixTool : McpToolBase
 
             string? inferredType = null;
 
-            // Context 1: §B{name:id:varName:TYPE} ... §NEW{object}
+            // Context 1: §B{name:TYPE} ... §NEW{object}
             // Binding with explicit type annotation on same line
             var bindMatch = Regex.Match(line, @"§B\{[^}]*:([A-Z]\w*(?:<[^>]+>)?)\}\s.*§NEW\{object\}");
             if (bindMatch.Success)
@@ -181,71 +175,6 @@ public sealed class FixTool : McpToolBase
         return (string.Join("\n", lines), fixes);
     }
 
-    /// <summary>
-    /// Detects and renumbers conflicting/duplicate IDs within a module.
-    /// Scans for declarations (§F, §M, §C, §IF, etc.) and renumbers duplicates.
-    /// </summary>
-    internal static (string Result, List<FixEntry> Fixes) FixIdConflicts(string source)
-    {
-        var fixes = new List<FixEntry>();
-        var seenIds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var lines = source.Split('\n');
-
-        // Pattern matches opening tags: §F{id:...}, §M{id:...}, §C{id:...}, §IF{id}, etc.
-        var declPattern = new Regex(@"§(F|M|C|IF|EI|EL|L|W|SW|SC|TR|CA|FI)\{([^:}]+)");
-
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i];
-            var matches = declPattern.Matches(line);
-
-            foreach (Match match in matches)
-            {
-                var kind = match.Groups[1].Value;
-                var id = match.Groups[2].Value;
-
-                if (!seenIds.TryGetValue(id, out var count))
-                {
-                    seenIds[id] = 1;
-                    continue;
-                }
-
-                // Duplicate found — generate new ID
-                seenIds[id] = count + 1;
-                var prefix = GetIdPrefix(kind);
-                var newId = GenerateUniqueId(prefix, seenIds);
-                seenIds[newId] = 1;
-
-                // Replace this ID in both opening and closing tags
-                var oldOpening = $"§{kind}{{{id}";
-                var newOpening = $"§{kind}{{{newId}";
-                var oldClosing = GetClosingTag(kind, id);
-                var newClosing = GetClosingTag(kind, newId);
-
-                lines[i] = lines[i].Replace(oldOpening, newOpening);
-
-                // Find and replace corresponding closing tag
-                for (var j = i; j < lines.Length; j++)
-                {
-                    if (lines[j].Contains(oldClosing))
-                    {
-                        lines[j] = lines[j].Replace(oldClosing, newClosing);
-                        break;
-                    }
-                }
-
-                fixes.Add(new FixEntry
-                {
-                    Rule = "id_conflicts",
-                    Line = i + 1,
-                    Description = $"Renumbered duplicate ID '{id}' → '{newId}'"
-                });
-            }
-        }
-
-        return (string.Join("\n", lines), fixes);
-    }
-
     // ── Helpers ──────────────────────────────────────────────────────
 
     /// <summary>Maps Calor short type names to C# type names for §NEW inference.</summary>
@@ -258,47 +187,6 @@ public sealed class FixTool : McpToolBase
         "str" => "string",
         "bool" => "bool",
         _ => calorType
-    };
-
-    private static string GetIdPrefix(string kind) => kind switch
-    {
-        "F" => "f",
-        "M" => "m",
-        "C" => "c",
-        "IF" or "EI" or "EL" => "if",
-        "L" => "l",
-        "W" => "w",
-        "SC" => "sc",
-        "TR" => "tr",
-        "CA" => "ca",
-        "FI" => "fi",
-        _ => "x"
-    };
-
-    private static string GenerateUniqueId(string prefix, Dictionary<string, int> seenIds)
-    {
-        for (var n = 1; n < 10000; n++)
-        {
-            var candidate = $"{prefix}{n}";
-            if (!seenIds.ContainsKey(candidate))
-                return candidate;
-        }
-        return $"{prefix}{Guid.NewGuid().ToString("N")[..6]}";
-    }
-
-    private static string GetClosingTag(string kind, string id) => kind switch
-    {
-        "F" => $"§/F{{{id}}}",
-        "M" => $"§/M{{{id}}}",
-        "C" => $"§/C{{{id}}}",
-        "IF" or "EI" or "EL" => $"§/I{{{id}}}",
-        "L" => $"§/L{{{id}}}",
-        "W" => $"§/W{{{id}}}",
-        "SC" => $"§/SC{{{id}}}",
-        "TR" => $"§/TR{{{id}}}",
-        "CA" => $"§/CA{{{id}}}",
-        "FI" => $"§/FI{{{id}}}",
-        _ => $"§/{kind}{{{id}}}"
     };
 
     // ── Output DTOs ─────────────────────────────────────────────────

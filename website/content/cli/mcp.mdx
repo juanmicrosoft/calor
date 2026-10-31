@@ -46,13 +46,17 @@ assuming names from pre-consolidation documentation.
 | `calor_session_close` | Release an open project session |
 | `calor_file_write` | Heal, check, and atomically apply a confined `.calr` write |
 | `calor_refine` | Refinement obligations, bounds, guards, fixes, and type suggestions |
-| `calor_fix` | Return non-destructive fixes for common compiler errors |
+| `calor_fix` | Return type-context fixes for `NEW{object}` placeholders |
 | `calor_migrate` | Run the project migration pipeline; this tool can write files |
 | `calor_self_test` | Check the compiler against embedded golden files |
 
 Diagnostic-producing tools use the shared [schema 2.0 envelope](/docs/cli/envelope-schema/)
 inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`.
+
+`calor_fix` never renames declarations or call targets. The former `id_conflicts`
+source rule is rejected: durable declaration identities live in `.calor/ids.json`.
+Migration's fix phases follow the same rule.
 
 ## Build, Test, and Verify in One Call
 

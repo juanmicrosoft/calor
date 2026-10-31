@@ -178,6 +178,41 @@ public class MigrateToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FixPhase_PreservesNamesAndRepeatedCallTargets()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-native-names-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var path = Path.Combine(tempDir, "Names.calr");
+        const string source = """
+            §M{Echo}
+              §F{Echo:pub} () -> i32
+                §R 1
+              §F{Use:pub} () -> i32
+                §B{first:i32} §C{Echo} §/C
+                §R §C{Echo} §/C
+            """;
+        await File.WriteAllTextAsync(path, source);
+        try
+        {
+            var compiled = Program.Compile(source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+                new { projectPath = tempDir, phase = "fix" }));
+
+            Assert.False(result.IsError);
+            var output = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(output.GetProperty("perFile").EnumerateArray());
+            Assert.Equal("clean", file.GetProperty("status").GetString());
+            Assert.False(file.TryGetProperty("fixesApplied", out _));
+            Assert.Equal(source, await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_FixPhase_InvalidFixLeavesExistingFileUnchanged()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-invalid-fix-{Guid.NewGuid():N}");
