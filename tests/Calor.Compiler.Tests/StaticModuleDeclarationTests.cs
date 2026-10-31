@@ -32,11 +32,18 @@ public class StaticModuleDeclarationTests
         var root = CliTestHarness.FindRepoRoot();
         var source = File.ReadAllText(Path.Combine(root, original));
         var control = ParseCurrentStaticControl(source, original);
-        var activeModule = Parse(File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root, original)));
+        var activeSource = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root, original));
+        var activeModule = Parse(activeSource);
         var expected = new CSharpEmitter(EmitContractMode.Release).Emit(control);
         var actual = new CSharpEmitter(EmitContractMode.Release).Emit(activeModule);
         if (IsLocalFunctionPreservationControl(original))
         {
+            Assert.Empty(activeModule.Functions);
+            var compiled = Program.Compile(activeSource, original);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            var formatted = new Formatting.CalorFormatter().FormatSource(activeSource, original);
+            Assert.True(formatted.Success, string.Join("\n", formatted.Errors));
+            Assert.False(formatted.UsedConservativeFallback, formatted.ConservativeFallbackReason);
             Assert.Equal(Assert.Single(Assert.Single(control.Classes).InteropBlocks).CSharpCode,
                 Assert.Single(Assert.Single(activeModule.Classes).InteropBlocks).CSharpCode);
             Assert.Equal(31620, Compile(OriginalLocalFunctionCSharp()).GetType("LocalFunctionFixture")!
@@ -46,10 +53,9 @@ public class StaticModuleDeclarationTests
                 var assembly = Compile(generated);
                 Assert.Equal(31620, assembly.GetType("Fixture.LocalFunctionFixture")!
                     .GetMethod("Run")!.Invoke(null, null));
-                if (original.EndsWith("/test.calr", StringComparison.Ordinal))
-                    Assert.Equal(31620, assembly.GetType("Fixture.FixtureModule")!
-                        .GetMethod("CheckCurrentRun")!.Invoke(null, null));
             }
+            if (original.EndsWith("/test.calr", StringComparison.Ordinal))
+                AssertLocalFunctionRuntimeHarness(activeSource);
         }
         Assert.Equal(expected, actual);
     }
@@ -739,16 +745,30 @@ public class StaticModuleDeclarationTests
         Assert.Equal('\n', csharp[run.Span.End]);
         var member = csharp[(line.Start - 1)..(run.Span.End + 1)];
         var preserved = source[..^nativeRun.Length] + "    §CSHARP{" + member + "}§/CSHARP\n";
-        if (hasPostcondition)
-        {
-            preserved += """
-
-                  §F{CheckCurrentRun:pub} () -> i32
-                    §S (== result 31620)
-                    §R §C{LocalFunctionFixture.Run}
-                """ + "\n";
-        }
         return ParseRejectedStaticControl(preserved);
+    }
+
+    private static void AssertLocalFunctionRuntimeHarness(string preservedSource)
+    {
+        // The wrapper tests runtime contracts; it is not original corpus content
+        // or a claim that the opaque member has a statically verified effect row.
+        const string wrapper = """
+              §F{CheckCurrentRun:pub} () -> i32
+                §S (== result 31620)
+                §R §C{LocalFunctionFixture.Run}
+            """;
+        var harness = Parse(preservedSource + "\n" + wrapper + "\n");
+        Assert.Single(Assert.Single(harness.Functions).Postconditions);
+        var assembly = Compile(new CSharpEmitter(EmitContractMode.Release).Emit(harness));
+        Assert.Equal(31620, assembly.GetType("Fixture.FixtureModule")!
+            .GetMethod("CheckCurrentRun")!.Invoke(null, null));
+
+        var failingHarness = Parse(preservedSource + "\n" + wrapper.Replace(
+            "§R §C{LocalFunctionFixture.Run}", "§R 31619", StringComparison.Ordinal) + "\n");
+        var failingAssembly = Compile(new CSharpEmitter(EmitContractMode.Release).Emit(failingHarness));
+        var error = Assert.Throws<TargetInvocationException>(() => failingAssembly
+            .GetType("Fixture.FixtureModule")!.GetMethod("CheckCurrentRun")!.Invoke(null, null));
+        Assert.IsType<Calor.Runtime.ContractViolationException>(error.InnerException);
     }
 
     private static ModuleNode ParseRejectedStaticControl(string source)

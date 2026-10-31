@@ -31,7 +31,3 @@
         }
     }
 }§/CSHARP
-
-  §F{CheckCurrentRun:pub} () -> i32
-    §S (== result 31620)
-    §R §C{LocalFunctionFixture.Run}
